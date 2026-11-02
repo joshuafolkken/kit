@@ -37,6 +37,9 @@ A bug filing's origin line: `prompts/collaboration-workflow/issue-template.md` (
 
 The rows' single source is `scripts/observations/observation-depth.ts`.
 
+A command subject → pass its script's path (`script:` in `scripts/josh/josh-commands*.ts`), never the
+command line.
+
 **The depth is read, not recorded** — no label carries it.
 
 - **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work

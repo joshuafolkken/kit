@@ -47,8 +47,8 @@ Choose it from the phenomenon, not the run, and record with one command:
 pnpm josh observation:record <slug> d<n> '<where>' '<what>' [--checkout <that repository's checkout>]
 ```
 
-`d<n>` → the token `pnpm josh observation:depth <where>` prints (`observation-filing.md` → "The depth
-test").
+`d<n>` → the token `pnpm josh observation:depth <path>` prints for the subject's path, a command's
+being its script (`observation-filing.md` → "The depth test").
 
 Standard output is one token: `file` (second sighting — file it, below) or `ledger` (nothing to file);
 standard error lists earlier sightings and the file appended to. A broken line, or `k:example`, exits

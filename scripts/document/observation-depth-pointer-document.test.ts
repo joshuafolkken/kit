@@ -25,6 +25,13 @@ describe('the depth test points at josh observation:depth', () => {
 	})
 
 	it('observation-ledger.md takes the record depth from the command', () => {
-		expect(read_unwrapped(LEDGER)).toContain(`\`d<n>\` → the token \`${COMMAND} <where>\` prints`)
+		expect(read_unwrapped(LEDGER)).toContain(`\`d<n>\` → the token \`${COMMAND} <path>\` prints`)
+	})
+
+	it.each([
+		[FILING, "A command subject → pass its script's path"],
+		[LEDGER, "a command's being its script"],
+	])('%s sends a command subject through its script path', (document_path, marker) => {
+		expect(read_unwrapped(document_path)).toContain(marker)
 	})
 })
