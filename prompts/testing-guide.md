@@ -15,7 +15,7 @@ Every requirement gets a test (`CLAUDE.md` → "Code Change Rules" Step 0); the 
 
 ### Verification checklist (add to the completion gate)
 
-- [ ] Requirement count equals the count of tests added/updated (each gap documented as infeasible).
+- [ ] Every requirement has a declared test (each gap documented as infeasible); `pnpm josh test:declared --match` checks each declaration against the change set (`docs/josh-commands.md` → "josh test:declared").
 - [ ] UI changes: a screenshot of the affected screen was checked (`CLAUDE.md` → UI verification); if impossible here, say so and ask the user to check.
 
 ---
