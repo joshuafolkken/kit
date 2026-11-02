@@ -9,6 +9,10 @@ describe('josh read-only invocations', () => {
 		[['help', 'ship']],
 		[['--all']],
 		[['ship', '--log', '5757']],
+		[['cost:audit', '--period', '14']],
+		[['ca']],
+		[['read:set', 'fullrun']],
+		[['read:set', 'fullrun', '--bytes']],
 	])('passes %j', (args) => {
 		expect(josh_read_only.refusal(args)).toBeUndefined()
 	})
@@ -24,6 +28,12 @@ describe('josh read-only invocations', () => {
 		[['toString']],
 	])('refuses %j and names its usage read', (args) => {
 		expect(josh_read_only.refusal(args)).toContain(`pnpm josh help ${args[0] ?? ''}`)
+	})
+
+	it('names both read-only declarations an entry can make in its refusal', () => {
+		expect(josh_read_only.refusal(['gate'])).toContain(
+			'its entry is not declared read-only and it carries no read-only flag its entry declares',
+		)
 	})
 })
 
