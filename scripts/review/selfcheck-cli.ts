@@ -5,12 +5,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { base_tree } from '#scripts/git/base-tree'
 import { change_base } from '#scripts/git/change-base'
+import { git_branch } from '#scripts/git/git-branch'
+import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { COMMAND_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import type { Hunk } from '#scripts/test/test-pinned-logic'
 import { execa } from 'execa'
 import { prose_stale_read } from './prose-stale-read'
 import { prose_stale_scan } from './prose-stale-scan'
+import { review_finding_ledger } from './review-finding-ledger'
 import { review_interaction } from './review-interaction'
 import { review_untouched_readers } from './review-untouched-readers'
 import { selfcheck_commands, type ProbeResult, type Runner } from './selfcheck-commands'
@@ -22,7 +26,10 @@ import { selfcheck_report, type Sections } from './selfcheck-report'
 // The diff runs from the change base to the working tree; an untracked file counts as wholly added.
 // Exit 0 pass, 1 a stale mention or a failed command, 2 when the base or a search could not be read.
 
-const USAGE = 'usage: josh review:selfcheck'
+const USAGE = 'usage: josh review:selfcheck [--interaction-answered]'
+const ANSWERED_FLAG = '--interaction-answered'
+const NO_ISSUE =
+	'review:selfcheck: the branch names no issue — the interaction answer is not recorded'
 const NO_BASE = 'review:selfcheck: no change base — fetch the default branch, then re-run'
 const TREE_PREFIX = 'josh-selfcheck-'
 // The parent `pnpm josh` run's own script context, which would pin the child to the lane's root.
@@ -113,19 +120,51 @@ function refuse(message: string): number {
 	return selfcheck_report.FAILED_EXIT
 }
 
+// **`--interaction-answered` records the q4 interaction answers as the issue's `- ri:none` round**
+// (joshuafolkken/kit#5832), so `review_interaction.status` answers `ok` and neither `run:review` nor the
+// ship's `review_stage` launches the separate interaction reviewer. Only a passing, due self-check records.
+async function record_answer(
+	root: string,
+	due: ReadonlyArray<string>,
+	exit_code: number,
+): Promise<void> {
+	if (exit_code !== 0 || due.length === 0) return
+	const issue = git_branch.issue_from_branch(await git_command.branch())
+
+	if (issue === undefined) {
+		console.error(NO_ISSUE)
+
+		return
+	}
+
+	const date = observation_ledger_home.ledger_date(new Date())
+	const line = review_finding_ledger.zero_round_line(date, issue, 'interaction')
+
+	await observation_ledger_home.append(observation_ledger_home.issue_path(issue, root), [line])
+	console.info(`review:selfcheck: interaction answers recorded — ${line}`)
+}
+
+async function report_change(base: string, is_answered: boolean): Promise<number> {
+	const root = await git_spawn.read(['rev-parse', '--show-toplevel'])
+	const found = await sections(root, base)
+	const { text, exit_code } = selfcheck_report.report(found)
+
+	console.info(text)
+	if (is_answered) await record_answer(root, found.interaction, exit_code)
+
+	return exit_code
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	if (argv.length > 0) return refuse(USAGE)
+	const flags = argv.join(' ')
+
+	if (!['', ANSWERED_FLAG].includes(flags)) return refuse(USAGE)
 
 	const base = await change_base.resolved()
 
 	if (base === undefined) return refuse(NO_BASE)
 
-	const root = await git_spawn.read(['rev-parse', '--show-toplevel'])
-	const { text, exit_code } = selfcheck_report.report(await sections(root, base))
-
-	console.info(text)
-
-	return exit_code
+	return await report_change(base, flags === ANSWERED_FLAG)
 }
 
 // A git call that throws exits 2, never 1's "found".
@@ -141,6 +180,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await guarded(process.argv.slice(FIRST_ARGUMENT))
 }
 
-const selfcheck_cli = { change_hunks, child_environment, guarded, run, sections, untracked_hunks }
+const selfcheck_cli = {
+	change_hunks,
+	child_environment,
+	guarded,
+	record_answer,
+	run,
+	sections,
+	untracked_hunks,
+}
 
 export { selfcheck_cli }
