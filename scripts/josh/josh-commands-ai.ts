@@ -105,6 +105,8 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// Kit-only: it reads kit's own transcript store, like `josh retrospective`, which carries its
 		// summary line.
 		is_kit_only: true,
+		// Reads transcripts and a `gh api` search (GET) only, so a consultation session can run it.
+		is_read_only: true,
 		usage: {
 			examples: [
 				{ arguments: '', note: 'the last 7 days against the 7 before' },

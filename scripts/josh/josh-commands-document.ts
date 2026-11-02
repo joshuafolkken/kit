@@ -27,6 +27,8 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		reference: ['[<entry>] [--json | --bytes]', 'automation', ['none']],
 		is_bundled: true,
+		// Reads the repository's documents and prints, so a consultation session can run it.
+		is_read_only: true,
 		usage: {
 			examples: [
 				{ arguments: '', note: 'every entry point' },
