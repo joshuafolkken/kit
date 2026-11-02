@@ -13,10 +13,11 @@ children until every one is processed, then the run advances to the next named i
 `backlogrun #<N>` on an Issue with no task list runs `#<N>` as a `fullrun` and finishes. A prerequisite
 or a split found mid-run does **not** stop it:
 
-1. File the new Issue(s) — `route:split` for a split, `route:tier-a` for a prerequisite — no
-   confirmation.
-2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `pnpm josh run:pause <N> --for <P>`
-   (`prerequisite.md`), which also records the dependency step 3 would; for a split,
+1. File the new Issue(s) without confirmation — a split's children (`route:split`) by
+   `split-assessment.md` → "Two or more always means an epic", a prerequisite (`route:tier-a`) by
+   `prerequisite.md`.
+2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `prerequisite.md`'s `run:pause`,
+   which also records the dependency step 3 would; for a split,
    `pnpm josh stash:push "..."`, `pnpm josh issue:comment <N> --body-file <path>` recording the
    stash, and `pnpm josh run:release <N>`.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
@@ -82,13 +83,6 @@ unit, run the child in the parent's context and still ask the hand-off at every 
 
 The person-facing report (`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」)
 is unchanged.
-
-## A delegated unit that stopped without reporting
-
-**Hand the child off without blocking, and wait on `pnpm josh lane:await <N>`** — a stopped unit
-leaves no notification, so the await's exit is the wake. Once its
-output is unchanged for the silent-unit window, read `backlogrun-recovery.md` → "A delegated unit that
-stopped without reporting" and ask `pnpm josh run:liveness`.
 
 ## Audit before the first child
 
