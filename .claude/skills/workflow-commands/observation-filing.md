@@ -33,13 +33,9 @@ A bug filing's origin line: `prompts/collaboration-workflow/issue-template.md` (
 
 ### The depth test — a discretionary filing cites the product work it blocked
 
-**Depth is read off the subject rather than judged:**
+**Depth is read off the subject's path, never judged — `pnpm josh observation:depth <path>`.**
 
-| Depth | The subject | Where it lives |
-| --- | --- | --- |
-| **0** | What a consumer of this package touches | A `josh` command's behavior, a distributed document or config, the published package |
-| **1** | The run orchestration that executes an Issue | `fullrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
-| **2** | What measures a run | `josh cost` and the run-timing report |
+The rows' single source is `scripts/observations/observation-depth.ts`.
 
 **The depth is read, not recorded** — no label carries it.
 
