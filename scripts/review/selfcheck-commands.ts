@@ -36,7 +36,8 @@ interface CommandsReport {
 	failed: number
 }
 
-const SPAN = /`pnpm josh ([^`]+)`/gu
+// A template literal escapes its backtick as \`, so a `\` before the closing one is not the command's.
+const SPAN = /`pnpm josh ((?:[^`\\]|\\(?!`))+)\\?`/gu
 // A placeholder or shell syntax the reader fills in: `<N>`, `[--flag]`, `${x}`, `a | b`, an ellipsis.
 const PLACEHOLDER = /[<>[\]{}$|…]|\.\.\./u
 const WORD = /"[^"]*"|'[^']*'|\S+/gu
