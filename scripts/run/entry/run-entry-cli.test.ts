@@ -257,11 +257,12 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 // joshuafolkken/kit#2760: an implementation cut outside a lane keeps its hold, so claiming first
 // refused the fresh session `busy` by its own run's hold and the resume was never asked.
 describe('run_entry_cli.run — a carried cut is resumed before the hold is claimed', () => {
+	// joshuafolkken/kit#5958: the section printed after the token is relayed to the resumed run.
 	it.each([
-		['resume-impl', OK],
-		['over', 1],
-	])('answers %j with its exit code and claims nothing', async (token, exit) => {
-		josh_run_mock.mockResolvedValueOnce({ code: exit, out: token })
+		['resume-impl', OK, ['## Resuming\n\nbody']],
+		['over', 1, []],
+	])('answers %j with its exit code and claims nothing', async (token, exit, section) => {
+		josh_run_mock.mockResolvedValueOnce({ code: exit, out: [token, ...section].join('\n') })
 
 		const code = await run_entry_cli.run([ISSUE])
 
@@ -269,7 +270,7 @@ describe('run_entry_cli.run — a carried cut is resumed before the hold is clai
 		expect(calls()).toStrictEqual([['run:cut', '--resume', ISSUE]])
 		expect(read_issue_mock).not.toHaveBeenCalled()
 		expect(gather_mock).not.toHaveBeenCalled()
-		expect(info_lines).toStrictEqual([`entry ${CITED} — resume: ${token}`])
+		expect(info_lines).toStrictEqual([`entry ${CITED} — resume: ${token}`, ...section])
 	})
 })
 

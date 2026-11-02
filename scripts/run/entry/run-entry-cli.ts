@@ -188,9 +188,11 @@ async function stop_untrusted(
 }
 
 // Anything but `fresh` is `run:cut --resume`'s answer to act on (`pre-gate-cut.md`), not a new run: the
-// token and its exit code are passed through, and nothing is claimed or read.
+// token, the section it printed and its exit code are passed through, and nothing is claimed or read.
 function resume_report(issue_number: string, resume: Resume): number {
 	console.info(`entry ${session_cite.issue(issue_number)} — resume: ${resume.token}`)
+
+	if (resume.section !== '') console.info(resume.section)
 
 	return resume.code
 }

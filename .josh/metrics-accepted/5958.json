@@ -1,0 +1,7 @@
+{
+	"reason": "run:entry relays the section run:cut --resume prints after its token #5958",
+	"date": "2026-11-02",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}
