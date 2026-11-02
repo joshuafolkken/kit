@@ -90,6 +90,8 @@ describe('josh epic operations and rule:list', () => {
 		'pnpm josh rule:list',
 		// joshuafolkken/kit#5818: the consultation session removes a dependency a person dropped.
 		'pnpm josh backlog:triage --apply 5767 --unblock 5562 --reason x',
+		// joshuafolkken/kit#5849: the read-only tag SHA check a CodeRabbit bypass cites.
+		'pnpm josh pin:verify actions/checkout v4.2.2 11bd71901bbe5b1630ceea73d27597364c9af683',
 	])('passes the operation %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(false)
 	})
@@ -99,6 +101,7 @@ describe('josh epic operations and rule:list', () => {
 		'pnpm josh gate',
 		'pnpm josh rule:other',
 		'pnpm josh rule:list-all',
+		'pnpm josh pin:verify-all',
 	])('still refuses %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(true)
 	})

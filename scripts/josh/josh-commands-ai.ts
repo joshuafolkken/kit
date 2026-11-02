@@ -216,6 +216,21 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'pin:verify': {
+		script: 'scripts/discovery/pin-verify-cli.ts',
+		description:
+			'Check that a tag resolves to the commit a SHA pin names, printing a line a bypass reason cites',
+		category: 'AI tools',
+		reference: ['<owner/repo> <tag> <sha>', 'automation', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: 'actions/checkout v4.2.2 11bd71901bbe5b1630ceea73d27597364c9af683',
+					note: '→ match / mismatch / unreadable',
+				},
+			],
+		},
+	},
 	...SHIP_COMMANDS,
 	...LANE_COMMANDS,
 	'run:watcher:guard': {
