@@ -18,6 +18,8 @@ const MESSAGE = 'fullrun new #5747: pre-existing changes'
 const ADOPT = { issue_number: '5747', command: 'fullrun', is_adopt: true }
 const STASH_PUSH = 'stash:push'
 const PUSH_CALL = [STASH_PUSH, MESSAGE]
+const MAIN_SYNC = 'main:sync'
+const MAIN_MERGE = 'main:merge'
 const STASHED = { code: OK, out: 'stashed' }
 const CLEAN = { code: OK, out: 'clean' }
 const SYNCED = { code: OK, out: '' }
@@ -58,18 +60,43 @@ describe('run_entry_sync.sync — the tree a new entry adopted is set aside, syn
 		expect(await run_entry_sync.sync({ ...ADOPT, command: 'halfrun' })).toBeUndefined()
 		expect(calls()).toStrictEqual([
 			[STASH_PUSH, 'halfrun new #5747: pre-existing changes'],
-			['main:merge'],
+			[MAIN_MERGE],
 		])
 	})
 
 	it.each([
-		['a #N entry', { ...ADOPT, is_adopt: false }, false],
-		['a lane child', ADOPT, true],
-	])('runs nothing for %s', async (_label, entry, is_child) => {
-		is_child_mock.mockReturnValue(is_child)
+		['a new entry', ADOPT],
+		['a #N entry', { ...ADOPT, is_adopt: false }],
+	])('runs nothing for %s in a lane child', async (_label, entry) => {
+		is_child_mock.mockReturnValue(true)
 
 		expect(await run_entry_sync.sync(entry)).toBeUndefined()
 		expect(josh_run_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_entry_sync.sync — a #N entry synchronizes its tree through the same steps', () => {
+	const ENTRY = { issue_number: '5943', command: 'prrun', is_adopt: false }
+
+	it.each([
+		['a primary checkout', false, MAIN_SYNC],
+		['a linked checkout', true, MAIN_MERGE],
+	])('runs the sync of %s', async (_label, is_linked, command) => {
+		is_linked_mock.mockResolvedValue(is_linked)
+		josh_run_mock.mockResolvedValueOnce(CLEAN).mockResolvedValueOnce(SYNCED)
+
+		expect(await run_entry_sync.sync(ENTRY)).toBeUndefined()
+		expect(calls()).toStrictEqual([[STASH_PUSH, 'prrun #5943: pre-existing changes'], [command]])
+	})
+
+	it('stops on a failed merge as a new entry does', async () => {
+		is_linked_mock.mockResolvedValue(true)
+		josh_run_mock.mockResolvedValueOnce(CLEAN).mockResolvedValueOnce(BROKEN)
+
+		const stop = await run_entry_sync.sync(ENTRY)
+
+		expect(stop?.report).toContain(`\`${MAIN_MERGE}\` failed`)
+		expect(stop?.notice.reason).toBe(run_entry_sync.SYNC_REASON)
 	})
 })
 
