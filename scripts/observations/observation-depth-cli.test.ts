@@ -23,11 +23,21 @@ afterEach(() => {
 })
 
 const ROOT = path.resolve('/repo')
-const PLACES = { root: ROOT, cwd: ROOT }
+const LANE_PLAN = 'scripts/lane/lane-plan.ts'
+
+function exists_always(): boolean {
+	return true
+}
+
+function is_lane_plan(absolute_path: string): boolean {
+	return absolute_path === path.join(ROOT, LANE_PLAN)
+}
+
+const PLACES = { root: ROOT, cwd: ROOT, exists: exists_always }
 
 describe('observation_depth_cli.run — a subject path', () => {
 	it('prints the depth on stdout and the row it applied on stderr', () => {
-		const code = observation_depth_cli.run(['scripts/lane/lane-plan.ts'], PLACES)
+		const code = observation_depth_cli.run([LANE_PLAN], PLACES)
 
 		expect(code).toBe(0)
 		expect(info_lines).toStrictEqual(['d1'])
@@ -62,6 +72,18 @@ describe('observation_depth_cli.run — nothing answered', () => {
 		expect(code).toBe(1)
 		expect(info_lines).toStrictEqual([])
 		expect(error_lines).toStrictEqual([`Refused: ../other/file.ts is outside ${ROOT}`])
+	})
+
+	// joshuafolkken/kit#5885: a root-relative path typed from a subdirectory names nothing.
+	it('refuses a path that does not exist rather than answering d0', () => {
+		const cwd = path.join(ROOT, 'scripts')
+		const code = observation_depth_cli.run([LANE_PLAN], { root: ROOT, cwd, exists: is_lane_plan })
+
+		expect(code).toBe(1)
+		expect(info_lines).toStrictEqual([])
+		expect(error_lines).toStrictEqual([
+			`Refused: ${LANE_PLAN} does not exist (a relative path is read from ${cwd})`,
+		])
 	})
 
 	it.each([[[]], [['a', 'b']], [['']]])('exits non-zero with the usage for %j', (argv) => {
