@@ -112,7 +112,7 @@ describe('issue_file_cli.run — every refusal in one pass', () => {
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
-	it('runs the scout once the local checks pass, and holds on its candidates', async () => {
+	it('holds a body the local checks pass on the scout candidates', async () => {
 		expect(await issue_file_cli.run(CLEAR_ARGV)).toBe(FAILURE_EXIT_CODE)
 		const printed = vi.mocked(console.error).mock.calls.join('\n')
 
