@@ -54,6 +54,7 @@ vi.mock('./run-review-steps', () => ({
 			await Promise.resolve()
 		}),
 		write_timing_start: vi.fn(),
+		wait_for_gate_finish: async () => 'green',
 	},
 }))
 

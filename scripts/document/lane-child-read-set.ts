@@ -11,7 +11,8 @@
 // section level, and the point-of-use documents a leaf never reaches dropped — applied by the shared
 // `read-set-trim`, which the `backlogrun` parent trim uses too.
 
-import type { ReadSetCost } from './entry-read-set'
+import { run_step_section } from '#scripts/run/run-step-section'
+import type { ReadSetCost, SectionReference } from './entry-read-set'
 import { read_set_trim } from './read-set-trim'
 
 const LANE_CHILD = 'lane-child'
@@ -66,6 +67,18 @@ const SKIPPED_POINT_OF_USE: ReadonlySet<string> = new Set([
 // child's reach carries it instead.
 const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['backlogrun-park.md', 'pre-gate-cut.md'])
 
+// **The child reads `pre-gate-cut.md` only as the sections `run:cut` prints** (joshuafolkken/kit#5953),
+// read off the command's own rows so the two never drift.
+function printed_sections(): Array<SectionReference> {
+	const rows = [run_step_section.CUT, run_step_section.RESUME].map((key) =>
+		run_step_section.GOVERNING_SECTIONS.get(key),
+	)
+
+	return rows
+		.filter((found) => found !== undefined)
+		.map((found) => ({ file: found.document, heading: found.heading }))
+}
+
 function costed(root: string): ReadSetCost {
 	return read_set_trim.costed(root, {
 		base_entry: FULLRUN,
@@ -73,6 +86,7 @@ function costed(root: string): ReadSetCost {
 		unused_skill_sections: UNUSED_SKILL_SECTIONS,
 		skipped_point_of_use: SKIPPED_POINT_OF_USE,
 		reached_point_of_use: REACHED_POINT_OF_USE,
+		printed_sections: printed_sections(),
 	})
 }
 

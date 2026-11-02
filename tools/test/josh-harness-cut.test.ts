@@ -46,7 +46,8 @@ async function command(
 
 	expect(result.exit_code, result.stderr).toBe(0)
 
-	return result.stdout
+	// The token is the first line; the section it acts on follows it (joshuafolkken/kit#5953).
+	return result.stdout.split('\n', 1)[0] ?? ''
 }
 
 async function seed(

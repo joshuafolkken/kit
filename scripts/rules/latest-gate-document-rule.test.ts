@@ -24,11 +24,21 @@ const OLD_RULE = 'mandatory, never skip'
 // joshuafolkken/kit#2190 cut `backlogrun.md` to a manifest and moved its once-per-session steps —
 // including `git switch main && git pull` then the dependency scope — into `backlogrun-steps.md`, so
 // that is where the `backlogrun` flow now names the command.
+// joshuafolkken/kit#5925: that flow runs the update through `run:prime`, whose own test pins
+// `latest:if-required` among its steps (`run-prime-cli.test.ts`).
+const PRIMED_DOCUMENT = '.claude/skills/workflow-commands/backlogrun-steps.md'
+const PRIME_COMMAND = 'pnpm josh run:prime'
+// The three places that once spelled the preparation out each point at the command instead.
+const PRIME_POINTER_DOCUMENTS: ReadonlyArray<string> = [
+	PRIMED_DOCUMENT,
+	'.claude/skills/workflow-commands/backlogrun-lanes.md',
+	'.claude/skills/workflow-commands/backlogrun-child.md',
+]
 const FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/SKILL.md',
 	'.claude/skills/workflow-commands/entry-sequence.md',
 	'.claude/skills/workflow-commands/halfrun.md',
-	'.claude/skills/workflow-commands/backlogrun-steps.md',
+	PRIMED_DOCUMENT,
 	GATE,
 ]
 
@@ -37,9 +47,19 @@ describe('the dependency update is routed to the command', () => {
 		expect(read_repo_file(document_path)).toContain(COMMAND)
 	})
 
-	it.each([...FLOW_DOCUMENTS, COMMAND_DOC])('%s names the one-call update', (document_path) => {
+	it.each([
+		...FLOW_DOCUMENTS.filter((document_path) => document_path !== PRIMED_DOCUMENT),
+		COMMAND_DOC,
+	])('%s names the one-call update', (document_path) => {
 		expect(read_repo_file(document_path)).toContain(FLOW_COMMAND)
 	})
+
+	it.each(PRIME_POINTER_DOCUMENTS)(
+		'%s names the preparation that runs the update',
+		(document_path) => {
+			expect(read_repo_file(document_path)).toContain(PRIME_COMMAND)
+		},
+	)
 
 	it.each(FLOW_DOCUMENTS.filter((document_path) => document_path !== GATE))(
 		'%s does not ask latest:scope again',

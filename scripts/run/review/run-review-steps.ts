@@ -30,11 +30,14 @@ const START_TREE_PREFIX = 'josh-run-review-start-tree-'
 // The tree this pair's gate started on, which tells a moved tree from a red gate at the join.
 const start_tree_stamp: FileMapStampAccess = file_map_stamp.create(START_TREE_PREFIX, PROJECT_ROOT)
 
-// The gate is a local, no-network command that finishes in tens of seconds; the review it runs beside
-// is the longer pole, so by the time the child joins, the gate has almost always already settled. The
-// cap is generous rather than tight — a wait that ended early would read a still-running gate as red.
+// The gate is a local, no-network command that finishes in tens of seconds, so the open waits on it
+// before the brief and the join after the review finds it settled (joshuafolkken/kit#5938). The cap is
+// generous rather than tight — a wait that ended early would read a still-running gate as red. The
+// open's cap sits under `run:chain`'s 600 s Bash budget, so a slow gate stops the open with its own
+// note rather than the Bash call being killed with no next step.
 const POLL_INTERVAL_MS = 1000
 const MAX_JOIN_WAIT_MS = 600_000
+const MAX_OPEN_WAIT_MS = 420_000
 
 type Clock = () => number
 
@@ -147,23 +150,23 @@ async function mark_gate_starting(): Promise<void> {
 	start_tree_stamp.write(tree)
 }
 
-// Waited on gate finish, for the join. The review is the longer pole, so this usually returns on its
-// first read; the cap only bounds a gate that hung, which reads as red rather than blocking for ever.
-async function wait_for_gate_finish(now: Clock = () => Date.now()): Promise<GateState> {
+// Waited on gate finish, for the open before its brief and for the join; the cap only bounds a gate
+// that hung, which reads as red rather than blocking for ever.
+async function wait_for_gate_finish(
+	max_wait_ms: number = MAX_JOIN_WAIT_MS,
+	now: Clock = () => Date.now(),
+): Promise<GateState> {
 	const started = now()
 	let state = await read_gate_state()
 
-	await poll.poll_until(
-		() => run_review.is_gate_settled(state) || now() - started >= MAX_JOIN_WAIT_MS,
-		{
-			attempts: Infinity,
-			interval_ms: POLL_INTERVAL_MS,
-			sleeper: async (milliseconds) => {
-				await sleep(milliseconds)
-				state = await read_gate_state()
-			},
+	await poll.poll_until(() => run_review.is_gate_settled(state) || now() - started >= max_wait_ms, {
+		attempts: Infinity,
+		interval_ms: POLL_INTERVAL_MS,
+		sleeper: async (milliseconds) => {
+			await sleep(milliseconds)
+			state = await read_gate_state()
 		},
-	)
+	})
 
 	return state
 }
@@ -191,6 +194,7 @@ function complete_timing(
 
 const run_review_steps = {
 	MAX_JOIN_WAIT_MS,
+	MAX_OPEN_WAIT_MS,
 	POLL_INTERVAL_MS,
 	complete_timing,
 	gate_log_path,
