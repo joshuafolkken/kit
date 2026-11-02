@@ -113,8 +113,8 @@ and leaves a closed issue alone; report each `kept` / `removed` line. The test i
 ## A prerequisite discovered mid-run
 
 Something else in **this** repository has to land first: not a split, not an upstream defect. File it
-(`route:tier-a`) and set the child in hand `<M>` aside with `run:pause` — `prerequisite.md`, the single source of the
-distinction, the filing, the pause and the ceiling. Then:
+(`route:tier-a`) and set the child in hand `<M>` aside with `run:pause` — `prerequisite.md`, the
+single source of the distinction, the filing, the pause and the ceiling. Then:
 
 1. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
 2. Pop the stash the pause comment names when `epic:next` offers `<M>` again, after its

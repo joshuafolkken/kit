@@ -16,8 +16,8 @@ or a split found mid-run does **not** stop it:
 1. File the new Issue(s) without confirmation — a split's children (`route:split`) by
    `split-assessment.md` → "Two or more always means an epic", a prerequisite (`route:tier-a`) by
    `prerequisite.md`.
-2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `prerequisite.md`'s `run:pause`,
-   which also records the dependency step 3 would; for a split,
+2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `pnpm josh run:pause <N> --for <P>`
+   (`prerequisite.md`), which also records the dependency step 3 would; for a split,
    `pnpm josh stash:push "..."`, `pnpm josh issue:comment <N> --body-file <path>` recording the
    stash, and `pnpm josh run:release <N>`.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
