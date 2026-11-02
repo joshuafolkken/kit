@@ -15,10 +15,10 @@ import { repository_lock } from './repository-lock'
 // asynchronous `git ls-remote` spawn, and a second spawn helper beside it would be that same clone.
 // **It is not the only one in this package** — `propagate_git.has_remote_branch` runs the same query
 // synchronously against a consumer's path, and the two share their arguments through
-// `git-ls-remote.ts` rather than the spawn. Its sole caller is `git-remote-branch.ts`, which turns
-// the raw output into the three-way answer (`absent` / `present` / `unreachable`) that
-// `lane-start-point.ts` and `release-publish.ts` both act on — so this module stops at "what git
-// printed" and the meaning of it is decided there.
+// `git-ls-remote.ts` rather than the spawn. `git-remote-branch.ts` turns the raw output into the
+// three-way answer (`absent` / `present` / `unreachable`) that `lane-start-point.ts` and
+// `release-publish.ts` both act on, and `lane-resolve-record.ts` reads the commit off it, which that
+// answer drops — so this module stops at "what git printed" and the meaning of it is decided there.
 const WORKTREE = 'worktree'
 const ORIGIN = 'origin'
 

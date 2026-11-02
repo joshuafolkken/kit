@@ -116,7 +116,7 @@ function verdict_line(outcome: Exclude<ResolveOutcome, { kind: 'refused' }>): st
 	return [...words, ...outcome.files].join(' ')
 }
 
-const lane_resolve = { RESOLUTION_HEADING, resolve, verdict_line }
+const lane_resolve = { RESOLUTION_HEADING, LANE_BRANCH_SUFFIX, resolve, verdict_line, wrong_branch }
 
 export { lane_resolve }
 export type { ResolveOutcome }

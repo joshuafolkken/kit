@@ -52,18 +52,17 @@ followup` ends that child with a named conflict in about ten seconds.
 consecutive-failure guard. **The merge direction is `origin/main` into the lane's branch, never a
 rebase**; no step rewrites a pushed commit.
 
-1. **Resolve in the lane.** `git fetch origin main`, merge `origin/main` into the lane's branch, resolve
-   in place. Do not close the lane, open another, or switch its branch.
+1. **Resolve in the lane — `pnpm josh lane:resolve <N>`**, then act on its verdict
+   (`docs/josh-commands.md` → "`josh lane:resolve`"): `conflict <paths>` → resolve in place;
+   `step-back 2|3` → park (below). Do not close the lane, open another, or switch its branch.
 2. **Re-run the whole gate.** The tree changed, so the green recorded before the conflict is void:
    `pnpm josh lint:related` and `pnpm josh test:related`, then `pnpm josh gate`.
 3. **Review the resolution, one round.** Brief it with `pnpm josh review:brief` and run `/code-review`
    over the resolution diff, then require `pnpm josh review:attest --check` to answer `ok`. That round
    is a different subject and does not spend one of the two the cap allows — `prompts/review.md` →
    "Review round cap" carries the exception.
-4. **Conclude the merge and push it, with `pnpm josh git -y`** — the only sanctioned way; without it
-   nothing changes on `origin` and condition 3 parks the child for good. **Record the resolution on the
-   Issue in this same step** — a comment naming the conflicting paths — because condition 3 counts
-   resolutions off the Issue comments, not off memory.
+4. **Conclude the merge and push it, with `pnpm josh git -y`**, then **`pnpm josh lane:resolve <N>
+   --record <paths>`** — the comment condition 3 counts; it refuses until the push has landed.
 5. **Merge**, by re-running `pnpm josh followup` exactly as before.
 
 **The safeguard is the re-run verification, not who holds the pen** — a conflict the run can resolve is
@@ -75,10 +74,8 @@ carries no judgement.**
 1. **The resolution requires deleting the other side's change.** That decides intended behavior, not
    text. It goes to the user as a **specification** question — "behavior A or behavior B" — never as a
    diff.
-2. **Both sides rewrote the same lines** — overlapping, not adjacent. Read off the structure of the
-   conflict hunks, so it needs no interpretation.
-3. **A second conflict on the same child.** One resolution per child; the count is read off the Issue
-   comments step 4 writes, so it survives an interrupt.
+2. **Both sides rewrote the same lines** — `lane:resolve`'s `step-back 2`, merge already aborted.
+3. **A second conflict on the same child** — `lane:resolve`'s `step-back 3`, read off step 4's comments.
 4. **The re-run gate did not come back green, or the resolution review returned a High.** Not only a
    High: a lint error, a failing test or a spell-check hit that merging a moved `main` introduced is
    this condition too.
@@ -87,5 +84,5 @@ Meeting any of the four, the child is parked — `needs-decision` plus a comment
 it was, read against `backlogrun-park.md` → "Only a person's judgement carries `needs-decision`" — and its lane is **kept**, because the pushed branch is the resume path
 (`backlogrun-lanes.md` → "What happens to a lane").
 
-**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or 4**
-(condition 3 fires before any merge starts).
+**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1 or 4**
+(`lane:resolve` aborts for 2; 3 fires before any merge starts).
