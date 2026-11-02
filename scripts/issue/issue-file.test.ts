@@ -35,6 +35,7 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		is_auto_ok_opted_out: false,
 		is_release: false,
 		is_blocking_finder: false,
+		is_check: false,
 		...overrides,
 	}
 }
@@ -53,24 +54,14 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		expect(parsed).toStrictEqual(args_of({ ...expected, distinct: [DUPLICATE_A, DUPLICATE_B] }))
 	})
 
-	it('reads --over-cap', () => {
-		expect(issue_file.parse([...FILED, '--over-cap'])).toStrictEqual(args_of({ is_over_cap: true }))
-	})
-
-	it('reads --no-auto-ok', () => {
-		const parsed = issue_file.parse([...FILED, '--no-auto-ok'])
-
-		expect(parsed).toStrictEqual(args_of({ is_auto_ok_opted_out: true }))
-	})
-
-	it('reads --release', () => {
-		expect(issue_file.parse([...FILED, '--release'])).toStrictEqual(args_of({ is_release: true }))
-	})
-
-	it('reads --blocks-finder', () => {
-		const parsed = issue_file.parse([...FILED, '--blocks-finder'])
-
-		expect(parsed).toStrictEqual(args_of({ is_blocking_finder: true }))
+	it.each<[string, Partial<FileArguments>]>([
+		['--over-cap', { is_over_cap: true }],
+		['--no-auto-ok', { is_auto_ok_opted_out: true }],
+		['--release', { is_release: true }],
+		['--blocks-finder', { is_blocking_finder: true }],
+		['--check', { is_check: true }],
+	])('reads %s', (flag, expected) => {
+		expect(issue_file.parse([...FILED, flag])).toStrictEqual(args_of(expected))
 	})
 
 	it.each([

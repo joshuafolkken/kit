@@ -40,6 +40,7 @@ function filing_to(target: string): Filing {
 		is_auto_ok_opted_out: false,
 		is_release: false,
 		is_blocking_finder: false,
+		is_check: false,
 	}
 
 	return { args, body: '', target, current: HERE }

@@ -74,8 +74,8 @@ function argv_of(body_file: string, ...extra: ReadonlyArray<string>): Array<stri
 	return ['A title', '--body-file', body_file, ...extra]
 }
 
-// joshuafolkken/kit#5333: the citation is read only once the local checks pass, so a filing that
-// reaches it carries the run label its `auto-ok` owes.
+// joshuafolkken/kit#5833: the citation is read beside the local checks, so these filings carry the
+// run label their `auto-ok` owes to keep that refusal out of the output.
 const RUN_LABEL = ['--label', 'run:lane']
 
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
@@ -103,7 +103,7 @@ afterAll(() => {
 })
 
 describe('issue_file_cli.run — a measurement follow-up with no start condition', () => {
-	it('refuses the filing with the declaration line, before any read or create', async () => {
+	it('refuses the filing with the declaration line, before the create', async () => {
 		expect(await issue_file_cli.run(argv_of(measurement_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(issue_sample_gate.DECLARATION)
 		expect(exec_gh_api).not.toHaveBeenCalled()
