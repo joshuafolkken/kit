@@ -40,10 +40,13 @@ function read_against_worktree(base: string): DiffSources | undefined {
 	return { before: read_sources_at(before), after: overrides_files.read_current_sources() }
 }
 
+// Both ends are resolved first, so an option-shaped name such as `--octopus` never reaches
+// `merge-base` as a flag.
 function read_against_branch(base: string, head: string): DiffSources | undefined {
+	const base_commit = resolve_commit(base)
 	const after = resolve_commit(head)
-	if (after === undefined) return undefined
-	const before = git_spawn_sync.read(['merge-base', base, after])
+	if (base_commit === undefined || after === undefined) return undefined
+	const before = git_spawn_sync.read(['merge-base', base_commit, after])
 	if (before === undefined) return undefined
 
 	return { before: read_sources_at(before), after: read_sources_at(after) }

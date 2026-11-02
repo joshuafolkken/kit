@@ -180,7 +180,7 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 	it.each([
 		'pnpm josh overrides --diff <default>...<branch>',
 		'**pnpm 11 and 12 read effective overrides only from `pnpm-workspace.yaml`.**',
-		'**Quote the two verdict lines it prints**',
+		'**Quote its verdict lines**',
 		'`devEngines: restore (<reason>)` — restore + ask',
 		'never touch `overrides`',
 		'never touch `devEngines`',

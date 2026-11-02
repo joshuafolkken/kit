@@ -24,10 +24,11 @@ pnpm josh overrides --diff HEAD                # an update not yet committed
 pnpm josh overrides --diff <default>...<branch> # after `josh adopt`, which committed and returned
 ```
 
-**Quote the two verdict lines it prints** — the `devEngines` line (§3) and `✔ overrides unchanged
-since <range> (…)`, or `✖ <file> overrides changed since <range>` for each of the two blocks that
-moved, with each added, removed or changed entry. A removed, modified or over-bumped entry: restore
-it immediately, investigate, and report — never keep it without approval.
+**Quote its verdict lines** — the `devEngines` line (§3), then `✔ overrides unchanged since
+<range> (…)` or a `✖ <file> overrides changed since <range>` heading per moved block with its
+entries. They cover the overrides blocks, not the `devDependencies` of overridden packages: confirm
+those still respect the effective overrides. A removed, modified or over-bumped entry: restore it
+immediately, investigate, and report — never keep it without approval.
 
 ## 3. `devEngines` — the one expected change
 

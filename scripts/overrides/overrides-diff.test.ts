@@ -8,6 +8,7 @@ const PACKAGE_AT_BASE = '{"name":"base"}'
 const PACKAGE_AT_HEAD = '{"name":"head"}'
 const WORKTREE_SOURCES = { package_json: '{"name":"worktree"}', workspace_yaml: '' }
 const ADOPT_RANGE = 'main...5853-lane'
+const MERGE_BASE_COMMAND = 'merge-base'
 
 const git_mock = vi.hoisted(() => {
 	// `<ref>^{commit}` → the commit `rev-parse` answers; `<commit>:./<path>` → what `git show` prints.
@@ -71,11 +72,16 @@ describe('overrides_diff.read_sources — josh adopt (<base>...<head>)', () => {
 			before: { package_json: PACKAGE_AT_BASE, workspace_yaml: WORKSPACE_WITH_ESBUILD },
 			after: { package_json: PACKAGE_AT_HEAD, workspace_yaml: '' },
 		})
-		expect(git_mock.read).toHaveBeenCalledWith(['merge-base', 'main', HEAD_COMMIT])
+		expect(git_mock.read).toHaveBeenCalledWith([MERGE_BASE_COMMAND, BASE_COMMIT, HEAD_COMMIT])
 	})
 
 	it('answers undefined when the head does not resolve', () => {
 		expect(overrides_diff.read_sources('main...')).toBeUndefined()
+	})
+
+	it('answers undefined for an option-shaped base, never passing it to merge-base', () => {
+		expect(overrides_diff.read_sources('--octopus...5853-lane')).toBeUndefined()
+		expect(git_mock.read).not.toHaveBeenCalledWith(expect.arrayContaining([MERGE_BASE_COMMAND]))
 	})
 
 	it('answers undefined when the two ends share no merge-base', () => {
