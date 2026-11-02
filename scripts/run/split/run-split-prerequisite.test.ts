@@ -155,6 +155,11 @@ describe('run_split_prerequisite.prerequisite — the listing cannot tell', () =
 		expect(result.kind).toBe(NEEDS_DECISION)
 		expect(state.calls).toStrictEqual(['stash', 'comment', 'park', 'release'])
 		expect(park_apply).toHaveBeenCalledWith('10', NEEDS_DECISION, expect.stringContaining(reason))
+		expect(park_apply).toHaveBeenCalledWith(
+			'10',
+			NEEDS_DECISION,
+			expect.stringContaining('`pnpm josh run:park 10 --clear`'),
+		)
 		expect(record).not.toHaveBeenCalled()
 		expect(epic_create).not.toHaveBeenCalled()
 	})

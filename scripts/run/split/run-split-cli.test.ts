@@ -73,6 +73,13 @@ describe('run_split_cli.run — arguments', () => {
 	})
 })
 
+describe('run_split_cli.USAGE', () => {
+	it('names both forms', () => {
+		expect(run_split_cli.USAGE).toContain('--children <N1,N2,...>')
+		expect(run_split_cli.USAGE).toContain('--prerequisite <P>')
+	})
+})
+
 describe('run_split_cli.run — `--prerequisite`', () => {
 	it.each([
 		[['10', PREREQUISITE]],
