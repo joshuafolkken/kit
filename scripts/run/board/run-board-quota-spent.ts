@@ -51,32 +51,69 @@ function ends_of(spans: ReadonlyArray<QuotaSpan>): Array<QuotaWindow> {
 	return spans.flatMap((span) => span.at(-1)?.windows ?? [])
 }
 
-// The windows of `span` inside the same reset as `end`.
-function windows_in(span: QuotaSpan, end: QuotaWindow): Array<QuotaWindow> {
-	return span.flatMap((reading) => reading.windows).filter((window) => is_same_window(window, end))
+// A window's use as one reading told it, and when.
+interface Told {
+	used_percent: number
+	taken_ms: number | undefined
+}
+
+// The uses of `span` inside the same reset as `end`.
+function told_in(span: QuotaSpan, end: QuotaWindow): Array<Told> {
+	return span.flatMap((reading) =>
+		reading.windows
+			.filter((window) => is_same_window(window, end))
+			.map((window) => ({ used_percent: window.used_percent, taken_ms: reading.taken_ms })),
+	)
+}
+
+// By use, then by time: the first is the lowest use's earliest reading, the last the highest's latest.
+function by_use(left: Told, right: Told): number {
+	return left.used_percent - right.used_percent || (left.taken_ms ?? 0) - (right.taken_ms ?? 0)
+}
+
+// The tasks the rise from `low` to `high` was spent by: the done files whose last reading lies after
+// `low` and by `high` (joshuafolkken/kit#5826), so a resumed lane's head read hours back does not
+// share the lanes done since among the sample alone; the sample's own count where untimed or none.
+function tasks_in(low: Told, high: Told, ends: ReadonlyArray<number>, sampled: number): number {
+	const { taken_ms: from } = low
+	const { taken_ms: to } = high
+
+	if (from === undefined || to === undefined) return sampled
+
+	const done = ends.filter((end_ms) => end_ms > from && end_ms <= to).length
+
+	return done > 0 ? done : sampled
 }
 
 // The meter is shared by every session, so concurrent lanes each rise by all of their overlap: the
 // sample's rise is read once across its files, from the lowest reading to the highest inside the
-// newest file's last reset, and shared by the files read inside it (joshuafolkken/kit#5770).
-function rise_per_task(spans: ReadonlyArray<QuotaSpan>, minutes: number): Array<[number, number]> {
+// newest file's last reset (joshuafolkken/kit#5770), and shared by the tasks done between them.
+function rise_per_task(
+	spans: ReadonlyArray<QuotaSpan>,
+	minutes: number,
+	ends: ReadonlyArray<number>,
+): Array<[number, number]> {
 	const end = ends_of(spans).find((window) => window.minutes === minutes)
 
 	if (end === undefined) return []
 
-	const told = spans.map((span) => windows_in(span, end)).filter((windows) => windows.length > 0)
-	const used = told.flat().map((window) => window.used_percent)
-	const rise = Math.max(...used) - Math.min(...used)
+	const told = spans.map((span) => told_in(span, end)).filter((uses) => uses.length > 0)
+	const ordered = told.flat().toSorted(by_use)
+	const [low, high] = [ordered.at(0), ordered.at(-1)]
 
-	return rise > 0 ? [[minutes, rise / told.length]] : []
+	if (low === undefined || high === undefined) return []
+
+	const rise = high.used_percent - low.used_percent
+
+	return rise > 0 ? [[minutes, rise / tasks_in(low, high, ends, told.length)]] : []
 }
 
-// Each window's spend per task over the spans of the sample's done files, newest first; a window that
-// did not rise across them tells nothing.
-function per_task_of(spans: ReadonlyArray<QuotaSpan>): Spent {
+// Each window's spend per task over the spans of the sample's done files, newest first, and the last
+// reading times of the done files read; a window that did not rise across them tells nothing.
+function per_task_of(spans: ReadonlyArray<QuotaSpan>, ends: ReadonlyArray<number> = []): Spent {
 	const lengths = new Set(ends_of(spans).map((window) => window.minutes))
 
-	return Object.fromEntries([...lengths].flatMap((minutes) => rise_per_task(spans, minutes)))
+	return Object.fromEntries([...lengths].flatMap((minutes) => rise_per_task(spans, minutes, ends)))
 }
 
 const run_board_quota_spent = { claude_done, codex_done, per_task_of, span_of }

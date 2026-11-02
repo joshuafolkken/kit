@@ -273,8 +273,8 @@ describe('run_board_quota_held.quota_reader — the sample of done files', () =>
 		expect(claude?.per_task).toEqual({ [WINDOW.minutes]: 6 })
 	})
 
-	it('stops reading once SAMPLE_SIZE done files tell a spend', async () => {
-		const { files, read_tail, ports } = fixture_of()
+	it('shares an untimed rise by the SAMPLE_SIZE done files that tell it, not the ones after', async () => {
+		const { files, ports } = fixture_of()
 		const { SAMPLE_SIZE } = run_board_quota_read
 
 		files.claude = Array.from({ length: SAMPLE_SIZE + 2 }, (_, index) => ({
@@ -282,8 +282,9 @@ describe('run_board_quota_held.quota_reader — the sample of done files', () =>
 			mtime_ms: 50 - index,
 		}))
 		files.codex = undefined
-		await quota_reader(ports)()
 
-		expect(read_tail).toHaveBeenCalledTimes(SAMPLE_SIZE)
+		const { claude } = await quota_reader(ports)()
+
+		expect(claude?.per_task).toEqual({ [WINDOW.minutes]: 6 / SAMPLE_SIZE })
 	})
 })

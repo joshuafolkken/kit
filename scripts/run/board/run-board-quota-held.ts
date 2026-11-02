@@ -14,7 +14,7 @@ import { run_board_quota_spent, type QuotaSpan } from './run-board-quota-spent'
 // path and `mtime` — is not opened again. A provider's newest file may hold no reading (a Codex child's
 // lane log, a rollout of an API-key session), so the reading is the newest that holds one. A done
 // file's head is read too, for the spend per task of `run-board-quota-spent.ts`, and files are read
-// newest first until enough done ones tell it.
+// newest first until enough done ones tell it, then back for the tasks done across their rise.
 
 const QUOTA_INTERVAL_MS = 60_000
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
@@ -23,7 +23,7 @@ const NO_QUOTAS: Quotas = { claude: undefined, codex: undefined }
 // Where a provider's readings come from: its newest files, newest first, the windows a tail of one
 // holds, those each event of its head held, and whether a tail ends a done file.
 interface QuotaSource {
-	find: () => Promise<Array<QuotaFile>>
+	find: (limit: number) => Promise<Array<QuotaFile>>
 	reading_of: (text: string) => QuotaReading | undefined
 	heads_of: (text: string) => Array<QuotaReading>
 	is_done: (tail: string) => boolean
@@ -47,6 +47,10 @@ type QuotaMarks = Map<QuotaProvider, ReadonlyArray<QuotaMark>>
 
 function is_unchanged(marked: QuotaFile, file: QuotaFile): boolean {
 	return marked.path === file.path && marked.mtime_ms === file.mtime_ms
+}
+
+function known_mark(marked: ReadonlyArray<QuotaMark>, file: QuotaFile): QuotaMark | undefined {
+	return marked.find((candidate) => is_unchanged(candidate.file, file))
 }
 
 // The reading off the widest tail needed, and whether the file is done by its first tail's last line.
@@ -73,7 +77,7 @@ async function file_mark(
 	ports: QuotaPorts,
 	marked: ReadonlyArray<QuotaMark>,
 ): Promise<QuotaMark> {
-	const mark = marked.find((candidate) => is_unchanged(candidate.file, file))
+	const mark = known_mark(marked, file)
 
 	if (mark !== undefined) return mark
 
@@ -106,15 +110,102 @@ async function sampled(
 	return [mark, ...(await sampled(rest, mark_of, is_told(mark) ? told + 1 : told))]
 }
 
+// The time a done file's last reading was taken.
+function end_of(mark: QuotaMark): Array<number> {
+	const end_ms = mark.span.at(-1)?.taken_ms
+
+	return end_ms === undefined ? [] : [end_ms]
+}
+
+// The oldest time the sample's done files were read at, where any was timed.
+function since_of(marks: ReadonlyArray<QuotaMark>): number | undefined {
+	const times = marks.flatMap((mark) => mark.span.flatMap((reading) => reading.taken_ms ?? []))
+
+	return times.length === 0 ? undefined : Math.min(...times)
+}
+
+// The marks of `files`, newest first, up to and including the first done one that ended before `since`.
+async function marks_back(
+	files: ReadonlyArray<QuotaFile>,
+	mark_of: (file: QuotaFile) => Promise<QuotaMark>,
+	since: number,
+): Promise<Array<QuotaMark>> {
+	const [file, ...rest] = files
+
+	if (file === undefined) return []
+
+	const mark = await mark_of(file)
+	const is_before = end_of(mark).some((end_ms) => end_ms < since)
+
+	return [mark, ...(is_before ? [] : await marks_back(rest, mark_of, since))]
+}
+
+interface ReadBack {
+	find: (limit: number) => Promise<Array<QuotaFile>>
+	mark_of: (file: QuotaFile) => Promise<QuotaMark>
+	since: number
+}
+
+// The files done since the sample's oldest reading, which its rise was spent by
+// (joshuafolkken/kit#5826): the list is widened until a file ended before it, every file is listed, or
+// `FILES_LIMIT` is reached. A wider list goes on past the files the narrower one read; every file is
+// listed once widening adds none, as a list shorter than its limit may leave out a Codex child's log.
+async function read_back(
+	back: ReadBack,
+	limit: number,
+	read: ReadonlyArray<QuotaMark> = [],
+): Promise<Array<QuotaMark>> {
+	const files = await back.find(limit)
+	const all = [...read, ...(await marks_back(files.slice(read.length), back.mark_of, back.since))]
+	const is_reached = all.length < files.length || files.length === read.length
+
+	if (is_reached || limit >= run_board_quota_read.FILES_LIMIT) return all
+
+	return await read_back(back, limit * run_board_quota_read.SCAN_FACTOR, all)
+}
+
 // The newest file's reading that holds windows, with each window's spend per task where told.
-function reading_with(marks: ReadonlyArray<QuotaMark>): QuotaReading | undefined {
+function reading_with(
+	marks: ReadonlyArray<QuotaMark>,
+	ends: ReadonlyArray<number>,
+): QuotaReading | undefined {
 	const reading = marks.find((mark) => (mark.reading?.windows.length ?? 0) > 0)?.reading
 
 	if (reading === undefined) return undefined
 
-	const per_task = run_board_quota_spent.per_task_of(marks.map((mark) => mark.span))
+	const per_task = run_board_quota_spent.per_task_of(
+		marks.map((mark) => mark.span),
+		ends,
+	)
 
 	return Object.keys(per_task).length === 0 ? reading : { ...reading, per_task }
+}
+
+function unique(marks: ReadonlyArray<QuotaMark>): Array<QuotaMark> {
+	return [...new Map(marks.map((mark) => [mark.file.path, mark])).values()]
+}
+
+// The sample's marks, and every mark read for it, the files read back included.
+async function marks_of(
+	source: QuotaSource,
+	mark_of: (file: QuotaFile) => Promise<QuotaMark>,
+): Promise<{ sample: Array<QuotaMark>; read: Array<QuotaMark> }> {
+	const { FILES_SCANNED } = run_board_quota_read
+	const sample = await sampled(await source.find(FILES_SCANNED), mark_of)
+	const since = since_of(sample)
+
+	if (since === undefined) return { sample, read: sample }
+
+	const back = await read_back(
+		{
+			find: source.find,
+			mark_of: async (file) => known_mark(sample, file) ?? (await mark_of(file)),
+			since,
+		},
+		FILES_SCANNED,
+	)
+
+	return { sample, read: unique([...sample, ...back]) }
 }
 
 async function fresh_reading(
@@ -123,13 +214,18 @@ async function fresh_reading(
 	marks: QuotaMarks,
 ): Promise<QuotaReading | undefined> {
 	const source = ports.sources[provider]
-	const files = await source.find()
 	const marked = marks.get(provider) ?? []
-	const fresh = await sampled(files, async (file) => await file_mark(file, source, ports, marked))
+	const { sample, read } = await marks_of(
+		source,
+		async (file) => await file_mark(file, source, ports, marked),
+	)
 
-	marks.set(provider, fresh)
+	marks.set(provider, read)
 
-	return reading_with(fresh)
+	return reading_with(
+		sample,
+		read.flatMap((mark) => end_of(mark)),
+	)
 }
 
 // A provider whose file cannot be read reads as none; the other is read all the same.
@@ -172,13 +268,13 @@ function live_quota_reader(): () => Promise<Quotas> {
 	return quota_reader({
 		sources: {
 			claude: {
-				find: async () => await claude_files(),
+				find: async (limit) => await claude_files(undefined, limit),
 				reading_of: claude_reading,
 				heads_of: claude_heads,
 				is_done: run_board_quota_spent.claude_done,
 			},
 			codex: {
-				find: async () => await codex_files(Date.now()),
+				find: async (limit) => await codex_files(Date.now(), undefined, limit),
 				reading_of: codex_reading,
 				heads_of: codex_heads,
 				is_done: run_board_quota_spent.codex_done,
