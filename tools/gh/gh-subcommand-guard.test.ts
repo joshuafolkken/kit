@@ -28,7 +28,7 @@ const GIT_CONSTANT = 'FIXTURE_GIT_BINARY'
 const SCRIPTS_SUBPATH_MODULE = '#scripts/rules/direct-pr-create'
 const SCRIPTS_GH_CONSTANT = 'GH_COMMAND'
 const SCRIPTS_DIRECTORY = 'scripts'
-const EPIC_ENTRY_FILE = 'scripts/epic/epic.ts'
+const EPIC_MODULE_FILE = 'scripts/epic/epic.ts'
 const GH_EXEC_FILE = 'scripts/gh/git-gh-exec.ts'
 const START_EXEC_FILE = 'scripts/init/start-exec.ts'
 // What a REST request's spawn reports as: `api` written inline, or an argument list built
@@ -112,7 +112,7 @@ describe('gh subcommand guard — what the scan reaches', () => {
 			SCRIPTS_DIRECTORY,
 			TOOLS_DIRECTORY,
 		])
-		expect(gh_subcommand_guard.source_files(SCRIPTS_DIRECTORY)).toContain(EPIC_ENTRY_FILE)
+		expect(gh_subcommand_guard.source_files(SCRIPTS_DIRECTORY)).toContain(EPIC_MODULE_FILE)
 		expect(gh_subcommand_guard.source_files(SCRIPTS_DIRECTORY)).toContain(GH_EXEC_FILE)
 	})
 
@@ -383,12 +383,12 @@ describe('gh subcommand guard — line numbers and URLs', () => {
 describe('gh subcommand guard — the failure message', () => {
 	it('names the file, the line and the command', () => {
 		const message = gh_subcommand_guard.describe_violation({
-			file: EPIC_ENTRY_FILE,
+			file: EPIC_MODULE_FILE,
 			line: 21,
 			subcommand: 'issue',
 		})
 
-		expect(message).toContain(`${EPIC_ENTRY_FILE}:21`)
+		expect(message).toContain(`${EPIC_MODULE_FILE}:21`)
 		expect(message).toContain('gh issue')
 	})
 

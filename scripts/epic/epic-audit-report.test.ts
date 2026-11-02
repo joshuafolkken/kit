@@ -1,4 +1,3 @@
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import type { AuditFinding } from './epic-audit'
 import { epic_audit_report } from './epic-audit-report'
@@ -71,13 +70,5 @@ describe('epic_audit_report.format_report', () => {
 
 		expect(text).toContain('✖')
 		expect(text).toContain('⚠')
-	})
-})
-
-describe('josh epic:audit registration', () => {
-	it('is registered as a command', () => {
-		const entry = COMMAND_MAP['epic:audit']
-
-		expect(entry?.script).toBe('scripts/epic/epic-audit-cli.ts')
 	})
 })

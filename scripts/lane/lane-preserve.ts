@@ -1,6 +1,10 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
+import { lane_close } from './lane-close'
 
 // Keeping a lane's uncommitted work before something discards or restarts it — `run:merge` closing a
 // lane, `lane:restart` handing it to a fresh session. The stash stack outlives the tree, so the push is
@@ -57,21 +61,33 @@ async function keep_work(issue: string, directory: string, occasion: string): Pr
 	}
 }
 
-/** `push_work`, then `announce` — for a caller with no reason to separate the two. */
-async function stash_work(
-	issue: string,
-	directory: string,
-	occasion: string,
-	cause: string,
-): Promise<string> {
-	const message = await push_work(issue, directory, occasion)
+// Keep whatever the issue's lane still holds uncommitted, and say on the Issue where it went — before
+// `run:merge` closes a merged child's lane, or (`--stash`) classifies a stopped unit. Returns whether
+// the tree is safe to remove: `false` when it could not be read or pushed, so it is left rather than
+// lost. A directory with no `.git` is no work tree — the remnant of an interrupted close — and holds
+// nothing git could keep.
+async function preserve_lane(issue: string, occasion: string, cause: string): Promise<boolean> {
+	const lane = await lane_close.resolve_lane(issue)
+	const { directory } = lane.targets
 
-	await announce(issue, message, cause)
+	if (!existsSync(path.join(directory, '.git'))) return true
 
-	return message
+	const kept = await keep_work(issue, directory, occasion)
+
+	if (kept.kind === 'unsaved') {
+		console.error(
+			`${session_cite.issue(issue)}: uncommitted work could not be stashed — lane left at ${directory}`,
+		)
+
+		return false
+	}
+
+	if (kept.stash !== undefined) await announce(issue, kept.stash, cause)
+
+	return true
 }
 
-const lane_preserve = { announce, keep_work, stash_work }
+const lane_preserve = { announce, keep_work, preserve_lane }
 
 export type { KeptWork }
 export { lane_preserve }

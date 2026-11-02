@@ -1,8 +1,5 @@
-import { existsSync } from 'node:fs'
-import path from 'node:path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
-import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, NOT_BEFORE_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
@@ -11,7 +8,6 @@ import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
-import { lane_close } from '#scripts/lane/lane-close'
 import { lane_preserve } from '#scripts/lane/lane-preserve'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
@@ -52,8 +48,8 @@ type ApplyCarryResult =
 const OVER = 'over'
 const LANES = '--lanes'
 const REPO_FLAG = '--repo'
-const LANE_CLOSE_OCCASION = 'lane close'
-const GIT_ENTRY = '.git'
+const CLOSE_CAUSE = '`run:merge` closed it'
+const STOPPED_CAUSE = 'the unit stopped and `run:merge --stash` classified it'
 const OPEN_STATE = 'OPEN'
 const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
 
@@ -75,6 +71,8 @@ interface MergeContext extends Pick<
 	// ending apart from a genuine child failure; absent leaves outage detection off, so the child is
 	// classified from its GitHub state alone.
 	output?: string | undefined
+	// `true` where the caller passed `--stash`: a stopped unit's lane work is kept before classifying.
+	stash?: boolean | undefined
 }
 
 interface FailedResult {
@@ -184,37 +182,9 @@ async function close_lane(child: string): Promise<void> {
 	if (result.code !== 0) console.error(`${session_cite.issue(child)}: lane:close is incomplete`)
 }
 
-async function stash_work(child: string, directory: string): Promise<void> {
-	await lane_preserve.stash_work(child, directory, LANE_CLOSE_OCCASION, '`run:merge` closed it')
-}
-
-// Stash whatever the lane still holds uncommitted before its tree is removed: `lane:close` deletes by
-// force, and a merged child's uncommitted work may exist nowhere else. The stash stack outlives the
-// tree, so the push is the copy. Returns whether closing is safe — `false` when the tree could not be
-// read or pushed, so it is left rather than lost. A directory with no `.git` is no work tree — the
-// remnant of an interrupted close — and holds nothing git could keep, so it is closed rather than
-// stranded behind a status that fails.
-async function preserve_uncommitted(child: string): Promise<boolean> {
-	const lane = await lane_close.resolve_lane(child)
-	const { directory } = lane.targets
-
-	if (!existsSync(path.join(directory, GIT_ENTRY))) return true
-
-	try {
-		if (await git_stash.has_changes(directory)) await stash_work(child, directory)
-
-		return true
-	} catch {
-		console.error(
-			`${session_cite.issue(child)}: uncommitted work could not be stashed — lane left at ${directory}`,
-		)
-
-		return false
-	}
-}
-
+// `lane:close` deletes by force, and a merged child's uncommitted work may exist nowhere else.
 async function close_preserved_lane(child: string): Promise<void> {
-	if (await preserve_uncommitted(child)) await close_lane(child)
+	if (await lane_preserve.preserve_lane(child, 'lane close', CLOSE_CAUSE)) await close_lane(child)
 }
 
 function kept_lane_comment(directory: string): string {
@@ -464,6 +434,14 @@ async function has_resumable_cut(child: string): Promise<boolean> {
 	return (await relaunchable_cut(child)) !== undefined
 }
 
+// `run:merge --stash`: a stopped unit's half-finished work is kept before the child is classified —
+// unless the lane holds a cut `resume_cut` may relaunch, whose successor resumes from that very tree.
+async function stash_stopped(child: string): Promise<void> {
+	if (await has_resumable_cut(child)) return
+
+	await lane_preserve.preserve_lane(child, 'stopped unit', STOPPED_CAUSE)
+}
+
 // **The cutting child launches its own successor; this is only the fallback**.
 // `lane:await` wakes the parent once every process of the lane has gone, so a cut still unadopted then
 // means the successor never took it over. It is relaunched through the same `lane_relaunch` the cut uses,
@@ -517,6 +495,7 @@ const run_merge_steps = {
 	is_over_budget,
 	refused_carry,
 	resume_cut,
+	stash_stopped,
 }
 
 export type { FailedResult, MergeContext, OutageResult }
