@@ -5,24 +5,6 @@
 This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` up to the pull request: a `prrun` never issues `pnpm josh ship` or a merging `pnpm josh followup` — it opens the pull request with `pnpm josh git -y` and ends by `prrun.md` → "The difference — the end of the run". The record below is reference only.
 Review results and successful pushes are never turn boundaries.
 
-0. **A lane child** (no `main:merge`: ship's sync merges main, stopping `conflict`): the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"; 1: `--join`'s `test:pinned`, 2/4/10: `review:selfcheck`), `pnpm josh run:chain <N>` (a metrics notice → its verdict line) —
-   the ship body draft's rows a green `test:related` left pending filled in beside the gate (`report-format.md` → "PR
-   本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --from-slot --interaction --issue <N>` — not backgrounded — a turn end kills it — then `pnpm josh run:chain <N> --join` (step 2), the
-   round's fixes, no `check:related` after them unless a brief follows (one before `--join` is refused, `round-one-check-related`), on a held finding `pnpm josh review:record --from-slot --issue <N>` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; a `lane:plan` widened after round 1 → the ship, whose `--review` reads the widened files (`review-lane-handover.ts`); on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
-   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it; `timeout` 600000). On `launched` it runs
-   `cost --cut` and, on `under`, one `ship:wait <N>` chunk; follow it
-   (`docs/josh-commands-run.md` → "`josh ship:wait`"); on `busy`, **end the turn**. No `pnpm josh gate`,
-   `check:related`, `check` or `metrics` before it or a re-detach, by hand: ship reuses the scoped
-   pair green on this tree and base (no fix, main unmoved) and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
-   `metrics` leaves no record it reuses. A stop no session waits on relaunches a child
-   whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
-   the stage printed nothing), on a review stop the sweep of each finding's other sites the stop note
-   directs, and (Anthropic lane) the re-detach to run after the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
-   round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`).
-   A preflight stop `unplanned: <files>` → take one of the two ways out it prints, then re-detach
-   — unless its `lane:plan` answers `yield` (`docs/josh-commands-run.md` → "`josh ship`").
-   `failed` → step 1.
 1. **Issue `pnpm josh run:cut <N>` alone first** — the pre-gate cut (a no-op outside a lane). Then
    `pnpm josh run:chain <N>` runs `main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
    the implementer's self-check"; 1: `run:review --join`, 2/4/10: `review:selfcheck`), the scoped
@@ -62,6 +44,27 @@ A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); ne
 CodeRabbit/Claude Review finding or a CI failure. In a lane the parent closes it. Managed config claims are reported by `followup` and do not stop the merge.
 
 Recommendations are informational; severity decides. A CodeRabbit rate-limit warning is not a finding.
+
+## A lane child — step 0
+
+0. **A lane child** (no `main:merge`: ship's sync merges main, stopping `conflict`): the self-check (`prompts/review.md` → "Before round 1 —
+   the implementer's self-check"; 1: `--join`'s `test:pinned`, 2/4/10: `review:selfcheck`), `pnpm josh run:chain <N>` (a metrics notice → its verdict line) —
+   the ship body draft's rows a green `test:related` left pending filled in beside the gate (`report-format.md` → "PR
+   本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --from-slot --interaction --issue <N>` — not backgrounded — a turn end kills it — then `pnpm josh run:chain <N> --join` (step 2), the
+   round's fixes, no `check:related` after them unless a brief follows (one before `--join` is refused, `round-one-check-related`), on a held finding `pnpm josh review:record --from-slot --issue <N>` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; a `lane:plan` widened after round 1 → the ship, whose `--review` reads the widened files (`review-lane-handover.ts`); on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
+   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it; `timeout` 600000). On `launched` it runs
+   `cost --cut` and, on `under`, one `ship:wait <N>` chunk; follow it
+   (`docs/josh-commands-run.md` → "`josh ship:wait`"); on `busy`, **end the turn**. No `pnpm josh gate`,
+   `check:related`, `check` or `metrics` before it or a re-detach, by hand: ship reuses the scoped
+   pair green on this tree and base (no fix, main unmoved) and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
+   `metrics` leaves no record it reuses. A stop no session waits on relaunches a child
+   whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
+   the stage printed nothing), on a review stop the sweep of each finding's other sites the stop note
+   directs, and (Anthropic lane) the re-detach to run after the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
+   round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`).
+   A preflight stop `unplanned: <files>` → take one of the two ways out it prints, then re-detach
+   — unless its `lane:plan` answers `yield` (`docs/josh-commands-run.md` → "`josh ship`").
+   `failed` → step 1.
 
 ## Orchestration facts single-sourced here
 
