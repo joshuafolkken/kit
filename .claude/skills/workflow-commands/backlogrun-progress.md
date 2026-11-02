@@ -41,34 +41,23 @@ summary, and who propagates" below.
 
 ## The hand-off — one session does not have to run the whole batch
 
-**The check is asked at every merge, and delegation does not excuse it** — `pnpm josh cost --cut`
-after every child's merge and `pnpm josh ms`, never wired to `pnpm josh delegate epic-child`. Crossing it **hands the session off to a fresh one,
-carrying the budget** (`backlogrun-steps.md` → "The session cut is inside the invocation"); it is not a
-stop. The threshold is the one `pnpm josh cost --cut` prints, priced at the session's model and
-shared by the scheduler entry, hand-off and the lane worker cut (`pre-gate-cut.md` → "The threshold").
+**The check is asked at every merge, and delegation does not excuse it** — `pnpm josh run:handoff-lanes`
+after every child's merge and `pnpm josh main:sync`, never wired to `pnpm josh delegate epic-child`. It
+chains `pnpm josh cost --cut` (its threshold priced at the session's model), the lane reading, `run:carry --cut`, `run:board --chat` and
+`pnpm josh run:report --handoff` (`backlogrun-handoff-report.md`), and prints its verdict and `next:`
+line. A cut **hands the session off to a fresh one, carrying the budget** (`backlogrun-steps.md` →
+"The session cut is inside the invocation"); the threshold is `pre-gate-cut.md` → "The threshold".
 
 | It answers | What the run does |
 | --- | --- |
 | `under` | Back to the loop |
-| `over` | Open no new lane, take no new child, and read the lanes below in the same turn |
-| exit 1, empty output | Report that the check could not answer, and take `over`'s branch |
+| `cut` | Open no new lane, take no new child, and end the turn; the `run:wake` driver polls the lanes |
+| `blocked <lanes>` | No cut, never assume idle: fix each named lane as printed, name it in the progress comment, re-ask at the next merge |
+| `capped` | No `run:wake`, no hand-off: carry this session on and re-ask at the next merge |
+| a step's exit code | Settle what it refused, then rerun the command |
 
 **A parent without a completion callback (Codex) dispatches the wave and ends the turn** — `run:step`
-prints the `--cut`.
-
-**On `over`, read the lanes rather than judging them** — `pnpm josh lane:list` prints each lane's state
-and output path; fill a missing path with `pnpm josh lane:output <N> <path>`:
-
-- **A lane nobody can poll** (`unreadable`, or `open` with no path) — **the cut does not happen**: name
-  it in the progress comment and re-ask at the next merge. **Never assume idle.** A `stranded` lane is
-  closed by `pnpm josh lane:prune`.
-- **Every in-flight lane records a path** — count everything, run `pnpm josh run:carry --cut`, post the progress comment naming every lane and its path with `pnpm josh run:board`, and end
-  the turn; the `run:wake` driver polls the lanes.
-- **`--cut` answers `capped`** (`MAX_CUTS`) — **do not `run:wake` or hand off**;
-  carry this session on and re-ask at the next merge.
-
-The hand-off report is `pnpm josh run:report --handoff` (`backlogrun-handoff-report.md`). **This is not a failure and not a
-park** — nothing is labelled, stashed or filed.
+prints the `--cut`. **A cut is not a failure and not a park** — nothing is labelled, stashed or filed.
 
 ## Resuming after a cut
 
