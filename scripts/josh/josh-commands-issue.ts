@@ -40,9 +40,14 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/issue/issue-read-main.ts',
 		description: "Print each issue's title, body and every comment on it, in one call",
 		category: 'AI tools',
-		reference: ['<issue...>', 'automation', ['network']],
+		reference: [ISSUES_WITH_REPO, 'automation', ['network']],
 		usage: {
-			examples: [{ arguments: '1715' }, { arguments: '1715 1567 1605', note: CONCURRENT }],
+			examples: [
+				{ arguments: '1715' },
+				{ arguments: '1715 1567 1605', note: CONCURRENT },
+				{ arguments: '42 --repo joshuafolkken/app-kit', note: 'an issue in another repo' },
+			],
+			flags: [REPO_FLAG],
 		},
 	},
 	'issue:state': {

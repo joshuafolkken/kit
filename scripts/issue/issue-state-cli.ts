@@ -170,10 +170,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 const issue_state_cli = {
 	READ_CONCURRENCY,
+	REPO_OPTIONS: OPTIONS,
 	STATE_FIELDS,
 	USAGE,
 	parse_request,
 	read_issue,
+	read_repo,
 	run,
 }
 

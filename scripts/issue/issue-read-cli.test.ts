@@ -31,6 +31,7 @@ const FAILURE = 1
 const LINE_FRACTION = 10
 const ISSUE = '1715'
 const OTHER_ISSUE = '1567'
+const REPO = 'joshuafolkken/app-kit'
 const FIELDS_JSON = JSON.stringify({ title: 'A title', state: 'open', body: 'The body' })
 const READ = { kind: 'read', json: FIELDS_JSON }
 // An author with write access, whose comment body `issue:read` prints whole.
@@ -75,6 +76,50 @@ describe('issue_read_cli.parse_numbers', () => {
 	it('refuses the whole call when a token is not an issue number', () => {
 		expect(issue_read_cli.parse_numbers([`#${ISSUE}`])).toBeUndefined()
 		expect(issue_read_cli.parse_numbers([])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5851: the flag follows `issue:state`'s rules — an empty, repeated or misspelled
+// `--repo` refuses rather than falling back to the session's repository.
+describe('issue_read_cli.parse_request', () => {
+	it('reads --repo beside the numbers, in either spelling', () => {
+		const expected = { issue_numbers: [ISSUE], repo: REPO }
+
+		expect(issue_read_cli.parse_request([ISSUE, '--repo', REPO])).toEqual(expected)
+		expect(issue_read_cli.parse_request([`--repo=${REPO}`, ISSUE])).toEqual(expected)
+	})
+
+	it('names no repository when --repo is absent', () => {
+		expect(issue_read_cli.parse_request([ISSUE])).toEqual({ issue_numbers: [ISSUE] })
+	})
+
+	it('refuses an empty, repeated or misspelled --repo', () => {
+		expect(issue_read_cli.parse_request([ISSUE, '--repo='])).toBeUndefined()
+		expect(issue_read_cli.parse_request([ISSUE, '--repo', REPO, '--repo', REPO])).toBeUndefined()
+		expect(issue_read_cli.parse_request([ISSUE, `--rep=${REPO}`])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5851: a body from one repository beside the comments of another is a block about
+// two different issues of the same number.
+describe('issue_read_cli.run — the repository it reads', () => {
+	it('reads the body and the comments from the repository --repo names', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		expect(await issue_read_cli.run([ISSUE, '--repo', REPO])).toBe(SUCCESS)
+		expect(classified_mock).toHaveBeenCalledWith(ISSUE, expect.any(String), REPO)
+		expect(comments_mock).toHaveBeenCalledWith(ISSUE, undefined, REPO)
+	})
+
+	it('reads the session repository when no --repo is given', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		await issue_read_cli.run([ISSUE])
+
+		expect(classified_mock).toHaveBeenCalledWith(ISSUE, expect.any(String), undefined)
+		expect(comments_mock).toHaveBeenCalledWith(ISSUE, undefined, undefined)
 	})
 })
 
