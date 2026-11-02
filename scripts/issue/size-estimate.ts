@@ -12,6 +12,10 @@ import { markdown_section } from './markdown-section'
 // **The guide is `split_assess`'s, never a copy** — the measured diff and the declared estimate are
 // judged by one `verdict_for`. An epic (a body carrying `## Split rationale`) declares no estimate:
 // its children do.
+//
+// joshuafolkken/kit#5654: lanes land at twice their declaration at the median (`lane:stats`, files
+// and lines alike), so the guide and the cap judge the declaration multiplied by
+// `DECLARED_GROWTH_FACTOR`. `parse` keeps the declared counts: `lane:plan` reads them as declared.
 
 const BACKGROUND_HEADING = '## 背景'
 const EPIC_HEADING = '## Split rationale'
@@ -27,6 +31,7 @@ const MISSING = `missing size estimate: declare \`${DECLARATION}\` under ${BACKG
 const EXAMPLE = `${PREFIX} 約 3 ファイル / 60 行（テスト除く）`
 const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 const estimate_schema = z.object({ files: z.coerce.number(), lines: z.coerce.number() })
+const DECLARED_GROWTH_FACTOR = 2
 
 function declared(body: string, prefix: string): string | undefined {
 	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
@@ -82,14 +87,28 @@ function is_epic(body: string): boolean {
 	return markdown_section.has_line(body, EPIC_HEADING)
 }
 
-// The declared estimate judged against the guide, or `undefined` when there is none or it does not parse.
+// A declared count as the guide and the cap judge it.
+function grown(count: number): number {
+	return count * DECLARED_GROWTH_FACTOR
+}
+
+// The declared estimate, its verdict judged on the grown counts, or `undefined` when there is none or
+// it does not parse.
 function parse(body: string): SizeMeasurement | undefined {
 	const read = estimate_schema.safeParse(VALUE_PATTERN.exec(declared(body, PREFIX) ?? '')?.groups)
 
 	if (!read.success) return undefined
 	const { files, lines } = read.data
 
-	return { files, lines, verdict: split_assess.verdict_for(files, lines) }
+	return { files, lines, verdict: split_assess.verdict_for(grown(files), grown(lines)) }
+}
+
+// The declared counts, the factor and the grown counts, as every refusal prints them.
+function projected(estimate: SizeMeasurement): string {
+	const declared_counts = `${String(estimate.files)} file(s) / ${String(estimate.lines)} line(s)`
+	const grown_counts = `${String(grown(estimate.files))} file(s) / ${String(grown(estimate.lines))} line(s)`
+
+	return `size estimate ${declared_counts} × ${String(DECLARED_GROWTH_FACTOR)} = ${grown_counts}`
 }
 
 // The shape check `issue:lint` makes: the declaration is there and parses. The guide needs the route,
@@ -108,7 +127,7 @@ function is_excused(body: string, route: string | undefined): boolean {
 
 // The counts against the guide, shared by the filing refusal and `backlog:next`'s offer note.
 function exceeded(estimate: SizeMeasurement): string {
-	return `size estimate ${String(estimate.files)} file(s) / ${String(estimate.lines)} line(s) exceeds the guide (more than ${String(split_assess.FILE_GUIDE)} files or ${String(split_assess.LINE_GUIDE)} lines)`
+	return `${projected(estimate)} exceeds the guide (more than ${String(split_assess.FILE_GUIDE)} files or ${String(split_assess.LINE_GUIDE)} lines)`
 }
 
 function refusal(estimate: SizeMeasurement): string {
@@ -133,7 +152,9 @@ function over_cap(body: string, route: string | undefined): SizeMeasurement | un
 
 	if (estimate === undefined || route === SPLIT_ROUTE_LABEL) return undefined
 
-	return split_assess.is_over_cap(estimate.files, estimate.lines) ? estimate : undefined
+	return split_assess.is_over_cap(grown(estimate.files), grown(estimate.lines))
+		? estimate
+		: undefined
 }
 
 // The filing route a row's labels carry — the split route, or none.
@@ -151,7 +172,7 @@ function is_issue_over_cap(issue: Pick<OpenIssueData, 'body' | 'labels'>): boole
 
 // The counts against the cap, shared by the filing refusal and `backlog:next`'s withheld note.
 function capped(estimate: SizeMeasurement): string {
-	return `size estimate ${String(estimate.files)} file(s) / ${String(estimate.lines)} line(s) exceeds the cap (more than ${String(split_assess.FILE_CAP)} files or ${String(split_assess.LINE_CAP)} lines), which \`${REASON_PREFIX}\` does not excuse`
+	return `${projected(estimate)} exceeds the cap (more than ${String(split_assess.FILE_CAP)} files or ${String(split_assess.LINE_CAP)} lines), which \`${REASON_PREFIX}\` does not excuse`
 }
 
 function cap_refusal(estimate: SizeMeasurement): string {
