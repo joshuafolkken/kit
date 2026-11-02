@@ -6,8 +6,9 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_ship_stop_text } from '#scripts/run/ship/run-ship-stop-text'
 import type { RunCostReport } from '#tools/cost/cost-run-report'
 import type { RoleTotals } from '#tools/cost/cost-run-roles'
-import { guard_friction, type SessionTranscript } from './guard-friction'
+import { guard_friction, type GuardRow, type SessionTranscript } from './guard-friction'
 import { investigation_payback } from './investigation-payback'
+import { retrospective_picks } from './retrospective-picks'
 
 // The composition half of `josh retrospective` — the end-of-run retrospective's aggregation.
 // A run that drains its backlog has spent time and money that nobody reads;
@@ -54,7 +55,7 @@ interface RetrospectiveInputs {
 }
 
 const CLOSING =
-	'Weigh these against retrospective.md: file the improvements worth carrying into the next run, and stack the rest in the observation ledger.'
+	'Weigh the picks against retrospective.md: file each top pick that passes the depth test with its issue:file line, and stack the rest in the observation ledger.'
 
 function minutes(ms: number): string {
 	return String(Math.round(ms / MS_PER_MINUTE))
@@ -65,9 +66,13 @@ function percent(share: number): string {
 }
 
 // A role's time share running ahead of its cost share is the run waiting rather than working, so it is
-// called out; a role that pays its way carries no note.
+// called out (and ranked as a pick); a role that pays its way carries no note.
+function is_waiting_heavy(role: RoleTotals): boolean {
+	return role.elapsed_share - role.cost_share >= WAITING_GAP
+}
+
 function waiting_note(role: RoleTotals): string {
-	return role.elapsed_share - role.cost_share >= WAITING_GAP ? ' — waiting-heavy' : ''
+	return is_waiting_heavy(role) ? ' — waiting-heavy' : ''
 }
 
 function role_line(role: RoleTotals): string {
@@ -133,9 +138,11 @@ function tally(reasons: ReadonlyArray<string>): Map<string, number> {
 
 // Where this invocation's `josh ship` supervisors stopped, by stage — the count
 // that otherwise took a hand tally of resume prompts. Scoped exactly as the friction count is.
-function ship_stop_lines(events: ReadonlyArray<RunEvent>, scope: EventScope): Array<string> {
-	const counts = tally(stop_reasons(run_event_scope.scoped_events(events, scope) ?? []))
+function ship_stop_counts(events: ReadonlyArray<RunEvent>, scope: EventScope): Map<string, number> {
+	return tally(stop_reasons(run_event_scope.scoped_events(events, scope) ?? []))
+}
 
+function ship_stop_lines(counts: ReadonlyMap<string, number>): Array<string> {
 	if (counts.size === 0) return ['Ship stops: none']
 
 	const body = [...counts].map(([reason, count]) => `${reason} ${String(count)}`)
@@ -143,9 +150,22 @@ function ship_stop_lines(events: ReadonlyArray<RunEvent>, scope: EventScope): Ar
 	return [`Ship stops: ${body.join(', ')}`]
 }
 
-// The four sections in a fixed order, separated by blank lines, closed by the pointer that hands the
-// judgement — which improvements are worth filing — to `retrospective.md`.
+// The measurements the sections already print, handed to the ranking rather than measured again.
+function pick_lines(inputs: RetrospectiveInputs, guards: ReadonlyArray<GuardRow>): Array<string> {
+	return retrospective_picks.report_lines({
+		audit_summary: inputs.audit_summary,
+		guards,
+		waiting: inputs.cost?.roles.filter((role) => is_waiting_heavy(role)) ?? [],
+		findings: inputs.findings,
+		ship_stops: ship_stop_counts(inputs.events, inputs.scope),
+	})
+}
+
+// The four sections in a fixed order, separated by blank lines, then the ranked picks and the pointer
+// that hands the depth test to `retrospective.md`.
 function compose(inputs: RetrospectiveInputs): string {
+	const guards = guard_friction.guard_rows(inputs.sessions)
+
 	return [
 		...cost_lines(inputs.cost),
 		inputs.audit_summary,
@@ -155,10 +175,12 @@ function compose(inputs: RetrospectiveInputs): string {
 		...observation_lines(inputs.observations),
 		'',
 		...friction_lines(inputs.events, inputs.scope),
-		...ship_stop_lines(inputs.events, inputs.scope),
+		...ship_stop_lines(ship_stop_counts(inputs.events, inputs.scope)),
 		'',
-		...guard_friction.report_lines(guard_friction.guard_rows(inputs.sessions)),
+		...guard_friction.report_lines(guards),
 		...investigation_payback.report_lines(inputs.sessions),
+		'',
+		...pick_lines(inputs, guards),
 		'',
 		CLOSING,
 	].join('\n')

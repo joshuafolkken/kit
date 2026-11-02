@@ -10,6 +10,10 @@ const PERCENT = 100
 const PERCENT_DECIMALS = 1
 const REGRESSION_MARK = '  regression'
 const NO_PREVIOUS = 'new'
+// The filing line's frame, shared with the retrospective's picks, which parse the row names back out.
+const FILING_PREFIX = 'File a cost regression: '
+const FILING_ROW_SEPARATOR = ', '
+const FILING_SUFFIX = ' — reproduce with `pnpm josh cost:audit`'
 
 interface AuditSection {
 	name: string
@@ -141,9 +145,16 @@ function filing_lines(audit: Audit): Array<string> {
 
 	if (names.length === 0) return []
 
-	return [`File a cost regression: ${names.join(', ')} — reproduce with \`pnpm josh cost:audit\``]
+	return [FILING_PREFIX + names.join(FILING_ROW_SEPARATOR) + FILING_SUFFIX]
 }
 
-const cost_audit_format = { filing_lines, report_lines, summary_line }
+const cost_audit_format = {
+	FILING_PREFIX,
+	FILING_ROW_SEPARATOR,
+	FILING_SUFFIX,
+	filing_lines,
+	report_lines,
+	summary_line,
+}
 
 export { cost_audit_format }
