@@ -1,0 +1,7 @@
+{
+	"reason": "#5815: isolate pins the session verdict so ship CLI suites stop waiting live",
+	"date": "2026-11-02",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}
