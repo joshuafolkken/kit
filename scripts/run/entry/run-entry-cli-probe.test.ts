@@ -20,6 +20,11 @@ const plan_at_entry_mock = vi.hoisted(() =>
 	vi.fn(async (): Promise<number | undefined> => undefined),
 )
 
+const record_lap_mock = vi.hoisted(() => vi.fn(async (_lap: { step: string }) => undefined))
+
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_ship_lap: record_lap_mock },
+}))
 vi.mock('#scripts/run/run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
@@ -148,6 +153,24 @@ describe('run_entry_cli.run — the entry probe of a lane child', () => {
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
 		expect(yield_mock).not.toHaveBeenCalled()
 		expect(plan_at_entry_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5831: each child the entry runs is a lap under `run:entry`.
+describe('run_entry_cli.run — the laps of a lane child entry', () => {
+	it('times the label, the reads, the entry lane:plan and the baseline as run:entry laps', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+		labels_mock.mockReturnValue(PLANNED_LABELS)
+		plan_at_entry_mock.mockResolvedValueOnce(3)
+
+		await run_entry_cli.run([ISSUE])
+
+		expect(record_lap_mock.mock.calls.map(([lap]) => lap.step)).toEqual(
+			expect.arrayContaining(
+				['label', 'run:prep', 'lane:plan', 'issue baseline'].map((step) => `run:entry › ${step}`),
+			),
+		)
 	})
 })
 

@@ -79,19 +79,23 @@ const SYNC_STEP: Step = {
 // (`run_ship_sync.catch_up`, joshuafolkken/kit#4825). A resumed ship with nothing left to push leaves
 // that to the followup, which pushes what it merges; a pushed branch with new work still catches up.
 // The commit's hooks claim cores with priority (`core-priority.ts`): a short closing stage need not
-// queue behind other lanes' heavy checks (joshuafolkken/kit#5767).
+// queue behind other lanes' heavy checks (joshuafolkken/kit#5767). `josh git` and its hooks time their
+// own steps under the commit's lap (joshuafolkken/kit#5831).
 async function commit_stage(args: ShipArguments, state: ShipState): Promise<StepResult> {
 	const stop = run_ship_stage.is_shipped(state) ? undefined : await run_ship_sync.catch_up()
 
 	if (stop !== undefined) return stop
 
 	const argv = ['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]
-	const { PRIORITY_ENVIRONMENT } = core_priority
+	const { STEP } = run_ship_lap
+	const environment = {
+		...core_priority.PRIORITY_ENVIRONMENT,
+		...run_ship_lap.environment(STEP.COMMIT),
+	}
 
 	return await run_ship_lap.timed(
-		run_ship_lap.STEP.COMMIT,
-		async () =>
-			await josh_command.josh_run(argv, should_forward_stderr, undefined, PRIORITY_ENVIRONMENT),
+		STEP.COMMIT,
+		async () => await josh_command.josh_run(argv, should_forward_stderr, undefined, environment),
 	)
 }
 

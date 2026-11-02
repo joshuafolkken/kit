@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/build/local-bin'
 import { core_budget } from '#scripts/gate/core-budget'
+import { hook_lap } from '#scripts/hooks/hook-lap'
 import { package_manifest } from '#scripts/lib/package-manifest'
 import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
@@ -292,7 +293,12 @@ async function run_command(
 	const early_exit = pre_dispatch_exit(resolved, entry, subcommand_arguments, is_consumer)
 	if (early_exit !== undefined) return early_exit
 
-	return await dispatch_entry(resolved, entry, subcommand_arguments)
+	return await hook_lap.timed_command(
+		resolved,
+		entry.category,
+		subcommand_arguments,
+		async () => await dispatch_entry(resolved, entry, subcommand_arguments),
+	)
 }
 
 const josh_logic = {

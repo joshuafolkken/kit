@@ -84,8 +84,22 @@ vi.mock('./git-push', () => ({ git_push: { push: vi.fn() } }))
 vi.mock('#scripts/gh/git-pr', () => ({ git_pr: { create_with_issue_info: vi.fn() } }))
 vi.mock('./git-error', () => ({ git_error: { handle: vi.fn() } }))
 
+// The laps the import-time run timed its steps under (joshuafolkken/kit#5831).
+const LAPS = vi.hoisted((): Array<string> => [])
+
+vi.mock('#scripts/run/ship/run-ship-lap', () => ({
+	run_ship_lap: {
+		timed: vi.fn(async (step: string, run: () => Promise<unknown>) => {
+			LAPS.push(step)
+
+			return await run()
+		}),
+	},
+}))
+
 const { git_workflow } = await import('./git-workflow')
 const IMPORT_TIME_ORDER = [...CALL_ORDER]
+const IMPORT_TIME_LAPS = [...LAPS]
 const { git_preflight } = await import('./git-preflight')
 const { git_staging } = await import('./git-staging')
 const { git_branch } = await import('./git-branch')
@@ -95,6 +109,12 @@ const { git_push } = await import('./git-push')
 describe('pre-fix check before the commit', () => {
 	it('asks test:red for the resolved Issue before committing', () => {
 		expect(IMPORT_TIME_ORDER).toStrictEqual(['preflight', 'stage', 'test:red #42', 'commit'])
+	})
+})
+
+describe('laps of the workflow steps', () => {
+	it('times the pre-fix check, the commit, the push and the PR each under its own lap', () => {
+		expect(IMPORT_TIME_LAPS).toStrictEqual(['test red', 'commit', 'push', 'pr'])
 	})
 })
 
