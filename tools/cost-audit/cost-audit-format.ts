@@ -17,6 +17,8 @@ const FILING_ROW_SEPARATOR = ', '
 const FILING_SUFFIX = ' — reproduce with `pnpm josh cost:audit`'
 const PHASE_TITLE =
 	'Lane children by phase (this period: cost — billed input / cache read / cache write / output tokens)'
+const AGENT_TITLE =
+	'Lane subagents by agent type (this period: cost — billed input / cache read / cache write / output tokens)'
 
 interface AuditSection {
 	name: string
@@ -112,12 +114,20 @@ function phase_line(row: PhaseRow): string {
 	return `  ${row.key}: ${figure_format.format_usd(row.usd)} — ${tokens.join(' / ')}`
 }
 
-// The current period's lane requests by phase (joshuafolkken/kit#5936), set apart from the regression
-// rows: it is read against a change aimed at one phase, not filed on.
-function phase_lines(audit: Audit): Array<string> {
-	const body = audit.phases.length === 0 ? ['  none'] : audit.phases.map((row) => phase_line(row))
+function token_table_lines(title: string, rows: ReadonlyArray<PhaseRow>): Array<string> {
+	const body = rows.length === 0 ? ['  none'] : rows.map((row) => phase_line(row))
 
-	return ['', PHASE_TITLE, ...body]
+	return ['', title, ...body]
+}
+
+// The current period's lane requests by phase (joshuafolkken/kit#5936) and the lane's delegated units by
+// agent type (joshuafolkken/kit#5971), set apart from the regression rows: each is read against a change
+// aimed at one phase or one agent, not filed on.
+function phase_lines(audit: Audit): Array<string> {
+	return [
+		...token_table_lines(PHASE_TITLE, audit.phases),
+		...token_table_lines(AGENT_TITLE, audit.agents),
+	]
 }
 
 function section_lines(section: AuditSection): Array<string> {

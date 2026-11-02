@@ -1587,6 +1587,8 @@ Under the cost per merge, `lane-child density` gives the lane children's tool ca
 
 Before the closing line, `Lane children by phase` gives the lane children's cost and four token kinds for the current period by the stage `lane_breakdown` places each request in, the implementation split into read, edit, check and review-fix; it is not marked for regressions.
 
+`Lane subagents by agent type` follows in the same shape, keyed by the `agentType` of each unit's `agent-<id>.meta.json`, a unit without one under its kind.
+
 It exits `0` on a report, and `1` with the usage on a bad `--period`.
 
 ### `josh eval`

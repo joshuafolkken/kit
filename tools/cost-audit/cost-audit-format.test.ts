@@ -22,6 +22,7 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		guards: [],
 		rewrites: { current: NO_REWRITES, previous: NO_REWRITES },
 		phases: [],
+		agents: [],
 		...overrides,
 	}
 }
@@ -84,9 +85,31 @@ describe('cost_audit_format.report_lines — the phase table', () => {
 		expect(lines).toContain('  implement: read: $2.5000 — 1,200 / 3,400,000 / 56,000 / 7,800')
 	})
 
-	it('says none for a period with no lane request, before the closing regressions', () => {
+	it('says none for a period with no lane request', () => {
 		const lines = cost_audit_format.report_lines(audit_with())
 		const title = lines.findIndex((line) => line.startsWith('Lane children by phase'))
+
+		expect(lines[title + 1]).toBe('  none')
+	})
+})
+
+// joshuafolkken/kit#5971: the lane's delegated units by agent type, in the phase table's shape.
+describe('cost_audit_format.report_lines — the agent type table', () => {
+	const AGENT_TITLE = 'Lane subagents by agent type'
+
+	it('prints each agent type with its cost and four token kinds', () => {
+		const tokens = { input: 10, cache_read: 2000, cache_write: 300, output: 40 }
+		const lines = cost_audit_format.report_lines(
+			audit_with({ agents: [{ key: 'subagent: reviewer', tokens, usd: 1.25 }] }),
+		)
+		const title = lines.findIndex((line) => line.startsWith(AGENT_TITLE))
+
+		expect(lines[title + 1]).toBe('  subagent: reviewer: $1.2500 — 10 / 2,000 / 300 / 40')
+	})
+
+	it('says none for a period with no lane subagent, before the closing regressions', () => {
+		const lines = cost_audit_format.report_lines(audit_with())
+		const title = lines.findIndex((line) => line.startsWith(AGENT_TITLE))
 
 		expect(lines.slice(title + 1)).toStrictEqual(['  none', '', NO_REGRESSIONS])
 	})

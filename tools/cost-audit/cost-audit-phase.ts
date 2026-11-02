@@ -24,6 +24,7 @@ const ROUND_ONE = 'review round 1'
 const ROUND_TWO = 'review round 2'
 const IMPLEMENT_LEAD = 'implement: '
 const REVIEW_FIX = 'review-fix'
+const AGENT_LEAD = 'subagent: '
 // A request that issued none of the calls below edits or thinks — the remainder `lane:breakdown`
 // names `editing & thinking`.
 const EDIT = 'edit'
@@ -154,16 +155,41 @@ function add_session(rows: Map<string, PhaseRow>, input: PhaseInput, session: Au
 	}
 }
 
+function sorted(rows: Map<string, PhaseRow>): Array<PhaseRow> {
+	return [...rows.values()].toSorted((left, right) => right.usd - left.usd)
+}
+
 // Every lane session's requests (already windowed) summed by phase, the costliest first.
 function rows_of(input: PhaseInput): Array<PhaseRow> {
 	const rows = new Map<string, PhaseRow>()
 
 	for (const session of input.sessions) add_session(rows, input, session)
 
-	return [...rows.values()].toSorted((left, right) => right.usd - left.usd)
+	return sorted(rows)
 }
 
-const cost_audit_phase = { PLAN, ROUND_ONE, ROUND_TWO, UNATTRIBUTED, rows_of }
+function agent_key(session: AuditSession): string {
+	return session.agent_type === undefined ? session.kind : `${AGENT_LEAD}${session.agent_type}`
+}
+
+// A lane's delegated unit — in the lane's directory, yet not the lane child's own session.
+function add_unit(rows: Map<string, PhaseRow>, session: AuditSession): void {
+	if (session.issue === undefined || session.is_lane) return
+
+	for (const record of session.records) add_record(rows, agent_key(session), record)
+}
+
+// The lane children's delegated units' requests (already windowed) summed by agent type, a unit with no
+// `meta.json` under its kind (joshuafolkken/kit#5971), the costliest first.
+function agent_rows_of(sessions: ReadonlyArray<AuditSession>): Array<PhaseRow> {
+	const rows = new Map<string, PhaseRow>()
+
+	for (const session of sessions) add_unit(rows, session)
+
+	return sorted(rows)
+}
+
+const cost_audit_phase = { PLAN, ROUND_ONE, ROUND_TWO, UNATTRIBUTED, agent_rows_of, rows_of }
 
 export type { PhaseRow, PhaseTokens }
 export { cost_audit_phase }

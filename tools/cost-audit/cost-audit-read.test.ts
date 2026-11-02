@@ -1,5 +1,8 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { cost_audit_fixture } from './cost-audit-fixture'
 import { cost_audit_read } from './cost-audit-read'
 
@@ -89,6 +92,59 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 			[undefined, false],
 			[5936, true],
 		])
+	})
+})
+
+// joshuafolkken/kit#5971: a delegated unit's agent type from the `meta.json` beside its transcript.
+const META_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'cost-audit-meta-'))
+
+// A unit transcript's path in the fixture directory, a fixed `meta.json` written beside it when given.
+function unit_path(id: string, meta: string | undefined): string {
+	if (meta !== undefined) writeFileSync(path.join(META_DIRECTORY, `agent-${id}.meta.json`), meta)
+
+	return path.join(META_DIRECTORY, `agent-${id}.jsonl`)
+}
+
+afterAll(() => {
+	rmSync(META_DIRECTORY, { recursive: true, force: true })
+})
+
+describe('cost_audit_read.agent_type_of — the meta.json beside a unit transcript', () => {
+	it('reads the agent type a fixed meta.json names', () => {
+		const meta = JSON.stringify({ agentType: 'reviewer', isBuiltIn: false, spawnDepth: 1 })
+
+		expect(cost_audit_read.agent_type_of(unit_path('a1', meta))).toBe('reviewer')
+	})
+
+	it('answers nothing for a unit with no meta.json', () => {
+		expect(cost_audit_read.agent_type_of(unit_path('a2', undefined))).toBeUndefined()
+	})
+
+	it('answers nothing for a meta.json that is not JSON or names no agent type', () => {
+		expect(cost_audit_read.agent_type_of(unit_path('a3', '{'))).toBeUndefined()
+		expect(cost_audit_read.agent_type_of(unit_path('a4', '{"agentType":""}'))).toBeUndefined()
+	})
+})
+
+describe('cost_audit_read.load — a delegated unit carries its agent type', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('gives a loaded delegated unit its agent type and a main session none', () => {
+		const meta = JSON.stringify({ agentType: 'investigator' })
+		const unit_file = { ...MAIN_FILE, path: unit_path('a5', meta), is_delegated: true, depth: 1 }
+		const main_file = { ...MAIN_FILE, session_id: 's9', path: unit_path('a6', meta) }
+
+		vi.spyOn(cost_transcript, 'session_cwd').mockReturnValue('/dev/kit')
+		vi.spyOn(cost_transcript, 'transcript_directories').mockReturnValue([])
+		vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue([unit_file, main_file])
+		vi.spyOn(cost_transcript, 'lane_transcript_directories').mockReturnValue([])
+		vi.spyOn(cost_transcript, 'read_raw').mockReturnValue(prompt_line(0, FULLRUN_PROMPT))
+
+		const types = cost_audit_read.load('/dev/kit', 0).map((one) => one.agent_type)
+
+		expect(types).toStrictEqual([undefined, 'investigator'])
 	})
 })
 

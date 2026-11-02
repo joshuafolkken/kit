@@ -3,10 +3,12 @@ import path from 'node:path'
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
+import { file_reader } from '#scripts/lib/read-file'
 import {
 	time_transcript_line,
 	type TranscriptLine,
 } from '#scripts/time-runtime/time-transcript-line'
+import { z } from 'zod'
 import { cost_audit_kind } from './cost-audit-kind'
 import { cost_audit_tool, type ToolCategory } from './cost-audit-tool'
 
@@ -31,6 +33,8 @@ interface AuditSession {
 	// The Issue of the lane checkout whose directory holds the transcript, its delegated units included;
 	// absent outside a lane. The phase table reads the lane's stages by it (joshuafolkken/kit#5936).
 	issue?: number | undefined
+	// A delegated unit's agent type from its `meta.json`; absent for a main session or a unit with none.
+	agent_type?: string | undefined
 	records: ReadonlyArray<UsageRecord>
 	// The categories of the calls each request issued, keyed by request id; a request absent here
 	// issued none.
@@ -39,6 +43,8 @@ interface AuditSession {
 }
 
 const LANE_ISSUE_PATTERN = /-(\d+)$/u
+const TRANSCRIPT_EXTENSION = /\.jsonl$/u
+const META_SCHEMA = z.object({ agentType: z.string().min(1) })
 
 interface SessionParts {
 	records: Array<UsageRecord>
@@ -130,11 +136,33 @@ function issue_of(file_path: string, lanes: ReadonlyArray<string>): number | und
 	return digits === undefined ? undefined : Number(digits)
 }
 
+function json_or_undefined(text: string): unknown {
+	try {
+		return JSON.parse(text)
+	} catch {
+		return undefined
+	}
+}
+
+// A delegated unit's agent type, read from the `agent-<id>.meta.json` beside its transcript; absent
+// when the file is missing or names none, so the unit falls into its kind's row (joshuafolkken/kit#5971).
+function agent_type_of(transcript_path: string): string | undefined {
+	const meta_path = transcript_path.replace(TRANSCRIPT_EXTENSION, '.meta.json')
+	const text = file_reader.read_if_readable(meta_path)
+
+	if (text === undefined) return undefined
+
+	const parsed = META_SCHEMA.safeParse(json_or_undefined(text))
+
+	return parsed.success ? parsed.data.agentType : undefined
+}
+
 function file_session(file: SessionFile, lanes: ReadonlyArray<string>): AuditSession {
 	const issue = issue_of(file.path, lanes)
 	const session = session_of(cost_transcript.read_raw(file), file.is_delegated, issue !== undefined)
+	const agent_type = file.is_delegated ? agent_type_of(file.path) : undefined
 
-	return { ...session, issue }
+	return { ...session, issue, agent_type }
 }
 
 // Every session touched since `since_ms`. A file last written before then holds no request inside the
@@ -149,7 +177,7 @@ function load(cwd: string, since_ms: number): Array<AuditSession> {
 	return dedupe_across(sessions)
 }
 
-const cost_audit_read = { session_of, dedupe_across, issue_of, load }
+const cost_audit_read = { session_of, dedupe_across, issue_of, agent_type_of, load }
 
 export type { AuditSession }
 export { cost_audit_read }
