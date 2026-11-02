@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises'
+import { core_priority } from '#scripts/gate/core-priority'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { git_location_environment } from '#scripts/git/git-location-environment'
@@ -56,7 +57,8 @@ function josh_argv(root: string, josh_args: ReadonlyArray<string>): LaunchArgv {
 }
 
 // A `josh` command left running in the background, its output kept at `log_path`: the gate, and the
-// `test:pinned` check beside it (`run-review-pinned-steps.ts`).
+// `test:pinned` check beside it (`run-review-pinned-steps.ts`). A long-running check never inherits the
+// review stage's core-budget priority mark (`core-priority.ts`, joshuafolkken/kit#5819).
 function launch_josh(
 	josh_args: ReadonlyArray<string>,
 	log_path: string,
@@ -67,7 +69,10 @@ function launch_josh(
 			argv: josh_argv(root, josh_args),
 			cwd: root,
 			log_path,
-			env: git_location_environment.location_free_environment(),
+			env: {
+				...git_location_environment.location_free_environment(),
+				...core_priority.UNMARKED_ENVIRONMENT,
+			},
 		},
 		(note) => process.stderr.write(`${note}\n`),
 	)
