@@ -69,9 +69,14 @@ function density_line(audit: Audit): string {
 }
 
 // The period's lane-child calls per request alone — `cost:audit --density`'s output, a number a
-// measurement Issue declares because it is the output's last line (`measure-declaration.ts`).
-function density_value(audit: Audit): string {
-	return cost_audit_density.calls_per_request(audit.lane_density.current).toFixed(DENSITY_DECIMALS)
+// measurement Issue declares because it is the output's last line (`measure-declaration.ts`). A period
+// with no lane-child request answers `undefined`, never a zero that would pass a declared bound.
+function density_value(audit: Audit): string | undefined {
+	const { current } = audit.lane_density
+
+	if (current.requests === 0) return undefined
+
+	return cost_audit_density.calls_per_request(current).toFixed(DENSITY_DECIMALS)
 }
 
 function rewrite_figures(count: RewriteCount): string {

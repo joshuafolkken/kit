@@ -66,11 +66,11 @@ describe('cost_audit_cli.run — the printed report', () => {
 		expect(info).toHaveBeenCalledWith('  per merge: $1.0000 (prev $0.0000, new)  regression')
 	})
 
-	it('prints only the lane-child density under --density, so it is the last line', async () => {
+	it('prints nothing and exits 1 under --density where no lane child made a request', async () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		expect(await cost_audit_cli.run(['--density'], '/repo', NOW_MS)).toBe(0)
-		expect(info.mock.calls).toStrictEqual([['0.00']])
+		expect(await cost_audit_cli.run(['--density'], '/repo', NOW_MS)).toBe(1)
+		expect(info).not.toHaveBeenCalled()
 	})
 
 	it('prints no per-merge row when GitHub cannot be read', async () => {

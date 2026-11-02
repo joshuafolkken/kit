@@ -53,6 +53,10 @@ describe('cost_audit_format.density_value — the density as one number', () => 
 
 		expect(cost_audit_format.density_value(audit_with({ lane_density }))).toBe('2.00')
 	})
+
+	it('answers nothing, not a zero, where no lane child made a request', () => {
+		expect(cost_audit_format.density_value(audit_with())).toBeUndefined()
+	})
 })
 
 describe('cost_audit_format.report_lines — the full cache rewrites', () => {

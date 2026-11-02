@@ -122,7 +122,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--density'],
 					description:
-						"print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it.",
+						"print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it; no lane-child request prints nothing and exits 1.",
 				},
 			],
 		},

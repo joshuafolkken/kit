@@ -90,6 +90,7 @@ describe('josh read:set — what it refuses', () => {
 		expect(code).toBe(FAILURE)
 		expect(err).toContain('Known entries:')
 		expect(err).toContain(BACKLOGRUN)
+		expect(err).toContain(read_set_cli.BYTES_FLAG)
 	})
 })
 
