@@ -55,8 +55,8 @@ Invoking `fullrun` is itself the explicit authorization to merge.
   `confirmation` Telegram and exits non-zero — fix and re-run. SonarCloud is carried by the required
   `SonarQube` check.
 - **Verify a CodeRabbit finding before bypassing it.** Never pass `--coderabbit-ignore-reason`
-  reflexively: a SHA pin flagged "not matching the tag" is checked with `gh api
-  repos/<owner>/<repo>/commits/<tag> --jq '.sha'`, and the bypass cites that command.
+  reflexively: a SHA pin flagged "not matching the tag" is checked with `pnpm josh pin:verify
+  <owner/repo> <tag> <sha>`; bypass only on `match`, citing its printed line.
 - **The merge is `followup`'s, not yours** — `.claude/settings.json` refuses `gh pr merge` and its
   `gh api` spellings (`operating-rules.md` → "git-rules"). Do **not** pass `--delete-branch` unless asked.
 - **A failed merge** (branch protection, a conflict) is reported and stops the run — never retried with

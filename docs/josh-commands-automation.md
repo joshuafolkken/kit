@@ -1057,6 +1057,20 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pre-
 
 Helpers for AI-assisted development workflows.
 
+### `josh pin:verify`
+
+<!-- usage: pin:verify -->
+
+Check that a tag resolves to the commit a SHA pin names, printing a line a bypass reason cites.
+
+```bash
+pnpm josh pin:verify actions/checkout v4.2.2 11bd71901bbe5b1630ceea73d27597364c9af683   # → match / mismatch / unreadable
+```
+
+<!-- /usage -->
+
+Resolves the tag through `repos/<owner>/<repo>/commits/<tag>` (an annotated tag is peeled to its commit) and compares it with the SHA. Prints one line on stdout, `match` / `mismatch` / `unreadable` and the resolved SHA — the line a `--coderabbit-ignore-reason` cites. Only `match` exits zero.
+
 ### `josh repo:party`
 
 <!-- usage: repo:party -->
