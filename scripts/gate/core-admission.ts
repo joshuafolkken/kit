@@ -40,6 +40,7 @@ interface LedgerReservation {
 	is_unit?: boolean | undefined
 	is_strict_admission?: boolean | undefined
 	is_memory_pending?: boolean | undefined
+	is_priority?: boolean | undefined
 }
 
 interface LedgerEntry {
@@ -66,9 +67,19 @@ interface Admission {
 	waited_ms?: number | undefined
 }
 
+function priority_rank(reservation: LedgerReservation): number {
+	return reservation.is_priority === true ? 0 : 1
+}
+
 // Claim order, with the filename as the tiebreak so every reader agrees on the same ledger order
-// however the wall clock rounded two near-simultaneous claims.
+// however the wall clock rounded two near-simultaneous claims. **A priority claim
+// (`core-priority.ts`) is ordered before every claim without the mark**, so it waits only for the room
+// running claims hold and the priority claims before it (joshuafolkken/kit#5767).
 function compare_claim(left: LedgerEntry, right: LedgerEntry): number {
+	const by_priority = priority_rank(left.reservation) - priority_rank(right.reservation)
+
+	if (by_priority !== 0) return by_priority
+
 	const by_time = left.reservation.claimed_at - right.reservation.claimed_at
 
 	return by_time === 0 ? left.key.localeCompare(right.key) : by_time
@@ -138,10 +149,12 @@ function first_waiter_limit(budget: MachineBudget): LedgerLoad {
 
 // Whether `own` may pass one waiter ahead: any waiter claimed within the window before it, and a heavier
 // one within the longer window (joshuafolkken/kit#4595) — a two-core `lint:related` queued for most of the
-// cap behind a unit claim of five cores that the running claims had no room for.
+// cap behind a unit claim of five cores that the running claims had no room for. A claim never passes a
+// priority waiter ahead of it, which would take the room that waiter was put first for.
 function may_pass_waiter(own: LedgerReservation, waiter: LedgerReservation): boolean {
 	const since_ms = own.claimed_at - waiter.claimed_at
 
+	if (priority_rank(waiter) < priority_rank(own)) return false
 	if (since_ms < BYPASS_WINDOW_MS) return true
 
 	return waiter.weight > own.weight && since_ms < HEAVIER_BYPASS_WINDOW_MS

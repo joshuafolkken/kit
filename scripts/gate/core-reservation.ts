@@ -4,6 +4,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import type { ReserveOptions } from './core-budget'
+import { core_priority } from './core-priority'
 import { core_wait } from './core-wait'
 
 // Shared marker storage for gate claims and detached lane memory claims. Optional fields preserve
@@ -16,6 +17,7 @@ const reservation_schema = process_owner_schema.extend({
 	is_unit: z.boolean().optional(),
 	is_strict_admission: z.boolean().optional(),
 	is_memory_pending: z.boolean().optional(),
+	is_priority: z.boolean().optional(),
 	granted: z.number().optional(),
 	command: z.string().optional(),
 	checkout: z.string().optional(),
@@ -43,6 +45,7 @@ function claim_fields(
 		is_unit,
 		is_strict_admission,
 		is_memory_pending,
+		is_priority: core_priority.marker_field(options),
 		...core_wait.where_of(options.checkout ?? process.cwd()),
 	}
 }
