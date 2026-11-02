@@ -59,6 +59,8 @@ interface Audit {
 	rewrites: { current: Rewrites; previous: Rewrites }
 	// The current period's lane requests by phase (joshuafolkken/kit#5936).
 	phases: ReadonlyArray<PhaseRow>
+	// The current period's lane delegated units by agent type (joshuafolkken/kit#5971).
+	agents: ReadonlyArray<PhaseRow>
 }
 
 interface AuditInput {
@@ -199,6 +201,7 @@ function audit(input: AuditInput): Audit {
 			previous: rewrites_inside(input.sessions, previous_window),
 		},
 		phases: phases_inside(input, current_window),
+		agents: cost_audit_phase.agent_rows_of(inside(input.sessions, current_window)),
 	}
 }
 

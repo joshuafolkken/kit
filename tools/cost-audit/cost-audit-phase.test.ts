@@ -162,3 +162,37 @@ describe('cost_audit_phase.rows_of — the fix of a review that ran inside the s
 		])
 	})
 })
+
+// joshuafolkken/kit#5971: a lane's delegated units by the agent type their `meta.json` names.
+function unit(
+	kind: string,
+	records: ReadonlyArray<UsageRecord>,
+	agent_type?: string,
+): AuditSession {
+	return { ...session(kind, records), issue: ISSUE, agent_type }
+}
+
+describe('cost_audit_phase.agent_rows_of — a lane subagent by its agent type', () => {
+	it('sums each agent type into one row and keeps a unit with no meta.json under its kind', () => {
+		const sessions = [
+			unit('review', [record('r1', 5, 2)], 'reviewer'),
+			unit('subagent', [record('i1', 6, 3)], 'investigator'),
+			unit('review', [record('r2', 7, 4)], 'reviewer'),
+			unit('subagent', [record('u1', 8, 1)]),
+		]
+		const rows = cost_audit_phase.agent_rows_of(sessions).map((row) => [row.key, row.usd])
+
+		expect(rows).toStrictEqual([
+			['subagent: reviewer', 6],
+			['subagent: investigator', 3],
+			['subagent', 1],
+		])
+	})
+
+	it("leaves out the lane child's own session and a unit outside every lane", () => {
+		const outside = { ...session('subagent', [record('o1', 5, 2)]), agent_type: 'reviewer' }
+		const sessions = [CHILD, outside]
+
+		expect(cost_audit_phase.agent_rows_of(sessions)).toStrictEqual([])
+	})
+})

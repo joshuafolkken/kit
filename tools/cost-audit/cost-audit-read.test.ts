@@ -1,5 +1,8 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { cost_audit_fixture } from './cost-audit-fixture'
 import { cost_audit_read } from './cost-audit-read'
 
@@ -89,6 +92,36 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 			[undefined, false],
 			[5936, true],
 		])
+	})
+})
+
+// joshuafolkken/kit#5971: a delegated unit's agent type from the `meta.json` beside its transcript.
+describe('cost_audit_read.agent_type_of — the meta.json beside a unit transcript', () => {
+	const directory = mkdtempSync(path.join(tmpdir(), 'cost-audit-meta-'))
+
+	function unit_path(id: string, meta: string | undefined): string {
+		if (meta !== undefined) writeFileSync(path.join(directory, `agent-${id}.meta.json`), meta)
+
+		return path.join(directory, `agent-${id}.jsonl`)
+	}
+
+	afterAll(() => {
+		rmSync(directory, { recursive: true, force: true })
+	})
+
+	it('reads the agent type a fixed meta.json names', () => {
+		const meta = JSON.stringify({ agentType: 'reviewer', isBuiltIn: false, spawnDepth: 1 })
+
+		expect(cost_audit_read.agent_type_of(unit_path('a1', meta))).toBe('reviewer')
+	})
+
+	it('answers nothing for a unit with no meta.json', () => {
+		expect(cost_audit_read.agent_type_of(unit_path('a2', undefined))).toBeUndefined()
+	})
+
+	it('answers nothing for a meta.json that is not JSON or names no agent type', () => {
+		expect(cost_audit_read.agent_type_of(unit_path('a3', '{'))).toBeUndefined()
+		expect(cost_audit_read.agent_type_of(unit_path('a4', '{"agentType":""}'))).toBeUndefined()
 	})
 })
 
