@@ -48,6 +48,7 @@ const FULL = inputs({
 	audit_summary: `Cost audit (7d): $12.0000 (+30.0%); regressions: total\n${REGRESSION_LINE}`,
 	guards: [
 		{ guard: 'batching', refusals: 2, stops: 0, usd: 0.5 },
+		{ guard: 'lane plan', refusals: 1, stops: 0, usd: 3 },
 		{ guard: "unsafe `sed -i` on $HOME's file", refusals: 4, stops: 1, usd: 1.25 },
 	],
 	waiting: [waiting_role('wake', 0.25, 0.52)],
@@ -73,9 +74,10 @@ describe('retrospective_picks.rank', () => {
 		])
 	})
 
-	it('drops a finding or ship stop seen only once', () => {
+	it('drops a guard, finding or ship stop seen only once', () => {
 		const titles = retrospective_picks.rank(FULL).map((pick) => pick.title)
 
+		expect(titles).not.toContain('Reduce lane plan guard friction')
 		expect(titles).not.toContain('Prevent recurring i18n review findings')
 		expect(titles).not.toContain('Reduce ship stops at review')
 	})
