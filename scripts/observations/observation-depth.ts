@@ -1,8 +1,8 @@
 import path from 'node:path'
 
-// The depth test's table (`.claude/skills/workflow-commands/observation-filing.md` → "The depth test"),
-// read off the subject's path instead of applied by the agent: the deepest row whose prefix the path
-// starts with wins, and a path no row claims is depth 0 — what a consumer of this package touches.
+// The depth test's rows — their single source; `.claude/skills/workflow-commands/observation-filing.md`
+// → "The depth test" points here through `josh observation:depth`. The deepest row whose prefix the
+// path starts with wins, and a path no row claims is depth 0 — what a consumer of this package touches.
 
 interface DepthRow {
 	depth: number
