@@ -77,7 +77,6 @@ function parse(value: unknown): AgentProfile | undefined {
 }
 
 const agent_profile_schema = {
-	ANTHROPIC_MODEL,
 	DEFAULT_PROFILES,
 	EFFORT_SCHEMA,
 	IMPLEMENTATION_PHASE,

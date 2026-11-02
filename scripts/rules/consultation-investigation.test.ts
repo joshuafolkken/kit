@@ -126,8 +126,8 @@ describe('consultation-investigation — a Fable main line', () => {
 })
 
 describe('consultation-investigation — the reason', () => {
-	it('names the investigation model and a narrow example', () => {
-		expect(ROW.reason).toContain(OPUS)
+	it('names the model the investigator dispatches on and a narrow example', () => {
+		expect(ROW.reason).toContain(SONNET)
 		expect(ROW.reason).toContain(`<= ${String(NARROW_LIMIT)} lines`)
 	})
 
@@ -143,9 +143,9 @@ describe('consultation-investigation — the reason', () => {
 
 	// The hook loads `.env` after the rows are imported, so the model is read at delivery.
 	it('names an investigation model set after import', () => {
-		vi.stubEnv('JOSH_INVESTIGATION_MODEL', SONNET)
+		vi.stubEnv('JOSH_INVESTIGATION_MODEL', OPUS)
 
-		expect(ROW.reason).toContain(SONNET)
+		expect(ROW.reason).toContain(OPUS)
 	})
 })
 

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { describe, expect, it } from 'vitest'
 
 // The investigation unit's definition (joshuafolkken/kit#3139). joshuafolkken/kit#3394 pins it to
@@ -11,6 +12,7 @@ const ROOT = process.cwd()
 const AGENT_PATH = '.claude/agents/investigator.md'
 const DELEGATION_PATH = '.claude/skills/workflow-commands/delegation.md'
 const FRONTMATTER = /^---\n(?<body>[\s\S]*?)\n---\n/u
+const PINNED_ALIAS = /^claude-(?<alias>[a-z]+)-/u
 
 function read(relative: string): string {
 	return readFileSync(path.join(ROOT, relative), 'utf8')
@@ -25,8 +27,14 @@ describe('investigator agent definition', () => {
 		expect(frontmatter()).toMatch(/^name: investigator$/mu)
 	})
 
-	it('runs on a cheaper model than the parent', () => {
-		expect(frontmatter()).toMatch(/^model: sonnet$/mu)
+	// joshuafolkken/kit#5944: the guard names the profile's model, the Agent tool dispatches on this
+	// alias — the profile's pinned id is the one source, the alias follows it.
+	it('runs on the alias of the profile investigation model', () => {
+		const pinned = agent_role_profile.investigation_model('anthropic', {})
+		const alias = PINNED_ALIAS.exec(pinned)?.groups?.['alias']
+
+		expect(alias).toBe('sonnet')
+		expect(frontmatter()).toMatch(new RegExp(`^model: ${alias ?? ''}$`, 'mu'))
 	})
 
 	it('lowers the effort', () => {
