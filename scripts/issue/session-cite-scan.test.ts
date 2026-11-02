@@ -114,7 +114,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The `run:stalled` park event, and the resume command a park comment and a board row name.
 	['run/park/run-stalled.ts', 2],
 	// The `run:pause` stash name, its idempotence marker, and the pause comment on the paused Issue.
-	['run/pause/run-pause.ts', 5],
+	['run/pause/run-pause.ts', 2],
+	// The `run:split` stash name, its idempotence marker, the split comment and the park comment.
+	['run/split/run-split.ts', 3],
 	['run/ship/run-ship-detach.ts', 1],
 	// The handover note on the run event stream, which `run:board` attributes by its `#<N>`.
 	['run/ship/run-ship-handover.ts', 1],

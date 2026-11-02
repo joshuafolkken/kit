@@ -57,15 +57,41 @@ async function fetch_epics(): Promise<FetchedEpics> {
 
 // A listing cut short is no answer about absence: an epic past the cut tracks `#M` invisibly, and a
 // direct relation written then leaves that epic recording an order its body never declares.
-async function tracking_epic(request: BlockedByRequest): Promise<Tracking | undefined> {
+async function tracked_in(
+	issue: string,
+): Promise<{ epic: number | undefined; fetched: FetchedEpics }> {
 	const fetched = await fetch_epics()
-	const index = epic_index.build_epic_index(fetched.epics)
-	const epic = index.get(Number(request.issue))
+	const epic = epic_index.build_epic_index(fetched.epics).get(Number(issue))
 
 	if (epic === undefined && !epic_bundle_gaps.is_membership_established(fetched.cutoff)) {
 		throw new Error(UNSEEN_EPIC)
 	}
 
+	return { epic, fetched }
+}
+
+interface ChildrenTracking {
+	epic: number
+	// Whether the same epic already lists every one of the children as a row of its own.
+	lists_children: boolean
+}
+
+// The epic tracking `#issue`, `undefined` for none, or a throw when the listing cannot tell.
+async function tracking_with(
+	issue: string,
+	children: ReadonlyArray<string>,
+): Promise<ChildrenTracking | undefined> {
+	const { epic, fetched } = await tracked_in(issue)
+	if (epic === undefined) return undefined
+
+	return {
+		epic,
+		lists_children: children.every((child) => is_listed_by(fetched.epics, child, epic)),
+	}
+}
+
+async function tracking_epic(request: BlockedByRequest): Promise<Tracking | undefined> {
+	const { epic, fetched } = await tracked_in(request.issue)
 	if (epic === undefined) return undefined
 
 	return { epic, is_prerequisite_child: is_listed_by(fetched.epics, request.prerequisite, epic) }
@@ -157,7 +183,7 @@ async function record(request: BlockedByRequest): Promise<string> {
 	return 'recorded'
 }
 
-const epic_blocked_by = { record, listing_epics }
+const epic_blocked_by = { record, listing_epics, tracking_with }
 
-export type { BlockedByRequest }
+export type { BlockedByRequest, ChildrenTracking }
 export { epic_blocked_by }

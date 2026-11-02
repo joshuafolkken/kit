@@ -161,3 +161,30 @@ describe('epic_blocked_by.listing_epics', () => {
 		await expect(epic_blocked_by.listing_epics(REQUEST.issue)).rejects.toThrow(UNSEEN)
 	})
 })
+
+// joshuafolkken/kit#5846: `run:split`'s placement — the epic tracking `#N`, and whether a rerun finds
+// every child already placed in it.
+describe('epic_blocked_by.tracking_with', () => {
+	it('answers no epic when none tracks the issue', async () => {
+		expect(await epic_blocked_by.tracking_with('10', ['11'])).toBeUndefined()
+	})
+
+	it.each([
+		[BOTH_TRACKED, ['11'], true],
+		[BOTH_TRACKED, ['11', '12'], false],
+		[ISSUE_TRACKED, ['11'], false],
+	])('reads %j with children %j as lists_children %s', async (body, children, lists_children) => {
+		epics_of(body)
+
+		expect(await epic_blocked_by.tracking_with('10', children)).toStrictEqual({
+			epic: EPIC,
+			lists_children,
+		})
+	})
+
+	it('throws when the listing is cut short and no epic is seen', async () => {
+		vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue({ cutoff: 'row_limit', epics: [] })
+
+		await expect(epic_blocked_by.tracking_with('10', ['11'])).rejects.toThrow(UNSEEN)
+	})
+})
