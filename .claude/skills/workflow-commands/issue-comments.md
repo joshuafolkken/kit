@@ -7,13 +7,12 @@ Read before implementing a `#N` Issue.
 turn as whatever else the run needs:
 
 ```bash
-pnpm josh issue:read <N> [<N> ...]     # body and comments, one call per batch
-gh api repos/<owner>/<repo>/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
+pnpm josh issue:read <N> [<N> ...]                       # body and comments, one call per batch
+pnpm josh issue:read <N> [<N> ...] --repo <owner/repo>   # an Issue in another repository
 ```
 
-**Type the first line**; it **says when a comment listing could not be read rather than showing no
-comments**. The `gh api` form is **cross-repository only** (the command takes no `--repo`); a read
-of this repository's Issue, its comments or its timeline — `repos/{owner}/…` or the repository
+The command **says when a comment listing could not be read rather than showing no comments**. A raw
+read of this repository's Issue, its comments or its timeline — `repos/{owner}/…` or the repository
 spelled out, and `gh issue view` — is refused (`pnpm josh rule:list` → `direct-issue-read`).
 
 An Issue whose author has no write access stops at `run:entry` until a person with write access
