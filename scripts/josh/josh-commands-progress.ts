@@ -83,11 +83,18 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:pickup': {
 		script: 'scripts/run/run-pickup-cli.ts',
-		description: 'Read the open lanes back after a manual cut: each liveness, and the watcher line',
+		description:
+			'Pick the lanes up after a manual cut: launch what the epics offer, then each liveness and the watcher line',
 		category: 'AI tools',
-		reference: ['', 'automation', ['processes']],
+		reference: ['[<epic>...]', 'automation', ['processes']],
 		usage: {
-			examples: [{ arguments: '', note: 'one line per lane, then the watcher line' }],
+			examples: [
+				{ arguments: '', note: 'one line per lane, then the watcher line' },
+				{
+					arguments: '5800',
+					note: 'first one line per child the epic offers: launched, refused or its verdict',
+				},
+			],
 		},
 	},
 	'run:handoff': {

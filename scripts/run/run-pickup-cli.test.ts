@@ -4,6 +4,7 @@ import { run_pickup_cli } from './run-pickup-cli'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const list_lanes_mock = vi.hoisted(() => vi.fn())
+const launch_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/issue/session-cite', () => ({
@@ -12,10 +13,16 @@ vi.mock('#scripts/issue/session-cite', () => ({
 vi.mock('#scripts/lane/lane-registry', () => ({
 	lane_registry: { list_lanes: list_lanes_mock },
 }))
+vi.mock('#scripts/run/run-pickup-launch', () => ({
+	run_pickup_launch: { launch: launch_mock },
+}))
 
 const OUTPUT_A = '/units/a.output'
 const OUTPUT_B = '/units/b.output'
 const WATCHER = 'watcher (start it in the background): pnpm josh run:progress --wait'
+const NO_LANES = 'no open lane — nothing to pick up'
+const LAUNCHED = '#21 launched — pid 4001'
+const REFUSED = 'epic:next refused — boom'
 
 function lane(issue: string, output: string | undefined): LaneInfo {
 	return {
@@ -43,6 +50,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	josh_run_mock.mockReset()
 	list_lanes_mock.mockReset()
+	launch_mock.mockReset()
 })
 
 describe('run:pickup with lanes recording a path', () => {
@@ -97,11 +105,46 @@ describe('run:pickup with nothing to poll', () => {
 		list_lanes_mock.mockResolvedValue([])
 
 		expect(await run_pickup_cli.run([])).toBe(0)
-		expect(printed()).toBe('no open lane — nothing to pick up')
+		expect(printed()).toBe(NO_LANES)
 	})
 
-	it('refuses an argument with the usage line', async () => {
-		expect(await run_pickup_cli.run(['5856'])).toBe(1)
-		expect(list_lanes_mock).not.toHaveBeenCalled()
+	it.each(['--lanes', '0'])(
+		'refuses %j, not an epic number, with the usage line',
+		async (value) => {
+			expect(await run_pickup_cli.run(['20', value])).toBe(1)
+			expect(console.error).toHaveBeenCalledWith('Usage: josh run:pickup [<epic>...]')
+			expect(list_lanes_mock).not.toHaveBeenCalled()
+			expect(launch_mock).not.toHaveBeenCalled()
+		},
+	)
+})
+
+describe('run:pickup with epics named', () => {
+	it('prints the launch lines before the lanes, listed after the launches', async () => {
+		launch_mock.mockResolvedValue({ lines: [LAUNCHED], is_refused: false })
+		list_lanes_mock.mockResolvedValue([lane('21', OUTPUT_A)])
+		josh_run_mock.mockResolvedValue({ code: 0, out: 'alive', err: '' })
+
+		expect(await run_pickup_cli.run(['20'])).toBe(0)
+		expect(launch_mock).toHaveBeenCalledWith(['20'])
+		expect(printed()).toBe(
+			[LAUNCHED, '#21 liveness: alive', `${WATCHER} --output ${OUTPUT_A}`].join('\n'),
+		)
+	})
+
+	it('exits 1 when the offer was refused, still reading the lanes back', async () => {
+		launch_mock.mockResolvedValue({ lines: [REFUSED], is_refused: true })
+		list_lanes_mock.mockResolvedValue([])
+
+		expect(await run_pickup_cli.run(['20'])).toBe(1)
+		expect(printed()).toBe([REFUSED, NO_LANES].join('\n'))
+	})
+
+	it('launches nothing with no epic named', async () => {
+		list_lanes_mock.mockResolvedValue([])
+
+		await run_pickup_cli.run([])
+
+		expect(launch_mock).not.toHaveBeenCalled()
 	})
 })

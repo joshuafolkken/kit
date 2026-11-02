@@ -135,28 +135,4 @@
 
 **1 つの要望を 2 件以上の Issue に分割したら、件数や順序の有無にかかわらず常に epic を作る。** 作成は `pnpm josh epic`、点検は `pnpm josh epic:check <E>`、子の追加は `pnpm josh epic --add` で行い、本文を手で編集しない。epic 自体を実装ランに渡さない（`backlogrun #<E> --only` が子を回す）。記法は `epic-commands` スキル →「Creating an epic」。
 
-`josh` が使えない環境での手作業手順:
-
-1. 子 Issue をすべて起票し、番号を控える。`epic` ラベルは `josh sync` が用意する。
-2. epic を作り、`id` ではなく **number** を控える: `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -F body=@<body-file> --jq .number`。本文は次の形にする（順序がなければ `Dependencies` に `None — the children are independent; any execution order works.` と書く）:
-
-   ```md
-   ## Split rationale
-
-   <why this split>
-
-   ## Dependencies
-
-   #101 -> #102
-
-   ## Execution
-
-   backlogrun #<E> --only
-
-   ## Progress
-
-   - [ ] #101 <title>
-   - [ ] #102 <title>
-   ```
-
-3. 順序があるときだけ、別ステップで依存を足す（Issue 番号ではなく database id を渡す。失敗しても止めない）: `gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"`
+本文の形（`Split rationale`・`Dependencies`・`Execution`・`Progress`）と、`--ordered` のときの `blocked-by` 依存は `pnpm josh epic` が組み立てる（`docs/josh-commands-backlog.md` → "josh epic"）。
