@@ -16,7 +16,7 @@ import { lane_plan, type LanePlan } from './lane-plan'
 // **Two more axes answer `split`** (joshuafolkken/kit#5568), since declarations run short — merged lanes
 // changed 1.5 times the files and 1.8 times the lines they declared, so twice the files alone rarely
 // fired: the probed hunks past twice the declared files, and the declared lines times the period's
-// `lines actual / declared median` (`DEFAULT_LINES_RATIO` without one) past the line guide (200 declared lines at 1.8 split). Both
+// `lines actual / declared median` (`split_assess.DECLARED_GROWTH_FACTOR` without one) past the line guide. Both
 // stand down once the lane has filed a split child: the lines axis reads the declaration alone, and the
 // hunks the tree already holds would otherwise refuse every re-plan the ship's `unplanned` stop asks for.
 // The lines axis also stands down on a re-plan of a cleared plan (joshuafolkken/kit#5600): the
@@ -70,8 +70,6 @@ interface Declared {
 	lines: number
 }
 
-const DEFAULT_LINES_RATIO = 1.8
-
 function declared_of(issue: number, issues: ReadonlyArray<OpenIssueData>): Declared | undefined {
 	const body = issues.find((candidate) => candidate.number === issue)?.body
 	const size = body === undefined ? undefined : size_estimate.declared_size(body)
@@ -96,7 +94,7 @@ function files_over(
 	declared: number,
 	recorded: ReadonlyArray<string>,
 ): FilesOver | undefined {
-	const limit = declared * split_assess.PLAN_GROWTH_FACTOR
+	const limit = declared * split_assess.DECLARED_GROWTH_FACTOR
 	const counted = plan.paths.filter((file) => !test_declared_logic.is_test_file(file))
 
 	if (counted.length <= limit) return undefined
@@ -134,13 +132,13 @@ function unplanned_hunks(
 }
 
 function hunks_over(declared: number, hunks: number): MeasureOver | undefined {
-	const limit = declared * split_assess.PLAN_GROWTH_FACTOR
+	const limit = declared * split_assess.DECLARED_GROWTH_FACTOR
 
 	return hunks > limit ? { reason: 'hunks', declared, limit, measured: hunks } : undefined
 }
 
 function lines_over(declared: number, lines_ratio: number | undefined): MeasureOver | undefined {
-	const measured = Math.round(declared * (lines_ratio ?? DEFAULT_LINES_RATIO))
+	const measured = Math.round(declared * (lines_ratio ?? split_assess.DECLARED_GROWTH_FACTOR))
 	const limit = split_assess.LINE_GUIDE
 
 	return measured > limit ? { reason: 'lines', declared, limit, measured } : undefined
@@ -182,7 +180,7 @@ function bar_tail(): string {
 
 function files_text(issue: number, over: FilesOver): string {
 	const counted = over.kept.length + over.split_off.length
-	const bar = `${String(counted)} files (tests excluded), over ${String(over.limit)} — ${String(split_assess.PLAN_GROWTH_FACTOR)} times the ${String(over.declared)} its \`- 規模見積もり:\` declares`
+	const bar = `${String(counted)} files (tests excluded), over ${String(over.limit)} — ${String(split_assess.DECLARED_GROWTH_FACTOR)} times the ${String(over.declared)} its \`- 規模見積もり:\` declares`
 	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
 
 	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. ${bar_tail()}`
@@ -190,7 +188,7 @@ function files_text(issue: number, over: FilesOver): string {
 
 function measure_bar(over: MeasureOver): string {
 	if (over.reason === 'hunks') {
-		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(split_assess.PLAN_GROWTH_FACTOR)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
+		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(split_assess.DECLARED_GROWTH_FACTOR)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
 	}
 
 	return `\`- 規模見積もり:\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)}-line guide`

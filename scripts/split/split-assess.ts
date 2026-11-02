@@ -38,10 +38,12 @@ const LINE_GUIDE = 200
 const CAP_FACTOR = 3
 const FILE_CAP = FILE_GUIDE * CAP_FACTOR
 const LINE_CAP = LINE_GUIDE * CAP_FACTOR
-// The growth bar `lane:plan` holds a plan to: twice the declared file count. Plans run 1.5 times their
-// declaration at the median; the two lanes past twice it ran their implement step at twice the median
-// (joshuafolkken/kit#5533).
-const PLAN_GROWTH_FACTOR = 2
+// The correction a declared size estimate takes before it is judged — the filing's guide and cap
+// (`size-estimate.ts`), `lane:plan`'s files and hunks bars, and its lines axis when the period has no
+// measured ratio. Its source is `lane:stats`' "measured lanes" table: at lanes 209-210 (2026-11-02)
+// `files actual / declared median` read 2.0 and `lines actual / declared median` 1.7
+// (joshuafolkken/kit#5945; earlier 1.5 / 1.8, joshuafolkken/kit#5533, joshuafolkken/kit#5654).
+const DECLARED_GROWTH_FACTOR = 2
 
 const SPLIT_VERDICT: SplitVerdict = 'split'
 const SINGLE_VERDICT: SplitVerdict = 'single'
@@ -141,12 +143,12 @@ function notice(measurement: SizeMeasurement): string | undefined {
 }
 
 const split_assess = {
+	DECLARED_GROWTH_FACTOR,
 	FILE_CAP,
 	FILE_GUIDE,
 	LINE_CAP,
 	LINE_GUIDE,
 	NOTICE_SECTION,
-	PLAN_GROWTH_FACTOR,
 	QUESTION_SECTION,
 	REASON_PREFIX,
 	SPLIT_VERDICT,
