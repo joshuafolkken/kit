@@ -4,22 +4,28 @@ import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park_cli } from './run-park-cli'
 
-const { apply_mock, clear_label_mock, record_mock, clear_record_mock, release_mock } = vi.hoisted(
-	() => ({
-		apply_mock:
-			vi.fn<
-				(
-					issue: string,
-					label: string,
-					body: string,
-				) => Promise<{ is_labelled: boolean; is_commented: boolean }>
-			>(),
-		clear_label_mock: vi.fn<(issue: string, label: string) => Promise<boolean>>(),
-		record_mock: vi.fn<(issue: string, directory: string) => boolean>(),
-		clear_record_mock: vi.fn<(issue: string, directory: string) => void>(),
-		release_mock: vi.fn<(issue: string) => Promise<number>>(),
-	}),
-)
+const {
+	apply_mock,
+	clear_label_mock,
+	record_mock,
+	clear_record_mock,
+	release_mock,
+	lane_note_mock,
+} = vi.hoisted(() => ({
+	lane_note_mock: vi.fn<(body: string, directory: string) => string>(),
+	apply_mock:
+		vi.fn<
+			(
+				issue: string,
+				label: string,
+				body: string,
+			) => Promise<{ is_labelled: boolean; is_commented: boolean }>
+		>(),
+	clear_label_mock: vi.fn<(issue: string, label: string) => Promise<boolean>>(),
+	record_mock: vi.fn<(issue: string, directory: string) => boolean>(),
+	clear_record_mock: vi.fn<(issue: string, directory: string) => void>(),
+	release_mock: vi.fn<(issue: string) => Promise<number>>(),
+}))
 
 vi.mock('#scripts/issue/issue-park', () => ({ issue_park: { apply: apply_mock } }))
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
@@ -27,6 +33,7 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 }))
 vi.mock('./run-park', () => ({ run_park: { record: record_mock, clear: clear_record_mock } }))
 vi.mock('./run-park-release', () => ({ run_park_release: { release: release_mock } }))
+vi.mock('./run-park-lane', () => ({ run_park_lane: { with_lane_note: lane_note_mock } }))
 
 const ISSUE = '4132'
 const LABEL = 'needs-decision'
@@ -37,6 +44,7 @@ const QUESTION = 'Which option?'
 const BODY = `${QUESTION}\n`
 const BODY_FILE_FLAG = '--body-file'
 const PARK_ARGV = [ISSUE, BODY_FILE_FLAG, BODY_FILE]
+const LANE_BODY = `${QUESTION}\n\n---\n- Lane directory: \`${DIRECTORY}\`\n`
 
 writeFileSync(BODY_FILE, BODY)
 
@@ -47,6 +55,7 @@ beforeEach(() => {
 	record_mock.mockReset().mockReturnValue(true)
 	clear_record_mock.mockReset()
 	release_mock.mockReset().mockResolvedValue(0)
+	lane_note_mock.mockReset().mockImplementation((body) => body)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -96,6 +105,17 @@ describe('run:park', () => {
 			expect(console.error).toHaveBeenCalledWith(run_park_cli.USAGE)
 		},
 	)
+})
+
+// joshuafolkken/kit#5840: the comment carries the lane note `run_park_lane` appends.
+describe('run:park lane note', () => {
+	it('posts the body with the lane note appended', async () => {
+		lane_note_mock.mockReturnValue(LANE_BODY)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
+		expect(lane_note_mock).toHaveBeenCalledWith(BODY, DIRECTORY)
+		expect(apply_mock).toHaveBeenCalledWith(ISSUE, LABEL, LANE_BODY)
+	})
 })
 
 // joshuafolkken/kit#5737: every parked ending owes the release, so the park runs it.
