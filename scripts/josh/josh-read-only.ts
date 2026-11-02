@@ -16,8 +16,11 @@ function is_help_request(command: string | undefined): boolean {
 	return command === undefined || command === ALL_FLAG || HELP_COMMANDS.has(command)
 }
 
-// `Object.hasOwn`, so a name spelled like an `Object.prototype` member is no command.
-function entry_of(command: string): CommandEntry | undefined {
+// The registry entry a typed name runs, an alias by the command it expands to. `Object.hasOwn`, so a
+// name spelled like an `Object.prototype` member is no command.
+function entry_of(name: string): CommandEntry | undefined {
+	const command = canonical_command(name)
+
 	return Object.hasOwn(COMMAND_MAP, command) ? COMMAND_MAP[command] : undefined
 }
 
@@ -33,12 +36,12 @@ function refusal(args: ReadonlyArray<string>): string | undefined {
 	const [command = '', ...rest] = args
 	if (is_help_request(args[0])) return undefined
 
-	const entry = entry_of(canonical_command(command))
+	const entry = entry_of(command)
 	if (entry !== undefined && has_read_only_flag(entry, rest)) return undefined
 
 	return `\`josh ${command}\` is not read-only: it is no help request and carries no read-only flag its entry declares; read its usage with \`pnpm josh help ${command}\``
 }
 
-const josh_read_only = { ALL_FLAG, is_help_request, refusal }
+const josh_read_only = { ALL_FLAG, entry_of, is_help_request, refusal }
 
 export { josh_read_only }

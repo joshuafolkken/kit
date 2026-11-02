@@ -19,6 +19,14 @@ function sink_of(): { laps: Array<ShipLapRecord>; sink: (lap: ShipLapRecord) => 
 	}
 }
 
+// A module whose once-per-process startup lap is not yet recorded.
+async function fresh_module(): Promise<typeof run_ship_lap> {
+	vi.resetModules()
+	const { run_ship_lap: fresh } = await import('./run-ship-lap')
+
+	return fresh
+}
+
 describe('run_ship_lap.timed — an inner step of a ship stage', () => {
 	it('records the step under the stage and issue it runs within', async () => {
 		const { laps, sink } = sink_of()
@@ -133,16 +141,16 @@ describe('run_ship_lap — a parent scope', () => {
 
 describe('run_ship_lap.environment — a scope handed to a child process', () => {
 	it('hands its scope to a child process, which times its steps under the parent', async () => {
+		const lap = await fresh_module()
 		const { laps, sink } = sink_of()
-		const environment = await run_ship_lap.within(ISSUE, STAGE, async () =>
-			run_ship_lap.environment(PARENT),
-		)
+		const environment = await lap.within(ISSUE, STAGE, async () => lap.environment(PARENT))
 
-		vi.stubEnv(run_ship_lap.ENVIRONMENT_KEY, environment[run_ship_lap.ENVIRONMENT_KEY])
-		await run_ship_lap.timed(CHILD_STEP, async () => 'out', { sink })
+		vi.stubEnv(lap.ENVIRONMENT_KEY, environment[lap.ENVIRONMENT_KEY])
+		await lap.timed(CHILD_STEP, async () => 'out', { sink })
 		vi.unstubAllEnvs()
 
 		expect(laps.map(({ issue, stage, step }) => ({ issue, stage, step }))).toEqual([
+			{ issue: Number(ISSUE), stage: STAGE, step: `${PARENT} › ${lap.STARTUP_STEP}` },
 			{ issue: Number(ISSUE), stage: STAGE, step: `${PARENT} › ${CHILD_STEP}` },
 		])
 	})
@@ -159,5 +167,50 @@ describe('run_ship_lap.environment — a scope handed to a child process', () =>
 		vi.unstubAllEnvs()
 
 		expect(laps).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#5896: a child process's startup, timed once ahead of its first step.
+describe('run_ship_lap.timed — the startup of a child process', () => {
+	it('records `<parent> › startup` once, before the first step under an inherited scope', async () => {
+		const lap = await fresh_module()
+		const { laps, sink } = sink_of()
+
+		vi.stubEnv(lap.ENVIRONMENT_KEY, JSON.stringify({ issue: 1, stage: STAGE, parent: PARENT }))
+		await lap.timed(CHILD_STEP, async () => 'out', { sink })
+		await lap.timed(CHILD_STEP, async () => 'out', { sink })
+		vi.unstubAllEnvs()
+
+		expect(laps.map((record) => record.step)).toEqual([
+			`${PARENT} › ${lap.STARTUP_STEP}`,
+			`${PARENT} › ${CHILD_STEP}`,
+			`${PARENT} › ${CHILD_STEP}`,
+		])
+		expect(laps[0]?.elapsed_ms).toBeGreaterThan(0)
+	})
+
+	it('records no startup for a step that declines it, as a git hook does', async () => {
+		const lap = await fresh_module()
+		const { laps, sink } = sink_of()
+
+		vi.stubEnv(lap.ENVIRONMENT_KEY, JSON.stringify({ issue: 1, stage: STAGE, parent: PARENT }))
+		await lap.timed(CHILD_STEP, async () => 'out', { sink, startup: false })
+		vi.unstubAllEnvs()
+
+		expect(laps.map((record) => record.step)).toEqual([`${PARENT} › ${CHILD_STEP}`])
+	})
+
+	it('records no startup within a scope this process opened', async () => {
+		const lap = await fresh_module()
+		const { laps, sink } = sink_of()
+
+		await lap.within(
+			ISSUE,
+			STAGE,
+			async () => await lap.timed(CHILD_STEP, async () => 'out', { sink }),
+			PARENT,
+		)
+
+		expect(laps.map((record) => record.step)).toEqual([`${PARENT} › ${CHILD_STEP}`])
 	})
 })

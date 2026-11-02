@@ -27,9 +27,9 @@ import { run_watcher_hook } from './run-watcher-hook'
 const SWITCH_ENV_KEY = 'JOSH_PARENT_CUT_GUARD'
 const STAMP_PREFIX = 'josh-parent-cut-guard-'
 
-// **One refusal, then a quiet window long enough to finish the hand-off in.** The hand-off is several
-// calls — `lane:list`, `lane:output`, `run:carry --cut`, `run:wake`, the progress comment — and a guard
-// refusing each of them would wedge the very procedure it asks for. A parent that could not cut (a lane
+// **One refusal, then a quiet window long enough to finish the hand-off in.** The hand-off is
+// `run:handoff-lanes` and the `lane:output` fix a `blocked` verdict names — and a guard refusing each
+// of them would wedge the very procedure it asks for. A parent that could not cut (a lane
 // nobody can poll) is asked again once the window has passed.
 const QUIET_WINDOW_MS = 600_000
 
@@ -54,9 +54,9 @@ const THRESHOLD_TEXT = '`pnpm josh cost --cut`'
 const PARENT_CUT_REASON =
 	'⛔ backlogrun parent hand-off: this session drives a `backlogrun` and its recent context ' +
 	`crossed the ${THRESHOLD_TEXT} threshold between merges. Take the hand-off now: open no new lane, ` +
-	'follow `backlogrun-progress.md` → "The hand-off" (`pnpm josh run:carry --cut`, then ' +
-	'`pnpm josh run:wake` unless `capped`) and end the turn. Reissue this call once done or if it ' +
-	'cannot be taken.'
+	'follow `backlogrun-progress.md` → "The hand-off" (`pnpm josh run:handoff-lanes`, then the ' +
+	'`next:` line its `cut` / `blocked` / `capped` verdict prints). Reissue this call once done or ' +
+	'if it cannot be taken.'
 
 // Neither an uncapped parent's own record nor a measured `over` is optional: a capped record has no cut
 // left to take (`run:carry --cut` answers `capped`), and an unmeasurable session is left alone here —

@@ -57,4 +57,15 @@ describe('hook_lap.timed_command — which commands are timed', () => {
 
 		expect(seen).toEqual([''])
 	})
+
+	// joshuafolkken/kit#5896: a hook's process starts inside the `josh git` step that ran git.
+	it('times a git hook with no startup lap of its own', async () => {
+		const { run_ship_lap } = await import('#scripts/run/ship/run-ship-lap')
+		const timed = vi.spyOn(run_ship_lap, 'timed')
+
+		await hook_lap.timed_command(UNIT_HOOK, HOOK_CATEGORY, [], async () => 0)
+
+		expect(timed).toHaveBeenCalledWith(UNIT_HOOK, expect.any(Function), { startup: false })
+		timed.mockRestore()
+	})
 })

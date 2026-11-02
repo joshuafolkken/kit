@@ -36,3 +36,14 @@ describe('josh help requests', () => {
 		expect(josh_read_only.is_help_request('ship')).toBe(false)
 	})
 })
+
+describe('josh registry entries', () => {
+	it('finds an alias by the command it expands to', () => {
+		expect(josh_read_only.entry_of('ms')).toBe(josh_read_only.entry_of('main:sync'))
+		expect(josh_read_only.entry_of('ms')).toBeDefined()
+	})
+
+	it('finds no entry for an Object.prototype member', () => {
+		expect(josh_read_only.entry_of('constructor')).toBeUndefined()
+	})
+})

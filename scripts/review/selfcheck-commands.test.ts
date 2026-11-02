@@ -153,6 +153,16 @@ describe('selfcheck_commands.run', () => {
 	})
 })
 
+describe('aliases in prose', () => {
+	it('looks an alias up by the command it expands to, never as an unknown command', async () => {
+		const { runner: fake } = runner()
+		const { lines, failed } = await selfcheck_commands.run(['ms'], fake)
+
+		expect(lines).toEqual(['skipped: pnpm josh ms (git, network)'])
+		expect(failed).toBe(0)
+	})
+})
+
 describe('help requests in prose', () => {
 	it('runs a help request, which no registry entry names', async () => {
 		const { runner: fake, calls } = runner()

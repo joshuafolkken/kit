@@ -528,6 +528,7 @@ pnpm josh run:merge <N>                                                  # backl
 - `--owner <pid>` — the parent's process, so the carry count respects the ownership guard; omitted, the calling session.
 - `--output <path>` — the transcript the outage and usage-limit splits read; absent, they are off.
 - `--driver` — the caller is `backlog:drive`, which has no context to cut and asks `backlog:offer` itself, so the merge is never handed back `over` and answers `deferred` in place of the next offer.
+- `--stash` — before classifying, stash the lane's uncommitted work and comment the `stash:pop` line on the Issue — the stopped-unit recovery.
 
 <!-- /usage -->
 

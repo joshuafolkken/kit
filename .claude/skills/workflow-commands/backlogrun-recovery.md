@@ -28,14 +28,11 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 **On `stopped`, re-read with `pnpm josh run:status <N>`.** **A re-read carrying `needs-decision`** — the
 unit parked it, then stopped: leave the label on and count nothing. Otherwise, while `state: OPEN`:
 
-1. **Stash the half-finished work** — `pnpm josh stash:push "backlogrun: stopped unit for #<N>"` — and
-   record it on the Issue; it is popped with `pnpm josh stash:pop "backlogrun: stopped unit for #<N>"`.
-2. **Classify and act in one call** — `pnpm josh run:merge <N> --output <path>` (`--epic <E> --repo
-   <owner/repo>` for a named epic), **the same composite a returned child takes**. It
-   tells an `outage` (re-dispatched with its session resumed, uncounted, bounded by
-   `CONSECUTIVE_OUTAGE_LIMIT`) from an `abandoned` child (parked `run:stalled` and counted), and drops
-   the stale `in-progress` itself.
-3. **Act on the token it printed** — `backlogrun-progress.md` → "Running a named epic's children".
+1. **Stash, classify and act in one call** — `pnpm josh run:merge <N> --output <path> --stash` (`--epic <E> --repo
+   <owner/repo>` for a named epic), **the same composite a returned child takes**. `--stash` stashes the
+   half-finished work and comments its `stash:pop` line; then it tells an `outage` from an `abandoned`
+   child and drops the stale `in-progress`.
+2. **Act on the token it printed** — `backlogrun-progress.md` → "Running a named epic's children".
 
 ## A person withdraws a running child
 
