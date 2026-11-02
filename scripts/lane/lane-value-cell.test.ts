@@ -107,6 +107,10 @@ describe('lane_value_cell.value — where and item', () => {
 		['an item of a cell that is no list', { ...CAUSES, row: 'merge', item: 'timed out' }],
 		['--zero on a table no title names', { ...REQUIRED, table: 'round 3', zero: true }],
 		['--zero on a row of a non-number', { ...CAUSES, row: 'merge', zero: true }],
+		[
+			'--zero on a --where column no table has',
+			{ ...REQUIRED, where: { ...LIVE, column: 'cod' }, zero: true },
+		],
 	])('answers undefined for an address of %s', (_case, address) => {
 		expect(lane_value_cell.value(MEASURED, address)).toBeUndefined()
 	})

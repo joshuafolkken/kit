@@ -1227,7 +1227,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample
 
 <!-- usage: lane:value -->
 
-Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --where --column --item), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
+Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --where --column --item --zero), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
 
 ```bash
 pnpm josh lane:value edit --since 2026-10-23T03:29Z                                                                    # the median Edit time since an instant

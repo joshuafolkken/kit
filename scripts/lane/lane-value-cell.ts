@@ -69,11 +69,13 @@ function is_addressed(cells: Cells, header: Cells, address: CellAddress): boolea
 	return where === undefined || cells[header.indexOf(where.column)] === where.text
 }
 
-// A table the address names: its title and its column.
+// A table the address names: its title, its column and its `where` column, so a mistyped header
+// never reads as a table without the row.
 function is_table(rows: ReadonlyArray<Cells>, address: CellAddress): boolean {
 	const [header = []] = rows
+	const columns = [address.column, address.where?.column ?? address.column]
 
-	return header[0] === address.table && header.includes(address.column)
+	return header[0] === address.table && columns.every((column) => header.includes(column))
 }
 
 // The cell texts at the address in one table the address names.
