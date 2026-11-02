@@ -97,6 +97,21 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'run:handoff-lanes': {
+		script: 'scripts/run/handoff-lanes/run-handoff-lanes-cli.ts',
+		description:
+			'Chain a backlogrun hand-off: cost --cut, the lane reading, run:carry --cut, run:board --chat and run:report --handoff, answering under, cut, blocked or capped',
+		category: 'AI tools',
+		reference: ['', 'automation', ['processes', 'files', 'network']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: 'after each child’s merge; prints the verdict line, then its next action',
+				},
+			],
+		},
+	},
 	'run:handoff': {
 		script: 'scripts/run/handoff/run-handoff-cli.ts',
 		description:

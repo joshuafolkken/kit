@@ -31,7 +31,14 @@ import { shell_segments } from './shell-segments'
 // The parent backlogrun budget/ownership commands. A child never runs either: `run:carry` begins and
 // advances the run budget the parent owns, and `run:merge` counts a returned child into it. Named in
 // canonical form only — `shell_segments.is_josh_command` canonicalizes an alias before the match.
-const RUN_BUDGET_COMMANDS: ReadonlySet<string> = new Set(['run:merge', 'run:carry'])
+// `run:handoff-lanes` runs `run:carry --cut` as a subprocess this guard never sees, so it is named too.
+const MERGE_COMMAND = 'run:merge'
+const HANDOFF_COMMAND = 'run:handoff-lanes'
+const RUN_BUDGET_COMMANDS: ReadonlySet<string> = new Set([
+	MERGE_COMMAND,
+	'run:carry',
+	HANDOFF_COMMAND,
+])
 
 // **A `run:carry` call prefixed with a non-empty `JOSH_TEMP_ROOT` cannot reach the parent's record**,
 // because every record it keeps is a `stamp_path` under that root. It is how
@@ -55,7 +62,8 @@ const REDIRECTED_PREFIX = new RegExp(
 )
 
 // The budget commands with an effect outside the temp root, so a redirected root does not isolate them.
-const SHARED_STATE_COMMANDS: ReadonlySet<string> = new Set(['run:merge'])
+// `run:handoff-lanes` reads the shared lane registry and sends the hand-off Telegram.
+const SHARED_STATE_COMMANDS: ReadonlySet<string> = new Set([MERGE_COMMAND, HANDOFF_COMMAND])
 
 // The leading assignments, stripped before the command is read. The shared command reader unwraps
 // `$(…)` into the command position — the subshell is the real work in a cost row — so without this
@@ -112,7 +120,8 @@ const ROW = {
 	about: {
 		title: 'Lane child carry commands',
 		topic: '`.claude/skills/workflow-commands/backlogrun-lanes.md`',
-		fires: 'a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence',
+		fires:
+			'a dispatched lane child running `pnpm josh run:merge` / `run:carry` / `run:handoff-lanes`. Every occurrence',
 		quiet: 'not a lane child — the parent owns the run budget',
 	},
 }
