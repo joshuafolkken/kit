@@ -215,6 +215,8 @@ describe('read-only consultation shell spellings', () => {
 		'wc -l scripts/hooks/implementation-shell.ts',
 		"find scripts -name '*.ts' -type f",
 		'time grep -rn pattern scripts',
+		'gh api "repos/owner/repo/issues?state=open&per_page=5"',
+		'grep -n "a|b=c" notes.md',
 	])('passes %s', (command) => {
 		expect(implementation_shell.refusal(command)).toBeUndefined()
 	})
@@ -224,6 +226,7 @@ const NEITHER = 'is neither a read-only program nor a consultation operation'
 const CD_WRITE = 'a write beside `cd`'
 const GIT_LOOP_EXPANSION = 'variable expansion in `git`'
 const ENV_ASSIGNMENT = 'an environment assignment'
+const VARIABLE_EXPANSION = 'a variable expansion'
 
 describe('read-only consultation shell spelling refusals', () => {
 	it.each([
@@ -231,6 +234,9 @@ describe('read-only consultation shell spelling refusals', () => {
 		['gh api --method PATCH repos/owner/repo -f title=x', NEITHER],
 		['gh api --method=put repos/owner/repo', NEITHER],
 		['gh api repos/owner/repo/issues/1 -X GET --method DELETE', NEITHER],
+		['gh api repos/owner/repo/issues/1 -iX DELETE', NEITHER],
+		['gh api repos/owner/repo/issues/1 -iX\tPATCH', NEITHER],
+		['grep -n "x;for f in y" $f', VARIABLE_EXPANSION],
 		['npx done', NEITHER],
 		['pnpm -s for x', NEITHER],
 		['true;GIT_EXTERNAL_DIFF=/tmp/x git diff', ENV_ASSIGNMENT],
@@ -244,7 +250,7 @@ describe('read-only consultation shell spelling refusals', () => {
 		['for f in --output=app.ts; do git diff "$f"; done', GIT_LOOP_EXPANSION],
 		['for p in rm; do $p app.ts; done', 'variable expansion in `$p`'],
 		['for f in app.ts; do echo x > $f; done', 'redirect to `$f`'],
-		['for f in a; do echo $HOME; done', 'a variable expansion'],
+		['for f in a; do echo $HOME; done', VARIABLE_EXPANSION],
 		['for f in a; do grep -n x $f; done > app.ts', 'redirect to `app.ts`'],
 		['time node scripts/probe.ts', '`node` is neither'],
 		['pnpm josh lint:related', 'pnpm josh help lint:related'],

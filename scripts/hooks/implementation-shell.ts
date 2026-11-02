@@ -64,7 +64,8 @@ const ARGUMENT_QUOTES = /['"\\]/gu
 const ARGUMENT_EXPANSION = /[*?{}[\]]/u
 // `find`'s actions that run a program or write a file; every other primary only selects and prints.
 const FIND_ACTIONS = /^-(?:exec|execdir|ok|okdir|delete|fprint0?|fprintf|fls)$/u
-const NON_GET_METHOD = /(?:^|\s)(?:-X\s*|--method(?:=|\s+))(?!GET(?:\s|$))\S/iu
+// `-X` may close a cluster of short flags (`-iX DELETE`), as gh's flag parser reads it.
+const NON_GET_METHOD = /(?:^|\s)(?:-[a-z]*X\s*|--method(?:=|\s+))(?!GET(?:\s|$))\S/iu
 const PNPM_VIEW = /^\s*pnpm(?:\s+-\S+)*\s+view(?:\s|$)/u
 const CD_WRITE = 'a write beside `cd`, whose target is not read off the repository root'
 
@@ -233,8 +234,8 @@ function segments_refusal(segments: Array<string>, root: string): Refusal {
 }
 
 // A `for` loop's variable takes a word of its visible list, so its reference is judged per segment.
-function without_loop_references(expanded: string): string {
-	const names = new Set([...expanded.matchAll(LOOP_HEADER)].map((match) => match[1]))
+function without_loop_references(expanded: string, plain: string): string {
+	const names = new Set([...plain.matchAll(LOOP_HEADER)].map((match) => match[1]))
 
 	return expanded.replaceAll(VARIABLE_REFERENCE, (reference, name: string) =>
 		names.has(name) ? '' : reference,
@@ -242,14 +243,16 @@ function without_loop_references(expanded: string): string {
 }
 
 // A single-quoted span expands nothing, so a finding quoting `code` in it is text, not a substitution.
+// An assignment or a loop header stands outside every quote, so those are read off the plain text.
 function input_refusal(command: string): Refusal {
 	const expanded = time_shell.literal_blanked(command)
+	const plain = time_shell.blanked(command) ?? expanded
 	const rules: ReadonlyArray<readonly [string, boolean]> = [
 		['an empty command', command.trim() === ''],
 		['a heredoc', time_shell.has_heredoc(command)],
 		['a command or process substitution', SUBSTITUTION.test(expanded)],
-		['an environment assignment', ENV_ASSIGNMENT.test(expanded.replaceAll(FIELD_VALUE, ' '))],
-		['a variable expansion', without_loop_references(expanded).includes('$')],
+		['an environment assignment', ENV_ASSIGNMENT.test(plain.replaceAll(FIELD_VALUE, ' '))],
+		['a variable expansion', without_loop_references(expanded, plain).includes('$')],
 	]
 
 	return rules.find(([, is_matched]) => is_matched)?.[0]
