@@ -1,0 +1,59 @@
+import { development_engines_verdict } from '#scripts/version/development-engines-verdict'
+import { overrides_diff, type ChangedBlock, type DiffSources } from './overrides-diff'
+import { overrides_check, type OverridesDiff } from './overrides-logic'
+
+// The dependency-update check read against a git revision (`.claude/skills/dependency-update`
+// §2–§3): the `devEngines` verdict line, then the overrides answer. `josh overrides --diff` and
+// `josh latest:if-required` both print it, so the check has one implementation.
+const ENGINES_RESTORE_PREFIX = 'devEngines: restore'
+
+interface PinVerdict {
+	is_overrides_moved: boolean
+	is_engines_moved: boolean
+}
+
+function print_diff_lines(diff: OverridesDiff, heading: string): void {
+	console.error(heading)
+
+	for (const line of overrides_check.format_diff_lines(diff)) {
+		console.error(line)
+	}
+}
+
+function print_overrides(sources: DiffSources, range: string): ReadonlyArray<ChangedBlock> {
+	const changed = overrides_diff.changed_blocks(sources)
+
+	for (const block of changed) {
+		print_diff_lines(block.diff, `✖ ${block.file} overrides changed since ${range}:`)
+	}
+
+	if (changed.length === 0) {
+		const summary = overrides_check.describe_sources(sources.after)
+
+		console.info(`✔ overrides unchanged since ${range} (${summary}).`)
+	}
+
+	return changed
+}
+
+// `undefined` when the range resolves to no commit (or merge-base) to compare against.
+function report(range: string): PinVerdict | undefined {
+	const sources = overrides_diff.read_sources(range)
+	if (sources === undefined) return undefined
+	const engines = development_engines_verdict.describe(
+		sources.before.package_json,
+		sources.after.package_json,
+	)
+
+	console.info(engines)
+	const changed = print_overrides(sources, range)
+
+	return {
+		is_overrides_moved: changed.length > 0,
+		is_engines_moved: engines.startsWith(ENGINES_RESTORE_PREFIX),
+	}
+}
+
+const overrides_diff_report = { report, print_diff_lines }
+
+export { overrides_diff_report, type PinVerdict }

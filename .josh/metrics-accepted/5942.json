@@ -1,0 +1,7 @@
+{
+	"reason": "latest:if-required now runs the dependency-update pin check itself (#5942); the overrides --diff verdict moved into a shared module both commands call",
+	"date": "2026-11-02",
+	"growth": {
+		"scripts.code_lines": 45
+	}
+}

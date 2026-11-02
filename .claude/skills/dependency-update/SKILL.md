@@ -24,6 +24,8 @@ pnpm josh overrides --diff HEAD                # an update not yet committed
 pnpm josh overrides --diff <default>...<branch> # after `josh adopt`, which committed and returned
 ```
 
+After `josh latest:if-required` → quote the lines it printed (`scripts/overrides/overrides-diff-report.ts`).
+
 **Quote its verdict lines** — the `devEngines` line (§3), then `✔ overrides unchanged since
 <range> (…)` or a `✖ <file> overrides changed since <range>` heading per moved block with its
 entries. They cover the overrides blocks, not the `devDependencies` of overridden packages: confirm
