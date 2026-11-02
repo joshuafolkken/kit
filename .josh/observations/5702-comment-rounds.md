@@ -1,0 +1,6 @@
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:37 | 2026-11-01 | #5702 | fixed
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:38 | 2026-11-01 | #5702 | fixed
+- rf:project-conventions | low | scripts/test/test-related-cap.ts:122 | 2026-11-01 | #5702 | fixed
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:37 | 2026-11-01 | #5702
+- rf:bug-risks | low | scripts/test/test-related-cap.ts:38 | 2026-11-01 | #5702
+- rf:project-conventions | low | scripts/test/test-related-cap.ts:122 | 2026-11-01 | #5702

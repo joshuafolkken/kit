@@ -1,0 +1,1 @@
+- rf:project-conventions | low | .claude/skills/workflow-commands/entry-sequence.md:35 | 2026-11-01 | #5747

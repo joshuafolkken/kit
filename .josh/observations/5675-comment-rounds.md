@@ -1,0 +1,1 @@
+- rf:performance | low | scripts/issue/issue-file-batch.ts:83 | 2026-11-01 | #5675
