@@ -57,7 +57,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// (and lowered `prrun` and the lane child by one block each).
 	{ entry: 'backlogrun', bytes: 73_728 },
 	// joshuafolkken/kit#5953 charged pre-gate-cut.md at the two sections run:cut prints, not whole;
-	// joshuafolkken/kit#5966 shrank the review ordering to command pointers, by another.
+	// joshuafolkken/kit#5958 dropped the seam's pointer to the cut, lowering it by a block.
 	{ entry: LANE_CHILD, bytes: 36_864 },
 ]
 
