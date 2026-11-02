@@ -45,10 +45,11 @@ const PARK_FAILURE_NOTE = `The failed child could not be parked with ${RUN_STALL
 // itself forbids (names cannot start with a hyphen) and which the taint analyzer keeps flagging.
 const REPO_PATTERN = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/u
 const USAGE =
-	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>] [--output <path>] [--driver]'
+	'Usage: josh run:merge <issue> [--over <deprecated>] [--epic <E> --repo <owner/repo>] [--owner <pid>] [--output <path>] [--driver] [--stash]'
 
 const OPTIONS = {
 	driver: { type: 'boolean' },
+	stash: { type: 'boolean' },
 	epic: { type: 'string' },
 	output: { type: 'string' },
 	over: { type: 'string' },
@@ -58,9 +59,8 @@ const OPTIONS = {
 
 interface ParsedArguments {
 	positionals: ReadonlyArray<string>
-	values: Partial<Record<'epic' | 'output' | 'over' | 'owner' | 'repo', string>> & {
-		driver?: boolean
-	}
+	values: Partial<Record<'epic' | 'output' | 'over' | 'owner' | 'repo', string>> &
+		Partial<Record<'driver' | 'stash', boolean>>
 }
 
 // Absent owner is the calling session (`run_carry.session_owner`); a present but malformed pid
@@ -156,6 +156,7 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 		over: cut_check_of(parsed.values),
 		owner,
 		output: parsed.values.output,
+		stash: parsed.values.stash,
 	}
 }
 
@@ -445,6 +446,8 @@ async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	if (lane_handoff.is_ship_running(ctx.child, process.cwd())) {
 		return { outcome: 'shipping', ...(await on_shipping()) }
 	}
+
+	if (ctx.stash === true) await run_merge_steps.stash_stopped(ctx.child)
 
 	const read = await issue_state_cli.read_issue(ctx.child, ctx.repo)
 	const signals = await run_merge_signals.read_signals(ctx, read)
