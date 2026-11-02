@@ -50,6 +50,7 @@ the behavior.
 | `josh review:record`      | #2325, #2343, #2419, #2919, #3645                                                                          |
 | `josh reserved-run`       | #2351                                                                                                      |
 | `josh repo:party`         | #2122                                                                                                      |
+| `josh pin:verify`         | #5849                                                                                                      |
 
 ## `josh refactor:scan` in detail
 
