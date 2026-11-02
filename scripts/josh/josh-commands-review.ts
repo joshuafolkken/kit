@@ -125,12 +125,16 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command',
 		category: 'AI tools',
-		reference: ['', 'automation', ['files', 'processes']],
+		reference: ['[--interaction-answered]', 'automation', ['files', 'processes']],
 		usage: {
 			examples: [
 				{
 					arguments: '',
 					note: '→ `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)',
+				},
+				{
+					arguments: '--interaction-answered',
+					note: "→ a passing, due run also records the issue's interaction round",
 				},
 			],
 		},
