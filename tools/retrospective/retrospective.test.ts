@@ -144,6 +144,20 @@ describe('retrospective.compose — the four sections are aggregated', () => {
 	})
 })
 
+describe('retrospective.compose — the improvement picks', () => {
+	it('ranks the picks from the sections it printed, before the closing pointer', () => {
+		const cost = cost_report([role('wake', 0.25, 0.52)])
+		const digest = retrospective.compose(inputs({ cost }))
+
+		expect(digest).toContain('Improvement picks (ranked by effect):')
+		expect(digest).toContain('  1. Cut wake waiting time')
+		expect(digest).toContain(
+			"pnpm josh issue:file 'Prevent recurring bug-risks review findings' --body-file <body.md>",
+		)
+		expect(digest.indexOf('Improvement picks')).toBeLessThan(digest.indexOf(retrospective.CLOSING))
+	})
+})
+
 describe('retrospective.compose — the signals it computes', () => {
 	it('marks a role whose time share runs ahead of its cost share as waiting-heavy', () => {
 		const cost = cost_report([role('wake', 0.25, 0.52)])

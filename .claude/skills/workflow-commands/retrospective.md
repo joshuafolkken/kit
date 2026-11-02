@@ -22,17 +22,15 @@ The command `run:step` prints folds four existing measurements into one digest �
 The two targets are **the run itself** (sections one, three, four) and **the repository** (section two,
 and anything the run surfaced that lives outside it).
 
-## What to file, and how the top two are chosen
+## What to file — the digest's `Improvement picks`
 
-**The filing condition is the existing depth test, unchanged** (`observation-filing.md` → "The depth
-test"). What cannot pass it is not filed — not a shortfall, just not yet a finding.
+**The digest ranks the picks and prints the top two's `issue:file` lines; the order is the command's
+(`tools/retrospective/retrospective-picks.ts`), not yours.** Write each body citing the pick's evidence
+and run its line. A cost regression ranks first and passes as printed — its line names the reproduction.
 
-**A cost regression is filed.** The digest's `File a cost regression: …` line passes the depth test as
-printed — measured, with the command it names as the reproduction — and ranks first: one Issue names
-every regressed row, and the scout keeps a repeat sighting from filing twice.
-
-**Order what passes by effect, and file the top two.** **The third onward is stacked in the observation
-ledger** (drained by `pnpm josh observations:flush`). **File nothing when nothing passes.**
+**Every other pick still faces the depth test** (`observation-filing.md` → "The depth test"): one that
+fails it is not filed, and the next pick does not move up. **The `stack:` lines go to the observation
+ledger** (drained by `pnpm josh observations:flush`); `Improvement picks: none` files nothing.
 
 **Exclude what is already filed or already done, through the existing scout** (`issue-scout.md`): file
 with `pnpm josh issue:file`, which scouts — an **open** candidate covering it means do not file, a
