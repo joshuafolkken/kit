@@ -25,12 +25,12 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:split': {
 		script: 'scripts/run/split/run-split-cli.ts',
-		description: 'Set a run aside and place its split into an epic in one call',
+		description: 'Set a run aside and place its split or prerequisite into an epic in one call',
 		category: 'AI tools',
 		// `run:release` underneath can send the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'<issue> --children <N1,N2,...> [--ordered] [--title <title>]',
+			'<issue> (--children <N1,N2,...> [--ordered] | --prerequisite <P>) [--title <title>]',
 			'automation',
 			['git', 'network', 'files'],
 		],
@@ -38,6 +38,7 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '1091 --children 1102,1103 --title "Split 1091"', note: 'independent split' },
 				{ arguments: '1091 --children 1102 --ordered', note: '1102 after 1091' },
+				{ arguments: '1091 --prerequisite 1104 --title "1104 then 1091"', note: '1104 first' },
 			],
 			flags: [
 				{
@@ -45,6 +46,10 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 					description: 'the filed split issues, comma-separated.',
 				},
 				{ names: ['--ordered'], description: '`<issue>` first, then the children in that order.' },
+				{
+					names: ['--prerequisite <P>'],
+					description: 'the filed issue that has to land first; `<issue>` is paused on it.',
+				},
 				{
 					names: ['--title <title>'],
 					description: 'the new epic’s title; required when no epic tracks `<issue>` yet.',

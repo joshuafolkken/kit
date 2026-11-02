@@ -4,6 +4,7 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_invocation } from '#scripts/run/run-invocation'
+import { run_step_section } from '#scripts/run/run-step-section'
 import type { DriveResult } from './run-wake-loop'
 
 const SUCCESS = 0
@@ -42,19 +43,21 @@ function is_final_stop(verdict: string | undefined, read: CarryRead): boolean {
 
 // **The details are the driver's whole stderr, so only their tail is handed on, and it goes last.**
 // The stderr carries every command the driver ran since it started, which
-// after a long run is tens of kilobytes — far past what `is_safe_value` lets into an argv element. Its
+// after a long run is tens of kilobytes — far past what `is_safe_prompt` lets into the prompt. Its
 // tail is where the reason for stopping is; placing it last means the cap `wake_argv` applies to the
-// whole prompt can only ever cut into the details, never the verdict, the resume line or the epic note.
+// whole prompt can only ever cut into the details, never the verdict, the resume line, the epic note
+// or the sections.
 function details_tail(details: string): string {
 	return details.length > DETAILS_TAIL_LENGTH
 		? `${TRUNCATION_MARK}${details.slice(-DETAILS_TAIL_LENGTH)}`
 		: details
 }
 
-// **The hand-off names its next move, so the woken session never searches the procedure for it.**
-// Whatever the branch, the session acts on it and ends its turn, whose stop hook writes the cut that
-// hands the loop back to the supervisor (`run_headless.hand_back_at_turn_end`); only a person's stop
-// ends the run instead.
+// **The hand-off names its next move and carries the sections that govern it** (joshuafolkken/kit#5920),
+// so the woken session neither searches the procedure nor spends a `doc:section` turn on it
+// (`run_step_section.driver_sections`). Whatever the branch, the session acts on it and ends its
+// turn, whose stop hook writes the cut that hands the loop back to the supervisor
+// (`run_headless.hand_back_at_turn_end`); only a person's stop ends the run instead.
 //
 // **The record is the session's before it wakes** (`run-wake-handoff.ts`), so the move names no claim.
 // It does say not to `--begin`: over a record the session already owns, that answers `standing`.
@@ -64,15 +67,15 @@ const HAND_BACK = 'then end the turn, which hands the loop back'
 const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 	[
 		'retrospective',
-		`run what pnpm josh run:step prints (retrospective.md), close it with pnpm josh run:carry --retrospective --summary "<result>", ${HAND_BACK}`,
+		`run what pnpm josh run:step prints (the retrospective below), close it with pnpm josh run:carry --retrospective --summary "<result>", ${HAND_BACK}`,
 	],
 	[
 		'merge human-review',
-		'stop the run, because the child stopped before its commit for a person (needs-human-review.md)',
+		'stop the run, because the child stopped before its commit for a person (the section below)',
 	],
-	['epic #', `follow backlogrun-steps.md → "Named issues run first, in order", ${HAND_BACK}`],
+	['epic #', `follow the named-issue sections below, ${HAND_BACK}`],
 ]
-const NEXT_DEFAULT = `act on the result by backlogrun-steps.md → "The loop", ${HAND_BACK}`
+const NEXT_DEFAULT = `act on the result by the sections below, ${HAND_BACK}`
 
 function next_move(verdict: string): string {
 	const found = NEXT_BY_VERDICT.find(([prefix]) => verdict.startsWith(prefix))
@@ -86,7 +89,9 @@ function handoff_material(verdict: string, resume: string, details: string): str
 		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> before continuing to the next named item.'
 		: ''
 
-	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict)}${context}`
+	const sections = `\n${run_step_section.driver_sections(verdict)}`
+
+	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict)}${sections}${context}`
 }
 
 function driver_result(out: string, read: CarryRead, details = ''): DriveResult {

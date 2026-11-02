@@ -4,21 +4,29 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_split, type SplitRequest, type SplitResult } from './run-split'
+import { run_split_prerequisite, type PrerequisiteRequest } from './run-split-prerequisite'
 
-// `josh run:split <N> --children <N1,N2,...> [--ordered] [--title <title>]` — the argument parsing
-// and the report around `run-split.ts`. One line per step that landed, then the verdict line a run
-// branches on: `epic #E` to continue against, or `needs-decision` to report. A failure names its step,
-// what was already done, and that a rerun continues from there.
+// `josh run:split <N> --children <N1,N2,...> [--ordered] [--title <title>]` and
+// `josh run:split <N> --prerequisite <P> [--title <title>]` — the argument parsing and the report
+// around `run-split.ts` and `run-split-prerequisite.ts`. One line per step that landed, then the
+// verdict line a run branches on: `epic #E` to continue against, or `needs-decision` to report. A
+// failure names its step, what was already done, and that a rerun continues from there.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh run:split <issue> --children <N1,N2,...> [--ordered] [--title <title>]'
+const USAGE = [
+	'Usage: josh run:split <issue> --children <N1,N2,...> [--ordered] [--title <title>]',
+	'       josh run:split <issue> --prerequisite <P> [--title <title>]',
+].join('\n')
 const OPTIONS = {
 	children: { type: 'string' },
+	prerequisite: { type: 'string' },
 	ordered: { type: 'boolean' },
 	title: { type: 'string' },
 } as const
+
+type Request = SplitRequest | PrerequisiteRequest
 
 // Every child has to be an issue number other than `#N`, each named once.
 function children_of(value: string | undefined, issue: string): Array<string> | undefined {
@@ -30,15 +38,49 @@ function children_of(value: string | undefined, issue: string): Array<string> | 
 	return is_valid && is_distinct ? children : undefined
 }
 
-function parse_request(argv: ReadonlyArray<string>): SplitRequest | undefined {
+interface Values {
+	children?: string | undefined
+	prerequisite?: string | undefined
+	ordered?: boolean | undefined
+	title?: string | undefined
+}
+
+function children_request(issue: string, values: Values): Request | undefined {
+	const children = children_of(values.children, issue)
+	if (children === undefined) return undefined
+	const is_ordered = values.ordered === true
+
+	return { issue, children, is_ordered, title: values.title }
+}
+
+// `--prerequisite` takes neither `--children` nor `--ordered`: the order is always `#P` first.
+function prerequisite_request(
+	issue: string,
+	prerequisite: string,
+	values: Values,
+): Request | undefined {
+	const is_alone = values.children === undefined && values.ordered !== true
+	const is_valid = issue_number_shape.is_issue_number(prerequisite) && prerequisite !== issue
+	if (!is_alone || !is_valid) return undefined
+
+	return { issue, prerequisite, title: values.title }
+}
+
+function parse_request(argv: ReadonlyArray<string>): Request | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 	if (parsed === undefined) return undefined
 	const issue = issue_number_shape.single_of(parsed.positionals)
-	const children = issue === undefined ? undefined : children_of(parsed.values.children, issue)
-	if (issue === undefined || children === undefined) return undefined
-	const { ordered: is_ordered, title } = parsed.values
+	if (issue === undefined) return undefined
+	const { values } = parsed
+	if (values.prerequisite === undefined) return children_request(issue, values)
 
-	return { issue, children, is_ordered: is_ordered === true, title }
+	return prerequisite_request(issue, values.prerequisite, values)
+}
+
+async function result_of(request: Request): Promise<SplitResult> {
+	if ('prerequisite' in request) return await run_split_prerequisite.prerequisite(request)
+
+	return await run_split.split(request)
 }
 
 // A missing `--title` is refused before any write, so the same command would only refuse again.
@@ -74,7 +116,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const result = await run_split.split(request)
+	const result = await result_of(request)
 
 	for (const { step, detail } of result.done) console.info(`${step}: ${detail}`)
 

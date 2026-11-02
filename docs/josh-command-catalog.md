@@ -182,6 +182,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lane:pause` · `josh lps` | `<issue> \| --all` | developer | processes | Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched, and record the pause in the lane’s state and the run’s event stream |
 | `josh lane:plan` | `<issue> <path>... [--probe]` | automation | files, network | Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue |
 | `josh lane:prune` | — | automation | files, git | Close every lane an interruption left without its work tree and every spent lane, then sweep unregistered leftovers under the lanes root |
+| `josh lane:resolve` · `josh lrv` | `<issue>` | developer | git, network, files | Merge the default branch into a lane's branch and print one verdict — resolved, conflict <paths>, or step-back 2 (overlapping hunks, merge aborted) / 3 (a resolution already recorded on the issue) |
 | `josh lane:restart` · `josh lrs` | `<issue>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure |
 | `josh lane:resume` · `josh lru` | `<issue> \| --all` | developer | processes | Let a paused lane child carry on from where it stopped (SIGCONT) |
 | `josh lane:sample` · `josh lsm` | `[--every <seconds>]` | maintainer | files | Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one |
@@ -229,7 +230,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
 | `josh run:report` | `[--handoff \| --end [--stopped "<reason>"]]` | automation | files, network, processes | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
 | `josh run:review` | `[--code-only] [--unpinned-ok "<reason>"] \| --join [--fixing] \| --pinned \| --push` | automation | processes, files, git, network | Start test:pinned and the gate in the background and write the /code-review brief to a file, printing its path, in one call so they overlap (--join to join them; it stops on an unpinned change) |
-| `josh run:split` | `<issue> --children <N1,N2,...> [--ordered] [--title <title>]` | automation | git, network, files | Set a run aside and place its split into an epic in one call |
+| `josh run:split` | `<issue> (--children <N1,N2,...> [--ordered] \| --prerequisite <P>) [--title <title>]` | automation | git, network, files | Set a run aside and place its split or prerequisite into an epic in one call |
 | `josh run:stale` | — | automation | git, network, files | Remove a stale `in-progress` label no checkout still holds |
 | `josh run:status` | `<issue> [--repo <owner/repo>]` | automation | network | Bundle a run’s read-only status: issue state, cost verdict, carry counters |
 | `josh run:step` | `[<issue>]` | automation | network, files | Print the run’s next single action, computed from the event stream, carry record and issue state |

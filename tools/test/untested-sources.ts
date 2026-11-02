@@ -88,7 +88,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/josh/josh-commands-development.ts',
 	'scripts/josh/josh-commands-document.ts',
 	'scripts/josh/josh-commands-hooks.ts',
-	'scripts/josh/josh-commands-lane.ts',
 	'scripts/josh/josh-commands-lint.ts',
 	'scripts/josh/josh-commands-project.ts',
 	'scripts/josh/josh-commands-run.ts',

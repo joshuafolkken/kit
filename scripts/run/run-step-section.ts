@@ -37,22 +37,29 @@ const PROGRESS = 'backlogrun-progress.md'
 const SHIP = 'ship'
 const REVIEW = 'run:review'
 const PROGRESS_WATCHER = 'run:progress'
+// Rows both tables carry — the step's and the driver's.
+const STEPS = 'backlogrun-steps.md'
+const LOOP = reference(STEPS, 'The loop')
+const RETROSPECTIVE_KEY = 'retrospective'
+const RETROSPECTIVE = reference('retrospective.md', 'The end-of-run retrospective')
+const HUMAN_REVIEW = reference('needs-human-review.md', '`needs-human-review`')
+const EPIC_CHILDREN = reference(PROGRESS, "Running a named epic's children")
 
 // Keyed on a verdict token, or on the josh subcommand a command action runs. An action with no row —
 // `wait`, `stop`, a `decide:` line — has no rule to read beyond its own line.
 const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	[ENTRY, reference('split-assessment.md', 'The question')],
 	[run_step.IMPLEMENT, CHAIN],
-	[run_step.HUMAN_REVIEW, reference('needs-human-review.md', '`needs-human-review`')],
+	[run_step.HUMAN_REVIEW, HUMAN_REVIEW],
 	[run_step.UPDATE_DEPS, reference('latest-gate.md', 'The dependency update')],
 	['followup', reference('followup.md', 'Run `pnpm josh followup`')],
 	[PROGRESS_WATCHER, reference('progress-watcher.md', 'Progress while the run is quiet')],
-	['run:merge', reference(PROGRESS, "Running a named epic's children")],
-	['backlog:next', reference('backlogrun-steps.md', 'The loop')],
+	['run:merge', EPIC_CHILDREN],
+	['backlog:next', LOOP],
 	['run:cut', reference('pre-gate-cut.md', 'Resuming')],
 	[SHIP, CHAIN],
 	[REVIEW, CHAIN],
-	['retrospective', reference('retrospective.md', 'The end-of-run retrospective')],
+	[RETROSPECTIVE_KEY, RETROSPECTIVE],
 	['run:carry', reference(PROGRESS, 'The hand-off')],
 ])
 
@@ -67,6 +74,41 @@ const LANE_CHILD_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	[SHIP, LANE_CHILD_STEP],
 	[REVIEW, LANE_CHILD_STEP],
 ])
+
+// **A `backlog:drive` verdict handed to a session carries its governing sections** (joshuafolkken/kit#5920):
+// keyed on the verdict's prefix, first match wins, so `merge human-review` stands above `merge`. A loop
+// row carries "The loop" — what the session does — beside the section the row needs.
+const DRIVER_SECTIONS: ReadonlyArray<readonly [string, ReadonlyArray<SectionReference>]> = [
+	[RETROSPECTIVE_KEY, [RETROSPECTIVE]],
+	['merge human-review', [HUMAN_REVIEW]],
+	['triage', [LOOP, reference(STEPS, 'Resolve what the plan can resolve')]],
+	['judge', [LOOP, reference('docs/josh-commands-backlog.md', '`josh auto-ok:judge`')]],
+	['launch #', [LOOP, reference('backlogrun-park.md', 'park and continue')]],
+	['merge', [LOOP, EPIC_CHILDREN]],
+	[
+		'epic #',
+		[
+			reference(STEPS, 'Named issues run first, in order'),
+			reference(STEPS, 'The session cut is inside the invocation'),
+		],
+	],
+	['watch', [LOOP, RETROSPECTIVE]],
+]
+
+// A section that does not resolve — a document a consumer does not ship — is named instead of
+// failing the hand-off; the table's test keeps every row resolving in kit.
+function carried_text(found: SectionReference, root: string): string {
+	return (
+		document_section_cli.section_text(found.document, found.heading, root) ??
+		`\`${found.document}\` → "${found.heading}"`
+	)
+}
+
+function driver_sections(verdict: string, root: string = process.cwd()): string {
+	const found = DRIVER_SECTIONS.find(([prefix]) => verdict.startsWith(prefix))
+
+	return (found?.[1] ?? [LOOP]).map((section) => carried_text(section, root)).join('\n')
+}
 
 function key_of(action: StepAction): string {
 	if (action.kind !== 'command') return action.line
@@ -121,10 +163,12 @@ function print_for(
 }
 
 const run_step_section = {
+	DRIVER_SECTIONS,
 	ENTRY,
 	GOVERNING_SECTIONS,
 	PROGRESS: PROGRESS_WATCHER,
 	LANE_CHILD_SECTIONS,
+	driver_sections,
 	key_of,
 	print_for,
 	print_once,
