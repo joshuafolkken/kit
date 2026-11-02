@@ -1,0 +1,3 @@
+- rf:project-conventions | low | prompts/collaboration-workflow/operating-rules.md:37 | 2026-11-02 | #5878 | false-positive
+- rf:bug-risks | low | docs/how-to/recover-a-run.md:9 | 2026-11-02 | #5878 | false-positive
+- rf:none | none | - | 2026-11-02 | #5878

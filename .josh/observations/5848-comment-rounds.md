@@ -1,0 +1,4 @@
+- rf:comments | low | .claude/skills/workflow-commands/issue-fold-existing.md:17 | 2026-11-02 | #5848
+- rf:bug-risks | low | scripts/issue/issue-fold-existing-cli.ts:151 | 2026-11-02 | #5848
+- rf:bug-risks | low | scripts/issue/issue-fold-existing-cli.ts:151 | 2026-11-02 | #5848
+- rf:tests | low | scripts/document/issue-fold-existing-document.test.ts:19 | 2026-11-02 | #5848
