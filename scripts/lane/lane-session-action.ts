@@ -4,6 +4,7 @@ import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import type { AgentProvider } from '#scripts/agent/agent-provider'
 import { api_auth } from '#scripts/agent/api-auth'
+import { core_priority } from '#scripts/gate/core-priority'
 import { distributed_paths } from '#scripts/init/distributed-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
@@ -171,7 +172,7 @@ async function launch_review(
 			cwd: lane.directory,
 			log_path: target.log,
 			profile: built.profile,
-			env: lane_child_marker.env_for(lane.issue),
+			env: { ...lane_child_marker.env_for(lane.issue), ...core_priority.PRIORITY_ENVIRONMENT },
 		},
 		console.error,
 	)

@@ -1,6 +1,7 @@
 import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { api_auth } from '#scripts/agent/api-auth'
+import { core_priority } from '#scripts/gate/core-priority'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -42,6 +43,7 @@ interface Briefed {
 
 const { CAUSE } = run_ship_stop_cause
 const { CODE } = review_attest.REVIEW_SLOT
+const { PRIORITY_ENVIRONMENT } = core_priority
 
 // **Every stop is tagged with the step's own cause**, so a round that stopped on a red join, a reviewer
 // that did not finish or a refused attestation is not booked as a finding (joshuafolkken/kit#4431).
@@ -61,8 +63,11 @@ function paths(slot?: ReviewSlot): { brief: string; findings: string; log: strin
 	return lane_session_broker.review_paths(PROJECT_ROOT, slot)
 }
 
+// The review stage's children claim cores with priority (`core-priority.ts`), as the commit's do: a
+// round's short checks need not queue behind other lanes' heavy ones (joshuafolkken/kit#5819). The gate
+// a round opens runs in the background and drops the mark at its launch (`run-review-steps.ts`).
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await josh_command.josh_run(argv, should_forward_stderr)
+	return await josh_command.josh_run(argv, should_forward_stderr, undefined, PRIORITY_ENVIRONMENT)
 }
 
 function note(text: string): void {
@@ -130,7 +135,7 @@ async function run_direct_session(
 	round: Round,
 ): Promise<JoshResult> {
 	const log_path = paths(slot).log
-	const request = { argv, cwd: PROJECT_ROOT, log_path, profile }
+	const request = { argv, cwd: PROJECT_ROOT, log_path, profile, env: PRIORITY_ENVIRONMENT }
 
 	note(agent_role_profile.describe_review(Number(round), profile))
 	const result = await detached_launch.launch_attached(request, note)
