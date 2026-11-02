@@ -11,7 +11,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 const SUCCESS = 0
 const SESSION_KEY = 'CLAUDE_CODE_SESSION_ID'
 const CHAIN_HEADING = /^## Run the review-to-merge chain/u
-const LANE_CHILD_STEP = /^0\. \*\*A lane child\*\*/u
+const LANE_CHILD_STEP = /^## A lane child — step 0\n\n0\. \*\*A lane child\*\*/u
 const REPEAT_LINE = /printed earlier this session; after a compaction: pnpm josh doc:section /u
 const REVIEW = 'run:review'
 

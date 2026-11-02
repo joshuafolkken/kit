@@ -12,6 +12,23 @@ const state = vi.hoisted(() => ({
 	comments: [] as Array<string>,
 	calls: [] as Array<string>,
 	release_code: 0,
+	is_lane: false,
+	commits: [] as Array<string>,
+}))
+
+vi.mock('./run-set-aside-commit', () => ({
+	run_set_aside_commit: {
+		is_lane: async () => state.is_lane,
+		message_of: (message: string) => `wip: ${message}`,
+		is_committed: async (message: string) => state.commits.includes(`wip: ${message}`),
+		commit: async (message: string) => {
+			state.calls.push('commit')
+			if (!state.has_work) return 'clean'
+			state.commits.push(`wip: ${message}`)
+
+			return 'committed'
+		},
+	},
 }))
 
 vi.mock('#scripts/git/stash/stash-push-cli', () => ({
@@ -53,6 +70,8 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 	},
 }))
 
+const NOTHING_SET_ASIDE = 'nothing was set aside'
+
 const REQUEST = {
 	issue: '10',
 	stash_message: 'aside: #10',
@@ -61,7 +80,15 @@ const REQUEST = {
 }
 
 beforeEach(() => {
-	Object.assign(state, { stashes: [], has_work: true, comments: [], calls: [], release_code: 0 })
+	Object.assign(state, {
+		stashes: [],
+		has_work: true,
+		comments: [],
+		calls: [],
+		release_code: 0,
+		is_lane: false,
+		commits: [],
+	})
 	vi.spyOn(git_stash, 'list').mockImplementation(async () =>
 		state.stashes.map((subject, index) => ({ selector: `stash@{${String(index)}}`, subject })),
 	)
@@ -85,12 +112,44 @@ describe('run_set_aside — the steps in order', () => {
 		expect(state.comments[0]).toContain(`pnpm josh stash:pop "${REQUEST.stash_message}"`)
 	})
 
-	it('says nothing was stashed on a clean tree', async () => {
+	it('says nothing was set aside on a clean tree', async () => {
 		state.has_work = false
 
 		await run_set_aside.run_steps(run_set_aside.steps_of(REQUEST))
 
-		expect(state.comments[0]).toContain('nothing was stashed')
+		expect(state.comments[0]).toContain(NOTHING_SET_ASIDE)
+	})
+})
+
+describe('run_set_aside — on the lane branch the work is committed, not stashed', () => {
+	it('commits and names the main merge as the resume', async () => {
+		state.is_lane = true
+
+		await run_set_aside.run_steps(run_set_aside.steps_of(REQUEST))
+
+		expect(state.calls).toStrictEqual(['commit', 'comment', 'release'])
+		expect(state.stashes).toStrictEqual([])
+		expect(state.comments[0]).toContain(`\`wip: ${REQUEST.stash_message}\``)
+		expect(state.comments[0]).toContain('pnpm josh main:merge')
+		expect(state.comments[0]).not.toContain('stash:pop')
+		expect(state.comments[0]).not.toContain('expect conflicts')
+	})
+
+	it('stashes work handed off to other issues even on the lane branch', async () => {
+		state.is_lane = true
+
+		await run_set_aside.run_steps(run_set_aside.steps_of({ ...REQUEST, is_handed_off: true }))
+
+		expect(state.calls).toStrictEqual(['stash', 'comment', 'release'])
+		expect(state.comments[0]).toContain('stash:pop')
+	})
+
+	it('says nothing was set aside when the lane tree was clean', async () => {
+		Object.assign(state, { is_lane: true, has_work: false })
+
+		await run_set_aside.run_steps(run_set_aside.steps_of(REQUEST))
+
+		expect(state.comments[0]).toContain(NOTHING_SET_ASIDE)
 	})
 })
 
