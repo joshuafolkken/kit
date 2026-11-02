@@ -11,6 +11,7 @@ import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { run_cut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
@@ -28,10 +29,11 @@ import { run_cut_review } from './run-cut-review'
 // against the record and hands the run on to the gate. **Turning `argv` into a request is
 // `run-cut-args.ts`'s**; what is here acts on the record and relaunches.
 //
-// The contract is `run:hold`'s and `run:carry`'s: **standard output carries exactly one token** and
-// every explanation goes to standard error, so a loop can branch on `answer=$(pnpm josh run:cut 12)`.
-// `--json` is the one exception, and it is still one line: the whole record has to reach a resuming
-// session.
+// The contract is `run:hold`'s and `run:carry`'s: **the first line of standard output is one token** and
+// every explanation goes to standard error, so a loop can branch on the first line of
+// `answer=$(pnpm josh run:cut 12)`. A non-trivial verdict is followed by the `pre-gate-cut.md` section
+// it acts on (joshuafolkken/kit#5953), so the reader never opens the whole document. `--json` is still
+// one line: the whole record has to reach a resuming session.
 
 const ARGV_OFFSET = 2
 const COMMAND = 'run:cut'
@@ -45,6 +47,7 @@ const {
 	FAILURE_EXIT_CODE,
 	FRESH_VERDICT,
 	HANDOFF_MISSING_NOTE,
+	last_verdict,
 	HANDOFF_OVERFLOW_NOTE,
 	NOT_A_LANE_VERDICT,
 	OVER_VERDICT,
@@ -295,10 +298,27 @@ async function take_cut(target: string, request: CutCommand): Promise<number> {
 	return await cut(target, request.issue, cut_phase(request), request.handoff_path)
 }
 
-async function act(target: string, request: Request): Promise<number> {
-	if (request.kind === 'cut') return await take_cut(target, request)
+// The verdicts that leave nothing to act on beyond carrying on, so no section follows them.
+const TRIVIAL_VERDICTS: ReadonlySet<string> = new Set([NOT_A_LANE_VERDICT, FRESH_VERDICT])
 
-	if (request.kind === 'resume') return await run_cut_resume.resume(target, request.issue)
+// The section is printed after the token, never instead of it, and the token's exit code stands.
+function with_section(key: string, code: number): number {
+	if (!TRIVIAL_VERDICTS.has(last_verdict())) run_step_section.print_once(key)
+
+	return code
+}
+
+async function act(target: string, request: Request): Promise<number> {
+	// "Taking the cut" is the pre-gate boundary's; an `--impl` cut's caller carries its own instruction.
+	if (request.kind === 'cut' && request.is_implementation) return await take_cut(target, request)
+
+	if (request.kind === 'cut') {
+		return with_section(run_step_section.CUT, await take_cut(target, request))
+	}
+
+	if (request.kind === 'resume') {
+		return with_section(run_step_section.RESUME, await run_cut_resume.resume(target, request.issue))
+	}
 
 	return end(target)
 }

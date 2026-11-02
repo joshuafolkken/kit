@@ -55,7 +55,8 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#5920 moved the loop's section pointers into the driver hand-off, by another.
 	{ entry: 'backlogrun', bytes: 77_824 },
 	// The `run:handoff` row of the workflow skill's shared table (joshuafolkken/kit#5352) crossed the 45056 block.
-	{ entry: LANE_CHILD, bytes: 49_152 },
+	// joshuafolkken/kit#5953 charged pre-gate-cut.md at the two sections run:cut prints, not whole.
+	{ entry: LANE_CHILD, bytes: 40_960 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

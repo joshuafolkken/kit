@@ -4,8 +4,9 @@ import { run_cut, type CutState, type RunCut } from './run-cut'
 import { run_cut_handoff } from './run-cut-handoff'
 
 // The verdict tokens `josh run:cut` answers with and the reports that print them, kept apart from
-// `run-cut-cli.ts` so the CLI keeps to acting on the record. **Standard output carries exactly one
-// token** and every explanation goes to standard error.
+// `run-cut-cli.ts` so the CLI keeps to acting on the record. **The first line of standard output is the
+// one token**, followed only by the section a non-trivial verdict follows; every explanation goes to
+// standard error.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -40,10 +41,18 @@ const UNKNOWN_VERDICT = 'unknown'
 const OVER_VERDICT = 'over'
 const SPLIT_UNRESOLVED_VERDICT = 'split-unresolved'
 
+// The token this process printed last — what decides whether `run:cut` prints its section after it.
+const printed = { verdict: '' }
+
 function report(verdict: string, code: number): number {
+	printed.verdict = verdict
 	console.info(verdict)
 
 	return code
+}
+
+function last_verdict(): string {
+	return printed.verdict
 }
 
 function report_stale(cut_record: RunCut): number {
@@ -217,6 +226,7 @@ const run_cut_report = {
 	UNREADABLE_VERDICT,
 	UNREADY_VERDICT,
 	refuse_unready,
+	last_verdict,
 	report,
 	report_bad_handoff,
 	report_busy,
