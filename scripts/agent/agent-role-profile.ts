@@ -125,6 +125,20 @@ const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> =
 
 const LEGACY_WORKER_KEYS = { model: 'JOSH_LANE_MODEL', effort: 'JOSH_LANE_EFFORT' }
 
+function phase_model_keys(): ReadonlyArray<string> {
+	return Object.values(PHASE_MODEL_KEYS).flatMap((phases) => Object.values(phases))
+}
+
+// Every env key a profile is read from. The unit suite blanks them so a lane's model and effort never
+// reach its fixtures (joshuafolkken/kit#5863); its test pins each to the pattern its config blanks.
+const PROFILE_KEYS: ReadonlyArray<string> = [
+	...Object.values(ENV_KEYS).flatMap((keys) => [keys.model, keys.effort]),
+	...Object.values(LEGACY_WORKER_KEYS),
+	...Object.values(VERIFICATION_KEYS),
+	...phase_model_keys(),
+	INVESTIGATION_MODEL_KEY,
+]
+
 const { MAX_VALUE_LENGTH, is_safe_prompt, is_safe_value } = agent_safe_text
 
 function is_verification(role: AgentRole, round: number | undefined): boolean {
@@ -329,6 +343,7 @@ const agent_role_profile = {
 	MAX_VALUE_LENGTH,
 	OPENAI_PROFILES,
 	PRE_GATE_PHASE,
+	PROFILE_KEYS,
 	REVIEWER,
 	SCHEDULER,
 	VERIFICATION_PROFILES,
