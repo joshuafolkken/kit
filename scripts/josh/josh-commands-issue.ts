@@ -163,7 +163,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/issue/issue-fold-existing-cli.ts',
 		description: 'Assess whether a complete draft can join an unstarted issue',
 		category: 'AI tools',
-		reference: ['<assessment.json> [--json | --apply <N>]', 'automation', ['none']],
+		reference: ['<assessment.json> [--json | --apply <N>]', 'automation', ['network']],
 		usage: {
 			examples: [
 				{ arguments: 'assessment.json --json' },

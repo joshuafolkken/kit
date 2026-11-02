@@ -36,6 +36,18 @@ describe('issue_fold_existing_cli.run', () => {
 		expect(info.mock.calls.join('\n')).toContain(ORIGINAL_CRITERION)
 	})
 
+	it('prints the verdict and the folded body as one JSON object', async () => {
+		vi.mocked(readFile).mockResolvedValue(JSON.stringify(ASSESSMENT))
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await issue_fold_existing_cli.run([PATH, '--json'])).toBe(0)
+		const printed = String(info.mock.calls[0]?.[0])
+
+		expect(info).toHaveBeenCalledTimes(1)
+		expect(JSON.parse(printed)).toMatchObject({ verdict: 'fold' })
+		expect(printed).toContain(ORIGINAL_CRITERION)
+	})
+
 	it('reports an unreadable assessment without a fold recommendation', async () => {
 		vi.mocked(readFile).mockRejectedValue(new Error('unreadable'))
 		vi.spyOn(console, 'error').mockImplementation(() => undefined)
