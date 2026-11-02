@@ -1,17 +1,9 @@
-#!/usr/bin/env tsx
 /**
  * Create an epic Issue that satisfies every requirement the auto-close and the order warning read.
- *
- * Usage: tsx scripts/epic/epic.ts "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->]
- *                                                       [--origin <owner/repo#N>] [--notify]
- *        tsx scripts/epic/epic.ts --promote <N> <N1> <N2> ... [same flags] [--title <title>]
- *        tsx scripts/epic/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
- *                                                      [--decision-file <path|->]
- *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
- *        tsx scripts/epic/epic.ts --decide <E> <N1> <N2> ... --decision-file <path|->
+ * `USAGE` below lists the `josh epic` forms; the entry is `epic-main.ts`, so `run:split` can import
+ * this module in the same process.
  */
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { error_text } from '#scripts/lib/error-message'
 import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
 import { epic_decide } from './epic-decide'
@@ -21,7 +13,6 @@ import { epic_remove } from './epic-remove'
 import { epic_run } from './epic-run'
 import { epic_split_reach } from './epic-split-reach'
 
-const ARGV_OFFSET = 2
 const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
@@ -238,17 +229,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_form(argv)
 }
 
-async function main(): Promise<void> {
-	const exit_code = await run(process.argv.slice(ARGV_OFFSET))
+const epic_command = { run }
 
-	if (exit_code !== 0) process.exit(exit_code)
-}
-
-// A `gh` failure carries its stderr as the message, which is the useful part; printing it alone
-// keeps a routine "not authenticated" or "label not found" from arriving as a stack trace.
-try {
-	await main()
-} catch (error) {
-	console.error(`✖ ${error_text.message_of(error)}`)
-	process.exit(FAILURE_EXIT_CODE)
-}
+export { epic_command }

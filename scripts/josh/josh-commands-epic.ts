@@ -10,7 +10,7 @@ const JUST_MERGED = 'skip the issue just merged'
 /* eslint-disable @typescript-eslint/naming-convention */
 const EPIC_COMMANDS: Record<string, CommandEntry> = {
 	epic: {
-		script: 'scripts/epic/epic.ts',
+		script: 'scripts/epic/epic-main.ts',
 		// `--notify` sends the `planning` Telegram (epic-notify.ts), which reads `.env`.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Create an epic issue from its child issue numbers',
@@ -122,7 +122,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'epic:audit': {
-		script: 'scripts/epic/epic-audit-cli.ts',
+		script: 'scripts/epic/epic-audit-main.ts',
 		description: "Audit an epic's children against each other for contradictions",
 		category: 'AI tools',
 		reference: ['<epic>', 'automation', ['network']],
