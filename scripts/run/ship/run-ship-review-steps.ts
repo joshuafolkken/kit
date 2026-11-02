@@ -278,7 +278,7 @@ async function reused_round(issue: string, reused: ReuseAnswer): Promise<StepRes
 	return { ...skipped(ROUND_ONE_RECORDED_NOTE), reason: run_ship_review_reason.reused(reused) }
 }
 
-// The round-1 review, beside the gate: scoped pair → open each slot's brief → their reviewers side by
+// The round-1 review, after the gate `run:review` waits on: scoped pair → open each slot's brief → their reviewers side by
 // side → join → attest → record, stopping at the first that did not pass.
 async function round_one_stage(
 	issue: string,

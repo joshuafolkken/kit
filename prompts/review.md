@@ -4,7 +4,7 @@ Review policy: the level, the round count, and what happens to a finding after t
 
 - Rubric (severity tests, nine categories, output format, stop conditions): `prompts/review-rubric.md`,
   handed to `/code-review` by `pnpm josh review:brief`.
-- Orchestration (gate beside the review, when the PR opens, the merge):
+- Orchestration (gate before round 1, when the PR opens, the merge):
   `.claude/skills/workflow-commands/chain-rule.md` → "Orchestration facts single-sourced here".
 
 ---

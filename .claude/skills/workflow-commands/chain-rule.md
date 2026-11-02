@@ -9,8 +9,8 @@ Review results and successful pushes are never turn boundaries.
    `pnpm josh run:chain <N>` runs `main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
    the implementer's self-check"; 1: `run:review --join`, 2/4/10: `review:selfcheck`), the scoped
    lint/test pair `check:related` and `run:review` in one Bash call (`timeout` 600000); a stop prints its next step
-   (`--from <stage>` resumes). `run:review` starts `pnpm josh test:pinned` and
-   `pnpm josh gate` in the background and writes the `/code-review` brief to a file, printing its path and prompt; two briefs take two `reviewer`s side by side, the second recorded with
+   (`--from <stage>` resumes). `run:review` starts `pnpm josh test:pinned` in the background,
+   runs `pnpm josh gate` and, once it is green, writes the `/code-review` brief to a file, printing its path and prompt; two briefs take two `reviewer`s side by side, the second recorded with
    `review:record --from-slot --interaction`. Launch the `/code-review` subagent as the `reviewer`
    agent type (`kit:reviewer` in a consumer) with that prompt verbatim and its `model` — the alias the brief prints beside its `model=` id (`(opus)` → `opus`)
    (`.claude/agents/reviewer.md`; never a guessed type name).
@@ -71,8 +71,9 @@ Recommendations are informational; severity decides. A CodeRabbit rate-limit war
 These are the gate → review → PR → merge facts other documents cite; this file is their single source
 (`prompts/review.md` carries the review _policy_, `prompts/review-rubric.md` the rubric).
 
-- **The gate runs beside this review, not in front of it** — started with the review, joined before the
-  commit. A red gate is fixed and re-run whatever the review concluded.
+- **The gate runs in front of round 1** — `run:review` writes no brief until it is green, so round 1
+  and its snapshot read the tree the gate passed. A red gate is fixed and `run:review` re-run. Round 2
+  runs beside the ship's gate.
 - **origin/main is merged in before the gate** — `pnpm josh main:merge` (in a lane, ship's sync) is the last edit, so the scoped
   pair and the gate run once over it (in a lane, ship's, after `run:review`'s over the unmerged tree); a conflict fires `backlogrun-recovery.md` → "Conflicts are not
   predicted" early. **This is the one place a conflicted merge's procedure is written**: `main:merge`

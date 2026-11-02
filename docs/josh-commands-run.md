@@ -611,10 +611,10 @@ A human-review child keeps its lane and hold, counts nothing, and offers more ch
 
 <!-- usage: run:review -->
 
-Start test:pinned and the gate in the background and write the /code-review brief to a file, printing its path, in one call so they overlap (--join to join them; it stops on an unpinned change).
+Start test:pinned in the background, run the gate and, once it is green, write the /code-review brief to a file, printing its path (--join to join them; it stops on an unpinned change).
 
 ```bash
-pnpm josh run:review                             # detach test:pinned and the gate, write the brief (the interaction brief after it where due) to a file and print its path, then launch a reviewer per brief
+pnpm josh run:review                             # detach test:pinned, wait for a green gate, write the brief (the interaction brief after it where due) to a file and print its path, then launch a reviewer per brief
 pnpm josh run:review --code-only                 # josh ship's own open: code's brief alone, since the ship opens the interaction brief itself
 pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
@@ -631,8 +631,9 @@ brief is written to its own file after code's and both paths are printed, so the
 side by side and `josh ship` reuses both records; `--code-only` is the ship's own open and prints code's
 brief, since the ship opens the interaction brief itself.
 
-The default waits only for the gate to _start_ and writes the brief to a file and prints its path;
-`--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
+The default waits for the gate to finish and writes the brief to a file and prints its path only on a
+green gate, so round 1 and its snapshot read the tree the gate passed; a red gate prints its log and
+exits non-zero with no brief. `--join` reads the settled gate, prints the timing, and **exits non-zero on a red gate** —
 "a review verdict is not adopted over a red gate". A gate that passed on a tree that moved after it
 (a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
 and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
