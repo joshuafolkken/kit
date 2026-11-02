@@ -1069,7 +1069,7 @@ pnpm josh pin:verify actions/checkout v4.2.2 11bd71901bbe5b1630ceea73d27597364c9
 
 <!-- /usage -->
 
-Resolves the tag through `repos/<owner>/<repo>/commits/<tag>` (an annotated tag is peeled to its commit) and compares it with the SHA. Prints one line on stdout, `match` / `mismatch` / `unreadable` and the resolved SHA — the line a `--coderabbit-ignore-reason` cites. Only `match` exits zero.
+Resolves the tag through `repos/<owner>/<repo>/commits/refs/tags/<tag>` (fully qualified, so a branch never answers; an annotated tag peeled to its commit) and compares it with the SHA. Prints one line on stdout: `match` / `mismatch` with the resolved SHA, or `unreadable` with the `gh` failure reason — the `match` line is what a `--coderabbit-ignore-reason` cites. Only `match` exits zero.
 
 ### `josh repo:party`
 

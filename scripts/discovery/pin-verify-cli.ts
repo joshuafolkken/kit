@@ -14,6 +14,9 @@ const FAILURE_EXIT_CODE = 1
 const ARGUMENT_COUNT = 3
 const OWNER_REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/u
 const SHA_PATTERN = /^[\da-f]{40}$/iu
+// Fully qualified so a branch or a bare SHA of the same name never answers for the tag; the shorter
+// `tags/<tag>` is not resolved in every repository.
+const TAG_REF_PREFIX = 'refs/tags/'
 
 type Verdict = 'match' | 'mismatch' | 'unreadable'
 
@@ -54,7 +57,8 @@ function subject(request: PinRequest): string {
 }
 
 async function resolve_tag(request: PinRequest): Promise<string> {
-	const path = git_gh_api_path.commit_api_path(encodeURIComponent(request.tag), request.owner_repo)
+	const reference = encodeURIComponent(`${TAG_REF_PREFIX}${request.tag}`)
+	const path = git_gh_api_path.commit_api_path(reference, request.owner_repo)
 
 	return await git_gh_exec.exec_gh_api({ path, jq_filter: '.sha' })
 }

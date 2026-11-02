@@ -9,6 +9,7 @@ vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock
 
 const REPO = 'actions/checkout'
 const TAG = 'v4.2.2'
+const TAG_REF = encodeURIComponent(`refs/tags/${TAG}`)
 const PINNED = '11bd71901bbe5b1630ceea73d27597364c9af683'
 const OTHER = '0000000000000000000000000000000000000001'
 
@@ -40,7 +41,7 @@ describe('pin_verify_cli.run outcomes', () => {
 		expect(code).toBe(0)
 		expect(out).toBe(`match — pin:verify: ${REPO}@${TAG} resolves to ${PINNED}, the pinned SHA`)
 		expect(api_mock).toHaveBeenCalledWith({
-			path: `repos/${REPO}/commits/${TAG}`,
+			path: `repos/${REPO}/commits/${TAG_REF}`,
 			jq_filter: '.sha',
 		})
 	})
