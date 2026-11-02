@@ -113,8 +113,17 @@ describe('pre-fix check before the commit', () => {
 })
 
 describe('laps of the workflow steps', () => {
-	it('times the pre-fix check, the commit, the push and the PR each under its own lap', () => {
-		expect(IMPORT_TIME_LAPS).toStrictEqual(['test red', 'commit', 'push', 'pr'])
+	// joshuafolkken/kit#5896: the steps before the commit are laps too, so `josh git`'s lap is explained.
+	it('times the preflight, the staging, the issue, the pre-fix check, the commit, the push and the PR', () => {
+		expect(IMPORT_TIME_LAPS).toStrictEqual([
+			'preflight',
+			'staging',
+			'issue',
+			'test red',
+			'commit',
+			'push',
+			'pr',
+		])
 	})
 })
 
