@@ -1,0 +1,2 @@
+- rf:project-conventions | low | scripts/run/ship/run-ship-recorded-fixture.ts:26 | 2026-11-02 | #5815
+- rf:tests | low | scripts/run/ship/run-ship-cli-pre-detach-stop.test.ts:102 | 2026-11-02 | #5815

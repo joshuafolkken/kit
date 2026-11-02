@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/lint/lint-parallel.ts:119 | 2026-11-01 | #5712
