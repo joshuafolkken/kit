@@ -1,0 +1,9 @@
+{
+	"reason": "Consultation-scope guard passes read-only shell spellings (pnpm view, gh api reads, cd, for loops, find) with method-cluster and quoted-span fixes from round 2 #5638",
+	"date": "2026-11-02",
+	"growth": {
+		"scripts.code_lines": 62,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 567
+	}
+}

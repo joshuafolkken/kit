@@ -27,11 +27,20 @@ const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'env',
 	'time',
 ])
-// The wrappers whose own flags stand between them and the program (`time -p`), skipped with them.
-const FLAGGED_WRAPPERS: ReadonlySet<string> = new Set(['time'])
-// Their flags that consume a separate following value (`time -o <file>`, `time -f <format>`), so the
-// value is not read as the program.
-const WRAPPER_VALUE_FLAGS: ReadonlySet<string> = new Set(['-o', '-f', '--output', '--format'])
+// The wrappers whose own flags stand between them and the program (`time -p`, `pnpm -s`), skipped
+// with them.
+const FLAGGED_WRAPPERS: ReadonlySet<string> = new Set(['time', 'pnpm'])
+// Their flags that consume a separate following value (`time -o <file>`, `time -f <format>`,
+// `pnpm -C <dir>`), so the value is not read as the program.
+const WRAPPER_VALUE_FLAGS: ReadonlySet<string> = new Set([
+	'-o',
+	'-f',
+	'--output',
+	'--format',
+	'-C',
+	'--dir',
+	'--filter',
+])
 const SUBSHELL_OPEN = '('
 
 // The git global options that consume a **separate** following token as their value, so the parser

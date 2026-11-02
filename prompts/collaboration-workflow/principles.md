@@ -77,6 +77,7 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
 - **相談の主セッションは相談・起票・運用を担当する。実装は実装レーンが担当し、主セッション自身で実装を開始しない。** 「起票して」は起票を実行し、「対応してください」は合意した起票・Issue 更新・レーン操作として処理する。実装が必要なら Issue に範囲と計画を残し、既存の実装レーンへ引き渡す
 - 明示されたワークフローキーワード（`kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun`）は `workflow-commands` skill の既存手順へ渡す。主セッションが実装する根拠には読み替えない。`kickoff` は起票・計画で停止し、実装系の実行は実装レーンへ引き渡す
 - 判別できないときは相談として扱う。承認済みの起票・Issue 更新・レーン操作と、実装レーン内の Tier A 判断は再確認せず進める。実行が指示された後の判断点は `CLAUDE.md` → "Decision autonomy" の Tier で決まる
+- 相談スコープのシェルが通すのは、書き込み先が無いと判定できる読み取りだけ → `scripts/hooks/implementation-shell.ts`。通る: 読み取りプログラム、`-exec` / `-delete` の無い `find`、`pnpm view`、`-X` 無しまたは `-X GET` の `gh api`、`pnpm -s josh <読み取り>`、`cd <dir> &&`、`time`、読み取りプログラムだけにループ変数を渡す `for`。拒否: リダイレクト、`cd` と並ぶ書き込み、書き込み系 josh コマンド、GET 以外の `gh api`、`node` などの任意実行
 
 ## latest-first — 最新優先・fix-forward（pin-back は最終手段）
 
