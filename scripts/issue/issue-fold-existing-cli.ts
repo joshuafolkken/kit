@@ -12,7 +12,8 @@ const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 const JSON_FLAG = '--json'
 const APPLY_FLAG = '--apply'
-const USAGE = `Usage: josh issue:fold-existing <assessment.json> [${JSON_FLAG} | ${APPLY_FLAG} <issue-number>]`
+const FINGERPRINT_FLAG = '--fingerprint'
+const USAGE = `Usage: josh issue:fold-existing <assessment.json> [${JSON_FLAG} | ${APPLY_FLAG} <issue-number>] | ${FINGERPRINT_FLAG} <issue-number>`
 
 const APPLY_REPORTS: Readonly<Record<ApplyResult, string>> = {
 	applied: 'folded — the body was written, its priority floor applied and the re-read carries it.',
@@ -27,7 +28,7 @@ const APPLY_REPORTS: Readonly<Record<ApplyResult, string>> = {
 type Mode = { kind: 'print'; should_json: boolean } | { kind: 'apply'; issue_number: string }
 
 const NO_OPTION = ''
-const APPLY_ARITY = 2
+const FLAG_VALUE_ARITY = 2
 const PRINT_MODES: ReadonlyMap<string, Mode> = new Map([
 	[NO_OPTION, { kind: 'print', should_json: false }],
 	[JSON_FLAG, { kind: 'print', should_json: true }],
@@ -43,6 +44,7 @@ const assessment_schema = z.object({
 	is_separable: z.boolean().optional(),
 	size_verdict: z.enum(['split', 'single']).optional(),
 	existing_body: z.string(),
+	comment_fingerprint: z.string().trim().min(1),
 	draft_body: z.string().trim().min(1),
 	verification: z.string().trim().min(1),
 })
@@ -87,6 +89,7 @@ async function apply_fold(input: Assessment, issue_number: string): Promise<numb
 	const result = await issue_fold_apply.apply({
 		issue_number,
 		existing_body: input.existing_body,
+		comment_fingerprint: input.comment_fingerprint,
 		body,
 	})
 	const line = `Issue ${session_cite.issue(issue_number)} ${APPLY_REPORTS[result]}`
@@ -132,12 +135,39 @@ function parse_apply([option, value]: ReadonlyArray<string>): Mode | undefined {
 
 // No option and `--json` print; `--apply <N>` writes.
 function parse_mode(options: ReadonlyArray<string>): Mode | undefined {
-	if (options.length === APPLY_ARITY) return parse_apply(options)
+	if (options.length === FLAG_VALUE_ARITY) return parse_apply(options)
 
 	return options.length <= 1 ? PRINT_MODES.get(options.join(NO_OPTION)) : undefined
 }
 
+// joshuafolkken/kit#5891: the token the assessment records as `comment_fingerprint`, read in the same
+// pass as the comments, so `--apply` can refuse a thread that changed after it.
+async function print_fingerprint(issue_number: string): Promise<number> {
+	const fingerprint = await issue_fold_apply.comment_fingerprint(issue_number)
+
+	if (fingerprint === undefined) {
+		console.error(`Issue ${session_cite.issue(issue_number)}'s comments could not be read.`)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	console.info(fingerprint)
+
+	return SUCCESS_EXIT_CODE
+}
+
+// `--fingerprint <N>` reads no assessment, so it stands in the assessment path's place.
+function fingerprint_issue(argv: ReadonlyArray<string>): string | undefined {
+	if (argv.length !== FLAG_VALUE_ARITY || argv[0] !== FINGERPRINT_FLAG) return undefined
+	const value = argv[1] ?? NO_OPTION
+
+	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const fingerprint_target = fingerprint_issue(argv)
+
+	if (fingerprint_target !== undefined) return await print_fingerprint(fingerprint_target)
 	const [path, ...options] = argv
 	const mode = parse_mode(options)
 

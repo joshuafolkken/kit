@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { read_json_listing } from '#scripts/git/parse-json-array'
+import { z } from 'zod'
 import { issue_priority_raise } from './issue-priority-raise'
 
 // joshuafolkken/kit#5848: the write half of a fold, which the assessor once chained by hand. The body
@@ -11,8 +14,11 @@ type ApplyResult =
 interface FoldWrite {
 	issue_number: string
 	existing_body: string
+	comment_fingerprint: string
 	body: string
 }
+
+const comment_stamp_schema = z.looseObject({ id: z.number(), updated_at: z.string() })
 
 // GitHub hands back a body edited in the browser with CRLF line ends, and `gh` drops the trailing
 // newline, so neither difference is a change.
@@ -26,12 +32,28 @@ async function reads_as(issue_number: string, expected: string): Promise<boolean
 	return current === undefined ? undefined : normalize(current) === normalize(expected)
 }
 
+// joshuafolkken/kit#5891: one token for the comment thread as it stands — each comment's id and its
+// `updated_at` enter the digest, so an added, edited or deleted comment changes it.
+async function comment_fingerprint(issue_number: string): Promise<string | undefined> {
+	const raw = await git_gh_command.issue_list_comments(issue_number)
+	const listing = raw === undefined ? undefined : read_json_listing(raw, comment_stamp_schema)
+
+	if (listing?.kind !== 'read') return undefined
+	const stamps = listing.rows.map((comment) => [comment.id, comment.updated_at])
+
+	return createHash('sha256').update(JSON.stringify(stamps)).digest('hex')
+}
+
+// A comment added or edited after the assessment can change the decision as surely as a body edit.
 async function check_unchanged(fold: FoldWrite): Promise<ApplyResult | undefined> {
-	const is_unchanged = await reads_as(fold.issue_number, fold.existing_body)
+	const checks = [
+		await reads_as(fold.issue_number, fold.existing_body),
+		await comment_fingerprint(fold.issue_number),
+	]
 
-	if (is_unchanged === undefined) return 'unreadable'
+	if (checks.includes(undefined)) return 'unreadable'
 
-	return is_unchanged ? undefined : 'changed'
+	return checks[0] === true && checks[1] === fold.comment_fingerprint ? undefined : 'changed'
 }
 
 async function write(fold: FoldWrite): Promise<ApplyResult | undefined> {
@@ -54,7 +76,7 @@ async function apply(fold: FoldWrite): Promise<ApplyResult> {
 	return (await reads_as(fold.issue_number, fold.body)) === true ? 'applied' : 'unverified'
 }
 
-const issue_fold_apply = { apply }
+const issue_fold_apply = { apply, comment_fingerprint }
 
 export type { ApplyResult, FoldWrite }
 export { issue_fold_apply }
