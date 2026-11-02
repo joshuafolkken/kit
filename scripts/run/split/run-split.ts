@@ -53,7 +53,8 @@ function cited_children(request: SplitRequest): string {
 	return request.children.map((child) => issue_cite.plain(child)).join(', ')
 }
 
-function aside_of(request: SplitRequest): AsideRequest {
+// `is_handed_off` when the children take the work over; a park keeps it on `#issue`'s own lane.
+function aside_of(request: SplitRequest, is_handed_off = false): AsideRequest {
 	const issue = issue_cite.plain(request.issue)
 	const children = cited_children(request)
 
@@ -62,6 +63,7 @@ function aside_of(request: SplitRequest): AsideRequest {
 		stash_message: `run:split: ${issue} split into ${children}`,
 		marker: `<!-- josh:run-split ${issue} into ${children} -->`,
 		headline: `Split: ${issue} continues beside ${children} in one epic.`,
+		is_handed_off,
 	}
 }
 
@@ -155,7 +157,7 @@ async function place_and_audit(
 	place: () => Promise<number>,
 ): Promise<SplitResult> {
 	const slot: EpicSlot = {}
-	const steps = run_set_aside.steps_of(aside_of(request), [
+	const steps = run_set_aside.steps_of(aside_of(request, true), [
 		place_step(slot, place),
 		audit_step(slot),
 	])
