@@ -42,7 +42,7 @@ summary, and who propagates" below.
 ## The hand-off — one session does not have to run the whole batch
 
 **The check is asked at every merge, and delegation does not excuse it** — `pnpm josh run:handoff-lanes`
-after every child's merge and `pnpm josh main:sync`, never wired to `pnpm josh delegate epic-child`. It
+after every child's merge, never wired to `pnpm josh delegate epic-child`; `followup` runs `main:sync` itself. It
 chains `pnpm josh cost --cut` (its threshold priced at the session's model), the lane reading, `run:carry --cut`, `run:board --chat` and
 `pnpm josh run:report --handoff` (`backlogrun-handoff-report.md`), and prints its verdict and `next:`
 line. A cut **hands the session off to a fresh one, carrying the budget** (`backlogrun-steps.md` →
