@@ -1,4 +1,5 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
+import { LANE_MERGE_COMMANDS } from './josh-commands-lane-merge'
 
 const BARE = { arguments: '' }
 // `lane:pause` and `lane:resume` take the same target.
@@ -168,6 +169,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
 		},
 	},
+	...LANE_MERGE_COMMANDS,
 	// `.env` is read for the Telegram settings the yield's hold release reaches (`run-hold-cli.ts`).
 	'lane:plan': {
 		script: 'scripts/lane/lane-plan-cli.ts',
