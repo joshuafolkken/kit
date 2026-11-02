@@ -49,9 +49,7 @@ reference is read as a section").
    - Dispatch: `backlogrun-child.md` → "Each child runs in a delegated unit".
 6. **The loop belongs to the supervisor — hand it over with what the bare `pnpm josh run:step`
    prints**, whatever the plan held: `run:wake` runs `backlog:drive`, which returns a branch to an AI
-   session only when it needs judgment (`backlogrun-steps.md` → "The loop").
-   - An `epic #N` hand-back or a `merge` branch: `backlogrun-progress.md` → "Running a named epic's
-     children".
+   session only when it needs judgment, its hand-off carrying the sections the branch needs.
    - A merge answered `over`: `backlogrun-progress.md` → "The hand-off".
    - A unit gone silent: `backlogrun-recovery.md` → "A delegated unit that stopped without reporting".
    - A child that cannot finish: `backlogrun-park.md` → "park and continue".

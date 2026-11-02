@@ -183,16 +183,19 @@ async function run_reconciliation(argv: ReadonlyArray<string>): Promise<number> 
 	return await epic_reconcile.reconcile_epic(parsed.epic_number)
 }
 
-async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
+// `epic: undefined` is a created epic whose URL could not be read — still a success here.
+type Creation = { kind: 'refused' } | { kind: 'created'; epic: number | undefined }
+
+async function create(argv: ReadonlyArray<string>): Promise<Creation> {
 	const parsed = epic_cli.parse_create_arguments(argv)
 
 	if (parsed === undefined) {
 		console.error(`✖ A title and at least one child issue number are required.\n${USAGE}`)
 
-		return FAILURE_EXIT_CODE
+		return { kind: 'refused' }
 	}
 
-	if (await is_split_stranded(parsed.children)) return FAILURE_EXIT_CODE
+	if (await is_split_stranded(parsed.children)) return { kind: 'refused' }
 
 	const epic_number = await epic_run.create_epic_number({
 		title: parsed.title,
@@ -204,7 +207,13 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 
 	await epic_notify.announce(parsed, epic_number)
 
-	return SUCCESS_EXIT_CODE
+	return { kind: 'created', epic: epic_number }
+}
+
+async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
+	const creation = await create(argv)
+
+	return creation.kind === 'refused' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
 type EpicForm = readonly [
@@ -229,6 +238,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_form(argv)
 }
 
-const epic_command = { run }
+const epic_command = { run, create }
 
+export type { Creation }
 export { epic_command }

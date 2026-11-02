@@ -49,6 +49,20 @@ describe.each(HEADINGS)('josh doc:section %s', (heading) => {
 
 		expect(capped_print_fixture.restored(printed())).toBe(section_text(heading))
 	})
+
+	// joshuafolkken/kit#5920: the text a driver hand-off carries is the text `run` prints.
+	it('returns the section verbatim, by the same resolution', () => {
+		expect(document_section_cli.section_text(DOCUMENT, heading, ROOT)).toBe(section_text(heading))
+	})
+})
+
+describe('josh doc:section — section_text on what does not resolve', () => {
+	it.each([
+		[DOCUMENT, 'No such heading anywhere'],
+		['no-such-document.md', 'The loop'],
+	])('answers undefined for %s → %s', (document, heading) => {
+		expect(document_section_cli.section_text(document, heading, ROOT)).toBeUndefined()
+	})
 })
 
 describe('josh doc:section — the kit package fallback', () => {

@@ -67,6 +67,41 @@ pnpm josh run:pause 1091 --for 1102   # pause 1091 until 1102 lands
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:pause` in detail".
 
+### `josh run:split`
+
+<!-- usage: run:split -->
+
+Set a run aside and place its split or prerequisite into an epic in one call.
+
+```bash
+pnpm josh run:split 1091 --children 1102,1103 --title "Split 1091"      # independent split
+pnpm josh run:split 1091 --children 1102 --ordered                      # 1102 after 1091
+pnpm josh run:split 1091 --prerequisite 1104 --title "1104 then 1091"   # 1104 first
+```
+
+**Options:**
+
+- `--children <N1,N2,...>` — the filed split issues, comma-separated.
+- `--ordered` — `<issue>` first, then the children in that order.
+- `--prerequisite <P>` — the filed issue that has to land first; `<issue>` is paused on it.
+- `--title <title>` — the new epic’s title; required when no epic tracks `<issue>` yet.
+
+<!-- /usage -->
+
+A split found mid-run in one call: the run set aside as `run:pause` sets it aside (stash, comment,
+release, each step skipped on a rerun once done), the children placed — `epic --add` into the epic
+already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `<issue>` heads — and
+that epic audited with `epic:audit`. The last line is `epic #<E>`. An epic listing that cannot tell
+whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
+`needs-decision`. Without `--title` and with no tracking epic it refuses before writing anything; a
+failed step keeps the hold. A rerun whose tracking epic already lists every child places nothing
+again and goes on to the audit.
+
+`--prerequisite <P>` is `run:pause <issue> --for <P>` with the placement: the relation's own
+`epic --add --before` places `<P>` in the epic tracking `<issue>`; with none, `epic "<title>" <P>
+<issue> --ordered` is created before the relation, which is then recorded inside it. The audit, the
+`needs-decision` park and the `--title` refusal are as above.
+
 ### `josh run:tidy`
 
 <!-- usage: run:tidy -->
@@ -297,6 +332,8 @@ pnpm josh run:park 1839 --clear                              # remove needs-deci
 <!-- /usage -->
 
 The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
+
+A park from inside a lane appends the lane directory, its held seat and `pnpm josh lane:close <N>` to the comment.
 
 **Output / exit codes:** one `park #<N>` line naming what was written, then the release's line; exit `0` once the label and the comment are both on the issue and the release succeeded (or, with `--clear`, once the label is off), `1` otherwise. The record is written only once both are on; a failed release keeps it and prints `pnpm josh run:release <N>` to re-run.
 

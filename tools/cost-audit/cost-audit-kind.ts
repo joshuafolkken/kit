@@ -1,11 +1,12 @@
 // What kind of session a transcript was, for `josh cost:audit`'s per-session-kind table.
 //
 // **No transcript line records why a session was started**, so the kind is read off the prompt that
-// opened it — the one thing every launcher writes: the review brief names `/code-review`, a lane
-// resume opens `Resuming the lane child`, a driver hand-off names `Driver handoff`, and a typed run
+// opened it — the one thing every launcher writes: a driver hand-off names `Driver handoff`, the
+// review brief names `/code-review`, a lane resume opens `Resuming the lane child`, and a typed run
 // opens with its workflow keyword. A delegated unit that is none of the first is a `subagent`;
-// anything else is a `conversation`. The rules are tried in order, so a review run as a subagent is
-// counted as a review.
+// anything else is a `conversation`. The rules are tried in order: the wake rule first, since a
+// hand-off's carried sections can name `/code-review`, and a review run as a subagent is counted as
+// a review.
 
 const RUN_KEYWORDS = ['fullrun', 'halfrun', 'prrun', 'backlogrun', 'kickoff'] as const
 
@@ -21,10 +22,10 @@ interface KindRule {
 }
 
 const RULES: ReadonlyArray<KindRule> = [
+	{ kind: 'wake', matches: (prompt) => prompt.includes(WAKE_MARKER) },
 	{ kind: 'review', matches: (prompt) => prompt.includes(REVIEW_MARKER) },
 	{ kind: 'subagent', matches: (_prompt, is_delegated) => is_delegated },
 	{ kind: 'resume', matches: (prompt) => prompt.trimStart().startsWith(RESUME_PREFIX) },
-	{ kind: 'wake', matches: (prompt) => prompt.includes(WAKE_MARKER) },
 ]
 
 function run_keyword(prompt: string): string | undefined {
