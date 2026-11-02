@@ -9,7 +9,7 @@ import { run_review_cli } from './run-review-cli'
 
 const { branch, brief_run, handed_over, launch_gate, launch_pinned, wait_gate } = vi.hoisted(
 	() => ({
-		wait_gate: vi.fn(async () => 'red'),
+		wait_gate: vi.fn(async () => 'green'),
 		branch: vi.fn<() => Promise<string>>(),
 		brief_run: vi.fn<(argv: ReadonlyArray<string>, emit?: Emit) => Promise<number>>(),
 		handed_over: vi.fn<(issue: number) => Promise<boolean>>(),
@@ -111,6 +111,7 @@ describe('run_review_cli.run — a lane child after its recorded round 1', () =>
 	// joshuafolkken/kit#5655: the refusal guards the open alone; the join that closes round 1 still runs.
 	it('still joins the pair after an attested round 1', async () => {
 		handed_over.mockResolvedValue(true)
+		wait_gate.mockResolvedValueOnce('red')
 
 		await run_review_cli.run(['--join'])
 
