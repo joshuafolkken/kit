@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { report_labels } from './report-labels'
 import { report_lint } from './report-lint'
+import { report_lint_child_summary } from './report-lint-child-summary'
 import { report_template, type ChangeInput } from './report-template'
 
 // joshuafolkken/kit#4157: the skeletons come from the label table `report:lint` checks, so a printed
@@ -70,8 +71,27 @@ describe('report_template.build — the skeleton shapes', () => {
 	})
 })
 
+// joshuafolkken/kit#5844: a lane child starts its final message from this skeleton rather than
+// assembling the labels itself.
+describe('report_template.build — the child summary', () => {
+	it.each([
+		['ja', JA],
+		['en', EN],
+	])('passes report:lint --child-summary in %s, paths and all', (_lang, labels) => {
+		const summary = report_template.build('child', CHANGES, labels)
+
+		expect(report_lint_child_summary.lint_child_summary(summary, labels)).toEqual([])
+	})
+
+	it('opens on the three labels and names no changed file', () => {
+		expect(report_template.build('child', CHANGES, JA)).toBe(
+			'- **原因**: <…>\n- **対応**: <…>\n- **結果**: <…>',
+		)
+	})
+})
+
 describe('report_template.is_kind', () => {
-	it.each(['summary', 'done'])('accepts %s', (kind) => {
+	it.each(['summary', 'done', 'child'])('accepts %s', (kind) => {
 		expect(report_template.is_kind(kind)).toBe(true)
 	})
 

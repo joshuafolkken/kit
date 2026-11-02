@@ -88,8 +88,7 @@ Under `josh backlogrun` the first lane opens while the plan is reported (`--begi
 `driving`); a run typed in a session reports it before its hand-off.
 
 **The plan is one command's output** — `pnpm josh backlog:plan`, from the pool `backlog:next` answers
-from. Report all four sections (Ready now, Waiting, Waiting on a person, Out of scope) in the session
-language, with any truncated-listing `⚠`.
+from, printed in the session language. Relay all four sections as printed, with any truncated-listing `⚠`.
 
 ### Resolve what the plan can resolve
 

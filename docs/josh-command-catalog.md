@@ -197,7 +197,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh read:set` | `[<entry>] [--json]` | automation | none | Print what an entry point reads before it starts, and what that read costs |
 | `josh repo:party` | `[<owner/repo>]` | automation | none | Say whether a repository is first-party or third-party by owner equality (computed, not judged) |
 | `josh report:lint` | `[--child-summary] (reads stdin)` | automation | none | Check a two-layer work summary, or with --child-summary a lane child's summary, on stdin against its mechanical format rules |
-| `josh report:template` | `summary\|done [<path>...]` | automation | files | Print the work summary or completion report skeleton in the session language: summary \| done |
+| `josh report:template` | `summary\|done\|child [<path>...]` | automation | files | Print the work summary, completion report or lane child's summary skeleton in the session language: summary \| done \| child |
 | `josh retrospective` · `josh rtr` · **kit only** | — | maintainer | none | Aggregate a finished run's cost, review findings, observation ledger and events into one digest |
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |
 | `josh review:brief` | `[--round <1\|2>] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
