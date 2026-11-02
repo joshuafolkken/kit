@@ -52,17 +52,24 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/overrides/overrides-check.ts',
 		description: 'Check pnpm overrides for drift',
 		category: 'Maintenance',
-		reference: ['[--save]', 'developer', ['files']],
+		reference: ['[--save] [--diff <base>[...<head>]]', 'developer', ['files']],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'verify overrides unchanged' },
 				{ arguments: '--save', note: 'snapshot current merged overrides' },
+				{ arguments: '--diff HEAD', note: 'after an update not yet committed' },
+				{ arguments: '--diff main...<branch>', note: 'after `josh adopt` committed its branch' },
 			],
 			flags: [
 				{
 					names: ['--save'],
 					description:
 						'write the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.',
+				},
+				{
+					names: ['--diff <base>[...<head>]'],
+					description:
+						'compare against git instead of the snapshot — `<base>` against the working tree, `<base>...<head>` the head against its merge-base with `<base>` — printing the `devEngines` verdict and `✔ overrides unchanged since <range>`, or exiting non-zero on any add, removal, or change. Refused beside `--save`.',
 				},
 			],
 		},

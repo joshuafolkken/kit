@@ -103,7 +103,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh latest:scope` | `[--record] [--json]` | automation | files | Say whether this run has to update dependencies, from when josh latest last finished (--record notes a run) |
 | `josh latest:update` · `josh lu` | — | developer | files, network | Update all dependencies to latest |
 | `josh lockfile:policy` · **kit only** | — | automation | network | Verify the lockfile against pnpm's supply-chain policy (minimumReleaseAge) when it or the policy moved from the merge-base |
-| `josh overrides` · `josh ov` | `[--save]` | developer | files | Check pnpm overrides for drift |
+| `josh overrides` · `josh ov` | `[--save] [--diff <base>[...<head>]]` | developer | files | Check pnpm overrides for drift |
 | `josh reconcile-templates` · `josh rt` | — | maintainer | files | Record template source hashes (--check to verify drift) |
 | `josh ruleset:check` · `josh rc` | `[--apply]` | maintainer | network | Check that the default branch requires every status check kit's workflows report (--apply adds the missing ones) |
 

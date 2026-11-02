@@ -20,22 +20,20 @@ declarations, but an absent package field says nothing about workspace overrides
 ## 2. The check is a command you run, not a conclusion you reach
 
 ```bash
-git diff -- pnpm-workspace.yaml package.json
+pnpm josh overrides --diff HEAD                # an update not yet committed
+pnpm josh overrides --diff <default>...<branch> # after `josh adopt`, which committed and returned
 ```
 
-(after `josh adopt`, which has already committed and returned to the default branch:
-`git diff <default>...<branch> -- pnpm-workspace.yaml package.json`). Confirm both overrides blocks
-are untouched **and** `devDependencies` still respect the effective overrides. A removed, modified or
-over-bumped entry: restore it immediately, investigate, and report — never keep it without approval.
-
-`josh latest` prints its verdict as its last overrides line (`✔ overrides unchanged (<n> from
-<file>)` or `⚠ overrides changed`); `pnpm josh overrides` compares against a saved snapshot —
-**quote what one printed.**
+**Quote its verdict lines** — the `devEngines` line (§3), then `✔ overrides unchanged since
+<range> (…)` or a `✖ <file> overrides changed since <range>` heading per moved block with its
+entries. They cover the overrides blocks, not the `devDependencies` of overridden packages: confirm
+those still respect the effective overrides. A removed, modified or over-bumped entry: restore it
+immediately, investigate, and report — never keep it without approval.
 
 ## 3. `devEngines` — the one expected change
 
-**Read the verdict line, never compare by eye.** `pnpm josh overrides` prints it first, and
-`josh latest` prints it after its pnpm bump — `HEAD`'s `package.json` against the working tree
+**Read the verdict line, never compare by eye.** `pnpm josh overrides` prints it first — against
+`HEAD`, or the `--diff` range's base — and `josh latest` prints it after its pnpm bump
 (`scripts/version/development-engines-verdict.ts`). Quote it:
 
 - `devEngines: unchanged` / `devEngines: kept` — keep. `kept` is the lockstep pnpm bump (the version

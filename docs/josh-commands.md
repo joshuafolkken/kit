@@ -862,13 +862,16 @@ The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`n
 Check pnpm overrides for drift.
 
 ```bash
-pnpm josh overrides          # verify overrides unchanged
-pnpm josh overrides --save   # snapshot current merged overrides
+pnpm josh overrides                          # verify overrides unchanged
+pnpm josh overrides --save                   # snapshot current merged overrides
+pnpm josh overrides --diff HEAD              # after an update not yet committed
+pnpm josh overrides --diff main...<branch>   # after `josh adopt` committed its branch
 ```
 
 **Options:**
 
 - `--save` — write the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.
+- `--diff <base>[...<head>]` — compare against git instead of the snapshot — `<base>` against the working tree, `<base>...<head>` the head against its merge-base with `<base>` — printing the `devEngines` verdict and `✔ overrides unchanged since <range>`, or exiting non-zero on any add, removal, or change. Refused beside `--save`.
 
 <!-- /usage -->
 
