@@ -1,12 +1,13 @@
 // What makes a module unsafe to import, judged on its source text alone: a main guard, which fires a
 // second main inside a bundle (joshuafolkken/kit#4186), or a top-level `main()` that runs on import
-// (joshuafolkken/kit#5912). `main-guard-boundary.test.ts` pins the guard over every imported module;
-// `lane:plan --imports` asks the same question before a lane writes the import (joshuafolkken/kit#5928).
+// (joshuafolkken/kit#5912). `main-guard-boundary.test.ts` shares the guard check over every imported
+// module; `lane:plan --imports` asks both before a lane writes the import (joshuafolkken/kit#5928).
 
 // A statement at the start of a line, so a comment or a string that only names `process.argv[1]` or
-// `main()` is neither.
+// `main()` is neither. The call is top-level alone or as the first statement of a top-level `try`, the
+// shape `epic.ts` had.
 const MAIN_GUARD = /^if \(process\.argv\[1\] ===/mu
-const UNCONDITIONAL_MAIN = /^(?:await |void )?main\(/mu
+const UNCONDITIONAL_MAIN = /^(?:try \{\n\s+)?(?:await |void )?main\(/mu
 
 const GUARD_REASON = 'main guard'
 const UNCONDITIONAL_REASON = 'unconditional main()'

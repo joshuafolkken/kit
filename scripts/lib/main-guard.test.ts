@@ -10,7 +10,12 @@ describe('main_guard.import_blocker', () => {
 		expect(main_guard.import_blocker(GUARDED)).toBe(main_guard.GUARD_REASON)
 	})
 
-	it.each(['main()', AWAIT_MAIN, 'void main()'])('names a top-level `%s`', (call) => {
+	it.each([
+		'main()',
+		AWAIT_MAIN,
+		'void main()',
+		`try {\n\t${AWAIT_MAIN}\n} catch {\n\tprocess.exit(1)\n}`,
+	])('names a top-level `%s`', (call) => {
 		const source = `${MAIN}\n${call}\n`
 
 		expect(main_guard.import_blocker(source)).toBe(main_guard.UNCONDITIONAL_REASON)

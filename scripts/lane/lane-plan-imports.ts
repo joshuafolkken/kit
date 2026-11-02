@@ -5,7 +5,8 @@ import { file_reader } from '#scripts/lib/read-file'
 // `lane:plan <N> <path>... --imports <path>...` — the existing modules the lane's new code will import,
 // probed before the first edit (joshuafolkken/kit#5928). joshuafolkken/kit#5846 learned only from
 // `main-guard-boundary.test.ts`, after implementing, that `epic.ts` ran `main()` on import, and paused
-// for the fix. The judgment is that test's own, `main-guard.ts`.
+// for the fix. The judgment is `main-guard.ts`: the guard check that test shares, and a top-level
+// `main()` the plan asks alone.
 
 const IMPORTS_FLAG = '--imports'
 const ABSENT = -1

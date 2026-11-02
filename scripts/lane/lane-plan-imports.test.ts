@@ -22,7 +22,11 @@ writeFileSync(
 	path.join(DIRECTORY, GUARDED),
 	'if (process.argv[1] === fileURLToPath(import.meta.url)) await main()\n',
 )
-writeFileSync(path.join(DIRECTORY, UNCONDITIONAL), 'async function main() {}\nawait main()\n')
+// The shape `epic.ts` had: the call inside a top-level `try`.
+writeFileSync(
+	path.join(DIRECTORY, UNCONDITIONAL),
+	'async function main() {}\ntry {\n\tawait main()\n} catch {\n\tprocess.exit(1)\n}\n',
+)
 writeFileSync(path.join(DIRECTORY, IMPORTABLE), 'export const epic_schema = {}\n')
 
 beforeEach(() => {
