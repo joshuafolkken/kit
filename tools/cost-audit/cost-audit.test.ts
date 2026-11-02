@@ -70,6 +70,24 @@ describe('cost_audit.audit — the floor keeps cent-sized growth out of the regr
 	})
 })
 
+// joshuafolkken/kit#5971: the agent type table reads the current period alone.
+describe('cost_audit.audit — the lane subagents by agent type', () => {
+	it('sums only the requests inside the current period', () => {
+		const records = [record('a', PREVIOUS, 5), record('b', CURRENT, 2)]
+		const unit = { ...session('review', records), issue: 7, agent_type: 'reviewer' }
+		const result = cost_audit.audit({
+			sessions: [unit],
+			days: DAYS,
+			now_ms: NOW_MS,
+			merges: undefined,
+		})
+
+		expect(result.agents.map((row) => [row.key, row.usd])).toStrictEqual([
+			['subagent: reviewer', 2],
+		])
+	})
+})
+
 describe('cost_audit.audit — guards are priced by their answering round trip', () => {
 	it('charges a refusal the request that answered it, in the period it fell in', () => {
 		const lines = time_transcript_line.parse_text(
