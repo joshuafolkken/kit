@@ -168,6 +168,14 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	// The depth test's table read off a path, so the `<depth>` above is derived rather than judged.
+	'observation:depth': {
+		script: 'scripts/observations/observation-depth-cli.ts',
+		description: "Print the depth test's depth for a subject path",
+		category: 'Workflow',
+		reference: ['<path>', 'automation', ['none']],
+		usage: { examples: [{ arguments: 'scripts/lane/lane-plan.ts' }] },
+	},
 	// The observation ledger's commit path for the lines no run's own commit carried:
 	// a lane's lines sit in the primary checkout, which
 	// its commit cannot see, and the recurrence count the promotion rule reads is a count of main.
