@@ -20,6 +20,10 @@ const AFTER_CITED_CHANGE: ReadonlyArray<RegExp> = [
 	/#[1-9]\d*[^#\n]{0,16}?(?:以降|以後)/u,
 ]
 const RECORD_READERS: ReadonlyArray<string> = ['lane:stats', 'actions/runs', 'ship --log']
+// joshuafolkken/kit#5886: `lane:breakdown` prints the ledger of lanes already run, so a criterion read
+// through it (the command, then the particle "by") waits on later lanes whether or not it cites the
+// change and whatever the body's estimate (#5860); one naming the command as its object reads no ledger.
+const LEDGER_READ = /lane:breakdown(?:[^`\n]*`)?\s*で/u
 const CITATION_PATTERN = /#[1-9]\d*/u
 const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\`, or \`${issue_sample_gate.CLOSING_FORMAT}\` before that pull request exists, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
 // joshuafolkken/kit#5144: one waiting K merges reads one value against a bound, which `backlog:drive`
@@ -36,9 +40,11 @@ function measures_a_change(criterion: string): boolean {
 
 function is_measurement(body: string): boolean {
 	if (measure_declaration.parse(body) !== undefined) return true
+	const criteria = acceptance_map.criteria_of(body)
+	if (criteria.some((criterion) => LEDGER_READ.test(criterion.text))) return true
 	if (size_estimate.declared_files(body) !== 0) return false
 
-	return acceptance_map.criteria_of(body).some((criterion) => measures_a_change(criterion.text))
+	return criteria.some((criterion) => measures_a_change(criterion.text))
 }
 
 // The refusal for a measurement follow-up whose start condition does not parse — missing, or
