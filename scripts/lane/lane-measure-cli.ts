@@ -15,7 +15,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
-import { lane_value_cell, type CellAddress } from './lane-value-cell'
+import { lane_value_cell, type CellAddress, type CellFilter } from './lane-value-cell'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement; `josh lane:value` and
 // `josh lane:net` print one measurement each.
@@ -43,7 +43,7 @@ const USAGE = [
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
 	'       josh lane:stats --period <days> --sinks [<minutes>]',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
-	`       josh lane:value ${CELL_METRIC} --table <title> --row <label> --column <header> --since <instant>`,
+	`       josh lane:value ${CELL_METRIC} --table <title> [--row <label>] [--where <header>=<text>] --column <header> [--item <label>] [--zero] --since <instant>`,
 	'       josh lane:net <issue>',
 ].join('\n')
 
@@ -58,7 +58,12 @@ const VALUE_OPTIONS = {
 	table: { type: 'string' },
 	row: { type: 'string' },
 	column: { type: 'string' },
+	where: { type: 'string' },
+	item: { type: 'string' },
+	zero: { type: 'boolean' },
 } as const
+// `--where <header>=<text>`: the header ends at the first `=`, so the text may hold one.
+const WHERE_SEPARATOR = '='
 
 function refuse(): number {
 	console.error(USAGE)
@@ -239,6 +244,9 @@ interface AddressFlags {
 	table?: string | undefined
 	row?: string | undefined
 	column?: string | undefined
+	where?: string | undefined
+	item?: string | undefined
+	zero?: boolean | undefined
 }
 
 function since_of(text = ''): number | undefined {
@@ -257,10 +265,24 @@ function metric_of(positionals: ReadonlyArray<string>): string | undefined {
 	return name !== undefined && positionals.length === 1 && is_known(name) ? name : undefined
 }
 
-function address_of({ table, row, column }: AddressFlags): CellAddress | undefined {
-	return table === undefined || row === undefined || column === undefined
-		? undefined
-		: { table, row, column }
+// `{ filter: undefined }` with no `--where`, `undefined` for one without a header or an `=`.
+function where_of(text: string | undefined): { filter: CellFilter | undefined } | undefined {
+	if (text === undefined) return { filter: undefined }
+
+	const at = text.indexOf(WHERE_SEPARATOR)
+
+	if (at < 1) return undefined
+
+	return { filter: { column: text.slice(0, at), text: text.slice(at + WHERE_SEPARATOR.length) } }
+}
+
+function address_of(flags: AddressFlags): CellAddress | undefined {
+	const { table, column } = flags
+	const where = where_of(flags.where)
+
+	if (table === undefined || column === undefined || where === undefined) return undefined
+
+	return { table, column, row: flags.row, where: where.filter, item: flags.item, zero: flags.zero }
 }
 
 function request_of(

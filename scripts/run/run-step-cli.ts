@@ -178,13 +178,12 @@ async function run_parent(): Promise<number> {
 	return FAILURE_EXIT_CODE
 }
 
-// The action line, then — under `implement` — the `lane:plan` a lane child runs before its first edit.
-// Only `implement` reads it, so no other step pays for the plan comment's request.
+// The action line, then — under `implement` — the `lane:plan` a lane child runs before its first edit
+// and its `--imports` hint. Only `implement` reads it, so no other step pays for the plan comment's request.
 async function action_lines(input: StepInput, line: string): Promise<ReadonlyArray<string>> {
 	if (line !== run_step.IMPLEMENT) return [line]
-	const next = await run_step_lane_plan.line_for(input.issue_number, input.is_lane_child)
 
-	return next === undefined ? [line] : [line, next]
+	return [line, ...(await run_step_lane_plan.lines_for(input.issue_number, input.is_lane_child))]
 }
 
 async function report({ input, ship_problems }: Gathered): Promise<number> {

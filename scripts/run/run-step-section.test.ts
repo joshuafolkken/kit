@@ -140,6 +140,7 @@ describe('run_step_section — the sections the retrospective, a park and a paus
 describe('run_step_section — a lane child reads its own step of the chain', () => {
 	const implement = { kind: 'verdict' as const, line: run_step.IMPLEMENT }
 	const MAIN_MERGE_STEP = '`pnpm josh run:chain <N>` runs `main:merge`'
+	const LANE_CHILD_HEADING = /^## A lane child — step 0\n\n0\. \*\*A lane child\*\*/u
 
 	it.each([...run_step_section.LANE_CHILD_SECTIONS])(
 		'resolves the lane child %s row against the shipped documents',
@@ -150,7 +151,7 @@ describe('run_step_section — a lane child reads its own step of the chain', ()
 
 	it('prints step 0 under implement, through its ship, and never the main:merge step', () => {
 		expect(run_step_section.print_for(implement, true)).toBe(SUCCESS)
-		expect(printed()).toMatch(/^0\. \*\*A lane child\*\*/u)
+		expect(printed()).toMatch(LANE_CHILD_HEADING)
 		expect(printed()).toContain('`failed` → step 1.')
 		expect(printed()).not.toContain(MAIN_MERGE_STEP)
 	})
@@ -159,14 +160,14 @@ describe('run_step_section — a lane child reads its own step of the chain', ()
 		const ship_log = { kind: 'command' as const, line: 'pnpm josh ship --log 5016' }
 
 		expect(run_step_section.print_for(ship_log, true)).toBe(SUCCESS)
-		expect(printed()).toMatch(/^0\. \*\*A lane child\*\*/u)
+		expect(printed()).toMatch(LANE_CHILD_HEADING)
 		expect(printed()).not.toContain(MAIN_MERGE_STEP)
 	})
 
 	// joshuafolkken/kit#5626: `run:review` prints its own row, so a lane child's open reads step 0 too.
 	it('prints step 0, not the main:merge step, for a lane child run:review', () => {
 		expect(run_step_section.print_section('run:review', process.cwd(), true)).toBe(SUCCESS)
-		expect(printed()).toMatch(/^0\. \*\*A lane child\*\*/u)
+		expect(printed()).toMatch(LANE_CHILD_HEADING)
 		expect(printed()).not.toContain(MAIN_MERGE_STEP)
 	})
 
@@ -174,6 +175,14 @@ describe('run_step_section — a lane child reads its own step of the chain', ()
 		expect(run_step_section.print_for(implement, false)).toBe(SUCCESS)
 		expect(printed()).toMatch(/^## Run the review-to-merge chain/u)
 		expect(printed()).toContain(MAIN_MERGE_STEP)
+	})
+})
+
+// joshuafolkken/kit#5946: step 0 is its own section, so a run outside a lane is not printed it.
+describe('run_step_section — the chain outside a lane', () => {
+	it('prints the chain for ship without the lane child step 0', () => {
+		expect(run_step_section.print_section('ship', process.cwd(), false)).toBe(SUCCESS)
+		expect(printed()).not.toContain('0. **A lane child**')
 	})
 })
 

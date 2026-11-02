@@ -17,8 +17,9 @@ import { cost_audit_read } from './cost-audit-read'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: pnpm josh cost:audit [--period <days>]'
-const OPTIONS = { period: { type: 'string' } } as const
+const USAGE = 'Usage: pnpm josh cost:audit [--period <days>] [--density]'
+const DENSITY_FLAG = '--density'
+const OPTIONS = { period: { type: 'string' }, density: { type: 'boolean' } } as const
 // A positive whole number of days (`cli_flags.to_positive`), at most ten years.
 const MAX_PERIOD_DAYS = 3650
 // GitHub's search qualifier takes an ISO instant without the milliseconds `toISOString` writes.
@@ -87,6 +88,23 @@ async function summary(cwd: string, now_ms: number = Date.now()): Promise<string
 	)
 }
 
+// `--density` prints the lane-child density alone, so the number is the output's last line; a period
+// with no lane-child request prints nothing, never a zero a declared bound would read as met.
+function printed_lines(argv: ReadonlyArray<string>, audit: Audit): Array<string> {
+	if (!argv.includes(DENSITY_FLAG)) return cost_audit_format.report_lines(audit)
+
+	const value = cost_audit_format.density_value(audit)
+
+	return value === undefined ? [] : [value]
+}
+
+// Nothing to print is a failure: `--density` with no sample exits non-zero, like `lane:value`.
+function printed(lines: ReadonlyArray<string>): number {
+	for (const line of lines) console.info(line)
+
+	return lines.length > 0 ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+}
+
 async function run(
 	argv: ReadonlyArray<string>,
 	cwd: string = process.cwd(),
@@ -100,11 +118,7 @@ async function run(
 		return FAILURE_EXIT_CODE
 	}
 
-	const lines = cost_audit_format.report_lines(await measure(cwd, days, now_ms))
-
-	for (const line of lines) console.info(line)
-
-	return SUCCESS_EXIT_CODE
+	return printed(printed_lines(argv, await measure(cwd, days, now_ms)))
 }
 
 const cost_audit_cli = { USAGE, read_period, merged_query, run, summary }

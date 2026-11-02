@@ -56,7 +56,18 @@ describe('lane_plan_auto.run_from_plan', () => {
 		)
 		expect(checked_paths()).toStrictEqual(EDITED)
 		expect(run_mock.mock.calls[0]?.[1]).toBe(DIRECTORY)
-		expect(printed).toStrictEqual([`pnpm josh lane:plan ${ISSUE} ${EDITED.join(' ')}`])
+		expect(printed).toStrictEqual([
+			`pnpm josh lane:plan ${ISSUE} ${EDITED.join(' ')}`,
+			lane_plan_auto.IMPORTS_HINT,
+		])
+	})
+
+	// joshuafolkken/kit#5934: this run clears the plan, so `run:step` names no `lane:plan` after it — the
+	// `--imports` hint has to be printed here or the child never sees it.
+	it('names --imports under the command it prints', async () => {
+		await lane_plan_auto.run_from_plan(ISSUE, plan_naming(EDITED), DIRECTORY)
+
+		expect(printed[1]).toContain('--imports <path>...')
 	})
 
 	it('leaves the consumers section’s paths out', async () => {
@@ -68,7 +79,10 @@ describe('lane_plan_auto.run_from_plan', () => {
 	it('prints the command for the child to finish when the plan names no path', async () => {
 		expect(await lane_plan_auto.run_from_plan(ISSUE, plan_naming([]), DIRECTORY)).toBe(0)
 		expect(run_mock).not.toHaveBeenCalled()
-		expect(printed).toStrictEqual([`pnpm josh lane:plan ${ISSUE} <path>...`])
+		expect(printed).toStrictEqual([
+			`pnpm josh lane:plan ${ISSUE} <path>...`,
+			lane_plan_auto.IMPORTS_HINT,
+		])
 	})
 })
 

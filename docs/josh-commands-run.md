@@ -528,7 +528,8 @@ on stderr) in a lane child or when no record is this session's.
 
 When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
 
-A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit, already taken when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
+A lane child whose plan `lane:plan` has not cleared gets `pnpm josh lane:plan <N> <paths>` under `implement`, its plan comment's paths (`<path>...` with none) — already run when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
+All three print it with a line naming `--imports`.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the
@@ -1225,7 +1226,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample
 
 <!-- usage: lane:value -->
 
-Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
+Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --where --column --item --zero), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
 
 ```bash
 pnpm josh lane:value edit --since 2026-10-23T03:29Z                                                                    # the median Edit time since an instant
@@ -1236,7 +1237,24 @@ pnpm josh lane:value cell --table "test:related scope" --row related --column "m
 
 The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
 
+Two figures outside `lane:value` print the number alone as the last line; `--density` with no lane-child request prints nothing and exits non-zero too:
+
+```bash
+pnpm josh cost:audit --density --period 7   # lane-child calls per request over the period
+pnpm josh read:set fullrun --bytes          # total bytes the fullrun entry reads
+```
+
 `cell` reads the tables `lane:stats` prints over the same window: `--table` is a table's first header cell, `--row` a row's first cell. An address matching no numeric cell, or more than one (the check and claim tables share `check`), exits non-zero.
+
+`--where <header>=<text>` keeps the rows whose `<header>` cell is `<text>`; `--row` may be left out, and `--column` may name the first column.
+
+`--item <label>` reads `<label>`'s exact count from a `label N, label N` list cell (`unpinned (noticed)` is its own label), `0` when the list omits it. `--zero` reads a named table with no matching row as `0`:
+
+```bash
+pnpm josh lane:value cell --table "round 2" --row required --where code=live --column decisions --zero --since 2026-11-02T00:00Z   # round 2 required for live
+pnpm josh lane:value cell --table stop --row preflight --column causes --item unpinned --since 2026-11-02T00:00Z                   # preflight stops caused by unpinned, not noticed
+pnpm josh lane:value cell --table "measured lanes" --column "measured lanes" --since 2026-11-02T00:00Z                            # merged lanes measured
+```
 
 #### `josh lane:net`
 
@@ -1385,6 +1403,7 @@ Print what an entry point reads before it starts, and what that read costs.
 pnpm josh read:set                     # every entry point
 pnpm josh read:set backlogrun          # one of them
 pnpm josh read:set backlogrun --json
+pnpm josh read:set fullrun --bytes     # its total read bytes alone, as the last line
 ```
 
 <!-- /usage -->
@@ -1549,11 +1568,13 @@ Report AI cost over a period by session kind, tool category and guard, with cost
 ```bash
 pnpm josh cost:audit               # the last 7 days against the 7 before
 pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
+pnpm josh cost:audit --density     # the lane-child calls per request alone, as the last line
 ```
 
 **Options:**
 
 - `--period <days>` — the length of each period, a positive whole number of days (default 7).
+- `--density` — print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it; no lane-child request prints nothing and exits 1.
 
 <!-- /usage -->
 
