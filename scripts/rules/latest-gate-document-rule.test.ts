@@ -96,9 +96,9 @@ describe(`${GATE} — the single source`, () => {
 		'No record answers `required`',
 		'The record is written by `josh latest` itself',
 		'`JOSH_LATEST_MAX_AGE_HOURS`',
-		// The `dependency-update` condition is unchanged for a run in which the update actually ran,
-		// which is the half a frequency change is most likely to drop.
-		'load the `dependency-update` skill and follow its procedure',
+		// The `dependency-update` check still follows every run in which the update actually ran (the
+		// command prints it, #5942), which is the half a frequency change is most likely to drop.
+		'It prints the `dependency-update` check',
 		// The audit net has to be named, or a reader cannot tell whether the frequency drop lost it.
 		'`Security Audit` job runs on every pull request',
 	])('states %j', (marker) => {

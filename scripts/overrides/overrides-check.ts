@@ -15,7 +15,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { file_reader } from '#scripts/lib/read-file'
 import { overrides_snapshot_schema } from '#scripts/lib/schemas'
 import { development_engines_verdict } from '#scripts/version/development-engines-verdict'
-import { overrides_diff } from './overrides-diff'
+import { overrides_diff_report } from './overrides-diff-report'
 import { overrides_files } from './overrides-files'
 import { overrides_check, type OverridesDiff } from './overrides-logic'
 
@@ -40,16 +40,8 @@ function load_snapshot(): Record<string, string> {
 	}
 }
 
-function print_diff_lines(diff: OverridesDiff, heading: string): void {
-	console.error(heading)
-
-	for (const line of overrides_check.format_diff_lines(diff)) {
-		console.error(line)
-	}
-}
-
 function print_diff(diff: OverridesDiff, heading: string): never {
-	print_diff_lines(diff, heading)
+	overrides_diff_report.print_diff_lines(diff, heading)
 
 	return process.exit(1)
 }
@@ -94,20 +86,10 @@ function refuse_range(range: string): never {
 // The same two verdict lines as the snapshot check, read against a git revision instead, so the
 // dependency-update check after `josh adopt` is a command's answer rather than a diff read by eye.
 function run_diff(range: string): void {
-	const sources = overrides_diff.read_sources(range)
-	if (sources === undefined) refuse_range(range)
-	const { before, after } = sources
+	const verdict = overrides_diff_report.report(range)
 
-	console.info(development_engines_verdict.describe(before.package_json, after.package_json))
-	const changed = overrides_diff.changed_blocks(sources)
-
-	for (const block of changed) {
-		print_diff_lines(block.diff, `✖ ${block.file} overrides changed since ${range}:`)
-	}
-
-	if (changed.length > 0) process.exit(1)
-
-	console.info(`✔ overrides unchanged since ${range} (${overrides_check.describe_sources(after)}).`)
+	if (verdict === undefined) refuse_range(range)
+	if (verdict.is_overrides_moved) process.exit(1)
 }
 
 // A line nobody can read is refused before the snapshot is read or written: a misspelled `--save` that
