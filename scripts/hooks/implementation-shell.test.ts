@@ -88,6 +88,8 @@ describe('josh epic operations and rule:list', () => {
 		'pnpm josh epic "Bring every lane under 30 minutes" 5502 5503',
 		'pnpm josh epic:check 5392',
 		'pnpm josh rule:list',
+		// joshuafolkken/kit#5818: the consultation session removes a dependency a person dropped.
+		'pnpm josh backlog:triage --apply 5767 --unblock 5562 --reason x',
 	])('passes the operation %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(false)
 	})

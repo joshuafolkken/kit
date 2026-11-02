@@ -143,13 +143,24 @@ describe('permission guards — the index, destructive and protected-file rows',
 			'gh api -X DELETE repos/joshuafolkken/kit/labels/bug',
 			destructive_command.DESTRUCTIVE_COMMAND_REASON,
 		],
+		[
+			'blocked-by',
+			'gh api -X DELETE repos/joshuafolkken/kit/issues/5767/dependencies/blocked_by/6136548813',
+			destructive_command.DESTRUCTIVE_COMMAND_REASON,
+		],
 		['clean', 'git clean -fdx', delivered_rules.WORKTREE_MUTATION_REASON],
 	])(DELIVERS_TITLE, (name, command, reason) => {
 		expect(delivered_for(`pg-${name}`, command)).toBe(reason)
 		expect(rules_claiming(command)).toBe(ONE_RULE)
 	})
 
-	it.each(['gh issue close 5', 'git status', 'rm -r dist'])(SILENT_TITLE, (command) => {
+	// joshuafolkken/kit#5818: the josh path that removes a blocked-by relation passes.
+	it.each([
+		'gh issue close 5',
+		'git status',
+		'rm -r dist',
+		'pnpm josh backlog:triage --apply 5767 --unblock 5562 --reason x',
+	])(SILENT_TITLE, (command) => {
 		expect(delivered_for(`pg-silent-${command}`, command)).toBeUndefined()
 	})
 })

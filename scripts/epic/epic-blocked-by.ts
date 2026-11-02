@@ -1,6 +1,6 @@
 import { epic_add } from '#scripts/epic/epic-add'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
-import { epic_index } from '#scripts/epic/epic-index'
+import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { epic_reconcile } from '#scripts/epic/epic-reconcile'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
@@ -19,6 +19,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 const EPIC_LIMIT = 200
 const SUCCESS_EXIT_CODE = 0
 const ALREADY = 'already'
+const UNSEEN_EPIC = 'the open epics were not read in full, so an epic tracking it may be unseen'
 
 interface BlockedByRequest {
 	issue: string
@@ -47,21 +48,38 @@ function is_listed_by(
 	return epic_index.build_tracking_index(epics).get(Number(child))?.includes(epic) === true
 }
 
+async function fetch_epics(): Promise<FetchedEpics> {
+	const fetched = await epic_index.fetch_epics(EPIC_LIMIT)
+	if (fetched === undefined) throw new Error('the open epics could not be read')
+
+	return fetched
+}
+
 // A listing cut short is no answer about absence: an epic past the cut tracks `#M` invisibly, and a
 // direct relation written then leaves that epic recording an order its body never declares.
 async function tracking_epic(request: BlockedByRequest): Promise<Tracking | undefined> {
-	const fetched = await epic_index.fetch_epics(EPIC_LIMIT)
-	if (fetched === undefined) throw new Error('the open epics could not be read')
+	const fetched = await fetch_epics()
 	const index = epic_index.build_epic_index(fetched.epics)
 	const epic = index.get(Number(request.issue))
 
 	if (epic === undefined && !epic_bundle_gaps.is_membership_established(fetched.cutoff)) {
-		throw new Error('the open epics were not read in full, so an epic tracking it may be unseen')
+		throw new Error(UNSEEN_EPIC)
 	}
 
 	if (epic === undefined) return undefined
 
 	return { epic, is_prerequisite_child: is_listed_by(fetched.epics, request.prerequisite, epic) }
+}
+
+// Every epic listing `#issue`, not the one `build_epic_index` keeps: removing a relation drops its
+// declaration from each, since any of them may declare it (`backlog:triage --unblock`). A listing cut
+// short refuses even when one epic is seen, for an epic past the cut may declare it too.
+async function listing_epics(issue: string): Promise<ReadonlyArray<number>> {
+	const fetched = await fetch_epics()
+
+	if (!epic_bundle_gaps.is_membership_established(fetched.cutoff)) throw new Error(UNSEEN_EPIC)
+
+	return epic_index.build_tracking_index(fetched.epics).get(Number(issue)) ?? []
 }
 
 async function add_to_epic(epic: number, request: BlockedByRequest): Promise<void> {
@@ -139,7 +157,7 @@ async function record(request: BlockedByRequest): Promise<string> {
 	return 'recorded'
 }
 
-const epic_blocked_by = { record }
+const epic_blocked_by = { record, listing_epics }
 
 export type { BlockedByRequest }
 export { epic_blocked_by }

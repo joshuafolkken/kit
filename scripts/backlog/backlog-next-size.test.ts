@@ -21,12 +21,15 @@ import { backlog_next_size } from './backlog-next-size'
 const { issue, opted_in_epic, console_streams } = auto_ok_fixture
 const CHILD = 901
 
-const OVER_NOTE = 'size estimate 12 file(s) / 300 line(s) exceeds the guide'
+// joshuafolkken/kit#5654: the guide and the cap judge the declaration doubled.
+const OVER_NOTE =
+	'size estimate 12 file(s) / 300 line(s) × 2 = 24 file(s) / 600 line(s) exceeds the guide'
 
 const streams = console_streams()
 const { stdout, stderr } = streams
 
-const CAP_NOTE = 'not offered: size estimate 25 file(s) / 300 line(s) exceeds the cap'
+const CAP_NOTE =
+	'not offered: size estimate 25 file(s) / 300 line(s) × 2 = 50 file(s) / 600 line(s) exceeds the cap'
 const REASON = '- 分割しない理由: 1 コミットで入れる'
 const REPO = 'joshuafolkken/kit'
 
@@ -97,7 +100,7 @@ describe('backlog:next with an estimate over the size cap', () => {
 	})
 
 	it('offers the issue at the cap itself', async () => {
-		backlog_fixture.stub_backlog({ opted_in: [sized_at(24, REASON)] })
+		backlog_fixture.stub_backlog({ opted_in: [sized_at(12, REASON)] })
 		await backlog_next.run([])
 
 		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
@@ -137,7 +140,7 @@ describe('backlog_next_size.held_children', () => {
 
 	it('holds neither a child at the cap nor a split child over it', () => {
 		const held = backlog_next_size.held_children([
-			epic_child(24, []),
+			epic_child(12, []),
 			epic_child(25, [SPLIT_ROUTE_LABEL]),
 		])
 
