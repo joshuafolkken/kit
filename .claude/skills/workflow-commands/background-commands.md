@@ -48,9 +48,10 @@ merge result?**
   `pnpm josh epic:next`, `pnpm josh backlog:next --exclude <N>`, `pnpm josh lane:close` /
   `pnpm josh lane:list`. **De-duplicating a step is not removing it** — none is dropped or answered
   from memory.
+- **Epic progress counters → `pnpm josh run:merge <N> --epic <E> --repo <owner/repo>` posts them**
+  after the merge (`docs/josh-commands-run.md` → "josh run:merge").
 - **It does not — it is composed in the turn that issues `followup`**: the completion report body.
-  **Only the write follows the merge.** Epic progress counters → `pnpm josh run:merge <N> --epic <E>`
-  posts them (`docs/josh-commands-run.md` → "josh run:merge").
+  **Only the write follows the merge.**
 - **`pnpm josh cost --cut` stays after the merge**, though it reads nothing from it (`backlogrun-progress.md`
   → "The check is asked at every merge").
 
