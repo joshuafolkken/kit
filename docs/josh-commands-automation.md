@@ -744,9 +744,9 @@ pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
 
 <!-- /usage -->
 
-Same fetch-then-count as `josh followup`: `required` when main has taken at least one merge since the version last changed, `skip` when the count is zero, `unknown` when it could not be read.
+Same fetch-then-count as `josh followup`: `required` when main has taken at least one merge since the version last changed, `skip` when the count is zero, `unknown` when it could not be read. On `required` it also prints `release_issue: [#N](url)|none|unknown` — the open release Issue, found by the search `issue:release` uses — and the `request:` line that closes a completion report.
 
-**Output / exit codes:** the verdict goes to stdout, the reason to stderr. Exit code is 0 for every verdict and 1 only for an unknown flag; `unknown` is never read as `skip`.
+**Output / exit codes:** the verdict goes to stdout, the reason (and on `required` the two lines above) to stderr; `--json` carries them as `release_issue` and `request`. Exit code is 0 for every verdict and 1 only for an unknown flag; `unknown` is never read as `skip`.
 
 ### `josh release:github`
 
