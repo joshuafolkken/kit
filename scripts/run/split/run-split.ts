@@ -39,9 +39,9 @@ type SplitResult =
 	| { kind: 'needs-decision'; done: ReadonlyArray<StepReport> }
 	| { kind: 'failed'; step: string; reason: string; done: ReadonlyArray<StepReport> }
 
-async function placement_of(request: SplitRequest): Promise<Placement> {
+async function placement_of(issue: string, children: ReadonlyArray<string>): Promise<Placement> {
 	try {
-		const tracking = await epic_blocked_by.tracking_with(request.issue, request.children)
+		const tracking = await epic_blocked_by.tracking_with(issue, children)
 
 		return tracking === undefined ? { kind: 'none' } : { kind: 'tracked', ...tracking }
 	} catch (error) {
@@ -93,8 +93,8 @@ async function add_to(request: SplitRequest, tracking: ChildrenTracking): Promis
 	return epic
 }
 
-async function create_for(request: SplitRequest, title: string): Promise<number> {
-	const creation = await epic_command.create(create_argv(request, title))
+async function create_epic(argv: ReadonlyArray<string>): Promise<number> {
+	const creation = await epic_command.create(argv)
 	if (creation.kind === 'created' && creation.epic !== undefined) return creation.epic
 
 	throw new Error('`epic` created no epic whose number could be read')
@@ -113,9 +113,8 @@ function park_body(request: SplitRequest, reason: string): string {
 	return `${NEEDS_DECISION_LABEL}: could not tell whether an epic already tracks ${issue} (${reason}), so the split was not placed. Place ${cited_children(request)} by hand once the epic listing reads in full.`
 }
 
-async function park(request: SplitRequest, reason: string): Promise<string> {
-	const body = park_body(request, reason)
-	const write = await issue_park.apply(request.issue, NEEDS_DECISION_LABEL, body)
+async function park(issue: string, body: string): Promise<string> {
+	const write = await issue_park.apply(issue, NEEDS_DECISION_LABEL, body)
 	if (!write.is_labelled) throw new Error(`the \`${NEEDS_DECISION_LABEL}\` label was not applied`)
 
 	return NEEDS_DECISION_LABEL
@@ -147,6 +146,10 @@ function place_step(slot: EpicSlot, place: () => Promise<number>): Step {
 
 // The tracked or created epic is carried from the `place` step to the `audit` step through `slot`;
 // `audit` runs only once `place` filled it.
+function audit_step(slot: EpicSlot): Step {
+	return ['audit', async () => await audit(slot.value ?? NaN)]
+}
+
 async function place_and_audit(
 	request: SplitRequest,
 	place: () => Promise<number>,
@@ -154,43 +157,55 @@ async function place_and_audit(
 	const slot: EpicSlot = {}
 	const steps = run_set_aside.steps_of(aside_of(request), [
 		place_step(slot, place),
-		['audit', async () => await audit(slot.value ?? NaN)],
+		audit_step(slot),
 	])
 
 	return placed(await run_set_aside.run_steps(steps), slot)
 }
 
-async function park_after_aside(request: SplitRequest, reason: string): Promise<SplitResult> {
-	const steps = run_set_aside.steps_of(aside_of(request), [
-		['park', async () => await park(request, reason)],
-	])
+// The set-aside `aside` names, then `#issue` parked with `needs-decision` and `body`.
+async function park_after(aside: AsideRequest, body: string): Promise<SplitResult> {
+	const steps = run_set_aside.steps_of(aside, [['park', async () => await park(aside.issue, body)]])
 	const result = await run_set_aside.run_steps(steps)
 
 	return result.kind === 'done' ? { kind: NEEDS_DECISION_LABEL, done: result.done } : result
 }
 
-const NO_TITLE_REASON =
-	'no epic tracks the issue, so `--title` is required to create one; nothing was written'
+const UNTITLED: SplitResult = {
+	kind: 'failed',
+	step: 'title',
+	reason: 'no epic tracks the issue, so `--title` is required to create one; nothing was written',
+	done: [],
+}
 
 async function split(request: SplitRequest): Promise<SplitResult> {
-	const placement = await placement_of(request)
+	const placement = await placement_of(request.issue, request.children)
 
-	if (placement.kind === 'unknown') return await park_after_aside(request, placement.reason)
+	if (placement.kind === 'unknown') {
+		return await park_after(aside_of(request), park_body(request, placement.reason))
+	}
 
 	if (placement.kind === 'tracked') {
 		return await place_and_audit(request, async () => await add_to(request, placement))
 	}
 
 	const { title } = request
+	if (title === undefined) return UNTITLED
 
-	if (title === undefined) {
-		return { kind: 'failed', step: 'title', reason: NO_TITLE_REASON, done: [] }
-	}
-
-	return await place_and_audit(request, async () => await create_for(request, title))
+	return await place_and_audit(request, async () => await create_epic(create_argv(request, title)))
 }
 
-const run_split = { split }
+// The steps `run-split-prerequisite.ts` shares, so both forms place, audit and park alike.
+const run_split = {
+	split,
+	placement_of,
+	create_epic,
+	place_step,
+	audit_step,
+	placed,
+	park_after,
+	UNTITLED,
+}
 
-export type { SplitRequest, SplitResult }
+export type { EpicSlot, SplitRequest, SplitResult }
 export { run_split }

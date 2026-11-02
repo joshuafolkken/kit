@@ -18,26 +18,10 @@ or more always means an epic", then
 `pnpm josh run:split <N> --children <N1,N2,...> [--ordered] [--title "<title>"]` (`docs/josh-commands-run.md`
 → "`josh run:split`"). `epic #<E>` → continue into the loop against `#<E>`; `needs-decision` → report.
 
-**A prerequisite** `<P>`:
-
-1. File it with `route:tier-a` — no confirmation.
-2. **Stash and remove `in-progress`**: `pnpm josh run:pause <N> --for <P>` (`prerequisite.md`), which
-   also records the dependency step 3 would.
-3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
-
-   | Answer | What to do |
-   | --- | --- |
-   | An epic `#<E>` already tracks `#<N>` | `pnpm josh epic --add <E> <P> --before <N>`. **Do not create a second epic**; continue against `#<E>` |
-   | No epic tracks it | `pnpm josh epic "<title>" <P> <N> --ordered` — the prerequisite **first** |
-   | **The command could not answer** | Park `#<N>` with `needs-decision` and report — "could not tell" is not "no epic" |
-
-   "Could not answer" is a non-zero exit, `Could not confirm which epic already tracks these — do not
-   place this issue in one.`, or a `⚠ The epic listing …` truncation warning (`hit its …-epic cap` /
-   `stopped at the …-issue page ceiling`) above `Nothing to bundle.`. `⚠ Could not read #N.` voids
-   nothing, and a definitive answer stands beside a warning.
-
-4. **Run `pnpm josh epic:audit <E>` now** — there is no epic to audit before step 3.
-5. **Do not stop.** Continue into the loop against `#<E>`.
+**A prerequisite** `<P>` → file it with `route:tier-a` (no confirmation), then
+`pnpm josh run:split <N> --prerequisite <P> [--title "<title>"]` (`docs/josh-commands-run.md` →
+"`josh run:split`"), which pauses `#<N>` as `run:pause` does (`prerequisite.md`). `epic #<E>` →
+**do not stop**, continue into the loop against `#<E>`; `needs-decision` → report.
 
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
 - **Every guard applies unchanged** (`backlogrun.md` → "Guards").

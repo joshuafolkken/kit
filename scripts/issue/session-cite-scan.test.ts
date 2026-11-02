@@ -117,6 +117,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/pause/run-pause.ts', 2],
 	// The `run:split` stash name, its idempotence marker, the split comment and the park comment.
 	['run/split/run-split.ts', 3],
+	// The `run:split --prerequisite` park comment on the paused Issue.
+	['run/split/run-split-prerequisite.ts', 2],
 	['run/ship/run-ship-detach.ts', 1],
 	// The handover note on the run event stream, which `run:board` attributes by its `#<N>`.
 	['run/ship/run-ship-handover.ts', 1],
