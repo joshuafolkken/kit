@@ -13,33 +13,27 @@ children until every one is processed, then the run advances to the next named i
 `backlogrun #<N>` on an Issue with no task list runs `#<N>` as a `fullrun` and finishes. A prerequisite
 or a split found mid-run does **not** stop it:
 
-1. File the new Issue(s) — `route:split` for a split, `route:tier-a` for a prerequisite — no
-   confirmation.
-2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `pnpm josh run:pause <N> --for <P>`
-   (`prerequisite.md`), which also records the dependency step 3 would; for a split,
-   `pnpm josh stash:push "..."`, `pnpm josh issue:comment <N> --body-file <path>` recording the
-   stash, and `pnpm josh run:release <N>`.
+**A split** → file the children with `route:split` (no confirmation), then
+`pnpm josh run:split <N> --children <N1,N2,...> [--ordered] [--title "<title>"]` (`docs/josh-commands-run.md`
+→ "`josh run:split`"). `epic #<E>` → continue into the loop against `#<E>`; `needs-decision` → report.
+
+**A prerequisite** `<P>`:
+
+1. File it with `route:tier-a` — no confirmation.
+2. **Stash and remove `in-progress`**: `pnpm josh run:pause <N> --for <P>` (`prerequisite.md`), which
+   also records the dependency step 3 would.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
 
    | Answer | What to do |
    | --- | --- |
-   | An epic `#<E>` already tracks `#<N>` | `pnpm josh epic --add <E> <P> --before <N>` (prerequisite) or `--add <E> <N1> ...` (split). **Do not create a second epic**; continue against `#<E>` |
-   | No epic tracks it | Create one (table below) |
+   | An epic `#<E>` already tracks `#<N>` | `pnpm josh epic --add <E> <P> --before <N>`. **Do not create a second epic**; continue against `#<E>` |
+   | No epic tracks it | `pnpm josh epic "<title>" <P> <N> --ordered` — the prerequisite **first** |
    | **The command could not answer** | Park `#<N>` with `needs-decision` and report — "could not tell" is not "no epic" |
 
    "Could not answer" is a non-zero exit, `Could not confirm which epic already tracks these — do not
    place this issue in one.`, or a `⚠ The epic listing …` truncation warning (`hit its …-epic cap` /
    `stopped at the …-issue page ceiling`) above `Nothing to bundle.`. `⚠ Could not read #N.` voids
    nothing, and a definitive answer stands beside a warning.
-
-   `#<N>` is itself one of the deliverables (the keep-as-a-child arm of `split-assessment.md`).
-   `--ordered` makes the argument order the dependency chain:
-
-   | Found | Command |
-   | --- | --- |
-   | A prerequisite `<P>` | `pnpm josh epic "<title>" <P> <N> --ordered` — the prerequisite **first** |
-   | A split into independent children | `pnpm josh epic "<title>" <N> <N1> ...` — **no `--ordered`** |
-   | A split whose children do have an order | `pnpm josh epic "<title>" ... --ordered`, in that order |
 
 4. **Run `pnpm josh epic:audit <E>` now** — there is no epic to audit before step 3.
 5. **Do not stop.** Continue into the loop against `#<E>`.

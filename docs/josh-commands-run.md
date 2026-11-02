@@ -67,6 +67,33 @@ pnpm josh run:pause 1091 --for 1102   # pause 1091 until 1102 lands
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:pause` in detail".
 
+### `josh run:split`
+
+<!-- usage: run:split -->
+
+Set a run aside and place its split into an epic in one call.
+
+```bash
+pnpm josh run:split 1091 --children 1102,1103 --title "Split 1091"   # independent split
+pnpm josh run:split 1091 --children 1102 --ordered                   # 1102 after 1091
+```
+
+**Options:**
+
+- `--children <N1,N2,...>` — the filed split issues, comma-separated.
+- `--ordered` — `<issue>` first, then the children in that order.
+- `--title <title>` — the new epic’s title; required when no epic tracks `<issue>` yet.
+
+<!-- /usage -->
+
+A split found mid-run in one call: the run set aside as `run:pause` sets it aside (stash, comment,
+release, each step skipped on a rerun once done), the children placed — `epic --add` into the epic
+already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `<issue>` heads — and
+that epic audited with `epic:audit`. The last line is `epic #<E>`. An epic listing that cannot tell
+whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
+`needs-decision`. Without `--title` and with no tracking epic it refuses before writing anything; a
+failed step keeps the hold.
+
 ### `josh run:tidy`
 
 <!-- usage: run:tidy -->

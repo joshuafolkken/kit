@@ -1,0 +1,9 @@
+{
+	"reason": "run:split adds a new command (#5846) and the set-aside steps shared with run:pause",
+	"date": "2026-11-02",
+	"growth": {
+		"scripts.code_lines": 262,
+		"prose.long_paragraphs": 1,
+		"prose.excess_bold": 1
+	}
+}

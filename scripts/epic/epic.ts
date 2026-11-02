@@ -10,6 +10,7 @@
  *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
  *        tsx scripts/epic/epic.ts --decide <E> <N1> <N2> ... --decision-file <path|->
  */
+import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { error_text } from '#scripts/lib/error-message'
 import { epic_add, type AddChildrenInput } from './epic-add'
@@ -192,16 +193,19 @@ async function run_reconciliation(argv: ReadonlyArray<string>): Promise<number> 
 	return await epic_reconcile.reconcile_epic(parsed.epic_number)
 }
 
-async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
+// `epic: undefined` is a created epic whose URL could not be read — still a success here.
+type Creation = { kind: 'refused' } | { kind: 'created'; epic: number | undefined }
+
+async function create(argv: ReadonlyArray<string>): Promise<Creation> {
 	const parsed = epic_cli.parse_create_arguments(argv)
 
 	if (parsed === undefined) {
 		console.error(`✖ A title and at least one child issue number are required.\n${USAGE}`)
 
-		return FAILURE_EXIT_CODE
+		return { kind: 'refused' }
 	}
 
-	if (await is_split_stranded(parsed.children)) return FAILURE_EXIT_CODE
+	if (await is_split_stranded(parsed.children)) return { kind: 'refused' }
 
 	const epic_number = await epic_run.create_epic_number({
 		title: parsed.title,
@@ -213,7 +217,13 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 
 	await epic_notify.announce(parsed, epic_number)
 
-	return SUCCESS_EXIT_CODE
+	return { kind: 'created', epic: epic_number }
+}
+
+async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
+	const creation = await create(argv)
+
+	return creation.kind === 'refused' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
 type EpicForm = readonly [
@@ -246,9 +256,20 @@ async function main(): Promise<void> {
 
 // A `gh` failure carries its stderr as the message, which is the useful part; printing it alone
 // keeps a routine "not authenticated" or "label not found" from arriving as a stack trace.
-try {
-	await main()
-} catch (error) {
-	console.error(`✖ ${error_text.message_of(error)}`)
-	process.exit(FAILURE_EXIT_CODE)
+async function main_reporting(): Promise<void> {
+	try {
+		await main()
+	} catch (error) {
+		console.error(`✖ ${error_text.message_of(error)}`)
+		process.exit(FAILURE_EXIT_CODE)
+	}
 }
+
+// `run:split` places its children through `run` and `create`, so the module runs only when invoked
+// directly.
+const epic_command = { run, create }
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main_reporting()
+
+export type { Creation }
+export { epic_command }
