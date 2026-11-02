@@ -63,6 +63,8 @@ interface ReserveOptions {
 	// Lane launches must wait for room even alone or beyond the gate's wait cap.
 	is_strict_admission?: boolean | undefined
 	is_memory_pending?: boolean | undefined
+	// A whole test suite besides the unit one, which `is_unit` names: never lifted by `core-priority.ts`.
+	is_suite?: boolean | undefined
 	checkout?: string | undefined
 	budget?: number
 	memory_mb?: number | undefined

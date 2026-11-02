@@ -5,6 +5,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
+import { core_priority } from './core-priority'
 import { core_reservation } from './core-reservation'
 
 const CHILD_PID = 4242
@@ -21,6 +22,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 	rmSync(probe.directory, { recursive: true, force: true })
 })
 
@@ -46,6 +48,27 @@ describe('core_reservation.transfer', () => {
 				now + core_admission.RAMP_UP_MS,
 			).memory_mb,
 		).toBe(MEMORY_MB)
+	})
+})
+
+// joshuafolkken/kit#5767: a ship's closing stages mark their children's claims as priority.
+describe('core_reservation.claim_fields — the priority mark', () => {
+	it('marks the claim priority under the environment mark', () => {
+		vi.stubEnv(core_priority.PRIORITY_KEY, '1')
+
+		expect(core_reservation.claim_fields(1, 1, {}).is_priority).toBe(true)
+	})
+
+	it('leaves the field out without the mark', () => {
+		vi.stubEnv(core_priority.PRIORITY_KEY, '')
+
+		expect(core_reservation.claim_fields(1, 1, {}).is_priority).toBeUndefined()
+	})
+
+	it('leaves the field out of a unit-suite claim under the mark', () => {
+		vi.stubEnv(core_priority.PRIORITY_KEY, '1')
+
+		expect(core_reservation.claim_fields(1, 1, { is_unit: true }).is_priority).toBeUndefined()
 	})
 })
 

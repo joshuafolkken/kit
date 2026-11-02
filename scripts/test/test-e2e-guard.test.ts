@@ -198,6 +198,7 @@ describe('test_e2e_guard.run_guarded_e2e — the core budget it claims', () => {
 
 		expect(reservation).toHaveBeenCalledWith(core_budget.CORE_WEIGHTS.e2e, expect.any(Function), {
 			command: 'test:e2e',
+			is_suite: true,
 			memory_mb: core_budget.MEMORY_MB.e2e,
 		})
 	})
