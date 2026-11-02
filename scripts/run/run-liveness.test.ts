@@ -108,12 +108,12 @@ describe('a stopped child is classified through run:merge, not parked outright',
 		expect(advice).toContain('re-dispatches')
 	})
 
-	it('asks for a stash before classifying only when the checkout is dirty', () => {
+	it('asks run:merge to stash in the same call only when the checkout is dirty', () => {
 		expect(run_liveness.decide(arrange_traces({ is_tree_dirty: true })).advice).toContain(
-			'pnpm josh stash:push',
+			'run:merge <N> --output <path> --stash',
 		)
 		expect(run_liveness.decide(arrange_traces({ is_tree_dirty: false })).advice).not.toContain(
-			'stash:push',
+			'--stash',
 		)
 	})
 })
