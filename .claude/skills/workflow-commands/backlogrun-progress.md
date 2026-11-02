@@ -71,7 +71,7 @@ a lane per child the epics offer, prints each lane's liveness, and prints the wa
 the background (`run:watcher:guard`). A lane with a path is a handed-over child, waited on per
 `backlogrun-recovery.md` → "A delegated unit that stopped without reporting".
 **A carried-over child finishes in its own unit — never run its `followup` yourself**; one lost in the
-cut is re-dispatched with `pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`.
+cut is re-dispatched with `pnpm josh lane:launch <N>`.
 
 ### What carries over
 
