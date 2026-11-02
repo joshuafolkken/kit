@@ -49,7 +49,14 @@ async function raise(issue_number: string): Promise<RaiseResult> {
 	return is_applied ? 'raised' : 'failed'
 }
 
-const issue_priority_raise = { raise }
+// The answers that leave the body's floor unapplied — every caller reports these as a failure.
+const FAILURES: ReadonlySet<RaiseResult> = new Set(['unreadable', 'failed'])
+
+function is_failure(result: RaiseResult): boolean {
+	return FAILURES.has(result)
+}
+
+const issue_priority_raise = { raise, is_failure }
 
 export type { RaiseResult }
 export { issue_priority_raise }
