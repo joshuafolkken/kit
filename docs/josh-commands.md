@@ -1074,9 +1074,9 @@ pnpm josh lane:resolve 3769   # prints `conflict docs/a.md` on a hand-resolvable
 
 <!-- /usage -->
 
-- The merge-conflict path of `backlogrun-recovery.md`, judged by a command. Step-back condition 3 is read first, before any merge: a trusted Issue comment starting `## Lane conflict resolved` means this child already spent its one resolution.
+- The merge-conflict path of `backlogrun-recovery.md`, judged by a command. It runs only on `<issue>-lane`; on any other branch it refuses before reading a comment or merging. Step-back condition 3 is read next, before any merge: a trusted Issue comment starting `## Lane conflict resolved` means this child already spent its one resolution.
 - The merge is `josh main:merge`'s (`main_merge.merge`), so the files it regenerates resolve themselves and its refusals hold.
-- Condition 2 is read per conflicted path off `git diff --unified=0` from the merge base to each side: both sides rewriting one base line overlaps; adjacent rewrites and pure insertions do not. An overlap aborts the merge, so the park finds a clean tree.
+- Condition 2 is read per conflicted path off `git diff --unified=0` from the merge base to each side: both sides rewriting one base line overlaps; adjacent rewrites, pure insertions and a hunk both sides made identically do not. An overlap aborts the merge, so the park finds a clean tree.
 - Conditions 1 and 4 stay the run's: a specification question, and the gate and review after a resolution.
 
 **Output / exit codes:** one line on stdout, exit 0 — `resolved`, `conflict <paths>`, `step-back 2 <paths>` or `step-back 3`. A refused merge, an unreadable comment thread or a git failure: stderr, exit 1.

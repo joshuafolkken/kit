@@ -1,7 +1,7 @@
 {
-	"reason": "#5837 adds the lane:resolve command (verdict, hunk-overlap judgement, CLI and its command entry)",
+	"reason": "lane:resolve adds the command, its hunk reader, the branch refusal and the identical-hunk rule (#5837)",
 	"date": "2026-11-02",
 	"growth": {
-		"scripts.code_lines": 159
+		"scripts.code_lines": 183
 	}
 }

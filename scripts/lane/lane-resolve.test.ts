@@ -1,4 +1,5 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { main_merge } from '#scripts/git/main-merge'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
@@ -21,6 +22,7 @@ const list_comments = vi.spyOn(git_gh_issue_read, 'issue_list_comments')
 const parse_comments = vi.spyOn(issue_read, 'parse_comments')
 const merge = vi.spyOn(main_merge, 'merge')
 const git_read = vi.spyOn(git_spawn, 'read')
+const branch = vi.spyOn(git_command, 'branch')
 
 function comment(body: string, is_trusted: boolean): IssueComment {
 	return { author: 'joshuafolkken', created_at: '2026-11-02T00:00:00Z', body, is_trusted }
@@ -42,6 +44,20 @@ beforeEach(() => {
 	list_comments.mockResolvedValue('[]')
 	parse_comments.mockResolvedValue([])
 	git_read.mockImplementation(fake_git)
+	branch.mockResolvedValue(`${ISSUE}-lane`)
+})
+
+describe('lane_resolve.resolve on the branch', () => {
+	it('refuses on another branch before any comment read or merge', async () => {
+		branch.mockResolvedValue('main')
+
+		await expect(lane_resolve.resolve(ISSUE)).resolves.toStrictEqual({
+			kind: 'refused',
+			message: `lane:resolve runs on ${ISSUE}-lane, not main`,
+		})
+		expect(list_comments).not.toHaveBeenCalled()
+		expect(merge).not.toHaveBeenCalled()
+	})
 })
 
 describe('lane_resolve.resolve on the resolution count', () => {

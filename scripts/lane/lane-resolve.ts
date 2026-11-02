@@ -1,4 +1,5 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { git_command } from '#scripts/git/git-command'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { main_merge } from '#scripts/git/main-merge'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
@@ -16,6 +17,7 @@ const OVERLAP_CONDITION = 2
 const REPEAT_CONDITION = 3
 const HEAD = 'HEAD'
 const MERGE_HEAD = 'MERGE_HEAD'
+const LANE_BRANCH_SUFFIX = '-lane'
 
 type ResolveOutcome =
 	| { kind: 'resolved' }
@@ -75,7 +77,18 @@ async function judge_merge(): Promise<ResolveOutcome> {
 	return { kind: 'resolved' }
 }
 
-async function resolve(issue: string): Promise<ResolveOutcome> {
+// The issue names both the thread condition 3 reads and the branch the merge lands on, so a run in
+// another checkout is refused rather than judged against one issue and merged into another.
+async function wrong_branch(issue: string): Promise<ResolveOutcome | undefined> {
+	const branch = await git_command.branch()
+	const expected = `${issue}${LANE_BRANCH_SUFFIX}`
+
+	if (branch === expected) return undefined
+
+	return { kind: 'refused', message: `lane:resolve runs on ${expected}, not ${branch}` }
+}
+
+async function judge(issue: string): Promise<ResolveOutcome> {
 	const count = await resolution_count(issue)
 
 	if (count === undefined) {
@@ -88,6 +101,10 @@ async function resolve(issue: string): Promise<ResolveOutcome> {
 	if (count > 0) return { kind: 'step-back', condition: REPEAT_CONDITION, files: [] }
 
 	return await judge_merge()
+}
+
+async function resolve(issue: string): Promise<ResolveOutcome> {
+	return (await wrong_branch(issue)) ?? (await judge(issue))
 }
 
 // The one line the run branches on: `resolved`, `conflict <paths>` or `step-back <condition> [<paths>]`.
