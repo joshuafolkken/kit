@@ -13,7 +13,8 @@ children until every one is processed, then the run advances to the next named i
 `backlogrun #<N>` on an Issue with no task list runs `#<N>` as a `fullrun` and finishes. A prerequisite
 or a split found mid-run does **not** stop it:
 
-**A split** → file the children with `route:split` (no confirmation), then
+**A split** → file the children with `route:split` (no confirmation) by `split-assessment.md` → "Two
+or more always means an epic", then
 `pnpm josh run:split <N> --children <N1,N2,...> [--ordered] [--title "<title>"]` (`docs/josh-commands-run.md`
 → "`josh run:split`"). `epic #<E>` → continue into the loop against `#<E>`; `needs-decision` → report.
 
@@ -76,13 +77,6 @@ unit, run the child in the parent's context and still ask the hand-off at every 
 
 The person-facing report (`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」)
 is unchanged.
-
-## A delegated unit that stopped without reporting
-
-**Hand the child off without blocking, and wait on `pnpm josh lane:await <N>`** — a stopped unit
-leaves no notification, so the await's exit is the wake. Once its
-output is unchanged for the silent-unit window, read `backlogrun-recovery.md` → "A delegated unit that
-stopped without reporting" and ask `pnpm josh run:liveness`.
 
 ## Audit before the first child
 

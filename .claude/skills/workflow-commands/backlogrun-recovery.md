@@ -4,7 +4,8 @@ Point-of-use, read one section at the failure that reaches it; the single source
 
 ## A delegated unit that stopped without reporting
 
-**A stop from outside leaves no notification behind, so the parent waits on `lane:await`, whose exit
+**A stop from outside leaves no notification behind, so the parent hands the child off without
+blocking and waits on `backlog:drive` or `lane:await` (`scripts/run/run-poll-hook.ts`), whose exit
 covers it.** Record
 where a lane child writes with `pnpm josh lane:output <N> <path>` in the dispatch turn, and once its
 output has been unchanged for the silent-unit window (`backlogrun-progress.md` → "Waiting, and never
