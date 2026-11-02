@@ -53,9 +53,7 @@ The one call also runs `run:release <N>`, so the parked child holds neither the 
 another run (a split lane parking a leftover child) is left to that run's own release. Return to
 step 1.
 
-**A parked child's lane is kept, whether or not it had committed** — `backlogrun-lanes.md` → "What
-happens to a lane". A lost merge race
-resolves in its lane instead (`backlogrun-recovery.md` → "Conflicts are not predicted").
+**What happens to a parked child's lane** — `backlogrun-lanes.md` → "What happens to a lane".
 
 **Parking keeps the stop's rule** — file upstream defects; never work around them.
 `epic:bundle`'s `ask` is Tier A (`epic-commands` skill).
@@ -114,24 +112,18 @@ and leaves a closed issue alone; report each `kept` / `removed` line. The test i
 
 ## A prerequisite discovered mid-run
 
-Something else in **this** repository has to land first: not a split, not an upstream defect.
-`prerequisite.md` is the single source of the distinction, the `route:tier-a` filing and the ceiling.
-`<M>` is the child in hand; `<N>` the new Issue.
+Something else in **this** repository has to land first: not a split, not an upstream defect. File it
+(`route:tier-a`) and set the child in hand `<M>` aside with `run:pause` — `prerequisite.md`, the
+single source of the distinction, the filing, the pause and the ceiling. Then:
 
-1. File the prerequisite `<N>` with `route:tier-a` (Tier A, first-party, no confirmation) — **first**,
-   because the next step names it.
-2. **`pnpm josh run:pause <M> --for <N>`** — the stash, the comment naming its `stash:pop`, `<M>`
-   blocked by `<N>` (the epic's row and declaration too) and `run:release <M>` in one call
-   (`prerequisite.md`). Pop the stash the comment names when `epic:next` offers `<M>` again, after its
+1. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
+2. Pop the stash the pause comment names when `epic:next` offers `<M>` again, after its
    `pnpm josh ms`; expect conflicts.
-3. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
-
-**A stop a dependency can express is never parked**, including a defect in this repository's own gate
-or run tooling — `prerequisite.md`.
 
 ## Splitting a child mid-run
 
-Not a reason to stop. File the new children with `route:split` (Tier A, first-party), then
+Not a reason to stop. File the new children (Tier A, first-party; `split-assessment.md` → "Two or
+more always means an epic"), then
 `pnpm josh epic --add <E> <N...> [--before <M> | --after <M>]` — never a hand edit. Same criteria as
 `kickoff`. If what remains needs a person, park **that** child and move on. Splitting alone never adds
 `needs-decision` to the promoted epic.

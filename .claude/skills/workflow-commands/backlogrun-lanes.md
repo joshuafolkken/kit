@@ -100,8 +100,7 @@ Everything else is unchanged; `pnpm josh followup` releases the lane's hold at t
 - **It passes `--permission-mode bypassPermissions`, never `--dangerously-skip-permissions`.**
   `.claude/settings.json`'s `deny` list still refuses what it names; report what stopped, never loosen it.
 
-**Start each child without blocking on it, then wait on `backlog:drive` or `lane:await`**
-(`scripts/run/run-poll-hook.ts`) — a silent one is
+**Start each child without blocking on it** — the wait, and a silent child:
 `backlogrun-recovery.md` → "A delegated unit that stopped without reporting", read in that child's lane.
 
 **`pnpm josh ms` is the parent's now, not the child's** — run it in the primary checkout **before
@@ -120,7 +119,7 @@ read `backlogrun-recovery.md` → "Conflicts are not predicted" when `pnpm josh 
 | The child was **parked before its commit** | **Left open**, its uncommitted work in place, its directory and held seat recorded on the Issue | The shared stash stack is unsafe; `lane:close` is a **forced** removal. `pnpm josh lane:launch <N>` re-dispatches into the kept lane (a failed-install lane is still refused) |
 | The child was **parked after its commit and push** | **Left open**, its directory and held seat recorded on the Issue | `lane:close` would take the **local branch**, the resume path |
 | The child hit a **merge conflict** | **Left open** — the resolution happens in it | `backlogrun-recovery.md` → "Conflicts are not predicted"; a park there takes the row above |
-| The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work is what a person looks at. `run:hold <N> --human-review-stop` names the lane directory in the Telegram; the stop report names it too |
+| The child stopped on **`needs-human-review`** | **Left open and untouched**, its hold kept | Not a park: `backlogrun-park.md` → "`needs-human-review` — the one stop that is not a park" |
 | The child **failed** | Whichever of the two parked rows applies, plus the consecutive-failure count | **A merge conflict is not this row**, and is not counted |
 | **`lane:open` failed on the install** | `pnpm josh lane:close <N>`, then park the child | Frees the seat; a person fixes the cause. Carry pnpm's reason into the park note |
 | The lane is **spent** — no child working in it, its Issue closed, not one this run launched and has not collected with `run:merge`, a clean tree, no commit that is on no remote | Nothing to do — `pnpm josh lane:prune` closes it | Any other lane is kept, with the reason on standard error |
@@ -138,11 +137,7 @@ and `pnpm josh lane:close <N>` to give it back.
 
 **Release the hold on either parked arm, and leave the lane before closing it**: `pnpm josh
 run:park <N>` in the lane releases it (**a release names the run it belongs to**); `lane:close` does
-not. `cd` out of the lane **before** `pnpm josh lane:close <N>`. **A `needs-human-review` stop is
-not a park and keeps its hold.**
-
-**A `needs-human-review` stop ends only its child** — its lane stays in use; the parent keeps
-launching children in the remaining free lanes (`backlogrun-park.md`).
+not. `cd` out of the lane **before** `pnpm josh lane:close <N>`.
 
 ### CI concurrency
 
