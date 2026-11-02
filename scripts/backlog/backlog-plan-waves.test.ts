@@ -53,6 +53,8 @@ function stub_backlog(): void {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
+	// The sections' headings are the English table's (`backlog-plan-words.ts`).
+	vi.stubEnv('JOSH_SESSION_LANG', 'en')
 	vi.spyOn(console, 'info').mockImplementation(streams.info)
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(console, 'warn').mockImplementation(streams.error)

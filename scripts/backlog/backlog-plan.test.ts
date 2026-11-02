@@ -106,6 +106,8 @@ function stub_closed_child(): void {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
+	// The headings below are the English table's; the Japanese one is `backlog-plan-words.test.ts`'s.
+	vi.stubEnv('JOSH_SESSION_LANG', 'en')
 	vi.spyOn(console, 'info').mockImplementation(streams.info)
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(console, 'warn').mockImplementation(streams.error)
