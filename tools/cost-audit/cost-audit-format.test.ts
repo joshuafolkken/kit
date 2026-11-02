@@ -43,6 +43,18 @@ describe('cost_audit_format.report_lines — the lane-child density line', () =>
 	})
 })
 
+// joshuafolkken/kit#5952: a measurement Issue declares the density, so it has to be a bare number.
+describe('cost_audit_format.density_value — the density as one number', () => {
+	it('prints the current period calls per request alone, two decimals', () => {
+		const lane_density = {
+			current: { requests: 4, calls: 8, single: 1 },
+			previous: { requests: 100, calls: 145, single: 79 },
+		}
+
+		expect(cost_audit_format.density_value(audit_with({ lane_density }))).toBe('2.00')
+	})
+})
+
 describe('cost_audit_format.report_lines — the full cache rewrites', () => {
 	it('prints the rewrites after a wait and within the TTL beside the previous period', () => {
 		const current = { after_wait: { count: 631, usd: 182 }, within_ttl: { count: 2, usd: 0.5 } }

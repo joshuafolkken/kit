@@ -17,8 +17,9 @@ import { cost_audit_read } from './cost-audit-read'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: pnpm josh cost:audit [--period <days>]'
-const OPTIONS = { period: { type: 'string' } } as const
+const USAGE = 'Usage: pnpm josh cost:audit [--period <days>] [--density]'
+const DENSITY_FLAG = '--density'
+const OPTIONS = { period: { type: 'string' }, density: { type: 'boolean' } } as const
 // A positive whole number of days (`cli_flags.to_positive`), at most ten years.
 const MAX_PERIOD_DAYS = 3650
 // GitHub's search qualifier takes an ISO instant without the milliseconds `toISOString` writes.
@@ -87,6 +88,13 @@ async function summary(cwd: string, now_ms: number = Date.now()): Promise<string
 	)
 }
 
+// `--density` prints the lane-child density alone, so the number is the output's last line.
+function printed_lines(argv: ReadonlyArray<string>, audit: Audit): Array<string> {
+	if (argv.includes(DENSITY_FLAG)) return [cost_audit_format.density_value(audit)]
+
+	return cost_audit_format.report_lines(audit)
+}
+
 async function run(
 	argv: ReadonlyArray<string>,
 	cwd: string = process.cwd(),
@@ -100,7 +108,7 @@ async function run(
 		return FAILURE_EXIT_CODE
 	}
 
-	const lines = cost_audit_format.report_lines(await measure(cwd, days, now_ms))
+	const lines = printed_lines(argv, await measure(cwd, days, now_ms))
 
 	for (const line of lines) console.info(line)
 

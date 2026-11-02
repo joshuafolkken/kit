@@ -25,13 +25,14 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/document/read-set-cli.ts',
 		description: 'Print what an entry point reads before it starts, and what that read costs',
 		category: 'AI tools',
-		reference: ['[<entry>] [--json]', 'automation', ['none']],
+		reference: ['[<entry>] [--json | --bytes]', 'automation', ['none']],
 		is_bundled: true,
 		usage: {
 			examples: [
 				{ arguments: '', note: 'every entry point' },
 				{ arguments: 'backlogrun', note: 'one of them' },
 				{ arguments: 'backlogrun --json' },
+				{ arguments: 'fullrun --bytes', note: 'its total read bytes alone, as the last line' },
 			],
 		},
 	},

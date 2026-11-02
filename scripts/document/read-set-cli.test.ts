@@ -14,6 +14,7 @@ const PROGRESS_DOC = 'backlogrun-progress.md'
 const HAND_OFF = 'The hand-off'
 const BACKLOGRUN = 'backlogrun'
 const LANE_CHILD = 'lane-child'
+const FULLRUN = 'fullrun'
 const NO_SUCH_DOC = 'no-such-doc.md'
 const FAILURE = 1
 const MISTYPED = 'not-an-entry'
@@ -132,6 +133,19 @@ describe('josh read:set', () => {
 				scoped: empty,
 			}),
 		).toBe(SUCCESS)
+	})
+})
+
+// joshuafolkken/kit#5952: a measurement Issue declares the total, so it has to be a bare number.
+describe('josh read:set — the total as one number', () => {
+	it('prints only the total read bytes under --bytes, the figure of the total-read row', () => {
+		const { code, out } = captured(() => read_set_cli.run([FULLRUN, read_set_cli.BYTES_FLAG], ROOT))
+		const report = captured(() => read_set_cli.run([FULLRUN], ROOT)).out
+		const total = report.split('\n').find((line) => line.includes(read_set_cli.TOTAL_READ_LABEL))
+
+		expect(code).toBe(SUCCESS)
+		expect(out).toMatch(/^\d+$/u)
+		expect(total).toContain(Number(out).toLocaleString('en-US'))
 	})
 })
 

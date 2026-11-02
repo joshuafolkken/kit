@@ -101,7 +101,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before',
 		category: 'AI tools',
-		reference: ['[--period <days>]', 'maintainer', ['none']],
+		reference: ['[--period <days>] [--density]', 'maintainer', ['none']],
 		// Kit-only: it reads kit's own transcript store, like `josh retrospective`, which carries its
 		// summary line.
 		is_kit_only: true,
@@ -109,11 +109,20 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '', note: 'the last 7 days against the 7 before' },
 				{ arguments: '--period 30', note: 'the last 30 days against the 30 before' },
+				{
+					arguments: '--density',
+					note: 'the lane-child calls per request alone, as the last line',
+				},
 			],
 			flags: [
 				{
 					names: ['--period <days>'],
 					description: 'the length of each period, a positive whole number of days (default 7).',
+				},
+				{
+					names: ['--density'],
+					description:
+						"print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it.",
 				},
 			],
 		},

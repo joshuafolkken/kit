@@ -1238,6 +1238,13 @@ pnpm josh lane:value cell --table "test:related scope" --row related --column "m
 
 The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
 
+Two figures outside `lane:value` print the same way, the number alone as the last line:
+
+```bash
+pnpm josh cost:audit --density --period 7   # lane-child calls per request over the period
+pnpm josh read:set fullrun --bytes          # total bytes the fullrun entry reads
+```
+
 `cell` reads the tables `lane:stats` prints over the same window: `--table` is a table's first header cell, `--row` a row's first cell. An address matching no numeric cell, or more than one (the check and claim tables share `check`), exits non-zero.
 
 #### `josh lane:net`
@@ -1387,6 +1394,7 @@ Print what an entry point reads before it starts, and what that read costs.
 pnpm josh read:set                     # every entry point
 pnpm josh read:set backlogrun          # one of them
 pnpm josh read:set backlogrun --json
+pnpm josh read:set fullrun --bytes     # its total read bytes alone, as the last line
 ```
 
 <!-- /usage -->
@@ -1551,11 +1559,13 @@ Report AI cost over a period by session kind, tool category and guard, with cost
 ```bash
 pnpm josh cost:audit               # the last 7 days against the 7 before
 pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
+pnpm josh cost:audit --density     # the lane-child calls per request alone, as the last line
 ```
 
 **Options:**
 
 - `--period <days>` — the length of each period, a positive whole number of days (default 7).
+- `--density` — print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it.
 
 <!-- /usage -->
 

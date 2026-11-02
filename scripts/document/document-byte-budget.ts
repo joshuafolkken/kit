@@ -83,7 +83,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `josh run:handoff` (joshuafolkken/kit#5352) crossed the 90112 block.
 	// `josh run:stale` (joshuafolkken/kit#5635) crossed the 94208 block.
 	// `josh run:handoff-lanes` (joshuafolkken/kit#5845) crossed the 98304 block.
-	{ path: 'docs/josh-commands-run.md', bytes: 102_400 },
+	// `cost:audit --density` / `read:set --bytes` (joshuafolkken/kit#5952) crossed the 102400 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 106_496 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
 	// (joshuafolkken/kit#5547) crossed the 65536 block.

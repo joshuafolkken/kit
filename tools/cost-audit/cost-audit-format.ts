@@ -68,6 +68,12 @@ function density_line(audit: Audit): string {
 	return `  lane-child density: ${density_text(current)} (prev ${density_text(previous)})`
 }
 
+// The period's lane-child calls per request alone — `cost:audit --density`'s output, a number a
+// measurement Issue declares because it is the output's last line (`measure-declaration.ts`).
+function density_value(audit: Audit): string {
+	return cost_audit_density.calls_per_request(audit.lane_density.current).toFixed(DENSITY_DECIMALS)
+}
+
 function rewrite_figures(count: RewriteCount): string {
 	return `${String(count.count)} (${figure_format.format_usd(count.usd)})`
 }
@@ -152,6 +158,7 @@ const cost_audit_format = {
 	FILING_PREFIX,
 	FILING_ROW_SEPARATOR,
 	FILING_SUFFIX,
+	density_value,
 	filing_lines,
 	report_lines,
 	summary_line,
