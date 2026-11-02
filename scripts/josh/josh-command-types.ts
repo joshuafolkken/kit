@@ -79,6 +79,9 @@ interface CommandEntry {
 	// so a scope that may not implement passes it (`josh-read-only.ts`). Declared here, not read off
 	// `side_effects`: `none` there is documentation, not a write audit (`edit:files` writes).
 	read_only_flags?: ReadonlyArray<string>
+	// A command whose every invocation only reads — `cost:audit`, `read:set` — so it passes the same
+	// scope with no flag (`josh-read-only.ts`). Declared only after its code paths are audited for writes.
+	is_read_only?: boolean
 	// A command that only makes sense inside the kit repository itself — the rule-compliance eval and
 	// the run measurements that analyze kit's own development. It is dropped from a consumer's
 	// `josh --help` and refused with guidance when run in a consumer project, so a distributed help

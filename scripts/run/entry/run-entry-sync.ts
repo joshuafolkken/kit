@@ -3,11 +3,11 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 
-// The tree sync a `new` entry (`run:entry <N> --adopt`) runs before its reads, so `fullrun new` and
-// `halfrun new` no longer issue it as three commands of their own: pre-existing changes are set aside
-// (`stash:push`), the tree is synchronized — a primary checkout by `main:sync`, a linked one by
-// `main:merge` (`entry-sequence.md`) — and the changes come back (`stash:pop`). A dispatched lane child
-// skips it: its ship's sync merges main.
+// The tree sync every entry runs before its reads — `#N` (joshuafolkken/kit#5943) and `new`
+// (`--adopt`, joshuafolkken/kit#5747) — so no run issues it as commands of its own: pre-existing changes
+// are set aside (`stash:push`), the tree is synchronized — a primary checkout by `main:sync`, a linked
+// one by `main:merge` — and the changes come back (`stash:pop`). A dispatched lane child skips it: its
+// ship's sync merges main.
 //
 // **A failed step stops the entry with the stash kept**, the report and the Telegram naming the stash,
 // rather than popping onto a tree a failed merge left half-done. The message carries the issue number,
@@ -46,8 +46,10 @@ interface StopText {
 	later: string
 }
 
-function stash_message({ command, issue_number }: SyncEntry): string {
-	return `${command} new ${issue_cite.plain(issue_number)}: pre-existing changes`
+function stash_message({ command, issue_number, is_adopt }: SyncEntry): string {
+	const entry = is_adopt ? `${command} new` : command
+
+	return `${entry} ${issue_cite.plain(issue_number)}: pre-existing changes`
 }
 
 function verdict_of(result: JoshResult): string {
@@ -131,10 +133,9 @@ async function sync_tree(message: string): Promise<EntryStop | undefined> {
 	return is_stashed ? stash_kept(command, message) : unstashed(command, 'nothing was stashed')
 }
 
-// `undefined` once the tree is synchronized, or where the sync is not this entry's — a `#N` entry's
-// or a lane child's; else the stop.
+// `undefined` once the tree is synchronized, or in a lane child, whose sync is its ship's; else the stop.
 async function sync(entry: SyncEntry): Promise<EntryStop | undefined> {
-	if (!entry.is_adopt || lane_child_marker.is_child_of(process.cwd())) return undefined
+	if (lane_child_marker.is_child_of(process.cwd())) return undefined
 
 	return await sync_tree(stash_message(entry))
 }

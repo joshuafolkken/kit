@@ -88,6 +88,19 @@ describe('run_entry_cli.run --adopt — the bare hold is re-keyed, then the #N e
 	)
 })
 
+describe('run_entry_cli.run <N> — a #N entry synchronizes its tree as a new entry does (joshuafolkken/kit#5943)', () => {
+	it('claims the tree, then syncs it before the reads', async () => {
+		josh_run_mock
+			.mockResolvedValueOnce(FRESH)
+			.mockResolvedValueOnce(HELD)
+			.mockResolvedValueOnce(UNDER)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(sync_mock).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ is_adopt: false }))
+		expect(gather_mock).toHaveBeenCalledTimes(1)
+	})
+})
+
 describe('run_entry_cli.run --adopt — the tree sync before the reads', () => {
 	it('stops on a failed sync, releasing the adopted record and notifying', async () => {
 		josh_run_mock

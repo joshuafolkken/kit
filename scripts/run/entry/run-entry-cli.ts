@@ -383,7 +383,7 @@ async function claim_run(request: EntryRequest, state: StageState): Promise<numb
 	}
 
 	const cost = await check_cost()
-	// A `new` run's entry synchronizes the tree it adopted before reading the issue.
+	// The entry synchronizes the tree with main before reading the issue (a lane child's ship does it).
 	const stop =
 		cost === run_entry.COST_OVER
 			? COST_STOP
