@@ -73,12 +73,12 @@ const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES
 // first only checks that the first round's findings were fixed, so its model and effort are set apart:
 // its own keys win, then the reviewer's, then its own default.
 const FIRST_REVIEW_ROUND = 1
-// Sonnet holds the verification pass by the eval criterion: on every `verification-fix-*` scenario its
-// pass/fail equals Opus's (100% agreement), and Opus passes all 4.
 const SONNET_MODEL = 'claude-sonnet-5-5'
 const VERIFICATION_PROFILES: Readonly<Record<AgentProvider, AgentProfile>> = {
 	anthropic: {
 		...DEFAULT_PROFILES.reviewer,
+		// Sonnet holds the verification pass by the eval criterion: on every `verification-fix-*`
+		// scenario its pass/fail equals Opus's (100% agreement), and Opus passes all 4.
 		model: SONNET_MODEL,
 		effort: VERIFICATION_EFFORT,
 	},
