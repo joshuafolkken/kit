@@ -7,6 +7,7 @@ const FIVE_HOURS = 300
 const SEVEN_DAYS = 10_080
 const RESET_MS = 1_800_000_000_000
 const MINUTE_MS = 60_000
+const HOUR_MS = 60 * MINUTE_MS
 
 function reading(five_hour: number, seven_day: number, shift_ms = 0): QuotaReading {
 	return {
@@ -15,6 +16,14 @@ function reading(five_hour: number, seven_day: number, shift_ms = 0): QuotaReadi
 			{ minutes: SEVEN_DAYS, used_percent: seven_day, resets_ms: RESET_MS },
 		],
 		taken_ms: undefined,
+	}
+}
+
+// A 7d reading of `used` percent taken `hour` hours in.
+function week(used: number, hour: number): QuotaReading {
+	return {
+		windows: [{ minutes: SEVEN_DAYS, used_percent: used, resets_ms: RESET_MS }],
+		taken_ms: hour * HOUR_MS,
 	}
 }
 
@@ -99,5 +108,24 @@ describe('run_board_quota_spent.per_task_of', () => {
 		expect(per_task_of([[], []])).toEqual({})
 		expect(per_task_of([])).toEqual({})
 		expect(per_task_of([file([4, 40], [4, 40]), file([4, 40], [4, 40])])).toEqual({})
+	})
+})
+
+describe('run_board_quota_spent.per_task_of over the lanes done in its rise', () => {
+	it("divides a resumed lane's rise from its first launch by the lanes done since, not the sample", () => {
+		const newest = span_of([week(44, 10)], week(45, 11))
+		const resumed = span_of([week(25, 0)], week(41, 9))
+		const older = span_of([week(42, 9)], week(43, 10))
+		const ends = [11, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 8].map((hour) => hour * HOUR_MS)
+
+		expect(per_task_of([newest, resumed, older], ends)).toEqual({ [SEVEN_DAYS]: 20 / 12 })
+	})
+
+	it('divides by the sample where the lanes done in its rise are the sample itself', () => {
+		const spans = [span_of([week(41, 2)], week(43, 3)), span_of([week(40, 1)], week(41, 2))]
+		const ends = [3, 2].map((hour) => hour * HOUR_MS)
+
+		expect(per_task_of(spans, ends)).toEqual({ [SEVEN_DAYS]: 3 / 2 })
+		expect(per_task_of(spans)).toEqual({ [SEVEN_DAYS]: 3 / 2 })
 	})
 })

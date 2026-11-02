@@ -223,6 +223,15 @@ describe('run_board_quota_read head readings', () => {
 		])
 		expect(claude_heads(ASSISTANT)).toEqual([])
 	})
+
+	it('times each Claude head event by the nearest timed line before it, as a tail is', () => {
+		const text = [timed(EARLIER), claude_line(0.1), timed(TAKEN), claude_line(0.42)].join('\n')
+
+		expect(claude_heads(text).map((reading) => reading.taken_ms)).toEqual([
+			Date.parse(EARLIER),
+			TAKEN_MS,
+		])
+	})
 })
 
 // A lane log runs megabytes of tool output past its last `rate_limit_event`.

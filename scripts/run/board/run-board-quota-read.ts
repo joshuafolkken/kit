@@ -34,6 +34,8 @@ const TAIL_LIMIT_BYTES = TAIL_BYTES * TAIL_GROWTH * TAIL_GROWTH
 const SAMPLE_SIZE = 10
 const SCAN_FACTOR = 3
 const FILES_SCANNED = SAMPLE_SIZE * SCAN_FACTOR
+// The most files read back for the tasks done across the sample's rise (joshuafolkken/kit#5826).
+const FILES_LIMIT = FILES_SCANNED * SCAN_FACTOR * SCAN_FACTOR
 const MS_PER_DAY = MINUTES_PER_DAY * MINUTES_PER_HOUR * MS_PER_SECOND
 const CLAUDE_MARK = '"rate_limit_event"'
 const CODEX_MARK = '"rate_limits":{'
@@ -154,13 +156,11 @@ function codex_line(line: string): QuotaReading | undefined {
 	}
 }
 
-function readings_in(
-	text: string,
-	line_of: (line: string) => QuotaReading | undefined,
-): Array<QuotaReading> {
+// Every event's reading, oldest first; a rollout's events carry their own time.
+function codex_heads(text: string): Array<QuotaReading> {
 	return text
 		.split('\n')
-		.map((line) => line_of(line))
+		.map((line) => codex_line(line))
 		.filter((reading) => reading !== undefined)
 }
 
@@ -184,10 +184,8 @@ function time_before(lines: ReadonlyArray<string>, index: number): number | unde
 	return timed === undefined ? undefined : line_ms(timed)
 }
 
-// Windows and time from the same last event; unrelated later lines never refresh its age.
-function claude_reading(text: string): QuotaReading | undefined {
-	const lines = text.split('\n')
-	const index = lines.findLastIndex((line) => claude_line(line) !== undefined)
+// The event at `index`, timed by the nearest earlier time where it carries none.
+function claude_at(lines: ReadonlyArray<string>, index: number): QuotaReading | undefined {
 	const reading = claude_line(lines[index] ?? '')
 
 	if (reading === undefined || reading.taken_ms !== undefined) return reading
@@ -195,17 +193,26 @@ function claude_reading(text: string): QuotaReading | undefined {
 	return { ...reading, taken_ms: time_before(lines, index) }
 }
 
+// Windows and time from the same last event; unrelated later lines never refresh its age.
+function claude_reading(text: string): QuotaReading | undefined {
+	const lines = text.split('\n')
+
+	return claude_at(
+		lines,
+		lines.findLastIndex((line) => claude_line(line) !== undefined),
+	)
+}
+
 function codex_reading(text: string): QuotaReading | undefined {
-	return readings_in(text, codex_line).at(-1)
+	return codex_heads(text).at(-1)
 }
 
-// Every event's reading, oldest first, which a file's head is read for.
+// Every event's reading, oldest first, which a file's head is read for — each timed, so the spend per
+// task can count the tasks done between two of them (joshuafolkken/kit#5826).
 function claude_heads(text: string): Array<QuotaReading> {
-	return readings_in(text, claude_line)
-}
+	const lines = text.split('\n')
 
-function codex_heads(text: string): Array<QuotaReading> {
-	return readings_in(text, codex_line)
+	return lines.flatMap((_line, index) => claude_at(lines, index) ?? [])
 }
 
 async function names_in(directory: string): Promise<Array<string>> {
@@ -244,9 +251,9 @@ function sorted(files: ReadonlyArray<QuotaFile>): Array<QuotaFile> {
 	return files.toSorted((left, right) => right.mtime_ms - left.mtime_ms)
 }
 
-// The `FILES_SCANNED` newest of `files`, newest first.
-function newest(files: ReadonlyArray<QuotaFile>): Array<QuotaFile> {
-	return sorted(files).slice(0, FILES_SCANNED)
+// The `limit` newest of `files`, newest first.
+function newest(files: ReadonlyArray<QuotaFile>, limit: number): Array<QuotaFile> {
+	return sorted(files).slice(0, limit)
 }
 
 function is_lane_log(name: string): boolean {
@@ -293,8 +300,11 @@ async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
 
 // The newest logs of lane children Claude ran, in the run-state directory. A Codex child logs under
 // the same name and writes no `rate_limit_event`, so its logs are passed over by their last header.
-async function claude_files(root: string = durable_state.root()): Promise<Array<QuotaFile>> {
-	const scanned = newest(await files_in(root, is_lane_log))
+async function claude_files(
+	root: string = durable_state.root(),
+	limit: number = FILES_SCANNED,
+): Promise<Array<QuotaFile>> {
+	const scanned = newest(await files_in(root, is_lane_log), limit)
 	const claude = await Promise.all(scanned.map(async (file) => await claude_log(file)))
 
 	return claude.flat()
@@ -318,13 +328,17 @@ function codex_home(): string {
 
 // The newest rollout files of the last `DAYS_PER_WEEK` days — never the whole `sessions` tree. A session
 // signed in with an API key writes only `rate_limits: null`, so the newest alone may hold no reading.
-async function codex_files(now_ms: number, home = codex_home()): Promise<Array<QuotaFile>> {
+async function codex_files(
+	now_ms: number,
+	home = codex_home(),
+	limit: number = FILES_SCANNED,
+): Promise<Array<QuotaFile>> {
 	const sessions = path.join(home, 'sessions')
 	const back = Array.from({ length: DAYS_PER_WEEK }, (_, day) => now_ms - day * MS_PER_DAY)
 	const days = back.map((ms) => day_directory(sessions, ms))
 	const found = await Promise.all(days.map(async (day) => await files_in(day, is_rollout)))
 
-	return newest(found.flat())
+	return newest(found.flat(), limit)
 }
 
 async function read_tail(file: string, bytes: number = TAIL_BYTES): Promise<string> {
@@ -369,9 +383,11 @@ async function reading_in(
 }
 
 const run_board_quota_read = {
+	FILES_LIMIT,
 	FILES_SCANNED,
 	FIVE_HOURS_MINUTES,
 	SAMPLE_SIZE,
+	SCAN_FACTOR,
 	SEVEN_DAYS_MINUTES,
 	TAIL_BYTES,
 	TAIL_LIMIT_BYTES,
