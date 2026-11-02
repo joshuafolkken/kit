@@ -604,6 +604,20 @@ Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh measure:rerun` in detail".
 
+### `josh observation:depth`
+
+<!-- usage: observation:depth -->
+
+Print the depth test's depth for a subject path.
+
+```bash
+pnpm josh observation:depth scripts/lane/lane-plan.ts
+```
+
+<!-- /usage -->
+
+It prints `d0`, `d1` or `d2` alone on stdout — the `<depth>` [`josh observation:record`](#josh-observationrecord) takes — and the row it applied, with the prefix it matched, on stderr. The deepest row whose prefix the path starts with wins; a path no row claims is `d0`. The rows: `scripts/observations/observation-depth.ts`.
+
 ### `josh observation:record`
 
 <!-- usage: observation:record -->
