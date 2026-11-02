@@ -111,7 +111,7 @@ Ask once round 1's fixes are in and the round is recorded with each finding's di
 every round-1 High/Medium as `fixed` or `false-positive`. Anything else, including a missing round-1
 snapshot, answers `required`.
 
-`skip` has two arms, and the reason line says which fired — A, an empty fix delta; B, an inert-only one (the path set: `scripts/review/review-round2.ts`).
+`skip` has two arms, and the reason line says which fired — A, an empty fix delta; B, one that leaves what executes unchanged (the path set: `scripts/review/review-round2.ts` → `is_unexecuted`).
 
 `--record <N>` records a skipped round on the Issue itself: a comment under `## Round 2 skipped`
 naming which arm fired and quoting the reason line verbatim, written once however often it is asked.
