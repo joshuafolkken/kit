@@ -50,7 +50,7 @@ function base_name(name: string): string {
 }
 
 // One lane's stages and laps, one row per name. The laps read no transcript calls: a call names no
-// lane, so another lane's Bash would fall into this one's time between ship stages.
+// lane, so another lane's calls would fall into this one's time between ship stages.
 function lane_parts(records: SinkRecords, issue: number): Array<Stage> {
 	const breakdown = lane_breakdown.of(records.entries, records.events, issue)
 
