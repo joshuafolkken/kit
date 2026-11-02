@@ -16,7 +16,7 @@ entry sequence and the stop branches are `entry-sequence.md`.
 ## The step list
 
 `halfrun #<N>`: read Issue #N and its comments → **record the agreed plan**, normalizing
-the title (`pnpm josh issue:plan`, same as `fullrun`) → `pnpm josh ms`, then on `run:prep`'s
+the title (`pnpm josh issue:plan`, same as `fullrun`; `run:entry` has merged main) → on `run:prep`'s
 `latest: required` `pnpm josh latest:if-required` (`latest-gate.md`; the `dependency-update` skill) → implement → run the **full verification gate** (refactor →
 start `pnpm josh gate` beside a subagent `/code-review` with the brief `pnpm josh review:brief` prints,
 join the gate before the stop, iterate to no high/medium findings, within the round cap (`prompts/review.md`) → `pnpm josh
