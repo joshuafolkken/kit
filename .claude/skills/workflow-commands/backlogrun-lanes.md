@@ -132,9 +132,6 @@ from `origin/<N>-lane`). A child parked before its commit has nothing on `origin
 it prints is `PR checks failed (merge conflict)`** — resolve in the lane. Never search for
 `mergeStateStatus: DIRTY` or `mergeable_state`; neither is printed.
 
-**A kept lane holds its seat. Say it in the park comment**: the lane directory, that its seat is held,
-and `pnpm josh lane:close <N>` to give it back.
-
 **Release the hold on either parked arm, and leave the lane before closing it**: `pnpm josh
 run:park <N>` in the lane releases it (**a release names the run it belongs to**); `lane:close` does
 not. `cd` out of the lane **before** `pnpm josh lane:close <N>`.
