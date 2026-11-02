@@ -92,7 +92,7 @@ function substitute_parts(script: string): Array<string> | undefined {
 	return parts.length === SUBSTITUTE_PARTS ? parts : undefined
 }
 
-// `file-edits.md` condition 2 reads both sides: no meta character in the pattern or the replacement,
+// `file-edits.md` reads both sides: no meta character in the pattern or the replacement,
 // and no flag that turns the plain-text match into something else.
 function has_plain_flags(parts: ReadonlyArray<string>): boolean {
 	return PLAIN_FLAGS.has(parts.at(-1) ?? '')

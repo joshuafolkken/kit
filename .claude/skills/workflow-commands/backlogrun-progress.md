@@ -77,10 +77,10 @@ as its `Next:` line says. A session resumed by hand reads the subsections below.
 
 ### Picking the lanes up in the fresh session
 
-**Start no child again and open no lane already open.** In one turn: `pnpm josh lane:list` (a line
-with a path is a handed-over child, waited on per `backlogrun-recovery.md` → "A delegated unit that stopped
-without reporting"), `pnpm josh run:progress --wait --output <handed-over paths>` in the background
-(`run:watcher:guard`), `pnpm josh run:liveness`, and `epic:next --lanes`, a lane per child it offers.
+**Start no child again and open no lane already open.** Run `pnpm josh run:pickup <E>...`: it launches
+a lane per child the epics offer, prints each lane's liveness, and prints the watcher line to start in
+the background (`run:watcher:guard`). A lane with a path is a handed-over child, waited on per
+`backlogrun-recovery.md` → "A delegated unit that stopped without reporting".
 **A carried-over child finishes in its own unit — never run its `followup` yourself**; one lost in the
 cut is re-dispatched with `pnpm josh lane:open <N>` then `pnpm josh lane:dispatch <N>`.
 

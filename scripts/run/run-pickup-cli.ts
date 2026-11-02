@@ -1,12 +1,15 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { run_pickup_launch, type PickupLaunch } from '#scripts/run/run-pickup-launch'
 
-// `josh run:pickup` — the lanes a session resumed by hand after a cut picks up, in one call
-// (`backlogrun-progress.md` → "Picking the lanes up in the fresh session"). It reads the open lanes,
-// asks `run:liveness` about every lane that records an output path, and prints one line per action.
+// `josh run:pickup [<epic>...]` — the lanes a session resumed by hand after a cut picks up, in one
+// call (`backlogrun-progress.md` → "Picking the lanes up in the fresh session"). It launches a lane
+// per child the named epics offer (`run-pickup-launch.ts`), reads the open lanes, asks `run:liveness`
+// about every lane that records an output path, and prints one line per action.
 //
 // It shells out to `run:liveness` rather than importing it, so the verdict and its guards are reused
 // rather than cloned. The progress watcher is printed as a command line, never started: it has to run
@@ -15,7 +18,7 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh run:pickup'
+const USAGE = 'Usage: josh run:pickup [<epic>...]'
 const NO_LANES = 'no open lane — nothing to pick up'
 const UNDETERMINED = 'undetermined'
 const WATCHER = 'pnpm josh run:progress --wait'
@@ -52,18 +55,26 @@ async function pickup_lines(lanes: ReadonlyArray<LaneInfo>): Promise<Array<strin
 	return [...lines, watcher_line(lanes)]
 }
 
+async function launch_lines(epics: ReadonlyArray<string>): Promise<PickupLaunch> {
+	if (epics.length === 0) return { lines: [], is_refused: false }
+
+	return await run_pickup_launch.launch(epics)
+}
+
+// The launches run before the lanes are listed, so a lane just started is polled and watched too.
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	if (argv.length > 0) {
+	if (argv.some((epic) => !issue_number_shape.is_issue_number(epic))) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
+	const launched = await launch_lines(argv)
 	const lines = await pickup_lines(await lane_registry.list_lanes())
 
-	console.info(lines.join('\n'))
+	console.info([...launched.lines, ...lines].join('\n'))
 
-	return SUCCESS_EXIT_CODE
+	return launched.is_refused ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
