@@ -7,12 +7,13 @@ import { describe, expect, it } from 'vitest'
 
 const CHAIN_RULE = '.claude/skills/workflow-commands/chain-rule.md'
 const LANE_STEP = '0. **A lane child**'
-const MAIN_LINE_STEP = '1. **Issue `pnpm josh run:cut <N>` alone first**'
+// joshuafolkken/kit#5946: step 0 is its own section, ending at the next heading.
+const LANE_STEP_END = '## Orchestration facts single-sourced here'
 
 function lane_step(): string {
 	const content = read_unwrapped(CHAIN_RULE)
 
-	return content.slice(content.indexOf(LANE_STEP), content.indexOf(MAIN_LINE_STEP))
+	return content.slice(content.indexOf(LANE_STEP), content.indexOf(LANE_STEP_END))
 }
 
 describe('chain-rule — a lane child records and ships after a round-1 fix', () => {
