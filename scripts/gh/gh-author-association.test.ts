@@ -16,6 +16,7 @@ beforeEach(() => {
 // The REST placeholders `gh api` fills in, kept out of a template literal.
 const COLLABORATORS_PATH = 'repos/{owner}/{repo}/collaborators/'
 const LOOKUP_TIMEOUT_MS = 5000
+const OTHER_REPO = 'joshuafolkken/app-kit'
 
 function permission(role_name: string, level = role_name): string {
 	return JSON.stringify({ permission: level, role_name })
@@ -130,6 +131,29 @@ describe('is_trusted — the lookup', () => {
 			path: `${COLLABORATORS_PATH}${login}/permission`,
 			timeout_ms: LOOKUP_TIMEOUT_MS,
 		})
+	})
+})
+
+// joshuafolkken/kit#5851: `issue:read --repo` reads another repository's authors, and write access is a
+// property of one repository — so it is asked of that one, and never answered from another's lookup.
+describe('is_trusted — the repository asked', () => {
+	it('asks the repository the row was read from', async () => {
+		api_mock.mockResolvedValue(permission('write'))
+		const login = 'other-repo-writer'
+
+		await gh_author_association.is_trusted({ login, association: 'MEMBER', repo: OTHER_REPO })
+		expect(api_mock).toHaveBeenCalledWith({
+			path: `repos/${OTHER_REPO}/collaborators/${login}/permission`,
+		})
+	})
+
+	it('asks again for the same login in another repository', async () => {
+		api_mock.mockResolvedValueOnce(permission('write')).mockResolvedValueOnce(permission('read'))
+		const author = { login: 'writes-here-only', association: 'COLLABORATOR' }
+
+		expect(await gh_author_association.is_trusted(author)).toBe(true)
+		expect(await gh_author_association.is_trusted({ ...author, repo: OTHER_REPO })).toBe(false)
+		expect(api_mock).toHaveBeenCalledTimes(2)
 	})
 })
 

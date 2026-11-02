@@ -30,11 +30,14 @@ const permission_schema = z.looseObject({
 	role_name: z.string().nullish(),
 })
 
-// `timeout_ms` bounds the lookup for a caller inside a hook's own timeout (`issue-watch`).
+// `timeout_ms` bounds the lookup for a caller inside a hook's own timeout (`issue-watch`). `repo` is
+// the repository the row was read from (`issue:read --repo`, joshuafolkken/kit#5851): write access is a
+// property of one repository, so it is asked of that one; absent, the session's.
 interface Author {
 	login: string | undefined
 	association: string | null | undefined
 	timeout_ms?: number | undefined
+	repo?: string | undefined
 }
 
 interface AuthorFields {
@@ -42,10 +45,12 @@ interface AuthorFields {
 	user?: { login: string } | null | undefined
 }
 
+type AskedAuthor = Author & { login: string }
+
 const answers = new Map<string, Promise<boolean | undefined>>()
 
-function permission_path(login: string): string {
-	return `${git_gh_api_path.repo_api_path()}/collaborators/${login}/permission`
+function permission_path(login: string, repo?: string): string {
+	return `${git_gh_api_path.repo_api_path(repo)}/collaborators/${login}/permission`
 }
 
 // `role_name` names `maintain` exactly; `permission` folds it into `write`, so either answers.
@@ -57,9 +62,10 @@ function has_write_role(raw: string): boolean {
 }
 
 // `undefined` for a lookup that failed, which is not an answer.
-async function ask_permission(login: string, timeout_ms?: number): Promise<boolean | undefined> {
+async function ask_permission(asked: AskedAuthor): Promise<boolean | undefined> {
 	try {
-		const raw = await git_gh_exec.exec_gh_api({ path: permission_path(login), timeout_ms })
+		const path = permission_path(asked.login, asked.repo)
+		const raw = await git_gh_exec.exec_gh_api({ path, timeout_ms: asked.timeout_ms })
 
 		return has_write_role(raw)
 	} catch {
@@ -69,15 +75,17 @@ async function ask_permission(login: string, timeout_ms?: number): Promise<boole
 
 // A failed lookup is not remembered: the backlog driver keeps one process for hours, so one dropped
 // request would otherwise leave that author unanswered until it restarts. Only the caller's own
-// request is evicted, never a newer one another caller has stored since.
-async function can_write(login: string, timeout_ms?: number): Promise<boolean | undefined> {
-	const asked = answers.get(login) ?? ask_permission(login, timeout_ms)
+// request is evicted, never a newer one another caller has stored since. Keyed by repository as well
+// as login, since one login can write to one repository and not another.
+async function can_write(author: AskedAuthor): Promise<boolean | undefined> {
+	const key = `${author.repo ?? ''} ${author.login}`
+	const asked = answers.get(key) ?? ask_permission(author)
 
-	answers.set(login, asked)
+	answers.set(key, asked)
 
 	const has_write = await asked
 
-	if (has_write === undefined && answers.get(login) === asked) answers.delete(login)
+	if (has_write === undefined && answers.get(key) === asked) answers.delete(key)
 
 	return has_write
 }
@@ -96,7 +104,7 @@ async function trust_of(author: Author): Promise<boolean | undefined> {
 	if (author.association === OWNER) return true
 	if (author.login === undefined || !is_asked(author)) return false
 
-	return await can_write(author.login, author.timeout_ms)
+	return await can_write({ ...author, login: author.login })
 }
 
 // A lookup that failed is not trust.

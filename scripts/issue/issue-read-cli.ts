@@ -2,8 +2,10 @@ import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_read, type IssueComment, type IssueFields } from './issue-read'
 import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
+import { issue_state_cli } from './issue-state-cli'
 
 // `josh issue:read <N> [<N> ...]` — the body *and* the comments of every issue named, in one call.
 //
@@ -14,19 +16,17 @@ import { issue_report_failures, type ReadFailureKind } from './issue-report-fail
 // own turn. A parent's cost grows as n²/2 in its own request count, so a turn removed there is worth
 // more than a turn removed anywhere else in the batch.
 //
-// **No `--repo`, deliberately.** The comment listing is `issue_list_comments`, which reads the
-// repository it runs in; a cross-repository read stays the two `gh api` calls it always was, and
-// inventing a repository-aware comment reader here would be a second deliverable. Naming the flag and
-// then ignoring it would be worse than not having it — a confident block for a *different*
-// repository's issue of the same number is the misread `issue:state`'s own `--repo` exists to
-// prevent.
+// **`--repo <owner/repo>` names the repository both reads go to** — the body *and* the comments
+// (joshuafolkken/kit#5851). One read at the session's repository beside one at the named one would
+// print a block mixing two issues of the same number, the misread `issue:state`'s own `--repo` exists
+// to prevent; the flag is parsed by `issue:state`'s own rules, so an empty or repeated value refuses.
 //
 // **A failed read is never printed as an issue**, and neither is a failed comment listing printed as
 // "no comments" — the block says which of the two it holds, because `issue-comments.md`'s rule is that the later text
 // wins, and a comment nobody read cannot win anything.
 
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh issue:read <issue-number> [<issue-number> ...]'
+const USAGE = 'Usage: josh issue:read <issue-number> [<issue-number> ...] [--repo <owner/repo>]'
 const BLOCK_SEPARATOR = '\n\n---\n\n'
 // The same bound `issue:state` puts on its batch read, for the same reason: every read is a `gh`
 // process, and an unbounded fan-out is answered with secondary rate limiting rather than with issues.
@@ -59,6 +59,11 @@ interface IssueReport {
 	result: NumberResult
 }
 
+interface ReadRequest {
+	issue_numbers: ReadonlyArray<string>
+	repo?: string
+}
+
 // A token that is not an issue number refuses the whole invocation rather than being dropped.
 // Dropping it answers fewer numbers than were asked for and still exits zero — and nothing in the
 // output then says a number went unanswered. `#1262` copied out of a table is exactly that token.
@@ -72,22 +77,35 @@ function parse_numbers(argv: ReadonlyArray<string>): ReadonlyArray<string> | und
 	return [...new Set(numbers)]
 }
 
+// An unrecognized flag refuses the call rather than being read as a number or dropped, for
+// `issue:state`'s reason: `--rep=owner/repo` discarded would read the session's repository instead.
+function parse_request(argv: ReadonlyArray<string>): ReadRequest | undefined {
+	const parsed = cli_flags.arguments_of(argv, issue_state_cli.REPO_OPTIONS)
+	if (parsed === undefined) return undefined
+	const repo = issue_state_cli.read_repo(parsed.values.repo)
+	const issue_numbers = parse_numbers(parsed.positionals)
+
+	if (repo === undefined || issue_numbers === undefined) return undefined
+
+	return { issue_numbers, ...repo }
+}
+
 // The comments are read beside the fields rather than after them: the two requests need nothing from
 // one another, and reading them in sequence would put back one of the two round trips this command
 // exists to remove.
-async function read_issue(issue_number: string): Promise<NumberResult> {
+async function read_issue(issue_number: string, repo?: string): Promise<NumberResult> {
 	const [read, comments_json] = await Promise.all([
-		git_gh_command.issue_view_json_classified(issue_number, ISSUE_FIELDS),
-		git_gh_command.issue_list_comments(issue_number),
+		git_gh_command.issue_view_json_classified(issue_number, ISSUE_FIELDS, repo),
+		git_gh_command.issue_list_comments(issue_number, undefined, repo),
 	])
 
 	if (read.kind !== 'read') return { kind: read.kind }
 
-	const fields = await issue_read.parse_issue_fields(read.json)
+	const fields = await issue_read.parse_issue_fields(read.json, repo)
 
 	if (fields === undefined) return { kind: 'unreadable' }
 
-	const comments = await issue_read.parse_comments(comments_json)
+	const comments = await issue_read.parse_comments(comments_json, repo)
 
 	return { kind: 'issue', content: { fields, comments } }
 }
@@ -123,11 +141,15 @@ async function read_block(issue_number: string): Promise<BlockRead> {
 	return { kind: 'ok', block: issue_read.format_issue(issue_number, fields, comments), trust }
 }
 
-async function read_all(issue_numbers: ReadonlyArray<string>): Promise<ReadonlyArray<IssueReport>> {
-	return await bounded_pool.bounded_map(issue_numbers, READ_CONCURRENCY, async (issue_number) => ({
-		issue_number,
-		result: await read_issue(issue_number),
-	}))
+async function read_all(request: ReadRequest): Promise<ReadonlyArray<IssueReport>> {
+	return await bounded_pool.bounded_map(
+		request.issue_numbers,
+		READ_CONCURRENCY,
+		async (issue_number) => ({
+			issue_number,
+			result: await read_issue(issue_number, request.repo),
+		}),
+	)
 }
 
 // `[]` for a number that produced no issue, so one unresolvable number costs the others nothing.
@@ -140,20 +162,20 @@ function issue_blocks(report: IssueReport): ReadonlyArray<string> {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const issue_numbers = parse_numbers(argv)
+	const request = parse_request(argv)
 
-	if (issue_numbers === undefined) {
+	if (request === undefined) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const reports = await read_all(issue_numbers)
+	const reports = await read_all(request)
 
 	issue_report_failures.print_blocks(
 		reports.flatMap((report) => issue_blocks(report)),
 		BLOCK_SEPARATOR,
-		`issue:read ${issue_numbers.join(' ')}`,
+		`issue:read ${request.issue_numbers.join(' ')}`,
 	)
 
 	return issue_report_failures.report_failures(reports, FAILURE_TERMS)
@@ -162,6 +184,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 const issue_read_cli = {
 	USAGE,
 	parse_numbers,
+	parse_request,
 	read_block,
 	run,
 }

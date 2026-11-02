@@ -16,14 +16,21 @@ Print each issue's title, body and every comment on it, in one call.
 
 ```bash
 pnpm josh issue:read 1715
-pnpm josh issue:read 1715 1567 1605   # several numbers, read concurrently
+pnpm josh issue:read 1715 1567 1605                    # several numbers, read concurrently
+pnpm josh issue:read 42 --repo joshuafolkken/app-kit   # an issue in another repo
 ```
+
+**Options:**
+
+- `--repo <owner/repo>` — read an issue in another repository; applies to every number.
 
 <!-- /usage -->
 
 The state is printed too. Attribute each block by its `issue:` line, never by position.
 
 Output past the Bash cap is written as part files, only their paths printed — read every part with the Read tool in one turn. A number that resolves to nothing prints `does not resolve`; a failed read prints `could not read`; non-zero exit if any went unanswered. A non-numeric token refuses the whole call.
+
+`--repo` reads the body and the comments from the named repository; an empty, repeated or misspelled `--repo` refuses the call.
 
 ### `josh issue:ack`
 
@@ -67,7 +74,7 @@ pnpm josh issue:state 42 43 --repo joshuafolkken/app-kit   # a child in another 
 
 **Options:**
 
-- `--repo <owner/repo>` — read a child in another repository; applies to every number.
+- `--repo <owner/repo>` — read an issue in another repository; applies to every number.
 
 <!-- /usage -->
 
