@@ -227,7 +227,7 @@ function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow, paused: Paus
 	].join('\n')
 }
 
-const lane_implement_stats = { SUB_STAGES, lane_totals_in, table }
+const lane_implement_stats = { EDIT_TOOLS, SUB_STAGES, lane_totals_in, table }
 
 export type { SubStage }
 export { lane_implement_stats }
