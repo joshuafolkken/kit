@@ -15,6 +15,7 @@ import { z } from 'zod'
 // A `JOSH_SHIP_*` mark, so the unit suite blanks it with the rest (`tools/test/unit-projects.ts`).
 const ENVIRONMENT_KEY = 'JOSH_SHIP_LAP_SCOPE'
 const PARENT_SEPARATOR = ' › '
+const STARTUP_STEP = 'startup'
 
 const lap_scope_schema = z.object({
 	issue: z.number(),
@@ -97,6 +98,21 @@ function no_note(): LapNote {
 interface LapOptions<T> {
 	sink?: LapSink
 	note_of?: (result: T) => LapNote
+	// `false` for a git hook: its process starts inside the `josh git` step that ran git, so a startup
+	// lap of its own would be counted twice beside the parent's.
+	startup?: boolean
+}
+
+const startup = { recorded: false }
+
+// A child process's first lap under the scope it inherited is preceded by its own startup — from
+// `timeOrigin` until that lap, the tsx load among it — so the parent's lap is explained by its
+// children (joshuafolkken/kit#5896). A scope this process opened with `within` started no process.
+async function record_startup(current: LapScope, sink: LapSink, is_wanted: boolean): Promise<void> {
+	if (!is_wanted || startup.recorded || scope.getStore() !== undefined) return
+	startup.recorded = true
+
+	await sink(lap_of(current, STARTUP_STEP, 0, {}))
 }
 
 // A step that threw still cost the stage its time, so it is timed either way; the append is
@@ -104,12 +120,13 @@ interface LapOptions<T> {
 async function timed<T>(
 	step: string,
 	run: () => Promise<T>,
-	{ sink = to_ledger, note_of = no_note }: LapOptions<T> = {},
+	{ sink = to_ledger, note_of = no_note, startup: with_startup }: LapOptions<T> = {},
 ): Promise<T> {
 	const current = current_scope()
 
 	if (current === undefined) return await run()
 
+	await record_startup(current, sink, with_startup !== false)
 	const started_ms = performance.now()
 	const noted: { note: LapNote } = { note: {} }
 
@@ -124,7 +141,7 @@ async function timed<T>(
 	}
 }
 
-const run_ship_lap = { ENVIRONMENT_KEY, STEP, environment, timed, within }
+const run_ship_lap = { ENVIRONMENT_KEY, STARTUP_STEP, STEP, environment, timed, within }
 
 export type { LapNote, LapOptions, LapSink }
 export { run_ship_lap }
