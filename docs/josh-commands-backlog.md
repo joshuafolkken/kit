@@ -155,7 +155,7 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 - `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.
-- `--check` — run steps 1–7, create nothing; exit 1 on a refusal.
+- `--check` — run steps 1–7, create nothing; exit 1 on a refusal. `--batch` refuses it.
 
 <!-- /usage -->
 
@@ -526,6 +526,20 @@ pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir"   # into
 **Verdicts:** `popped` and `conflicted` (exit 0), `no-match` and `ambiguous` (exit 1). `conflicted` means the stash is on the tree: resolve the conflicts and continue. A message matching no stash, or more than one, is refused — pass one identifying exactly one entry.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh stash:pop` in detail".
+
+### `josh tree:status`
+
+<!-- usage: tree:status -->
+
+Bundle the working tree’s read-only pre-check: branch, status, stash list, run hold.
+
+```bash
+pnpm josh tree:status
+```
+
+<!-- /usage -->
+
+Run it before acting on what the tree holds. It reads the hold record and never claims it (`run:hold` claims), and lists the stash without touching it. The first line is `tree — branch: … · changes: … · stash: … · hold: …`; the hold is `free`, `held`, `stale`, `unreadable` or `unknown`, and the last two exit 1.
 
 ## Epics and backlog
 

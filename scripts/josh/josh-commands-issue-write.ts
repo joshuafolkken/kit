@@ -207,7 +207,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--check'],
-					description: 'run steps 1–7, create nothing; exit 1 on a refusal.',
+					description: 'run steps 1–7, create nothing; exit 1 on a refusal. `--batch` refuses it.',
 				},
 			],
 		},
