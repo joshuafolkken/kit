@@ -23,8 +23,10 @@ describe('run_entry_children.STEP — the lap names lane:breakdown prints', () =
 			SYNC: 'sync',
 			LABEL: 'label',
 			PREP: 'run:prep',
+			PROBE: 'lane:plan probe',
 			LANE_PLAN: 'lane:plan',
 			BASELINE: 'issue baseline',
+			REPORT: 'report',
 		})
 	})
 })

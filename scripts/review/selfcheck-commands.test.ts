@@ -50,6 +50,15 @@ describe('selfcheck_commands.extract', () => {
 		expect(selfcheck_commands.extract([added])).toEqual([SECTION_COMMAND])
 	})
 
+	it('ends a span at a template literal escaped backtick, leaving the backslash out', () => {
+		const escaped = hunk([
+			'console.error(`Rerun the same \\`pnpm josh run:split\\` to continue from ${result.step}.`)',
+			'`Run \\`pnpm josh ms\\` first.`',
+		])
+
+		expect(selfcheck_commands.extract([escaped])).toEqual(['run:split', 'ms'])
+	})
+
 	it.each([
 		['a placeholder', '`pnpm josh run:step <N>`'],
 		['an optional flag', '`pnpm josh help [command]`'],
