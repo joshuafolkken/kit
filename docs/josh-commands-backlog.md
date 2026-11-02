@@ -520,6 +520,20 @@ pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir"   # into
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh stash:pop` in detail".
 
+### `josh tree:status`
+
+<!-- usage: tree:status -->
+
+Bundle the working tree’s read-only pre-check: branch, status, stash list, run hold.
+
+```bash
+pnpm josh tree:status
+```
+
+<!-- /usage -->
+
+Run it before acting on what the tree holds. It reads the hold record and never claims it (`run:hold` claims), and lists the stash without touching it. The first line is `tree — branch: … · changes: … · stash: … · hold: …`; the hold is `free`, `held`, `stale`, `unreadable` or `unknown`, and the last two exit 1.
+
 ## Epics and backlog
 
 Track an epic's children and pick what an unattended run takes next.
