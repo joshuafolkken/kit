@@ -57,7 +57,7 @@ Before every `git commit`, a subagent runs `/code-review` per `prompts/review.md
 
 ## Git Rules
 
-Commits, the index and shared state (merge, branch delete, force push) only on explicit instruction, through `pnpm josh git` / `pnpm josh pr`; run `git status` live before any tree assumption: `prompts/collaboration-workflow/operating-rules.md` → "git-rules".
+Commits, the index and shared state (merge, branch delete, force push) only on explicit instruction, through `pnpm josh git` / `pnpm josh pr`; run `pnpm josh tree:status` live before any tree assumption: `prompts/collaboration-workflow/operating-rules.md` → "git-rules".
 
 ## Collaboration Workflow
 

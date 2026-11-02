@@ -18,7 +18,7 @@
 - **コミットは指示されたときだけ。** マージ・ブランチ削除・force push などの共有状態の変更は、そのターンで指示されたときだけ。例外は `fullrun` / `backlogrun` の起動で、`pnpm josh followup` 経由のマージを認める（`prrun` は認めない）。deny は規則より狭い — ツールが通したことを許可と読まない
 - **git index は自分の判断で変えない** — 明示の指示か `pnpm josh git` 経由だけ（下記 "no-self-staging"）
 - **コミットは `pnpm josh git`、PR は `pnpm josh pr`** — `gh pr create` の直接実行は `direct-pr-create` 行が拒否する。GitHub 操作は `gh api`（REST） — [`gh-rest.md`](./gh-rest.md)
-- **作業ツリーの前提で動く前に `git status`（と `git stash list`）をその場で実行する**
+- **作業ツリーの前提で動く前に `pnpm josh tree:status` をその場で実行する** — branch・status・stash list・hold を 1 回で読む
 
 ### 指示されていない行動は取らない
 
