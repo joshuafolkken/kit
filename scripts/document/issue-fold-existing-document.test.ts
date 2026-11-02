@@ -24,7 +24,10 @@ describe('existing issue fold procedure', () => {
 	})
 
 	it('records the comment fingerprint instead of a manual comment check', () => {
-		expect(PROCEDURE).toContain('pnpm josh issue:fold-existing --fingerprint <N>')
+		const fingerprint_at = PROCEDURE.indexOf('pnpm josh issue:fold-existing --fingerprint <N>')
+
+		expect(fingerprint_at).toBeGreaterThan(-1)
+		expect(fingerprint_at).toBeLessThan(PROCEDURE.indexOf('pnpm josh issue:read <N>'))
 		expect(PROCEDURE).toContain('the comments as `comment_fingerprint`')
 		expect(PROCEDURE).not.toContain('confirm no comment has arrived')
 	})

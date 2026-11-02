@@ -172,7 +172,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '--fingerprint 5848',
-					note: "print the comment thread's fingerprint the assessment records as `comment_fingerprint`.",
+					note: "print the comment thread's fingerprint, before reading the issue, for the assessment's `comment_fingerprint`.",
 				},
 				{ arguments: 'assessment.json --json' },
 				{

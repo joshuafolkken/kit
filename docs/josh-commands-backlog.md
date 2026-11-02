@@ -193,7 +193,7 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:f
 Assess whether a complete draft can join an unstarted issue.
 
 ```bash
-pnpm josh issue:fold-existing --fingerprint 5848             # print the comment thread's fingerprint the assessment records as `comment_fingerprint`.
+pnpm josh issue:fold-existing --fingerprint 5848             # print the comment thread's fingerprint, before reading the issue, for the assessment's `comment_fingerprint`.
 pnpm josh issue:fold-existing assessment.json --json
 pnpm josh issue:fold-existing assessment.json --apply 5848   # write the fold to the issue once its body and comments still read as assessed, apply its priority floor, and verify the re-read.
 ```
@@ -202,7 +202,7 @@ pnpm josh issue:fold-existing assessment.json --apply 5848   # write the fold to
 
 Run it after the issue and the draft are read. It returns `duplicate` / `fold` / `separate` / `inspect`; only `--apply <N>` updates the issue, and only on `fold`. The JSON carries the facts (`content`, `is_open`, `size_verdict`, `existing_body`, `draft_body`, …); an unknown fact answers `inspect`. `separate` returns to the ordinary filing path.
 
-The JSON also carries `comment_fingerprint`, as `--fingerprint <N>` prints it; `--apply` writes nothing when a comment was added, edited or deleted after that read.
+The JSON also carries `comment_fingerprint`, as `--fingerprint <N>` prints it before the issue is read; `--apply` writes nothing when a comment was added, edited or deleted since.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:fold-existing` in detail".
 
