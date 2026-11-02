@@ -123,12 +123,13 @@ describe('the self-check question 1 and josh test:pinned', () => {
 		)
 	})
 
+	// joshuafolkken/kit#5938: the gate now runs in front of round 1, so only test:pinned stays beside it.
 	it('the chain rule says run:review runs test:pinned beside the gate and how it carries on past it', () => {
 		const step = read_unwrapped(CHAIN_RULE)
 
 		expect(step).toContain('self-check"; 1: `--join`\'s `test:pinned`')
 		expect(step).toContain(
-			'`run:review` starts `pnpm josh test:pinned` and `pnpm josh gate` in the background',
+			'`run:review` starts `pnpm josh test:pinned` in the background, runs `pnpm josh gate` and, once it is green, writes',
 		)
 		expect(step).toContain('on a red gate, `3` on an `unpinned` line')
 		// joshuafolkken/kit#4920: the stop note names the call that passes the reason without a re-run.

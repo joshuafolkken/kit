@@ -25,9 +25,8 @@ import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
 
-// `josh run:review` — one call that leaves `josh gate` running in the background and writes the
-// `/code-review` brief to a file, printing its path, so a lane child launches the two together and they
-// overlap.
+// `josh run:review` — one call that runs `josh gate` and, once it is green, writes the `/code-review`
+// brief to a file, printing its path, so round 1 reads the tree the gate passed (joshuafolkken/kit#5938).
 // It composes `josh gate` and `josh review:brief` and changes neither: the gate is the same command
 // spawned detached, and the brief is `review:brief` run unchanged, so the nonce/checkout contract
 // `review:attest --check` enforces is minted exactly as a standalone brief mints it.
@@ -86,7 +85,7 @@ function join_exit_code(state: GateState): number {
 }
 
 const JOIN_HINT =
-	'Gate is running in the background. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer), with the prompt printed under its brief file, verbatim; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
+	'Gate green. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer), with the prompt printed under its brief file, verbatim; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
 
 const INTERACTION_HINT =
 	'Two brief files above: launch one `reviewer` per brief side by side, each with its own printed prompt, and once both are attested record the interaction pass the reviewer wrote with `pnpm josh review:submit --interaction` by `pnpm josh review:record --from-slot --interaction --issue <N>` beside round 1.'
@@ -176,17 +175,71 @@ function follow_brief(slots: ReadonlyArray<ReviewSlot>, is_early_push: boolean):
 	if (is_early_push) run_review_early_push.launch()
 }
 
-async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<number> {
+const GREEN_NOTE = 'Gate green — the review verdict may be adopted.'
+const RED_NOTE =
+	'Gate RED — the review verdict is blocked; fix the gate and re-run it before committing.'
+const MOVED_NOTE =
+	'Gate passed on an earlier tree — the tree moved after it (a review fix in place); re-run the gate on this tree before committing.'
+const STILL_RUNNING_NOTE =
+	'Gate still running at the open’s wait cap — no brief written; re-run `pnpm josh run:review` (in a chain, `pnpm josh run:chain <N> --from run:review`), which waits on the same gate.'
+
+// A moved tree's gate passed, so its log is no failure to show.
+function settled_note(state: GateState): string | undefined {
+	if (state === run_review.GATE_GREEN) return GREEN_NOTE
+	if (state === run_review.GATE_MOVED) return MOVED_NOTE
+
+	return undefined
+}
+
+function report_gate(state: GateState): void {
+	const settled = settled_note(state)
+
+	if (settled !== undefined) {
+		process.stdout.write(`${settled}\n`)
+
+		return
+	}
+
+	const log = run_review_steps.read_gate_log()
+
+	if (log !== undefined) process.stdout.write(`${log}\n`)
+	process.stdout.write(`${RED_NOTE}\n`)
+}
+
+// **Round 1 reads the tree the gate passed** (joshuafolkken/kit#5938): the brief, and the round-1
+// snapshot `josh review:round2` measures its fix delta from, follow a green gate, so a gate fix never
+// moves the diff round 1 read into round 2. A red gate writes no brief; its log and note are the stop.
+// A gate still running at the open's cap is no red one, so it stops with its own note.
+async function is_gate_green(): Promise<boolean> {
+	const state = await run_review_steps.wait_for_gate_finish(run_review_steps.MAX_OPEN_WAIT_MS)
+
+	if (state === run_review.GATE_GREEN) return true
+	if (state === run_review.GATE_RUNNING) process.stdout.write(`${STILL_RUNNING_NOTE}\n`)
+	else report_gate(state)
+
+	return false
+}
+
+// The moment the gate started, once it is green; `undefined` where it could not start or was not.
+async function passed_gate_start(): Promise<string | undefined> {
 	const gate_started_at = now_iso()
 	const launch = run_review_steps.launch_gate()
 
 	if (launch.kind === 'failed') {
 		process.stderr.write(`the background gate could not be started: ${launch.note}\n`)
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
 	await run_review_steps.mark_gate_starting()
+
+	return (await is_gate_green()) ? gate_started_at : undefined
+}
+
+async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<number> {
+	const gate_started_at = await passed_gate_start()
+
+	if (gate_started_at === undefined) return FAILURE_EXIT_CODE
 	run_review_steps.write_timing_start({ gate_started_at, review_started_at: now_iso() })
 	const code = await open_briefs(plan)
 
@@ -244,35 +297,6 @@ function gate_ended_at(is_green: boolean): string {
 	if (!is_green) return now_iso()
 
 	return review_stamps.gate_stamp.read()?.taken_at ?? now_iso()
-}
-
-const GREEN_NOTE = 'Gate green — the review verdict may be adopted.'
-const RED_NOTE =
-	'Gate RED — the review verdict is blocked; fix the gate and re-run it before committing.'
-const MOVED_NOTE =
-	'Gate passed on an earlier tree — the tree moved after it (a review fix in place); re-run the gate on this tree before committing.'
-
-// A moved tree's gate passed, so its log is no failure to show.
-function settled_note(state: GateState): string | undefined {
-	if (state === run_review.GATE_GREEN) return GREEN_NOTE
-	if (state === run_review.GATE_MOVED) return MOVED_NOTE
-
-	return undefined
-}
-
-function report_gate(state: GateState): void {
-	const settled = settled_note(state)
-
-	if (settled !== undefined) {
-		process.stdout.write(`${settled}\n`)
-
-		return
-	}
-
-	const log = run_review_steps.read_gate_log()
-
-	if (log !== undefined) process.stdout.write(`${log}\n`)
-	process.stdout.write(`${RED_NOTE}\n`)
 }
 
 function report_timing(timing: ReviewTiming | undefined): void {
