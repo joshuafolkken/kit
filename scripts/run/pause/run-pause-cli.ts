@@ -2,13 +2,14 @@
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { run_pause, type PauseRequest, type PauseResult, type StepReport } from './run-pause'
 
 // `josh run:pause <M> --for <N>` — the argument parsing and the report around `run-pause.ts`. One
 // line per step that landed; a failure names its step, what was already done, and the rerun that
-// continues from there.
+// continues from there. A landed pause prints `prerequisite.md` → "Each entry's branch, and the
+// pause" once per session (joshuafolkken/kit#5842), the section the paused run follows.
 
-const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh run:pause <issue> --for <prerequisite>'
@@ -56,7 +57,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const result = await run_pause.pause(request)
 
 	report_done(result.done)
-	if (result.kind === 'paused') return SUCCESS_EXIT_CODE
+	if (result.kind === 'paused') return run_step_section.print_once(run_step_section.PAUSE)
 	report_failure(request, result)
 
 	return FAILURE_EXIT_CODE

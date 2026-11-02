@@ -105,6 +105,38 @@ describe('run_step_section — the one table of governing sections', () => {
 	})
 })
 
+// joshuafolkken/kit#5842: the retrospective step, `run:park` and `run:pause` print their section,
+// so none of the three is fetched again.
+describe('run_step_section — the sections the retrospective, a park and a pause print', () => {
+	it('prints the retrospective for the end-of-run step', () => {
+		const retrospective = { kind: 'command' as const, line: run_step.RETROSPECTIVE_COMMAND }
+
+		expect(run_step_section.key_of(retrospective)).toBe(run_step_section.RETROSPECTIVE)
+		expect(run_step_section.print_for(retrospective, false)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^# The end-of-run retrospective/u)
+	})
+
+	it('prints "park and continue" for a parent park, never the whole document', () => {
+		expect(run_step_section.print_section(run_step_section.PARK)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^## park and continue/u)
+		expect(printed()).not.toMatch(/^# backlogrun/mu)
+	})
+
+	// A lane child's park is its stop, so it never reads the parent's "keep going".
+	it('prints the park-then-stop for a lane child park', () => {
+		expect(run_step_section.print_section(run_step_section.PARK, process.cwd(), true)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^## A lane child records its park before it stops/u)
+		expect(printed()).not.toContain('park and continue\n')
+	})
+
+	// Every entry pauses, so the pause prints the section naming each entry's branch — `fullrun` stops.
+	it('prints every entry branch for a pause, the fullrun stop included', () => {
+		expect(run_step_section.print_section(run_step_section.PAUSE)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^## Each entry's branch, and the pause/u)
+		expect(printed()).toContain('and then **stop**')
+	})
+})
+
 describe('run_step_section — a lane child reads its own step of the chain', () => {
 	const implement = { kind: 'verdict' as const, line: run_step.IMPLEMENT }
 	const MAIN_MERGE_STEP = '`pnpm josh run:chain <N>` runs `main:merge`'
