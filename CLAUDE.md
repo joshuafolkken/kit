@@ -61,7 +61,7 @@ Commits, the index and shared state (merge, branch delete, force push) only on e
 
 ## Collaboration Workflow
 
-The issue-driven flow: `prompts/collaboration-workflow.md`.
+The issue-driven flow: `prompts/collaboration-workflow/`.
 
 ### Shorthand Commands
 
