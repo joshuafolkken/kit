@@ -64,6 +64,14 @@ describe('lane_limit_override — on a live run', () => {
 describe('lane_limit_override.read_carried', () => {
 	beforeEach(() => {
 		run_carry.begin_carry(carry_target(), 'backlogrun')
+		vi.spyOn(run_carry, 'is_owner_live').mockReturnValue(true)
+	})
+
+	it('ignores the start limit a crashed run left behind', async () => {
+		vi.spyOn(run_carry, 'is_owner_live').mockReturnValue(false)
+		await lane_limit_override.write_launch(LAUNCH_LIMIT)
+
+		await expect(lane_limit_override.read_carried()).resolves.toBeUndefined()
 	})
 
 	it('reads nothing on a run that recorded no limit', async () => {

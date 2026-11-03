@@ -39,12 +39,20 @@ async function read_override(): Promise<number | undefined> {
 	return carry?.lane_limit
 }
 
+// A record a crashed run left must not pin its start limit over an edited `.env`: the start limit
+// counts while its owner lives, or while a cut hands the record to a successor.
+function is_run_live(carry: RunCarry): boolean {
+	return carry.is_handed_off === true || run_carry.is_owner_live(carry)
+}
+
 // The limit a live run holds: its override, else the limit it started with — so a `--reset` returns
 // to the run's own `JOSH_LANE_LIMIT`, not the one a shell's `.env` reads now (joshuafolkken/kit#6166).
 async function read_carried(): Promise<number | undefined> {
 	const carry = await current_carry()
 
-	return carry?.lane_limit ?? carry?.launch_limit
+	if (carry?.lane_limit !== undefined) return carry.lane_limit
+
+	return carry !== undefined && is_run_live(carry) ? carry.launch_limit : undefined
 }
 
 // Answers whether a live run took the fields: with no run there is no record to write to, and the

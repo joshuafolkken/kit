@@ -56,6 +56,7 @@ beforeEach(() => {
 	run.repository = `/lane-limit-reset-test/${randomUUID()}`
 	rmSync(LEDGER, { force: true })
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(run.repository)
+	vi.spyOn(run_carry, 'is_owner_live').mockReturnValue(true)
 	run_carry.begin_carry(carry_target(), 'backlogrun')
 	vi.stubEnv(lane_capacity.LANE_LIMIT_KEY, String(LAUNCH_LIMIT))
 })
