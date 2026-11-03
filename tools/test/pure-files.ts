@@ -8,8 +8,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'env/index.test.ts',
 	'eslint/base-resolution.test.ts',
 	'eslint/base.test.ts',
-	'eslint/english-only-prose-document.test.ts',
-	'eslint/refactor-scan-prompt-sync.test.ts',
 	'eslint/rules/code-quality.test.ts',
 	'eslint/rules/comment-why-only.test.ts',
 	'eslint/rules/english-only-prose.test.ts',

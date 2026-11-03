@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+import { create_base_config } from '#eslint/base.js'
 import { describe, expect, it } from 'vitest'
 import { refactor_lint } from './refactor-lint'
 
@@ -21,6 +23,17 @@ interface RawResult {
 
 function results(messages: ReadonlyArray<RawMessage>): Array<RawResult> {
 	return [{ filePath: FILE, messages: [...messages] }]
+}
+
+// joshuafolkken/kit#2255: a queried rule the config does not define would never report, so the
+// oracle would answer `clear` without reading it.
+function configured_rule_names(): ReadonlySet<string> {
+	const config = create_base_config({
+		gitignore_path: new URL('../../.gitignore', import.meta.url),
+		tsconfig_root_dir: fileURLToPath(new URL('../..', import.meta.url)),
+	})
+
+	return new Set(config.flatMap((block) => Object.keys(block.rules ?? {})))
 }
 
 function candidates_of(key: string, messages: ReadonlyArray<RawMessage>): ReadonlyArray<unknown> {
@@ -83,6 +96,17 @@ describe('refactor_lint.categorize buckets the rules added in #2255', () => {
 			{ location: 'scripts/a.ts:9', rule: NO_UNUSED },
 		])
 	})
+})
+
+describe('every queried rule is a real eslint rule', () => {
+	const configured = configured_rule_names()
+
+	it.each(refactor_lint.CATEGORIES.flatMap((category) => category.rules))(
+		'%s is configured in the base eslint config',
+		(rule) => {
+			expect(configured.has(rule)).toBe(true)
+		},
+	)
 })
 
 describe('refactor_lint.parse_results', () => {
