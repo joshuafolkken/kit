@@ -75,9 +75,9 @@ describe('size_estimate.guide_problem', () => {
 	})
 
 	it('refuses an estimate over the guide on both axes', () => {
-		const problem = size_estimate.guide_problem(body_with(estimate(12, 300)), undefined)
+		const problem = size_estimate.guide_problem(body_with(estimate(6, 150)), undefined)
 
-		expect(problem).toContain('12 file(s) / 300 line(s)')
+		expect(problem).toContain('6 file(s) / 150 line(s)')
 		expect(problem).toContain('more than 8 files or 200 lines')
 		expect(problem).toContain('split-assessment.md → "The question"')
 	})
@@ -140,7 +140,7 @@ describe('size_estimate.over_guide', () => {
 	})
 
 	it('passes an estimate over the guide with a reason declared', () => {
-		const body = body_with(estimate(12, 300), REASON)
+		const body = body_with(estimate(6, 150), REASON)
 
 		expect(size_estimate.guide_problem(body, undefined)).toBeUndefined()
 	})
@@ -156,31 +156,32 @@ describe('size_estimate.over_guide', () => {
 	})
 })
 
-// joshuafolkken/kit#5502: past three times the guide a declared reason no longer excuses a filing.
-// joshuafolkken/kit#5654: the doubled declaration is what meets the cap, so 12 / 300 sits at it.
+// joshuafolkken/kit#5502: past the cap a declared reason no longer excuses a filing.
+// joshuafolkken/kit#5654: the doubled declaration is what meets the cap, so 6 / 150 sits at it
+// (joshuafolkken/kit#6066 lowered it to one and a half times the guide).
 describe('size_estimate cap', () => {
-	it('passes 12 files / 300 lines with a reason declared', () => {
-		const body = body_with(estimate(12, 300), REASON)
+	it('passes 6 files / 150 lines with a reason declared', () => {
+		const body = body_with(estimate(6, 150), REASON)
 
 		expect(size_estimate.guide_problem(body, undefined)).toBeUndefined()
 		expect(size_estimate.over_cap(body, undefined)).toBeUndefined()
 	})
 
-	it('refuses 13 files with a reason declared', () => {
-		const body = body_with(estimate(13, 300), REASON)
+	it('refuses 7 files with a reason declared', () => {
+		const body = body_with(estimate(7, 150), REASON)
 		const problem = size_estimate.guide_problem(body, undefined)
 
-		expect(problem).toContain('13 file(s) / 300 line(s) × 2 = 26 file(s) / 600 line(s)')
-		expect(problem).toContain('exceeds the cap (more than 24 files or 600 lines)')
+		expect(problem).toContain('7 file(s) / 150 line(s) × 2 = 14 file(s) / 300 line(s)')
+		expect(problem).toContain('exceeds the cap (more than 12 files or 300 lines)')
 		expect(problem).toContain('--route split')
 	})
 
-	it('refuses 301 lines with a reason declared', () => {
-		const body = body_with(estimate(12, 301), REASON)
+	it('refuses 151 lines with a reason declared', () => {
+		const body = body_with(estimate(6, 151), REASON)
 
 		expect(size_estimate.over_cap(body, undefined)).toEqual({
-			files: 12,
-			lines: 301,
+			files: 6,
+			lines: 151,
 			verdict: 'split',
 		})
 	})

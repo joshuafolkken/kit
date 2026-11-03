@@ -206,20 +206,29 @@ function budget_refusal(estimate: SizeMeasurement, rate: ImplementRate): string 
 }
 
 // joshuafolkken/kit#6025: an estimate over the guide whose projected implement time exceeds the stage
-// budget is refused even with a reason declared — only a split filing passes it; `undefined` with no
-// measured rate, under the guide or within the budget.
+// budget, reason declared or not — the filing refuses it and `backlog:next` notes it
+// (joshuafolkken/kit#6066); `undefined` for a split filing, with no measured rate, under the guide or
+// within the budget.
+function over_budget(
+	body: string,
+	route: string | undefined,
+	rate: ImplementRate | undefined,
+): SizeMeasurement | undefined {
+	const estimate = route === SPLIT_ROUTE_LABEL ? undefined : guide_exceeded(body)
+
+	if (estimate === undefined || rate === undefined) return undefined
+
+	return projected_minutes(estimate, rate) > IMPLEMENT_BUDGET ? estimate : undefined
+}
+
 function budget_problem(
 	body: string,
 	route: string | undefined,
 	rate: ImplementRate | undefined,
 ): string | undefined {
-	const estimate = route === SPLIT_ROUTE_LABEL ? undefined : guide_exceeded(body)
+	const estimate = over_budget(body, route, rate)
 
-	if (estimate === undefined || rate === undefined) return undefined
-
-	return projected_minutes(estimate, rate) > IMPLEMENT_BUDGET
-		? budget_refusal(estimate, rate)
-		: undefined
+	return estimate === undefined || rate === undefined ? undefined : budget_refusal(estimate, rate)
 }
 
 // The filing refusal for an estimate over the cap, else over the implement budget at `rate`, else over
@@ -250,6 +259,7 @@ const size_estimate = {
 	exceeded,
 	guide_problem,
 	is_issue_over_cap,
+	over_budget,
 	over_cap,
 	over_guide,
 	problems,

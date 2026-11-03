@@ -18,6 +18,8 @@ import {
 	RUN_SOLO_LABEL,
 } from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
+import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
+import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { vi } from 'vitest'
 
 // One description of a backlog, stubbed across every read `josh backlog:next` makes.
@@ -68,6 +70,8 @@ interface BacklogInput {
 	defect_rate?: DefectRate
 	// A measurement that could not be read at all.
 	is_rate_unreadable?: boolean
+	// The measured implement rate `issue:file` projects a size by. Left out, none is measured.
+	implement_rate?: ImplementRate
 	// The repository's open `in-progress` issues, which the `run:solo` gate reads on a `run` answer.
 	// Left out, nothing is running.
 	in_progress?: ReadonlyArray<OpenIssueData>
@@ -202,13 +206,15 @@ function stub_environment(): void {
 	vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(REACHABLE_STATUS)
 }
 
-// The two reads the defect priority adds: the rate, and each candidate's body.
+// The two reads the defect priority adds: the rate, and each candidate's body — beside the implement
+// rate the size note projects by.
 function stub_defect_priority(input: BacklogInput): void {
 	const bodies = new Map((input.children ?? []).map((child) => [String(child.number), child.body]))
 	const measured =
 		input.is_rate_unreadable === true ? undefined : (input.defect_rate ?? AT_BASELINE)
 
 	vi.spyOn(defect_rate_cli, 'measure_window').mockResolvedValue(measured)
+	vi.spyOn(lane_net_read, 'implement_rate').mockResolvedValue(input.implement_rate)
 	vi.spyOn(git_gh_command, 'issue_get_body').mockImplementation(async (number) =>
 		bodies.get(number),
 	)

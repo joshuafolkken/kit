@@ -62,3 +62,20 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 		expect(size_estimate.guide_problem(body, undefined, SLOW)).toContain('exceeds the cap')
 	})
 })
+
+// joshuafolkken/kit#6066: the judgment `backlog:next` notes on, shared with the filing refusal.
+describe('size_estimate.over_budget', () => {
+	it('answers the estimate of a reasoned body projecting past the budget', () => {
+		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, SLOW)).toEqual({
+			files: 5,
+			lines: 120,
+			verdict: 'split',
+		})
+	})
+
+	it('answers nothing within the budget, with no rate, or for a split filing', () => {
+		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, FAST)).toBeUndefined()
+		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, undefined)).toBeUndefined()
+		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, SPLIT_ROUTE, SLOW)).toBeUndefined()
+	})
+})
