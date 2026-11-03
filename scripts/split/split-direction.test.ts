@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { file_reader } from '#scripts/lib/read-file'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { split_direction } from './split-direction'
 
@@ -103,6 +104,7 @@ describe('split_direction.refusal_of', () => {
 
 describe('split_direction.refusal_of — the commands of a split-off file', () => {
 	it('refuses when the kept criteria name only the command a split-off file registers', async () => {
+		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(undefined)
 		stub_kept(kept_body('`run:entry` が節を中継する'))
 		const refusal = await split_direction.refusal_of(SPLIT_FILING, CHILD_BODY)
 
@@ -127,6 +129,7 @@ describe('split_direction.references', () => {
 	})
 
 	it('reads a command from the words of a command line', () => {
+		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(undefined)
 		const body = kept_body('`pnpm josh run:entry 5953 --to halfrun` が節を印字する')
 
 		expect(split_direction.references(body, CHILD_BODY)).toEqual([
