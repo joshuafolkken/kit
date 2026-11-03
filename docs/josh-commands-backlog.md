@@ -407,6 +407,22 @@ A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベース�
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:lint` in detail".
 
+### `josh issue:spill`
+
+<!-- usage: issue:spill -->
+
+Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line.
+
+```bash
+pnpm josh issue:spill 5999 --estimate "3 ファイル / 80 行"
+```
+
+**Options:**
+
+- `--estimate "<F> ファイル / <L> 行"` — the follow-up's size estimate, never apportioned from the issue's. Required.
+
+<!-- /usage -->
+
 ### `josh defect:origin`
 
 <!-- usage: defect:origin -->
