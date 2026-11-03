@@ -1,0 +1,7 @@
+{
+	"reason": "New split-direction check refusing an independent split the kept issue depends on (#5985)",
+	"date": "2026-11-03",
+	"growth": {
+		"scripts.code_lines": 67
+	}
+}

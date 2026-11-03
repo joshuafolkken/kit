@@ -13,6 +13,7 @@ import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_hold_member } from '#scripts/run/hold/run-hold-member'
+import { split_direction } from '#scripts/split/split-direction'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
@@ -27,8 +28,8 @@ import type { ScoutOutcome } from './issue-scout-cli'
 // `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok]
 // [--release] [--blocks-finder] [--check]` — file an Issue with every filing step run: the third-party
-// refusal, the filing cap per origin and the fold question against the run's earlier filings, each
-// ending the filing on its own; then one pass printing every refusal at once (`issue-file-pass.ts`) —
+// refusal, the filing cap per origin, the fold question against the run's earlier filings and a split
+// child the kept Issue depends on (`split-direction.ts`), each ending the filing on its own; then one pass printing every refusal at once (`issue-file-pass.ts`) —
 // the body lint, the size estimate against the split guide, the start condition a measurement
 // follow-up owes, the `## Origin` check for another repository, the `auto-ok` decision with the run
 // label it owes, the start condition read as a pull request, the WIP cap count and the duplicate
@@ -190,7 +191,8 @@ async function is_run_clear(filing: Filing): Promise<boolean> {
 
 	return (
 		(await issue_file_cap.is_cap_clear(filing.args.found_during)) &&
-		(await issue_file_fold.is_fold_clear(prefix, filing.args))
+		(await issue_file_fold.is_fold_clear(prefix, filing.args)) &&
+		(await split_direction.is_direction_clear(filing.args, filing.body))
 	)
 }
 
