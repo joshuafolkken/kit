@@ -111,6 +111,9 @@ describe('COMMAND_MAP — registration', () => {
 	// without a registration test per table (joshuafolkken/kit#6028); a moved entry point leaves the
 	// map pointing at nothing, and no other test runs every command (joshuafolkken/kit#2903).
 	it('registers every command table entry intact, each with a script on disk', async () => {
+		expect(readdirSync(COMMAND_TABLE_DIRECTORY).some((file) => is_command_table_file(file))).toBe(
+			true,
+		)
 		expect({
 			unregistered: await unregistered_commands(),
 			without_script: commands_without_script(),
