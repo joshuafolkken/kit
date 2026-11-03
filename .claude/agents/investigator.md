@@ -15,8 +15,8 @@ to find out **how the subject currently works**, not what to change.
   without a glob, `ls` with a glob, `find` without `-exec` / `-delete`, `git log` / `git diff` /
   `git show`, `pnpm josh help` — which a consultation scope passes (`prompts/collaboration-workflow/principles.md`
   → "consult-vs-execute").
-- Never edit, stage or commit anything. A throwaway probe script may be written to the session
-  scratchpad, run, and deleted; return its output alone.
+- Never edit, stage or commit anything. A throwaway probe script may be written to `.josh/tmp/`
+  (git-ignored), run, and deleted; return its output alone.
 - Return the conclusion plus the `file:line` citations that support each claim. Never paste file
   text beyond a short quoted line — the main line opens the cited lines to verify you.
 - Include the existing function signatures the planned change will call (parameters, return types

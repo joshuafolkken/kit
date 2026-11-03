@@ -78,7 +78,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: PR_TITLE, note: 'merges (default)' },
 				{ arguments: String.raw`${PR_TITLE} --notify-message "Implemented X:\n- change 1"` },
-				{ arguments: `${PR_TITLE} --notify-message-file completion.md` },
+				{ arguments: `${PR_TITLE} --notify-message-file .josh/tmp/completion.md` },
 				{ arguments: `${PR_TITLE} --ai-review-ignore-reason "false positive"` },
 				{ arguments: `${PR_TITLE} --no-merge`, note: 'do the work, leave the PR open' },
 			],
@@ -119,7 +119,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 					arguments: String.raw`--task-type planning ${ISSUE_URL} --body="- bullet 1\n- bullet 2"`,
 				},
 				{
-					arguments: `--task-type confirmation ${ISSUE_URL} --body-file r.md --recommended "Go" --alternative "Wait"`,
+					arguments: `--task-type confirmation ${ISSUE_URL} --body-file .josh/tmp/r.md --recommended "Go" --alternative "Wait"`,
 				},
 			],
 			flags: [
