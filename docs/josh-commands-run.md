@@ -1231,6 +1231,10 @@ Under the gate check table, the claim-versus-measured table (`lane-claim-stats.t
 claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and
 runs with no `cpu_ms` left out. It only reports: a core weight is changed in its own Issue, from this table.
 
+Under the size table, the implement-rate table (`lane-implement-rate.ts`) prints the median `implement` minutes per 100
+actual non-test lines over the period's merged lanes, and how many lanes it reads: the `implement` interval joined by
+issue to the last `size` measured before the merge, lanes with no size, no interval or zero lines left out.
+
 Procedure and columns for measuring a lane limit: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample` / `josh lane:stats` in detail".

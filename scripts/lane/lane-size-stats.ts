@@ -63,6 +63,6 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n')
 }
 
-const lane_size_stats = { lines_ratio, table }
+const lane_size_stats = { lines_ratio, merged_sizes, table }
 
 export { lane_size_stats }
