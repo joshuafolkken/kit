@@ -10,7 +10,7 @@ import {
 // (joshuafolkken/kit#902; `prompts/testing-guide.md` → "Closing the E2E gate without a human run"
 // → "The gate is not weakened").
 //
-// **Two separate mechanisms hold the gate closed, and each fixture below picks one.** `E2E` is
+// **Two separate mechanisms hold the gate closed, and each E2E fixture below picks one.** `E2E` is
 // deliberately not in `DEFAULT_REQUIRED_CHECKS`. A *failed* E2E job is caught by
 // `collect_blocking_failures` since joshuafolkken/kit#990, which short-circuits `evaluate_pr_state`
 // before the merge state is consulted at all. A *non-passing but not failed* one — still running, or
@@ -218,8 +218,8 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 // exercises that rule against the supported layouts.
 //
 // It would add nothing to the failure path either. A red E2E already ends the wait at once
-// (joshuafolkken/kit#990) and can never reach `success`, which is what the first two E2E describes here
-// assert — and they assert it without `E2E` being required.
+// (joshuafolkken/kit#990) and can never reach `success`, which is what the first E2E describe here
+// asserts — and it asserts it without `E2E` being required.
 //
 // And it would cost a repository that does not use this workflow its whole merge budget. With no
 // `E2E` context reported at all the required entry resolves to `missing`, which is never `pass`, so

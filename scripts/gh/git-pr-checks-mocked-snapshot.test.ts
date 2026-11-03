@@ -57,15 +57,20 @@ afterEach(() => {
 	vi.useRealTimers()
 })
 
-// `followup` reports each poll's checks to the run's event stream through the observer the wait is
-// handed, so every snapshot the wait reads must reach it.
-describe('observer', () => {
+// An approved pull request with every required check green — what the observer describes poll.
+function use_green_approved(): void {
 	beforeEach(() => {
 		vi.mocked(git_gh_pr_snapshot.pr_get_review_decision).mockResolvedValue('APPROVED')
 		stub_state(GREEN_STATE)
 	})
+}
 
-	it('hands each snapshot git_pr_checks.wait_for_pr_success polls to the observer', async () => {
+// `followup` reports each poll's checks to the run's event stream through the observer the wait is
+// handed, so every snapshot the wait reads must reach it.
+describe('git_pr_checks.wait_for_pr_success — observer', () => {
+	use_green_approved()
+
+	it('hands each polled snapshot to the observer', async () => {
 		const observed: Array<PrStateSnapshot> = []
 
 		async function observe(snapshot: PrStateSnapshot): Promise<void> {
@@ -76,10 +81,14 @@ describe('observer', () => {
 
 		expect(observed).toStrictEqual([result])
 	})
+})
 
-	// The watch polls for up to two minutes before the wait above, so a row re-entering followup after
-	// a red wait must see the new CI's pending checks from the watch rather than keep the old red line.
-	it('hands the git_pr_checks_watch.pr_checks_watch poll snapshot to the observer', async () => {
+// The watch polls for up to two minutes before the wait above, so a row re-entering followup after a
+// red wait must see the new CI's pending checks from the watch rather than keep the old red line.
+describe('git_pr_checks_watch.pr_checks_watch — observer', () => {
+	use_green_approved()
+
+	it('hands the watch poll snapshot to the observer', async () => {
 		stub_state({ statusCheckRollup: [FAILING_CHECK] })
 		const observed: Array<PrStateSnapshot> = []
 
