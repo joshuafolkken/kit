@@ -27,7 +27,8 @@ answers `not-a-lane` outside a lane, so it is safe to issue unconditionally.
 ## Taking the cut
 
 `chain-rule.md` step 1 issues it before `pnpm josh run:chain <N>`, the scoped pair and the gate —
-**unconditionally**:
+**unconditionally** — first tick in #N's body the criteria this tree meets (`gh issue edit <N> --body-file`),
+the green part `budget-over` reads:
 
 ```bash
 pnpm josh run:cut <N>
@@ -42,6 +43,8 @@ pnpm josh run:cut <N>
 - `failed` (1) — no live OpenAI supervisor, or the Anthropic relaunch could not start. Continue.
 - `unknown` (1) — the git directory could not be read. Continue to the gate.
 - `split-unresolved` (1) — `split-assessment.md` → "Over the guide before the gate".
+- `budget-over` (0) — implement past its stage budget with a criterion checked; nothing was cut. Run
+  what it prints, then continue to the gate on this tree.
 
 **`cut` is the only verdict that ends the turn.**
 

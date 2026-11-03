@@ -17,6 +17,7 @@ import { run_step_section } from '#scripts/run/run-step-section'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
+import { run_cut_budget } from './run-cut-budget'
 import { run_cut_digest } from './run-cut-digest'
 
 // What the `josh run:cut` CLI suites share: the scratch repository, the spied git and lane reads, and
@@ -74,6 +75,9 @@ const emit = vi.spyOn(run_event_stream_emit, 'emit')
 // The split notice's answer is read off the repository's own lane ledger; a case that got the notice
 // says so (joshuafolkken/kit#4695).
 const split_refusal = vi.spyOn(split_resolution, 'ledger_refusal')
+// The implementation's budget is read off the repository's own ledger, events and Issue body; no case
+// is over it unless it says so (joshuafolkken/kit#6026).
+const budget_over = vi.spyOn(run_cut_budget, 'over_minutes')
 // The review round a cut must not drop is read off the repository's own attestation and ledger; no
 // round is attested unless a case says so (joshuafolkken/kit#4868).
 const is_attested_on = vi.spyOn(review_attest, 'is_attested_on')
@@ -134,6 +138,7 @@ function write_handoffs(): void {
 
 function reset_review(): void {
 	split_refusal.mockResolvedValue(undefined)
+	budget_over.mockResolvedValue(undefined)
 	is_attested_on.mockReturnValue(false)
 	record_check.mockResolvedValue({ status: 'not-required' })
 }
@@ -189,6 +194,7 @@ const run_cut_cli_fixture = {
 	launch,
 	session_verdict,
 	split_refusal,
+	budget_over,
 	is_attested_on,
 	record_check,
 	own_digest,
