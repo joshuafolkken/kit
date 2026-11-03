@@ -1,7 +1,7 @@
 {
-	"reason": "#6003 adds secret-paths.ts, the credential-file matcher the protected-file guard needs, and the Grep path check",
+	"reason": "Normalize path spellings (./, //, x/../, backslash) in the secret-path matcher so non-normalized spellings cannot bypass the credential-read guard (round-2 security finding)",
 	"date": "2026-11-03",
 	"growth": {
-		"scripts.code_lines": 43
+		"scripts.code_lines": 52
 	}
 }

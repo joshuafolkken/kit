@@ -14,6 +14,7 @@ import path from 'node:path'
 
 const TOKEN_QUOTES = /["']/gu
 const BRACED_VARIABLE = /\$\{(\w+)\}/gu
+const BACKSLASH = /\\/gu
 const SECRET_FILES: ReadonlySet<string> = new Set(['.env', '.dev.vars'])
 const ENVIRONMENT_VARIANT_PREFIX = '.env.'
 // The two variants `.gitignore` un-ignores: they are tracked and hold placeholders, not secrets. The
@@ -62,14 +63,27 @@ function is_home_secret(token: string): boolean {
 	)
 }
 
-function is_secret_path(word: string): boolean {
-	const token = word.replaceAll(TOKEN_QUOTES, '').replaceAll(BRACED_VARIABLE, '$$$1')
-
+function is_secret_token(token: string): boolean {
 	return (
 		is_environment_file(token) ||
 		SECRET_SUFFIXES.some((suffix) => ends_with_path(token, suffix)) ||
 		is_home_secret(token)
 	)
+}
+
+// A path names the same file through `./`, `//` and `x/../`, so each token is matched normalized. A
+// backslash is a shell escape (`~/.\netrc`) or a Windows separator (`~\.netrc`), so both readings
+// are matched.
+function spellings_of(word: string): ReadonlyArray<string> {
+	const token = word.replaceAll(TOKEN_QUOTES, '').replaceAll(BRACED_VARIABLE, '$$$1')
+
+	return [token.replaceAll(BACKSLASH, ''), token.replaceAll(BACKSLASH, '/')].map((spelling) =>
+		path.posix.normalize(spelling),
+	)
+}
+
+function is_secret_path(word: string): boolean {
+	return spellings_of(word).some((token) => is_secret_token(token))
 }
 
 const secret_paths = { is_secret_path }

@@ -7,6 +7,8 @@ import { secret_paths } from './secret-paths'
 // credentials by the path's end, and the home dotfiles only under the home directory.
 
 const home = os.homedir()
+const NAMES_SECRET = 'names a secret in %j'
+const NAMES_NO_SECRET = 'names no secret in %j'
 
 describe('secret_paths.is_secret_path', () => {
 	it.each([
@@ -25,7 +27,7 @@ describe('secret_paths.is_secret_path', () => {
 		'~/.ssh',
 		path.join(home, '.ssh', 'config'),
 		path.join(home, '.config', 'gh', 'config.yml'),
-	])('names a secret in %j', (word) => {
+	])(NAMES_SECRET, (word) => {
 		expect(secret_paths.is_secret_path(word)).toBe(true)
 	})
 
@@ -39,7 +41,27 @@ describe('secret_paths.is_secret_path', () => {
 		'not-gh/hosts.yml',
 		'~/.sshd/x',
 		path.join(home, '.config', 'ghost', 'x'),
-	])('names no secret in %j', (word) => {
+	])(NAMES_NO_SECRET, (word) => {
+		expect(secret_paths.is_secret_path(word)).toBe(false)
+	})
+})
+
+describe('secret_paths.is_secret_path on a non-normalized spelling', () => {
+	it.each([
+		'~/./.netrc',
+		'~//.netrc',
+		'$HOME/x/../.netrc',
+		'~/.ssh/../.netrc',
+		String.raw`~/.\netrc`,
+		String.raw`~\.netrc`,
+		String.raw`~\.ssh\id_rsa`,
+		'./apps/../.env',
+		`${home}/./.ssh/config`,
+	])(NAMES_SECRET, (word) => {
+		expect(secret_paths.is_secret_path(word)).toBe(true)
+	})
+
+	it.each(['~/x/.netrc', '~/.ssh/../x'])(NAMES_NO_SECRET, (word) => {
 		expect(secret_paths.is_secret_path(word)).toBe(false)
 	})
 })
