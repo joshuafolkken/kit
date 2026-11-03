@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import type { AgentEnvironment } from '#scripts/agent/agent-provider'
 import type { AgentProvider } from '#scripts/agent/agent-role-profile'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
+import { lane_limit_history } from '#scripts/lane/lane-limit-history'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import type { LaunchResult } from '#scripts/run/detached-launch'
@@ -40,6 +41,7 @@ interface BacklogrunPorts {
 	stranded: (git_directory: string) => Promise<ReplaceVerdict | undefined>
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
 	preflight: (args: BacklogrunArguments, git_directory: string) => PreflightResult
+	record_limit: () => Promise<void>
 	start_supervisor: (git_directory: string, provider: AgentProvider) => LaunchResult
 	stop: (git_directory: string) => Promise<StopReport>
 	restart: (git_directory: string) => Promise<number>
@@ -60,6 +62,9 @@ const LIVE_PORTS: BacklogrunPorts = {
 	stranded: async (git_directory) => await backlogrun_replace.stranded(git_directory),
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
 	preflight: (args, git_directory) => backlog_preflight.preflight({ ...args, git_directory }),
+	record_limit: async () => {
+		await lane_limit_history.record_current()
+	},
 	start_supervisor: run_wake_cli.start_for_launch,
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
 	restart: async (git_directory) => await backlogrun_restart.restart(git_directory),
@@ -122,6 +127,8 @@ async function launch(
 
 	ports.write(launched_note(result))
 	ports.preflight(args, git_directory)
+	// The limit the run starts under, so `lane:stats` sees a `.env` change between runs (joshuafolkken/kit#6139).
+	await ports.record_limit()
 	ports.write(supervisor_note(ports.start_supervisor(git_directory, args.provider)))
 
 	return await ports.show_board()

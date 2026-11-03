@@ -253,6 +253,8 @@ const push_miss_schema = z.object({
 	scope: z.enum(['whole', 'related']),
 	reason: z.string(),
 })
+// The lane limit a run started under or `lane:limit` set it to (`lane-limit-history.ts`, joshuafolkken/kit#6139).
+const limit_schema = z.object({ kind: z.literal(KIND.LIMIT), at: z.string(), limit: z.number() })
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -277,6 +279,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	push_miss_schema,
 	ship_lap_schema,
 	size_schema,
+	limit_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -313,6 +316,7 @@ type ShipLapEntry = z.infer<typeof ship_lap_schema>
 type ShipLapRecord = Omit<ShipLapEntry, 'kind' | 'at'>
 type SizeEntry = z.infer<typeof size_schema>
 type SizeRecord = Omit<SizeEntry, 'kind' | 'at'>
+type LimitEntry = z.infer<typeof limit_schema>
 type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
@@ -339,6 +343,7 @@ export type {
 	LaneStateChangeEntry,
 	LaneStateChangeRecord,
 	LedgerEntry,
+	LimitEntry,
 	LoadEntry,
 	MergeEntry,
 	OfferableEntry,
