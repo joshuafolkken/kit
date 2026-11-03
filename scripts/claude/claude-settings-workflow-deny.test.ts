@@ -4,8 +4,9 @@ import { claude_settings_fixture } from './claude-settings-fixture'
 const { load_settings } = claude_settings_fixture
 
 // A `pull_request` run executes the branch's own workflow files, so a rewritten workflow can turn a
-// required check green. `pretool-guard` refuses a lane child's edit (joshuafolkken/kit#6050); these
-// entries are the static backstop for a hook that did not run (joshuafolkken/kit#6067).
+// required check green. The lane child's refusal, Bash included, belongs to `pretool-guard`
+// (joshuafolkken/kit#6050); these entries cover the file tools whether or not that hook runs
+// (joshuafolkken/kit#6067).
 const WORKFLOW_EDIT_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Edit(./.github/workflows/**)',
 	'Write(./.github/workflows/**)',
