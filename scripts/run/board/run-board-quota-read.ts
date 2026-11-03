@@ -5,8 +5,8 @@ import { codex_home_source } from '#scripts/agent/codex-home-source'
 import { durable_state } from '#scripts/josh/durable-state'
 import { figure_format } from '#scripts/lib/figure-format'
 import { json_value } from '#scripts/lib/json-value'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_instant } from '#scripts/time-runtime/time-instant'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
 
 // The usage-limit windows Claude Code and Codex last reported, read off files they already write — no
@@ -342,7 +342,7 @@ async function codex_files(
 }
 
 async function read_tail(file: string, bytes: number = TAIL_BYTES): Promise<string> {
-	return time_density_hook.read_tail(file, bytes)
+	return transcript_tail.read_tail(file, bytes)
 }
 
 // The first `bytes` of `file`; only the bytes read are decoded.

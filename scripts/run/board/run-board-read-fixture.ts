@@ -8,7 +8,7 @@ import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_wake } from '#scripts/run/wake/run-wake'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { vi } from 'vitest'
 
 const REPOSITORY = '/repo/.git'
@@ -65,7 +65,7 @@ function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	// The limit is read off the environment and a live run's override: never a real one from a test.
 	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: LANE_LIMIT })
 	// Every log is read off the machine: never a real one from a test.
-	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
+	vi.spyOn(transcript_tail, 'read_tail').mockReturnValue('')
 	// Each lane's child is probed with `pgrep`: never a real process from a test.
 	vi.spyOn(lane_spent, 'idle_lanes').mockReturnValue([])
 	// Each lane's branch and tree are read with git: never a real lane from a test.

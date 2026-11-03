@@ -1,8 +1,8 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { run_headless } from './run-headless'
 import { run_watcher_hook } from './run-watcher-hook'
 
@@ -120,7 +120,7 @@ function is_repeat(raw_payload: string): boolean {
 
 	if (transcript === undefined) return false
 
-	return repeats_last_call(time_density_hook.read_tail(transcript), reads)
+	return repeats_last_call(transcript_tail.read_tail(transcript), reads)
 }
 
 /**

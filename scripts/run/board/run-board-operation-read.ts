@@ -1,4 +1,4 @@
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { run_board_operation, type Operation } from './run-board-operation'
 
 // The disk half of the third line's operation: the end of each session's log, read every time the
@@ -60,7 +60,7 @@ function lane_operation(source: LaneSource, read_tail: ReadTail): Array<LaneOper
 
 function read(
 	sources: OperationSources,
-	read_tail: ReadTail = time_density_hook.read_tail,
+	read_tail: ReadTail = transcript_tail.read_tail,
 ): SessionOperations {
 	return {
 		lanes: sources.lanes.flatMap((lane) => lane_operation(lane, read_tail)),
