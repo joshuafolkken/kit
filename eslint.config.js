@@ -81,7 +81,7 @@ export default [
 	},
 	// Issue #2124: enforce the English-only Content rule for comments and test titles. It is wired here
 	// rather than in the distributed base config because it is kit's own convention; the off block that
-	// follows is the CLAUDE.md exception for `eslint/rules/`, where a rule module may explain its
+	// follows is the Content-rules exception for `eslint/rules/`, where a rule module may explain its
 	// rationale in Japanese. The off block comes last so nothing re-enables it for those files.
 	{
 		plugins: {
