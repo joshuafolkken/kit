@@ -28,7 +28,7 @@ When a child hits something only a person can decide (→ "Only a person's judge
 `needs-decision`"), **park the child and keep going**:
 
 ```bash
-pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision, then releases
+pnpm josh run:park <N> --body-file .josh/tmp/park.md   # what needs deciding, and the options; applies needs-decision, then releases
 ```
 
 Return to step 1.
@@ -59,7 +59,7 @@ lane:launch <N>`.
 It never carries:
 
 - a recommended, reversible choice — Tier A: adopt it, record it in the epic's Decisions and child
-  comment with `pnpm josh epic --decide <E> <N...> --decision-file <path|->`, and continue
+  comment with `pnpm josh epic --decide <E> <N...> --decision-file .josh/tmp/decision.md`, and continue
   (`prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy", the single source);
 - whether to run something already planned and opted in with `auto-ok` — the opt-in is that decision;
 - a wait for the next published release — a dependency, `pnpm josh issue:release <N> --wait`

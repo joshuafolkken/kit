@@ -263,6 +263,7 @@ const size_estimate = {
 	over_cap,
 	over_guide,
 	problems,
+	projected_minutes,
 	restated,
 	route_of,
 	split_over_guide,

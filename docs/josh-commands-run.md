@@ -1326,6 +1326,24 @@ Each ship stage lists its inner steps under it, longest first: the `ship-lap` ro
 
 A stretch between ship stages that a park fell in is named after the park instead: `pause for #<M>` or `park (<reason>)`, net of its wait, and what the lane redid up to its next park — `(re-plan, ship ×2 re-run)`, a ship counted again where a stage starts twice (`lane-breakdown-pause.ts`).
 
+#### `josh lane:why`
+
+<!-- usage: lane:why -->
+
+Print a merged lane's stages over budget, one row each, beside the records that say why.
+
+```bash
+pnpm josh lane:why 6050   # the cause table an overrun investigation joins by hand
+```
+
+<!-- /usage -->
+
+One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`), longest first, no model run.
+
+The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last, a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
+
+A missing record, or an Issue listing that cannot be read, leaves its cell blank. A lane with no stage over budget prints one line; one the ledger holds no dispatch and merge of exits non-zero (`lane-why.ts`).
+
 ### `josh lane:plan`
 
 <!-- usage: lane:plan -->

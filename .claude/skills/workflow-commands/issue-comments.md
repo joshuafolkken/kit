@@ -55,7 +55,7 @@ the Issue (`scripts/issue/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `
 applies `already-done` and releases the hold, in that order, stopping at the first failure:
 
 ```bash
-pnpm josh issue:already-done <N> --evidence-file <path>
+pnpm josh issue:already-done <N> --evidence-file .josh/tmp/evidence.md
 ```
 
 **The evidence file names the merging pull request or commit and, per acceptance criterion, the
@@ -71,7 +71,7 @@ one this run still owes.
 ## A measurement-only Issue
 
 **Every criterion is a measurement, so no pull request closes it** → `pnpm josh issue:measured <N>
---evidence-file <path>` (per criterion, the result and its run), never a bare comment: an OPEN child is
+--evidence-file .josh/tmp/evidence.md` (per criterion, the result and its run), never a bare comment: an OPEN child is
 parked `run:stalled`. Invoking `fullrun` / `backlogrun` authorizes this close. `docs/josh-commands-backlog.md` → "`josh issue:measured`".
 
 ## A long thread

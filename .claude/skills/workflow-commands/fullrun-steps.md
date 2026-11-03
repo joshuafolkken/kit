@@ -10,7 +10,7 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
 1. **`in-progress` is already on the Issue** — `run:entry` applied it once the tree was held and the
    budget allowed the run, and `run:release <N>` takes it back off.
 2. Read the Issue and its comments off `run:entry`'s `run:prep` report (`issue-comments.md`).
-3. **Record the agreed plan** with `pnpm josh issue:plan <N> --body-file <path>`, adding
+3. **Record the agreed plan** with `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md`, adding
    `--title "<title>"` when the title is not in English or can be phrased more clearly (the plan goes
    into the body when it is blank and its author has write access, otherwise into a comment; its
    `### 影響を受ける既存の利用者` section is drafted with `pnpm josh plan:consumers` — `kickoff.md` step 4).
@@ -35,7 +35,7 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
 ## The `fullrun new` step list
 
 `kickoff new` + `fullrun #N` in one run. Steps: (1) Derive an English title, or use the provided one.
-(2) Create Issue: `pnpm josh issue:file "<title>" --body-file <body-file>`,
+(2) Create Issue: `pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md`,
 with the labels `kickoff.md` → "Words typed after `new`" maps (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
@@ -43,7 +43,7 @@ that covers the same work stops the run rather than filing a second Issue (`issu
 (`run:hold --adopt`) for its claim; before its reads it stashes pre-existing changes, synchronizes
 as every entry does and pops the stash, and a failed step stops with the stash kept, naming it
 (`scripts/run/entry/run-entry-sync.ts`); every later stop releases with `run:release <N>`. (4) Record the
-agreed plan in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its consumers
+agreed plan in the session language: `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md` (its consumers
 section as in `kickoff.md` step 4). (5) On (3)'s `latest: required` run
 `pnpm josh latest:if-required` and load the `dependency-update` skill; on `skip` neither runs
 (`latest-gate.md` is the single source). (6) Implement. (7) Run round 1 of the verification chain (`chain-rule.md` → "Run the review-to-merge

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 // the Issue, so no `new` step declares `--requested` any more. The words a person may type after
 // `new` are still defined in one table rather than left to each run's reading.
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands'
-const NEW_FILING = 'pnpm josh issue:file "<title>" --body-file <body-file>`'
+const NEW_FILING = 'pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md`'
 const NEW_STEP_DOCUMENTS = [
 	`${WORKFLOW_SKILL}/kickoff.md`,
 	`${WORKFLOW_SKILL}/halfrun.md`,
@@ -28,7 +28,7 @@ describe.each(NEW_STEP_DOCUMENTS)('%s — the `new` filing a person asked for', 
 describe('kickoff.md — the multi-issue split of a `new` entry', () => {
 	it('files each split child without --requested', () => {
 		expect(read_unwrapped(`${WORKFLOW_SKILL}/kickoff.md`)).toContain(
-			'<body-file> --route split` plus the labels',
+			'.josh/tmp/body.md --route split` plus the labels',
 		)
 	})
 })
