@@ -17,6 +17,11 @@ const RELAUNCH = 'cut → resume'
 const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
 const YIELD = 'yield → redispatch'
+const YIELD_HOLDER = 'yield: holder running'
+const YIELD_OFFER = 'yield: offer wait'
+const YIELD_LAUNCH = 'yield: launch'
+const YIELD_UNKNOWN = 'yield: holder unknown'
+const NAMES_NO_HOLDER = 4400
 const MERGE = 'followup → merge'
 const FIRST_LANE = 'start → first lane'
 const SETUP_KIND = 'setup'
@@ -182,6 +187,26 @@ describe('lane_gap_stats.table -- yield → redispatch', () => {
 		expect(row_of([dispatch(ISSUE, 40)], events, YIELD)).toBe(`| ${YIELD} | 1 | 60 | 60 | 0 |`)
 	})
 
+	// joshuafolkken/kit#5984: the split and the unknown counts add up to the yield row's.
+	it('splits a yield naming its holder and counts one naming none apart', () => {
+		const events = [
+			event(
+				'note',
+				`#${String(ISSUE)} yielded its lane: overlaps #${String(OTHER)} · at: summary`,
+				100,
+			),
+			yield_note(NAMES_NO_HOLDER, 100),
+			event(SETUP_KIND, `opening lane #${String(ISSUE)}`, 50),
+		]
+		const entries = [merge(OTHER, 70), dispatch(ISSUE, 40), dispatch(NAMES_NO_HOLDER, 40)]
+
+		expect(row_of(entries, events, YIELD)).toBe(`| ${YIELD} | 2 | 60 | 60 | 0 |`)
+		expect(row_of(entries, events, YIELD_HOLDER)).toBe(`| ${YIELD_HOLDER} | 1 | 30 | 30 | 0 |`)
+		expect(row_of(entries, events, YIELD_OFFER)).toBe(`| ${YIELD_OFFER} | 1 | 20 | 20 | 0 |`)
+		expect(row_of(entries, events, YIELD_LAUNCH)).toBe(`| ${YIELD_LAUNCH} | 1 | 10 | 10 | 0 |`)
+		expect(row_of(entries, events, YIELD_UNKNOWN)).toBe(`| ${YIELD_UNKNOWN} | 1 | 60 | 60 | 0 |`)
+	})
+
 	it('leaves out a withdrawal that is not a yield', () => {
 		const events = [withdraw(ISSUE, 'a person', 100)]
 
@@ -226,7 +251,7 @@ describe('lane_gap_stats.table -- the period', () => {
 		const lines = lane_gap_stats.table([], WINDOW).split('\n')
 
 		expect(lines[0]).toBe(HEADER)
-		expect(lines).toHaveLength(8)
+		expect(lines).toHaveLength(12)
 	})
 
 	it('leaves out a gap that started before the period', () => {
