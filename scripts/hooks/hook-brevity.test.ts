@@ -1,4 +1,5 @@
 import { duplicate_reads } from '#scripts/delegation/duplicate-read-guard'
+import { session_language_cli } from '#scripts/josh/session-language-cli'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { issue_comments } from '#scripts/rules/issue-comments'
@@ -8,16 +9,23 @@ import { piped_verification } from '#scripts/rules/piped-verification'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
 import { run_poll_hook } from '#scripts/run/run-poll-hook'
+import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { describe, expect, it } from 'vitest'
+import { MAX_REWRITE_CHARS, rewrite_notice } from './format-rewrite-notice'
 
 // Every `PreToolUse` and `Stop` refusal or notice is read by the model, and stays in its context once
-// delivered. `hook-notice-brevity.test.ts` bounds the batching texts; this suite extends the same
-// bound to every other one: what is wrong and the next command, in a sentence or two. The history
-// behind a row lives on its Issue and in `docs/maintainers/rule-delivery-rationale.md`, never here.
+// delivered: what is wrong and the next command, in a sentence or two. This suite pins the bounds, so
+// a rewrite that pastes the rule body back fails here; the directives the batching refusal must keep
+// are pinned by `turn-batching-rule.test.ts`. The history behind a row lives on its Issue and in
+// `docs/maintainers/rule-delivery-rationale.md`, never here.
 
 const MAX_CHARS = 400
 const HISTORY = /kit#\d|#\d{3,}|Before this/u
 const BACKTICKED = /`[^`]+`/u
+const BATCHING_RULE_POINTER = 'prompts/collaboration-workflow/turn-batching.md'
+const REWRITE_BOUND = 600
+const LARGE_REFORMAT_LINES = 400
+const LINE_TEXT = 'const value = compute_something(input, options)'
 
 const TEXTS: ReadonlyArray<[string, string]> = [
 	...delivered_rules.MEASURED_RULES.map((rule): [string, string] => [rule.id, rule.reason]),
@@ -39,21 +47,65 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	['poll', run_poll_hook.POLL_REASON],
 ]
 
+// The batching texts fire again and again in a run (joshuafolkken/kit#3398): the refusal takes the
+// shared bound, and the two notices tighter ones set a little above the text as written, so a wording
+// tweak fits but a re-paste does not. The lane notice recurs on every single-call turn, so it is held
+// to a single short sentence.
+const BATCHING_TEXTS: ReadonlyArray<[string, string, number]> = [
+	['batching: the refusal', time_batch_guard.REASON, MAX_CHARS],
+	['batching: the Write notice', time_batch_guard.NOTICE, 240],
+	['batching: the lane notice', time_batch_guard.LANE_NOTICE, 160],
+]
+
+const BOUNDED_TEXTS: ReadonlyArray<[string, string, number]> = [
+	...TEXTS.map(([name, text]): [string, string, number] => [name, text, MAX_CHARS]),
+	...BATCHING_TEXTS,
+]
+
 const MODE_REASONS: ReadonlyArray<[string, string]> = lane_guard_policy.LANE_GUARD_POLICY.map(
 	(entry) => [entry.id, entry.because],
 )
 
 describe('every refusal and notice is the action and the next command', () => {
-	it.each(TEXTS)('%s stays within the bound', (_name, text) => {
-		expect(text.length).toBeLessThanOrEqual(MAX_CHARS)
+	it.each(BOUNDED_TEXTS)('%s stays within its bound', (_name, text, limit) => {
+		expect(text.length).toBeLessThanOrEqual(limit)
 	})
 
-	it.each(TEXTS)('%s carries no history', (_name, text) => {
+	it.each(BOUNDED_TEXTS)('%s carries no history', (_name, text) => {
 		expect(text).not.toMatch(HISTORY)
 	})
 
-	it.each(TEXTS)('%s names a command or a pointer', (_name, text) => {
+	it.each(BOUNDED_TEXTS)('%s names a command or a pointer', (_name, text) => {
 		expect(text).toMatch(BACKTICKED)
+	})
+
+	it.each(BATCHING_TEXTS)('%s still points at the rule body', (_name, text) => {
+		expect(text).toContain(BATCHING_RULE_POINTER)
+	})
+})
+
+describe('the rewrite notice is bounded as a whole', () => {
+	it('caps the notice itself, header and range included, at about 600 characters', () => {
+		expect(MAX_REWRITE_CHARS).toBeLessThanOrEqual(REWRITE_BOUND)
+	})
+
+	it('keeps a large reformat inside the bound with the line range first', () => {
+		const after = Array.from({ length: LARGE_REFORMAT_LINES }, () => LINE_TEXT).join('\n')
+		const notice = rewrite_notice.build('', after) ?? ''
+
+		expect(notice.length).toBeLessThanOrEqual(REWRITE_BOUND)
+		expect(notice.split('\n', 2)[1]).toBe(`Lines 1-${String(LARGE_REFORMAT_LINES)}:`)
+	})
+})
+
+describe('the session-language line', () => {
+	it('prints nothing when the language is the default', () => {
+		expect(
+			session_language_cli.format_line({
+				lang: session_language_cli.DEFAULT_SESSION_LANG,
+				is_default: true,
+			}),
+		).toBe('')
 	})
 })
 
