@@ -76,7 +76,7 @@ Detached launchers also hand this variable to processes without an agent session
 | `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch.                            |
 | `JOSH_WORKER_MODEL`                 | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue.                           |
 | `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.                          |
-| `JOSH_WORKER_SHIP_MODEL`            | No       | the worker's model                                 | The model a lane relaunches on once it reaches the gate (the ship phase).  |
+| `JOSH_WORKER_SHIP_MODEL`            | No       | `claude-sonnet-5-5`                                | The model a lane relaunches on once it reaches the gate (the ship phase).  |
 | `JOSH_REVIEWER_MODEL`               | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.                              |
 | `JOSH_REVIEWER_EFFORT`              | No       | `medium`                                           | The effort of the review a lane's change gets.                             |
 | `JOSH_REVIEWER_VERIFICATION_MODEL`  | No       | `claude-sonnet-5-5`                                | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_MODEL`.  |
