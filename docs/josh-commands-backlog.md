@@ -200,7 +200,9 @@ pnpm josh issue:fold-existing assessment.json --apply 5848   # write the fold to
 
 <!-- /usage -->
 
-Run it after the issue and the draft are read. It returns `duplicate` / `fold` / `separate` / `inspect`; only `--apply <N>` updates the issue, and only on `fold`. The JSON carries the facts (`content`, `is_open`, `size_verdict`, `existing_body`, `draft_body`, …); an unknown fact answers `inspect`. `separate` returns to the ordinary filing path.
+Run it after the issue and the draft are read. It returns `duplicate` / `fold` / `separate` / `inspect`; only `--apply <N>` updates the issue, and only on `fold`. The JSON carries the facts (`content`, `is_open`, `size_verdict`, `existing_body`, `draft_body`, …). `separate` returns to the ordinary filing path.
+
+`content`, `has_complete_read`, `existing_body`, `comment_fingerprint`, `draft_body` and `verification` are required; an assessment without one exits 1. Any other unknown fact is omitted and answers `inspect`.
 
 The JSON also carries `comment_fingerprint`, as `--fingerprint <N>` prints it before the issue is read; `--apply` writes nothing when a comment was added, edited or deleted since.
 
