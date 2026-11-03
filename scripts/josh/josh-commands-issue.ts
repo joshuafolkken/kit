@@ -10,10 +10,8 @@ const REPO_FLAG = {
 const BODY_FILE = '--body-file <path>'
 const JSON_FLAG = { names: ['--json'], description: 'print the verdict and reason as JSON.' }
 
-// The issue-reading and issue-citation commands, split out of `josh-commands-ai.ts` when the mandated
-// `issue:cite` section pushed that file past its 300-line ceiling — the same
-// group-per-file shape `LANE_COMMANDS` and `SPLIT_COMMANDS` already take. `COMMAND_MAP` spreads this
-// in, so nothing downstream sees where an entry lives.
+// The issue-reading and issue-citation commands. `COMMAND_MAP` spreads this in, so nothing
+// downstream sees where an entry lives.
 
 // The synopsis `issue:read`, `issue:state` and `issue:cite` share: a list of numbers with an optional
 // cross-repo flag. One constant, so they cannot drift and the literal is not duplicated.

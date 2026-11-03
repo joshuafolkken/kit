@@ -8,10 +8,8 @@ const OUTPUT = '--output <path>'
 const REPO_FLAG = { names: ['--repo <owner/name>'], description: 'a child in another repository.' }
 const ISSUE = { arguments: '<N>' }
 
-// The run-lifecycle registry (`run:hold` through `run:step`), split out of `josh-commands-ai.ts` so
-// that file stays under its 300-code-line limit, as `BACKLOG_COMMANDS` and `LANE_COMMANDS` are. It
-// is spread into `AI_COMMANDS` at the place the entries belong, so the generated catalog keeps their
-// order.
+// The run-lifecycle registry (`run:hold` through `run:step`). It is spread into `AI_COMMANDS` at the
+// place the entries belong, so the generated catalog keeps their order.
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
 const RUN_HOLD_SCRIPT = 'scripts/run/hold/run-hold-main.ts'
