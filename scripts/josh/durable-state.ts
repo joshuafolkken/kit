@@ -59,6 +59,7 @@ const PREFIX = {
 	SHIP_RESULT: 'josh-ship-result-',
 	LANE_DISPATCH: 'josh-lane-dispatch-',
 	LANE_PLAN: 'josh-lane-plan-',
+	INVESTIGATION: 'josh-investigation-record-',
 } as const
 
 const PREFIXES: ReadonlyArray<string> = Object.values(PREFIX)
