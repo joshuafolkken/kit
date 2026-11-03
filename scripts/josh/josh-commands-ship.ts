@@ -181,7 +181,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--body-file <path>'],
 					description:
-						'the PR body carrying the live-execution evidence `followup` gates on; forwarded to `git -y` alone.',
+						'the PR body carrying the live-execution evidence `followup` gates on, written under `.josh/tmp/`; forwarded to `git -y` alone.',
 				},
 				{ names: ['--notify-message <text>'], description: 'forwarded to `followup` alone.' },
 				{
