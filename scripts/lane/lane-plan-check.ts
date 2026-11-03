@@ -14,6 +14,7 @@ import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_signals } from './lane-plan-signals'
 import { lane_plan_size, type Oversize } from './lane-plan-size'
 import { lane_plan_wait } from './lane-plan-wait'
+import { lane_plan_wait_event } from './lane-plan-wait-event'
 import { lane_yield, type YieldAt } from './lane-yield'
 
 // The check `josh lane:plan <issue> <path>...` runs (`lane-plan-cli.ts`) — record the files a lane child
@@ -242,9 +243,10 @@ async function settle(plan: LanePlan, clash: Clash, directory: string): Promise<
 	const waiting = { ...plan, waits_until: until }
 
 	lane_plan.record(waiting, directory)
-	const end = await lane_plan_wait.hold(
-		Date.parse(until),
-		async () => await is_free(waiting, directory),
+	const until_ms = Date.parse(until)
+	const end = await lane_plan_wait_event.timed(
+		{ issue: plan.issue, holder: clash.holder },
+		async () => await lane_plan_wait.hold(until_ms, async () => await is_free(waiting, directory)),
 	)
 
 	if (end === 'free') return clear(waiting, directory)

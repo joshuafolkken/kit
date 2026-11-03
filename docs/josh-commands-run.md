@@ -1303,6 +1303,8 @@ pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation commen
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
+A ship stop closes the ship stage open at it. A blocking `lane:plan` wait on a holder is its own `lane:plan wait (#<M>)` row, cut out of the stage it fell in (`lane-plan-wait-event.ts`).
+
 Under the waits taken out, the yield wait splits into `yield wait: holder remaining` and `yield wait: redispatch gap (offer + launch)`; a wait whose note names no holder gets a `no holder named, unsplit` line (`lane-yield-split.ts`).
 
 A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column. Between the two, its `lane first lint:related` row takes each lane's first timed `lint:related`, over the lanes that ran one.
