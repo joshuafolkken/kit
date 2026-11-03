@@ -21,6 +21,7 @@ const SUCCESS_EXIT_CODE = 0
 const should_forward_stderr = true
 const MOVED_SINCE_GREEN = 'moved since this ship last met the pair green on this base'
 const MERGE_MEETS_BRANCH = "where the merge with the default branch meets this branch's change"
+const REUSED_PAIR = 'scoped pair: reused — both checks are green on this tree'
 
 type Phase = () => Promise<JoshResult>
 
@@ -134,12 +135,13 @@ async function settled_pair(): Promise<JoshResult> {
 	const tree = await rerecorded_tree()
 	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
 
-	// Nothing stale ran nothing, so the records already vouch for the tree read.
+	// Nothing stale ran nothing, so the records already vouch for the tree read — a ship retried over
+	// an unmoved tree says so in its log (joshuafolkken/kit#6024).
 	if (scripts.length === 0) {
 		run_ship_narrowed.remember(tree)
 		run_ship_pair_runs.met(tree, SUCCESS_EXIT_CODE)
 
-		return { code: SUCCESS_EXIT_CODE, out: '' }
+		return printed(REUSED_PAIR)
 	}
 
 	const result = await stale_pair(tree, scripts)
@@ -226,7 +228,7 @@ async function is_gate_green(): Promise<boolean> {
 	return is_reusable(await gate_tree.read_gate_tree())
 }
 
-const run_ship_scoped = { is_gate_green, run_phases, scoped_gate, scoped_pair }
+const run_ship_scoped = { REUSED_PAIR, is_gate_green, run_phases, scoped_gate, scoped_pair }
 
 export type { Phase }
 export { run_ship_scoped }
