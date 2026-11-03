@@ -1,7 +1,7 @@
 import { json_value } from '#scripts/lib/json-value'
 import { consultation_handoff } from '#scripts/rules/consultation-handoff'
 import { run_handoff_args } from '#scripts/run/handoff/run-handoff-args'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
 import { session_model_record } from './session-model-record'
 
@@ -43,7 +43,7 @@ function tail_of(transcript_path: string | null | undefined): string {
 	if (transcript_path === undefined || transcript_path === null) return ''
 
 	try {
-		return time_density_hook.read_tail(transcript_path)
+		return transcript_tail.read_tail(transcript_path)
 	} catch {
 		return ''
 	}

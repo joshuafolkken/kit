@@ -1,7 +1,7 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { delivered_rules, type DeliveredRule } from './delivered-rules'
 import { guard_remedy } from './guard-remedy'
 
@@ -36,7 +36,7 @@ function read_payload_tail(raw_payload: string): string {
 		const payload = hook_decision.parse_hook_payload(raw_payload)
 
 		return payload
-			? time_density_hook.read_tail(
+			? transcript_tail.read_tail(
 					time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id),
 				)
 			: ''

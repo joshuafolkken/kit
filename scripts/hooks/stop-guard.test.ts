@@ -17,7 +17,7 @@ import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { stop_guard, write_stop_decision } from './stop-guard'
@@ -227,7 +227,7 @@ function held_world(is_handed_off: boolean, tail: string, read: HoldRead): void 
 	quiet_world()
 	process.env[LANG_KEY] = 'en'
 	vi.stubEnv(agent_headless.KEY, undefined)
-	vi.mocked(time_density_hook.read_tail).mockReturnValue(tail)
+	vi.mocked(transcript_tail.read_tail).mockReturnValue(tail)
 	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(process.cwd())
 	vi.spyOn(run_hold, 'read_hold').mockReturnValue(read)
 	vi.spyOn(run_hold_session, 'mark_notified').mockReturnValue(undefined)
