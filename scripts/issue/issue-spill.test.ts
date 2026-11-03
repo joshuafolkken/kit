@@ -43,6 +43,19 @@ describe('issue_spill.unchecked_lines', () => {
 		expect(issue_spill.unchecked_lines(BODY)).toStrictEqual(MOVED)
 	})
 
+	it('takes sub-items and deep continuations with their unchecked criterion', () => {
+		const nested = [
+			'- [ ] handles these cases:',
+			'  - case a',
+			'  - [x] case b',
+			'- [ ] wrapped',
+			'      deep continuation',
+		]
+		const body = [ACCEPTANCE, '', '- [x] done', ...nested, '- [x] last', '  done tail'].join('\n')
+
+		expect(issue_spill.unchecked_lines(body)).toStrictEqual(nested)
+	})
+
 	it('returns nothing when every criterion is checked', () => {
 		expect(issue_spill.unchecked_lines(`${ACCEPTANCE}\n\n- [x] done`)).toStrictEqual([])
 	})

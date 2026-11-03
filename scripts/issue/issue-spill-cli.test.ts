@@ -143,3 +143,23 @@ describe('issue_spill_cli.run placement', () => {
 		expect(add_children_mock).not.toHaveBeenCalled()
 	})
 })
+
+describe('issue_spill_cli.run failures after the filing', () => {
+	const PLACE_HINT = `epic --add <E> ${String(FOLLOW_UP)} --after ${String(ISSUE)}`
+
+	it('names the placing command when the epic refuses the follow-up', async () => {
+		listing('none', new Map([[ISSUE, EPIC]]))
+		add_children_mock.mockResolvedValue(FAILURE)
+
+		expect(await issue_spill_cli.run(ARGV)).toBe(FAILURE)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(PLACE_HINT))
+	})
+
+	it('skips the placement when #N cannot be rewritten', async () => {
+		edit_body_mock.mockRejectedValue(new Error('HTTP 502'))
+
+		expect(await issue_spill_cli.run(ARGV)).toBe(FAILURE)
+		expect(fetch_epics_mock).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('HTTP 502'))
+	})
+})

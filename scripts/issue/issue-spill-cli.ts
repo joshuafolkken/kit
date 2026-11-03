@@ -26,7 +26,8 @@ import { session_cite } from './session-cite'
 // the scout would otherwise hold #N as its duplicate.
 //
 // **#N is rewritten only once the follow-up exists**, and before the placement: a refused filing
-// leaves #N untouched, and a failed placement leaves the two bodies consistent with a re-run hint.
+// leaves #N untouched, and a failed placement leaves the two bodies consistent and prints the
+// `epic --add` command that places the follow-up.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -156,16 +157,27 @@ async function parent_epic(issue_number: number): Promise<ParentEpic> {
 	}
 }
 
-async function place(issue: SpillIssue, follow_up: number): Promise<number> {
+async function placed(issue: SpillIssue, follow_up: number): Promise<number> {
 	const { epic, is_complete } = await parent_epic(issue.issue_number)
 
 	if (epic !== undefined) return await add_after(epic, issue.issue_number, follow_up)
 	if (is_complete) return await create_epic(issue, follow_up)
-	console.error(
-		`✖ the open epics could not be read in full — place ${session_cite.issue(follow_up)} with \`pnpm josh epic --add <E> ${String(follow_up)} --after ${String(issue.issue_number)}\`.`,
-	)
+	console.error('✖ the open epics could not be read in full.')
 
 	return FAILURE_EXIT_CODE
+}
+
+// A re-run cannot place it — #N has no unchecked criteria left — so every failure names the command.
+async function place(issue: SpillIssue, follow_up: number): Promise<number> {
+	const exit_code = await placed(issue, follow_up)
+
+	if (exit_code !== SUCCESS_EXIT_CODE) {
+		console.error(
+			`✖ ${session_cite.issue(follow_up)} was not placed — place it with \`pnpm josh epic --add <E> ${String(follow_up)} --after ${String(issue.issue_number)}\`.`,
+		)
+	}
+
+	return exit_code
 }
 
 async function rewrite(issue: SpillIssue, follow_up: number): Promise<boolean> {

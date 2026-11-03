@@ -13,8 +13,8 @@ const BACKGROUND_HEADING = '## 背景'
 const HEADING_PREFIX = '## '
 const ESTIMATE_PREFIX = '- 規模見積もり:'
 const UNCHECKED_PATTERN = /^\s*[-*+]\s+\[ \]\s+\S/u
-const LIST_ITEM_PATTERN = /^\s*(?:[-*+]|\d+\.)\s/u
-const CONTINUATION_PATTERN = /^\s+\S/u
+// No line's indent is negative, so this owner stands for "not inside an unchecked criterion".
+const OUTSIDE = -1
 const DECLARATION_PATTERN = /^-\s+[^:：\s][^:：]*[:：]/u
 const ESTIMATE_PATTERN = /^(?:約\s*)?(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行$/u
 
@@ -41,27 +41,32 @@ function acceptance_range(visible: ReadonlyArray<string>): LineRange | undefined
 	return { start: heading + 1, end: end === -1 ? visible.length : end }
 }
 
-function is_continuation(line: string): boolean {
-	return CONTINUATION_PATTERN.test(line) && !LIST_ITEM_PATTERN.test(line)
+function indent_of(line: string): number {
+	return line.length - line.trimStart().length
 }
 
-function is_moved(line: string, is_previous_moved: boolean): boolean {
-	return UNCHECKED_PATTERN.test(line) || (is_previous_moved && is_continuation(line))
+// The marker indent of the unchecked criterion `line` belongs to, or `OUTSIDE`. Every non-blank line
+// indented past the marker — a wrapped tail, a sub-item, a deep continuation — is part of it.
+function owner_of(line: string, owner: number): number {
+	if (UNCHECKED_PATTERN.test(line)) return indent_of(line)
+	const is_inside = owner !== OUTSIDE && line.trim() !== '' && indent_of(line) > owner
+
+	return is_inside ? owner : OUTSIDE
 }
 
-// The line indices of each unchecked criterion, its indented continuation lines included, in body
-// order. A fenced line is never a criterion.
+// The line indices of each unchecked criterion, its indented lines included, in body order. A fenced
+// line is never a criterion.
 function unchecked_indices(body: string): ReadonlyArray<number> {
-	const visible = markdown_section.unfenced_lines(body)
+	const visible = markdown_section.fence_free_lines(body)
 	const range = acceptance_range(visible)
 
 	if (range === undefined) return []
 	const indices: Array<number> = []
-	let is_previous_moved = false
+	let owner = OUTSIDE
 
 	for (let index = range.start; index < range.end; index += 1) {
-		is_previous_moved = is_moved(visible[index] ?? '', is_previous_moved)
-		if (is_previous_moved) indices.push(index)
+		owner = owner_of(visible[index] ?? '', owner)
+		if (owner !== OUTSIDE) indices.push(index)
 	}
 
 	return indices
