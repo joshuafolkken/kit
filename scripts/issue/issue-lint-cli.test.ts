@@ -76,6 +76,15 @@ describe('issue:lint run-last declaration', () => {
 	})
 })
 
+// joshuafolkken/kit#6029: a behavior-change body names what stops a violation and what measures it.
+describe('issue:lint enforcement declaration', () => {
+	it('refuses a behavior-change body with no enforcement line', () => {
+		const body = `${VALID_BODY}- 種別: 振る舞い変更\n- 計測: \`pnpm josh lane:stats\`\n${REQUIRED_SECTIONS}`
+
+		expect(issue_lint_cli.problems(body).join('\n')).toContain('- 強制:')
+	})
+})
+
 describe('issue:lint fenced headings', () => {
 	it('rejects required headings that appear only inside a fenced example', async () => {
 		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-fenced-heading-'))

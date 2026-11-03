@@ -1,6 +1,7 @@
 import { cli_body } from '#scripts/josh/cli-body'
 import { aggregation_split } from './aggregation-split'
 import { behavior_change_lint } from './behavior-change-lint'
+import { enforcement_lint } from './enforcement-lint'
 import { expected_effect_lint } from './expected-effect-lint'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
@@ -44,6 +45,7 @@ function problems(body: string): ReadonlyArray<string> {
 	return [
 		...missing,
 		...behavior_change_lint.problems(body),
+		...enforcement_lint.problems(body),
 		...expected_effect_lint.problems(body),
 		...issue_classification.problems(body),
 		...issue_not_before.problems(body),
