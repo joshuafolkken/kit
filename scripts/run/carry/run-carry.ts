@@ -133,6 +133,9 @@ interface RunCarry {
 	// with, and the record is the one place both it and a person's shell read. Carried across a hand-off
 	// like `done`; optional and `| undefined` for the same disk round-trip reason.
 	lane_limit?: number | undefined
+	// The limit the run started with, read after `lane_limit` so `lane:limit --reset` restores it rather
+	// than the `JOSH_LANE_LIMIT` a shell's `.env` reads now (joshuafolkken/kit#6166).
+	launch_limit?: number | undefined
 }
 
 // The identity of a process, as `process-identity.ts` keeps it: the pid plus an opaque start-time
@@ -212,6 +215,7 @@ const run_carry_schema = z.object({
 	retrospective: z.boolean().optional(),
 	added: z.array(carry_addition_schema).optional(),
 	lane_limit: z.number().int().positive().optional(),
+	launch_limit: z.number().int().positive().optional(),
 })
 
 function carry_path(git_directory: string): string {

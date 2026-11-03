@@ -36,18 +36,24 @@ function read_limit(raw: string | undefined, name: string): LimitChoice {
 	return cli_flags.read_positive_setting(raw, name, DEFAULT_LANE_LIMIT)
 }
 
-// **A live run's `lane:limit` override outranks the environment**: a running
-// parent keeps the environment it started with, so the override is the only way its limit moves. This
-// stays the one place the limit is read; the override reader is injected so a test reads none.
+// `JOSH_LANE_LIMIT` as this process's environment holds it.
+function environment_limit(environment: LaneEnvironment = process.env): LimitChoice {
+	return read_limit(environment[LANE_LIMIT_KEY], LANE_LIMIT_KEY)
+}
+
+// **A live run's limit outranks the environment** — its `lane:limit` override, else the limit it
+// started with: a running parent keeps the environment it started with, so a shell whose `.env` moved
+// since must not read another limit than the parent does. This stays the one place the limit is read;
+// the carry reader is injected so a test reads none.
 async function lane_limit(
 	environment: LaneEnvironment = process.env,
-	read_override: () => Promise<number | undefined> = lane_limit_override.read_override,
+	read_carried: () => Promise<number | undefined> = lane_limit_override.read_carried,
 ): Promise<LimitChoice> {
-	const override = await read_override()
+	const carried = await read_carried()
 
-	if (override !== undefined) return { kind: 'limit', limit: override }
+	if (carried !== undefined) return { kind: 'limit', limit: carried }
 
-	return read_limit(environment[LANE_LIMIT_KEY], LANE_LIMIT_KEY)
+	return environment_limit(environment)
 }
 
 // **A limit above the seat count is capped at the seats**. `lane:open` refuses
@@ -75,6 +81,7 @@ function free_lanes(limit: number, occupied: number, seated = occupied): number 
 
 const lane_capacity = {
 	LANE_LIMIT_KEY,
+	environment_limit,
 	free_lanes,
 	lane_limit,
 	limit_room,

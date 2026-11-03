@@ -178,7 +178,7 @@ async function start_fresh(
 	if (carry === undefined) return report_lost(is_json)
 
 	// The limit the run starts under, for a run the launcher's preflight did not begin (joshuafolkken/kit#6147).
-	await lane_limit_history.record_current()
+	await lane_limit_history.record_launch()
 	await run_event_setup.emit(run_event_setup.STAGE.PLANNING)
 
 	return report_carry(BEGAN_VERDICT, carry, is_json)

@@ -63,7 +63,7 @@ const LIVE_PORTS: BacklogrunPorts = {
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
 	preflight: (args, git_directory) => backlog_preflight.preflight({ ...args, git_directory }),
 	record_limit: async () => {
-		await lane_limit_history.record_current()
+		await lane_limit_history.record_launch()
 	},
 	start_supervisor: run_wake_cli.start_for_launch,
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
@@ -250,7 +250,7 @@ async function run(
 	return await dispatch(parsed, git_directory, ports, { argv, environment })
 }
 
-const backlogrun_cli = { run }
+const backlogrun_cli = { LIVE_PORTS, run }
 
 // `.env` is read inside the guard, as `run:board` reads it, so the board draws in the person's
 // `JOSH_SESSION_LANG` while the unit tests see no developer's `.env`.

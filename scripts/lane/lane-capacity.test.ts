@@ -67,6 +67,21 @@ describe('lane_capacity.lane_limit — a live run override', () => {
 	})
 })
 
+// joshuafolkken/kit#6166: the start limit a run records is the environment's, never a carried one.
+describe('lane_capacity.environment_limit', () => {
+	it('reads the variable alone', () => {
+		const choice = lane_capacity.environment_limit(environment(String(CONFIGURED_LIMIT)))
+
+		expect(choice).toEqual({ kind: 'limit', limit: CONFIGURED_LIMIT })
+	})
+
+	it('refuses a variable that is not a limit', () => {
+		const choice = lane_capacity.environment_limit(environment('six'))
+
+		expect(choice).toMatchObject({ kind: 'problem' })
+	})
+})
+
 // An invalid value is a hard error rather than a silent fall back, the rule `PORT_SEED` already
 // holds to: a typo that quietly becomes the default is a limit nobody chose, and the setting exists
 // precisely so the number is the one a person chose.
