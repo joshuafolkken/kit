@@ -2,6 +2,7 @@ import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { figure_format } from '#scripts/lib/figure-format'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { guard_rephrase } from '#scripts/time-runtime/guard-rephrase'
 import {
 	time_transcript_line,
 	type TranscriptLine,
@@ -38,10 +39,13 @@ interface GuardSource {
 	lines: ReadonlyArray<TranscriptLine>
 }
 
+// `rephrased` counts the refusals the next call of their tool rephrased into an allowed one — the
+// false-positive proxy `josh rule:value` also prints (`guard-rephrase.ts`).
 interface GuardRow {
 	guard: string
 	refusals: number
 	stops: number
+	rephrased: number
 	usd: number
 }
 
@@ -115,15 +119,31 @@ function count_of(kind: HitKind, wanted: HitKind): number {
 	return kind === wanted ? 1 : 0
 }
 
+function row_of(rows: Map<string, GuardRow>, guard: string): GuardRow {
+	return rows.get(guard) ?? { guard, refusals: 0, stops: 0, rephrased: 0, usd: 0 }
+}
+
 function add_hit(rows: Map<string, GuardRow>, one: GuardHit, usd: number): void {
-	const row = rows.get(one.guard) ?? { guard: one.guard, refusals: 0, stops: 0, usd: 0 }
+	const row = row_of(rows, one.guard)
 
 	rows.set(one.guard, {
-		guard: one.guard,
+		...row,
 		refusals: row.refusals + count_of(one.kind, 'refusal'),
 		stops: row.stops + count_of(one.kind, 'stop'),
 		usd: row.usd + usd,
 	})
+}
+
+function add_rephrase(rows: Map<string, GuardRow>, raw_guard: string): void {
+	const guard = RENAMED_GUARDS.get(raw_guard) ?? raw_guard
+	const row = row_of(rows, guard)
+
+	rows.set(guard, { ...row, rephrased: row.rephrased + 1 })
+}
+
+function add_session(rows: Map<string, GuardRow>, session: GuardSource): void {
+	for (const [one, usd] of priced_hits(session)) add_hit(rows, one, usd)
+	for (const guard of guard_rephrase.rephrased_guards(session.lines)) add_rephrase(rows, guard)
 }
 
 function total_hits(row: GuardRow): number {
@@ -134,9 +154,7 @@ function total_hits(row: GuardRow): number {
 function guard_rows(sessions: ReadonlyArray<GuardSource>): Array<GuardRow> {
 	const rows = new Map<string, GuardRow>()
 
-	for (const session of sessions) {
-		for (const [one, usd] of priced_hits(session)) add_hit(rows, one, usd)
-	}
+	for (const session of sessions) add_session(rows, session)
 
 	return [...rows.values()].toSorted((left, right) => total_hits(right) - total_hits(left))
 }
