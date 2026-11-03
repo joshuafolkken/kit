@@ -7,6 +7,7 @@ import { rule_rephrase, type RephraseCounts } from './rule-rephrase'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_cache, type FreshReading } from './rule-value-cache'
 import { rule_value_candidates } from './rule-value-candidates'
+import { rule_value_prose } from './rule-value-prose'
 
 // `josh rule:value` — what each delivered rule earns on the channel that carries it, one row per rule.
 // `rule_value.measure` was public but had no caller outside its own test, so
@@ -21,6 +22,7 @@ import { rule_value_candidates } from './rule-value-candidates'
 const ARGV_OFFSET = 2
 const REFRESH_FLAG = '--refresh'
 const FRESH_FLAG = '--fresh'
+const PROSE_FLAG = '--prose'
 const CACHED_NOTE = 'cached reading taken at'
 const PERCENT_SIGN = '%'
 const COLUMN_GAP = '  '
@@ -184,6 +186,17 @@ function print_reading(argv: ReadonlyArray<string>, cwd: string): void {
 	else process.stdout.write(`${cached_text(fresh)}\n`)
 }
 
+// `--prose` reads the documents instead of the transcripts: every prose rule and whether a registered
+// row enforces it (`rule-value-prose.ts`).
+function print_prose(cwd: string): void {
+	process.stdout.write(`${rule_value_prose.render(rule_value_prose.audit(cwd))}\n`)
+}
+
+function print_transcripts(argv: ReadonlyArray<string>, cwd: string): void {
+	if (argv.includes(REFRESH_FLAG)) rule_value_cache.store(render_parts(gather_runs(cwd)).table, cwd)
+	else print_reading(argv, cwd)
+}
+
 // `--refresh` is the detached measurement the `backlogrun` loop head starts: the table goes to the
 // cache `backlog:offer` prints from, never to stdout (`rule-value-cache.ts`). The candidates are read
 // when a rule is retired, not at the loop head, so they print to stdout only and the cache keeps its
@@ -191,8 +204,8 @@ function print_reading(argv: ReadonlyArray<string>, cwd: string): void {
 // the measurement re-reads every transcript and takes minutes (joshuafolkken/kit#5186); `--fresh`
 // measures regardless.
 function run_rule_value(argv: ReadonlyArray<string> = [], cwd: string = process.cwd()): number {
-	if (argv.includes(REFRESH_FLAG)) rule_value_cache.store(render_parts(gather_runs(cwd)).table, cwd)
-	else print_reading(argv, cwd)
+	if (argv.includes(PROSE_FLAG)) print_prose(cwd)
+	else print_transcripts(argv, cwd)
 
 	return 0
 }

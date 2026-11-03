@@ -1,0 +1,9 @@
+{
+	"reason": "rule:value --prose audit command and its tests; one more line for the typed class list",
+	"date": "2026-11-03",
+	"growth": {
+		"scripts.code_lines": 134,
+		"prose.long_paragraphs": 1,
+		"prose.excess_bold": 1
+	}
+}
