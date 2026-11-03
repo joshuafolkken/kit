@@ -1,4 +1,5 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import type { ShipArguments } from './run-ship-steps'
@@ -78,6 +79,12 @@ function is_stray_unpinned_ok(values: ParsedValues): boolean {
 	return values.review !== true || reason.trim() === ''
 }
 
+// The preflight reads `--body-file` once per check and `git -y` reads it again, so stdin — readable
+// once — would reach all but the first as an empty body; `josh ship` takes a file path only.
+function is_refused_option(values: ParsedValues): boolean {
+	return is_stray_unpinned_ok(values) || values[BODY_FILE_OPTION] === cli_body.STDIN_PATH
+}
+
 // A follow-up citation passed as a trailing positional is a bare issue number, so a stray flag is
 // refused rather than forwarded to the wrong step.
 function ship_args(
@@ -117,7 +124,7 @@ function command_of(
 	positionals: ReadonlyArray<string>,
 ): ShipCommand | undefined {
 	if (values.log !== undefined) return log_command(values.log, positionals)
-	if (is_stray_unpinned_ok(values)) return undefined
+	if (is_refused_option(values)) return undefined
 
 	const title = positionals[FIRST]
 	const args =

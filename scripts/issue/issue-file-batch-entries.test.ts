@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { issue_file_batch_entries } from './issue-file-batch-entries'
 
@@ -96,5 +97,17 @@ describe('issue_file_batch_entries.entries_of — one file split at %%% lines', 
 			distinct: '7',
 		})
 		expect(entries[2]?.source).toBe(`${file}[3]`)
+	})
+})
+
+// joshuafolkken/kit#6056: the batch's body files are read through `cli_body`, so a batch kept in the
+// work tree is refused as one `--body-file` would be.
+describe('issue_file_batch_entries.entries_of — where the batch sits', () => {
+	it('refuses a batch file in the work tree that git does not ignore', async () => {
+		const repository = cli_body_repository.create()
+		const file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, `${TITLE}\n${BODY}`)
+
+		await expect(issue_file_batch_entries.entries_of(file)).rejects.toThrow('not git-ignored')
+		repository.remove()
 	})
 })

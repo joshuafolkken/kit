@@ -1,5 +1,6 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
+import { cli_body } from '#scripts/josh/cli-body'
 
 // The filings `josh issue:file --batch <dir|file>` reads: every `*.md` body file in a directory, in
 // name order, or each part of one file split at its `%%%` lines. A body's title is its front matter's
@@ -85,19 +86,17 @@ async function directory_entries(directory: string): Promise<ReadonlyArray<Batch
 		.filter((name) => name.endsWith(BODY_EXTENSION))
 		.toSorted((left, right) => left.localeCompare(right))
 
-	return await Promise.all(
-		names.map(async (name) => {
-			const source = path.join(directory, name)
+	return names.map((name) => {
+		const source = path.join(directory, name)
 
-			return entry_of(await readFile(source, 'utf8'), source)
-		}),
-	)
+		return entry_of(cli_body.read_file_or_stdin(source), source)
+	})
 }
 
 async function entries_of(source: string): Promise<ReadonlyArray<BatchEntry>> {
 	const status = await stat(source)
 
-	if (status.isFile()) return split_entries(await readFile(source, 'utf8'), source)
+	if (status.isFile()) return split_entries(cli_body.read_file_or_stdin(source), source)
 
 	return await directory_entries(source)
 }

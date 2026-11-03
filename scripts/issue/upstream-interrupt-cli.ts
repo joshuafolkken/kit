@@ -1,10 +1,11 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { stash_push_cli } from '#scripts/git/stash/stash-push-cli'
+import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { shell_quote } from '#scripts/lib/shell-quote'
@@ -160,7 +161,7 @@ function candidate_of(interrupt: Interrupt, draft: string): string {
 
 async function candidate_body(interrupt: Interrupt): Promise<string | undefined> {
 	try {
-		return candidate_of(interrupt, await readFile(interrupt.body_file, 'utf8'))
+		return candidate_of(interrupt, cli_body.read_file_or_stdin(interrupt.body_file))
 	} catch (error) {
 		stopped('draft', error_text.message_of(error), command_of(interrupt))
 
@@ -184,7 +185,7 @@ async function saved(body: string): Promise<string> {
 // printed re-run, reads the copy.
 async function kept_body(interrupt: Interrupt): Promise<Interrupt | undefined> {
 	try {
-		const body_file = await saved(await readFile(interrupt.body_file, 'utf8'))
+		const body_file = await saved(cli_body.read_file_or_stdin(interrupt.body_file))
 
 		return { ...interrupt, body_file }
 	} catch (error) {
