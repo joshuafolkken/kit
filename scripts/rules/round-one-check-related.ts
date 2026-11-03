@@ -1,9 +1,9 @@
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_markers } from '#scripts/time-runtime/time-markers'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { bash_triggers } from './bash-triggers'
 import { shell_segments } from './shell-segments'
 import { tail_commands } from './tail-commands'
@@ -120,7 +120,7 @@ function is_full_reach_candidate(command: string): boolean {
 
 // Refused on every occurrence while the round stays open: the way on is the join, never a reissue.
 function decide(_call: unknown, run: GuardRun): boolean {
-	return fixes_an_open_round(time_density_hook.read_tail(run.transcript))
+	return fixes_an_open_round(transcript_tail.read_tail(run.transcript))
 }
 
 const ROUND_ONE_CHECK_RELATED_REASON =
