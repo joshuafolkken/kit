@@ -1,4 +1,5 @@
 import { run_step_section } from '#scripts/run/run-step-section'
+import { followup_ship_environment } from './followup-ship-environment'
 
 // **`josh followup` prints the section that governs it, once per session** (joshuafolkken/kit#5645),
 // so the reader spends no `doc:section` turn on `followup.md` before issuing it. A followup a ship
@@ -8,16 +9,8 @@ import { run_step_section } from '#scripts/run/run-step-section'
 
 const SUCCESS_EXIT_CODE = 0
 const FOLLOWUP = 'followup'
-const SHIP_FOLLOWUP_KEY = 'JOSH_SHIP_FOLLOWUP'
-const SHIP_FOLLOWUP_ON = '1'
-const SHIPPED_ENVIRONMENT: Readonly<Record<string, string>> = {
-	[SHIP_FOLLOWUP_KEY]: SHIP_FOLLOWUP_ON,
-}
 const UNRESOLVED_MESSAGE = 'The section that governs `josh followup` could not be printed.'
-
-function is_ship_run(source: NodeJS.ProcessEnv): boolean {
-	return source[SHIP_FOLLOWUP_KEY] === SHIP_FOLLOWUP_ON
-}
+const { SHIPPED_ENVIRONMENT, is_ship_run } = followup_ship_environment
 
 // An unresolved heading fails the command, exactly as `run:review` and `ship` refuse it, so a renamed
 // section is never acted on unread.

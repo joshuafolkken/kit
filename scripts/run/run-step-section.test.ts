@@ -33,31 +33,6 @@ function printed(): string {
 		.join('\n')
 }
 
-// joshuafolkken/kit#5920: a `backlog:drive` hand-off carries these sections' text.
-describe('run_step_section — the sections a driver hand-off carries', () => {
-	it.each(
-		run_step_section.DRIVER_SECTIONS.flatMap(([prefix, sections]) =>
-			sections.map((section) => [prefix, section] as const),
-		),
-	)('resolves the %s driver row against the shipped documents', (_prefix, reference) => {
-		expect(resolves(reference.document, reference.heading)).toBe(true)
-	})
-
-	it('names a driver section it cannot resolve rather than dropping it', () => {
-		vi.spyOn(document_section_cli, 'section_text').mockReturnValue(undefined)
-
-		expect(run_step_section.driver_sections('judge')).toContain(
-			'`docs/josh-commands-backlog.md` → "`josh auto-ok:judge`"',
-		)
-	})
-
-	it('carries "The loop" for a verdict with no row of its own', () => {
-		expect(run_step_section.driver_sections('offer')).toBe(
-			document_section_cli.section_text('backlogrun-steps.md', 'The loop'),
-		)
-	})
-})
-
 describe('run_step_section — the one table of governing sections', () => {
 	it.each([...run_step_section.GOVERNING_SECTIONS])(
 		'resolves the %s row against the shipped documents',

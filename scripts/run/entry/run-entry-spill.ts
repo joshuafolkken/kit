@@ -7,8 +7,8 @@ import { document_section_cli } from '#scripts/document/document-section-cli'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_prep, type PrepParts } from '#scripts/run/run-prep'
-import { run_step_section } from '#scripts/run/run-step-section'
 import { run_step_section_once } from '#scripts/run/run-step-section-once'
+import { run_step_section_table } from '#scripts/run/run-step-section-table'
 
 // The `run:prep` bundle `run:entry` prints, kept under the Bash result cap (joshuafolkken/kit#5213).
 // Past the cap the harness hands back a preview, and a lane child re-ran `run:entry` into a file to see
@@ -34,7 +34,7 @@ function byte_length(text: string): number {
 }
 
 function section_length(key: string, root: string): number {
-	const found = run_step_section.GOVERNING_SECTIONS.get(key)
+	const found = run_step_section_table.GOVERNING_SECTIONS.get(key)
 
 	if (found === undefined) return 0
 
@@ -47,7 +47,7 @@ function section_length(key: string, root: string): number {
 // The watcher's section counts only where `run:entry` prints it whole: outside a lane child, before
 // this session printed it — after that it is one line the headroom covers.
 function is_watcher_printed_whole(root: string): boolean {
-	const watcher = run_step_section.GOVERNING_SECTIONS.get(run_step_section.PROGRESS)
+	const watcher = run_step_section_table.GOVERNING_SECTIONS.get(run_step_section_table.PROGRESS)
 	const is_printed = watcher === undefined || run_step_section_once.is_recorded(watcher)
 
 	return !is_printed && !lane_child_marker.is_child_of(root)
@@ -56,12 +56,12 @@ function is_watcher_printed_whole(root: string): boolean {
 function watcher_length(root: string): number {
 	if (!is_watcher_printed_whole(root)) return 0
 
-	return section_length(run_step_section.PROGRESS, root)
+	return section_length(run_step_section_table.PROGRESS, root)
 }
 
 // The sections `run:entry` prints after the bundle.
 function sections_length(root: string): number {
-	return section_length(run_step_section.ENTRY, root) + watcher_length(root)
+	return section_length(run_step_section_table.ENTRY, root) + watcher_length(root)
 }
 
 function report_budget(root: string): number {
