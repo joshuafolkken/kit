@@ -39,4 +39,10 @@ describe('lane_ledger_schema_ship — the lines josh ship writes, read through t
 
 		expect(lane_ledger_schema.entry_schema.parse(stop)).toEqual(stop)
 	})
+
+	it('keeps the base a review failure stopped on', () => {
+		const stop = { kind: 'stop', at: AT, issue: 6141, reason: 'review', base: 'a'.repeat(40) }
+
+		expect(lane_ledger_schema.entry_schema.parse(stop)).toEqual(stop)
+	})
 })
