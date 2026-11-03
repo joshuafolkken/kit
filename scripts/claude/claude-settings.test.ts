@@ -112,6 +112,12 @@ const REQUIRED_DENY_PATTERNS: ReadonlyArray<string> = [
 	PR_MERGE_DENY,
 	...REST_MERGE_DENY_PATTERNS,
 	'Bash(sudo *)',
+	// The static backstop behind the `egress` guard row (joshuafolkken/kit#5999).
+	'Bash(curl *)',
+	'Bash(wget *)',
+	'Bash(nc *)',
+	'Bash(gh auth token*)',
+	'Bash(printenv)',
 ]
 
 // A deny entry was observed to apply to each command of a compound invocation, not only to the

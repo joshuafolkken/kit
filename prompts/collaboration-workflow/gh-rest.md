@@ -7,7 +7,7 @@
 
 例外は 2 つだけ:
 
-- `gh auth token` — ローカルの認証情報を返すだけで、どのエンドポイントにも接続しない
+- `gh auth token` — ローカルの認証情報を返すだけで、どのエンドポイントにも接続しない。スクリプトが自分のプロセス内で読む形に限る。エージェントの `Bash` からは `egress` 行が拒否する（`scripts/rules/egress-guard.ts`）
 - GitHub Actions のワークフロー — ランナー上では `gh` が動き、`gh pr merge --auto` の API は GraphQL にしか無い
 
 ## 認証は環境によって別物である
