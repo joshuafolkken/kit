@@ -66,9 +66,11 @@ describe('check_related.report_results metrics growth notice', () => {
 	})
 
 	// joshuafolkken/kit#4987: a tail of the last lines read `passed` alone, and the ship stopped on it.
-	it('names the ship stop and the accept form on the verdict line itself', () => {
+	// joshuafolkken/kit#6023: run:review's open is now the stop, the pre-detach its backstop.
+	it('names the run:review stop and the accept form on the verdict line itself', () => {
 		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
 
+		expect(verdict).toContain('`josh run:review`')
 		expect(verdict).toContain('pre-detach')
 		expect(verdict).toContain('pnpm josh metrics --accept')
 	})

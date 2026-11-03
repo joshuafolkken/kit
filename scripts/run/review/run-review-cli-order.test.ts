@@ -37,6 +37,9 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 		},
 	}
 })
+vi.mock('#scripts/gate/metrics-totals', () => ({
+	metrics_totals: { totals_refusal: async () => undefined },
+}))
 vi.mock('./run-review-join-read', () => ({ run_review_join_read: { mark_due: vi.fn() } }))
 vi.mock('./run-review-pinned-steps', () => ({
 	run_review_pinned_steps: {

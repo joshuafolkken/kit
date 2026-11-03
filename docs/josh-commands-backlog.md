@@ -304,6 +304,8 @@ A plan without `### 影響を受ける既存の利用者` (entries, or `なし�
 
 When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split). On `wait` (`1`), re-run the printed command, not `issue:plan`.
 
+Run both with Bash `timeout` 600000: a bounded wait blocks up to 9 minutes (`docs/josh-commands-run.md` → "`josh lane:plan`").
+
 A plan naming no path prints `pnpm josh lane:plan <N> <path>...` for the child to finish (`scripts/lane/lane-plan-auto.ts`). Outside a lane child, `kickoff`'s plan records no lane plan.
 
 ### `josh plan:consumers`
@@ -404,6 +406,22 @@ A non-epic body without a well-formed `- 規模見積もり: 約 <N> ファイ�
 A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベースライン` (a re-runnable `` `<command>` → <value> ``) and `## 再現` (a command with its actual output). [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline after merge.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:lint` in detail".
+
+### `josh issue:spill`
+
+<!-- usage: issue:spill -->
+
+Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line.
+
+```bash
+pnpm josh issue:spill 5999 --estimate "3 ファイル / 80 行"
+```
+
+**Options:**
+
+- `--estimate "<F> ファイル / <L> 行"` — the follow-up's size estimate, never apportioned from the issue's. Required.
+
+<!-- /usage -->
 
 ### `josh defect:origin`
 
