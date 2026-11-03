@@ -4,6 +4,7 @@ import { backlog_preflight } from '#scripts/backlog/backlog-preflight'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import { lane_limit_history } from '#scripts/lane/lane-limit-history'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -176,6 +177,8 @@ async function start_fresh(
 
 	if (carry === undefined) return report_lost(is_json)
 
+	// The limit the run starts under, for a run the launcher's preflight did not begin (joshuafolkken/kit#6147).
+	await lane_limit_history.record_current()
 	await run_event_setup.emit(run_event_setup.STAGE.PLANNING)
 
 	return report_carry(BEGAN_VERDICT, carry, is_json)

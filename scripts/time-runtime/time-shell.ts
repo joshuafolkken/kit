@@ -1,5 +1,4 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
-import { canonical_command } from '#scripts/josh/josh-aliases'
 import { json_value } from '#scripts/lib/json-value'
 
 // Reading a shell command well enough to name what it ran.
@@ -309,21 +308,16 @@ function bash_label(command: string): string {
 	return word === '' ? cost_blocks.BASH_TOOL : `${cost_blocks.BASH_TOOL}${BASH_SEPARATOR}${word}`
 }
 
-// **An alias is expanded here, so one command is one name**. Every reading
-// built on this field keyed `pnpm josh ga` and `pnpm josh gate` as two different commands: the
-// per-command table printed them as two rows, the per-invocation table dropped both for having one
-// call each, and — the one with real cost — the failure chain did not see the second as answering the
-// first, so the time a red gate made the run pay again went unreported.
+// The josh subcommand one segment runs, as typed, or `''` for a segment that runs none. Shared by the
+// two readers below so what counts as a segment's josh command is one rule, not two.
 //
-// **The expansion belongs at the name, not at each reader.** `time-gate-runs.ts` had already patched
-// its own copy of this reading, which left the gate count and the per-invocation table answering
-// differently about the same run; `canonical_command` is the one rule both now go through.
-// The josh subcommand one segment runs, alias-expanded, or `''` for a segment that runs none. Shared
-// by the two readers below so what counts as a segment's josh command is one rule, not two.
+// **An alias is not expanded here** (joshuafolkken/kit#6159): expanding pulled the alias table into
+// every reader of this file. A reader that keys or matches on the name goes through
+// `time-josh-names.ts`, the one layer that expands.
 function josh_command_of_segment(segment: string): string {
 	const name = JOSH_PATTERN.exec(command_words(segment).join(' '))?.[1]
 
-	return name === undefined ? '' : `${JOSH_PREFIX}${canonical_command(name)}`
+	return name === undefined ? '' : `${JOSH_PREFIX}${name}`
 }
 
 function josh_command_of(command: string): string {

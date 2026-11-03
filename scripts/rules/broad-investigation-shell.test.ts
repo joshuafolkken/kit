@@ -37,6 +37,7 @@ describe('broad_investigation_shell.is_broad_command — the broad', () => {
 		'node -e "console.log(1)"',
 		'python3 summarize.py',
 		'pnpm josh cost:session',
+		'pnpm josh ca',
 		'grep -rn guard .',
 		'grep -n guard tree',
 		'rg guard',
