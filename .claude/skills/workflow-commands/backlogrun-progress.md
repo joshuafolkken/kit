@@ -16,7 +16,7 @@ next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --output <path>)
 
 **`pnpm josh run:merge <N>` is the only reading of how a child ended** — never
 classify `issue:state` by hand or ask `epic:next` in its place. **Pass `--output <path>`, the child's
-transcript**; the named-epic flags are dropped for the opted-in backlog. Act on the token.
+transcript**; the named-epic flags are dropped for the opted-in backlog. It closes the lane itself; act on the token.
 
 | It prints | What the run does |
 | --- | --- |
