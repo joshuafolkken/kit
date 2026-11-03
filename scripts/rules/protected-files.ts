@@ -6,7 +6,7 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { edit_tool } from './edit-tool'
 import { git_argv } from './git-argv'
-import { shell_segments } from './shell-segments'
+import { nested_commands } from './nested-commands'
 
 // The trigger and the delivered text behind the `protected-file` row of `delivered-rules.ts`:
 // the two files a run's own file tools must not touch.
@@ -37,10 +37,7 @@ const TOKEN_QUOTES = /["']/gu
 // is spaced out to a mark, so the word after the last one is the file it reads or writes.
 const REDIRECT = />\||[<>]/gu
 const REDIRECT_MARK = '<'
-// Programs that run their quoted argument as a script.
-const SHELLS: ReadonlySet<string> = new Set(['bash', 'eval', 'sh', 'zsh'])
-// The body of a `$(…)` (innermost) or a backtick command substitution.
-const SUBSTITUTION = /\$\((?<dollar>[^()]*)\)|`(?<backtick>[^`]*)`/gu
+const { SHELLS } = nested_commands
 // Programs that print a named file's bytes or run them, and programs that write one: a write could set
 // a guard switch, so `cp .env.example .env` is refused too (kit #4660) — the person makes the file.
 const SHELL_PROGRAMS: ReadonlySet<string> = new Set([
@@ -139,36 +136,10 @@ function is_environment_shell_segment(segment: string): boolean {
 	return SHELL_PROGRAMS.has(call.name) && call.args.some((word) => is_environment_path(word))
 }
 
-// A shell's quoted script holds commands of its own (`bash -c "true; cat .env"`), so it is cut again
-// without regard to quotes.
-function script_commands_of(segment: string): Array<string> {
-	const program = git_argv.program_of(segment)?.name
-
-	if (program === undefined || !SHELLS.has(program)) return []
-
-	return shell_segments.commands_of(segment)
-}
-
-// A command substitution runs even inside double quotes (`echo "$(echo x > .env)"`), which the
-// quote-blanked reading takes for text, so its body is cut out as commands of their own.
-function substitution_commands_of(segment: string): Array<string> {
-	return [...segment.matchAll(SUBSTITUTION)].flatMap((match) =>
-		shell_segments.commands_of(match.groups?.['dollar'] ?? match.groups?.['backtick'] ?? ''),
-	)
-}
-
-function segments_of(command: string): Array<string> {
-	return shell_segments
-		.quote_aware_commands_of(command)
-		.flatMap((segment) => [
-			segment,
-			...script_commands_of(segment),
-			...substitution_commands_of(segment),
-		])
-}
-
 function is_environment_shell_access(command: string): boolean {
-	return segments_of(command).some((segment) => is_environment_shell_segment(segment))
+	return nested_commands
+		.commands_of(command)
+		.some((segment) => is_environment_shell_segment(segment))
 }
 
 // A `Read` lands the secret in the transcript; an `Edit` / `Write` could set a guard switch.

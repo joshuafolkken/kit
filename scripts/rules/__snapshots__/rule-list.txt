@@ -164,6 +164,10 @@
   - fires: `pnpm josh pretool:guard` — a `gh api` POST / PUT / PATCH (path or URL) to the rulesets, branch protection, collaborators, invitations, secrets, variables, hooks, keys, environments, actions permissions or transfer, a `PATCH` of the repository, the matching GraphQL mutations, `gh secret` / `gh variable` writes, `gh repo edit` / `deploy-key` writes. Every occurrence
   - silent: `gh secret list`, `gh variable get`, a `gh api` read — a `DELETE` is `destructive-command`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Network egress or credential print** (`egress`, `SECURITY.md` → "Secrets")
+  - fires: `pnpm josh pretool:guard` — `curl` / `wget` / `nc` / `ssh` / `scp` / a remote `rsync` and the like, a network call in an inline `node -e` / `python -c` script, `gh auth token`, `gh` sent to a host other than github.com, or a print of the environment or a `*TOKEN*` / `*SECRET*` / `*KEY*` variable — nested in `bash -c`, `eval`, `$(…)` or a heredoc as well. Every occurrence
+  - silent: `gh` against github.com, `git fetch` / `push`, `pnpm` / `npx`, `curl` to localhost or GitHub, and `env X=1 <command>`
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
   - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence
   - silent: the command started with `run_in_background` — its exit ends the wait

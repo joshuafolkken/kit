@@ -71,6 +71,8 @@ kit never stores a secret in a file it ships or commits. The ones it uses:
 - `GH_TOKEN` — authenticates `gh` in CI and cloud sessions, where `gh auth login` is not available.
 - `NODE_AUTH_TOKEN` — the GitHub Packages credential, only for projects that still install kit from there ([authentication.md](https://github.com/joshuafolkken/kit/blob/main/docs/authentication.md)). The `prepare` script above reads it.
 
+An unattended agent runs with `Bash(*)`, so an instruction planted in text it reads could send one of these off the machine. The `egress` guard row (`scripts/rules/egress-guard.ts`) refuses an agent's `Bash` call that reaches another host (`curl`, `wget`, `nc`, `ssh`, `scp`, a remote `rsync`, a network call in an inline `node -e` / `python -c` script, `gh` sent to a host other than github.com) or prints a credential (`gh auth token`, `printenv`, a bare `env`, a `*TOKEN*` / `*SECRET*` / `*KEY*` variable), nested in `bash -c`, `eval` or `$(…)` as well. `curl` to localhost or GitHub, `gh` against github.com, `git` and `pnpm` stay allowed. `.claude/settings.json` denies `curl`, `wget`, `nc`, `gh auth token` and `printenv` as a static backstop for when the hook does not run.
+
 ## MCP External Endpoints
 
 This project ships `.mcp.json` which connects to external MCP servers at runtime (e.g. `https://mcp.svelte.dev/mcp`). These servers are treated as trusted third-party services. Consumers should be aware that:
