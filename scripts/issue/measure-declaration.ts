@@ -138,6 +138,7 @@ const measure_declaration = {
 	DECLARATION,
 	EXAMPLE,
 	PREFIX,
+	background_value,
 	format,
 	is_stated,
 	judge,
