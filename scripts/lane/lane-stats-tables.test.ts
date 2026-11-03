@@ -19,6 +19,7 @@ const FIRST_HEADER_CELLS = [
 	'round 2',
 	'reason',
 	'measured lanes',
+	'implement-rate lanes',
 	'held by',
 	'lane',
 	'process',
