@@ -118,7 +118,7 @@ function report_relaunch_failure(target: string, note: string): number {
 // A pre-gate resume drives the gate, commit, PR and merge — the mechanical
 // ship/bookkeeping region, lowered — while an implementation resume keeps the role default. The
 // phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it,
-// and a pre-gate resume moves to `JOSH_WORKER_SHIP_MODEL` when that is set.
+// and a pre-gate resume moves to the ship model — Sonnet, or `JOSH_WORKER_SHIP_MODEL` when that is set.
 async function relaunch(target: string, lane: LaneInfo, phase: string): Promise<number> {
 	const notes: Array<string> = []
 	const result = await lane_relaunch.resume(lane, phase, (note) => {

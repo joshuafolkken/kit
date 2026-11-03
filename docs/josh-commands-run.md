@@ -1129,7 +1129,9 @@ version is checked against the model it will run: `claude-opus-5-5` needs Claude
 refuses launch with that update named — never a quiet switch to an older model. A lane keeps the
 profile it recorded at dispatch: a cut, resume or wake of a lane created before a migration stays on
 its recorded model (a model the floor table does not name is not version-checked), and only a newly
-dispatched lane takes the new default. `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
+dispatched lane takes the new default. The one exception is a pre-gate cut of a Claude lane: it moves
+to the ship phase's default, `claude-sonnet-5-5`, or to `JOSH_WORKER_SHIP_MODEL` when that is set.
+`JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
 only; they never rewrite a recorded lane. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`.
 
