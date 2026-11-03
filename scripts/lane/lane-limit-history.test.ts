@@ -9,8 +9,15 @@ import type { LedgerEntry } from './lane-ledger'
 // limit moved in with each limit it held rather than the one it reads now.
 
 const lane_limit_mock = vi.hoisted(() => vi.fn())
+const environment_limit_mock = vi.hoisted(() => vi.fn())
+const write_launch_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('./lane-capacity', () => ({ lane_capacity: { lane_limit: lane_limit_mock } }))
+vi.mock('./lane-capacity', () => ({
+	lane_capacity: { lane_limit: lane_limit_mock, environment_limit: environment_limit_mock },
+}))
+vi.mock('./lane-limit-override', () => ({
+	lane_limit_override: { write_launch: write_launch_mock },
+}))
 
 const { lane_ledger } = await import('./lane-ledger')
 const { lane_limit_history } = await import('./lane-limit-history')
@@ -19,6 +26,7 @@ const { lane_measure_cli } = await import('./lane-measure-cli')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'lane-limit-history-test-'))
 const CURRENT_LIMIT = 4
+const LAUNCH_LIMIT = 3
 const PROBLEM: LimitChoice = { kind: 'problem', problem: 'JOSH_LANE_LIMIT is not a number' }
 const WINDOW = {
 	since_ms: Date.parse('2026-11-02T16:00:00.000Z'),
@@ -39,6 +47,30 @@ afterAll(() => {
 
 beforeEach(() => {
 	lane_limit_mock.mockReset().mockResolvedValue({ kind: 'limit', limit: CURRENT_LIMIT })
+	environment_limit_mock.mockReset().mockReturnValue({ kind: 'limit', limit: LAUNCH_LIMIT })
+	write_launch_mock.mockReset().mockResolvedValue(true)
+})
+
+// joshuafolkken/kit#6166: the start limit is the environment's, kept on the carry record as well.
+describe('lane_limit_history.record_launch', () => {
+	it('keeps the environment limit on the run and appends it', async () => {
+		const ledger = path.join(scratch, 'launch.jsonl')
+
+		await lane_limit_history.record_launch(ledger)
+
+		expect(write_launch_mock).toHaveBeenCalledWith(LAUNCH_LIMIT)
+		expect(lane_ledger.read_entries(ledger)).toMatchObject([{ kind: 'limit', limit: LAUNCH_LIMIT }])
+	})
+
+	it('keeps and appends nothing when the environment limit cannot be read', async () => {
+		const ledger = path.join(scratch, 'launch-problem.jsonl')
+
+		environment_limit_mock.mockReturnValue(PROBLEM)
+		await lane_limit_history.record_launch(ledger)
+
+		expect(write_launch_mock).not.toHaveBeenCalled()
+		expect(lane_ledger.read_entries(ledger)).toStrictEqual([])
+	})
 })
 
 describe('lane_limit_history.record_current', () => {

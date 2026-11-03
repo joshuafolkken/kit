@@ -32,7 +32,7 @@ const NO_RUN_MESSAGE = `No run is in progress: lane:limit changes a live run's l
 
 const OPTIONS = { reset: { type: 'boolean' } } as const
 
-// `set` with no limit is `--reset`: the override is cleared and the environment's limit stands.
+// `set` with no limit is `--reset`: the override is cleared and the run's start limit stands.
 type LimitRequest =
 	| { kind: 'show' }
 	| { kind: 'set'; limit: number | undefined }

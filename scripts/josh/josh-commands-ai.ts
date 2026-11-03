@@ -477,7 +477,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '8', note: "raise or lower the live run's limit to 8" },
 				{ arguments: '', note: 'print the limit, the lanes in use and the free lanes' },
-				{ arguments: '--reset', note: 'clear the override; JOSH_LANE_LIMIT applies again' },
+				{ arguments: '--reset', note: 'clear the override; the run’s start limit applies again' },
 			],
 		},
 	},
