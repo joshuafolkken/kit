@@ -277,6 +277,9 @@ words:
   - subshell
   # A shell reader `protected-files.ts` refuses on `.env` (joshuafolkken/kit#4038).
   - hexdump
+  # A credential file `secret-paths.ts` refuses in the home directory (joshuafolkken/kit#6003); its
+  # sibling `netrc` is in the distributed dictionary.
+  - curlrc
   # How a session that never calls `Edit` or `Write` rewrites a file — the mode the density hook's
   # matcher was widened to reach (joshuafolkken/kit#1337). Named in `docs/` and in a test file,
   # neither of which `josh sync` copies, so it stays in this local list.

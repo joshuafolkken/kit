@@ -104,6 +104,87 @@ describe('protected_files.is_protected_file_call — the wider readers', () => {
 	})
 })
 
+// joshuafolkken/kit#6003: the tools' own credential files, wherever the home directory is spelled.
+describe('protected_files.is_protected_file_call — reading a credential file', () => {
+	const home = os.homedir()
+
+	it.each([
+		path.join(home, '.config', 'gh', 'hosts.yml'),
+		path.join(home, '.codex', 'auth.json'),
+		'/work/app/node_modules/.cache/josh/openai/reviewer-home/auth.json',
+		path.join(home, '.netrc'),
+		path.join(home, '.curlrc'),
+		path.join(home, '.npmrc'),
+		path.join(home, '.ssh', 'id_ed25519'),
+	])('refuses a Read of the credential file %j', (file) => {
+		const call = { name: 'Read', input: { file_path: file } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+	})
+
+	it.each([path.join(home, '.npmrc'), path.join(home, '.ssh'), '$CODEX_HOME/auth.json'])(
+		'refuses a Grep through the credential path %j',
+		(file) => {
+			const call = { name: 'Grep', input: { pattern: 'token', path: file } }
+
+			expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+		},
+	)
+
+	it('is silent on a Grep of the working tree', () => {
+		const call = { name: 'Grep', input: { pattern: 'token', path: '/work/app/src' } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+	})
+
+	it.each([
+		'/work/app/.npmrc',
+		'/work/app/src/auth.json',
+		'/work/app/docs/hosts.yml',
+		path.join(home, '.config', 'git', 'config'),
+	])('is silent on a Read of the non-credential file %j', (file) => {
+		const call = { name: 'Read', input: { file_path: file } }
+
+		expect(protected_files.is_protected_file_call(call, is_consumer)).toBe(false)
+	})
+})
+
+describe('protected_files.ROW — the credential files it names', () => {
+	it.each(['hosts.yml', 'auth.json', '~/.netrc', '~/.ssh/**'])('names %s in its reason', (file) => {
+		expect(protected_files.ROW.reason).toContain(file)
+	})
+})
+
+describe('protected_files.is_protected_file_call — a credential file through Bash', () => {
+	it.each([
+		'cat ~/.config/gh/hosts.yml',
+		'grep oauth_token "$HOME/.config/gh/hosts.yml"',
+		'less ${XDG_CONFIG_HOME}/gh/hosts.yml',
+		'head $CODEX_HOME/auth.json',
+		'cat ${CODEX_HOME}/auth.json',
+		'jq . ~/.codex/auth.json',
+		'cat ~/.netrc',
+		'tail ${HOME}/.curlrc',
+		'cat ~/.npmrc',
+		'grep -r key ~/.ssh',
+		'cat ~/.ssh/id_rsa',
+		'base64 < ~/.ssh/id_ed25519',
+	])('refuses the credential read in %j', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+	})
+
+	it.each(['cat .npmrc', 'cat ~/.gitconfig', 'ls ~/.ssh', 'cat fixtures/auth.json'])(
+		'is silent on the non-credential command %j',
+		(command) => {
+			const call = { name: 'Bash', input: { command } }
+
+			expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+		},
+	)
+})
+
 // joshuafolkken/kit#4660: a write to `.env` could set a guard switch, so it is refused like a read.
 describe('protected_files.is_protected_file_call — writing .env', () => {
 	it.each(['Edit', 'Write'])('refuses a %s of .env', (name) => {

@@ -61,6 +61,9 @@ words:
   # The process-listing command `epicrun.md` names among the traces a stopped delegated unit leaves
   # (joshuafolkken/kit#1212). Distributed, because the skill that names it is copied by `josh sync`.
   - pgrep
+  # The home credential file the `protected-file` guard refuses a read of (joshuafolkken/kit#6003).
+  # Distributed, because the package ships `scripts/rules/`, whose guard reason names it.
+  - netrc
   # The shell variable naming the parent process, which `josh run:carry --owner "$PPID"` passes so the
   # record can name the long-lived session spending the budget (joshuafolkken/kit#1722). Distributed,
   # because `backlogrun.md` types that command and `josh sync` copies that skill.
