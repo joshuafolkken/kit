@@ -14,7 +14,8 @@ import { session_cite } from '#scripts/issue/session-cite'
 
 const KEPT_HEADINGS = ['## 期待結果', '## 受け入れ条件']
 const CODE_SPAN = /`([^`]+)`/gu
-const NAME = /[\w-]+/gu
+const NOT_A_NAME = /[\s:]/u
+const LINE_SUFFIX = /:\d+(?:[-:]\d+)?$/u
 const SEPARATOR = '/'
 const EXTENSION = /\.[^.]*$/u
 
@@ -37,12 +38,23 @@ function module_of(path: string): string {
 	return normalized(path.slice(path.lastIndexOf(SEPARATOR) + 1).replace(EXTENSION, ''))
 }
 
+// The file or identifier a span names, by its stem: `run-entry-cli.ts:12` and `run_entry_cli.main`
+// both name `run-entry-cli`, and a `:12` line suffix is dropped. A span still holding a space or `:` is
+// a command line, whose words name no module.
+function stem_of(span: string): string | undefined {
+	const name = span.replace(LINE_SUFFIX, '')
+	if (NOT_A_NAME.test(name)) return undefined
+	const stem = name.slice(name.lastIndexOf(SEPARATOR) + 1).split('.', 1)[0] ?? ''
+
+	return stem === '' ? undefined : normalized(stem)
+}
+
 // The names the kept Issue's expected result and criteria write in code spans.
 function kept_names(body: string): ReadonlySet<string> {
 	const text = KEPT_HEADINGS.flatMap((heading) => markdown_section.section_lines(body, heading))
 	const spans = [...text.join('\n').matchAll(CODE_SPAN)].map((match) => match[1] ?? '')
 
-	return new Set(spans.flatMap((span) => (span.match(NAME) ?? []).map((name) => normalized(name))))
+	return new Set(spans.map((span) => stem_of(span)).filter((stem) => stem !== undefined))
 }
 
 // Each file `child_body` declares whose module name the kept Issue's criteria name.

@@ -184,8 +184,8 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<stri
 	return url
 }
 
-// The holds that end the filing whatever the body says, read first: the filing cap reads the local
-// event stream, the fold the stream and diff.
+// The holds that end the filing before the one pass, read first: the filing cap reads the local event
+// stream, the fold the stream and diff, the split direction the kept Issue's body on GitHub.
 async function is_run_clear(filing: Filing): Promise<boolean> {
 	const prefix = issue_file_fold.reference_prefix(filing.target, filing.current)
 

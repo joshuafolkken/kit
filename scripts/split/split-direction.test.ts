@@ -82,10 +82,19 @@ describe('split_direction.refusal_of', () => {
 })
 
 describe('split_direction.references', () => {
-	it('ignores a declared directory', () => {
-		const body = kept_body('`entry` の配下')
+	it('reads no module from the words of a command line or a directory', () => {
+		const body = kept_body('`pnpm josh gate` と `run:entry` と `scripts/run/entry/` が緑')
+		const child = '`scripts/josh/josh.ts` と `scripts/run/entry/` と `scripts/run/run-entry.ts`'
 
-		expect(split_direction.references(body, '`scripts/run/entry/`')).toEqual([])
+		expect(split_direction.references(body, child)).toEqual([])
+	})
+
+	it('reads a path with a line suffix by its file stem', () => {
+		const body = kept_body(`\`${RELAY}:12\` が resume を中継する`)
+
+		expect(split_direction.references(body, CHILD_BODY)).toEqual([
+			{ path: RELAY, module: 'run-entry-cli' },
+		])
 	})
 })
 
