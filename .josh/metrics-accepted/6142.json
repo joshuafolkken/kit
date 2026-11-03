@@ -1,0 +1,7 @@
+{
+	"reason": "run:review's open checks lane:plan overlap for unplanned files before the review, with the non-waiting probe moved to lane-plan-probe.ts (#6142)",
+	"date": "2026-11-03",
+	"growth": {
+		"scripts.code_lines": 67
+	}
+}

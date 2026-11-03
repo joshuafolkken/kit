@@ -67,6 +67,9 @@ vi.mock('#scripts/gate/check-related-unplanned', () => ({
 	check_related_unplanned: { show: vi.fn(async () => undefined) },
 }))
 vi.mock('#scripts/gate/metrics-totals', () => ({ metrics_totals: { totals_refusal: grown } }))
+vi.mock('./run-review-unplanned', () => ({
+	run_review_unplanned: { refusal: async () => undefined },
+}))
 
 const ISSUE = 4850
 const SUCCESS_EXIT_CODE = 0
