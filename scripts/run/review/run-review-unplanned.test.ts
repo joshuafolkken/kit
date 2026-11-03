@@ -8,6 +8,8 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_plan_probe } from '#scripts/lane/lane-plan-probe'
+import { lane_plan_wait } from '#scripts/lane/lane-plan-wait'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review_unplanned } from './run-review-unplanned'
@@ -24,6 +26,10 @@ const HELD = 'scripts/lane/held.ts'
 const FREE_FILE = 'scripts/lane/free.ts'
 const LISTING_LIMIT = 100
 const TEXT = 'unplanned: the two ways out'
+const REMAINING_MINUTES = 12
+const LANE_PLANNED_AT = '2026-11-02T00:00:00.000Z'
+const PASSED_WAIT = '2026-11-02T00:30:00.000Z'
+const YIELDS = 'would yield'
 
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
 const read_unplanned = vi.spyOn(check_related_unplanned, 'read_unplanned')
@@ -49,6 +55,7 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	info.mockImplementation(vi.fn())
 	fetch_opted_in.mockResolvedValue(listing())
+	vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(undefined)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
 		mkdtempSync(path.join(ROOT, 'repository-')),
 	)
@@ -57,7 +64,7 @@ beforeEach(() => {
 		directory,
 	)
 	lane_plan.record(
-		{ issue: LANE, paths: [PLANNED], planned_at: '2026-11-02T00:00:00.000Z', cleared: true },
+		{ issue: LANE, paths: [PLANNED], planned_at: LANE_PLANNED_AT, cleared: true },
 		directory,
 	)
 })
@@ -102,6 +109,48 @@ describe('run_review_unplanned.refusal', () => {
 
 		expect(await run_review_unplanned.refusal(directory)).toBeUndefined()
 		expect(fetch_opted_in).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_review_unplanned.refusal — the wait on the holder (joshuafolkken/kit#6145)', () => {
+	it('names the holder, the minutes left, the issue:spill way out and the lane:plan wait', async () => {
+		found(HELD)
+		vi.spyOn(lane_plan_wait, 'deadline').mockImplementationOnce(
+			async (_issue: number, _holder: number, now_ms: number): Promise<number> =>
+				now_ms + REMAINING_MINUTES * MS_PER_MINUTE,
+		)
+
+		const stop = await run_review_unplanned.refusal(directory)
+
+		expect(stop).toContain(`/issues/${String(HOLDER)}) at most ${String(REMAINING_MINUTES)} min`)
+		expect(stop).toContain(`pnpm josh issue:spill ${String(LANE)} --estimate`)
+		expect(stop).toContain(`pnpm josh lane:plan ${String(LANE)} ${PLANNED} ${HELD}\` to wait`)
+		expect(stop).toContain(TEXT)
+	})
+
+	it('offers only the spill when lane:plan would yield to the holder', async () => {
+		found(HELD)
+
+		const stop = await run_review_unplanned.refusal(directory)
+
+		expect(stop).toContain(YIELDS)
+		expect(stop).toContain('issue:spill')
+		expect(stop).not.toContain('to wait')
+	})
+})
+
+describe('run_review_unplanned.refusal — a wait the plan already recorded', () => {
+	it('reads that deadline, as lane:plan does, and yields once it passed', async () => {
+		found(HELD)
+		lane_plan.record(
+			{ issue: LANE, paths: [PLANNED], planned_at: LANE_PLANNED_AT, waits_until: PASSED_WAIT },
+			directory,
+		)
+
+		const stop = await run_review_unplanned.refusal(directory)
+
+		expect(stop).toContain(YIELDS)
+		expect(lane_plan_wait.deadline).not.toHaveBeenCalled()
 	})
 })
 
