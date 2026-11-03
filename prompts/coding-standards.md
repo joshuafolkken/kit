@@ -19,45 +19,6 @@
 
 ## 📁 新規作成時の手順
 
-### 1. 既存ファイルを必ず参照
-
-```bash
-# 類似機能の既存ファイルを探す
-find src -name "*.ts" -o -name "*.svelte" | grep -i [関連キーワード]
-```
-
-### 2. ファイル分割の指針
-
-- `CLAUDE.md` → "Quality limits" の上限に近づいたら分割を検討する。編集前に `pnpm josh lines <path>` で余裕を確認する
-- 責任ごと、また他ファイルからも使われうるロジックごとに別ファイルに分け、メインファイルは主要な処理フローに集中させる
-- 小さすぎる分割は避け、関連する機能は同じファイルにまとめる
-
-### 3. 名前空間オブジェクトの名付け方
-
-- ファイル名と名前空間名で意図を明確にする（例: `git-command.ts` → `git_command`）
-- メソッド名は短く、名前空間で補完する（例: `exec_git_branch()` → `git_command.branch()`）
-
-```typescript
-// ✅ ファイル名: git-command.ts / 名前空間名: git_command
-async function branch(): Promise<string> {
-	return await exec_git_command('rev-parse --abbrev-ref HEAD')
-}
-
-async function status(): Promise<string> {
-	return await exec_git_command('status --porcelain')
-}
-
-const git_command = {
-	branch,
-	status,
-}
-
-export { git_command }
-```
-
-```typescript
-// 使用側
-import { git_command } from './git/git-command.js'
-
-const branch_name = await git_command.branch()
-```
+- 書く前に類似機能の既存ファイルを読み、その構成と名付けに合わせる
+- 分割は責任ごと。他ファイルからも使われうるロジックは別ファイルに分け、メインファイルは主要な処理フローに集中させる。小さすぎる分割は避ける。編集前に `pnpm josh lines <path>` で上限までの余裕を見る
+- 名前空間名はファイル名から取る: `git-command.ts` → `git_command`。メソッド名は名前空間で補って短くする（`exec_git_branch()` → `git_command.branch()`）

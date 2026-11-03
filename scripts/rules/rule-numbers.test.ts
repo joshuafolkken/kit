@@ -133,6 +133,6 @@ describe.each(RETIRED_POINTERS)('%s — the pointer-only file is retired', (reti
 	})
 
 	it('is not linked from the index', () => {
-		expect(read_index()).not.toContain(retired.replace('prompts/', './'))
+		expect(read_index()).not.toContain(`../${retired}`)
 	})
 })
