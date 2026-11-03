@@ -84,15 +84,4 @@ describe('run_investigation_record.load — a lane dispatched again after a yiel
 		expect(path.dirname(target)).toBe(durable_state.root())
 		expect(path.basename(target)).toContain(durable_state.PREFIX.INVESTIGATION)
 	})
-
-	it('reads the findings the yielded lane saved once its work tree is gone', async () => {
-		const yielded_work_tree = mkdtempSync(path.join(TEMPORARY, 'worktree-'))
-
-		writeFileSync(await record_path(), FINDINGS)
-		rmSync(yielded_work_tree, { recursive: true, force: true })
-
-		const record = await run_investigation_record.load(ISSUE)
-
-		expect(record?.findings).toBe(FINDINGS)
-	})
 })

@@ -53,8 +53,9 @@ async function load(issue_number: string): Promise<InvestigationRecord | undefin
 	}
 }
 
-// Removed once the pull request merged, as the ship body draft is: a durable record no lane close
-// prunes would hand a reopened issue's run the old findings.
+// Removed once the pull request merged, as the ship body draft is, and once a closed issue's lane is
+// withdrawn: a record left behind would hand a reopened issue's run the old findings. One no path
+// removes is pruned after the durable state's retention (`durable-state-migrate.ts`).
 async function remove(issue_number: string): Promise<void> {
 	await rm(path_of(issue_number), { force: true })
 }

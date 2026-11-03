@@ -442,7 +442,7 @@ Its `=== ship preconditions ===` section asks, ahead of the ship, the refusals `
 
 Its `=== investigation ===` section names, before the first read, the step the investigation guard otherwise names only on its refusal: the limit and the `investigator` dispatch — the same wording, from `delegation-policy.ts`.
 
-The investigator's saved conclusion is a durable run record keyed by repository and Issue, so a lane dispatched again after a yield prints it and skips the investigator; it is removed once the PR merges.
+The investigator's saved conclusion is a durable run record keyed by repository and Issue, so a lane dispatched again after a yield prints it and skips the investigator; it is removed once the PR merges or a closed Issue's lane is withdrawn, and pruned after 14 days unwritten.
 
 ### `josh run:entry`
 
