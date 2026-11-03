@@ -2,8 +2,7 @@ import { globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { document_section } from '#scripts/document/document-section'
 import { decision_oracle } from './decision-oracle'
-import { delivered_rules } from './delivered-rules'
-import { stop_rule_rows } from './stop-rule-rows'
+import { guard_rule_rows } from './guard-rule-rows'
 
 // `josh rule:value --prose` — every prose rule, read against the registered rules that cite its source.
 // A prose rule is a paragraph or list item that opens with a bold label, the form these documents
@@ -17,7 +16,7 @@ const ENFORCED = '強制あり'
 const MEASURED = '計測のみ'
 const PROSE_ONLY = '文章だけ'
 // The label runs to its closing `**` or the line end, so a label that wraps still names its rule.
-const RULE_LINE = /^(?:\s*(?:[-*]|\d+\.) )?\*\*(?<label>[^*]+)/u
+const RULE_LINE = /^(?<marker>\s*(?:[-*]|\d+\.) )?\*\*(?<label>[^*]+)/u
 const SOURCE_ARROW = '→'
 const CITE_MARKS = /["`]/gu
 const MARKDOWN_EXTENSION = '.md'
@@ -55,8 +54,19 @@ interface Sources {
 	oracles: ReadonlyArray<string>
 }
 
-function rule_at(file: string, line: string, index: number): ProseRule | undefined {
-	const label = RULE_LINE.exec(line)?.groups?.['label']
+// A bare `**` line opens a rule only after a blank line; mid-paragraph it is a wrapped continuation.
+function opens_rule(lines: ReadonlyArray<string>, index: number, marker?: string): boolean {
+	return marker !== undefined || (lines[index - LINE_BASE] ?? '').trim() === ''
+}
+
+function opening_label(lines: ReadonlyArray<string>, index: number): string | undefined {
+	const groups = RULE_LINE.exec(lines[index] ?? '')?.groups ?? {}
+
+	return opens_rule(lines, index, groups['marker']) ? groups['label'] : undefined
+}
+
+function rule_at(file: string, lines: ReadonlyArray<string>, index: number): ProseRule | undefined {
+	const label = opening_label(lines, index)
 
 	if (label === undefined) return undefined
 
@@ -69,13 +79,13 @@ function rules_of({ file, markdown }: ProseDocument): Array<ProseRule> {
 	const fenced = document_section.fenced_flags(lines)
 
 	return lines
-		.map((line, index) => (fenced[index] === true ? undefined : rule_at(file, line, index)))
+		.map((_line, index) => (fenced[index] === true ? undefined : rule_at(file, lines, index)))
 		.filter((rule): rule is ProseRule => rule !== undefined)
 }
 
 // A cited file names a document by its path or its base name, as `topic` strings do.
 function is_cited_file(file: string, cited: string): boolean {
-	return file === cited || file.endsWith(`${path.sep}${cited}`)
+	return file === cited || file.endsWith(`/${cited}`)
 }
 
 function span_of(document: ProseDocument, heading: string): Span | undefined {
@@ -146,10 +156,8 @@ function documents_in(cwd: string): Array<ProseDocument> {
 
 function registered_sources(): Sources {
 	return {
-		// The rows `rule:list` prints; that module runs as a script, so it is not imported here.
-		guards: [...delivered_rules.MEASURED_RULES, ...stop_rule_rows.ROWS].map(
-			(row) => row.about.topic,
-		),
+		// The rows `rule:list` prints.
+		guards: guard_rule_rows.rows().map((row) => row.about.topic),
 		oracles: decision_oracle.DECISION_ORACLES.map((oracle) => oracle.single_source),
 	}
 }

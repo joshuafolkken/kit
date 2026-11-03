@@ -30,6 +30,11 @@ const ANSWERED: ProseDocument = {
 	markdown: ['# Oracle', '', '1. **Answered rule.** A command answers it.'].join('\n'),
 }
 
+const WRAPPED: ProseDocument = {
+	file: 'prompts/wrapped.md',
+	markdown: ['A paragraph that wraps onto', '**bold** mid-sentence.'].join('\n'),
+}
+
 const DOCUMENTS = [GUARDED, ANSWERED]
 
 function classes_of(guards: ReadonlyArray<string>, oracles: ReadonlyArray<string>): Array<string> {
@@ -45,6 +50,10 @@ describe('rule_value_prose.classify', () => {
 			`${PROSE_ONLY} prompts/guarded.md:9`,
 			`${PROSE_ONLY} ${ORACLE_FILE}:3`,
 		])
+	})
+
+	it('does not read a wrapped line that starts with bold text as a rule', () => {
+		expect(classify([WRAPPED], { guards: [], oracles: [] })).toStrictEqual([])
 	})
 
 	it('classes every rule in a file cited without a section', () => {
