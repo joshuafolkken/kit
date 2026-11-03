@@ -132,6 +132,41 @@ describe('lane_yield_split.of_issue', () => {
 	})
 })
 
+// joshuafolkken/kit#6006: `lane:breakdown` prints the #5953 wait as its holder part and its gap.
+describe('lane_yield_split.issue_parts and share_of', () => {
+	it('sums the #5953 holder part and its offer and launch parts', () => {
+		const events = [yield_note(HOLDER), opening(YIELDER)]
+		const splits = lane_yield_split.issue_parts([MERGE, DISPATCH], events, YIELDER)
+
+		expect(lane_yield_split.share_of(splits)).toStrictEqual({
+			holder_ms: 23 * MS_PER_MINUTE,
+			gap_ms: 14 * MS_PER_MINUTE,
+			unsplit_ms: 0,
+		})
+		expect(lane_yield_split.issue_parts([MERGE, DISPATCH], events, HOLDER)).toStrictEqual([])
+	})
+
+	it('counts no part that has not ended', () => {
+		const splits = lane_yield_split.issue_parts([], [yield_note(HOLDER)], YIELDER)
+
+		expect(lane_yield_split.share_of(splits)).toStrictEqual({
+			holder_ms: 0,
+			gap_ms: 0,
+			unsplit_ms: 0,
+		})
+	})
+
+	it('counts the wait of a note naming no holder as unsplit', () => {
+		const splits = lane_yield_split.issue_parts([MERGE, DISPATCH], [yield_note()], YIELDER)
+
+		expect(lane_yield_split.share_of(splits)).toStrictEqual({
+			holder_ms: 0,
+			gap_ms: 0,
+			unsplit_ms: 37 * MS_PER_MINUTE,
+		})
+	})
+})
+
 describe('lane_yield_split.of_issue -- a redispatch the split does not reach', () => {
 	it('marks a redispatch before the holder ended as early, with no gap', () => {
 		expect(lane_yield_split.of_issue([DISPATCH], [yield_note(HOLDER)], YIELDER)).toStrictEqual([

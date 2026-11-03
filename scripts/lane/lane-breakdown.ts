@@ -5,6 +5,7 @@ import { lane_breakdown_pause, type PauseMark } from './lane-breakdown-pause'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_net_time, type LaneSpan } from './lane-net-time'
 import { lane_stop_stats } from './lane-stop-stats'
+import { lane_yield_split, type YieldShare } from './lane-yield-split'
 
 // A lane's net time by stage (joshuafolkken/kit#4995), read off the run events it already leaves: from
 // its dispatch to its `plan`, the implementation from the `plan` (or `lane-phase implement`, or else
@@ -39,6 +40,9 @@ interface Breakdown {
 	slept_ms: number
 	// The yields' waits for a redispatch among them (joshuafolkken/kit#5216).
 	yield_ms: number
+	// That yield wait split into the holder's remaining time and the redispatch gap
+	// (joshuafolkken/kit#6006).
+	yield_split?: YieldShare
 	// The waits taken out, each — the implementation's split leaves them out of its remainder too.
 	waits: ReadonlyArray<LaneSpan>
 	// The start-to-plan spans, waits left in — the window its longest calls are read in
@@ -223,6 +227,24 @@ function windows_of(segments: ReadonlyArray<Segment>): Windows {
 	}
 }
 
+// The yields' wait inside `span`, and its split into the holder's remaining time and the redispatch
+// gap — the yields whose wait began inside it.
+function yields_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Pick<Breakdown, 'yield_ms' | 'yield_split'> {
+	const splits = lane_yield_split
+		.issue_parts(entries, events, issue)
+		.filter((split) => is_inside(split.wait.from_ms, span))
+
+	return {
+		yield_ms: spans_ms(lane_net_time.yielded(entries, events, issue, span)),
+		yield_split: lane_yield_split.share_of(splits),
+	}
+}
+
 /**
  * `issue`'s lane by stage, or `undefined` when the ledger holds no dispatch and merge of it — the same
  * span and waits `lane_net_time.net_ms` reads, so the stages add up to it. `edit_ms`, the lane's first
@@ -249,7 +271,7 @@ function of(
 		stages: ranked(parts),
 		excluded_ms: spans_ms(waits),
 		slept_ms: spans_ms(lane_net_time.slept(events, span)),
-		yield_ms: spans_ms(lane_net_time.yielded(entries, events, issue, span)),
+		...yields_of(entries, events, issue, span),
 		waits,
 		...windows_of(segments),
 		reasons: reasons_of(events, issue, span),
