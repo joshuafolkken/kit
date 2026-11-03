@@ -1,6 +1,7 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { time_background } from './time-background'
 import { time_bundle_call } from './time-bundle-call'
+import { time_josh_names } from './time-josh-names'
 import { time_markers, type PhaseMarker } from './time-markers'
 import { time_shell } from './time-shell'
 import { time_single_check } from './time-single-check'
@@ -132,13 +133,13 @@ function non_bash_call(name: string, input: unknown, message_id: string): ToolCa
 
 function bash_call(input: unknown, message_id: string): ToolCall {
 	const command = time_shell.bash_command(input)
-	const josh_command = time_shell.josh_command_of(command)
+	const josh_command = time_josh_names.josh_command_of(command)
 
 	return {
 		label: time_shell.bash_label(command),
 		josh_command,
-		josh_commands: time_shell.josh_commands_of(command),
-		josh_signatures: time_shell.josh_signatures_of(command),
+		josh_commands: time_josh_names.josh_commands_of(command),
+		josh_signatures: time_josh_names.josh_signatures_of(command),
 		check_key: time_single_check.check_key(josh_command, command),
 		marker: time_markers.bash_marker(command),
 		message_id,

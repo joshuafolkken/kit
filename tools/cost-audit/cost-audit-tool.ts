@@ -1,4 +1,5 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 
 // Which kind of work a tool call was, for `josh cost:audit`'s per-tool-category table.
@@ -84,7 +85,7 @@ function josh_category(josh_command: string): ToolCategory {
 
 function bash_category(input: unknown): ToolCategory {
 	const command = time_shell.bash_command(input)
-	const josh_command = time_shell.josh_command_of(command)
+	const josh_command = time_josh_names.josh_command_of(command)
 
 	if (josh_command !== '') return josh_category(josh_command)
 
