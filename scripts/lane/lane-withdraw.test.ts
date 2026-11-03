@@ -6,6 +6,7 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { run_label } from '#scripts/run/run-label'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_close, type CloseOutcome } from './lane-close'
@@ -64,6 +65,7 @@ const announce = vi.spyOn(lane_preserve, 'announce')
 const unmark = vi.spyOn(run_label, 'unmark')
 const close_lane = vi.spyOn(lane_close, 'close_lane')
 const record_change = vi.spyOn(lane_state, 'record_change')
+const remove_investigation = vi.spyOn(run_investigation_record, 'remove')
 
 function first_call(spy: { mock: { invocationCallOrder: Array<number> } }): number {
 	return spy.mock.invocationCallOrder[0] ?? 0
@@ -93,6 +95,7 @@ function arrange_writes(): void {
 	unmark.mockResolvedValue(true)
 	close_lane.mockResolvedValue(CLOSED_LANE)
 	record_change.mockResolvedValue({ kind: 'skipped', reason: 'test' })
+	remove_investigation.mockResolvedValue()
 }
 
 beforeEach(() => {
@@ -283,6 +286,24 @@ describe('lane_withdraw.withdraw — a yielded lane', () => {
 
 		expect(text).toContain('offered again once the holding lane ends')
 		expect(text).not.toContain('this run does not offer it again')
+	})
+
+	// joshuafolkken/kit#6153: the re-dispatched lane reads the saved investigation instead of redoing it.
+	it('keeps the saved investigation for the next dispatch', async () => {
+		await lane_withdraw.withdraw(ISSUE, REASON, 'yield')
+
+		expect(remove_investigation).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6153: a reopened issue's run does not read a closed issue's stale citations.
+describe('lane_withdraw.withdraw — a closed issue forgets its saved investigation', () => {
+	it('removes the investigation record of a closed issue', async () => {
+		read_issue.mockResolvedValue(state_read('CLOSED'))
+
+		await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(remove_investigation).toHaveBeenCalledWith(ISSUE)
 	})
 })
 
