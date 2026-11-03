@@ -6,7 +6,6 @@ import { LINT_RULE_WORKERS, type CommandEntry } from './josh-command-types'
 // `josh-commands-ai.ts` stays under its line ceiling. `lint:rule` is here for the same reason:
 // `josh-commands-development.ts`, where the other lint commands are, is at its line ceiling.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const LINT_COMMANDS: Record<string, CommandEntry> = {
 	'lint:rule': {
 		script: 'scripts/lint/lint-rule.ts',
@@ -79,6 +78,5 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { LINT_COMMANDS }

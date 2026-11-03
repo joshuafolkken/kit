@@ -26,8 +26,8 @@ or more always means an epic", then
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
 - **Every guard applies unchanged** (`backlogrun.md` → "Guards").
 - **`fullrun` does not promote itself** — it files and **stops** (`split-assessment.md` → "Finding a
-  split mid-run stops the run"). `josh epic:next` still refuses an Issue with no task list.
-- **A bare Issue named beside an epic is a mistyped command.** Named alone, the refusal is the answer;
+  split mid-run stops the run").
+- **A bare Issue named beside an epic is a mistyped command.** Named alone, `epic:next`'s refusal is the answer;
   among several, it is **skipped** — `backlogrun #<E> --only #<N>` exits 0, notes the skip on stderr
   and **never runs `#<N>`**. To do both, type `backlogrun #<N>` after the epic.
 
@@ -36,8 +36,7 @@ or more always means an epic", then
 **Whatever offers a child — the loop, or a person clearing a label — the child is handed to a lane,
 never run in the parent's context.** `pnpm josh delegate epic-child` answers `delegate`; the unit is a
 detached process from `pnpm josh lane:launch` (`backlogrun-lanes.md` → "Opening one lane and
-dispatching its child") with the CLI's `worker` profile — Claude Code defaults to Anthropic
-`claude-opus-5-5` / `medium` (`docs/josh-commands-run.md` → "`josh lane:dispatch`"). With no isolated
+dispatching its child"; its profile and model: `docs/josh-commands-run.md` → "`josh lane:dispatch`"). With no isolated
 unit, run the child in the parent's context and still ask the hand-off at every merge.
 
 - **The parent reads GitHub, never the summary** — `pnpm josh issue:state <N>` (or `run:merge`)
@@ -59,9 +58,6 @@ unit, run the child in the parent's context and still ask the hand-off at every 
 - **Cut**: the changed-file list, per-round review detail, restated rules.
 - Before the final message → `pnpm josh report:lint --child-summary < summary.md`.
 
-The person-facing report (`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」)
-is unchanged.
-
 ## Audit before the first child
 
 Run `pnpm josh epic:audit <E>` before the first child; a run begun from a bare Issue audits when it
@@ -78,7 +74,6 @@ primary checkout; the lock file lands with its `pnpm josh git -y`. A resumed `ba
 
 ## Preflight — the child's claim asks it
 
-`pnpm josh run:hold <N>`, the child's first call, checks for an interrupted run's leftovers before
-claiming the tree and prints the step for each answer (`reclaim` / `resume` / `park`) on stderr —
-follow it, and report a reclaim or resume with its stash reference (`docs/josh-commands-run.md` →
-"`josh run:hold`").
+`pnpm josh run:hold <N>`, the child's first call, prints the step for an interrupted run's leftovers
+on stderr — follow it, and report a reclaim or resume with its stash reference
+(`docs/josh-commands-run.md` → "`josh run:hold`").

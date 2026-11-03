@@ -1,6 +1,5 @@
 import type { CommandEntry } from './josh-command-types'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 	bump: {
 		script: 'scripts/version/bump-version-main.ts',
@@ -99,6 +98,5 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { VERSIONING_COMMANDS }

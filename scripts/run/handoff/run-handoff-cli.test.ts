@@ -1,17 +1,26 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import type { LaunchRequest } from '#scripts/run/detached-launch'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_handoff_cli, type HandoffPorts } from './run-handoff-cli'
 
 // joshuafolkken/kit#5352: `josh run:handoff` waits for a kickoff, detaches a run and hands backlogrun on.
 
-const BRIEF_FILE = 'brief.md'
+// joshuafolkken/kit#6056: the brief is read through `cli_body`, so it is a real file outside any work tree.
+const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-handoff-'))
+const BRIEF_FILE = path.join(TEMPORARY, 'brief.md')
+const MISSING_BRIEF = path.join(TEMPORARY, 'missing.md')
 const BRIEF_FLAG = '--brief-file'
 const ISSUE_URL = 'https://github.com/joshuafolkken/kit/issues/5400'
 const FINAL = JSON.stringify({ type: 'result', result: `Filed ${ISSUE_URL}` })
 const CLAUDE_SESSION = { CLAUDE_CODE_SESSION_ID: 'session', HOME: '/home' }
 const PID = 42
 const BRIEF_TEXT = 'Agreed brief'
+
+writeFileSync(BRIEF_FILE, BRIEF_TEXT)
 
 interface Fake {
 	ports: HandoffPorts
@@ -30,7 +39,7 @@ function fake(overrides: Partial<HandoffPorts> = {}): Fake {
 		now: () => 1,
 		repository_directory: async () => '/repo/.git',
 		tree_hold: async () => ({ kind: 'free' }),
-		read_text: (target) => (target === BRIEF_FILE ? BRIEF_TEXT : FINAL),
+		read_text: () => FINAL,
 		launch: (request) => {
 			requests.push(request)
 
@@ -63,8 +72,8 @@ const REFUSALS: ReadonlyArray<{
 	{ why: 'a missing brief flag', argv: ['kickoff', 'new'], overrides: {} },
 	{
 		why: 'an unreadable brief',
-		argv: ['kickoff', 'new', BRIEF_FLAG, BRIEF_FILE],
-		overrides: { read_text: () => undefined },
+		argv: ['kickoff', 'new', BRIEF_FLAG, MISSING_BRIEF],
+		overrides: {},
 	},
 	{
 		why: 'no git repository',
@@ -96,6 +105,10 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+afterAll(() => {
+	rmSync(TEMPORARY, { force: true, recursive: true })
+})
+
 describe('run_handoff_cli.run', () => {
 	it('waits for kickoff and prints its final message and the URLs it created', async () => {
 		const { ports, lines, requests } = fake()
@@ -108,7 +121,7 @@ describe('run_handoff_cli.run', () => {
 
 	it('fails a kickoff whose child exits non-zero and says it left no final message', async () => {
 		const { ports, lines } = fake({
-			read_text: (target) => (target === BRIEF_FILE ? BRIEF_TEXT : ''),
+			read_text: () => '',
 			launch_attached: async () => ({ kind: 'completed', pid: PID, exit_code: 1 }),
 		})
 		const code = await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, BRIEF_FILE], ports)
@@ -171,6 +184,19 @@ describe('run_handoff_cli.run refusals', () => {
 		expect(await run_handoff_cli.run(argv, ports)).toBe(1)
 		expect(lines.at(-1)).toMatch(/^run:handoff: /u)
 		expect(lines.some((line) => line.startsWith('log: '))).toBe(why === FAILED_START)
+		expect(requests).toEqual([])
+	})
+
+	// joshuafolkken/kit#6056: the brief read is `cli_body`'s, so a brief in the work tree is refused.
+	it('refuses a brief in the work tree that git does not ignore, naming why', async () => {
+		const repository = cli_body_repository.create()
+		const brief_file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, BRIEF_TEXT)
+		const { ports, lines, requests } = fake()
+		const code = await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, brief_file], ports)
+
+		repository.remove()
+		expect(code).toBe(1)
+		expect(lines.at(-1)).toContain('not git-ignored')
 		expect(requests).toEqual([])
 	})
 })

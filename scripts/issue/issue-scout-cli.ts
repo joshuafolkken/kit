@@ -1,9 +1,9 @@
-import { readFile } from 'node:fs/promises'
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/epic/epic-bundle'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import {
@@ -78,14 +78,14 @@ function read_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined
 	return { title, body: values.body ?? '', body_file: values['body-file'] }
 }
 
-async function with_draft_body(args: ScoutArguments): Promise<ScoutArguments | undefined> {
+function with_draft_body(args: ScoutArguments): ScoutArguments | undefined {
 	if (args.body_file === undefined) return args
+	const read = cli_body.read_result(args.body_file)
 
-	try {
-		return { ...args, body: await readFile(args.body_file, 'utf8') }
-	} catch {
-		return undefined
-	}
+	if ('text' in read) return { ...args, body: read.text }
+	console.error(read.problem)
+
+	return undefined
 }
 
 // The issue as it would be filed. The summary is carried as the body because that is what the epic
@@ -370,7 +370,7 @@ async function report(args: ScoutArguments, repo: string): Promise<number> {
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = read_arguments(argv)
-	const args = parsed === undefined ? undefined : await with_draft_body(parsed)
+	const args = parsed === undefined ? undefined : with_draft_body(parsed)
 
 	if (args === undefined) {
 		console.error(USAGE)

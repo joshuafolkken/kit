@@ -2,6 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import { rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_template_section } from './issue-template-section'
@@ -45,6 +46,18 @@ describe('issue:lint label output', () => {
 
 		expect(await issue_lint_cli.run(body_path)).toBe(0)
 		expect(report).toHaveBeenCalledWith(expected)
+	})
+})
+
+// joshuafolkken/kit#6056: the body is read through `cli_body`, so one left in the work tree is refused.
+describe('issue_lint_cli.run — where the body sits', () => {
+	it('refuses a body in the work tree that git does not ignore', async () => {
+		const repository = cli_body_repository.create()
+
+		TEMP_PATHS.push(repository.root)
+		const body_path = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, VALID_BODY)
+
+		await expect(issue_lint_cli.run(body_path)).rejects.toThrow('not git-ignored')
 	})
 })
 

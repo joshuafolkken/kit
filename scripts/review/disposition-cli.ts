@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
-import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { cli_body } from '#scripts/josh/cli-body'
 import { disposition_batch } from './disposition-batch'
 import { disposition_batch_filing } from './disposition-batch-filing'
 import { disposition } from './disposition-logic'
@@ -37,7 +37,7 @@ function run_batch(argv: ReadonlyArray<string>): number {
 
 	if (path === undefined) return refuse(USAGE)
 
-	const result = disposition_batch.parse(readFileSync(path, 'utf8'))
+	const result = disposition_batch.parse(cli_body.read_file_or_stdin(path))
 
 	if ('invalid' in result) {
 		return refuse(`not in the review:record grammar:\n${result.invalid.join('\n')}`)

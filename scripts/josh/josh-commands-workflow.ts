@@ -13,7 +13,6 @@ const SKIP_PUSH = '--skip-push'
 const GIT_WORKFLOW_SCRIPT = 'scripts/git/git-workflow.ts'
 const GIT_MESSAGE_ARGUMENTS = '[-y] <message>'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	git: {
 		script: GIT_WORKFLOW_SCRIPT,
@@ -273,6 +272,5 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '' }] },
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { WORKFLOW_COMMANDS }

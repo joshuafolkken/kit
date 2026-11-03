@@ -7,7 +7,6 @@ const JUST_MERGED = 'skip the issue just merged'
 // The epic and auto-ok commands, split out of `josh-commands-ai.ts` when each command's usage moved onto
 // its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const EPIC_COMMANDS: Record<string, CommandEntry> = {
 	epic: {
 		script: 'scripts/epic/epic-main.ts',
@@ -180,6 +179,5 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { EPIC_COMMANDS }

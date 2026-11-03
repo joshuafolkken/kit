@@ -14,7 +14,6 @@ const REQUIRED_FILE_ARGUMENTS = '<files...>'
 const FILTER_ARGUMENTS = '[filters...]'
 const PATH_ARGUMENTS = '<path...>'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'pr:classification': {
 		script: 'scripts/ci/pr-classification-main.ts',
@@ -303,6 +302,5 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { DEV_COMMANDS }
