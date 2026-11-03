@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
@@ -211,6 +211,26 @@ describe('rule_value_cli.render — a lazy source reads as the materialized one'
 			expect(rule_value_cli.render(runs)).toBe(rule_value_cli.NO_TARGETS)
 		} finally {
 			vi.restoreAllMocks()
+		}
+	})
+})
+
+describe('rule_value_cli.run_rule_value — --prose audits the documents', () => {
+	it('prints each prose rule with its class and source line, and writes no cache', () => {
+		const cwd = mkdtempSync(path.join(tmpdir(), TEMPORARY_PREFIX))
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		try {
+			writeFileSync(path.join(cwd, 'CLAUDE.md'), '- **Uncited rule.** Nothing cites it.\n')
+
+			expect(rule_value_cli.run_rule_value(['--prose'], cwd)).toBe(0)
+			expect(stdout).toHaveBeenCalledExactlyOnceWith(
+				'文章だけ  CLAUDE.md:1  Uncited rule.\n\n強制あり 0 · 計測のみ 0 · 文章だけ 1\n',
+			)
+			expect(existsSync(rule_value_cache.cache_path(cwd, rule_value_cache.CACHE_FILE))).toBe(false)
+		} finally {
+			vi.restoreAllMocks()
+			rmSync(cwd, { recursive: true, force: true })
 		}
 	})
 })
