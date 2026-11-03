@@ -28,6 +28,7 @@ function ports_for(is_running = false): BacklogrunPorts {
 			launched: { pid: 1, log_path: '/log', session: undefined },
 		})),
 		preflight: vi.fn((): PreflightResult => ({ kind: 'standing' })),
+		record_limit: vi.fn(async () => undefined),
 		start_supervisor: vi.fn((): LaunchResult => ({ kind: 'launched', pid: 1 })),
 		stop: vi.fn(async (): Promise<StopReport> => ({
 			supervisor: undefined,

@@ -6,7 +6,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
-import { lane_capacity } from './lane-capacity'
+import { lane_limit_history } from './lane-limit-history'
 import { lane_net_read } from './lane-net-read'
 import { lane_over } from './lane-over'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
@@ -118,16 +118,6 @@ async function sample_command(
 	return 0
 }
 
-// The label defaults to the limit this process reads, which is the period's limit only when nobody
-// changed it since — `--limit` names it outright.
-async function limit_label(given: string | undefined): Promise<string> {
-	if (given !== undefined) return given
-
-	const choice = await lane_capacity.lane_limit()
-
-	return choice.kind === 'limit' ? String(choice.limit) : lane_stats.MISSING
-}
-
 // Every lane's transcript directory under this checkout's lane root, read from a lane or the main checkout.
 function transcript_directories(context: MeasureContext): ReadonlyArray<string> {
 	if (context.transcript_directories !== undefined) return context.transcript_directories
@@ -225,6 +215,18 @@ function table_choice(request: StatsRequest): { table: LedgerTable; minutes: num
 		: { table: lane_sinks.table, minutes: request.sinks }
 }
 
+// The ledger and the event stream alone — no lane's transcript (`lane-sinks.ts`, `lane-over.ts`).
+async function threshold_text(
+	choice: { table: LedgerTable; minutes: number },
+	context: MeasureContext,
+	window: StatsWindow,
+): Promise<string> {
+	const sources = await lane_net_read.read_records(context)
+	const issues = await lane_sinks_issues.read()
+
+	return session_cite.text(choice.table(sources, window, choice.minutes, issues))
+}
+
 async function stats_text(
 	request: StatsRequest,
 	context: MeasureContext,
@@ -232,17 +234,11 @@ async function stats_text(
 ): Promise<string> {
 	const choice = table_choice(request)
 
-	// The ledger and the event stream alone — no lane's transcript (`lane-sinks.ts`, `lane-over.ts`).
-	if (choice !== undefined) {
-		const sources = await lane_net_read.read_records(context)
-		const issues = await lane_sinks_issues.read()
-
-		return session_cite.text(choice.table(sources, window, choice.minutes, issues))
-	}
+	if (choice !== undefined) return await threshold_text(choice, context, window)
 
 	const records = await period_records(context, window)
-	const label = { limit: await limit_label(request.limit), period_days: request.period_days }
-	const row = lane_stats.row(records.entries, window, label)
+	const limit = await lane_limit_history.label(request.limit, records.entries, window)
+	const row = lane_stats.row(records.entries, window, { limit, period_days: request.period_days })
 	const tables = lane_stats_tables.tables_of(records, window)
 
 	return [`${lane_stats.header()}\n${row}`, ...tables].join('\n\n')
