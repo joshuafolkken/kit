@@ -17,6 +17,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 		read_held_at: vi.fn(),
 	},
 }))
+vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
+// The reach cap walks no import graph here; what it caps is `test-related-cap.test.ts`.
+vi.mock('./test-pinned-reach')
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))

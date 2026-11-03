@@ -672,15 +672,15 @@ The flush is residual: a run's lines ride its own commit, so it commits only a l
 Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step.
 
 ```bash
-pnpm josh ship "<title> #<N>" --body-file <evidence.md>
-pnpm josh ship "<title> #<N>" --review                    # both review rounds inside the ship
-pnpm josh ship --detach "<title> #<N>"                    # hand the ship to a supervisor; on `launched` and `cost --cut` `under`, wait one `ship:wait` chunk
-pnpm josh ship --log <N>                                  # a detached ship's log
+pnpm josh ship "<title> #<N>" --body-file .josh/tmp/evidence.md
+pnpm josh ship "<title> #<N>" --review                            # both review rounds inside the ship
+pnpm josh ship --detach "<title> #<N>"                            # hand the ship to a supervisor; on `launched` and `cost --cut` `under`, wait one `ship:wait` chunk
+pnpm josh ship --log <N>                                          # a detached ship's log
 ```
 
 **Options:**
 
-- `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on; forwarded to `git -y` alone.
+- `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on, written under `.josh/tmp/`; forwarded to `git -y` alone.
 - `--notify-message <text>` — forwarded to `followup` alone.
 - `--review` — runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. A pre-detach `test:pinned` stop probes remaining hunks in the background for the next pre-detach.
 - `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
@@ -967,9 +967,9 @@ pnpm josh run:handoff-lanes   # after each child’s merge; prints the verdict l
 Hand a workflow keyword typed in a consultation session to a child on the role profile model.
 
 ```bash
-pnpm josh run:handoff kickoff new --brief-file <path>   # waits; prints its final message and URLs
-pnpm josh run:handoff fullrun <N> --brief-file <path>   # detached; a bare N is #N; check it with run:progress --once
-pnpm josh run:handoff backlogrun <E> --only             # josh backlogrun with this session’s --agent
+pnpm josh run:handoff kickoff new --brief-file .josh/tmp/brief.md   # waits; prints its final message and URLs
+pnpm josh run:handoff fullrun <N> --brief-file .josh/tmp/brief.md   # detached; a bare N is #N; check it with run:progress --once
+pnpm josh run:handoff backlogrun <E> --only                         # josh backlogrun with this session’s --agent
 ```
 
 <!-- /usage -->
@@ -1342,7 +1342,7 @@ pnpm josh lane:why 6050   # the cause table an overrun investigation joins by ha
 
 One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`), longest first, no model run.
 
-The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last, a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
+The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last and the lane branch's longest CI job and that job's longest step (`ci:timing`, the branch's latest commit), a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
 
 A missing record, or an Issue listing that cannot be read, leaves its cell blank. A lane with no stage over budget prints one line; one the ledger holds no dispatch and merge of exits non-zero (`lane-why.ts`).
 
