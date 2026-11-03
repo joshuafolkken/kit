@@ -672,15 +672,15 @@ The flush is residual: a run's lines ride its own commit, so it commits only a l
 Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step.
 
 ```bash
-pnpm josh ship "<title> #<N>" --body-file <evidence.md>
-pnpm josh ship "<title> #<N>" --review                    # both review rounds inside the ship
-pnpm josh ship --detach "<title> #<N>"                    # hand the ship to a supervisor; on `launched` and `cost --cut` `under`, wait one `ship:wait` chunk
-pnpm josh ship --log <N>                                  # a detached ship's log
+pnpm josh ship "<title> #<N>" --body-file .josh/tmp/evidence.md
+pnpm josh ship "<title> #<N>" --review                            # both review rounds inside the ship
+pnpm josh ship --detach "<title> #<N>"                            # hand the ship to a supervisor; on `launched` and `cost --cut` `under`, wait one `ship:wait` chunk
+pnpm josh ship --log <N>                                          # a detached ship's log
 ```
 
 **Options:**
 
-- `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on; forwarded to `git -y` alone.
+- `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on, written under `.josh/tmp/`; forwarded to `git -y` alone.
 - `--notify-message <text>` — forwarded to `followup` alone.
 - `--review` — runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. A pre-detach `test:pinned` stop probes remaining hunks in the background for the next pre-detach.
 - `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
@@ -965,9 +965,9 @@ pnpm josh run:handoff-lanes   # after each child’s merge; prints the verdict l
 Hand a workflow keyword typed in a consultation session to a child on the role profile model.
 
 ```bash
-pnpm josh run:handoff kickoff new --brief-file <path>   # waits; prints its final message and URLs
-pnpm josh run:handoff fullrun <N> --brief-file <path>   # detached; a bare N is #N; check it with run:progress --once
-pnpm josh run:handoff backlogrun <E> --only             # josh backlogrun with this session’s --agent
+pnpm josh run:handoff kickoff new --brief-file .josh/tmp/brief.md   # waits; prints its final message and URLs
+pnpm josh run:handoff fullrun <N> --brief-file .josh/tmp/brief.md   # detached; a bare N is #N; check it with run:progress --once
+pnpm josh run:handoff backlogrun <E> --only                         # josh backlogrun with this session’s --agent
 ```
 
 <!-- /usage -->
