@@ -1,0 +1,7 @@
+{
+	"reason": "launch_limit on the carry record and record_launch, needed so lane:limit --reset restores the run's start limit (#6166)",
+	"date": "2026-11-03",
+	"growth": {
+		"scripts.code_lines": 37
+	}
+}

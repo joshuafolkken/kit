@@ -1,7 +1,8 @@
-import { lane_capacity } from './lane-capacity'
+import { lane_capacity, type LimitChoice } from './lane-capacity'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import type { LedgerEntry, LimitEntry } from './lane-ledger-schema'
 import { lane_ledger_write } from './lane-ledger-write'
+import { lane_limit_override } from './lane-limit-override'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // The lane limit's history in the lane ledger: one `limit` line each time a run starts and each time
@@ -11,16 +12,29 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 const { KIND } = lane_ledger_kind
 const CHANGE_SEPARATOR = '→'
 
-// The limit this process reads — the run's override, else `JOSH_LANE_LIMIT` — written best-effort;
-// an unreadable limit writes nothing.
-async function record_current(path?: string): Promise<void> {
-	const choice = await lane_capacity.lane_limit()
-
+// Written best-effort; an unreadable limit writes nothing.
+async function record(choice: LimitChoice, path?: string): Promise<void> {
 	if (choice.kind !== 'limit') return
 
 	const at = new Date().toISOString()
 
 	await lane_ledger_write.record({ kind: KIND.LIMIT, at, limit: choice.limit }, path)
+}
+
+// The limit this process reads — the run's override, else the limit it started with, else
+// `JOSH_LANE_LIMIT`.
+async function record_current(path?: string): Promise<void> {
+	await record(await lane_capacity.lane_limit(), path)
+}
+
+// The limit a run starts under: kept on its carry record, so a later `lane:limit --reset` restores it
+// whatever a shell's `.env` reads by then (joshuafolkken/kit#6166), and written to the ledger.
+async function record_launch(path?: string): Promise<void> {
+	const choice = lane_capacity.environment_limit()
+
+	if (choice.kind === 'limit') await lane_limit_override.write_launch(choice.limit)
+
+	await record(choice, path)
 }
 
 function is_limit(entry: LedgerEntry): entry is LimitEntry {
@@ -58,6 +72,6 @@ async function label(
 	return limits.length === 0 ? await current_label() : limits.map(String).join(CHANGE_SEPARATOR)
 }
 
-const lane_limit_history = { label, record_current }
+const lane_limit_history = { label, record_current, record_launch }
 
 export { lane_limit_history }

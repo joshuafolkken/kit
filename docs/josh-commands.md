@@ -1005,12 +1005,12 @@ Change a live backlogrun’s lane limit without stopping it, or print the limit,
 ```bash
 pnpm josh lane:limit 8         # raise or lower the live run's limit to 8
 pnpm josh lane:limit           # print the limit, the lanes in use and the free lanes
-pnpm josh lane:limit --reset   # clear the override; JOSH_LANE_LIMIT applies again
+pnpm josh lane:limit --reset   # clear the override; the run’s start limit applies again
 ```
 
 <!-- /usage -->
 
-The run keeps the environment it started with, so this writes an override onto the run's record, which every lane-limit read takes over `JOSH_LANE_LIMIT`.
+The run keeps the environment it started with, so this writes an override onto the run's record, read before `JOSH_LANE_LIMIT`.
 
 - The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes within a minute to fill the freed lanes.
 - Lowering it stops no running child; a lane that finishes is not refilled.
@@ -1018,10 +1018,11 @@ The run keeps the environment it started with, so this writes an override onto t
 - Every dispatch atomically acquires a seat and updates `.env` and the child's environment before starting. Kept trees are prioritized within the same free-seat limit as fresh launches.
 - A live or suspended lane child or listener keeps its seat; idle shells and portless helpers do not. Unreadable process ownership or ports block allocation with a reason. A saved `.env` seat alone is no reservation, so older stopped trees need no manual cleanup.
 - A lane whose child and every process under it are stopped (`lane:pause`, `kill -STOP`) is not counted either; `lane:resume` continues it in place, and it is counted again.
-- `run:board` leads the waiting row with `🧵 <used>/<limit>`; it counts the lanes in use and does not name them — some may be no board row, such as a lane an earlier run left.
+- `run:board` leads the waiting row with `🧵 <used>/<limit>`; it counts the lanes in use, some of which (an earlier run's) may have no board row.
 - The limit counts lanes, not memory or usage: the driver opens no lane under memory pressure or a Claude usage limit, and `run:board` leads the waiting row with `🧠` or `🪫 <reset>`.
 - A limit above the nine port seats is counted at the seats, as `JOSH_LANE_LIMIT` is; a value that is not a positive integer is refused.
-- The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
+- With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
+- `--reset` returns to the run's start `JOSH_LANE_LIMIT`, even if `.env` changed. A crashed run's record keeps its override and start limit until the next `backlogrun`.
 - A run's start limit and each change are ledger `limit` lines; `lane:stats` labels a period with each limit it held (`3→4`).
 
 **Output / exit codes:** prints `lane limit <n> (<source>) · in use <n> · free <n>` and exits 0. Bad arguments, an invalid limit or no run in progress exit 1.

@@ -14,13 +14,13 @@ vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
 }))
 vi.mock('#scripts/lane/lane-limit-history', () => ({
-	lane_limit_history: { record_current: vi.fn(async () => undefined) },
+	lane_limit_history: { record_launch: vi.fn(async () => undefined) },
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
 const { lane_limit_history } = await import('#scripts/lane/lane-limit-history')
 const git_directories = vi.mocked(git_command.git_directories)
-const record_current = vi.mocked(lane_limit_history.record_current)
+const record_launch = vi.mocked(lane_limit_history.record_launch)
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-cli-limit-'))
 const WORKTREE = path.join(scratch, 'worktree.git')
@@ -40,7 +40,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])
-	record_current.mockClear()
+	record_launch.mockClear()
 	run_carry.end_carry(carry_target())
 	rmSync(event_target(), { force: true })
 })
@@ -59,15 +59,15 @@ describe('run:carry --begin records the lane limit', () => {
 	it('records the limit to the ledger when it begins a fresh record', async () => {
 		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
 
-		expect(record_current).toHaveBeenCalledOnce()
+		expect(record_launch).toHaveBeenCalledOnce()
 	})
 
 	it('records no limit when a standing record refuses the begin', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION])
-		record_current.mockClear()
+		record_launch.mockClear()
 
 		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(1)
 
-		expect(record_current).not.toHaveBeenCalled()
+		expect(record_launch).not.toHaveBeenCalled()
 	})
 })
