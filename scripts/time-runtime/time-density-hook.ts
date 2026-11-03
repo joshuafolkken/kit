@@ -147,7 +147,6 @@ const time_density_hook = {
 	notice_path,
 	parse_call,
 	parse_transcript_path,
-	read_tail: transcript_tail.read_tail,
 }
 
 export { time_density_hook }
