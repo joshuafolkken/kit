@@ -17,15 +17,12 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    `confirmation` Telegram carrying stderr (`run:entry` sends it). `working-tree-hold.md` is the single
    source; a cross-repository target resolves its checkout from `pnpm josh doctor` first
    (`target-repository.md`).
-2. **`in-progress` rides on the hold** — for a `#N`, `run:entry` applies it once the tree is held and
-   the budget allows the run; a `new` entry runs `pnpm josh run:entry <N> --adopt` once filed — the
-   `#N` entry, re-keying the hold (`fullrun-steps.md`). Every stop that leaves the tree clean
-   ends with `pnpm josh run:release <N>`, which removes the label with the record.
+2. **`in-progress` rides on the hold** — `run:entry` applies it; a `new` entry runs
+   `pnpm josh run:entry <N> --adopt` once filed (`fullrun-steps.md`). Every stop that leaves the tree
+   clean ends with `pnpm josh run:release <N>`.
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
-   continues; `over` (or unanswerable) stops before the plan — `run:entry` sends the `confirmation`
-   Telegram and runs `run:release` (`stop notified: …`); `new` asks it through `--adopt`. **Skip it when
-   dispatched by a batch** (that batch owns the question). The verdict and the model-priced threshold
-   are the command's own.
+   continues; `over` (or unanswerable) stops before the plan; `new` asks it through `--adopt`. **Skip it
+   when dispatched by a batch** (that batch owns the question).
 4. **Gather the mechanical reads — `pnpm josh run:prep <N>`**: `issue:read`'s body and comments
    (`issue-comments.md`), `issue:state`'s state, labels and `human_review`, and `latest:scope`'s
    dependency scope in one report; `new` runs it through `--adopt`. The comment stops, the
@@ -35,10 +32,8 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    `run:entry` has already merged main (`docs/josh-commands-run.md` → "`josh run:entry`"). On `latest: required`, run `pnpm josh latest:if-required` (`latest-gate.md`). Later actions and their
    point-of-use reads come from `run:step` and `SKILL.md` (`residency.md` → "順序の問い").
 
-**Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
-background, started once and relayed never, and `pnpm josh run:progress --mark` in the same turn as
-every real report (`progress-watcher.md` → "Progress while the run is quiet"). A run dispatched as a
-lane child starts none and never reads that document (`pnpm josh read:set lane-child`).
+**Start the progress watcher once the hold is claimed** — `progress-watcher.md` → "Progress while the
+run is quiet". A lane child starts none.
 
 ## The stop branches
 
@@ -54,6 +49,3 @@ lane child starts none and never reads that document (`pnpm josh read:set lane-c
 - **An observation** — `observation-filing.md` (ask first if interactive).
 
 **The per-origin filing cap is `prerequisite.md`'s** (`issue:file`'s own step); on its refusal, stop and report.
-
-**The `into <target>` suffix** (a `new` entry) inserts the artifact into a named epic —
-`into-target.md`, read when the suffix is typed.

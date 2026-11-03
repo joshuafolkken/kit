@@ -27,20 +27,9 @@ relays none. **It exits only on one of three, and the command computes which:**
 **A report is not an exit, and neither is a decline** — with no run recorded it keeps waiting, and the
 `--hours` exit says so on standard error.
 
-**`pnpm josh run:watcher:guard` detects a missed restart** — via `pretool-guard` it refuses the next
-tool call while lane children are in flight and the watcher's record is stale, once per run.
-
 **`--mark` at every real report** — `pnpm josh run:progress --mark` in the same turn restarts the
-silence clock (`docs/josh-commands-run.md` → "`josh run:progress`").
-
-**Do not keep a progress clock of your own** — the hook refuses the arm
-(`scripts/rules/early-heartbeat.ts` → `decide`), though a single correctly-spaced arm is allowed.
-`--wait` is not a wait timer.
-
-**The default interval is twenty minutes, overridable — by the person, not the run.**
-`JOSH_PROGRESS_INTERVAL_MINUTES` moves both sides; `josh` → `progress_interval_minutes` in
-`package.json` sits one step below it. **`--interval` moves the watcher alone** — quieter, never the
-guard stricter.
+silence clock; the interval and its overrides are the person's (`docs/josh-commands-run.md` →
+"`josh run:progress`"). **Do not keep a progress clock of your own** — the hook refuses the arm.
 
 ### What a report says
 
