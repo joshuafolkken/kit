@@ -25,6 +25,7 @@ import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
+import { run_review_unplanned } from './run-review-unplanned'
 
 // `josh run:review` — one call that runs `josh gate` and, once it is green, writes the `/code-review`
 // brief to a file, printing its path, so round 1 reads the tree the gate passed (joshuafolkken/kit#5938).
@@ -394,11 +395,22 @@ async function metrics_refusal(is_code_only: boolean): Promise<string | undefine
 	return await metrics_totals.totals_refusal(PROJECT_ROOT)
 }
 
+// An unplanned file's overlap stops the open while the file can still be dropped (joshuafolkken/kit#6142);
+// the ship's own open has just passed the `unplanned` preflight.
+async function unplanned_refusal(is_code_only: boolean): Promise<string | undefined> {
+	if (is_code_only) return undefined
+
+	return await run_review_unplanned.refusal()
+}
+
 async function open_accepted(is_code_only: boolean, reason: string | undefined): Promise<number> {
 	const accepted = await accept_finished(is_code_only, reason)
 
 	if (accepted !== undefined) return accepted
-	const stop = (await handover_refusal(is_code_only)) ?? (await metrics_refusal(is_code_only))
+	const stop =
+		(await handover_refusal(is_code_only)) ??
+		(await metrics_refusal(is_code_only)) ??
+		(await unplanned_refusal(is_code_only))
 
 	if (stop !== undefined) return refuse(stop)
 

@@ -59,6 +59,7 @@ function harness(
 		stranded: vi.fn(async (): Promise<ReplaceVerdict | undefined> => undefined),
 		start: vi.fn(() => started),
 		preflight: vi.fn((): PreflightResult => ({ kind: 'standing' })),
+		record_limit: vi.fn(async () => undefined),
 		start_supervisor: vi.fn((): LaunchResult => SUPERVISED),
 		stop: vi.fn(async () => STOPPED),
 		restart: vi.fn(async () => 0),
@@ -114,6 +115,14 @@ describe('backlogrun_cli.run starting the supervisor', () => {
 		expect(ports.preflight).toHaveBeenCalledExactlyOnceWith(expect.anything(), GIT_DIRECTORY)
 		expect(ports.start).toHaveBeenCalledBefore(vi.mocked(ports.preflight))
 		expect(ports.preflight).toHaveBeenCalledBefore(vi.mocked(ports.start_supervisor))
+	})
+
+	// joshuafolkken/kit#6139: `lane:stats` reads the limit each run started under off the ledger.
+	it('records the lane limit the launched run starts under', async () => {
+		const { ports } = harness(false)
+
+		await backlogrun_cli.run(['6139'], ports)
+		expect(ports.record_limit).toHaveBeenCalledOnce()
 	})
 
 	it('says a supervisor that did not start and still shows the board', async () => {
