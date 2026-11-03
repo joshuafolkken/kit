@@ -4,10 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { english_only_prose_plugin } from './rules/english-only-prose.js'
 
 // Issue #2124: the Content rule "comments and test titles are English only" was prose while every
-// sibling limit was machine-enforced. This suite is the guard the two do not drift — the same shape as
-// quality-limits-document.test.ts: the document's statement is read back, the wiring that is supposed
-// to match it is read out of eslint.config.js, and the rule's behavior is asserted, so removing any
-// half fails here rather than passing silently.
+// sibling limit was machine-enforced. This suite is the guard the two do not drift: the document's
+// statement is read back, the wiring that is supposed to match it is read out of eslint.config.js,
+// and the rule's behavior is asserted, so removing any half fails here rather than passing silently.
 
 const RULE_ID = 'kit/english-only-prose'
 // The content rule's single source is the coding standards' Conventions list, not CLAUDE.md (#3395).
