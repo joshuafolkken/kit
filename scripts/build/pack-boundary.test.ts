@@ -1,5 +1,16 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	copyFileSync,
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	readlinkSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
@@ -112,9 +123,56 @@ function packed_paths(raw: string): Set<string> {
 	return new Set((report?.files ?? []).map((entry) => entry.path))
 }
 
-function packed_files(): Set<string> {
-	return packed_paths(run_pack(REPO_ROOT))
+// A tracked file deleted from the tree is not copied, nor an untracked nested repository, which the
+// listing names as a directory.
+function is_copyable(file: string): boolean {
+	const stats = lstatSync(path.join(REPO_ROOT, file), { throwIfNoEntry: false })
+
+	return stats !== undefined && !stats.isDirectory()
 }
+
+// A hook launch or a build in this checkout prunes the previous `dist/hooks` chunks, so a pack of
+// the checkout itself fails to read a chunk it listed (joshuafolkken/kit#6168). The boundary concerns
+// the sources, so it packs a copy of the tracked and unignored files, which the ignored `dist/` never
+// joins.
+function listed_sources(): Array<string> {
+	const listing = execFileSync(
+		'git',
+		['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+		{ cwd: REPO_ROOT, encoding: 'utf8' },
+	)
+
+	return listing.split('\0').filter((file) => file !== '' && is_copyable(file))
+}
+
+// A tracked symlink is copied as a link, which pack skips here as it does in the checkout.
+function copy_source(source: string, target: string): void {
+	if (lstatSync(source).isSymbolicLink()) symlinkSync(readlinkSync(source), target)
+	else copyFileSync(source, target)
+}
+
+function copy_sources(directory: string): void {
+	for (const file of listed_sources()) {
+		const target = path.join(directory, file)
+
+		mkdirSync(path.dirname(target), { recursive: true })
+		copy_source(path.join(REPO_ROOT, file), target)
+	}
+}
+
+function packed_files(): Set<string> {
+	const directory = mkdtempSync(path.join(tmpdir(), 'pack-boundary-sources-'))
+
+	try {
+		copy_sources(directory)
+
+		return packed_paths(run_pack(directory))
+	} finally {
+		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
+const PACKED = packed_files()
 
 function read_manifest(): PackageManifest {
 	return JSON.parse(readFileSync(path.join(REPO_ROOT, MANIFEST_NAME), 'utf8')) as PackageManifest
@@ -150,7 +208,11 @@ function reachable_files(): Set<string> {
 }
 
 describe('the published package boundary', () => {
-	const packed = packed_files()
+	const packed = PACKED
+
+	it('packs a copy of the sources, never the dist/ a concurrent rebuild in this checkout rewrites', () => {
+		expect([...packed].filter((file) => file.startsWith('dist/'))).toEqual([])
+	})
 
 	it('ships no kit-only measurement report or eval module', () => {
 		const leaked = [...packed].filter(
@@ -241,7 +303,7 @@ describe('the published package carries no per-machine hook scratch', () => {
 })
 
 describe('the published package carries nothing kit-internal', () => {
-	const packed = packed_files()
+	const packed = PACKED
 
 	it('ships no scripts module that no consumer entry reaches', () => {
 		const reachable = reachable_files()
