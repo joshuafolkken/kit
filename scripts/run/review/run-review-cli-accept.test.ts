@@ -17,6 +17,9 @@ import { run_review_steps } from './run-review-steps'
 vi.mock('#scripts/gate/metrics-totals', () => ({
 	metrics_totals: { totals_refusal: async () => undefined },
 }))
+vi.mock('./run-review-unplanned', () => ({
+	run_review_unplanned: { refusal: async () => undefined },
+}))
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 

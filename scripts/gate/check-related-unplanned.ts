@@ -39,6 +39,6 @@ async function show(): Promise<void> {
 	if (text !== undefined) console.info(text)
 }
 
-const check_related_unplanned = { notice, show }
+const check_related_unplanned = { notice, read_unplanned, show }
 
 export { check_related_unplanned }
