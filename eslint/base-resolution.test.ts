@@ -74,6 +74,22 @@ describe('create_base_config — tests block (issue #867)', () => {
 	})
 })
 
+// joshuafolkken/kit#6030: the kinds whose every file needs the rule off get it by glob.
+describe('create_base_config — naming-convention by file kind', () => {
+	const naming_rule = '@typescript-eslint/naming-convention'
+
+	it.each(['scripts/josh/josh-commands-ai.ts', 'scripts/ci/ci-yml-fixture.ts'])(
+		'resolves the rule to off for %s',
+		async (file_path) => {
+			await expect(resolve_severity(file_path, naming_rule)).resolves.toBe(OFF)
+		},
+	)
+
+	it('keeps the rule at error for another script', async () => {
+		await expect(resolve_severity(SOURCE_FILE, naming_rule)).resolves.toBe(ERROR)
+	})
+})
+
 // joshuafolkken/kit#1112: asserted through the linter's own ignore resolution rather than by
 // matching the glob in the config, because what has to hold is that eslint does not open the file —
 // and a glob that reads correctly can still miss, since these paths are relative to the project

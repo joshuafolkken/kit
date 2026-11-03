@@ -44,6 +44,7 @@ const FILE_PATTERNS = {
 	eslint_rules: ['eslint/**/*.ts', 'eslint/rules/**/*.js'],
 	// joshuafolkken/kit#6028: the josh command tables — one object per command, no control flow.
 	command_tables: ['scripts/josh/josh-commands-*.ts'],
+	fixtures: ['scripts/**/*-fixture.ts'],
 	// joshuafolkken/kit#3294: the SvelteKit convention files, whose named exports — route handlers,
 	// `load`, `handle`, `match` — are typed through a const annotation (`export const GET:
 	// RequestHandler = …`). That idiom is the one place `func-style` allows an arrow const.
@@ -251,6 +252,13 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			files: FILE_PATTERNS.command_tables,
 			ignores: FILE_PATTERNS.tests,
 			rules: { 'max-lines': 'off' },
+		},
+		{
+			// A command table keys by command name (`'exports:unused'`) and a fixture by the external
+			// shape it mimics, so every file of either kind breaks the naming convention by design.
+			files: [...FILE_PATTERNS.command_tables, ...FILE_PATTERNS.fixtures],
+			ignores: FILE_PATTERNS.tests,
+			rules: { '@typescript-eslint/naming-convention': 'off' },
 		},
 		{
 			// `.mjs` / `.cjs` too (joshuafolkken/kit#2693): the typed parser options above reach only
