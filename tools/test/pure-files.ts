@@ -184,7 +184,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/gh/github-issue-url.test.ts',
 	'scripts/issue/issue-labels.test.ts',
 	'scripts/git/listing-cutoff.test.ts',
-	'scripts/git/main-merge-guard.test.ts',
 	'scripts/git/parse-json-array.test.ts',
 	'scripts/git/git-schemas.test.ts',
 	'scripts/git/stash/stash-orphans.test.ts',

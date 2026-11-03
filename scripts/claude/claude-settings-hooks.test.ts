@@ -96,6 +96,7 @@ const MODEL_RECORD_HOOK_COMMAND = hook_launch.hook_launch_command('audit-provisi
 const MINIMUM_PROVISION_TIMEOUT_SECONDS =
 	security_audit_provision_logic.SESSION_DOWNLOAD_TIMEOUT_MS / MS_PER_SECOND +
 	STARTUP_ALLOWANCE_SECONDS
+const PROVISION_TIMEOUT_MARGIN_SECONDS = 20
 // The session-language hook (joshuafolkken/kit#1903): resolves JOSH_SESSION_LANG and prints it to
 // stdout, so a SessionStart / UserPromptSubmit hook injects the value into context every turn. It
 // starts no download and reads no large file, so one script start is its whole budget. Launched from
@@ -249,10 +250,25 @@ function describe_stop_hook(title: string, wiring: HookWiring): void {
 	})
 }
 
-describe_session_hook('.claude/settings.json — session-start audit provisioning', {
+const PROVISION_WIRING: HookWiring = {
 	event: 'SessionStart',
 	command: PROVISION_HOOK_COMMAND,
 	minimum_timeout_seconds: MINIMUM_PROVISION_TIMEOUT_SECONDS,
+}
+
+describe_session_hook('.claude/settings.json — session-start audit provisioning', PROVISION_WIRING)
+
+// Measured, not guessed (joshuafolkken/kit#6038): a cold download ran up to 58s, inside the script's
+// own download bound, so the floor plus this margin is the whole budget the hook can use. A larger
+// declaration only lets a hang outside the download hold the session start longer.
+describe('.claude/settings.json — session-start audit provisioning budget', () => {
+	it('declares no more than its floor and the measured margin', () => {
+		const timeouts = handlers_of(PROVISION_WIRING).map((handler) => handler.timeout ?? 0)
+
+		expect(Math.max(...timeouts)).toBeLessThanOrEqual(
+			MINIMUM_PROVISION_TIMEOUT_SECONDS + PROVISION_TIMEOUT_MARGIN_SECONDS,
+		)
+	})
 })
 
 // `/clear` opens a new transcript with no assistant entry, so its start records the model too —

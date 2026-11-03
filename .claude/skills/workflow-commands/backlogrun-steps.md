@@ -12,11 +12,9 @@ arguments, never inferred. **Two repairs that would bound this the other way are
 dropping a run's own filings, and requiring a person's `auto-ok` on a child; the brake below bounds it.
 A Tier C action inside a child still stops that child.
 
-**`pnpm josh issue:file` judges `auto-ok` and prints it** — `auto-ok: applied` or
-`auto-ok: not applied` with the reason (`scripts/issue/issue-auto-ok.ts`). Every filing, the
-retrospective's included, is judged the same way: the excluded labels, then the body's `- 人の判断:`
-declaration (`issue-template.md`). **Declare `- 人の判断: 要` when the new issue needs a person's
-judgement** — a Tier B toss-up or a Tier C action inside it; `--no-auto-ok` withholds it too.
+**`pnpm josh issue:file` judges `auto-ok` and prints it** (`scripts/issue/issue-auto-ok.ts`).
+**Declare `- 人の判断: 要` when the new issue needs a person's judgement** — a Tier B toss-up or a
+Tier C action inside it (`issue-template.md`); `--no-auto-ok` withholds it too.
 
 ### The brake that replaces the promise
 
@@ -117,11 +115,8 @@ never `needs-human-review` (`needs-human-review.md`), the priority labels only t
 
 **The loop is computed, not walked by hand** — the `run:wake` supervisor runs `pnpm josh backlog:drive`
 (`docs/josh-commands-backlog.md` → "`josh backlog:drive`"). A session reaches this section only when
-the `Driver result:` line hands a branch back. The supervisor has already claimed the carry record for
-the session (`run-wake-handoff.ts`), so it claims nothing and never runs `run:carry --begin`: act on
-the row, then end the turn — its `Stop` hook writes the cut that hands the loop back
-(`run_headless.hand_back_at_turn_end`). The hand-off carries the sections its row needs
-(`scripts/run/run-step-section-table.ts` → `DRIVER_SECTIONS`) wherever the document ships, so the session searches none:
+the `Driver result:` line hands a branch back. The supervisor already holds the carry record — never
+run `run:carry --begin`; act on the row, then end the turn:
 
 | Handed back | What the session does |
 | --- | --- |
@@ -134,8 +129,7 @@ the row, then end the turn — its `Stop` hook writes the cut that hands the loo
 | `watch` | The retrospective is owed (`run:step`) |
 | `window` | Hand the loop back as is |
 
-**A candidate only in another repository is never a token** — report it with its checkout. The budgets,
-verdicts and stops are the driver's own.
+**A candidate only in another repository is never a token** — report it with its checkout.
 
 ## What runs once per session, not once per issue
 
@@ -147,4 +141,4 @@ verdicts and stops are the driver's own.
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |
 | `pnpm josh release:scope` once, after the last merge and lane close | `followup.md` → "When `pnpm josh release` runs" |
 
-**`pnpm josh epic:audit` is not run.** There is no epic to audit — the run began from the backlog.
+**`pnpm josh epic:audit` is not run on the opted-in backlog.**

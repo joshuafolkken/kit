@@ -1,5 +1,6 @@
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_background } from '#scripts/rules/lane-background'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { main_merge_guard } from './main-merge-guard'
 
 // joshuafolkken/kit#2445: a lane child merged the default branch over uncommitted work, stashed around
@@ -131,5 +132,24 @@ describe('main_merge_guard.refusal in a lane child', () => {
 		const commit = main_merge_guard.commit_command(true)
 
 		expect(main_merge_guard.conflict_hint(commit)).toContain(LANE_COMMIT_COMMAND)
+	})
+})
+
+// joshuafolkken/kit#4769: the guidance's command is resolved from the lane mark when no caller passes
+// one — the path `josh main:merge` and `josh stash:push` take.
+describe('main_merge_guard — the lane mark decides the guided command', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it.each([
+		[true, `\`${LANE_COMMIT_COMMAND}\``],
+		[false, `\`${COMMIT_COMMAND}\``],
+	])('reads lane child %s as %s', (is_lane_child, command) => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(is_lane_child)
+
+		expect(main_merge_guard.refusal(CONFLICTED, [], 'main')).toContain(command)
+		expect(main_merge_guard.conflict_hint()).toContain(command)
+		expect(main_merge_guard.unresolved_message('stash:push', ['a.ts'], 'it')).toContain(command)
 	})
 })
