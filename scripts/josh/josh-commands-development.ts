@@ -212,6 +212,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Report exported namespace members nothing reads (kit only; a consumer project skips it)',
 		category: 'Development',
 		reference: ['', 'developer', ['none']],
+		// Reads source files and prints only, so a consultation session can run it.
+		is_read_only: true,
 		usage: { examples: [{ arguments: '' }] },
 	},
 	'test:unit': {
