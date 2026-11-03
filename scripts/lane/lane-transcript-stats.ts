@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -61,7 +62,7 @@ const { NOT_MEASURED } = lane_stage_stats
 function segment_command(segment: string): string {
 	const words = segment.trim().split(WORD_PATTERN)
 	const start = words.findIndex((word) => !KEYWORDS.has(word))
-	const named = time_shell.josh_command_of_segment(words.slice(start).join(' '))
+	const named = time_josh_names.josh_command_of_segment(words.slice(start).join(' '))
 
 	return named.slice(time_shell.JOSH_PREFIX.length)
 }
