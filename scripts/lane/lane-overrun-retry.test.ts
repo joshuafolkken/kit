@@ -46,6 +46,7 @@ vi.mock('#scripts/cost-runtime/cost-transcript', () => ({
 	cost_transcript: {
 		home_directory: () => '/home',
 		lane_transcript_directories: mocks.transcripts,
+		list_sessions_across: () => [],
 		session_cwd: (cwd: string) => cwd,
 	},
 }))
