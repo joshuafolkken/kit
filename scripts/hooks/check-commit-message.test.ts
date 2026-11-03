@@ -19,11 +19,26 @@ const mocked_read = vi.mocked(read_file_sync)
 mocked_branch.mockResolvedValue('main')
 mocked_git_directories.mockResolvedValue([])
 
+// The spies watch the module's first import, so a side effect at load time is caught; their counts are
+// read before `beforeEach` clears them.
+const console_spy = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+const exit_spy = vi.spyOn(process, 'exit').mockImplementation(vi.fn() as never)
 const { check_commit_message, extract_issue_number, is_safe_commit_message_path } =
 	await import('./check-commit-message')
+const import_calls = { info: console_spy.mock.calls.length, exit: exit_spy.mock.calls.length }
+
+console_spy.mockRestore()
+exit_spy.mockRestore()
 
 beforeEach(() => {
 	vi.clearAllMocks()
+})
+
+describe('check-commit-message — side-effect-free import', () => {
+	it('does not call console.info or process.exit on import', () => {
+		expect(import_calls.info).toBe(0)
+		expect(import_calls.exit).toBe(0)
+	})
 })
 
 // What `git rev-parse` answers in a linked work tree: the work tree's own git directory first, then

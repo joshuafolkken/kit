@@ -237,8 +237,8 @@ measured not to fire in non-interactive zsh. The rule body and the trigger's bli
 
 A refusal or notice is read by the model and stays in its context for the rest of the session, so
 each one says what is wrong and the next command, in at most 400 characters, and never carries its
-history: no Issue number, no "Before this". `scripts/hooks/hook-refusal-brevity.test.ts` pins that
-bound over every `PreToolUse` and `Stop` text, extending `hook-notice-brevity.test.ts`. A reworded
+history: no Issue number, no "Before this". `scripts/hooks/hook-brevity.test.ts` pins that bound
+over every `PreToolUse` and `Stop` text, the batching notices under tighter bounds of their own. A reworded
 reason keeps its first 48 characters (`rule-value.ts` matches a delivered refusal by its opening) or
 lists the old opening in its row's `former_reasons`. The history the texts used to carry lives here:
 
