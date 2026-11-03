@@ -180,7 +180,7 @@ function describe_shared_hook_properties(wiring: HookWiring): void {
 	// whose live-source fallback fails with nothing pointing at the cause. The launcher derives that
 	// subcommand from the hook name (joshuafolkken/kit#3184); a plain `pnpm josh <cmd>` hook names it.
 	it('names a subcommand josh actually has', () => {
-		const hook_name = new RegExp(String.raw`${hook_launch.RUN_HOOK_SCRIPT} ([\w-]+)`, 'u').exec(
+		const hook_name = new RegExp(String.raw`${hook_launch.RUN_HOOK_SCRIPT}"? ([\w-]+)`, 'u').exec(
 			wiring.command,
 		)?.[1]
 		const subcommand =
