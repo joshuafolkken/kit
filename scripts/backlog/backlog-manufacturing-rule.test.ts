@@ -255,7 +255,7 @@ describe.each(AI_DOCS)('%s — carries the trigger for the resident defaults', (
 // topic happened to quote the label, and the assertion would pass on a link that no longer exists.
 describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () => {
 	it('links the topic file', () => {
-		expect(read_index()).toContain('| オープン Issue の WIP 上限 ')
+		expect(read_index()).toContain('| The open-Issue WIP cap ')
 	})
 })
 
