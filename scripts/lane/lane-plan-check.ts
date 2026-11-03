@@ -3,15 +3,13 @@ import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { backlog_overlap, type Clash } from '#scripts/backlog/backlog-overlap'
 import { backlog_plan_comment } from '#scripts/backlog/backlog-plan-comment'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { has_any_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { session_cite } from '#scripts/issue/session-cite'
 import { line_budget } from '#scripts/lines/line-budget'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan, type LanePlan } from './lane-plan'
-import { lane_plan_signals } from './lane-plan-signals'
+import { lane_plan_probe } from './lane-plan-probe'
 import { lane_plan_size, type Oversize } from './lane-plan-size'
 import { lane_plan_wait } from './lane-plan-wait'
 import { lane_plan_wait_event } from './lane-plan-wait-event'
@@ -49,12 +47,7 @@ const FAILURE_EXIT_CODE = 1
 const YIELD_EXIT_CODE = 2
 const SPLIT_EXIT_CODE = 3
 const RELEASE_FLAG = '--release'
-const RUNNING = new Set([IN_PROGRESS_LABEL])
-const UNREAD = 'unread'
 const NEAR_CAP_HEADROOM = 20
-
-// What the overlap check found: the clash, none, or a listing it could not read.
-type Probe = Clash | typeof UNREAD | undefined
 
 function plan_of(argv: ReadonlyArray<string>, now: Date): LanePlan | undefined {
 	const [issue = '', ...paths] = argv
@@ -66,33 +59,6 @@ function plan_of(argv: ReadonlyArray<string>, now: Date): LanePlan | undefined {
 	return { issue: Number(issue), paths: claims, planned_at: now.toISOString() }
 }
 
-// The opted-in listing — the running lanes carry the pickup label, so it holds their bodies.
-async function opted_in(): Promise<ReadonlyArray<OpenIssueData> | undefined> {
-	const read = await auto_ok_cli.fetch_opted_in()
-
-	return read.kind === 'read' ? read.issues : undefined
-}
-
-function running_of(issues: ReadonlyArray<OpenIssueData>): ReadonlyArray<OpenIssueData> {
-	return issues.filter((issue) => has_any_label(issue.labels, RUNNING))
-}
-
-function clash_among(
-	plan: LanePlan,
-	issues: ReadonlyArray<OpenIssueData>,
-	directory: string,
-): Clash | undefined {
-	const declared = lane_plan.with_plans(backlog_overlap.declared_of(issues), directory)
-
-	return lane_plan.clash_of(plan, declared, directory)
-}
-
-function overlap_text(issue: number, clash: Clash): string {
-	const holder = session_cite.issue(clash.holder)
-
-	return `${session_cite.issue(issue)}'s planned \`${clash.path}\` overlaps \`${clash.claimed}\`, which ${holder} declares or plans`
-}
-
 // The yield goes on the stream before the child is told to end, so `run:merge` books it `yielded`. The
 // plan is kept as yielded (`lane_plan.release`) and the child's hold released, so it can end with no
 // edit; `yield` is printed last, after the release's own verdict.
@@ -102,7 +68,7 @@ async function give_back(
 	directory: string,
 	at: YieldAt,
 ): Promise<number> {
-	const overlap = overlap_text(plan.issue, clash)
+	const overlap = lane_plan_probe.overlap_text(plan.issue, clash)
 
 	lane_plan.record({ ...plan, yielded: true, waits_until: undefined }, directory)
 	await lane_yield.record_yield(plan.issue, overlap, at)
@@ -122,10 +88,7 @@ function clear_answer(): number {
 }
 
 function clear(plan: LanePlan, directory: string): number {
-	lane_plan.record(
-		{ ...plan, cleared: true, yielded: undefined, waits_until: undefined },
-		directory,
-	)
+	lane_plan_probe.record_cleared(plan, directory)
 
 	return clear_answer()
 }
@@ -136,27 +99,6 @@ function unread(): number {
 	console.info('wait')
 
 	return FAILURE_EXIT_CODE
-}
-
-// The overlap check alone, writing nothing — what `--probe` answers and `check_plan` acts on.
-function probe(
-	plan: LanePlan,
-	issues: ReadonlyArray<OpenIssueData> | undefined,
-	directory: string,
-): Probe {
-	return issues === undefined ? UNREAD : clash_among(plan, running_of(issues), directory)
-}
-
-// A plan grown past twice its Issue's declaration is refused before it is recorded (`lane-plan-size.ts`).
-async function oversize_of(
-	plan: LanePlan,
-	issues: ReadonlyArray<OpenIssueData> | undefined,
-	directory: string,
-): Promise<Oversize | undefined> {
-	if (issues === undefined || !lane_plan_size.declares(plan.issue, issues)) return undefined
-	const signals = await lane_plan_signals.signals_of(plan.issue)
-
-	return lane_plan_size.oversize(plan, issues, lane_plan.read(plan.issue, directory), signals)
 }
 
 function split(plan: LanePlan, over: Oversize): number {
@@ -220,7 +162,7 @@ async function wait_until(plan: LanePlan, holder: number): Promise<string | unde
 
 function held(plan: LanePlan, clash: Clash, until: string): number {
 	console.error(
-		`${overlap_text(plan.issue, clash)}; this lane was dispatched first and holds commits, so it keeps its seat until ${until}: run this \`lane:plan\` again now — it waits inside, and answers \`clear\` once that lane ends, or \`yield\` past the deadline.`,
+		`${lane_plan_probe.overlap_text(plan.issue, clash)}; this lane was dispatched first and holds commits, so it keeps its seat until ${until}: run this \`lane:plan\` again now — it waits inside, and answers \`clear\` once that lane ends, or \`yield\` past the deadline.`,
 	)
 	console.info('wait')
 
@@ -229,9 +171,12 @@ function held(plan: LanePlan, clash: Clash, until: string): number {
 
 // Whether no running lane holds `plan`'s files any more; an unread listing proves nothing.
 async function is_free(plan: LanePlan, directory: string): Promise<boolean> {
-	const issues = await opted_in()
+	const issues = await lane_plan_probe.opted_in()
+	const running = issues === undefined ? undefined : lane_plan_probe.running_of(issues)
 
-	return issues !== undefined && clash_among(plan, running_of(issues), directory) === undefined
+	return (
+		running !== undefined && lane_plan_probe.clash_among(plan, running, directory) === undefined
+	)
 }
 
 // A clash yields, unless the lane waits a bounded time on a later-dispatched holder, blocking here
@@ -258,32 +203,32 @@ async function settle(plan: LanePlan, clash: Clash, directory: string): Promise<
 
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
-	const issues = await opted_in()
-	const over = await oversize_of(plan, issues, directory)
+	const issues = await lane_plan_probe.opted_in()
+	const over = await lane_plan_probe.oversize_of(plan, issues, directory)
 
 	if (over !== undefined) return await noted_split(plan, over)
 	const sized = sized_of(plan, issues)
 
 	lane_plan.record(sized, directory)
-	const found = probe(sized, issues, directory)
+	const found = lane_plan_probe.probe(sized, issues, directory)
 
-	if (found === UNREAD) return unread()
+	if (lane_plan_probe.is_unread(found)) return unread()
 
 	return found === undefined ? clear(sized, directory) : await settle(sized, found, directory)
 }
 
 // `--probe`'s answer: the same tokens and exit codes as the plan's, with nothing written.
 async function probe_answer(plan: LanePlan, directory: string): Promise<number> {
-	const issues = await opted_in()
-	const over = await oversize_of(plan, issues, directory)
+	const issues = await lane_plan_probe.opted_in()
+	const over = await lane_plan_probe.oversize_of(plan, issues, directory)
 
 	if (over !== undefined) return split(plan, over)
-	const found = probe(plan, issues, directory)
+	const found = lane_plan_probe.probe(plan, issues, directory)
 
-	if (found === UNREAD) return unread()
+	if (lane_plan_probe.is_unread(found)) return unread()
 	if (found === undefined) return clear_answer()
 
-	console.error(`${overlap_text(plan.issue, found)}.`)
+	console.error(`${lane_plan_probe.overlap_text(plan.issue, found)}.`)
 	console.info('yield')
 
 	return YIELD_EXIT_CODE
@@ -326,7 +271,9 @@ async function entry_yield(
 	directory: string,
 ): Promise<boolean> {
 	const plan = await entry_plan(issue, issues, directory)
-	const found = plan === undefined ? undefined : clash_among(plan, running_of(issues), directory)
+	const running = lane_plan_probe.running_of(issues)
+	const found =
+		plan === undefined ? undefined : lane_plan_probe.clash_among(plan, running, directory)
 
 	if (plan === undefined || found === undefined) return false
 
@@ -339,7 +286,7 @@ async function entry_yield(
 // there, noted `at: entry`, the way `lane:plan` would after the summary. A clear answer, an unread
 // listing or no declared path writes nothing — the later `lane:plan` still checks at the first edit.
 async function yield_at_entry(issue: number, directory: string = process.cwd()): Promise<boolean> {
-	const issues = await opted_in()
+	const issues = await lane_plan_probe.opted_in()
 
 	return issues === undefined ? false : await entry_yield(issue, issues, directory)
 }
