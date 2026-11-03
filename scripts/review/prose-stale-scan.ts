@@ -10,7 +10,8 @@ import { review_readers_scan } from './review-readers-scan'
 // constant on a code file's removed line (the declaration reading is `review-readers-scan.ts`'s), a `josh x:y` command
 // on any removed line, and a `.md` file's `#` heading. **A word the diff still writes is not removed**: an
 // identifier or command any added line carries, a heading an added `.md` line still titles, and a command
-// the registry still holds. **A renamed declaration is removed unless an added line declares it again**
+// the registry still holds, and a name a changed code file still declares in the working tree, an
+// unchanged line included (joshuafolkken/kit#6077). **A renamed declaration is removed unless an added line declares it again**
 // (joshuafolkken/kit#5540): a hunk whose removed lines declare a name its added lines do not, beside
 // one they declare anew, renamed it, and the old name an added comment or a local still carries as a
 // token is stale all the same.
@@ -137,12 +138,18 @@ function is_removed(term: Term, kept: Kept): boolean {
 	return !kept.tokens.has(term.word)
 }
 
-// Each removed word once, in diff order; `registered` is the command registry's names.
-function stale_terms(hunks: ReadonlyArray<Hunk>, registered: ReadonlySet<string>): Array<Term> {
+// Each removed word once, in diff order; `registered` is the command registry's names, `surviving`
+// the names the change's code files still declare in the working tree, on an unchanged line too.
+function stale_terms(
+	hunks: ReadonlyArray<Hunk>,
+	registered: ReadonlySet<string>,
+	surviving: ReadonlySet<string> = new Set(),
+): Array<Term> {
 	const kept = kept_of(hunks, registered)
 	const unique = new Map(hunks.flatMap((hunk) => hunk_terms(hunk)).map((term) => [term.word, term]))
 
-	return [...unique.values()].filter((term) => is_removed(term, kept))
+	// A name a file still declares is kept, whatever a hunk did to it: renamed, moved or left unchanged.
+	return [...unique.values()].filter((term) => !surviving.has(term.word) && is_removed(term, kept))
 }
 
 // A heading is searched quoted, the way a `→ "Heading"` pointer names it; any other word as a whole word.
@@ -184,7 +191,7 @@ function report(references: ReadonlyArray<Reference>): Report {
 	}
 }
 
-const prose_stale_scan = { FAILED_EXIT, pattern, report, stale_terms }
+const prose_stale_scan = { CODE_FILE, FAILED_EXIT, pattern, report, stale_terms }
 
 export type { Reference, Term }
 export { prose_stale_scan }
