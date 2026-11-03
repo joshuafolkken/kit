@@ -12,11 +12,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_next } from './epic-next'
 import { epic_stopped_fixture } from './epic-stopped-fixture'
 
+// Every way out to a real process — `ps`, `git` — refuses here: a probe of this machine is what made
+// the suite time out under gate load (joshuafolkken/kit#6177), so each test asserts none was attempted.
+const spawned = vi.hoisted(() => {
+	const attempts: Array<string> = []
+
+	function refuse(name: string): () => never {
+		return function refused(): never {
+			attempts.push(name)
+			throw new Error(`unexpected ${name} in epic-next-stopped`)
+		}
+	}
+
+	return { attempts, refuse }
+})
+
+vi.mock('node:child_process', async (original) => ({
+	...(await original<Record<string, unknown>>()),
+	exec: spawned.refuse('exec'),
+	execFile: spawned.refuse('execFile'),
+	execFileSync: spawned.refuse('execFileSync'),
+	execSync: spawned.refuse('execSync'),
+	spawn: spawned.refuse('spawn'),
+	spawnSync: spawned.refuse('spawnSync'),
+}))
+vi.mock('execa', () => ({ execa: spawned.refuse('execa'), execaSync: spawned.refuse('execaSync') }))
+
 const { REPO, EPIC, CHILD, RUNNING, STOPPED } = epic_stopped_fixture
 const ARGV = [EPIC, '--repo', REPO, '--lanes']
 const lines: Array<string> = []
 
 beforeEach(() => {
+	spawned.attempts.length = 0
 	epic_stopped_fixture.arrange()
 	lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
@@ -25,7 +52,10 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+	vi.restoreAllMocks()
+	expect(spawned.attempts).toEqual([])
+})
 
 async function command_output(argv: ReadonlyArray<string>): Promise<{ code: number; out: string }> {
 	lines.length = 0

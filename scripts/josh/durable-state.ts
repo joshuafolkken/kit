@@ -26,10 +26,15 @@ const RUN_STATE_DIRECTORY = 'run-state'
 const OVERRIDE_STATE_DIRECTORY = 'josh-state'
 const STATE_DIRECTORY_MODE = 0o700
 
-function state_root(override: string | undefined, common: string | undefined): string {
+// **The common git directory is asked only when no override stands**: asking it is a `git rev-parse`
+// of the checkout, and under the unit suite's override every record lookup paid that probe for an
+// answer it then discarded — what timed a suite out under gate load (joshuafolkken/kit#6177).
+function state_root(override: string | undefined, read_common: () => string | undefined): string {
 	if (override !== undefined && override !== '') {
 		return path.join(override, OVERRIDE_STATE_DIRECTORY)
 	}
+
+	const common = read_common()
 
 	if (common === undefined) return PLATFORM_TEMP_ROOT
 
@@ -40,7 +45,7 @@ function state_root(override: string | undefined, common: string | undefined): s
 const STATE_ROOT_OVERRIDE = process.env[platform_temporary.TEMP_ROOT_KEY]
 
 function root(): string {
-	return state_root(STATE_ROOT_OVERRIDE, git_common_directory.repository())
+	return state_root(STATE_ROOT_OVERRIDE, git_common_directory.repository)
 }
 
 // Every record kept here, by the prefix of its file name — the list the one-time copy from `/tmp`
