@@ -8,7 +8,7 @@
   3. Analyze requirements → **scope assessment per `split-assessment.md` → "The question"**, exactly
      as `kickoff new` does.
   4. **Record the plan** — written to a file in the session language (`JOSH_SESSION_LANG`, default
-     `ja`), then `pnpm josh issue:plan <N> --body-file <path> --title "<title>" --planned`, which
+     `ja`), then `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --title "<title>" --planned`, which
      records it, applies `run:planned` and sends the `planning` Telegram (`docs/josh-commands-backlog.md`
      → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`.
      Before writing the plan, run `pnpm josh plan:consumers <identifier...>` on what it adds or changes
@@ -17,7 +17,7 @@
 
   **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
   children as in `kickoff new`, then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
-  ... --title "<title>" --notify [--ordered] [--rationale-file <path|->]` (when `#N` is a request, a discussion
+  ... --title "<title>" --notify [--ordered] [--rationale-file .josh/tmp/rationale.md]` (when `#N` is a request, a discussion
   or a container) — `--title` renames it to the step-2 title — or keep `#N` as a child of a new epic
   made with `pnpm josh epic … --notify`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
   record the reasoning on the Issue. Present `backlogrun #<E> --only` and stop.
@@ -37,18 +37,18 @@ checked out here. A third-party owner is Tier C: stop rather than file.
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
   deliverable takes the **single-issue path**, several the **multi-issue split path**.
   - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
-    "<title>" --body-file <body-file>` plus the labels the words typed after `new` name
+    "<title>" --body-file .josh/tmp/body.md` plus the labels the words typed after `new` name
     ("Words typed after `new`", below; body per `prompts/collaboration-workflow/issue-template.md`) —
     its duplicate scan runs first, and a candidate covering the same work stops the run (`SKILL.md` →
     `issue-scout.md`). Capture `<N>`. (3) Post the plan as `kickoff #<N>` does — its `--planned` sends the Telegram. (4)
     **Stop**.
   - **Multi-issue split path**: (1) Per deliverable, `pnpm josh issue:file "<sub-title>" --body-file
-    <body-file> --route split` plus the labels the words after `new` name (duplicate scan
+    .josh/tmp/body.md --route split` plus the labels the words after `new` name (duplicate scan
     per `issue-scout.md`). A split filed into another repository gives every child body the `## Origin`
     backlink, the epic the same link as prose (never a checkbox row, which disables its auto-close), and
     the originating Issue lists children and epic under `## Upstream issues`. (2) **Epic — always, for
     every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... --notify [--ordered]
-    [--rationale-file <path|->] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
+    [--rationale-file .josh/tmp/rationale.md] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
     with `pnpm josh epic:check <E>`. (3) `--notify` sends the Telegram listing every created Issue.
     (4) Present `backlogrun #<E> --only`. (5) **Stop**.
 

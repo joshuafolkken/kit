@@ -75,7 +75,7 @@ condition to evaluate.** **An entry point that applies a different condition is 
 is the non-closing home for the split rationale.
 
 **Each split child is filed with the `route:split` label** —
-`pnpm josh issue:file "<sub-title>" --body-file <body-file> --route split` — and judged for
+`pnpm josh issue:file "<sub-title>" --body-file .josh/tmp/body.md --route split` — and judged for
 `auto-ok` like any filing (`kickoff.md` → "Words typed after `new`").
 
 ## Promote, or create a new epic
