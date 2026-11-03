@@ -11,7 +11,7 @@ import { time_shell } from '#scripts/time-runtime/time-shell'
 // real cost — the failure chain did not see the second as answering the first, so the time a red gate
 // made the run pay again went unreported.
 //
-// **The expansion belongs at the name, not at each reader.** `time-gate-runs.ts` had once patched its
+// **The expansion belongs at the name, not at each reader.** A gate-run reader had once patched its
 // own copy of this reading, which left the gate count and the per-invocation table answering
 // differently about the same run; `canonical_command` here is the one rule every reader goes through.
 

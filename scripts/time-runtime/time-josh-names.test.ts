@@ -3,7 +3,7 @@ import { time_josh_names } from './time-josh-names'
 import { time_shell } from './time-shell'
 
 // The josh names a reader matches against canonical ones, alias-expanded at this layer
-// (joshuafolkken/kit#6161), so the readers keep seeing `gate` for `ga` once `time_shell` stops expanding.
+// (joshuafolkken/kit#6161), so the readers see `gate` for `ga` though `time_shell` does not expand.
 // `time_shell` is stubbed to hand back unexpanded names, so these fail on a layer that only passes through.
 
 const LINT_RELATED = 'josh lint:related'
