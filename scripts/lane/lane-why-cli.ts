@@ -8,6 +8,7 @@ import { lane_net_read } from './lane-net-read'
 import { lane_sinks_issues } from './lane-sinks-issues'
 import { lane_why, type WhyRecords } from './lane-why'
 import { lane_why_ci } from './lane-why-ci'
+import { lane_why_ship } from './lane-why-ship'
 
 // `josh lane:why <issue>` — a merged lane's stages over budget, each beside its causes
 // (joshuafolkken/kit#6120).
@@ -41,6 +42,8 @@ async function print(issue: string): Promise<number> {
 	}
 
 	console.info(lane_why.table(records) ?? `No stage of ${lane} ran over its budget.`)
+	// A blank line keeps the two tables apart where the output is pasted as Markdown.
+	console.info(`\n${lane_why_ship.table(records)}`)
 
 	return 0
 }

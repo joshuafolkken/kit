@@ -162,7 +162,24 @@ function of(
 	return laps
 }
 
-const lane_breakdown_laps = { CORE_WAIT_STEP, of }
+// `issue`'s laps and core-budget waits that ended in a ship stage, one per run and unmerged — what
+// `josh lane:why` sums over the whole ship (joshuafolkken/kit#6154).
+function ship_parts(
+	entries: ReadonlyArray<LedgerEntry>,
+	issue: number,
+	breakdown: Breakdown,
+): Array<Stage> {
+	const placed = entries.flatMap((entry) => [...lap_of(entry, issue), ...wait_of(entry, issue)])
+
+	return [...grouped(placed, breakdown.ship).values()].flat()
+}
+
+// Whether a row stamped `at` ended in a ship stage of `breakdown`, by the rule its laps are placed by.
+function is_in_ship(breakdown: Breakdown, at: string): boolean {
+	return stage_at(breakdown.ship, Date.parse(at)) !== undefined
+}
+
+const lane_breakdown_laps = { CORE_WAIT_STEP, is_in_ship, of, ship_parts }
 
 export { lane_breakdown_laps }
 export type { Laps }
