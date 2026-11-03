@@ -3,22 +3,6 @@
 **Read this file in full when a child cannot finish** — before parking it, before a
 `needs-human-review` stop, or before recording a mid-run prerequisite or split.
 
-## What happens to a child that cannot finish
-
-A `backlogrun` child is a `fullrun` under a batch authorization:
-
-- **A stop that would end the run parks one issue and the run continues** — → "park and continue".
-- **A prerequisite discovered mid-run is recorded as a dependency rather than parked** — → "A
-  prerequisite discovered mid-run"; `prerequisite.md` separates prerequisite, split and upstream
-  defect. With no epic, the `blocked-by` is written on the issue itself.
-- **A split found mid-run** files the children and the epic and does not stop the batch —
-  `split-assessment.md`, → "Splitting a child mid-run". Not a park, not a failure.
-- **`in-progress` left behind by an interrupted run** — → "`in-progress` is removed by whoever finds
-  it stale".
-- **A child released from `needs-decision` is re-dispatched to a lane, never implemented by the
-  parent** — `backlogrun.md` → "Claim nothing at the entry — this parent orchestrates and never
-  implements".
-
 ## The parent does not investigate a lane failure itself
 
 **A lane failure whose reason is not on its Issue is read by a unit** — `pnpm josh delegate
@@ -32,10 +16,9 @@ implementation and the gate run, nothing is committed, the tree is left dirty an
 `pnpm josh run:hold <N> --human-review-stop` sends the `confirmation` Telegram with the resume command
 and the lane directory. The parent collects that dispatch and offers the next children.
 
-**The child goes on holding its repository**, and **its lane is left open and untouched**. **Name the
-lane directory in the stop report.** The stopped lane stays counted in use by `lane:limit`;
-never park or release it. The parent keeps launching children while free lanes remain. A fresh
-dispatch resumes the lane's normal lifecycle after the person reviews it.
+**The child goes on holding its repository**, and **its lane is left open and untouched** — never
+park or release it. **Name the lane directory in the stop report.** The parent keeps launching
+children while free lanes remain.
 
 **Never apply or remove the label** — a person's alone (`needs-human-review.md`, the single source).
 
@@ -48,10 +31,7 @@ When a child hits something only a person can decide (→ "Only a person's judge
 pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision, then releases
 ```
 
-The one call also runs `run:release <N>`, so the parked child holds neither the tree nor
-`in-progress`; a failed release prints `pnpm josh run:release <N>` to re-run. A tree whose hold names
-another run (a split lane parking a leftover child) is left to that run's own release. Return to
-step 1.
+Return to step 1.
 
 **What happens to a parked child's lane** — `backlogrun-lanes.md` → "What happens to a lane".
 
@@ -80,8 +60,7 @@ It never carries:
 
 - a recommended, reversible choice — Tier A: adopt it, record it in the epic's Decisions and child
   comment with `pnpm josh epic --decide <E> <N...> --decision-file <path|->`, and continue
-  (`prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy", the single source).
-  `run:park` refuses `推奨` / `recommend` (case-insensitive); Tier C still needs explicit authorization;
+  (`prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy", the single source);
 - whether to run something already planned and opted in with `auto-ok` — the opt-in is that decision;
 - a wait for the next published release — a dependency, `pnpm josh issue:release <N> --wait`
   (`prerequisite.md`);
@@ -97,18 +76,10 @@ known, and removed when the reason is not on it.
 
 ## `in-progress` is removed by whoever finds it stale
 
-An interrupted run leaves `in-progress` behind, which excludes the child from `epic:next` permanently
-and occupies a lane. **A session that detects a stale child removes the label itself** (Tier A) and
-reports it, before continuing. **The rule therefore applies to any open issue in the repository, not
-only to this epic's children** (`epic:next` names the holders on standard error).
-
-```bash
-pnpm josh run:stale
-```
-
-It removes the label only where nothing holds it, keeps a real hold (a dirty checkout, a live run),
-and leaves a closed issue alone; report each `kept` / `removed` line. The test is
-`docs/josh-commands-run.md` → "`josh run:stale`".
+**A session that detects a stale `in-progress` on any open issue in the repository — not only this
+epic's children (`epic:next` names the holders on standard error) — runs `pnpm josh run:stale`**
+(Tier A) before continuing, and reports each `kept` / `removed` line (`docs/josh-commands-run.md` →
+"`josh run:stale`").
 
 ## A prerequisite discovered mid-run
 

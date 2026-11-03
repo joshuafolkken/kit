@@ -5,6 +5,7 @@ import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { stash_push_cli } from '#scripts/git/stash/stash-push-cli'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
@@ -246,4 +247,29 @@ describe('josh upstream:interrupt refusals', () => {
 		expect(vi.mocked(stash_push_cli.set_aside)).not.toHaveBeenCalled()
 		expect(stderr_text()).toContain('Usage: josh upstream:interrupt')
 	})
+})
+
+// joshuafolkken/kit#6056: both body reads go through `cli_body` — the first-party copy before the
+// stash and the third-party draft — so a body left in the work tree stops either before it is used.
+describe('josh upstream:interrupt — where the body file sits', () => {
+	it.each([FIRST_PARTY_REPO, THIRD_PARTY_REPO])(
+		'refuses a body in the work tree that git does not ignore (%s)',
+		async (repo) => {
+			const repository = cli_body_repository.create()
+			const body_file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, DRAFT)
+			const code = await upstream_interrupt_cli.run([
+				FINDER,
+				TITLE,
+				REPO_FLAG,
+				repo,
+				BODY_FILE_FLAG,
+				body_file,
+			])
+
+			repository.remove()
+			expect(code).toBe(FAILURE_EXIT_CODE)
+			expect(vi.mocked(git_gh_command.issue_comment)).not.toHaveBeenCalled()
+			expect(stderr_text()).toContain('not git-ignored')
+		},
+	)
 })

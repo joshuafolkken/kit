@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { cli_body } from '#scripts/josh/cli-body'
 import { aggregation_split } from './aggregation-split'
 import { behavior_change_lint } from './behavior-change-lint'
 import { expected_effect_lint } from './expected-effect-lint'
@@ -76,7 +76,7 @@ async function run(body_path: string | undefined): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const body = await readFile(body_path, 'utf8')
+	const body = cli_body.read_file_or_stdin(body_path)
 
 	return report(problems(body), body)
 }

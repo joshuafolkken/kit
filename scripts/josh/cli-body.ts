@@ -2,7 +2,10 @@ import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { error_text } from '#scripts/lib/error-message'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
+
+type BodyRead = { text: string } | { problem: string }
 
 // A body — an Issue comment, a PR comment, a notification message — handed to a command as an inline
 // double-quoted shell argument is **evaluated by the shell before the command ever sees it**.
@@ -44,7 +47,7 @@ const ESCAPED_NEWLINE = String.raw`\n`
 // **A regular file inside a work tree that git does not ignore is refused** (joshuafolkken/kit#6055).
 // Sessions kept writing bodies into an untracked `scratchpad/` beside the code, where `git status`
 // carries them and a commit can sweep them up. The refusal sits in this reader rather than in a rule
-// per writer; the `*-file` flags still read without it are joshuafolkken/kit#6056. git answers whether the path is
+// per writer, and every `*-file` flag reads through it (joshuafolkken/kit#6056). git answers whether the path is
 // ignored, so no second ignore table exists: exit 1 alone refuses — 0 is ignored, 128 is no
 // repository, and a timeout is no answer. Devices and FIFOs are never asked about.
 function is_unignored_in_tree(resolved: string): boolean {
@@ -75,6 +78,17 @@ function read_body_file(raw_path: string): string {
 
 function read_file_or_stdin(raw_path: string): string {
 	return raw_path === STDIN_PATH ? readFileSync(STDIN_FD, 'utf8') : read_body_file(raw_path)
+}
+
+// The non-throwing read, for a caller that turns an unreadable or refused body into its own exit:
+// the refusal's sentence is carried out, so `issue:file` and the rest do not replace it with a
+// vaguer one of their own.
+function read_result(raw_path: string): BodyRead {
+	try {
+		return { text: read_file_or_stdin(raw_path) }
+	} catch (error) {
+		return { problem: error_text.message_of(error) }
+	}
 }
 
 function expand_escaped_newlines(raw: string): string {
@@ -114,6 +128,6 @@ function resolve(input: {
 	return read_file_or_stdin(file_path)
 }
 
-const cli_body = { read_file_or_stdin, has_value, resolve }
+const cli_body = { STDIN_PATH, read_file_or_stdin, read_result, has_value, resolve }
 
 export { cli_body }

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Unmet } from '#scripts/git/git-preflight'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { report_format_reference } from '#scripts/report/report-format-reference'
 import { acceptance_map } from '#scripts/review/acceptance-map'
 import { live_evidence } from '#scripts/review/live-evidence'
@@ -169,6 +170,11 @@ describe('run_ship_preflight.stage — the lane plan', () => {
 	})
 })
 
+// joshuafolkken/kit#6056: the --body-file is read through `cli_body`, so one in the work tree is refused.
+const TREE_BODY = cli_body_repository
+	.create(TEMPORARY)
+	.write(cli_body_repository.UNIGNORED_DIRECTORY, EVIDENCE_BODY)
+
 afterAll(() => {
 	rmSync(TEMPORARY, { force: true, recursive: true })
 })
@@ -228,14 +234,14 @@ describe('run_ship_preflight.stage — a precondition that cannot be read', () =
 		expect(scoped_mock).not.toHaveBeenCalled()
 	})
 
-	it('still reports the git preflight problems when the --body-file cannot be read', async () => {
+	it('still reports the git preflight problems when the --body-file is refused', async () => {
 		problems_mock.mockResolvedValue([CLASSIFICATION_UNMET])
-		const result = await run_ship_preflight.stage({ title: TITLE, body_path: MISSING_BODY })
+		const result = await run_ship_preflight.stage({ title: TITLE, body_path: TREE_BODY })
 
 		expect(result.code).toBe(FAILED)
 		expect(result.out).toContain(TWO_PROBLEMS)
 		expect(result.out).toContain(CLASSIFICATION)
-		expect(result.out).toContain(MISSING_BODY)
+		expect(result.out).toContain('not git-ignored')
 	})
 
 	it('still reports the evidence problem when the git preflight read throws', async () => {
