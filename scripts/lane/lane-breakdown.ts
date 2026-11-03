@@ -4,6 +4,7 @@ import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_breakdown_pause, type PauseMark } from './lane-breakdown-pause'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_net_time, type LaneSpan } from './lane-net-time'
+import { lane_plan_wait_event } from './lane-plan-wait-event'
 import { lane_stop_stats } from './lane-stop-stats'
 import { lane_yield_split, type YieldShare } from './lane-yield-split'
 
@@ -20,6 +21,8 @@ const { PHASE } = run_ship_stage
 const PLAN_STAGE = 'start to plan'
 const IMPLEMENT_STAGE = 'implement'
 const BETWEEN_STAGE = 'between ship stages'
+// A ship stop's marker before `closed` reads it — never a stage.
+const STOP_MARK = 'stop'
 const SHIP_LEAD = 'ship '
 const PRE_DETACH_STAGE = `${SHIP_LEAD}${lane_ledger.PRE_DETACH_STAGE}`
 const FOLLOWUP_STAGE = `${SHIP_LEAD}${run_ship_stage.STAGE.FOLLOWUP}`
@@ -78,6 +81,11 @@ function is_ship(segment: Segment): boolean {
 interface Marker {
 	at_ms: number
 	stage: string
+}
+
+interface Records {
+	entries: ReadonlyArray<LedgerEntry>
+	events: ReadonlyArray<RunEvent>
 }
 
 function ship_stage_of(text: string): string {
@@ -151,15 +159,39 @@ function edit_markers(
 	return opens_implement(opened, edit_ms) ? [{ at_ms: edit_ms, stage: IMPLEMENT_STAGE }] : []
 }
 
+function stop_of(entry: LedgerEntry, issue: number, span: LaneSpan): ReadonlyArray<Marker> {
+	if (entry.kind !== lane_ledger.KIND.STOP || entry.issue !== issue) return []
+	const at_ms = Date.parse(entry.at)
+
+	return is_inside(at_ms, span) ? [{ at_ms, stage: STOP_MARK }] : []
+}
+
+// A ship's stop closes the ship stage open at it (joshuafolkken/kit#6140) — a preflight stop writes
+// no stage of its own after its `pre-detach start` — and opens nothing anywhere else.
+function closing(marker: Marker, before: Marker | undefined): ReadonlyArray<Marker> {
+	if (marker.stage !== STOP_MARK) return [marker]
+	if (before?.stage.startsWith(SHIP_LEAD) !== true) return []
+
+	return [{ ...marker, stage: BETWEEN_STAGE }]
+}
+
+function closed(markers: ReadonlyArray<Marker>): Array<Marker> {
+	return markers.flatMap((marker, index) => closing(marker, markers[index - 1]))
+}
+
+// The stages the lane's events and ship stops opened, in time order.
+function opened_of(records: Records, issue: number, span: LaneSpan): Array<Marker> {
+	const events = records.events.flatMap((event) => marker_of(event, issue, span))
+	const stops = records.entries.flatMap((entry) => stop_of(entry, issue, span))
+
+	return closed([...events, ...stops].toSorted((left, right) => left.at_ms - right.at_ms))
+}
+
 function segments_of(
-	events: ReadonlyArray<RunEvent>,
-	issue: number,
+	opened: ReadonlyArray<Marker>,
 	span: LaneSpan,
 	edit_ms: number | undefined,
 ): Array<Segment> {
-	const opened = events
-		.flatMap((event) => marker_of(event, issue, span))
-		.toSorted((left, right) => left.at_ms - right.at_ms)
 	// A marker of the stage already open opens nothing: the `plan` and `lane-phase implement` of one
 	// start, or of a resumed session, leave the implementation one span.
 	const markers = [
@@ -173,6 +205,18 @@ function segments_of(
 		from_ms: marker.at_ms,
 		to_ms: markers[index + 1]?.at_ms ?? span.to_ms,
 	}))
+}
+
+// The lane's stages as spans, each `lane:plan` wait cut out as a stage of its own.
+function lane_segments(
+	records: Records,
+	issue: number,
+	span: LaneSpan,
+	edit_ms: number | undefined,
+): Array<Segment> {
+	const segments = segments_of(opened_of(records, issue, span), span, edit_ms)
+
+	return lane_plan_wait_event.carved(segments, lane_plan_wait_event.spans(records.events, issue))
 }
 
 function clipped(segment: LaneSpan, parts: ReadonlyArray<LaneSpan>): Array<LaneSpan> {
@@ -261,7 +305,7 @@ function of(
 	if (span === undefined) return undefined
 
 	const waits = lane_net_time.waits(entries, events, issue, span)
-	const segments = segments_of(events, issue, span, edit_ms)
+	const segments = lane_segments({ entries, events }, issue, span, edit_ms)
 	const parts = segments.map((segment) => ({
 		name: segment.stage,
 		ms: segment.to_ms - segment.from_ms - covered_ms(segment, waits),

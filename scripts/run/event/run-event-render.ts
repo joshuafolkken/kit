@@ -55,6 +55,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	'paused-notice': { ja: '一時停止の通知', en: 'paused notice' },
 	measured: { ja: '計測で完了', en: 'measured' },
 	sleep: { ja: 'ホストのスリープ', en: 'host sleep' },
+	'plan-wait': { ja: '計画の重なり待ち', en: 'plan wait' },
 }
 
 const LABELS_BY_KIND: ReadonlyMap<string, KindLabel> = new Map(Object.entries(KIND_LABELS))
