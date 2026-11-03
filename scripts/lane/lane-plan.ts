@@ -27,6 +27,8 @@ const lane_plan_schema = z.object({
 	sized: z.boolean().optional(),
 	// The lane gave its lane back on this plan (`lane-yield.ts`), so the plan outlives the lane.
 	yielded: z.boolean().optional(),
+	// When the lane's bounded wait on a later-dispatched holder ends (`lane-plan-wait.ts`), ISO time.
+	waits_until: z.string().optional(),
 	// Every path an earlier cleared plan of this lane held (joshuafolkken/kit#5672), so a re-plan that
 	// narrows `paths` keeps the files the lane already cleared and edited planned for the hunks axis.
 	cleared_paths: z.array(z.string()).optional(),

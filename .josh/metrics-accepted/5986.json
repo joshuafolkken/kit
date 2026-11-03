@@ -1,0 +1,7 @@
+{
+	"reason": "#5986 adds the bounded-wait rule for lane:plan (new lane-plan-wait.ts with its blocking hold, and its branch in lane-plan-check.ts)",
+	"date": "2026-11-03",
+	"growth": {
+		"scripts.code_lines": 121
+	}
+}

@@ -1345,6 +1345,12 @@ On a clash the child gives its lane back instead of polling with its seat taken:
 - Its plan stays recorded, uncleared and marked yielded: `backlog:next` holds the issue back on it and offers it again once the holder's lane ends. Unlike `lane:withdraw`, a yield keeps the issue in the run.
 - The note ends `· at: summary`, or `· at: entry` for the entry probe below.
 
+A lane dispatched before its holder and holding commits waits instead, keeping its seat (`scripts/lane/lane-plan-wait.ts`):
+
+- It waits when the holder's estimated remaining time (the median lane of the last 3 days less the holder's elapsed time) is no more than its own worked time, capped at 30 minutes.
+- The first such ask records a deadline that far ahead on the plan. `lane:plan` then blocks, re-reading the holders once a minute, for at most 9 minutes per ask.
+- It answers `clear` once the holder's lane ends, `yield` once the deadline passes, or `wait` when the ask's own 9 minutes run out first — the child runs `lane:plan` again at once.
+
 `--probe` answers the same check and writes nothing. A lane child's `run:entry` runs it once, before the issue report, on the paths dispatch gated on; on a clash it gives the lane back as above and exits 2.
 
 A `run:planned` candidate's plan comment (the latest trusted one carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body: one naming a running lane's file is held back before dispatch; a path its body only cites holds nothing.
@@ -1355,7 +1361,7 @@ So does a tree whose changed hunks pass twice the declared files, or whose decla
 
 `--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
 
-**Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash (issue, planned file, overlapped path, holder) on stderr: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
+**Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash (issue, planned file, overlapped path, holder) on stderr: end the session. `wait`, exit 1, on an unreadable listing or a bounded wait on a holder — run it again. No path: the usage, exit 1.
 
 ## Session and documents
 
