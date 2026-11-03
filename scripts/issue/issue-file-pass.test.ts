@@ -1,4 +1,5 @@
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
@@ -21,13 +22,15 @@ const NO_DUPLICATES = { report: 'Duplicates: none', candidates: [] }
 // Opted into `auto-ok` with no run label named, and missing every section after the background.
 const REFUSED_BODY = '## 背景\n\n- 種別: 不具合\n- 人の判断: 不要\n'
 
+const CLEAR_ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
+
 // Every local check passes: a judgement-needed body is not opted into `auto-ok`, so it owes no run label.
 const CLEAR_BODY = [
 	'## 背景',
 	'',
 	'- 種別: 不具合',
 	'- 原因: #4201',
-	'- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）',
+	CLEAR_ESTIMATE,
 	'- 人の判断: 要（目視確認）',
 	'',
 	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n',
@@ -56,6 +59,7 @@ beforeEach(() => {
 	vi.spyOn(issue_sample_source, 'problem').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
 	vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue(NO_DUPLICATES)
+	vi.spyOn(lane_net_read, 'implement_rate').mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -127,5 +131,19 @@ describe('issue_file_pass.labels_in_one_pass — a measurement already declared'
 		vi.mocked(issue_scout_cli.scout).mockResolvedValue({ ...NO_DUPLICATES, measure_twins: [] })
 
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeDefined()
+	})
+})
+
+// joshuafolkken/kit#6025: the size estimate is judged at the ledger's recent implement rate.
+describe('issue_file_pass.labels_in_one_pass — the implement rate', () => {
+	it('refuses a reasoned estimate the ledger rate projects past the budget', async () => {
+		vi.mocked(lane_net_read.implement_rate).mockResolvedValue({ median: 10, lanes: 4 })
+		const body = CLEAR_BODY.replace(
+			CLEAR_ESTIMATE,
+			'- 規模見積もり: 約 5 ファイル / 120 行（テスト除く）\n- 分割しない理由: 一体で入れる',
+		)
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(body))).toBeUndefined()
+		expect(printed()).toContain('implement budget')
 	})
 })

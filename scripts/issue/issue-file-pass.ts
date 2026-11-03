@@ -1,4 +1,6 @@
 import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
+import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
+import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
@@ -29,10 +31,10 @@ interface Filing {
 }
 
 // Every refusal the body and the arguments carry, read locally — `[]` when the body is admitted.
-function refusals_of(filing: Filing): ReadonlyArray<string> {
+function refusals_of(filing: Filing, rate: ImplementRate | undefined): ReadonlyArray<string> {
 	const problems = [
 		...issue_lint_cli.problems(filing.body),
-		size_estimate.guide_problem(filing.body, filing.args.route),
+		size_estimate.guide_problem(filing.body, filing.args.route, rate),
 		issue_sample_required.problem(filing.body),
 		issue_auto_ok.declaration_problem(filing.body),
 		issue_priority.problem(filing.body, filing.args.labels),
@@ -153,8 +155,9 @@ function labels_of(filing: Filing): ReadonlyArray<string> | undefined {
 	return undefined
 }
 
+// The size estimate is judged at the ledger's recent implement rate (joshuafolkken/kit#6025).
 async function is_admitted(filing: Filing): Promise<boolean> {
-	const refusals = refusals_of(filing)
+	const refusals = refusals_of(filing, await lane_net_read.implement_rate())
 
 	if (refusals.length === 0) return true
 	const hint = await issue_file_lane_hint.lines_of(filing.args.found_during, filing.body)

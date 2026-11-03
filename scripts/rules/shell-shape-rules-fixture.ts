@@ -45,6 +45,7 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'destructive-command': [SUBSHELL, HEREDOC],
 	'repo-admin': [],
 	'protected-file': [HEREDOC],
+	'workflow-edit': [],
 	egress: ['curl-data-file'],
 	'direct-pr-create': [SEMICOLON, HEREDOC],
 	'pr-merge': [SEMICOLON, HEREDOC],
