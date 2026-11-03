@@ -18,10 +18,10 @@ package_dir=${hooks_dir%/scripts/hooks}
 bundle="$package_dir/dist/hooks/$hook_name.js"
 josh_command="${hook_name%%-*}:${hook_name#*-}"
 
-project_root=${package_dir%%/node_modules/*}
+launch_directory=$PWD
+cd "${package_dir%/node_modules/*/*}" || exit
 # A command from before joshuafolkken/kit#6033 exports the launch directory itself, then moves to the root.
-if [ "$PWD" != "$project_root" ] || [ -z "$JOSH_HOOK_CWD" ]; then export JOSH_HOOK_CWD="$PWD"; fi
-cd "$project_root" || exit
+if [ "$launch_directory" != "$PWD" ] || [ -z "$JOSH_HOOK_CWD" ]; then export JOSH_HOOK_CWD="$launch_directory"; fi
 worktrees_dir=$PWD/.claude/worktrees/
 case $JOSH_HOOK_CWD in
 "$worktrees_dir"?*)

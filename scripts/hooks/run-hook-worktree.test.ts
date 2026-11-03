@@ -14,6 +14,7 @@ const WORKTREE = '.claude/worktrees/agent-demo'
 const CWD_STUB = 'process.stdout.write(process.cwd())\n'
 const KIT_GATE = 'tools/hooks/hook-bundle-ready.ts'
 const KIT_COMMAND = hook_launch.hook_launch_command('demo-hook')
+const INSTALLED_BUNDLE = 'dist/hooks/demo-hook.js'
 
 const workspace = { root: '' }
 
@@ -91,16 +92,6 @@ describe('a hook launched inside a Claude Code worktree', () => {
 		expect(hook_directory(unsynced_command, 'src')).toBe(workspace.root)
 	})
 
-	it('runs in the worktree under the unsynced command that exports the launch directory', () => {
-		create_package('.', KIT_GATE)
-
-		const unsynced_command = `export JOSH_HOOK_CWD="$PWD" && cd "$CLAUDE_PROJECT_DIR" && sh ${hook_launch.RUN_HOOK_SCRIPT} demo-hook`
-
-		expect(hook_directory(unsynced_command, `${WORKTREE}/src`)).toBe(
-			path.join(workspace.root, WORKTREE),
-		)
-	})
-
 	// The launcher finds the root from its own path, so no `CLAUDE_PROJECT_DIR` is needed to reach it.
 	it('runs in the project root from a subdirectory with no root named', () => {
 		create_package('.', KIT_GATE)
@@ -111,11 +102,45 @@ describe('a hook launched inside a Claude Code worktree', () => {
 	})
 
 	it.each(LAUNCHES)('runs in an installed package from %s', (_case, launch_directory, expected) => {
-		create_package(claude_plugin_config.MARKETPLACE_PATH, 'dist/hooks/demo-hook.js')
+		create_package(claude_plugin_config.MARKETPLACE_PATH, INSTALLED_BUNDLE)
 		write_file(path.join(claude_plugin_config.MARKETPLACE_PATH, 'package.json'), '{}\n')
 
 		expect(
 			hook_directory(hook_command_bootstrap.consumer_command(KIT_COMMAND), launch_directory),
 		).toBe(path.join(workspace.root, expected))
+	})
+})
+
+const EXPORTING_PREFIX = 'export JOSH_HOOK_CWD="$PWD" && cd "$CLAUDE_PROJECT_DIR" && sh '
+const UNSYNCED_LAUNCHES: ReadonlyArray<readonly [string, string, string]> = [
+	['kit checkout', '.', KIT_GATE],
+	['an installed package', claude_plugin_config.MARKETPLACE_PATH, INSTALLED_BUNDLE],
+]
+
+// The command from before joshuafolkken/kit#6033 exports the launch directory and moves to the root
+// before the launcher runs; the launcher keeps that launch directory.
+describe('a hook launched by an unsynced command that exports the launch directory', () => {
+	it.each(UNSYNCED_LAUNCHES)('runs in the worktree in %s', (_case, package_root, hand_over) => {
+		create_package(package_root, hand_over)
+
+		const launcher = path.join(package_root, hook_launch.RUN_HOOK_SCRIPT)
+		const command = `${EXPORTING_PREFIX}./${launcher} demo-hook`
+
+		expect(hook_directory(command, `${WORKTREE}/src`)).toBe(path.join(workspace.root, WORKTREE))
+	})
+})
+
+describe('a hook in a project checked out under a directory named node_modules', () => {
+	it('runs in that project root', () => {
+		const project = 'node_modules/app'
+		const package_root = path.join(project, claude_plugin_config.MARKETPLACE_PATH)
+
+		create_package(package_root, INSTALLED_BUNDLE)
+
+		const launcher = path.join(workspace.root, package_root, hook_launch.RUN_HOOK_SCRIPT)
+
+		expect(hook_directory(`sh "${launcher}" demo-hook`, project, false)).toBe(
+			path.join(workspace.root, project),
+		)
 	})
 })
