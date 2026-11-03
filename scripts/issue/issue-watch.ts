@@ -247,7 +247,8 @@ interface Acknowledged {
 }
 
 // When the newest update an acknowledgement takes in landed — a comment's `created_at`, a body edit's
-// the issue's `updated_at` — each never later than now, an unreadable one now. **Not the
+// the issue's `updated_at` — each never later than now, an unreadable one now, and never earlier than
+// the stamp it replaces, so a late-listed comment cannot lift a refusal. **Not the
 // acknowledgement's own time** (joshuafolkken/kit#5835): a run's own body edit landed before its review
 // was briefed, and stamping the later ack refused that review as briefed on an older spec.
 function landed_at(
@@ -258,7 +259,7 @@ function landed_at(
 	const times = issue_watch_diff.landed_times(record, fetched.snapshot, fetched.updated_at ?? '')
 	const landed = times.map((time) => Math.min(Date.parse(time) || now.getTime(), now.getTime()))
 
-	return new Date(Math.max(...landed, 0)).toISOString()
+	return new Date(Math.max(...landed, Date.parse(record.acknowledged_at) || 0)).toISOString()
 }
 
 // `josh issue:ack`: read the issue as it is now, return what changed since the baseline, and make

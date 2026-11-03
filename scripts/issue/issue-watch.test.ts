@@ -202,6 +202,14 @@ describe('issue_watch.acknowledge — when the update landed', () => {
 
 		expect(issue_watch.read_record(root())?.acknowledged_at).toBe(LATER_TIME)
 	})
+
+	it('never moves acknowledged_at earlier than the stamp it replaces', async () => {
+		stub_issue(changed(EDITED_BODY, OPEN_STATE, 'OWNER', BASE_TIME))
+		seed({ acknowledged_at: LATER_TIME })
+		await issue_watch.acknowledge(root(), new Date(FUTURE_TIME))
+
+		expect(issue_watch.read_record(root())?.acknowledged_at).toBe(LATER_TIME)
+	})
 })
 
 describe('issue_watch.acknowledge — the review brief across an acknowledgement', () => {

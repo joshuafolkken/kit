@@ -8,8 +8,8 @@ import { lane_stop_stats } from './lane-stop-stats'
 
 // A lane's net time by stage (joshuafolkken/kit#4995), read off the run events it already leaves: from
 // its dispatch to its `plan`, the implementation from the `plan` (or `lane-phase implement`, or else
-// the first edit) to the first ship stage, each ship stage from its start to its end, and the time between ship stages — a stopped
-// stage's fix included. The waits `lane:net` takes out are taken out of the stage they fell in and
+// the first edit) to the first ship stage, each ship stage from its start to its end, and the time
+// between ship stages — a stopped stage's fix included. The waits `lane:net` takes out are taken out of the stage they fell in and
 // counted apart, so the stages add up to the net time. A cut and its resume open no stage: the
 // implementation stays one stage across them.
 
