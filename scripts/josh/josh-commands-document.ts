@@ -4,7 +4,6 @@ import type { CommandEntry } from './josh-command-types'
 // commands stay grouped under the 'AI tools' category. `read:files` and
 // `edit:files` are the read/write halves of the round-trip fold.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 	'doc:section': {
 		script: 'scripts/document/document-section-main.ts',
@@ -84,6 +83,5 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { DOCUMENT_COMMANDS }

@@ -1,12 +1,10 @@
 import { core_weights } from '#scripts/gate/core-weights'
 import { LINT_RULE_WORKERS, type CommandEntry } from './josh-command-types'
 
-// The linters for the fixed-shape artifacts a run writes by hand. They are
-// `AI tools` by category, like every other automation command, but live in their own file so
-// `josh-commands-ai.ts` stays under its line ceiling. `lint:rule` is here for the same reason:
-// `josh-commands-development.ts`, where the other lint commands are, is at its line ceiling.
+// The linters for the fixed-shape artifacts a run writes by hand, plus `lint:rule`. They are
+// `AI tools` by category, like every other automation command. Spread into `COMMAND_MAP` in
+// `josh-command-map.ts` ahead of `CLONE_COMMANDS`.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const LINT_COMMANDS: Record<string, CommandEntry> = {
 	'lint:rule': {
 		script: 'scripts/lint/lint-rule.ts',
@@ -79,6 +77,5 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { LINT_COMMANDS }

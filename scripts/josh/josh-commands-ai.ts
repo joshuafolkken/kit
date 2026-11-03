@@ -38,7 +38,6 @@ const PAUSE_ARGUMENTS = {
 	reference: [ISSUE_OR_ALL, 'developer', ['processes']],
 } satisfies Partial<CommandEntry>
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const AI_COMMANDS: Record<string, CommandEntry> = {
 	...ISSUE_COMMANDS,
 	'pkg:scout': {
@@ -619,6 +618,5 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { AI_COMMANDS }

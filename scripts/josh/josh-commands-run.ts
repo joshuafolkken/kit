@@ -14,7 +14,6 @@ const ISSUE = { arguments: '<N>' }
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
 const RUN_HOLD_SCRIPT = 'scripts/run/hold/run-hold-main.ts'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const RUN_COMMANDS: Record<string, CommandEntry> = {
 	'run:hold': {
 		script: RUN_HOLD_SCRIPT,
@@ -308,6 +307,5 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { RUN_COMMANDS }

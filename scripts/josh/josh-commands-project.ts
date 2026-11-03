@@ -8,10 +8,6 @@ const PR_NUMBER = '42'
 const DRY_RUN = '--dry-run'
 const SKIP_PUBLISH_WAIT = '--skip-publish-wait'
 
-// Command names are the CLI's, not TypeScript's: a scoped one carries a colon (`sync:scope`), which
-// no identifier format allows. The same disable sits at the top of `josh-commands-maintenance.ts`
-// for the same reason.
-/* eslint-disable @typescript-eslint/naming-convention */
 const PROFILE_ARGUMENTS = '[--profile basic|full]'
 const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 	profile: {
