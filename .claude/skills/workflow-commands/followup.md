@@ -9,7 +9,7 @@ stops before the commit.
 Run it in the foreground after `pnpm josh git` and after every required review disposition:
 
 ```bash
-pnpm josh followup "<title> #<N>" --notify-message-file <report-file>
+pnpm josh followup "<title> #<N>" --notify-message-file .josh/tmp/report.md
 ```
 
 The report uses the session language: plain `Cause:`, `Fix:` and `Result:` lines, then `Details:`
@@ -84,7 +84,7 @@ josh release` runs" below.
 A `failure` Telegram is sent **by hand, exactly once**, and only when recovery is given up:
 
 ```bash
-pnpm josh notify --task-type failure --issue-url "<issue-url>" --body-file <reason-file>
+pnpm josh notify --task-type failure --issue-url "<issue-url>" --body-file .josh/tmp/failure.md
 ```
 
 ## What the output means

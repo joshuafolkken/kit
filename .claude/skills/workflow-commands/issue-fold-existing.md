@@ -2,7 +2,7 @@
 
 ## Reading the candidates
 
-Pass the whole draft — purpose, requirements and acceptance criteria — to `pnpm josh issue:scout "<title>" --body-file <draft.md>`. An explicitly referenced `#N` is a candidate even when its title looks unrelated. `Duplicates: incomplete` means the read or the search fell short; it is not a conclusion that no candidate exists.
+Pass the whole draft — purpose, requirements and acceptance criteria — to `pnpm josh issue:scout "<title>" --body-file .josh/tmp/body.md`. An explicitly referenced `#N` is a candidate even when its title looks unrelated. `Duplicates: incomplete` means the read or the search fell short; it is not a conclusion that no candidate exists.
 
 First record the comment thread's token with `pnpm josh issue:fold-existing --fingerprint <N>`.
 

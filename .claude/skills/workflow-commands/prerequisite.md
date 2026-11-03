@@ -37,7 +37,7 @@ open), then `pnpm josh run:pause <M> --for <the release Issue>` as for a prerequ
 so the observation row carries no `route:` label (`observation-filing.md`):
 
 ```bash
-pnpm josh issue:file "<title>" --body-file <body-file> --route tier-a
+pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --route tier-a
 ```
 
 The command lints the body against `prompts/collaboration-workflow/issue-template.md`, applies the
