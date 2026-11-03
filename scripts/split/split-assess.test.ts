@@ -93,14 +93,14 @@ describe('verdict needs either guide exceeded', () => {
 	})
 })
 
-describe('is_over_cap is three times the guide', () => {
-	it('is under the cap at exactly 24 files / 600 lines', () => {
-		expect(split_assess.is_over_cap(24, 600)).toBe(false)
+describe('is_over_cap is one and a half times the guide', () => {
+	it('is under the cap at exactly 12 files / 300 lines', () => {
+		expect(split_assess.is_over_cap(12, 300)).toBe(false)
 	})
 
 	it('is over the cap past either axis', () => {
-		expect(split_assess.is_over_cap(25, 600)).toBe(true)
-		expect(split_assess.is_over_cap(24, 601)).toBe(true)
+		expect(split_assess.is_over_cap(13, 300)).toBe(true)
+		expect(split_assess.is_over_cap(12, 301)).toBe(true)
 	})
 })
 

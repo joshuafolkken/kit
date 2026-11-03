@@ -4,12 +4,14 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
+import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { split_assess, type SizeMeasurement } from '#scripts/split/split-assess'
 import type { PoolContext } from './backlog-gate-scope'
 import { backlog_pool } from './backlog-pool'
 
 // An offered Issue whose declared estimate is over the split guide, with no reason it stays one —
-// judged by the same `size_estimate.over_guide` `issue:file` refuses on, so a body edited past the
+// judged by the same `size_estimate.over_guide` `issue:file` refuses on (and, reason or not, its
+// `over_budget` at the pool's measured rate — joshuafolkken/kit#6066), so a body edited past the
 // guide after filing is still seen before a lane starts it (joshuafolkken/kit#5384). A split child
 // passes the guide at filing, yet is warned on here too: lanes land past the doubled declaration
 // (joshuafolkken/kit#5935).
@@ -24,19 +26,37 @@ function remedy_of(route: string | undefined): string {
 		: `with no \`${split_assess.REASON_PREFIX}\``
 }
 
-function warned_estimate(body: string, route: string | undefined): SizeMeasurement | undefined {
-	return size_estimate.over_guide(body, route) ?? size_estimate.split_over_guide(body, route)
+// A reason declared does not excuse an estimate projected over the implement budget
+// (joshuafolkken/kit#6066).
+const BUDGET_REMEDY = `and is projected over the implement budget, which \`${split_assess.REASON_PREFIX}\` does not excuse — split it`
+
+interface Warning {
+	estimate: SizeMeasurement
+	remedy: string
 }
 
-function note_of(issue: OpenIssueData, repo: string): string | undefined {
+function warning_of(
+	body: string,
+	route: string | undefined,
+	rate: ImplementRate | undefined,
+): Warning | undefined {
+	const guide = size_estimate.over_guide(body, route) ?? size_estimate.split_over_guide(body, route)
+
+	if (guide !== undefined) return { estimate: guide, remedy: remedy_of(route) }
+	const budget = size_estimate.over_budget(body, route, rate)
+
+	return budget === undefined ? undefined : { estimate: budget, remedy: BUDGET_REMEDY }
+}
+
+function note_of(issue: OpenIssueData, context: PoolContext): string | undefined {
 	const labels = issue.labels?.map((label) => label.name) ?? []
 	const route = size_estimate.route_of(labels)
-	const estimate = warned_estimate(issue.body ?? '', route)
+	const warning = warning_of(issue.body ?? '', route, context.implement_rate)
 
-	if (estimate === undefined) return undefined
-	const cited = session_cite.issue(issue.number, undefined, repo)
+	if (warning === undefined) return undefined
+	const cited = session_cite.issue(issue.number, undefined, context.repo)
 
-	return `${cited} ${size_estimate.exceeded(estimate)} ${remedy_of(route)} — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${cited} ${size_estimate.exceeded(warning.estimate)} ${warning.remedy} — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // One stderr line per offered number over the guide; the stdout tokens stay bare numbers.
@@ -45,7 +65,7 @@ function warn_over_guide(tokens: ReadonlyArray<string>, context: PoolContext): v
 	const issues = context.opted_in.issues.filter((issue) => offered.has(String(issue.number)))
 
 	for (const issue of issues) {
-		const note = note_of(issue, context.repo)
+		const note = note_of(issue, context)
 
 		if (note !== undefined) console.error(note)
 	}

@@ -15,7 +15,7 @@ import { issue_scout_cli } from './issue-scout-cli'
 
 const HERE = 'joshuafolkken/kit'
 const FAILURE_EXIT_CODE = 1
-const OVER_GUIDE = '- 規模見積もり: 約 12 ファイル / 300 行（テスト除く）'
+const OVER_GUIDE = '- 規模見積もり: 約 6 ファイル / 150 行（テスト除く）'
 const OVER_CAP = '- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）'
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
 
@@ -94,7 +94,7 @@ describe('issue_file_cli.run — a size estimate over the split guide', () => {
 describe('issue_file_cli.run — a size estimate over the cap', () => {
 	it('refuses the filing despite a reason declared', async () => {
 		expect(await issue_file_cli.run(argv_of(capped_path))).toBe(FAILURE_EXIT_CODE)
-		expect(refusals()).toContain('exceeds the cap (more than 24 files or 600 lines)')
+		expect(refusals()).toContain('exceeds the cap (more than 12 files or 300 lines)')
 	})
 
 	it('lets it through filed as a split', async () => {
