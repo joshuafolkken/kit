@@ -46,12 +46,14 @@ function indent_of(line: string): number {
 }
 
 // The marker indent of the unchecked criterion `line` belongs to, or `OUTSIDE`. Every non-blank line
-// indented past the marker — a wrapped tail, a sub-item, a deep continuation — is part of it.
+// indented past the marker — a wrapped tail, a sub-item (unchecked ones too), a deep continuation —
+// is part of it; only a line outside it can start the next one.
 function owner_of(line: string, owner: number): number {
-	if (UNCHECKED_PATTERN.test(line)) return indent_of(line)
 	const is_inside = owner !== OUTSIDE && line.trim() !== '' && indent_of(line) > owner
 
-	return is_inside ? owner : OUTSIDE
+	if (is_inside) return owner
+
+	return UNCHECKED_PATTERN.test(line) ? indent_of(line) : OUTSIDE
 }
 
 // The line indices of each unchecked criterion, its indented lines included, in body order. A fenced

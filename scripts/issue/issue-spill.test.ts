@@ -48,6 +48,8 @@ describe('issue_spill.unchecked_lines', () => {
 			'- [ ] handles these cases:',
 			'  - case a',
 			'  - [x] case b',
+			'  - [ ] case c',
+			'  - case d after an unchecked sub-item',
 			'- [ ] wrapped',
 			'      deep continuation',
 		]
