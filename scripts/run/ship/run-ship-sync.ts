@@ -43,6 +43,8 @@ const MERGED_GATE_NOTE =
 const PUSHED_NOTE = 'pushed the merge ahead of the gate, so CI runs beside it'
 const PUSH_FAILED_NOTE =
 	'the push ahead of the gate failed; the commit stage pushes after the gate:'
+const PAIR_RED_NOTE =
+	'the scoped pair is red on the merged tree; the commit stage pushes after the gate'
 
 // A stage's result, plus the paths a stopped merge left unmerged — carried to the stop prompt.
 // `is_skipped` marks a stage that found nothing to do — a review round with nothing to review, a gate
@@ -128,7 +130,16 @@ async function commit_locally(title: string, is_dirty: boolean): Promise<JoshRes
 // default branch pushes nothing either, so the commit stage stays the one push; a merged one makes it
 // two, and CI and the review bots run again on the second. A failed push stops nothing: the commit
 // stage pushes the gated tree.
+//
+// **The scoped pair settles before that push** (joshuafolkken/kit#6121): the merge moved the base
+// under the pair's records, so the hook's related run read none of them and re-ran tests the pair had
+// passed. A merge sharing nothing with the branch re-records the pair without a run, any other runs it
+// where the two meet, and the hook then reuses `test:related`'s record; the gate stage reuses the pair.
 async function push_ahead(title: string): Promise<string> {
+	const pair = await run_ship_scoped.scoped_pair()
+
+	if (pair.code !== SUCCESS_EXIT_CODE) return PAIR_RED_NOTE
+
 	const push = await timed(
 		STEP.PUSH,
 		async () =>
@@ -340,6 +351,7 @@ const run_ship_sync = {
 	CONFLICT_NOTE,
 	MAX_MERGE_RETRIES,
 	MERGED_GATE_NOTE,
+	PAIR_RED_NOTE,
 	PUSHED_NOTE,
 	PUSH_FAILED_NOTE,
 	catch_up,
