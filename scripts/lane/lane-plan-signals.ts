@@ -89,6 +89,6 @@ async function signals_of(issue: number): Promise<PlanSignals> {
 	return signals_from(issue, tree, entries, Date.now())
 }
 
-const lane_plan_signals = { hunk_files, signals_from, signals_of }
+const lane_plan_signals = { RATIO_PERIOD_DAYS, hunk_files, signals_from, signals_of }
 
 export { lane_plan_signals }

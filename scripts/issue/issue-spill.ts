@@ -13,6 +13,7 @@ const BACKGROUND_HEADING = '## 背景'
 const HEADING_PREFIX = '## '
 const ESTIMATE_PREFIX = '- 規模見積もり:'
 const UNCHECKED_PATTERN = /^\s*[-*+]\s+\[ \]\s+\S/u
+const CHECKED_PATTERN = /^\s*[-*+]\s+\[[xX]\]\s+\S/u
 // No line's indent is negative, so this owner stands for "not inside an unchecked criterion".
 const OUTSIDE = -1
 const DECLARATION_PATTERN = /^-\s+[^:：\s][^:：]*[:：]/u
@@ -72,6 +73,17 @@ function unchecked_indices(body: string): ReadonlyArray<number> {
 	}
 
 	return indices
+}
+
+// How many acceptance criteria are checked — the green part a spill leaves behind. A fenced line is
+// never a criterion.
+function checked_count(body: string): number {
+	const visible = markdown_section.fence_free_lines(body)
+	const range = acceptance_range(visible)
+
+	if (range === undefined) return 0
+
+	return visible.slice(range.start, range.end).filter((line) => CHECKED_PATTERN.test(line)).length
 }
 
 function unchecked_lines(body: string): ReadonlyArray<string> {
@@ -140,6 +152,7 @@ function kept_body(body: string, follow_up: number): string {
 }
 
 const issue_spill = {
+	checked_count,
 	estimate_line,
 	follow_up_body,
 	follow_up_title,

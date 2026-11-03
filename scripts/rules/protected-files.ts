@@ -2,12 +2,12 @@ import path from 'node:path'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { edit_tool } from './edit-tool'
 import { git_argv } from './git-argv'
 import { nested_commands } from './nested-commands'
 import { secret_paths } from './secret-paths'
+import { shell_redirects } from './shell-redirects'
 
 // The trigger and the delivered text behind the `protected-file` row of `delivered-rules.ts`:
 // the two kinds of file a run's own file tools must not touch.
@@ -31,12 +31,6 @@ const FILE_TOOLS: ReadonlySet<string> = new Set([READ_TOOL, GREP_TOOL])
 const { is_edit_tool } = edit_tool
 const { is_secret_path } = secret_paths
 const SETTINGS_FILE = path.join('.claude', 'settings.json')
-const WHITESPACE = /\s+/u
-// Each character of a redirect operator (`<`, `>`, `>>`, `2>`, `&>`) — and the clobber `>|` whole —
-// is spaced out to a mark, so the word after the last one is the file it reads or writes.
-const REDIRECT = />\||[<>]/gu
-const REDIRECT_MARK = '<'
-const { SHELLS } = nested_commands
 // Programs that print a named file's bytes or run them, and programs that write one: a write could set
 // a guard switch, so `cp .env.example .env` is refused too (kit #4660) — the person makes the file.
 const SHELL_PROGRAMS: ReadonlySet<string> = new Set([
@@ -93,35 +87,14 @@ function file_path_of(call: GuardedCall): string {
 
 // A shell read reaches the same bytes a `Read` does, and a shell write changes the file an `Edit`
 // would, so a segment that runs one of the programs (`cat .env`, `source .env`, `tee .env`) or
-// redirects the file (`< .env`, `>> .env`) is refused too. Claude Code applies the `Read` deny rules to
-// the readers it recognizes, but `source .env.local` passes them (measured on 2.1.289, kit #3602), so
-// the variants are matched here as well.
-//
-// A quoted `>` is text (`git commit -m "x >> .env"`), so the marks are read on the quote-blanked
-// segment, whose offsets match the original; a shell's quoted script (`sh -c "echo x > .env"`) runs,
-// so its marks are read as written, as is a heredoc line, which `blanked` does not cut.
-function redirect_marks_of(segment: string, program: string | undefined): string {
-	if (program !== undefined && SHELLS.has(program)) return segment
-
-	return time_shell.blanked(segment) ?? segment
-}
-
-function spaced_redirects(segment: string, program: string | undefined): string {
-	const marks = redirect_marks_of(segment, program)
-
-	return segment.replaceAll(REDIRECT, (mark, offset: number) =>
-		marks.startsWith(mark, offset) ? ` ${REDIRECT_MARK} ` : mark,
-	)
-}
-
+// redirects the file (`< .env`, `>> .env`, `shell-redirects.ts`) is refused too. Claude Code applies
+// the `Read` deny rules to the readers it recognizes, but `source .env.local` passes them (measured on
+// 2.1.289, kit #3602), so the variants are matched here as well.
 function is_secret_shell_segment(segment: string): boolean {
 	const call = git_argv.program_of(segment)
-	const words = spaced_redirects(segment, call?.name)
-		.split(WHITESPACE)
-		.filter((word) => word !== '')
-	const is_redirected = words.some(
-		(word, index) => word === REDIRECT_MARK && is_secret_path(words[index + 1] ?? ''),
-	)
+	const is_redirected = shell_redirects
+		.targets_of(segment, call?.name)
+		.some((target) => is_secret_path(target))
 
 	if (is_redirected || call === undefined) return is_redirected
 
