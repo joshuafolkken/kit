@@ -158,7 +158,7 @@ kit ships with permission prompts off, so the unattended commands (`fullrun`, `b
 - `backlogrun` starts its sessions with `--permission-mode bypassPermissions`.
 - The `egress` guard row refuses an agent's `Bash` call that sends data off the machine (`curl` / `wget` / `nc` / `ssh` to another host, a network call in `node -e`) or prints a credential (`gh auth token`, `printenv`), nested spellings included; `.claude/settings.json` denies the plain forms as a backstop. See [SECURITY.md](../SECURITY.md#secrets).
 
-The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).
+The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable) and of the credential files: gh's `hosts.yml`, Codex's `auth.json`, `~/.netrc`, `~/.curlrc`, `~/.npmrc` and `~/.ssh/**`.
 
 The deny list matches the start of a command, so `git -C . …` or `command git …` passes it. The hook reads git's own arguments past those, but a git command inside `bash -c '…'`, a `python -c` one-liner or a script that opens the file itself still gets through. A command they let through is not thereby permitted.
 

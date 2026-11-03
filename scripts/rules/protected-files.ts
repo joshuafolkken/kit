@@ -7,14 +7,16 @@ import { bash_triggers } from './bash-triggers'
 import { edit_tool } from './edit-tool'
 import { git_argv } from './git-argv'
 import { nested_commands } from './nested-commands'
+import { secret_paths } from './secret-paths'
 
 // The trigger and the delivered text behind the `protected-file` row of `delivered-rules.ts`:
-// the two files a run's own file tools must not touch.
+// the two kinds of file a run's own file tools must not touch.
 //
 // - **A secret file is never read** — by the `Read` tool or by a shell reader in a `Bash` call. `.env`
 //   carries the Telegram bot token, its `.env.*` variants and wrangler's `.dev.vars` carry the same
-//   kind of value, and either read lands it in the transcript. The scripts that need one load it in
-//   their own process, so refusing the call costs them nothing.
+//   kind of value, and gh's `hosts.yml`, Codex's `auth.json`, `~/.netrc` and `~/.ssh/**` carry the
+//   tools' own credentials (`secret-paths.ts`); either read lands it in the transcript. The scripts
+//   that need one load it in their own process, so refusing the call costs them nothing.
 // - **`.claude/settings.json` is never edited in a consumer repository.** It is the deny list and the
 //   hooks that enforce every other rule, so a run that rewrites it can switch the guards off; `josh
 //   sync` owns it there. Only a kit consumer's file is refused — decided per file from the repository
@@ -25,14 +27,9 @@ import { nested_commands } from './nested-commands'
 
 const READ_TOOL = 'Read'
 const { is_edit_tool } = edit_tool
-const SECRET_FILES: ReadonlySet<string> = new Set(['.env', '.dev.vars'])
-const ENVIRONMENT_VARIANT_PREFIX = '.env.'
-// The two variants `.gitignore` un-ignores: they are tracked and hold placeholders, not secrets. The
-// `Read(!…)` carve-outs in `.claude/settings.json` name the same two.
-const TRACKED_VARIANTS: ReadonlySet<string> = new Set(['.env.example', '.env.test'])
+const { is_secret_path } = secret_paths
 const SETTINGS_FILE = path.join('.claude', 'settings.json')
 const WHITESPACE = /\s+/u
-const TOKEN_QUOTES = /["']/gu
 // Each character of a redirect operator (`<`, `>`, `>>`, `2>`, `&>`) — and the clobber `>|` whole —
 // is spaced out to a mark, so the word after the last one is the file it reads or writes.
 const REDIRECT = />\||[<>]/gu
@@ -91,14 +88,6 @@ function file_path_of(call: GuardedCall): string {
 	return typeof value === 'string' ? value : ''
 }
 
-function is_environment_path(token: string): boolean {
-	const name = path.basename(token.replaceAll(TOKEN_QUOTES, ''))
-
-	if (TRACKED_VARIANTS.has(name)) return false
-
-	return SECRET_FILES.has(name) || name.startsWith(ENVIRONMENT_VARIANT_PREFIX)
-}
-
 // A shell read reaches the same bytes a `Read` does, and a shell write changes the file an `Edit`
 // would, so a segment that runs one of the programs (`cat .env`, `source .env`, `tee .env`) or
 // redirects the file (`< .env`, `>> .env`) is refused too. Claude Code applies the `Read` deny rules to
@@ -122,33 +111,29 @@ function spaced_redirects(segment: string, program: string | undefined): string 
 	)
 }
 
-function is_environment_shell_segment(segment: string): boolean {
+function is_secret_shell_segment(segment: string): boolean {
 	const call = git_argv.program_of(segment)
 	const words = spaced_redirects(segment, call?.name)
 		.split(WHITESPACE)
 		.filter((word) => word !== '')
 	const is_redirected = words.some(
-		(word, index) => word === REDIRECT_MARK && is_environment_path(words[index + 1] ?? ''),
+		(word, index) => word === REDIRECT_MARK && is_secret_path(words[index + 1] ?? ''),
 	)
 
 	if (is_redirected || call === undefined) return is_redirected
 
-	return SHELL_PROGRAMS.has(call.name) && call.args.some((word) => is_environment_path(word))
+	return SHELL_PROGRAMS.has(call.name) && call.args.some((word) => is_secret_path(word))
 }
 
-function is_environment_shell_access(command: string): boolean {
-	return nested_commands
-		.commands_of(command)
-		.some((segment) => is_environment_shell_segment(segment))
+function is_secret_shell_access(command: string): boolean {
+	return nested_commands.commands_of(command).some((segment) => is_secret_shell_segment(segment))
 }
 
 // A `Read` lands the secret in the transcript; an `Edit` / `Write` could set a guard switch.
-function is_environment_access(call: GuardedCall): boolean {
-	if (call.name === READ_TOOL || is_edit_tool(call.name)) {
-		return is_environment_path(file_path_of(call))
-	}
+function is_secret_access(call: GuardedCall): boolean {
+	if (call.name === READ_TOOL || is_edit_tool(call.name)) return is_secret_path(file_path_of(call))
 
-	return bash_triggers.on_bash_command(is_environment_shell_access)(call)
+	return bash_triggers.on_bash_command(is_secret_shell_access)(call)
 }
 
 // The repository the settings file belongs to is two levels above it (`<root>/.claude/settings.json`).
@@ -169,12 +154,13 @@ function is_protected_file_call(
 	call: GuardedCall,
 	is_kit_consumer: (root: string) => boolean = doctor_consumer.is_kit_consumer,
 ): boolean {
-	return is_environment_access(call) || is_consumer_settings_edit(call, is_kit_consumer)
+	return is_secret_access(call) || is_consumer_settings_edit(call, is_kit_consumer)
 }
 
 const PROTECTED_FILE_REASON =
-	'⛔ protected file: `.env`, a `.env.*` variant and `.dev.vars` hold secrets and are written only ' +
-	'by the person, and a consumer ' +
+	'⛔ protected file: `.env`, a `.env.*` variant, `.dev.vars` and the credential files (gh ' +
+	"`hosts.yml`, Codex's `auth.json`, `~/.netrc`, `~/.curlrc`, `~/.npmrc`, `~/.ssh/**`) hold " +
+	'secrets and are read and written only by the person, and a consumer ' +
 	'`.claude/settings.json` is owned by `josh sync` (a change belongs upstream in kit). Leave these ' +
 	'files alone, or ask the user. It fires on every occurrence.'
 
@@ -189,7 +175,7 @@ const ROW = {
 		title: 'Protected file',
 		topic: '`operating-rules.md`',
 		fires:
-			'a `Read`, `Edit` or `Write` of `.env` (or a shell read or write of it), or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence',
+			'a `Read`, `Edit` or `Write` of `.env` or a credential file such as gh `hosts.yml`, Codex `auth.json`, `~/.netrc` or `~/.ssh/**` (or a shell read or write of one), or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence',
 		quiet: "kit itself, or the user's `~/.claude/settings.json`",
 	},
 }

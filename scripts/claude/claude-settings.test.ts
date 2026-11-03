@@ -88,12 +88,17 @@ const DESTRUCTIVE_DENY_PATTERNS: ReadonlyArray<string> = [
 ]
 
 // Under `bypassPermissions` and `Bash(*)` the deny list is the only thing between the Read tool and
-// a secret file, so the dotenv variants and wrangler's `.dev.vars` are named beside `.env` itself.
+// a secret file, so the dotenv variants, wrangler's `.dev.vars` and the home credential files (#6003)
+// are named beside `.env` itself.
 const ENV_VARIANT_DENY = 'Read(./.env.*)'
 const SECRET_READ_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Read(./.env)',
 	ENV_VARIANT_DENY,
 	'Read(./.dev.vars)',
+	'Read(~/.config/gh/**)',
+	'Read(~/.codex/auth.json)',
+	'Read(~/.netrc)',
+	'Read(~/.ssh/**)',
 ]
 
 // `.gitignore` un-ignores these two: they are tracked placeholders, so the variant deny must not take

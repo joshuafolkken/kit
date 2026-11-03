@@ -41,6 +41,9 @@ const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
 	path.join('cost-runtime', 'cost-transcript.ts'),
 	path.join('run', 'run-liveness.ts'),
 	path.join('agent', 'codex-home-source.ts'),
+	// `secret-paths` names the home directory's credential files so the protected-file guard can refuse
+	// a read of one; it only compares paths (joshuafolkken/kit#6003).
+	path.join('rules', 'secret-paths.ts'),
 ]
 // Every way a Node script can put bytes on disk — sync, async and `fs/promises` alike — plus the
 // low-level primitives the named calls are built on. Each entry is written so it can only match a
