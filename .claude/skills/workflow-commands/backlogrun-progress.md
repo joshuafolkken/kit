@@ -95,4 +95,4 @@ removed first, so the next ask can offer it.
 epic** — the start and completion notifications, `josh propagate`, and `pnpm josh release:scope` once
 after the last merge (`followup.md` → "When `pnpm josh release` runs"). **Never compose the summary by
 hand — `pnpm josh run:report` generates it**; pass it to `pnpm josh notify
---body-file`.
+--body-file .josh/tmp/report.md`.
