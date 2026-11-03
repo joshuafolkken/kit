@@ -55,21 +55,21 @@ still there for a reading outside a run.
 
 ## The columns
 
-| Column                          | Source                                                           |
-| ------------------------------- | ---------------------------------------------------------------- |
-| `JOSH_LANE_LIMIT`               | `--limit`, else the limit `lane:stats` reads                     |
-| `period (days)`                 | `--period`                                                       |
-| `merges`                        | `merge` entries in the period                                    |
-| `merges / hour`                 | merges per active hour — time `load` samples saw a lane working  |
-| `effective lanes`               | mean of the working `load` samples' `lanes` (child running)      |
-| `lane median (min)`             | median per merge of the time since its issue's latest `dispatch` |
-| `lanes over 40 min`             | merges whose lane time is over the overrun threshold             |
-| `lane p90 (min)`                | nearest-rank 90th percentile of the same lane times              |
-| `gate median (min)` / `max`     | `gate` entries' `elapsed_ms`                                     |
-| `load peak` / `mean`            | `load` samples' one-minute load average                          |
-| `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples   |
-| `free memory min` / `mean (GB)` | `load` samples' `available_mb`                                   |
-| `load samples`                  | how many `load` samples the period holds                         |
+| Column                          | Source                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `JOSH_LANE_LIMIT`               | `--limit`, else the period's `limit` entries (`3→4`), else the limit `lane:stats` reads |
+| `period (days)`                 | `--period`                                                                              |
+| `merges`                        | `merge` entries in the period                                                           |
+| `merges / hour`                 | merges per active hour — time `load` samples saw a lane working                         |
+| `effective lanes`               | mean of the working `load` samples' `lanes` (child running)                             |
+| `lane median (min)`             | median per merge of the time since its issue's latest `dispatch`                        |
+| `lanes over 40 min`             | merges whose lane time is over the overrun threshold                                    |
+| `lane p90 (min)`                | nearest-rank 90th percentile of the same lane times                                     |
+| `gate median (min)` / `max`     | `gate` entries' `elapsed_ms`                                                            |
+| `load peak` / `mean`            | `load` samples' one-minute load average                                                 |
+| `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples                          |
+| `free memory min` / `mean (GB)` | `load` samples' `available_mb`                                                          |
+| `load samples`                  | how many `load` samples the period holds                                                |
 
 **A column with no samples prints `—`, never `0`** — a period no `backlogrun` ran in has no load,
 which is not an idle machine. **The swap columns need two samples between half a minute and an hour apart** — a

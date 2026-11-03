@@ -1022,6 +1022,7 @@ The run keeps the environment it started with, so this writes an override onto t
 - The limit counts lanes, not memory or usage: the driver opens no lane under memory pressure or a Claude usage limit, and `run:board` leads the waiting row with `🧠` or `🪫 <reset>`.
 - A limit above the nine port seats is counted at the seats, as `JOSH_LANE_LIMIT` is; a value that is not a positive integer is refused.
 - The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
+- A run's start limit and each change are ledger `limit` lines; `lane:stats` labels a period with each limit it held (`3→4`).
 
 **Output / exit codes:** prints `lane limit <n> (<source>) · in use <n> · free <n>` and exits 0. Bad arguments, an invalid limit or no run in progress exit 1.
 
