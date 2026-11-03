@@ -64,17 +64,56 @@ function with_session_notice(outcome: GuardOutcome, raw_payload: string): GuardO
 	return notice === undefined ? outcome : { reason: undefined, notice, fault: undefined }
 }
 
-// All guards run unconditionally, exactly as the separate PreToolUse entries did: each records its own
-// once-per-run stamp, so short-circuiting on the first refusal would change which guard is allowed to
-// fire on a later call.
+function guarded_call(raw_payload: string): GuardedCall | undefined {
+	try {
+		const payload = hook_decision.parse_hook_payload(raw_payload)
+
+		return payload === undefined
+			? undefined
+			: { name: payload.tool_name, input: payload.tool_input }
+	} catch {
+		return undefined
+	}
+}
+
+function authority_outcome(raw_payload: string): GuardOutcome {
+	return {
+		reason: implementation_authority.reason(raw_payload),
+		notice: undefined,
+		fault: undefined,
+	}
+}
+
+function lane_plan_outcome(raw_payload: string): GuardOutcome {
+	return { reason: lane_plan_guard.reason(raw_payload), notice: undefined, fault: undefined }
+}
+
+// The most frequent calls of a session, which only the guards marked `reads` act on.
+const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['Read', 'Glob', 'Grep'])
+
+// The synchronous guards, in refusal order, and whether each acts on a read-only tool: batching
+// and investigation count one, duplicate-read refuses a re-read. The edit guards are skipped there
+// by tool name (joshuafolkken/kit#6041) — safe because neither records a stamp, and neither fires
+// on a read. The rule rows stay on every
+// call: their `consultation-investigation` row is triggered by `Glob` / `Grep`.
+const SYNC_GUARDS: ReadonlyArray<{
+	outcome: (raw_payload: string) => GuardOutcome
+	reads: boolean
+}> = [
+	{ outcome: authority_outcome, reads: false },
+	{ outcome: batch_outcome, reads: true },
+	{ outcome: investigation_outcome, reads: true },
+	{ outcome: duplicate_read_outcome, reads: true },
+	{ outcome: lane_plan_outcome, reads: false },
+]
+
+// Every guard that acts on the call runs, never short-circuited on the first refusal: each records
+// its own once-per-run stamp, so stopping early would change which guard may fire on a later call.
 function guard_outcome(raw_payload: string): GuardOutcome {
-	const outcomes = [
-		{ reason: implementation_authority.reason(raw_payload), notice: undefined, fault: undefined },
-		batch_outcome(raw_payload),
-		investigation_outcome(raw_payload),
-		duplicate_read_outcome(raw_payload),
-		{ reason: lane_plan_guard.reason(raw_payload), notice: undefined, fault: undefined },
-	]
+	const is_read = READ_ONLY_TOOLS.has(guarded_call(raw_payload)?.name ?? '')
+	const outcomes = SYNC_GUARDS.filter((guard) => guard.reads || !is_read).map((guard) =>
+		guard.outcome(raw_payload),
+	)
 
 	return combine_outcomes(outcomes, delivered_rules.delivery(raw_payload))
 }
@@ -125,18 +164,6 @@ async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome>
 	await mark_phase(outcome)
 
 	return outcome
-}
-
-function guarded_call(raw_payload: string): GuardedCall | undefined {
-	try {
-		const payload = hook_decision.parse_hook_payload(raw_payload)
-
-		return payload === undefined
-			? undefined
-			: { name: payload.tool_name, input: payload.tool_input }
-	} catch {
-		return undefined
-	}
 }
 
 // A rewrite's note first, so the transcript's context line opens with it; the outcome's notice after.
