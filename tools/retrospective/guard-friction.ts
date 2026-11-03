@@ -164,7 +164,7 @@ function sum_of(rows: ReadonlyArray<GuardRow>, field: 'refusals' | 'stops' | 'us
 }
 
 function row_line(row: GuardRow): string {
-	return `  ${row.guard}: ${String(row.refusals)} refused, ${String(row.stops)} stopped, ${figure_format.format_usd(row.usd)}`
+	return `  ${row.guard}: ${String(row.refusals)} refused, ${String(row.rephrased)} rephrased, ${String(row.stops)} stopped, ${figure_format.format_usd(row.usd)}`
 }
 
 function report_lines(rows: ReadonlyArray<GuardRow>): Array<string> {

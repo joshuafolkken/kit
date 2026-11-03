@@ -75,17 +75,12 @@ function gather_runs(cwd: string = process.cwd()): Generator<Array<string>> {
 	return runs_of(group_by_run(files).values())
 }
 
-// The `piped-verification` refusals are named by shape, and every guard's rephrased refusals counted,
-// in the same pass, so the corpus is read once.
+// The `piped-verification` refusals are named by shape, and the runs each guard's refusals were
+// rephrased in counted, in the same pass, so the corpus is read once.
 interface Tally {
 	runs: number
 	shapes: ShapeCounts
 	rephrased: RephraseCounts
-}
-
-function count_text(text: string, tally: Tally): void {
-	piped_verification_shapes.count(text, tally.shapes)
-	rule_rephrase.count(text, tally.rephrased)
 }
 
 function* counted(
@@ -94,7 +89,8 @@ function* counted(
 ): Generator<ReadonlyArray<string>> {
 	for (const texts of runs) {
 		tally.runs += 1
-		for (const text of texts) count_text(text, tally)
+		for (const text of texts) piped_verification_shapes.count(text, tally.shapes)
+		rule_rephrase.count_run(texts, tally.rephrased)
 		yield texts
 	}
 }
@@ -118,8 +114,8 @@ function optional_column(label: string, value: number): Array<string> {
 	return value > 0 ? [`${label} ${value.toString()}`] : []
 }
 
-// `rephrased` is the refusals the next call of their tool turned into an allowed one — the guard's
-// false-positive proxy (`rule-rephrase.ts`).
+// `rephrased` is the runs where the next call of a refused tool was allowed — the guard's
+// false-positive proxy, in the same unit as `refused` (`rule-rephrase.ts`).
 function row(reading: RuleReading, rephrased = 0): string {
 	const id = reading.id.padEnd(ID_WIDTH)
 	const reached = `reached ${reading.sessions.toString()}`

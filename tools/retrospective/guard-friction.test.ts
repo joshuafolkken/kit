@@ -90,7 +90,7 @@ describe('guard_friction.report_lines', () => {
 		const lines = guard_friction.report_lines(guard_friction.guard_rows([LANE]))
 
 		expect(lines[0]).toMatch(/^Guard friction: 3 refusal\(s\), 1 Stop re-entry\(ies\), \$/u)
-		expect(lines[1]).toMatch(/^ {2}investigation: 2 refused, 0 stopped, \$/u)
+		expect(lines[1]).toMatch(/^ {2}investigation: 2 refused, 0 rephrased, 0 stopped, \$/u)
 	})
 
 	it('says none when no guard fired', () => {

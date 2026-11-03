@@ -8,24 +8,32 @@ import { rule_value_fixture } from './rule-value-fixture'
 const { bash_call_line, allowed_line, refusal_line } = guard_friction_fixture
 const ISSUE_COMMENTS = 'issue-comments'
 
-function rephrased_text(): string {
+function rephrased_text(reason: string = issue_comments.ROW.reason): string {
 	return [
 		bash_call_line(1, 'a'),
-		refusal_line(2, 'a', issue_comments.ROW.reason),
+		refusal_line(2, 'a', reason),
 		bash_call_line(3, 'b'),
 		allowed_line(4, 'b'),
 	].join('\n')
 }
 
-describe('rule_rephrase — a guard refusal rephrased into an allowed call, per rule', () => {
-	it('counts it under the rule whose reason names the refusing guard', () => {
+describe('rule_rephrase — the runs a rule refusal was rephrased in, per rule', () => {
+	it('counts each run once under the rule whose reason names the refusing guard', () => {
 		const counts: RephraseCounts = new Map()
 
-		rule_rephrase.count(rephrased_text(), counts)
-		rule_rephrase.count(rephrased_text(), counts)
+		rule_rephrase.count_run([rephrased_text(), rephrased_text()], counts)
+		rule_rephrase.count_run([rephrased_text()], counts)
 
 		expect(rule_rephrase.rephrased_of(ISSUE_COMMENTS, counts)).toBe(2)
 		expect(rule_rephrase.rephrased_of('git-force', counts)).toBe(0)
+	})
+
+	it('counts a refusal under a former reason under the rule it was renamed to', () => {
+		const counts: RephraseCounts = new Map()
+
+		rule_rephrase.count_run([rephrased_text(issue_comments.ROW.former_reasons[0])], counts)
+
+		expect(rule_rephrase.rephrased_of(ISSUE_COMMENTS, counts)).toBe(1)
 	})
 })
 
