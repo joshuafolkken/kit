@@ -149,7 +149,7 @@
   - silent: `gh issue close` or removing an Issue label — the workflow's own steps
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Protected file** (`protected-file`, `operating-rules.md`)
-  - fires: `pnpm josh pretool:guard` — a `Read`, `Edit` or `Write` of `.env` or a credential file such as gh `hosts.yml`, Codex `auth.json`, `~/.netrc` or `~/.ssh/**` (or a shell read or write of one), or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a `Read`, `Grep`, `Edit` or `Write` of `.env` or a credential file such as gh `hosts.yml`, Codex `auth.json`, `~/.netrc` or `~/.ssh/**` (or a shell read or write of one), or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence
   - silent: kit itself, or the user's `~/.claude/settings.json`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Direct PR creation** (`direct-pr-create`, `operating-rules.md` → "git-rules")

@@ -1,7 +1,7 @@
 {
-	"reason": "#6003 adds secret-paths.ts, the credential-file matcher the protected-file guard needs",
+	"reason": "#6003 adds secret-paths.ts, the credential-file matcher the protected-file guard needs, and the Grep path check",
 	"date": "2026-11-03",
 	"growth": {
-		"scripts.code_lines": 39
+		"scripts.code_lines": 43
 	}
 }

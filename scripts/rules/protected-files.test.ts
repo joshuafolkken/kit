@@ -122,6 +122,21 @@ describe('protected_files.is_protected_file_call — reading a credential file',
 		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
 	})
 
+	it.each([path.join(home, '.npmrc'), path.join(home, '.ssh'), '$CODEX_HOME/auth.json'])(
+		'refuses a Grep through the credential path %j',
+		(file) => {
+			const call = { name: 'Grep', input: { pattern: 'token', path: file } }
+
+			expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+		},
+	)
+
+	it('is silent on a Grep of the working tree', () => {
+		const call = { name: 'Grep', input: { pattern: 'token', path: '/work/app/src' } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+	})
+
 	it.each([
 		'/work/app/.npmrc',
 		'/work/app/src/auth.json',
@@ -131,6 +146,12 @@ describe('protected_files.is_protected_file_call — reading a credential file',
 		const call = { name: 'Read', input: { file_path: file } }
 
 		expect(protected_files.is_protected_file_call(call, is_consumer)).toBe(false)
+	})
+})
+
+describe('protected_files.ROW — the credential files it names', () => {
+	it.each(['hosts.yml', 'auth.json', '~/.netrc', '~/.ssh/**'])('names %s in its reason', (file) => {
+		expect(protected_files.ROW.reason).toContain(file)
 	})
 })
 
