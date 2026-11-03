@@ -258,6 +258,19 @@ mean denying `git` and its read-only inspection with it. The deny stops the habi
 `CLAUDE.md` stays the authority, and a command being let through is not permission. An explicit
 staging request is blocked for the agent too — deliberately; the user runs it in their own terminal.
 
+## The workflow edit deny
+
+`Edit(./.github/workflows/**)` and `Write(./.github/workflows/**)` are denied (joshuafolkken/kit#6067).
+A `pull_request` run executes the branch's own workflow files, so a rewritten workflow can turn a
+required check green. `pretool-guard` refuses a lane child's workflow edit (joshuafolkken/kit#6050);
+the deny entries are the static backstop for a hook that did not run.
+
+The deny reaches every session, and that is accepted. Settings cannot tell a lane child from an
+interactive session, and `.claude/settings.local.json` cannot lift a deny: a deny wins at any scope.
+
+A workflow change is made by the person in their editor. `josh init` and `josh sync` write workflows
+from node scripts, not with the file tools, so they are unaffected. Reading a workflow stays open.
+
 ## The Bash output cap
 
 **The same file caps what one command's output contributes to the context.** Its `env` block sets

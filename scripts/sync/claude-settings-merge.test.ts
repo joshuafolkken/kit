@@ -175,6 +175,19 @@ describe('merge_claude_settings — permissions', () => {
 	})
 })
 
+describe('merge_claude_settings — the workflow edit deny', () => {
+	it.each(['Edit(./.github/workflows/**)', 'Write(./.github/workflows/**)'])(
+		'restores %s the project removed',
+		(workflow_deny) => {
+			const merged = merged_with((settings) => {
+				settings.permissions[DENY] = [OWN_DENY]
+			})
+
+			expect(merged.permissions[DENY]).toContain(workflow_deny)
+		},
+	)
+})
+
 describe('merge_claude_settings — permissions kit withdrew', () => {
 	it("removes a withdrawn kit entry and keeps the project's own beside it", () => {
 		const merged = merged_with((settings) => {
