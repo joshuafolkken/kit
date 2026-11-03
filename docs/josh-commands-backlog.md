@@ -403,7 +403,7 @@ A `- 実施可能条件:` whose K is over 30 exits 1; its paste-ready line uses 
 
 A non-epic body without a well-formed `- 規模見積もり: 約 <N> ファイル / <M> 行（テスト除く）` line under `## 背景` exits 1. An epic (a body with `## Split rationale`) declares none.
 
-A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベースライン` (a re-runnable `` `<command>` → <value> ``) and `## 再現` (a command with its actual output). [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline after merge.
+A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベースライン` (a re-runnable `` `<command>` → <value> ``) and `## 再現` (a command with its actual output), plus `- 強制: <hook, lint or gate>` (or `- 強制: 計測のみ`) and `- 計測: <command and number>` under `## 背景` — a missing line or `なし` exits 1. [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline after merge.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:lint` in detail".
 
