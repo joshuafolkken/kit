@@ -95,6 +95,12 @@ describe('lane_implement_rate.rate', () => {
 	})
 })
 
+describe('lane_implement_rate.minutes_for', () => {
+	it('projects the implement minutes of a line count at the measured rate', () => {
+		expect(lane_implement_rate.minutes_for(240, { median: 10, lanes: 4 })).toBe(24)
+	})
+})
+
 describe('lane_implement_rate.table', () => {
 	it('prints the lane count and the median, a dash when none is measured', () => {
 		expect(row([...lane(1, 30, 200)])).toBe('| 1 | 15.0 |')
