@@ -1,4 +1,6 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
+import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
 import { split_assess, type SizeMeasurement } from '#scripts/split/split-assess'
 import { z } from 'zod'
 import { SPLIT_ROUTE_LABEL } from './issue-labels'
@@ -32,6 +34,7 @@ const EXAMPLE = `${PREFIX} 約 3 ファイル / 60 行（テスト除く）`
 const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 const estimate_schema = z.object({ files: z.coerce.number(), lines: z.coerce.number() })
 const { DECLARED_GROWTH_FACTOR } = split_assess
+const IMPLEMENT_BUDGET = lane_stage_budget.BUDGET_MINUTES.implement
 
 function declared(body: string, prefix: string): string | undefined {
 	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
@@ -134,25 +137,26 @@ function refusal(estimate: SizeMeasurement): string {
 	return `${exceeded(estimate)} — file it split (\`--route split\`) or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
+// The declared estimate when it is over the guide, whatever excuses it; `undefined` under it or with
+// no parsable estimate.
+function guide_exceeded(body: string): SizeMeasurement | undefined {
+	const estimate = parse(body)
+
+	return estimate?.verdict === split_assess.SPLIT_VERDICT ? estimate : undefined
+}
+
 // The declared estimate when it is over the guide and not excused; `undefined` under it, on a split
 // filing, with the reason declared, or with no parsable estimate. `issue:file` and `backlog:next` both
 // judge through it (joshuafolkken/kit#5384).
 function over_guide(body: string, route: string | undefined): SizeMeasurement | undefined {
-	const estimate = parse(body)
-
-	if (estimate?.verdict !== split_assess.SPLIT_VERDICT) return undefined
-
-	return is_excused(body, route) ? undefined : estimate
+	return is_excused(body, route) ? undefined : guide_exceeded(body)
 }
 
 // joshuafolkken/kit#5935: a split filing passes the guide at filing, yet a lane still lands past its
 // doubled declaration, so `backlog:next` warns on the declared estimate of a split child over the
 // guide; `undefined` under it, on any other route, or with no parsable estimate.
 function split_over_guide(body: string, route: string | undefined): SizeMeasurement | undefined {
-	if (route !== SPLIT_ROUTE_LABEL) return undefined
-	const estimate = parse(body)
-
-	return estimate?.verdict === split_assess.SPLIT_VERDICT ? estimate : undefined
+	return route === SPLIT_ROUTE_LABEL ? guide_exceeded(body) : undefined
 }
 
 // The declared estimate when it is over the cap; a declared reason does not excuse it, only a split
@@ -189,15 +193,49 @@ function cap_refusal(estimate: SizeMeasurement): string {
 	return `${capped(estimate)} — file an ordered epic of \`--route split\` children instead (the mechanical changes first, the child that switches the setting on last); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
-// The filing refusal for an estimate over the cap, else over the guide. A missing or malformed
-// estimate is `problems`' refusal, not this one.
-function guide_problem(body: string, route: string | undefined): string | undefined {
+// The implement minutes the grown declared lines take at the measured rate.
+function projected_minutes(estimate: SizeMeasurement, rate: ImplementRate): number {
+	return lane_implement_rate.minutes_for(grown(estimate.lines), rate)
+}
+
+function budget_refusal(estimate: SizeMeasurement, rate: ImplementRate): string {
+	const minutes = Math.round(projected_minutes(estimate, rate))
+	const measured = `${rate.median.toFixed(1)} implement min / 100 lines over ${String(rate.lanes)} lane(s)`
+
+	return `${exceeded(estimate)} and projects ${String(minutes)} implement minute(s) at ${measured}, over the ${String(IMPLEMENT_BUDGET)}-minute implement budget, which \`${REASON_PREFIX}\` does not excuse — file it split (\`--route split\`); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+}
+
+// joshuafolkken/kit#6025: an estimate over the guide whose projected implement time exceeds the stage
+// budget is refused even with a reason declared — only a split filing passes it; `undefined` with no
+// measured rate, under the guide or within the budget.
+function budget_problem(
+	body: string,
+	route: string | undefined,
+	rate: ImplementRate | undefined,
+): string | undefined {
+	const estimate = route === SPLIT_ROUTE_LABEL ? undefined : guide_exceeded(body)
+
+	if (estimate === undefined || rate === undefined) return undefined
+
+	return projected_minutes(estimate, rate) > IMPLEMENT_BUDGET
+		? budget_refusal(estimate, rate)
+		: undefined
+}
+
+// The filing refusal for an estimate over the cap, else over the implement budget at `rate`, else over
+// the guide. A missing or malformed estimate is `problems`' refusal, not this one.
+function guide_problem(
+	body: string,
+	route: string | undefined,
+	rate?: ImplementRate,
+): string | undefined {
 	const over = over_cap(body, route)
 
 	if (over !== undefined) return cap_refusal(over)
 	const estimate = over_guide(body, route)
+	const guide_refusal = estimate === undefined ? undefined : refusal(estimate)
 
-	return estimate === undefined ? undefined : refusal(estimate)
+	return budget_problem(body, route, rate) ?? guide_refusal
 }
 
 // The declared file count, or `undefined` when there is no estimate or it does not parse.
