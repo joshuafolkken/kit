@@ -52,11 +52,14 @@ describe('lane_plan_wait.deadline_of', () => {
 		expect(lane_plan_wait.deadline_of(facts())).toBe(NOW_MS + CAP_MINUTES * MS_PER_MINUTE)
 	})
 
-	it('yields to a holder dispatched before it', () => {
-		const later = facts({ own_at_ms: minutes_ago(HOLDER_ELAPSED_MINUTES - 1) })
+	it.each([HOLDER_ELAPSED_MINUTES - 1, HOLDER_ELAPSED_MINUTES])(
+		'yields to a holder dispatched before it or at once (own %i minutes ago)',
+		(own_minutes) => {
+			const later = facts({ own_at_ms: minutes_ago(own_minutes) })
 
-		expect(lane_plan_wait.deadline_of(later)).toBeUndefined()
-	})
+			expect(lane_plan_wait.deadline_of(later)).toBeUndefined()
+		},
+	)
 
 	it('yields when it holds no commits', () => {
 		expect(lane_plan_wait.deadline_of(facts({ has_commits: false }))).toBeUndefined()
