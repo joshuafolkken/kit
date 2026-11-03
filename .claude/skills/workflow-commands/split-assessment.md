@@ -13,7 +13,7 @@ several. Every command applies it identically.
    over. Docs, snapshots and command listings the change has to follow count as files.
 
 A change that must land in one commit is one deliverable, **separability alone splits nothing**, up to
-**the cap, three times the guide**: past it a lane runs over an hour, so no reason keeps it one Issue.
+**the cap, 1.5 times the guide**: past it, or past the projected implement budget, no reason keeps it one Issue.
 The numbers are read against the whole request's estimate, a declared one doubled. `lane:plan` answers `split` past
 twice the declared files (files or hunks) or the line guide.
 

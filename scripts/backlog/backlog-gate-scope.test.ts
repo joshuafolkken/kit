@@ -34,6 +34,7 @@ const CONTEXT: PoolContext = {
 	tracking: { kind: 'read', index: new Map(), cutoff: 'none' },
 	repo: REPO,
 	exclude: [],
+	implement_rate: undefined,
 }
 
 beforeEach(() => {

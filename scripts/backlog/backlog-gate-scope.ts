@@ -1,6 +1,7 @@
 import type { OptedInRead, TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import { epic_graph } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
+import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_state } from '#scripts/lane/lane-state'
 import { backlog_plan_comment } from './backlog-plan-comment'
@@ -11,11 +12,13 @@ type OptedIn = Extract<OptedInRead, { kind: 'read' }>
 type Tracking = Extract<TrackingRead, { kind: 'read' }>
 
 // Everything the answer is assembled from, read once and passed down rather than re-fetched.
+// `implement_rate` is the rate `issue:file` projects a declared size by (joshuafolkken/kit#6066).
 interface PoolContext {
 	opted_in: OptedIn
 	tracking: Tracking
 	repo: string
 	exclude: ReadonlyArray<number>
+	implement_rate: ImplementRate | undefined
 }
 
 // The rows the offer's cap bounds — the standalone half.
