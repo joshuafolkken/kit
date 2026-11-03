@@ -1,10 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { devNull, tmpdir } from 'node:os'
 import path from 'node:path'
-import { git_location_environment } from '#scripts/git/git-location-environment'
-import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { cli_body } from './cli-body'
+import { cli_body_repository } from './cli-body-repository-fixture'
 
 // The one export this file replaces, in the shape `cli_body` calls it. The rest of `node:fs` is
 // spread through untouched at run time — only the type is narrowed to what is being wrapped.
@@ -214,36 +213,18 @@ describe('cli_body.resolve — a path that names no file', () => {
 	)
 })
 
-// joshuafolkken/kit#6055: bodies kept landing in an untracked `scratchpad/` beside the code. The
-// scratch repository stands in for the checkout, ignoring `.josh/tmp/` the way the distributed
-// `.gitignore` does; `WORK_DIRECTORY` above is the tree-outside case, since it sits in no repository.
-const REPOSITORY = mkdtempSync(path.join(tmpdir(), 'cli-body-repository-'))
-
-git_spawn_sync.run(['init', '--quiet'], {
-	cwd: REPOSITORY,
-	env: git_location_environment.location_free_environment(),
-})
-writeFileSync(path.join(REPOSITORY, '.gitignore'), '.josh/tmp/\n')
-
-function write_in_repository(directory: string): string {
-	const absolute_directory = path.join(REPOSITORY, directory)
-
-	mkdirSync(absolute_directory, { recursive: true })
-
-	const target = path.join(absolute_directory, 'body.md')
-
-	writeFileSync(target, DONE)
-
-	return target
-}
+// joshuafolkken/kit#6055: bodies kept landing in an untracked `scratchpad/` beside the code.
+// `WORK_DIRECTORY` above is the tree-outside case, since it sits in no repository.
+const repository = cli_body_repository.create()
+const { IGNORED_DIRECTORY, UNIGNORED_DIRECTORY } = cli_body_repository
 
 afterAll(() => {
-	rmSync(REPOSITORY, { recursive: true, force: true })
+	repository.remove()
 })
 
 describe('cli_body.read_file_or_stdin — where a body file may sit', () => {
 	it('opens a body under the ignored `.josh/tmp/`', () => {
-		expect(cli_body.read_file_or_stdin(write_in_repository('.josh/tmp'))).toBe(DONE)
+		expect(cli_body.read_file_or_stdin(repository.write(IGNORED_DIRECTORY, DONE))).toBe(DONE)
 	})
 
 	it('opens a body outside any work tree', () => {
@@ -251,9 +232,21 @@ describe('cli_body.read_file_or_stdin — where a body file may sit', () => {
 	})
 
 	it('refuses a body in the work tree that git does not ignore, naming `.josh/tmp/`', () => {
-		expect(() => cli_body.read_file_or_stdin(write_in_repository('drafts'))).toThrow(
+		expect(() => cli_body.read_file_or_stdin(repository.write(UNIGNORED_DIRECTORY, DONE))).toThrow(
 			'write it to .josh/tmp/body.md instead',
 		)
+	})
+})
+
+describe('cli_body.read_result — the read that does not throw', () => {
+	it('carries the text of a readable body', () => {
+		expect(cli_body.read_result(write_body('result.md', DONE))).toStrictEqual({ text: DONE })
+	})
+
+	it('carries the refusal sentence of a body in the work tree', () => {
+		expect(cli_body.read_result(repository.write(UNIGNORED_DIRECTORY, DONE))).toStrictEqual({
+			problem: expect.stringContaining('not git-ignored') as string,
+		})
 	})
 })
 

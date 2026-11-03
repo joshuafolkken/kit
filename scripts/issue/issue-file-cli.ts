@@ -1,10 +1,10 @@
-import { readFile } from 'node:fs/promises'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
+import { cli_body } from '#scripts/josh/cli-body'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import type { PollOptions } from '#scripts/lib/poll'
@@ -53,14 +53,6 @@ const { GH_REPO_VARIABLE } = issue_file_pass
 // The open listing `epic:bundle` reads trails the create call, so the issue just filed is looked for
 // again for up to ten seconds before the placement is given up.
 const FRESH_ISSUE_POLL: PollOptions = { attempts: 6, interval_ms: 2000 }
-
-async function read_body(path: string): Promise<string | undefined> {
-	try {
-		return await readFile(path, 'utf8')
-	} catch {
-		return undefined
-	}
-}
 
 // An owner that cannot be read is refused like a third party — stricter than the `third-party-write`
 // hook, which stays silent on `unknown`: a filing is admitted only when the target is known to be ours.
@@ -231,9 +223,10 @@ async function check(filing: Filing): Promise<number> {
 }
 
 async function filing_of(args: FileArguments): Promise<Filing | string> {
-	const body = await read_body(args.body_file)
+	const read = cli_body.read_result(args.body_file)
 
-	if (body === undefined) return `Could not read the body file ${args.body_file}.`
+	if ('problem' in read) return `Could not read the body file ${args.body_file}: ${read.problem}`
+	const body = read.text
 	const current = await git_gh_command.repo_get_name_with_owner()
 
 	if (current === undefined) return UNKNOWN_REPO_MESSAGE

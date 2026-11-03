@@ -5,6 +5,7 @@ import {
 	type AgentEnvironment,
 	type AgentProvider,
 } from '#scripts/agent/agent-provider'
+import { cli_body } from '#scripts/josh/cli-body'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import {
@@ -208,9 +209,13 @@ async function handed(
 	provider: AgentProvider,
 	ports: HandoffPorts,
 ): Promise<number> {
-	const brief = ports.read_text(handoff.brief_file)
+	const read = cli_body.read_result(handoff.brief_file)
 
-	if (brief === undefined) return refuse(`could not read ${handoff.brief_file}`, ports)
+	if ('problem' in read) {
+		return refuse(`could not read ${handoff.brief_file}: ${read.problem}`, ports)
+	}
+
+	const brief = read.text
 
 	const git_directory = await ports.repository_directory()
 

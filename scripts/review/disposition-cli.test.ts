@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { disposition_cli } from './disposition-cli'
 
@@ -52,6 +53,15 @@ function findings_file(content: string): string {
 }
 
 describe('disposition_cli.run --batch', () => {
+	// joshuafolkken/kit#6056: the findings file is read through `cli_body`.
+	it('refuses a findings file in the work tree that git does not ignore', () => {
+		const repository = cli_body_repository.create()
+		const file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, FILE_ROUTED_LINE)
+
+		expect(() => disposition_cli.run([BATCH_FLAG, file])).toThrow('not git-ignored')
+		repository.remove()
+	})
+
 	it('prints the routing table for a findings file', () => {
 		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 		const file = findings_file(`comments:low:${INERT_FILE} — a stale comment\n`)
