@@ -20,17 +20,20 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '"Epic: split the parser work" 101 102 103' },
 				{ arguments: '"Epic: staged rollout" 101 102 --ordered' },
-				{ arguments: '"Epic: ..." 101 102 --rationale-file rationale.md' },
+				{ arguments: '"Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md' },
 				{ arguments: '--promote 858 101 102 103', note: 'turn an existing issue into an epic' },
 				{ arguments: '--add 893 894', note: 'track #894, declaring no order for it' },
 				{ arguments: '--add 893 894 --before 891', note: '#894 must finish before #891' },
 				{ arguments: '--add 893 894 --after 890', note: '#894 starts once #890 is done' },
-				{ arguments: '--add 893 894 --decision-file why.md', note: '…and record why, in one call' },
+				{
+					arguments: '--add 893 894 --decision-file .josh/tmp/why.md',
+					note: '…and record why, in one call',
+				},
 				{
 					arguments: '--reconcile 2184',
 					note: 'rewrite the body to match the recorded blocked-by, and record any order the body declared',
 				},
-				{ arguments: '--decide 893 894 --decision-file why.md' },
+				{ arguments: '--decide 893 894 --decision-file .josh/tmp/why.md' },
 			],
 			flags: [
 				{

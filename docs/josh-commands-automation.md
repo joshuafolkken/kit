@@ -505,7 +505,7 @@ Follow-up git workflow.
 ```bash
 pnpm josh followup "PR title #N"                                                 # merges (default)
 pnpm josh followup "PR title #N" --notify-message "Implemented X:\n- change 1"
-pnpm josh followup "PR title #N" --notify-message-file completion.md
+pnpm josh followup "PR title #N" --notify-message-file .josh/tmp/completion.md
 pnpm josh followup "PR title #N" --ai-review-ignore-reason "false positive"
 pnpm josh followup "PR title #N" --no-merge                                      # do the work, leave the PR open
 ```
@@ -543,7 +543,7 @@ Send Telegram notification.
 
 ```bash
 pnpm josh notify --task-type planning --issue-url "https://..." --body="- bullet 1\n- bullet 2"
-pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file r.md --recommended "Go" --alternative "Wait"
+pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file .josh/tmp/r.md --recommended "Go" --alternative "Wait"
 ```
 
 **Options:**

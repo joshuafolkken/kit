@@ -52,7 +52,7 @@ const { run_ship_return } = await import('./run-ship-return')
 
 const ISSUE = '2428'
 const TITLE = `Hand a stopped ship back #${ISSUE}`
-const BODY_PATH = 'scratchpad/evidence.md'
+const BODY_PATH = '.josh/tmp/evidence.md'
 const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: true }
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }
 const OUTPUT = 'FAIL scripts/run/ship/run-ship.test.ts'
