@@ -13,6 +13,7 @@ import {
 	type ScoutIssue,
 } from './issue-scout'
 import { issue_scout_closed, type ClosedScan } from './issue-scout-closed'
+import { measure_twin } from './measure-twin'
 import { session_cite } from './session-cite'
 
 const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_about_closed } =
@@ -318,6 +319,9 @@ function linkified_report(
 interface ScoutOutcome {
 	report: string
 	candidates: ReadonlyArray<number>
+	// The open issues declaring the draft's measurement (`measure-twin.ts`), read off the open listing
+	// alone so a closed issue never holds a filing.
+	measure_twins?: ReadonlyArray<number>
 }
 
 // The backlog is read without its `blocked-by` relations: a draft has no number, so no recorded
@@ -350,6 +354,7 @@ async function scout(args: ScoutArguments, repo: string): Promise<ScoutOutcome |
 	return {
 		report: linkified_report(draft, widened, closed, repo),
 		candidates: duplicates.candidates.map((candidate) => candidate.number),
+		measure_twins: measure_twin.twins_of(args.body, backlog.issues),
 	}
 }
 
