@@ -2,6 +2,7 @@ import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import {
 	time_transcript_line,
@@ -34,7 +35,7 @@ import { run_tail_rule } from './run-tail-rule'
 // so the `Stop` hook sends the child back to wait or detach rather than asking for a notify
 // (`stop-rules.ts`). The launch and finish ids are `time_transcript_line`'s, never re-parsed here.
 
-// The josh subcommands that run long enough to be backgrounded, as `time_shell` names them — canonical,
+// The josh subcommands that run long enough to be backgrounded, as `time_josh_names` names them — canonical,
 // so the `ga` / `g` / `fu` aliases are covered by the one spelling.
 // `ship`, `ship:wait` and `lane:plan` are run in the foreground at the cap rather than refused: a
 // `ship:wait` left at the two-minute default is moved aside mid-chunk and dies with the turn, its verdict
@@ -60,7 +61,7 @@ function is_backgrounded(input: unknown): boolean {
 }
 
 function long_commands_of(command: string): Array<string> {
-	return time_shell.josh_commands_of(command).filter((name) => LONG_RUNNING_COMMANDS.has(name))
+	return time_josh_names.josh_commands_of(command).filter((name) => LONG_RUNNING_COMMANDS.has(name))
 }
 
 // A call whose long-running work is `ship` or `ship:wait` alone. In a child a foreground `ship` already
