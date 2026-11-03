@@ -212,6 +212,23 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'issue:spill': {
+		script: 'scripts/issue/issue-spill-main.ts',
+		description:
+			"Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line",
+		category: 'AI tools',
+		reference: ['<issue> --estimate "<F> ファイル / <L> 行"', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '5999 --estimate "3 ファイル / 80 行"' }],
+			flags: [
+				{
+					names: ['--estimate "<F> ファイル / <L> 行"'],
+					description:
+						"the follow-up's size estimate, never apportioned from the issue's. Required.",
+				},
+			],
+		},
+	},
 	'upstream:interrupt': {
 		script: 'scripts/issue/upstream-interrupt-main.ts',
 		description:
