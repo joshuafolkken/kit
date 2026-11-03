@@ -39,13 +39,15 @@ const NO_LEDGER = 'no ledger'
 
 // A lane's net minutes and their breakdown by stage, or why there are none (joshuafolkken/kit#4818).
 // `is_commented` says an earlier pass of the lane commented the breakdown on its Issue already;
-// `entries` are the ledger rows the breakdown's details are read off (joshuafolkken/kit#5078).
+// `entries` are the ledger rows the breakdown's details are read off (joshuafolkken/kit#5078), and
+// `events` the stream an overrun's breakdown is read again from, its first edit included.
 type LaneNet =
 	| {
 			kind: 'minutes'
 			minutes: number
 			breakdown: Breakdown
 			entries: ReadonlyArray<LedgerEntry>
+			events: ReadonlyArray<RunEvent>
 			is_commented: boolean
 	  }
 	| { kind: 'missing'; reason: string }
@@ -110,7 +112,14 @@ function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): L
 		return { kind: 'missing', reason: lane_net_time.missing_reason(entries, issue) }
 	}
 
-	return { kind: 'minutes', minutes, breakdown, entries, is_commented: is_commented(events, issue) }
+	return {
+		kind: 'minutes',
+		minutes,
+		breakdown,
+		entries,
+		events,
+		is_commented: is_commented(events, issue),
+	}
 }
 
 // The net time of a lane not yet noted, or `undefined` when its note is on the stream already.
@@ -200,15 +209,18 @@ function launched(issue: number, minutes: number, report: Report): string {
 type OverranNet = Extract<LaneNet, { kind: 'minutes' }>
 
 // The breakdown goes on the lane's Issue before the session starts, once across the lane's passes; a
-// refused comment costs the comment, not the investigation.
+// refused comment costs the comment, not the investigation. Only an overrun reads the lane's
+// transcripts, for the first edit that opens a lane with no `plan` event (joshuafolkken/kit#5994).
 async function overran_text(issue: number, net: OverranNet): Promise<string> {
-	const report = lane_breakdown_text.report_of(issue, net.breakdown, net.entries)
+	const breakdown =
+		lane_breakdown_implement.breakdown_of(net.entries, net.events, issue) ?? net.breakdown
+	const report = lane_breakdown_text.report_of(issue, breakdown, net.entries)
 	const comment = lane_breakdown_text.comment(issue, net.minutes, report)
 
 	if (!net.is_commented) await git_gh_issue_write.issue_try_comment(String(issue), comment)
 
 	const outcome = launched(issue, net.minutes, report)
-	const longest = lane_breakdown.longest_of(net.breakdown)
+	const longest = lane_breakdown.longest_of(breakdown)
 
 	return run_event_overrun.started_text(issue, net.minutes, outcome, longest)
 }

@@ -40,6 +40,7 @@ vi.mock('#scripts/cost-runtime/cost-transcript', () => ({
 	cost_transcript: {
 		home_directory: () => '/home',
 		lane_transcript_directories: mocks.transcripts,
+		list_sessions_across: () => [],
 		session_cwd: (cwd: string) => cwd,
 	},
 }))
@@ -67,6 +68,11 @@ function lane(minutes: number): ReadonlyArray<LedgerEntry> {
 
 function park(minute: number): RunEvent {
 	return { pos: minute, at: at(minute), kind: 'park', text: `#${String(ISSUE)} parked` }
+}
+
+// A note an earlier pass left on the stream once the lane merged.
+function note(text: string): RunEvent {
+	return { pos: 1, at: at(41), kind: 'note', text }
 }
 
 function launched_prompt(): string {
@@ -336,12 +342,7 @@ describe('lane_overrun.investigate — a lane whose earlier pass threw', () => {
 	it('is investigated again', async () => {
 		mocks.read_entries.mockReturnValue(lane(41))
 		mocks.all_events.mockResolvedValue([
-			{
-				pos: 1,
-				at: at(41),
-				kind: 'note',
-				text: `#${String(ISSUE)} overrun investigation failed: no profile`,
-			},
+			note(`#${String(ISSUE)} overrun investigation failed: no profile`),
 		])
 
 		await lane_overrun.investigate(ISSUE)
@@ -356,14 +357,9 @@ describe('lane_overrun.investigate — a lane already investigated or refused a 
 	})
 
 	it('launches once for a lane already on the stream', async () => {
-		const note: RunEvent = {
-			pos: 1,
-			at: at(41),
-			kind: 'note',
-			text: `#${String(ISSUE)} overran: 41 min net — investigating in pid 1`,
-		}
-
-		mocks.all_events.mockResolvedValue([note])
+		mocks.all_events.mockResolvedValue([
+			note(`#${String(ISSUE)} overran: 41 min net — investigating in pid 1`),
+		])
 
 		await lane_overrun.investigate(ISSUE)
 
@@ -372,14 +368,7 @@ describe('lane_overrun.investigate — a lane already investigated or refused a 
 	})
 
 	it('records once for a lane whose net minutes are on the stream', async () => {
-		const note: RunEvent = {
-			pos: 1,
-			at: at(41),
-			kind: 'note',
-			text: `#${String(ISSUE)} net: 9 min`,
-		}
-
-		mocks.all_events.mockResolvedValue([note])
+		mocks.all_events.mockResolvedValue([note(`#${String(ISSUE)} net: 9 min`)])
 
 		await lane_overrun.investigate(ISSUE)
 
