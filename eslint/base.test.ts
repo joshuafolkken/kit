@@ -129,7 +129,8 @@ describe('create_base_config — command tables block', () => {
 	})
 })
 
-// joshuafolkken/kit#6030: every command table and fixture breaks the naming rule by design.
+// joshuafolkken/kit#6030: a command table, or a fixture mirroring an external shape, breaks the
+// naming rule by design.
 describe('create_base_config — naming-convention by file kind block', () => {
 	const naming_block = build_config().find((block) => has_file_pattern(block, '-fixture.ts'))
 

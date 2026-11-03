@@ -3,8 +3,8 @@ import { package_path } from '#scripts/init/init-paths'
 import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 
 // GitHub spells some workflow keys in kebab-case. They are declared verbatim — a fixture's glob
-// turns the naming rule off — rather than reached through an index signature, which would silently turn every misspelled key in these guards into
-// `undefined` and make a `toBeUndefined()` assertion pass without testing anything.
+// turns the naming rule off — rather than reached through an index signature, which would
+// silently turn every misspelled key in these guards into `undefined` and make a `toBeUndefined()` assertion pass without testing anything.
 interface WorkflowStep {
 	id?: string
 	name?: string

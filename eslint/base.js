@@ -254,8 +254,8 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			rules: { 'max-lines': 'off' },
 		},
 		{
-			// A command table keys by command name (`'exports:unused'`) and a fixture by the external
-			// shape it mimics, so every file of either kind breaks the naming convention by design.
+			// A command table keys by command name (`'exports:unused'`) and a fixture may mirror an
+			// external shape (`'timeout-minutes'`), so either kind breaks the naming convention by design.
 			files: [...FILE_PATTERNS.command_tables, ...FILE_PATTERNS.fixtures],
 			ignores: FILE_PATTERNS.tests,
 			rules: { '@typescript-eslint/naming-convention': 'off' },

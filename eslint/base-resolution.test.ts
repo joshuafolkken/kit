@@ -85,9 +85,12 @@ describe('create_base_config — naming-convention by file kind', () => {
 		},
 	)
 
-	it('keeps the rule at error for another script', async () => {
-		await expect(resolve_severity(SOURCE_FILE, naming_rule)).resolves.toBe(ERROR)
-	})
+	it.each([SOURCE_FILE, 'scripts/josh/josh-commands-ai.test.ts'])(
+		'keeps the rule at error for %s',
+		async (file_path) => {
+			await expect(resolve_severity(file_path, naming_rule)).resolves.toBe(ERROR)
+		},
+	)
 })
 
 // joshuafolkken/kit#1112: asserted through the linter's own ignore resolution rather than by
