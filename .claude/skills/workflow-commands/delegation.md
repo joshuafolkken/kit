@@ -38,7 +38,7 @@ forecast** — where the guard refuses, not a budget. Brief the unit on what was
 **Dispatch the unit as the `investigator` agent** (`kit:investigator` in a consumer) — read-only, on
 the `model` its definition names, briefed with the planned change and tests (what it returns:
 `.claude/agents/investigator.md`). A `general-purpose` or `Explore` dispatch that investigates is
-briefed to return `file:line` citations too.
+briefed to return what that file asks for too.
 
 **The main line does not idle while the unit reads** — the reads of files this run will edit go in
 the same message (the `investigator-foreground` row of `pnpm josh rule:list`); then verify the unit's

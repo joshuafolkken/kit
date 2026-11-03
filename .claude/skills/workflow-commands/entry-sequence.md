@@ -33,7 +33,7 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    point-of-use reads come from `run:step` and `SKILL.md` (`residency.md` → "順序の問い").
 
 **Start the progress watcher once the hold is claimed** — `progress-watcher.md` → "Progress while the
-run is quiet". A lane child starts none.
+run is quiet", never fetched: `run:entry` prints it. A lane child starts none.
 
 ## The stop branches
 

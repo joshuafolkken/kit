@@ -55,7 +55,7 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 A `latest: skip` answer reads nothing. **A lane child that parks reads
 `backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run starts
 `pnpm josh run:progress --wait` once its hold is claimed** — `progress-watcher.md` → "Progress while
-the run is quiet".
+the run is quiet" is never fetched: `run:entry` prints it.
 
 ### A section reference is read as a section
 
