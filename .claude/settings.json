@@ -64,7 +64,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision --session-start",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" audit-provision --session-start",
 						"timeout": 90
 					}
 				]
@@ -74,7 +74,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision --session-model",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" audit-provision --session-model",
 						"timeout": 10
 					}
 				]
@@ -86,7 +86,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh session-lang",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" session-lang",
 						"timeout": 10
 					}
 				]
@@ -98,7 +98,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh pretool-guard",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" pretool-guard",
 						"timeout": 20
 					}
 				]
@@ -110,7 +110,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh format-edited",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" format-edited",
 						"timeout": 90
 					}
 				]
@@ -122,7 +122,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh stop-guard",
+						"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" stop-guard",
 						"timeout": 20
 					}
 				]

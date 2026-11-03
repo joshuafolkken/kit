@@ -34,7 +34,7 @@ const UNMATCHED_EVENTS: ReadonlySet<string> = new Set(['UserPromptSubmit'])
 const JSON_INDENT = '\t'
 
 function adapter_command(mode: string): string {
-	return hook_launch.hook_launch_command(`codex-hook-adapter ${mode}`)
+	return hook_launch.hook_launch_command(`codex-hook-adapter ${mode}`, hook_launch.CODEX_ROOT)
 }
 
 // Each Claude-side guard command the adapter stands in for, keyed by that command verbatim.
@@ -44,7 +44,10 @@ const ADAPTED_COMMANDS: ReadonlyMap<string, string> = new Map([
 ])
 
 function codex_handler(handler: HookHandler): HookHandler {
-	return { ...handler, command: ADAPTED_COMMANDS.get(handler.command) ?? handler.command }
+	const command =
+		ADAPTED_COMMANDS.get(handler.command) ?? hook_launch.codex_command(handler.command)
+
+	return { ...handler, command }
 }
 
 function additional_tools(event: string): string {
