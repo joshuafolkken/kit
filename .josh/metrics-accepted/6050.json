@@ -1,7 +1,8 @@
 {
-	"reason": "#6050 adds the workflow-edit pretool-guard row (a new security guard) and the shared shell-redirects reading it uses with protected-files",
+	"reason": "workflow-edit guard: new pretool-guard row plus shared shell-redirects module, widened after review to cover cp -t, dd of=, patch/unlink/shred and cd into .github",
 	"date": "2026-11-03",
 	"growth": {
-		"scripts.code_lines": 101
+		"scripts.code_lines": 139,
+		"prose.long_paragraphs": 1
 	}
 }

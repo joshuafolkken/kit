@@ -14,21 +14,38 @@ import { shell_redirects } from './shell-redirects'
 //
 // It reads the call, not a glob: an `Edit` / `Write` by its `file_path`, and every command a `Bash`
 // call runs (`bash -c`, `$()` and heredoc lines included, `nested-commands.ts`) by the files it
-// writes — a `>` redirect, `tee`, the destination of `cp` / `install` / `ln`, any path of `mv` / `rm`
-// / `touch` / `truncate`, an in-place `sed` / `perl`, and `git checkout` / `restore` / `rm` / `mv`.
+// writes — a `>` redirect, `tee`, the destination of `cp` / `install` / `ln` (`-t` included), `dd`'s
+// `of=`, any path of `mv` / `rm` / `unlink` / `shred` / `touch` / `truncate` / `patch`, an in-place
+// `sed` / `perl`, and `git checkout` / `restore` / `rm` / `mv` — and a `cd` / `pushd` into `.github`.
 // A read (`Read`, `cat`, `grep`, a `<` redirect) passes. A session that is not a lane child is left
 // alone: an Issue that changes a workflow is implemented in an interactive session.
 
 const WORKFLOW_PATH = /(?:^|\/)\.github\/workflows(?:\/|$)/u
+// A path relative to `.github` names a workflow without spelling `.github/workflows`, so entering
+// `.github` (`cd .github && echo x > workflows/a.yml`) is refused as the write it leads to.
+const GITHUB_PATH = /(?:^|\/)\.github(?:\/|$)/u
 const QUOTES = /["']/gu
 const LAST = -1
+const NEXT = 1
 // Programs where any path argument is changed.
-const PATH_WRITERS: ReadonlySet<string> = new Set(['mv', 'rm', 'tee', 'touch', 'truncate'])
-// Programs whose last argument is the file written.
+const PATH_WRITERS: ReadonlySet<string> = new Set([
+	'mv',
+	'patch',
+	'rm',
+	'shred',
+	'tee',
+	'touch',
+	'truncate',
+	'unlink',
+])
+// Programs whose last argument, or the directory of `-t` / `--target-directory`, is the file written.
 const COPIERS: ReadonlySet<string> = new Set(['cp', 'install', 'ln', 'rsync'])
+const TARGET_FLAG = /^(?:-t|--target-directory=?)/u
 // Programs that write their file arguments only with an in-place flag (`-i`, `-i.bak`, `-pi`).
 const IN_PLACE_EDITORS: ReadonlySet<string> = new Set(['perl', 'sed'])
 const IN_PLACE_FLAG = /^(?:-[A-Za-z]*i|--in-place)/u
+const DD_OUTPUT = /^of=/u
+const DIRECTORY_CHANGERS: ReadonlySet<string> = new Set(['cd', 'pushd'])
 const GIT_WRITERS: ReadonlySet<string> = new Set(['checkout', 'mv', 'restore', 'rm'])
 
 function is_workflow_path(word: string): boolean {
@@ -39,12 +56,41 @@ function names_workflow(words: ReadonlyArray<string>): boolean {
 	return words.some((word) => is_workflow_path(word))
 }
 
+function target_directory(args: ReadonlyArray<string>, index: number): string {
+	const attached = (args[index] ?? '').replace(TARGET_FLAG, '')
+
+	return attached === '' ? (args[index + NEXT] ?? '') : attached
+}
+
+function copier_destinations(args: ReadonlyArray<string>): ReadonlyArray<string> {
+	// A word that is no `-t` maps to '', which names no workflow.
+	const flagged = args.map((word, index) =>
+		TARGET_FLAG.test(word) ? target_directory(args, index) : '',
+	)
+
+	return [...args.slice(LAST), ...flagged]
+}
+
+function in_place_files(args: ReadonlyArray<string>): ReadonlyArray<string> {
+	return args.some((word) => IN_PLACE_FLAG.test(word)) ? args : []
+}
+
+function dd_outputs(args: ReadonlyArray<string>): ReadonlyArray<string> {
+	return args.filter((word) => word.startsWith('of=')).map((word) => word.replace(DD_OUTPUT, ''))
+}
+
 function written_args(call: ProgramCall): ReadonlyArray<string> {
 	if (PATH_WRITERS.has(call.name)) return call.args
-	if (COPIERS.has(call.name)) return call.args.slice(LAST)
-	if (!IN_PLACE_EDITORS.has(call.name)) return []
+	if (COPIERS.has(call.name)) return copier_destinations(call.args)
+	if (IN_PLACE_EDITORS.has(call.name)) return in_place_files(call.args)
 
-	return call.args.some((word) => IN_PLACE_FLAG.test(word)) ? call.args : []
+	return call.name === 'dd' ? dd_outputs(call.args) : []
+}
+
+function enters_github(call: ProgramCall): boolean {
+	if (!DIRECTORY_CHANGERS.has(call.name)) return false
+
+	return call.args.some((word) => GITHUB_PATH.test(word.replaceAll(QUOTES, '')))
 }
 
 function is_git_write(segment: string): boolean {
@@ -55,13 +101,17 @@ function is_git_write(segment: string): boolean {
 	return names_workflow(call.args)
 }
 
+function is_program_write(call: ProgramCall): boolean {
+	return names_workflow(written_args(call)) || enters_github(call)
+}
+
 function is_workflow_write_segment(segment: string): boolean {
 	const call = git_argv.program_of(segment)
 
 	if (names_workflow(shell_redirects.written_of(segment, call?.name))) return true
 	if (call === undefined) return false
 
-	return names_workflow(written_args(call)) || is_git_write(segment)
+	return is_program_write(call) || is_git_write(segment)
 }
 
 function is_workflow_shell_write(command: string): boolean {
@@ -97,7 +147,7 @@ const ROW = {
 		title: 'Lane child changing a workflow',
 		topic: '`SECURITY.md`',
 		fires:
-			'a dispatched lane child changing `.github/workflows/**` — an `Edit` / `Write` of it, or a `Bash` write to it (a `>` redirect, `tee`, `cp` / `install` / `ln` to it, `mv` / `rm` / `touch` / `truncate`, an in-place `sed` / `perl`, `git checkout` / `restore` / `rm` / `mv`), inside `bash -c`, `$()` or a heredoc too. Every occurrence',
+			'a dispatched lane child changing `.github/workflows/**` — an `Edit` / `Write` of it, or a `Bash` write to it (a `>` redirect, `tee`, `cp` / `install` / `ln` to it, `dd of=`, `mv` / `rm` / `unlink` / `shred` / `touch` / `truncate` / `patch`, an in-place `sed` / `perl`, `git checkout` / `restore` / `rm` / `mv`), or a `cd` / `pushd` into `.github`, inside `bash -c`, `$()` or a heredoc too. Every occurrence',
 		quiet: 'not a lane child, or a read (`Read`, `cat`, `grep`, a `<` redirect)',
 	},
 }

@@ -36,6 +36,16 @@ const REFUSED_COMMANDS = [
 	`(echo x > ${WORKFLOW})`,
 	`git -C /repo checkout main ${WORKFLOW}`,
 	`echo x > "./${WORKFLOW}"`,
+	'cd .github/workflows && echo x > claude-review.yml',
+	"cd .github && sed -i '' s/a/b/ workflows/claude-review.yml",
+	'pushd /repo/.github',
+	'cp -t .github/workflows /tmp/pass.yml',
+	'cp --target-directory=.github/workflows /tmp/pass.yml',
+	'install -t.github/workflows /tmp/pass.yml',
+	`dd if=/tmp/pass.yml of=${WORKFLOW}`,
+	`patch ${WORKFLOW} /tmp/pass.patch`,
+	`unlink ${WORKFLOW}`,
+	`shred -u ${WORKFLOW}`,
 ]
 
 const ALLOWED_COMMANDS = [
@@ -49,6 +59,8 @@ const ALLOWED_COMMANDS = [
 	`git log -- ${WORKFLOW}`,
 	`echo "x > ${WORKFLOW}"`,
 	'echo x > docs/workflows.md',
+	'cd /repo/scripts',
+	`dd if=${WORKFLOW} of=/tmp/review.yml`,
 ]
 
 describe('workflow_edit.is_workflow_edit_call — a lane child', () => {

@@ -411,7 +411,7 @@ test file pins:
   sixth row of `permission-guards.ts`
 - `scripts/rules/workflow-edit.test.ts` — pins the predicate that stops a lane child changing
   `.github/workflows/**` by `Edit`, `Write` or a shell write (`sed -i`, a `>` redirect, `tee`,
-  `cp` / `mv`, `git checkout -- `, inside `bash -c` or a heredoc), while a read and a session that is
+  `cp` / `mv`, `git checkout --`, a `cd` into `.github`, inside `bash -c` or a heredoc), while a read and a session that is
   not a lane child pass (joshuafolkken/kit#6050). It is the eighth row of `permission-guards.ts`
 - `scripts/rules/rule-body-guard.test.ts` — pins the predicate, the message and the enumeration entry
   for an `Edit` / `Write` that appends a rule body to prose (joshuafolkken/kit#2272). This one suite pins firing (an append to

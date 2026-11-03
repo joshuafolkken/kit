@@ -169,7 +169,7 @@
   - silent: `gh` against github.com, `git fetch` / `push`, `pnpm` / `npx`, and `env X=1 <command>`. A plain `curl` / `wget` is still refused by the `.claude/settings.json` deny list, even to localhost; the hook lets localhost or GitHub through only for spellings that list does not reach
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Lane child changing a workflow** (`workflow-edit`, `SECURITY.md`)
-  - fires: `pnpm josh pretool:guard` — a dispatched lane child changing `.github/workflows/**` — an `Edit` / `Write` of it, or a `Bash` write to it (a `>` redirect, `tee`, `cp` / `install` / `ln` to it, `mv` / `rm` / `touch` / `truncate`, an in-place `sed` / `perl`, `git checkout` / `restore` / `rm` / `mv`), inside `bash -c`, `$()` or a heredoc too. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child changing `.github/workflows/**` — an `Edit` / `Write` of it, or a `Bash` write to it (a `>` redirect, `tee`, `cp` / `install` / `ln` to it, `dd of=`, `mv` / `rm` / `unlink` / `shred` / `touch` / `truncate` / `patch`, an in-place `sed` / `perl`, `git checkout` / `restore` / `rm` / `mv`), or a `cd` / `pushd` into `.github`, inside `bash -c`, `$()` or a heredoc too. Every occurrence
   - silent: not a lane child, or a read (`Read`, `cat`, `grep`, a `<` redirect)
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
