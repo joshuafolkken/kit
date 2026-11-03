@@ -4,9 +4,7 @@ Point-of-use, read one section at the failure that reaches it; the single source
 
 ## A delegated unit that stopped without reporting
 
-**A stop from outside leaves no notification behind, so the parent hands the child off without
-blocking and waits on `backlog:drive` or `lane:await` (`scripts/run/run-poll-hook.ts`), whose exit
-covers it.** Record
+**The parent hands the child off without blocking and waits on `backlog:drive` or `lane:await`.** Record
 where a lane child writes with `pnpm josh lane:output <N> <path>` in the dispatch turn, and once its
 output has been unchanged for the silent-unit window (`backlogrun-progress.md` → "Waiting, and never
 waiting forever") **ask the command rather than combining the traces yourself**, in the checkout the
@@ -30,9 +28,7 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 unit parked it, then stopped: leave the label on and count nothing. Otherwise, while `state: OPEN`:
 
 1. **Stash, classify and act in one call** — `pnpm josh run:merge <N> --output <path> --stash` (`--epic <E> --repo
-   <owner/repo>` for a named epic), **the same composite a returned child takes**. `--stash` stashes the
-   half-finished work and comments its `stash:pop` line; then it tells an `outage` from an `abandoned`
-   child and drops the stale `in-progress`.
+   <owner/repo>` for a named epic), **the same composite a returned child takes**.
 2. **Act on the token it printed** — `backlogrun-progress.md` → "Running a named epic's children".
 
 ## A person withdraws a running child
@@ -44,9 +40,8 @@ On a person's instruction to drop a running child, run `pnpm josh lane:withdraw 
 
 **This path is the fallback**: every `fullrun` merges origin/main ahead of the gate
 (`chain-rule.md` → "origin/main is merged in before the gate"), so it covers an overlap that lands on
-`main` *after* it. **Nothing here forecasts which children will overlap** — a conflicting pull request
-comes back `mergeStateStatus: DIRTY`, which `git-pr-checks-eval.ts` reads as a **failure**, so `pnpm josh
-followup` ends that child with a named conflict in about ten seconds.
+`main` *after* it. **Nothing here forecasts which children will overlap** — `pnpm josh followup` ends a
+conflicting child with a named conflict.
 
 **That child does not stop: it resolves the conflict in its own lane**, uncounted by the
 consecutive-failure guard. **The merge direction is `origin/main` into the lane's branch, never a
@@ -58,18 +53,13 @@ rebase**; no step rewrites a pushed commit.
 2. **Re-run the whole gate.** The tree changed, so the green recorded before the conflict is void:
    `pnpm josh lint:related` and `pnpm josh test:related`, then `pnpm josh gate`.
 3. **Review the resolution, one round.** Brief it with `pnpm josh review:brief` and run `/code-review`
-   over the resolution diff, then require `pnpm josh review:attest --check` to answer `ok`. That round
-   is a different subject and does not spend one of the two the cap allows — `prompts/review.md` →
-   "Review round cap" carries the exception.
+   over the resolution diff, then require `pnpm josh review:attest --check` to answer `ok`. The round
+   spends none of the cap (`prompts/review.md` → "Review round cap").
 4. **Conclude the merge and push it, with `pnpm josh git -y`**, then **`pnpm josh lane:resolve <N>
    --record <paths>`** — the comment condition 3 counts; it refuses until the push has landed.
 5. **Merge**, by re-running `pnpm josh followup` exactly as before.
 
-**The safeguard is the re-run verification, not who holds the pen** — a conflict the run can resolve is
-not routed to a person.
-
-**The run steps back under these four conditions, and under no others. The list is exhaustive and
-carries no judgement.**
+**The run steps back under these four conditions, and under no others.**
 
 1. **The resolution requires deleting the other side's change.** That decides intended behavior, not
    text. It goes to the user as a **specification** question — "behavior A or behavior B" — never as a
