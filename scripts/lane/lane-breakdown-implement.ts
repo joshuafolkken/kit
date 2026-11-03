@@ -42,7 +42,9 @@ const COMMAND_KINDS: ReadonlyArray<readonly [RegExp, string]> = [
 	[/\bjosh main:merge\b/u, 'main:merge'],
 	[/\bjosh check:related\b/u, 'check:related'],
 	[/\bjosh gate\b/u, 'gate'],
-	[/\bjosh run:review\b/u, 'run:review'],
+	// `run:chain` runs `check:related` and `run:review`, and its whole call counts here, ahead of the
+	// `test` it may be chained after (joshuafolkken/kit#6152).
+	[/\bjosh run:(?:review|chain)\b/u, 'run:review'],
 	// Not `\b`: it holds before the `:` of `ship:evidence`, whose wrapped command is its own kind.
 	[/\bjosh ship(?::wait)?(?![\w:-])/u, 'ship / ship:wait'],
 	[/\bjosh test(?::[\w-]+)?\b/u, 'test'],
