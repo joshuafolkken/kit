@@ -16,6 +16,9 @@ const HEADING = 'Net time by stage, longest first'
 const EXCLUDED = 'waits taken out (park, outage, usage limit, yield, host sleep)'
 const SLEPT = 'of which host sleep'
 const YIELDED = 'of which yield wait'
+const HOLDER = 'yield wait: holder remaining'
+const GAP = 'yield wait: redispatch gap (offer + launch)'
+const UNSPLIT = 'yield wait: no holder named, unsplit'
 
 interface Report {
 	breakdown: Breakdown
@@ -125,19 +128,44 @@ function stage_entry(stage: Stage, report: Report): Entry {
 	}
 }
 
-function entries_of(report: Report): Array<Entry> {
-	const { breakdown } = report
+// The yield wait's holder remaining time and redispatch gap, and the wait no note's holder splits,
+// the lines under the waits taken out — each only where it counted time (joshuafolkken/kit#6006).
+function yield_lines(breakdown: Breakdown): Array<string> {
+	const split = breakdown.yield_split
+
+	if (split === undefined || breakdown.yield_ms === 0) return []
+
+	const named: Array<Stage> = [
+		{ name: HOLDER, ms: split.holder_ms },
+		{ name: GAP, ms: split.gap_ms },
+	]
+	const unsplit: Array<Stage> = [{ name: UNSPLIT, ms: split.unsplit_ms }]
+
+	return [
+		...(split.holder_ms + split.gap_ms > 0 ? named : []),
+		...(split.unsplit_ms > 0 ? unsplit : []),
+	].map((part) => part_text(part))
+}
+
+function excluded_entry(breakdown: Breakdown): Entry {
 	const yielded = `${YIELDED} ${lane_breakdown.minutes_text(breakdown.yield_ms)}`
 	const slept = `${SLEPT} ${lane_breakdown.minutes_text(breakdown.slept_ms)}`
 	const excluded = `${EXCLUDED} ${lane_breakdown.minutes_text(breakdown.excluded_ms)}, ${yielded}, ${slept}`
 
-	const notes = [report.discarded, report.related].filter(
-		(text): text is string => text !== undefined && text !== '',
-	)
+	return { text: excluded, laps: yield_lines(breakdown), calls: [] }
+}
 
-	const tail = [...notes, excluded].map((text) => ({ text, laps: [], calls: [] }))
+function entries_of(report: Report): Array<Entry> {
+	const { breakdown } = report
+	const notes = [report.discarded, report.related]
+		.filter((text): text is string => text !== undefined && text !== '')
+		.map((text) => ({ text, laps: [], calls: [] }))
 
-	return [...breakdown.stages.map((stage) => stage_entry(stage, report)), ...tail]
+	return [
+		...breakdown.stages.map((stage) => stage_entry(stage, report)),
+		...notes,
+		excluded_entry(breakdown),
+	]
 }
 
 function bullets_of(entry: Entry): Array<string> {

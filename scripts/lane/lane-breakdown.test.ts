@@ -196,6 +196,24 @@ describe('lane_breakdown.of — a yield', () => {
 		expect(breakdown?.excluded_ms).toBe(43 * MINUTE_MS)
 		expect(total_ms(breakdown)).toBe(lane_net_time.net_ms(entries, events, ISSUE))
 	})
+
+	// joshuafolkken/kit#6006: the holder's remaining time and the redispatch gap, apart.
+	it('splits the yield wait at its holder merge', () => {
+		const entries: ReadonlyArray<LedgerEntry> = [
+			{ kind: 'dispatch', at: at(-50), issue: ISSUE },
+			{ kind: 'merge', at: at(-20), issue: OTHER },
+			{ kind: 'dispatch', at: at(0), issue: ISSUE },
+			{ kind: 'merge', at: at(MERGE_MINUTE), issue: ISSUE },
+		]
+		const text = `${LANE} yielded its lane: overlaps, which #${String(OTHER)} declares · at: summary`
+		const events = [event(-43, 'note', text), ...events_4970()]
+
+		expect(lane_breakdown.of(entries, events, ISSUE)?.yield_split).toStrictEqual({
+			holder_ms: 23 * MINUTE_MS,
+			gap_ms: 20 * MINUTE_MS,
+			unsplit_ms: 0,
+		})
+	})
 })
 
 describe('lane_breakdown.of — waits and resumes', () => {

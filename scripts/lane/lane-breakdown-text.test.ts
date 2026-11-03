@@ -53,6 +53,35 @@ describe('lane_breakdown_text.comment', () => {
 	})
 })
 
+// joshuafolkken/kit#6006: the yield wait split into the holder's remaining time and the gap.
+describe('lane_breakdown_text.comment — the yield split', () => {
+	it('writes the yield split under the waits taken out, and none without a yield wait', () => {
+		const yield_split = { holder_ms: 0, gap_ms: MINUTE_MS, unsplit_ms: 0 }
+		const breakdown = { ...REPORT.breakdown, yield_split }
+		const report = { ...REPORT, breakdown }
+		const lines = lane_breakdown_text.comment(ISSUE, 62, report).split('\n')
+
+		expect(lines.slice(-2)).toStrictEqual([
+			'  - yield wait: holder remaining 0.0 min',
+			'  - yield wait: redispatch gap (offer + launch) 1.0 min',
+		])
+		expect(lane_breakdown_text.line({ ...report, breakdown: { ...breakdown, yield_ms: 0 } })).toBe(
+			lane_breakdown_text.line({ ...REPORT, breakdown: { ...REPORT.breakdown, yield_ms: 0 } }),
+		)
+	})
+
+	it('writes a wait no holder splits as its own line, and no zero split beside it', () => {
+		const yield_split = { holder_ms: 0, gap_ms: 0, unsplit_ms: MINUTE_MS }
+		const report = { ...REPORT, breakdown: { ...REPORT.breakdown, yield_split } }
+		const lines = lane_breakdown_text.comment(ISSUE, 62, report).split('\n')
+
+		expect(lines.slice(-2)).toStrictEqual([
+			`- ${EXCLUDED_TEXT}`,
+			'  - yield wait: no holder named, unsplit 1.0 min',
+		])
+	})
+})
+
 describe('lane_breakdown_text.line', () => {
 	it('writes the stages on one line', () => {
 		expect(lane_breakdown_text.line(REPORT)).toBe(

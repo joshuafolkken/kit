@@ -165,6 +165,17 @@ function issue_yield(note: RunEvent, split: YieldParts | undefined): IssueYield 
 	}
 }
 
+// The yield notes `issue` took, beside their waits.
+function notes_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+): Array<{ note: RunEvent; wait: Span | undefined }> {
+	return notes_with_waits(entries, events).filter(
+		({ note }) => lane_stop_stats.issue_of(note) === issue,
+	)
+}
+
 // The yields `issue` took, in the notes' order (joshuafolkken/kit#5988).
 function of_issue(
 	entries: ReadonlyArray<LedgerEntry>,
@@ -173,12 +184,45 @@ function of_issue(
 ): Array<IssueYield> {
 	const points = points_of(entries, events)
 
-	return notes_with_waits(entries, events)
-		.filter(({ note }) => lane_stop_stats.issue_of(note) === issue)
-		.map(({ note, wait }) => issue_yield(note, parts_of(note, wait, points).at(0)))
+	return notes_of(entries, events, issue).map(({ note, wait }) =>
+		issue_yield(note, parts_of(note, wait, points).at(0)),
+	)
 }
 
-const lane_yield_split = { parts, of_issue }
+// The parts of the yields `issue` took, in the notes' order (joshuafolkken/kit#6006).
+function issue_parts(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+): Array<YieldParts> {
+	const points = points_of(entries, events)
+
+	return notes_of(entries, events, issue).flatMap(({ note, wait }) => parts_of(note, wait, points))
+}
+
+// The waits' holder parts and redispatch gaps together, and the ended waits of the notes naming no
+// holder, which have no split; a part not ended counts none.
+interface YieldShare {
+	holder_ms: number
+	gap_ms: number
+	unsplit_ms: number
+}
+
+function part_ms(span: Span | undefined): number {
+	return span?.end_ms === undefined ? 0 : span.end_ms - span.from_ms
+}
+
+function share_of(splits: ReadonlyArray<YieldParts>): YieldShare {
+	return {
+		holder_ms: splits.reduce((sum, split) => sum + part_ms(split.holder), 0),
+		gap_ms: splits.reduce((sum, split) => sum + (gap_ms(split) ?? 0), 0),
+		unsplit_ms: splits
+			.filter((split) => split.holder === undefined)
+			.reduce((sum, split) => sum + part_ms(split.wait), 0),
+	}
+}
+
+const lane_yield_split = { issue_parts, of_issue, parts, share_of }
 
 export { lane_yield_split }
-export type { IssueYield, YieldParts }
+export type { IssueYield, YieldParts, YieldShare }

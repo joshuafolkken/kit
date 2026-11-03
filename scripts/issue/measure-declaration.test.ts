@@ -5,6 +5,7 @@ import { measure_declaration } from './measure-declaration'
 
 const BACKGROUND = '## 背景\n\n'
 const DECLARED = `${BACKGROUND}- 計測宣言: \`pnpm josh count\` <= 5\n`
+const PLACEHOLDER = `${BACKGROUND}- 計測宣言: \`pnpm josh count --since <merge instant>\` <= 5\n`
 
 describe('measure_declaration.parse', () => {
 	it('reads the command, the operator and the bound', () => {
@@ -33,6 +34,7 @@ describe('measure_declaration.parse', () => {
 			`${BACKGROUND}\`\`\`md\n- 計測宣言: \`echo 1\` <= 5\n\`\`\`\n`,
 		],
 		['a malformed declaration', `${BACKGROUND}- 計測宣言: echo 1 under 5\n`],
+		['a declaration with a placeholder left in its command', PLACEHOLDER],
 	])('reads nothing from %s', (_case, body) => {
 		expect(measure_declaration.parse(body)).toBeUndefined()
 	})
@@ -58,7 +60,21 @@ describe('measure_declaration.problems', () => {
 		expect(measure_declaration.parse(`${BACKGROUND}${example}\n`)).toBeDefined()
 	})
 
-	it.each([DECLARED, `${BACKGROUND}- 種別: 非不具合\n`])('finds no problem in %j', (body) => {
+	// joshuafolkken/kit#6016: a placeholder left in the command is a shell syntax error when the drive runs it.
+	it('names a placeholder left in the command and ends in an example that parses', () => {
+		const [found = ''] = measure_declaration.problems(PLACEHOLDER)
+		const example = found.split('\n').at(-1) ?? ''
+
+		expect(found).toContain('`<merge instant>`')
+		expect(measure_declaration.parse(`${BACKGROUND}${example}\n`)).toBeDefined()
+	})
+
+	it.each([
+		DECLARED,
+		`${BACKGROUND}- 種別: 非不具合\n`,
+		`${BACKGROUND}- 計測宣言: \`pnpm josh count 2>&1 < input.txt\` < 5\n`,
+		`${BACKGROUND}- 計測宣言: \`wc -l <in.txt >out.txt\` < 5\n`,
+	])('finds no problem in %j', (body) => {
 		expect(measure_declaration.problems(body)).toStrictEqual([])
 	})
 })
