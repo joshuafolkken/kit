@@ -114,7 +114,7 @@ Before filing: say whether an issue like this exists and which epic it belongs t
 ```bash
 pnpm josh issue:scout "Stop the gate re-running after every edit"
 pnpm josh issue:scout "<title>" --body "parent: #1246"
-pnpm josh issue:scout "<title>" --body-file draft.md
+pnpm josh issue:scout "<title>" --body-file .josh/tmp/draft.md
 ```
 
 **Options:**
@@ -135,9 +135,9 @@ Duplicates are scored by title token overlap: ≥2 significant shared words and 
 File an Issue: filing cap, fold, one pass naming each refusal (lint, Origin, auto-ok, start condition, WIP cap, scout), labels, epic:bundle.
 
 ```bash
-pnpm josh issue:file "<title>" --body-file body.md
-pnpm josh issue:file "<title>" --body-file body.md --route tier-a --repo joshuafolkken/kit
-pnpm josh issue:file "<title>" --body-file body.md --distinct 2801,2795
+pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md
+pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --route tier-a --repo joshuafolkken/kit
+pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --distinct 2801,2795
 pnpm josh issue:file --batch .josh/tmp/deferred --route tier-a
 pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 ```
@@ -287,7 +287,7 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:c
 Record a plan: normalize the title, fill a blank body or comment, apply run:planned.
 
 ```bash
-pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned   # kickoff's three writes
+pnpm josh issue:plan 4134 --body-file .josh/tmp/plan.md --title "Add issue:plan" --planned   # kickoff's three writes
 ```
 
 **Options:**
@@ -583,14 +583,14 @@ Create an epic issue from its child issue numbers.
 ```bash
 pnpm josh epic "Epic: split the parser work" 101 102 103
 pnpm josh epic "Epic: staged rollout" 101 102 --ordered
-pnpm josh epic "Epic: ..." 101 102 --rationale-file rationale.md
-pnpm josh epic --promote 858 101 102 103                           # turn an existing issue into an epic
-pnpm josh epic --add 893 894                                       # track #894, declaring no order for it
-pnpm josh epic --add 893 894 --before 891                          # #894 must finish before #891
-pnpm josh epic --add 893 894 --after 890                           # #894 starts once #890 is done
-pnpm josh epic --add 893 894 --decision-file why.md                # …and record why, in one call
-pnpm josh epic --reconcile 2184                                    # rewrite the body to match the recorded blocked-by, and record any order the body declared
-pnpm josh epic --decide 893 894 --decision-file why.md
+pnpm josh epic "Epic: ..." 101 102 --rationale-file .josh/tmp/rationale.md
+pnpm josh epic --promote 858 101 102 103                                     # turn an existing issue into an epic
+pnpm josh epic --add 893 894                                                 # track #894, declaring no order for it
+pnpm josh epic --add 893 894 --before 891                                    # #894 must finish before #891
+pnpm josh epic --add 893 894 --after 890                                     # #894 starts once #890 is done
+pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                # …and record why, in one call
+pnpm josh epic --reconcile 2184                                              # rewrite the body to match the recorded blocked-by, and record any order the body declared
+pnpm josh epic --decide 893 894 --decision-file .josh/tmp/why.md
 ```
 
 **Options:**
