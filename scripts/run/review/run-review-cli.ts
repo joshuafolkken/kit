@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
@@ -384,13 +385,22 @@ function refuse(text: string): number {
 	return FAILURE_EXIT_CODE
 }
 
+// A metrics total grown past every approval stops the open, right after the implementation and before
+// anything is launched, rather than the ship's pre-detach after the review (joshuafolkken/kit#6023).
+// The ship's own `--code-only` open has just passed that pre-detach.
+async function metrics_refusal(is_code_only: boolean): Promise<string | undefined> {
+	if (is_code_only) return undefined
+
+	return await metrics_totals.totals_refusal(PROJECT_ROOT)
+}
+
 async function open_accepted(is_code_only: boolean, reason: string | undefined): Promise<number> {
 	const accepted = await accept_finished(is_code_only, reason)
 
 	if (accepted !== undefined) return accepted
-	const handover = await handover_refusal(is_code_only)
+	const stop = (await handover_refusal(is_code_only)) ?? (await metrics_refusal(is_code_only))
 
-	if (handover !== undefined) return refuse(handover)
+	if (stop !== undefined) return refuse(stop)
 
 	return await run_start({ is_code_only, slots: await brief_slots(is_code_only) }, reason)
 }

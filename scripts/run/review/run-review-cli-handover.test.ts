@@ -7,9 +7,10 @@ import { run_review_cli } from './run-review-cli'
 // joshuafolkken/kit#4850: a lane child that had recorded round 1 reopened `josh run:review` and was
 // handed a round-2 brief. Its open is refused, pointing at the ship; nothing is launched.
 
-const { branch, brief_run, handed_over, launch_gate, launch_pinned, wait_gate } = vi.hoisted(
+const { branch, brief_run, grown, handed_over, launch_gate, launch_pinned, wait_gate } = vi.hoisted(
 	() => ({
 		wait_gate: vi.fn(async () => 'green'),
+		grown: vi.fn<(directory: string) => Promise<string | undefined>>(async () => undefined),
 		branch: vi.fn<() => Promise<string>>(),
 		brief_run: vi.fn<(argv: ReadonlyArray<string>, emit?: Emit) => Promise<number>>(),
 		handed_over: vi.fn<(issue: number) => Promise<boolean>>(),
@@ -65,6 +66,7 @@ vi.mock('./run-review-steps', () => ({
 vi.mock('#scripts/gate/check-related-unplanned', () => ({
 	check_related_unplanned: { show: vi.fn(async () => undefined) },
 }))
+vi.mock('#scripts/gate/metrics-totals', () => ({ metrics_totals: { totals_refusal: grown } }))
 
 const ISSUE = 4850
 const SUCCESS_EXIT_CODE = 0
@@ -143,6 +145,36 @@ describe('run_review_cli.run — opens never asked', () => {
 
 		expect(await run_review_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(handed_over).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6023: a metrics total grown past every approval stops the open right after the
+// implementation, not the ship's pre-detach after the review.
+describe('run_review_cli.run — an unaccepted metrics growth', () => {
+	const ACCEPT = 'pnpm josh metrics --accept --reason "<why>"'
+
+	it('refuses the open with the accept command, minting no brief and launching nothing', async () => {
+		handed_over.mockResolvedValue(false)
+		grown.mockResolvedValueOnce(`run:review refused\n${ACCEPT}`)
+
+		expect(await run_review_cli.run([])).toBe(FAILURE_EXIT_CODE)
+		expect(stderr_text()).toContain(ACCEPT)
+		expect(brief_run).not.toHaveBeenCalled()
+		expect(launch_gate).not.toHaveBeenCalled()
+		expect(launch_pinned).not.toHaveBeenCalled()
+	})
+
+	it('briefs once the growth is accepted', async () => {
+		handed_over.mockResolvedValue(false)
+
+		expect(await run_review_cli.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(grown).toHaveBeenCalledOnce()
+		expect(brief_run).toHaveBeenCalledWith([], expect.any(Function))
+	})
+
+	it('never asks on the ship’s own --code-only open, which has just passed the pre-detach', async () => {
+		expect(await run_review_cli.run([run_review.CODE_ONLY_FLAG])).toBe(SUCCESS_EXIT_CODE)
+		expect(grown).not.toHaveBeenCalled()
 	})
 })
 
