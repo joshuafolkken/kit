@@ -3,9 +3,11 @@ import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import { CHECK_WAIT_INTERVAL_MS, git_pr_checks } from './git-pr-checks'
 import { REQUIRED_CHECKS } from './git-pr-checks-eval'
+import type { PrStateSnapshot } from './git-pr-checks-parse'
+import { CHECKS_FAILED_MESSAGE, git_pr_checks_watch } from './git-pr-checks-watch'
 
-// joshuafolkken/kit#2497. The wait a flush runs once auto-merge is on: `merged` ends it, the merge
-// gate's own failure verdict ends it early, and a read that failed keeps it polling.
+// The merge-gate waits against a mocked `git_gh_pr_snapshot`: the observer each poll reports to
+// (joshuafolkken/kit#3770), and the wait a flush runs once auto-merge is on (joshuafolkken/kit#2497).
 vi.mock('./git-gh-pr-auto-merge', () => ({
 	git_gh_pr_auto_merge: { pr_is_merged: vi.fn() },
 }))
@@ -21,6 +23,13 @@ const fetch_checks = vi.mocked(git_gh_pr_snapshot.pr_get_checks_snapshot)
 
 const BRANCH = 'observations/2026-09-24-010203'
 const PR_NUMBER = 2497
+const GREEN_STATE = {
+	mergeStateStatus: 'CLEAN',
+	statusCheckRollup: REQUIRED_CHECKS.map(function green(name: string): Record<string, string> {
+		return { name, status: 'COMPLETED', conclusion: 'SUCCESS' }
+	}),
+}
+const FAILING_CHECK = { name: 'E2E', status: 'COMPLETED', conclusion: 'FAILURE' }
 const READ_FAILED = 'gh unavailable'
 const PENDING_STATE = { mergeStateStatus: 'BLOCKED', statusCheckRollup: [] }
 const CONFLICT_STATE = { mergeStateStatus: 'DIRTY', statusCheckRollup: [] }
@@ -46,6 +55,44 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.useRealTimers()
+})
+
+// `followup` reports each poll's checks to the run's event stream through the observer the wait is
+// handed, so every snapshot the wait reads must reach it.
+describe('observer', () => {
+	beforeEach(() => {
+		vi.mocked(git_gh_pr_snapshot.pr_get_review_decision).mockResolvedValue('APPROVED')
+		stub_state(GREEN_STATE)
+	})
+
+	it('hands each snapshot git_pr_checks.wait_for_pr_success polls to the observer', async () => {
+		const observed: Array<PrStateSnapshot> = []
+
+		async function observe(snapshot: PrStateSnapshot): Promise<void> {
+			observed.push(snapshot)
+		}
+
+		const result = await git_pr_checks.wait_for_pr_success(BRANCH, 1, undefined, observe)
+
+		expect(observed).toStrictEqual([result])
+	})
+
+	// The watch polls for up to two minutes before the wait above, so a row re-entering followup after
+	// a red wait must see the new CI's pending checks from the watch rather than keep the old red line.
+	it('hands the git_pr_checks_watch.pr_checks_watch poll snapshot to the observer', async () => {
+		stub_state({ statusCheckRollup: [FAILING_CHECK] })
+		const observed: Array<PrStateSnapshot> = []
+
+		async function observe(snapshot: PrStateSnapshot): Promise<void> {
+			observed.push(snapshot)
+		}
+
+		await expect(git_pr_checks_watch.pr_checks_watch(BRANCH, observe)).rejects.toThrow(
+			CHECKS_FAILED_MESSAGE,
+		)
+		expect(observed).toHaveLength(1)
+		expect(observed[0]?.rollup).toHaveLength(1)
+	})
 })
 
 describe('git_pr_checks.read_merge_progress', () => {
