@@ -18,7 +18,7 @@ function is_file_flag(token: string): boolean {
 
 function document_file_arguments(name: string): Array<[string, string]> {
 	const tokens = readFileSync(path.join(DIRECTORY, name), 'utf8')
-		.split(/\s+/u)
+		.split(/[\s=]+/u)
 		.map((token) => token.replaceAll(MARKUP, ''))
 
 	return tokens.flatMap((token, index): Array<[string, string]> => {
