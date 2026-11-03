@@ -118,7 +118,7 @@ describe('lane_yield_split.of_issue', () => {
 		const events = [yield_note(HOLDER), opening(YIELDER)]
 
 		expect(lane_yield_split.of_issue([MERGE, DISPATCH], events, YIELDER)).toStrictEqual([
-			{ holder: HOLDER, gap_ms: 14 * MS_PER_MINUTE },
+			{ holder: HOLDER, gap_ms: 14 * MS_PER_MINUTE, is_early: false },
 		])
 	})
 
@@ -126,8 +126,28 @@ describe('lane_yield_split.of_issue', () => {
 		const events = [yield_note(HOLDER)]
 
 		expect(lane_yield_split.of_issue([], events, YIELDER)).toStrictEqual([
-			{ holder: HOLDER, gap_ms: undefined },
+			{ holder: HOLDER, gap_ms: undefined, is_early: false },
 		])
 		expect(lane_yield_split.of_issue([], events, HOLDER)).toStrictEqual([])
+	})
+})
+
+describe('lane_yield_split.of_issue -- a redispatch the split does not reach', () => {
+	it('marks a redispatch before the holder ended as early, with no gap', () => {
+		expect(lane_yield_split.of_issue([DISPATCH], [yield_note(HOLDER)], YIELDER)).toStrictEqual([
+			{ holder: HOLDER, gap_ms: undefined, is_early: true },
+		])
+	})
+
+	it('reads the gap from the redispatch when the stream lacks the lane opening', () => {
+		const taken = lane_yield_split.of_issue([MERGE, DISPATCH], [yield_note(HOLDER)], YIELDER)
+
+		expect(taken).toStrictEqual([{ holder: HOLDER, gap_ms: 14 * MS_PER_MINUTE, is_early: false }])
+	})
+
+	it('marks a note naming no holder neither early nor gapped', () => {
+		expect(lane_yield_split.of_issue([MERGE, DISPATCH], [yield_note()], YIELDER)).toStrictEqual([
+			{ holder: undefined, gap_ms: undefined, is_early: false },
+		])
 	})
 })

@@ -100,6 +100,31 @@ describe('lane_over.chain_of', () => {
 	})
 })
 
+function yield_records(holder?: number): { entries: Array<LedgerEntry>; events: Array<RunEvent> } {
+	const which = holder === undefined ? '' : `, which ${cited(holder)} declares or plans`
+	const text = `#${String(YIELDER)} yielded its lane: ${cited(YIELDER)}'s planned \`a.ts\` overlaps \`a.ts\`${which} · at: summary`
+
+	return {
+		entries: [
+			{ kind: 'dispatch', at: at('17:00'), issue: YIELDER },
+			{ kind: 'dispatch', at: at('18:33'), issue: YIELDER },
+		],
+		events: [{ pos: 0, at: at('17:56'), kind: 'note', text }],
+	}
+}
+
+describe('lane_over.chain_of — a yield the holder end does not split', () => {
+	it('names a redispatch before the still-running holder ended', () => {
+		expect(lane_over.chain_of(yield_records(HOLDER), YIELDER)).toBe(
+			`yield → ${session_cite.issue(HOLDER)} dispatched before holder end`,
+		)
+	})
+
+	it('prints a yield naming no holder with its gap open', () => {
+		expect(lane_over.chain_of(yield_records(), YIELDER)).toBe('yield gap open')
+	})
+})
+
 describe('lane_over.table', () => {
 	it('prints one row for #5953 alone, past the 40-minute threshold', () => {
 		const rows = lane_over.table(RECORDS, WINDOW, 40, []).split('\n')
@@ -131,6 +156,10 @@ function seeded_context(): { ledger_path: string; events_path: string; now_ms: n
 }
 
 describe('lane_measure_cli.run — stats --over', () => {
+	it('names --over in the usage', () => {
+		expect(lane_measure_cli.USAGE).toContain('josh lane:stats --period <days> --over <minutes>')
+	})
+
 	it('prints the over-time lane rows', async () => {
 		vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
 		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)

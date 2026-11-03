@@ -138,18 +138,31 @@ function parts(
 	return notes_with_waits(entries, events).flatMap(({ note, wait }) => parts_of(note, wait, points))
 }
 
-// The holder's end until the redispatch — the offer and launch parts together; `undefined` while
-// the holder's lane has not ended.
-function gap_ms({ offer, launch }: YieldParts): number | undefined {
-	const end_ms = launch === undefined ? undefined : launch.end_ms
-
-	return offer === undefined || end_ms === undefined ? undefined : end_ms - offer.from_ms
+// The holder's end until the redispatch — the offer and launch parts together, an opening the
+// stream lacks included; `undefined` while the holder's lane or the redispatch has not happened.
+function gap_ms({ wait, offer }: YieldParts): number | undefined {
+	return offer === undefined || wait.end_ms === undefined ? undefined : wait.end_ms - offer.from_ms
 }
 
-// One yield of `issue`: the holder it yielded to and the redispatch gap after the holder's end.
+// The yielder was dispatched again while its holder still ran, so no gap followed the holder's end.
+function is_early({ wait, holder, offer }: YieldParts): boolean {
+	return holder !== undefined && offer === undefined && wait.end_ms !== undefined
+}
+
+// One yield of `issue`: the holder it yielded to and the redispatch gap after the holder's end, or
+// `is_early` when the redispatch came first.
 interface IssueYield {
 	holder: number | undefined
 	gap_ms: number | undefined
+	is_early: boolean
+}
+
+function issue_yield(note: RunEvent, split: YieldParts | undefined): IssueYield {
+	return {
+		holder: holder_of(note),
+		gap_ms: split === undefined ? undefined : gap_ms(split),
+		is_early: split !== undefined && is_early(split),
+	}
 }
 
 // The yields `issue` took, in the notes' order (joshuafolkken/kit#5988).
@@ -162,11 +175,7 @@ function of_issue(
 
 	return notes_with_waits(entries, events)
 		.filter(({ note }) => lane_stop_stats.issue_of(note) === issue)
-		.map(({ note, wait }) => {
-			const [split] = parts_of(note, wait, points)
-
-			return { holder: holder_of(note), gap_ms: split === undefined ? undefined : gap_ms(split) }
-		})
+		.map(({ note, wait }) => issue_yield(note, parts_of(note, wait, points).at(0)))
 }
 
 const lane_yield_split = { parts, of_issue }

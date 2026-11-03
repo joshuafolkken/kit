@@ -19,6 +19,7 @@ const COLUMNS = ['lane', 'net min', 'wait min', 'chain', 'top stage', 'open issu
 const SEPARATOR = ' · '
 const NO_CHAIN = '-'
 const GAP_OPEN = 'gap open'
+const DISPATCHED_FIRST = 'dispatched before holder end'
 const { KIND } = lane_ledger_kind
 
 type Kind = LedgerEntry['kind']
@@ -58,12 +59,17 @@ function unplanned_part({ entries }: SinkRecords, issue: number): Array<string> 
 	return counted(KIND.UNPLANNED_NOTICE, of_kind(entries, KIND.UNPLANNED_NOTICE, issue).length)
 }
 
-function yield_text({ holder, gap_ms }: IssueYield): string {
-	const target = holder === undefined ? 'yield' : `yield → ${session_cite.issue(holder)}`
-	const gap =
-		gap_ms === undefined ? GAP_OPEN : `gap ${String(Math.round(gap_ms / MS_PER_MINUTE))} min`
+function gap_text({ gap_ms, is_early }: IssueYield): string {
+	if (gap_ms !== undefined) return `gap ${String(Math.round(gap_ms / MS_PER_MINUTE))} min`
 
-	return `${target} ${gap}`
+	return is_early ? DISPATCHED_FIRST : GAP_OPEN
+}
+
+function yield_text(taken: IssueYield): string {
+	const { holder } = taken
+	const target = holder === undefined ? 'yield' : `yield → ${session_cite.issue(holder)}`
+
+	return `${target} ${gap_text(taken)}`
 }
 
 function yield_part({ entries, events }: SinkRecords, issue: number): Array<string> {

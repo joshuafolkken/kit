@@ -1210,7 +1210,8 @@ net and waited minutes, the ledger chain behind them, its longest stage and the 
 `--sinks` matches a row (`lane-over.ts`).
 
 The chain names `split-notice ×N`, `split-filed <child>`, `round 1 blocking`, `unplanned-notice ×N`, each yield's
-holder and redispatch gap (`gap open` until the lane is dispatched again) and each `hub over cap <file>` of
+holder and redispatch gap (`dispatched before holder end` when the lane came back first, `gap open` while either is
+pending) and each `hub over cap <file>` of
 `test:related`.
 
 A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
