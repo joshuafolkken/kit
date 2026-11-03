@@ -4,15 +4,20 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { has_any_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_plan, type LanePlan } from './lane-plan'
+import { lane_plan_signals } from './lane-plan-signals'
+import { lane_plan_size, type Oversize } from './lane-plan-size'
 
 // `lane:plan`'s overlap check without its wait or its yield (`lane-plan-check.ts` acts on it), kept apart
 // so `run:review`'s open widens a plan (joshuafolkken/kit#6142) without importing the yield's release.
 
 const RUNNING = new Set([IN_PROGRESS_LABEL])
 const UNREAD = 'unread'
+const OVERSIZE = 'oversize'
 
 // What the overlap check found: the clash, none, or a listing it could not read.
 type Probe = Clash | typeof UNREAD | undefined
+// What `extend` found: the overlap check's answer, or a widening past the Issue's declared size.
+type Extended = Probe | typeof OVERSIZE
 
 // The opted-in listing — the running lanes carry the pickup label, so it holds their bodies.
 async function opted_in(): Promise<ReadonlyArray<OpenIssueData> | undefined> {
@@ -50,7 +55,7 @@ function probe(
 	return issues === undefined ? UNREAD : clash_among(plan, running_of(issues), directory)
 }
 
-function is_unread(found: Probe): found is typeof UNREAD {
+function is_unread(found: Extended): found is typeof UNREAD {
 	return found === UNREAD
 }
 
@@ -61,11 +66,30 @@ function record_cleared(plan: LanePlan, directory: string): void {
 	)
 }
 
+// A plan grown past twice its Issue's declaration is refused before it is recorded (`lane-plan-size.ts`).
+async function oversize_of(
+	plan: LanePlan,
+	issues: ReadonlyArray<OpenIssueData> | undefined,
+	directory: string,
+): Promise<Oversize | undefined> {
+	if (issues === undefined || !lane_plan_size.declares(plan.issue, issues)) return undefined
+	const signals = await lane_plan_signals.signals_of(plan.issue)
+
+	return lane_plan_size.oversize(plan, issues, lane_plan.read(plan.issue, directory), signals)
+}
+
+function is_oversize(found: Extended): found is typeof OVERSIZE {
+	return found === OVERSIZE
+}
+
 // **A plan widened without the wait**: `run:review`'s open records a clear widening and stops on a clash
-// itself. A clash or an unread listing writes nothing and is returned; the ship's `unplanned` preflight
-// still checks.
-async function extend(plan: LanePlan, directory: string): Promise<Probe> {
-	const found = probe(plan, await opted_in(), directory)
+// itself. An oversize widening — `lane:plan`'s `split` — a clash or an unread listing writes nothing and
+// is returned; the ship's `unplanned` preflight still checks.
+async function extend(plan: LanePlan, directory: string): Promise<Extended> {
+	const issues = await opted_in()
+
+	if ((await oversize_of(plan, issues, directory)) !== undefined) return OVERSIZE
+	const found = probe(plan, issues, directory)
 
 	if (found === undefined) record_cleared(plan, directory)
 
@@ -75,13 +99,15 @@ async function extend(plan: LanePlan, directory: string): Promise<Probe> {
 const lane_plan_probe = {
 	clash_among,
 	extend,
+	is_oversize,
 	is_unread,
 	opted_in,
 	overlap_text,
+	oversize_of,
 	probe,
 	record_cleared,
 	running_of,
 }
 
 export { lane_plan_probe }
-export type { Probe }
+export type { Extended, Probe }

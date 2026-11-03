@@ -8,6 +8,7 @@ import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan } from './lane-plan'
 import { lane_plan_probe } from './lane-plan-probe'
+import { lane_plan_signals } from './lane-plan-signals'
 
 // joshuafolkken/kit#6142: `run:review`'s open widens a plan through `extend`, which neither waits nor
 // yields — a clear check records the widened plan, a clash or an unread listing writes nothing.
@@ -22,16 +23,22 @@ const FREE_FILE = 'scripts/lane/free.ts'
 const LISTING_LIMIT = 100
 const LANE_PLAN = { issue: LANE, paths: [PLANNED], planned_at: '2026-11-02T00:00:00.000Z' }
 
+const EXTRA_FILE = 'scripts/lane/extra.ts'
+const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
+const QUIET = { hunk_files: [], committed_files: [], lines_ratio: undefined, split_filed: false }
+
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
 
-function running(number: number): OpenIssueData {
+vi.spyOn(lane_plan_signals, 'signals_of').mockResolvedValue(QUIET)
+
+function running(number: number, body = ''): OpenIssueData {
 	const labels = [{ name: 'in-progress' }, { name: 'auto-ok' }]
 
-	return { number, title: 'running', createdAt: '2026-11-01T00:00:00Z', labels, body: '' }
+	return { number, title: 'running', createdAt: '2026-11-01T00:00:00Z', labels, body }
 }
 
-function listing(): Awaited<ReturnType<typeof auto_ok_cli.fetch_opted_in>> {
-	const issues = [running(HOLDER), running(LANE)]
+function listing(lane_body = ''): Awaited<ReturnType<typeof auto_ok_cli.fetch_opted_in>> {
+	const issues = [running(HOLDER), running(LANE, lane_body)]
 
 	return { kind: 'read', issues, cutoff: cutoff_of(issues.length, LISTING_LIMIT, false) }
 }
@@ -80,6 +87,18 @@ describe('lane_plan_probe.extend', () => {
 		)
 
 		expect(lane_plan_probe.is_unread(found)).toBe(true)
+		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED])
+	})
+
+	it('answers oversize and records nothing when the widening outgrows the declared size', async () => {
+		fetch_opted_in.mockResolvedValue(listing(DECLARED))
+
+		const found = await lane_plan_probe.extend(
+			{ ...LANE_PLAN, paths: [PLANNED, FREE_FILE, EXTRA_FILE] },
+			directory,
+		)
+
+		expect(lane_plan_probe.is_oversize(found)).toBe(true)
 		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED])
 	})
 })

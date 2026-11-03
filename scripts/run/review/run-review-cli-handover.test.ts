@@ -7,17 +7,17 @@ import { run_review_cli } from './run-review-cli'
 // joshuafolkken/kit#4850: a lane child that had recorded round 1 reopened `josh run:review` and was
 // handed a round-2 brief. Its open is refused, pointing at the ship; nothing is launched.
 
-const { branch, brief_run, grown, handed_over, launch_gate, launch_pinned, wait_gate } = vi.hoisted(
-	() => ({
+const { branch, brief_run, grown, handed_over, launch_gate, launch_pinned, unplanned, wait_gate } =
+	vi.hoisted(() => ({
 		wait_gate: vi.fn(async () => 'green'),
 		grown: vi.fn<(directory: string) => Promise<string | undefined>>(async () => undefined),
+		unplanned: vi.fn<() => Promise<string | undefined>>(async () => undefined),
 		branch: vi.fn<() => Promise<string>>(),
 		brief_run: vi.fn<(argv: ReadonlyArray<string>, emit?: Emit) => Promise<number>>(),
 		handed_over: vi.fn<(issue: number) => Promise<boolean>>(),
 		launch_gate: vi.fn(() => ({ kind: 'launched' })),
 		launch_pinned: vi.fn(() => ({ kind: 'launched' })),
-	}),
-)
+	}))
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
@@ -68,7 +68,7 @@ vi.mock('#scripts/gate/check-related-unplanned', () => ({
 }))
 vi.mock('#scripts/gate/metrics-totals', () => ({ metrics_totals: { totals_refusal: grown } }))
 vi.mock('./run-review-unplanned', () => ({
-	run_review_unplanned: { refusal: async () => undefined },
+	run_review_unplanned: { refusal: unplanned },
 }))
 
 const ISSUE = 4850
@@ -178,6 +178,26 @@ describe('run_review_cli.run — an unaccepted metrics growth', () => {
 	it('never asks on the ship’s own --code-only open, which has just passed the pre-detach', async () => {
 		expect(await run_review_cli.run([run_review.CODE_ONLY_FLAG])).toBe(SUCCESS_EXIT_CODE)
 		expect(grown).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6142: an unplanned file a running lane holds stops the open before any brief.
+describe('run_review_cli.run — an unplanned file a running lane holds', () => {
+	const HELD = 'unplanned: the two ways out'
+
+	it('refuses the open with the overlap, minting no brief and launching nothing', async () => {
+		handed_over.mockResolvedValue(false)
+		unplanned.mockResolvedValueOnce(HELD)
+
+		expect(await run_review_cli.run([])).toBe(FAILURE_EXIT_CODE)
+		expect(stderr_text()).toContain(HELD)
+		expect(brief_run).not.toHaveBeenCalled()
+		expect(launch_gate).not.toHaveBeenCalled()
+	})
+
+	it('never asks on the ship’s own --code-only open', async () => {
+		expect(await run_review_cli.run([run_review.CODE_ONLY_FLAG])).toBe(SUCCESS_EXIT_CODE)
+		expect(unplanned).not.toHaveBeenCalled()
 	})
 })
 

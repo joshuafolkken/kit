@@ -10,7 +10,6 @@ import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_probe } from './lane-plan-probe'
-import { lane_plan_signals } from './lane-plan-signals'
 import { lane_plan_size, type Oversize } from './lane-plan-size'
 import { lane_plan_wait } from './lane-plan-wait'
 import { lane_plan_wait_event } from './lane-plan-wait-event'
@@ -100,18 +99,6 @@ function unread(): number {
 	console.info('wait')
 
 	return FAILURE_EXIT_CODE
-}
-
-// A plan grown past twice its Issue's declaration is refused before it is recorded (`lane-plan-size.ts`).
-async function oversize_of(
-	plan: LanePlan,
-	issues: ReadonlyArray<OpenIssueData> | undefined,
-	directory: string,
-): Promise<Oversize | undefined> {
-	if (issues === undefined || !lane_plan_size.declares(plan.issue, issues)) return undefined
-	const signals = await lane_plan_signals.signals_of(plan.issue)
-
-	return lane_plan_size.oversize(plan, issues, lane_plan.read(plan.issue, directory), signals)
 }
 
 function split(plan: LanePlan, over: Oversize): number {
@@ -217,7 +204,7 @@ async function settle(plan: LanePlan, clash: Clash, directory: string): Promise<
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
 	const issues = await lane_plan_probe.opted_in()
-	const over = await oversize_of(plan, issues, directory)
+	const over = await lane_plan_probe.oversize_of(plan, issues, directory)
 
 	if (over !== undefined) return await noted_split(plan, over)
 	const sized = sized_of(plan, issues)
@@ -233,7 +220,7 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 // `--probe`'s answer: the same tokens and exit codes as the plan's, with nothing written.
 async function probe_answer(plan: LanePlan, directory: string): Promise<number> {
 	const issues = await lane_plan_probe.opted_in()
-	const over = await oversize_of(plan, issues, directory)
+	const over = await lane_plan_probe.oversize_of(plan, issues, directory)
 
 	if (over !== undefined) return split(plan, over)
 	const found = lane_plan_probe.probe(plan, issues, directory)

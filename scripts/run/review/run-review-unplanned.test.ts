@@ -7,6 +7,7 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { lane_plan } from '#scripts/lane/lane-plan'
+import { lane_plan_probe } from '#scripts/lane/lane-plan-probe'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review_unplanned } from './run-review-unplanned'
@@ -101,5 +102,18 @@ describe('run_review_unplanned.refusal', () => {
 
 		expect(await run_review_unplanned.refusal(directory)).toBeUndefined()
 		expect(fetch_opted_in).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_review_unplanned.refusal — a widening past the declared size', () => {
+	it('stops, pointing at lane:plan, recording nothing', async () => {
+		found(FREE_FILE)
+		vi.spyOn(lane_plan_probe, 'extend').mockResolvedValueOnce('oversize')
+
+		const stop = await run_review_unplanned.refusal(directory)
+
+		expect(stop).toContain('lane:plan')
+		expect(stop).toContain(TEXT)
+		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED])
 	})
 })
