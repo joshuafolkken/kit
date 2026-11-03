@@ -1,8 +1,8 @@
 {
-	"reason": "egress pretool-guard row plus round-1 review fixes: launcher/env-flag resolution and disguised-name normalization so wrapped curl/wget cannot slip through",
+	"reason": "egress pretool-guard row plus review fixes: launcher resolution split into launched-call.ts (operand-position reading, command -v lookups) and glued curl/wget flag checks so wrapped or glued spellings cannot slip through",
 	"date": "2026-11-03",
 	"growth": {
-		"scripts.code_lines": 283,
+		"scripts.code_lines": 352,
 		"ai_cost.on_demand_bytes": 263
 	}
 }

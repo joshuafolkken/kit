@@ -1,6 +1,7 @@
 import { bash_triggers } from './bash-triggers'
 import { direct_pr_create } from './direct-pr-create'
 import { git_argv, type ProgramCall } from './git-argv'
+import { launched_call } from './launched-call'
 import { nested_commands } from './nested-commands'
 
 // The trigger and the delivered text behind the `egress` row of `delivered-rules.ts`: a `Bash` call
@@ -11,27 +12,14 @@ import { nested_commands } from './nested-commands'
 // need a token read it in their own process, so refusing the call costs them nothing.
 //
 // **The deny list matches globs; this reads the program**, the way `pr-merge.ts` does, in every command
-// the call runs (`nested-commands.ts`): `/usr/bin/curl`, `env X=1 curl`, `bash -c 'curl …'`,
-// `bash <(curl …)` and a heredoc's lines all reach `curl`.
+// the call runs (`nested-commands.ts`), past a launcher (`launched-call.ts`): `/usr/bin/curl`,
+// `env X=1 curl`, `timeout 5 curl`, `bash -c 'curl …'`, `bash <(curl …)` and a heredoc's lines all
+// reach `curl`.
 //
 // **It fires on every occurrence**, for the reason `git-force.ts` does.
 
 const GH_COMMAND = 'gh'
 const ENV_COMMAND = 'env'
-// `env`'s flags that take a separate value (`env -u NAME`).
-const ENV_VALUE_FLAGS: ReadonlySet<string> = new Set(['-u', '--unset', '-C', '--chdir'])
-// Launchers `program_of` does not skip, which run a program named among their words.
-const LAUNCHERS: ReadonlySet<string> = new Set([
-	'busybox',
-	'command',
-	'nice',
-	'nohup',
-	'stdbuf',
-	'timeout',
-	'xargs',
-])
-// A quoted or escaped program name (`"curl"`, `c\url`) still runs the program.
-const NAME_NOISE = /["'\\]/gu
 const FLAG_PREFIX = '-'
 const NEXT = 1
 // Programs whose purpose is to reach another host.
@@ -48,31 +36,55 @@ const NETWORK_PROGRAMS: ReadonlySet<string> = new Set([
 ])
 const LOCAL_URL =
 	/^['"]?(?:https?:\/\/)?(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:[/?#]\S*)?['"]?$/u
+
+interface Fetcher {
+	value_flags: ReadonlySet<string>
+	// The run of value-less letters a cluster (`-sSL`) starts with.
+	bare_prefix: RegExp
+}
+
 // The two fetchers a local check runs against a dev server (`curl http://localhost:<port>/`), each
 // with its flags whose value names no destination — every other value is read as one, so an unknown
-// flag (`-x proxy`, `--connect-to`) leaves the call refused. Keyed per fetcher: `curl -O` takes no
-// value, `wget -O` names the output file.
-const LOCAL_VALUE_FLAGS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+// flag (`-x proxy`, `--connect-to`) leaves the call refused — and its value-less letters. Keyed per
+// fetcher: `curl -O` takes no value, `wget -O` names the output file.
+const LOCAL_FETCHERS: ReadonlyMap<string, Fetcher> = new Map([
 	[
 		'curl',
-		new Set([
-			'-H',
-			'--header',
-			'-X',
-			'--request',
-			'-m',
-			'--max-time',
-			'-o',
-			'--output',
-			'-w',
-			'--write-out',
-		]),
+		{
+			value_flags: new Set([
+				'-H',
+				'--header',
+				'-X',
+				'--request',
+				'-m',
+				'--max-time',
+				'-o',
+				'--output',
+				'-w',
+				'--write-out',
+			]),
+			bare_prefix: /^[fiIkLsSv]*/u,
+		},
 	],
 	[
 		'wget',
-		new Set(['--header', '-O', '--output-document', '-o', '--output-file', '-T', '--timeout']),
+		{
+			value_flags: new Set([
+				'--header',
+				'-O',
+				'--output-document',
+				'-o',
+				'--output-file',
+				'-T',
+				'--timeout',
+			]),
+			bare_prefix: /^[qSv]*/u,
+		},
 	],
 ])
+// A flag with its value glued on: `--name=value`, or a short flag with text after its letter.
+const GLUED_LONG = /^(?<flag>--[^=]+)=/u
+const SHORT_CLUSTER = /^-(?<letters>[^-].+)$/u
 const REDIRECT_WORD = /^[\d&]?[<>]/u
 // `rsync` reaches another host only through a `host:path` or `rsync://` operand.
 const RSYNC_COMMAND = 'rsync'
@@ -134,14 +146,43 @@ function is_allowed_destination(word: string): boolean {
 	return LOCAL_URL.test(word) || GITHUB_HOSTS.has(host_of(word) ?? '')
 }
 
-// `curl` / `wget` whose every destination is this machine or GitHub.
-function is_local_fetch(call: ProgramCall): boolean {
-	const value_flags = LOCAL_VALUE_FLAGS.get(call.name)
+// Value-less letters, ending at most in a value flag with its value glued on (`-sSo/tmp/out`).
+function is_known_cluster(letters: string, fetcher: Fetcher): boolean {
+	const stop = fetcher.bare_prefix.exec(letters)?.[0].length ?? 0
 
-	if (value_flags === undefined) return false
+	if (stop === letters.length) return true
+
+	return stop < letters.length - 1 && fetcher.value_flags.has(FLAG_PREFIX + letters.charAt(stop))
+}
+
+function group_of(pattern: RegExp, word: string, name: string): string | undefined {
+	return pattern.exec(word)?.groups?.[name]
+}
+
+// A glued value is read with its flag, so an unknown one (`--proxy=…`, a `-x` proxy or a `-e`
+// setting glued on) may send the request elsewhere.
+function is_known_flag(word: string, fetcher: Fetcher): boolean {
+	const long = group_of(GLUED_LONG, word, 'flag')
+
+	if (long !== undefined) return fetcher.value_flags.has(long)
+
+	const letters = group_of(SHORT_CLUSTER, word, 'letters')
+
+	return letters === undefined || is_known_cluster(letters, fetcher)
+}
+
+function has_known_flags(args: ReadonlyArray<string>, fetcher: Fetcher): boolean {
+	return args.every((word) => !word.startsWith(FLAG_PREFIX) || is_known_flag(word, fetcher))
+}
+
+// `curl` / `wget` whose every flag is known and every destination is this machine or GitHub.
+function is_local_fetch(call: ProgramCall): boolean {
+	const fetcher = LOCAL_FETCHERS.get(call.name)
+
+	if (fetcher === undefined || !has_known_flags(call.args, fetcher)) return false
 
 	const destinations = call.args.filter((_word, index) =>
-		is_destination_word(call.args, index, value_flags),
+		is_destination_word(call.args, index, fetcher.value_flags),
 	)
 
 	return destinations.length > 0 && destinations.every((word) => is_allowed_destination(word))
@@ -236,72 +277,6 @@ function is_environment_dump(_segment: string, call: ProgramCall): boolean {
 	return DUMP_CHECKS.get(call.name)?.(call.args) ?? false
 }
 
-// The programs this row reads, looked for among a launcher's words.
-const WATCHED_PROGRAMS: ReadonlySet<string> = new Set([
-	...NETWORK_PROGRAMS,
-	...INLINE_FLAGS.keys(),
-	...DUMP_CHECKS.keys(),
-	RSYNC_COMMAND,
-	GH_COMMAND,
-	ENV_COMMAND,
-])
-
-function plain_name(word: string): string {
-	return word.replaceAll(NAME_NOISE, '').split('/').at(-1) ?? ''
-}
-
-function is_environment_operand(words: ReadonlyArray<string>, index: number): boolean {
-	const word = words[index] ?? ''
-
-	return (
-		!word.startsWith(FLAG_PREFIX) &&
-		!word.includes('=') &&
-		!ENV_VALUE_FLAGS.has(words[index - NEXT] ?? '')
-	)
-}
-
-// The first word is a flag, so the rest is shorter; no operand left is a bare `env`.
-function past_environment_flags(words: ReadonlyArray<string>): ReadonlyArray<string> {
-	const index = words.findIndex((_word, position) => is_environment_operand(words, position))
-
-	return index === -1 ? [] : words.slice(index)
-}
-
-function past_launcher(call: ProgramCall): ReadonlyArray<string> | undefined {
-	if (!LAUNCHERS.has(call.name)) return undefined
-
-	const index = call.args.findIndex((word) => WATCHED_PROGRAMS.has(plain_name(word)))
-
-	return index === -1 ? undefined : call.args.slice(index)
-}
-
-// The words from the program a call hands over to: past `env`'s flags, which `program_of` takes for
-// the program (`env -u X pnpm test`), or past a launcher it does not skip (`timeout 5 curl …`).
-// `undefined` when the call runs its own program.
-function inner_words_of(call: ProgramCall | undefined): ReadonlyArray<string> | undefined {
-	if (call === undefined) return undefined
-	if (call.name.startsWith(FLAG_PREFIX)) return past_environment_flags([call.name, ...call.args])
-
-	return past_launcher(call)
-}
-
-function named_call(call: ProgramCall | undefined): ProgramCall | undefined {
-	return call === undefined ? undefined : { name: plain_name(call.name), args: call.args }
-}
-
-// Each round reads a shorter word list, so the loop ends.
-function resolved_call(segment: string): ProgramCall | undefined {
-	let call = named_call(git_argv.program_of(segment))
-	let inner = inner_words_of(call)
-
-	while (inner !== undefined) {
-		call = named_call(git_argv.program_of(inner.join(' ')))
-		inner = inner_words_of(call)
-	}
-
-	return call
-}
-
 const PROGRAM_CHECKS: ReadonlyArray<ProgramCheck> = [
 	is_network_send,
 	is_inline_network,
@@ -311,10 +286,10 @@ const PROGRAM_CHECKS: ReadonlyArray<ProgramCheck> = [
 
 // A segment that runs no program but names `env` prints the environment (`env`, `env -0`).
 function is_egress_segment(segment: string): boolean {
-	const call = resolved_call(segment)
+	const call = launched_call.resolved_call(segment)
 
 	if (call === undefined) {
-		return git_argv.words_of(segment).some((word) => plain_name(word) === ENV_COMMAND)
+		return git_argv.words_of(segment).some((word) => launched_call.plain_name(word) === ENV_COMMAND)
 	}
 
 	return PROGRAM_CHECKS.some((check) => check(segment, call))
