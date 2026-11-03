@@ -17,9 +17,8 @@ Review results and successful pushes are never turn boundaries.
    Never load the review skill in the main line.
 2. Once the review returns, `pnpm josh run:chain <N> --join` (`--fixing`: round-1 fixes); follow what
    it prints (`scripts/run/review/run-chain-join.ts`). Never version-bump a child (`pnpm josh release` decides).
-3. A bare `run:review --join` takes `review:attest --check` first; `missing` or
-   `mismatch` discards the round uncounted; rerun against the brief's checkout. A review error receives a
-   `confirmation` Telegram and stops.
+3. A round `review:attest --check` answers `missing` or `mismatch` for is discarded uncounted; rerun
+   against the brief's checkout. A review error receives a `confirmation` Telegram and stops.
 4. Route the attested verdict mechanically:
    - Clean or Low-only round 1: no second round. Fix, file, or drop each Low with a one-line reason.
    - High/Medium round 1: fix and record it (below), then `ship --review` (step 5) asks
@@ -30,8 +29,6 @@ Review results and successful pushes are never turn boundaries.
    Record an attested round's findings with `pnpm josh review:record --from-slot
    --issue <N>` (dispositions: its usage). **A round 2 that
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").
-   **`pnpm josh followup` refuses the merge until the round is recorded**
-   (`pnpm josh review:record --check --issue <N>`).
 5. **The clean path ships in one call** — with no second round due, background
    `pnpm josh ship "<title> #<N>"` — its body draft carries `## 実機証跡`
    (`pnpm josh ship:evidence` fills it) and `## 受け入れ条件の対応` (`report-format.md`), both asked at the preflight: PR preflight → gate → `git -y` →
@@ -102,5 +99,4 @@ These are the gate → review → PR → merge facts other documents cite; this 
   review:attest <nonce>` from the tree it read, and `pnpm josh review:attest --check` must answer `ok`
   before anything acts on the verdict.
 
-This file is the single source of the gate → review → PR → merge chain rule; other documents reference
-it rather than restating it. `prompts/collaboration-workflow/plan-comment.md` keeps Step 3.
+`prompts/collaboration-workflow/plan-comment.md` keeps Step 3.

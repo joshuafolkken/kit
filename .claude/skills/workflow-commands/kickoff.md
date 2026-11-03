@@ -5,15 +5,14 @@
   1. Read Issue #N **and every comment on it** — `pnpm josh issue:read <N>`; the later text is the
      agreement in force (`issue-comments.md`, which also carries the answers that stop the run).
   2. Derive a clear English title.
-  3. Analyze requirements → **scope assessment per `split-assessment.md`**.
+  3. Analyze requirements → **scope assessment per `split-assessment.md` → "The question"**, exactly
+     as `kickoff new` does.
   4. **Record the plan** — written to a file in the session language (`JOSH_SESSION_LANG`, default
-     `ja`), then `pnpm josh issue:plan <N> --body-file <path> --title "<title>" --planned`: it renames
-     the issue, writes the plan into the body when it is blank and its author has write access (a
-     comment otherwise), applies `run:planned`, so the next command's `run:entry` starts at the
-     implementation — in a lane child, running `lane:plan` on the plan comment's paths — and sends the `planning` Telegram (`docs/josh-commands-backlog.md` → "`josh issue:plan`"). A target named in front of the reference
-     adds `--repo <owner/name>`. Before writing the plan, run `pnpm josh plan:consumers
-     <identifier...>` on what it adds or changes and finish the `### 影響を受ける既存の利用者` draft it
-     prints; `issue:plan` refuses a plan without it (`docs/josh-commands-backlog.md` → "`josh issue:plan`").
+     `ja`), then `pnpm josh issue:plan <N> --body-file <path> --title "<title>" --planned`, which
+     records it, applies `run:planned` and sends the `planning` Telegram (`docs/josh-commands-backlog.md`
+     → "`josh issue:plan`"). A target named in front of the reference adds `--repo <owner/name>`.
+     Before writing the plan, run `pnpm josh plan:consumers <identifier...>` on what it adds or changes
+     and finish the `### 影響を受ける既存の利用者` draft it prints.
   5. Report the plan, the Telegram's last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>`, then **stop** (do not implement).
 
   **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
@@ -35,10 +34,6 @@ the tree (`working-tree-hold.md`).
 epic` writes only the repository it runs in, and the promote arm stops when that repository is not
 checked out here. A third-party owner is Tier C: stop rather than file.
 
-**Read `split-assessment.md` → "The question" first** — `kickoff #N` assesses scope exactly as
-`kickoff new` does. The default is not to split: separability and a scope over the size guide must hold
-**together**. The rest of `split-assessment.md` is read when a split is found.
-
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
   deliverable takes the **single-issue path**, several the **multi-issue split path**.
   - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
@@ -53,10 +48,9 @@ checked out here. A third-party owner is Tier C: stop rather than file.
     backlink, the epic the same link as prose (never a checkbox row, which disables its auto-close), and
     the originating Issue lists children and epic under `## Upstream issues`. (2) **Epic — always, for
     every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... --notify [--ordered]
-    [--rationale-file <path|->] [--origin <owner/repo#N>]`, capturing `<E>`. It builds the `epic` label,
-    the task-list rows (`- [ ] #N`), the machine-readable `Dependencies` and the `backlogrun` line; check
-    a hand-edited epic with `pnpm josh epic:check <E>`. (3) `--notify` sends the Telegram listing every
-    created Issue. (4) Present `backlogrun #<E> --only`. (5) **Stop**.
+    [--rationale-file <path|->] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
+    with `pnpm josh epic:check <E>`. (3) `--notify` sends the Telegram listing every created Issue.
+    (4) Present `backlogrun #<E> --only`. (5) **Stop**.
 
   **The epic itself is never implemented** — `backlogrun` runs its *children*, and it closes itself
   once every child is closed, whichever josh path closes the last one. Children with no required order take `None — the children are
