@@ -2,8 +2,8 @@ import { text } from 'node:stream/consumers'
 import { json_value } from '#scripts/lib/json-value'
 import { file_reader } from '#scripts/lib/read-file'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
 import { josh_environment_file } from './josh-environment-file'
 import { stamp_file } from './stamp-file'
@@ -380,7 +380,7 @@ function guard_reason_for_payload(
 	// A hook firing inside a delegated unit is handed the *parent's* path, so the fork's own file is
 	// derived here rather than judged from the parent's frozen timeline.
 	const transcript = time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id)
-	const tail = time_density_hook.read_tail(transcript)
+	const tail = transcript_tail.read_tail(transcript)
 	const is_unit = typeof payload.agent_id === 'string' && payload.agent_id.length > 0
 	const run = { transcript, now_ms, model: payload.model ?? undefined, is_unit }
 	const context = { ...parts, tail, call, run }
