@@ -1,7 +1,7 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
-import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { run_headless } from './run-headless'
 import { run_watcher_hook } from './run-watcher-hook'
@@ -77,7 +77,7 @@ function read_keys(signatures: ReadonlyArray<string>): Array<string> {
 }
 
 function state_reads_of(command: string): ReadonlyArray<string> {
-	return read_keys(time_shell.josh_signatures_of(command))
+	return read_keys(time_josh_names.josh_signatures_of(command))
 }
 
 function command_of(input: unknown): string {
