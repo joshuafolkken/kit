@@ -169,7 +169,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		read_only_flags: ['--log'],
 		usage: {
 			examples: [
-				{ arguments: '"<title> #<N>" --body-file .josh/tmp/evidence.md' },
+				{ arguments: '"<title> #<N>" --body-file <evidence.md>' },
 				{ arguments: '"<title> #<N>" --review', note: 'both review rounds inside the ship' },
 				{
 					arguments: '--detach "<title> #<N>"',

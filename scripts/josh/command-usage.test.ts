@@ -11,20 +11,6 @@ const GATE_USAGE = [
 	'```',
 ].join('\n')
 const UNKNOWN_NAME = 'not-a-command'
-const FILE_FLAG_SUFFIX = '-file'
-const STDIN = '-'
-const JOSH_TMP = '.josh/tmp/'
-
-// The value after each `--<name>-file` token of one example's arguments.
-function file_flag_values(arguments_text: string): Array<string> {
-	const tokens = arguments_text.split(' ')
-
-	return tokens
-		.map((token, index) =>
-			token.endsWith(FILE_FLAG_SUFFIX) ? (tokens[index + 1] ?? '') : undefined,
-		)
-		.filter((value) => value !== undefined)
-}
 
 describe('command usage', () => {
 	it('aligns every example comment in one column', () => {
@@ -75,15 +61,6 @@ describe('command entry usage', () => {
 			.map(([name]) => name)
 
 		expect(empty).toEqual([])
-	})
-
-	it('writes every example body file under .josh/tmp/', () => {
-		const misplaced = Object.values(COMMAND_MAP)
-			.flatMap((entry) => entry.usage.examples)
-			.flatMap((example) => file_flag_values(example.arguments))
-			.filter((path) => path !== STDIN && !path.startsWith(JOSH_TMP))
-
-		expect(misplaced).toEqual([])
 	})
 })
 

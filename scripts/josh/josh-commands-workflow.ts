@@ -2,7 +2,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 
 const PR_TITLE = '"PR title #N"'
 const BODY_FILE_NOTE =
-	'written under `.josh/tmp/` (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.'
+	'(`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.'
 const ISSUE_URL = '--issue-url "https://..."'
 const REVIEW_ISSUE = '--issue 2325'
 const CHECK = '--check'

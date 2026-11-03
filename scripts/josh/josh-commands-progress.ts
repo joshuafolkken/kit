@@ -120,11 +120,11 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		usage: {
 			examples: [
 				{
-					arguments: 'kickoff new --brief-file .josh/tmp/brief.md',
+					arguments: 'kickoff new --brief-file <path>',
 					note: 'waits; prints its final message and URLs',
 				},
 				{
-					arguments: 'fullrun <N> --brief-file .josh/tmp/brief.md',
+					arguments: 'fullrun <N> --brief-file <path>',
 					note: 'detached; a bare N is #N; check it with run:progress --once',
 				},
 				{

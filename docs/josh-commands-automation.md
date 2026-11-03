@@ -514,7 +514,7 @@ pnpm josh followup "PR title #N" --no-merge                                     
 
 - `--no-merge` — do the follow-up work but do not merge; leaves the PR open (the only flag that stops the merge). `--merge` is a deprecated no-op. A PR already merged by hand skips the CI wait, the AI-review scan and the merge and runs only the post-merge tail; a completion report already on the Issue is not posted again.
 - `--notify-message` — inline completion body; `\n` expands to newlines.
-- `--notify-message-file` — read the completion body from a file written under `.josh/tmp/` (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
+- `--notify-message-file` — read the completion body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--ai-review-ignore-reason` — reason to dismiss an AI-review finding.
 
 <!-- /usage -->
@@ -550,7 +550,7 @@ pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file 
 
 - `--task-type` — one of `planning` 📋, `completion` ✅, `failure` ❌, `warning` ⚠️, `kickoff_retry` 🔄, `confirmation` ⏸️. Do not send `completion` or `warning` by hand — `josh followup` sends them.
 - `--body` / `--body=$'…'` — inline body; use `--body=$'…'` when it starts with `-`.
-- `--body-file` — read the body from a file written under `.josh/tmp/` (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
+- `--body-file` — read the body from a file (`-` reads stdin); use this whenever the body carries a backtick or `$`. Passing both forms is refused.
 - `--repo-name` / `--issue-url` / `--pr-url` — header repository, resolved in that order, then the working directory. The issue title is read from `--issue-url`.
 - `--recommended` / `--alternative` — the choices appended under `JOSH_SESSION_LANG` headings; `--recommended` is required for `confirmation`, `--alternative` is repeatable.
 
