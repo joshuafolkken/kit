@@ -1,11 +1,5 @@
 # Delegation decisions — the procedure
 
-Read this file when the first delegation decision arises during a run, not at workflow entry.
-
-Designing, assessing a split and reviewing are judgement; applying a fix the gate has already named is
-not. The steps whose answer is already decided go to a cheaper execution tier, and the judgement stays
-where it is.
-
 **Ask before delegating any step of a run**, and use what it answers:
 
 ```bash
@@ -14,10 +8,8 @@ pnpm josh delegate --list   # the enumeration, and what was rejected and why
 ```
 
 **Never decide it yourself. Anything not on the list is `keep`.** A step earns its place by naming
-**how a wrong result is caught** cheaply in the parent tier, not merely by being unlikely to fail.
-`pnpm josh delegate --list` names both delegatable and rejected steps; a rejected step either has no
-verifier or lets a wrong result propagate too far. The command distinguishes `kept deliberately`
-from `kept by default`. `docs/josh-commands-backlog.md` → "`josh delegate`" carries the full enumeration.
+**how a wrong result is caught** cheaply in the parent tier, not merely by being unlikely to fail
+(`docs/josh-commands-backlog.md` → "`josh delegate`").
 
 **The mechanism is not the unit.** `pnpm josh delegate` covers a run step, a file-disjoint Step 0
 implementation unit (`pnpm josh fanout`), and `epic-child` — an epic's child and a named issue of a
@@ -44,13 +36,9 @@ forecast** — where the guard refuses, not a budget. Brief the unit on what was
 `pnpm josh rule:list` refuses the threshold call, in a lane child too (`pnpm josh delegate --list`).
 
 **Dispatch the unit as the `investigator` agent** (`kit:investigator` in a consumer) — read-only, on
-the `model` its definition names. A `general-purpose` or `Explore` dispatch that investigates is
-briefed to return `file:line` citations too.
-
-Brief it with the planned change and tests. Ask for the existing function signatures the change
-will call (parameters, return types and needed overloads) and the existing test fixtures its tests
-will use (paths and setup or helper usage), with `file:line` citations beside the conclusion. Ask it
-to state when either does not apply or was not found, never to invent one or paste implementations.
+the `model` its definition names, briefed with the planned change and tests (what it returns:
+`.claude/agents/investigator.md`). A `general-purpose` or `Explore` dispatch that investigates is
+briefed to return what that file asks for too.
 
 **The main line does not idle while the unit reads** — the reads of files this run will edit go in
 the same message (the `investigator-foreground` row of `pnpm josh rule:list`); then verify the unit's

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { delivered_rules } from './delivered-rules'
 import { piped_verification_shapes, type ShapeCounts } from './piped-verification-shapes'
+import { rule_rephrase, type RephraseCounts } from './rule-rephrase'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_cache, type FreshReading } from './rule-value-cache'
 import { rule_value_candidates } from './rule-value-candidates'
@@ -74,10 +75,12 @@ function gather_runs(cwd: string = process.cwd()): Generator<Array<string>> {
 	return runs_of(group_by_run(files).values())
 }
 
-// The `piped-verification` refusals are named by shape in the same pass, so the corpus is read once.
+// The `piped-verification` refusals are named by shape, and the runs each guard's refusals were
+// rephrased in counted, in the same pass, so the corpus is read once.
 interface Tally {
 	runs: number
 	shapes: ShapeCounts
+	rephrased: RephraseCounts
 }
 
 function* counted(
@@ -87,6 +90,7 @@ function* counted(
 	for (const texts of runs) {
 		tally.runs += 1
 		for (const text of texts) piped_verification_shapes.count(text, tally.shapes)
+		rule_rephrase.count_run(texts, tally.rephrased)
 		yield texts
 	}
 }
@@ -105,14 +109,27 @@ function rate_text(reading: RuleReading): string {
 	return `${rate.toString()}${PERCENT_SIGN} unaided`
 }
 
-function row(reading: RuleReading): string {
+// A count column only where it is non-zero, so the rows of rules it never touched keep their shape.
+function optional_column(label: string, value: number): Array<string> {
+	return value > 0 ? [`${label} ${value.toString()}`] : []
+}
+
+// `rephrased` is the runs where the next call of a refused tool was allowed — the guard's
+// false-positive proxy, in the same unit as `refused` (`rule-rephrase.ts`).
+function row(reading: RuleReading, rephrased = 0): string {
 	const id = reading.id.padEnd(ID_WIDTH)
 	const reached = `reached ${reading.sessions.toString()}`
 	const refused = `refused ${reading.refusals.toString()}`
-	// Only where a rewrite happened, so the rows of rules that can only refuse keep their shape.
-	const rewritten = reading.rewrites > 0 ? [`rewritten ${reading.rewrites.toString()}`] : []
+	const rewritten = optional_column('rewritten', reading.rewrites)
 
-	return [id, reached, rate_text(reading), refused, ...rewritten].join(COLUMN_GAP)
+	return [
+		id,
+		reached,
+		rate_text(reading),
+		refused,
+		...rewritten,
+		...optional_column('rephrased', rephrased),
+	].join(COLUMN_GAP)
 }
 
 // `candidates` is set only where something measurable was found, so `NO_TARGETS` stays the whole answer.
@@ -126,7 +143,7 @@ interface Rendered {
 // The runs are counted as `measure` consumes them, since a lazy source cannot be asked its length
 // up front.
 function render_parts(runs: Iterable<ReadonlyArray<string>>): Rendered {
-	const tally: Tally = { runs: 0, shapes: new Map() }
+	const tally: Tally = { runs: 0, shapes: new Map(), rephrased: new Map() }
 	const readings = rule_value.measure(counted(runs, tally))
 
 	if (tally.runs === 0) return { table: NO_TARGETS }
@@ -135,7 +152,9 @@ function render_parts(runs: Iterable<ReadonlyArray<string>>): Rendered {
 	const shapes = piped_verification_shapes.render(tally.shapes)
 
 	return {
-		table: readings.map((reading) => row(reading)).join('\n'),
+		table: readings
+			.map((reading) => row(reading, rule_rephrase.rephrased_of(reading.id, tally.rephrased)))
+			.join('\n'),
 		candidates: `${rule_value_candidates.render(judged, tally.runs)}\n${shapes}`,
 	}
 }

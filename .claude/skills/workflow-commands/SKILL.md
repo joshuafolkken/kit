@@ -21,8 +21,7 @@ existing procedure below; it does not turn the consultation main session into an
 
 Read this file, then the files the typed command's row names. A command file is a **manifest** of
 terse triggers and pointers; `pnpm josh run:step <N>` prints the run's next single action and the
-section that governs it, computed from the event stream, the carry record and the issue state, never
-the conversation; a section it prints is not fetched again.
+section that governs it; a section it prints is not fetched again.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
@@ -38,8 +37,7 @@ each manifest carries only its difference. `split-assessment.md` → "The questi
 
 ### The fetch is one `Read` call per file
 
-**Fetch each file above with one `Read` call of its own — never `cat`, never two in one command.** A
-Bash result is capped at `BASH_MAX_OUTPUT_LENGTH` characters and truncates a longer document;
+**Fetch each file above with one `Read` call of its own — never `cat`, never two in one command.**
 `pnpm josh doc:read <file>` is the cap-safe whole-file read.
 
 ### Four documents are read at the point of use, not at the entry
@@ -57,7 +55,7 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 A `latest: skip` answer reads nothing. **A lane child that parks reads
 `backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run starts
 `pnpm josh run:progress --wait` once its hold is claimed** — `progress-watcher.md` → "Progress while
-the run is quiet" is never fetched: `run:entry` (no lane child) and `run:progress --wait` print it, once per session.
+the run is quiet" is never fetched: `run:entry` prints it.
 
 ### A section reference is read as a section
 
@@ -68,12 +66,9 @@ pnpm josh doc:section <file.md> "<heading>"   # the section, verbatim
 pnpm josh read:set [<keyword>]                # what an entry reads, and what it costs
 ```
 
-A heading that does not resolve is refused, with the file's own headings listed.
-
 ## 2. What every one of them shares
 
-Each shared rule is a **trigger, a one-line action, and the single source** the procedure is read
-from — read at that trigger, never restated here.
+Each shared rule is a **trigger, a one-line action, and the single source** read at that trigger.
 
 | Trigger | Action | Single source |
 | --- | --- | --- |
