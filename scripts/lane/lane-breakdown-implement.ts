@@ -1,8 +1,10 @@
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
 import { lane_implement_stats } from './lane-implement-stats'
-import type { LaneSpan } from './lane-net-time'
+import type { LedgerEntry } from './lane-ledger'
+import { lane_net_time, type LaneSpan } from './lane-net-time'
 import type { Subagent, ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
 
@@ -21,6 +23,7 @@ const OTHER_BASH = 'other bash'
 const BASH_TOOL = 'Bash'
 const READ = 'read'
 const EDIT = 'edit'
+const EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write'])
 
 const TOOL_KINDS: ReadonlyMap<string, string> = new Map([
 	['Read', READ],
@@ -231,7 +234,42 @@ function read(issue: number, breakdown: Breakdown): Array<ToolCall> {
 	return lane_transcript_stats.read_calls(transcript_directories(issue), window)
 }
 
-const lane_breakdown_implement = { between_kinds, of, plan_calls, read, transcript_directories }
+// When the first of `calls` that edited a file started inside `span`, `undefined` when none did — the
+// `edit_ms` `lane_breakdown.of` takes.
+function first_edit_ms(calls: ReadonlyArray<ToolCall>, span: LaneSpan): number | undefined {
+	const edits = calls
+		.filter((call) => EDIT_TOOLS.has(call.tool ?? '') && span_of(call, [span]) !== undefined)
+		.map((call) => call.started_ms)
+
+	return edits.length === 0 ? undefined : Math.min(...edits)
+}
+
+// The breakdown with its implementation opened at the lane's first edit where no event opened it
+// (joshuafolkken/kit#5835), the edit read off the lane's own transcripts.
+function breakdown_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+): Breakdown | undefined {
+	const span = lane_net_time.span_of(entries, issue)
+
+	if (span === undefined) return undefined
+
+	const window = { since_ms: span.from_ms, until_ms: span.to_ms }
+	const calls = lane_transcript_stats.read_calls(transcript_directories(issue), window)
+
+	return lane_breakdown.of(entries, events, issue, first_edit_ms(calls, span))
+}
+
+const lane_breakdown_implement = {
+	between_kinds,
+	breakdown_of,
+	first_edit_ms,
+	of,
+	plan_calls,
+	read,
+	transcript_directories,
+}
 
 export { lane_breakdown_implement }
 export type { ImplementDetail }

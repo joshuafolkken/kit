@@ -7,9 +7,9 @@ import { lane_net_time, type LaneSpan } from './lane-net-time'
 import { lane_stop_stats } from './lane-stop-stats'
 
 // A lane's net time by stage (joshuafolkken/kit#4995), read off the run events it already leaves: from
-// its dispatch to its `plan`, the implementation from the `plan` (or `lane-phase implement`) to the first
-// ship stage, each ship stage from its start to its end, and the time between ship stages — a stopped
-// stage's fix included. The waits `lane:net` takes out are taken out of the stage they fell in and
+// its dispatch to its `plan`, the implementation from the `plan` (or `lane-phase implement`, or else
+// the first edit) to the first ship stage, each ship stage from its start to its end, and the time
+// between ship stages — a stopped stage's fix included. The waits `lane:net` takes out are taken out of the stage they fell in and
 // counted apart, so the stages add up to the net time. A cut and its resume open no stage: the
 // implementation stays one stage across them.
 
@@ -124,19 +124,45 @@ function reasons_of(
 	return new Map(ordered.flatMap((event) => reason_of(event, issue, span)))
 }
 
+// Whether a lane's first edit opens the implementation: no `plan` / `lane-phase implement` marker did,
+// and the edit came before the first stage another event opened.
+function opens_implement(opened: ReadonlyArray<Marker>, edit_ms: number): boolean {
+	const [first] = opened
+
+	if (opened.some((marker) => marker.stage === IMPLEMENT_STAGE)) return false
+
+	return first === undefined || edit_ms < first.at_ms
+}
+
+// The implementation's marker at the lane's first edit, where no event marked it — a docs-only lane
+// writes no runtime file, so its Step 0 notice, which writes the `plan` event, never fires
+// (joshuafolkken/kit#5835).
+function edit_markers(
+	opened: ReadonlyArray<Marker>,
+	span: LaneSpan,
+	edit_ms: number | undefined,
+): Array<Marker> {
+	if (edit_ms === undefined || !is_inside(edit_ms, span)) return []
+
+	return opens_implement(opened, edit_ms) ? [{ at_ms: edit_ms, stage: IMPLEMENT_STAGE }] : []
+}
+
 function segments_of(
 	events: ReadonlyArray<RunEvent>,
 	issue: number,
 	span: LaneSpan,
+	edit_ms: number | undefined,
 ): Array<Segment> {
 	const opened = events
 		.flatMap((event) => marker_of(event, issue, span))
 		.toSorted((left, right) => left.at_ms - right.at_ms)
 	// A marker of the stage already open opens nothing: the `plan` and `lane-phase implement` of one
 	// start, or of a resumed session, leave the implementation one span.
-	const markers = [{ at_ms: span.from_ms, stage: PLAN_STAGE }, ...opened].filter(
-		(marker, index, all) => marker.stage !== all[index - 1]?.stage,
-	)
+	const markers = [
+		{ at_ms: span.from_ms, stage: PLAN_STAGE },
+		...edit_markers(opened, span, edit_ms),
+		...opened,
+	].filter((marker, index, all) => marker.stage !== all[index - 1]?.stage)
 
 	return markers.map((marker, index) => ({
 		stage: marker.stage,
@@ -199,19 +225,21 @@ function windows_of(segments: ReadonlyArray<Segment>): Windows {
 
 /**
  * `issue`'s lane by stage, or `undefined` when the ledger holds no dispatch and merge of it — the same
- * span and waits `lane_net_time.net_ms` reads, so the stages add up to it.
+ * span and waits `lane_net_time.net_ms` reads, so the stages add up to it. `edit_ms`, the lane's first
+ * edit, opens the implementation where no event did.
  */
 function of(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
 	issue: number,
+	edit_ms?: number,
 ): Breakdown | undefined {
 	const span = lane_net_time.span_of(entries, issue)
 
 	if (span === undefined) return undefined
 
 	const waits = lane_net_time.waits(entries, events, issue, span)
-	const segments = segments_of(events, issue, span)
+	const segments = segments_of(events, issue, span, edit_ms)
 	const parts = segments.map((segment) => ({
 		name: segment.stage,
 		ms: segment.to_ms - segment.from_ms - covered_ms(segment, waits),

@@ -39,6 +39,7 @@ const record_schema = z.object({
 const issue_schema = z.looseObject({
 	body: z.string().nullish(),
 	state: z.string(),
+	updated_at: z.string().optional(),
 	...gh_author_association.author_fields_schema,
 })
 
@@ -50,7 +51,7 @@ type Fetched =
 	| { kind: 'unchanged' }
 	| { kind: 'unreadable' }
 	| { kind: 'closed' }
-	| { kind: 'read'; snapshot: WatchSnapshot; etag: string | undefined }
+	| { kind: 'read'; snapshot: WatchSnapshot; etag: string | undefined; updated_at?: string }
 
 const UNREADABLE: Fetched = { kind: 'unreadable' }
 
@@ -101,7 +102,9 @@ async function read_snapshot(
 
 	if (comments === undefined) return UNREADABLE
 
-	return { kind: 'read', snapshot: { body: issue.body ?? '', is_body_trusted, comments }, etag }
+	const snapshot = { body: issue.body ?? '', is_body_trusted, comments }
+
+	return { kind: 'read', snapshot, etag, ...(issue.updated_at && { updated_at: issue.updated_at }) }
 }
 
 async function fetch_issue(request: FetchRequest): Promise<Fetched> {
@@ -121,8 +124,8 @@ async function fetch_issue(request: FetchRequest): Promise<Fetched> {
 	return await read_snapshot(request, fields, read.etag)
 }
 
-// `acknowledged_at` is when a person's update was last taken in — the baseline's own read, or an
-// acknowledgement that had something to take in. The review attestation compares it with the brief.
+// `acknowledged_at` is when a person's update last taken in landed — the baseline's own read, or the
+// update an acknowledgement took in (`landed_at`). The review attestation compares it with the brief.
 function fresh_record(
 	issue: string,
 	fetched: Extract<Fetched, { kind: 'read' }>,
@@ -243,6 +246,22 @@ interface Acknowledged {
 	diff: string | undefined
 }
 
+// When the newest update an acknowledgement takes in landed — a comment's `created_at`, a body edit's
+// the issue's `updated_at` — each never later than now, an unreadable one now, and never earlier than
+// the stamp it replaces, so a late-listed comment cannot lift a refusal. **Not the
+// acknowledgement's own time** (joshuafolkken/kit#5835): a run's own body edit landed before its review
+// was briefed, and stamping the later ack refused that review as briefed on an older spec.
+function landed_at(
+	record: WatchRecord,
+	fetched: Extract<Fetched, { kind: 'read' }>,
+	now: Date,
+): string {
+	const times = issue_watch_diff.landed_times(record, fetched.snapshot, fetched.updated_at ?? '')
+	const landed = times.map((time) => Math.min(Date.parse(time) || now.getTime(), now.getTime()))
+
+	return new Date(Math.max(...landed, Date.parse(record.acknowledged_at) || 0)).toISOString()
+}
+
 // `josh issue:ack`: read the issue as it is now, return what changed since the baseline, and make
 // that the new baseline. **What is returned is exactly what is acknowledged** — the read and the new
 // baseline are the same snapshot, so an update landing between the two cannot be acknowledged unseen.
@@ -260,7 +279,8 @@ async function acknowledge(
 
 	const diff = issue_watch_diff.unread_diff(record, fetched.snapshot)
 
-	const acknowledged_at = diff === undefined ? record.acknowledged_at : now.toISOString()
+	const acknowledged_at =
+		diff === undefined ? record.acknowledged_at : landed_at(record, fetched, now)
 
 	write_record(fresh_record(record.issue, fetched, now, acknowledged_at), root)
 

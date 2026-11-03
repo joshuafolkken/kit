@@ -203,6 +203,19 @@ function unread_diff(baseline: WatchBaseline, snapshot: WatchSnapshot): string |
 	return sections.length === 0 ? undefined : sections.join(SECTION_SEPARATOR)
 }
 
+// The texts of when the updates `unread_diff` takes in landed (joshuafolkken/kit#5835): each new person
+// comment's `created_at`, and `body_at` — the issue's own time, a body edit carrying none — when the body
+// changed.
+function landed_times(
+	baseline: WatchBaseline,
+	snapshot: WatchSnapshot,
+	body_at: string,
+): ReadonlyArray<string> {
+	const comments = new_person_comments(baseline, snapshot).map((comment) => comment.created_at)
+
+	return is_body_edited(baseline, snapshot) ? [body_at, ...comments] : comments
+}
+
 // The notice for a body edit `unread_diff` withholds, or `undefined` when there is none.
 function withheld_notice(baseline: WatchBaseline, snapshot: WatchSnapshot): string | undefined {
 	if (snapshot.is_body_trusted !== false || !is_body_edited(baseline, snapshot)) return undefined
@@ -214,6 +227,7 @@ const issue_watch_diff = {
 	RUN_MARKER,
 	WITHHELD_BODY_EDIT,
 	baseline_of,
+	landed_times,
 	parse_comments,
 	unread_diff,
 	withheld_notice,
