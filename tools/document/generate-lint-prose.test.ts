@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { code_quality_rules, code_quality_test_rules } from '#eslint/rules/code-quality.js'
+import { JAPANESE_RATIONALE_DIRECTORY } from '#eslint/rules/english-only-prose.js'
 import { sonarjs_rules } from '#eslint/rules/sonarjs.js'
+import { refactor_lint } from '#scripts/refactor/refactor-lint'
 import { generate_command_usage } from '#tools/document/generate-command-usage'
 import { generate_lint_prose } from '#tools/document/generate-lint-prose'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -10,6 +12,7 @@ const STALE_SPAN = 'Limits: <!-- lint: line-counting -->`max-lines`<!-- /lint --
 const MAX_LINES = 'max-lines'
 const MUTABLE_RULES: Record<string, unknown> = code_quality_rules
 const ORIGINAL_MAX_LINES = MUTABLE_RULES[MAX_LINES]
+const CATEGORY_RULES = refactor_lint.CATEGORIES.flatMap((category) => category.rules)
 
 const MAX_OPTION = z.tuple([z.string(), z.object({ max: z.number() })])
 
@@ -73,6 +76,25 @@ describe('generate lint prose', () => {
 		expect(() => generate_lint_prose.fill_lint_spans('<!-- lint: nope --><!-- /lint -->')).toThrow(
 			'no lint prose is registered for `nope`',
 		)
+	})
+})
+
+describe('generate lint prose from the refactor and English-only configs', () => {
+	it('lists every refactor:scan rule and marks only the low-priority category', () => {
+		const filled = generate_lint_prose.fill_lint_spans(
+			'<!-- lint: refactor-scan-rules --><!-- /lint -->',
+		)
+
+		for (const rule of CATEGORY_RULES) expect(filled).toContain(`\`${rule}\``)
+
+		expect(filled).toContain('unused code（低優先度: `@typescript-eslint/no-unused-vars`）')
+		expect(filled.match(/低優先度/gu)).toHaveLength(1)
+	})
+
+	it('names the directory the English-only rule is switched off for', () => {
+		expect(
+			generate_lint_prose.fill_lint_spans('<!-- lint: english-only-exemption --><!-- /lint -->'),
+		).toBe(`<!-- lint: english-only-exemption -->\`${JAPANESE_RATIONALE_DIRECTORY}\`<!-- /lint -->`)
 	})
 })
 
