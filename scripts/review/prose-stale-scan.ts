@@ -11,7 +11,8 @@ import { review_readers_scan } from './review-readers-scan'
 // on any removed line, and a `.md` file's `#` heading. **A word the diff still writes is not removed**: an
 // identifier or command any added line carries, a heading an added `.md` line still titles, and a command
 // the registry still holds, and a name a changed code file still declares in the working tree, an
-// unchanged line included (joshuafolkken/kit#6077). **A renamed declaration is removed unless an added line declares it again**
+// unchanged line included (joshuafolkken/kit#6077). **A deleted file names only what another module
+// could import** (joshuafolkken/kit#6130). **A renamed declaration is removed unless an added line declares it again**
 // (joshuafolkken/kit#5540): a hunk whose removed lines declare a name its added lines do not, beside
 // one they declare anew, renamed it, and the old name an added comment or a local still carries as a
 // token is stale all the same.
@@ -53,8 +54,16 @@ function to_terms(kind: TermKind, words: ReadonlyArray<string>): Array<Term> {
 	return words.map((word) => ({ kind, word }))
 }
 
-function code_terms(source: string): Array<Term> {
-	const declared = review_readers_scan.declarations(source).map((entry) => entry.name)
+// A deleted file's local names no other file could name are dropped (joshuafolkken/kit#6130): only
+// what it exported is searched.
+function declared_names(source: string, is_deleted: boolean): Array<string> {
+	if (is_deleted) return review_readers_scan.reachable_names(source)
+
+	return review_readers_scan.declarations(source).map((entry) => entry.name)
+}
+
+function code_terms(source: string, is_deleted: boolean): Array<Term> {
+	const declared = declared_names(source, is_deleted)
 	const listed = [...review_readers_scan.exported_names(source)]
 	const constants = declared.filter((name) => UPPER_CASE.test(name))
 	const names = [...declared.filter((name) => !UPPER_CASE.test(name)), ...listed]
@@ -96,10 +105,13 @@ function renamed_terms(hunk: Hunk): Array<Term> {
 	})
 }
 
-function hunk_terms(hunk: Hunk): Array<Term> {
+function hunk_terms(hunk: Hunk, deleted: ReadonlySet<string>): Array<Term> {
 	const lines = hunk.old_lines
 	const is_code = CODE_FILE.test(hunk.file)
-	const code = is_code ? [...code_terms(lines.join('\n')), ...renamed_terms(hunk)] : []
+	const source = lines.join('\n')
+	const code = is_code
+		? [...code_terms(source, deleted.has(hunk.file)), ...renamed_terms(hunk)]
+		: []
 	const titled = hunk.file.endsWith(MARKDOWN_EXTENSION) ? to_terms('heading', headings(lines)) : []
 
 	return [...code, ...command_terms(lines), ...titled]
@@ -138,15 +150,25 @@ function is_removed(term: Term, kept: Kept): boolean {
 	return !kept.tokens.has(term.word)
 }
 
-// Each removed word once, in diff order; `registered` is the command registry's names, `surviving`
-// the names the change's code files still declare in the working tree, on an unchanged line too.
+// The working tree's answer for the change's code files: `surviving` the names they still declare, on
+// an unchanged line too; `deleted` the files the change removed.
+interface Tree {
+	surviving: ReadonlySet<string>
+	deleted: ReadonlySet<string>
+}
+
+const EMPTY_TREE: Tree = { surviving: new Set(), deleted: new Set() }
+
+// Each removed word once, in diff order; `registered` is the command registry's names.
 function stale_terms(
 	hunks: ReadonlyArray<Hunk>,
 	registered: ReadonlySet<string>,
-	surviving: ReadonlySet<string> = new Set(),
+	tree: Tree = EMPTY_TREE,
 ): Array<Term> {
+	const { surviving, deleted } = tree
 	const kept = kept_of(hunks, registered)
-	const unique = new Map(hunks.flatMap((hunk) => hunk_terms(hunk)).map((term) => [term.word, term]))
+	const terms = hunks.flatMap((hunk) => hunk_terms(hunk, deleted))
+	const unique = new Map(terms.map((term) => [term.word, term]))
 
 	// A name a file still declares is kept, whatever a hunk did to it: renamed, moved or left unchanged.
 	return [...unique.values()].filter((term) => !surviving.has(term.word) && is_removed(term, kept))
@@ -193,5 +215,5 @@ function report(references: ReadonlyArray<Reference>): Report {
 
 const prose_stale_scan = { CODE_FILE, FAILED_EXIT, pattern, report, stale_terms }
 
-export type { Reference, Term }
+export type { Reference, Term, Tree }
 export { prose_stale_scan }

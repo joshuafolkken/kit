@@ -21,7 +21,7 @@ function hunk(file: string, old_lines: Array<string>, new_lines: Array<string> =
 }
 
 function terms(hunks: Array<Hunk>, registered = NONE, surviving = NONE): Array<Term> {
-	return prose_stale_scan.stale_terms(hunks, registered, surviving)
+	return prose_stale_scan.stale_terms(hunks, registered, { surviving, deleted: NONE })
 }
 
 function hit(path: string, excerpt: string): Hit {
@@ -111,6 +111,40 @@ describe('prose_stale_scan.stale_terms — a name the working tree still declare
 		]
 
 		expect(terms(removed, NONE, new Set(['OLD_LIMIT', 'old_name']))).toEqual([COMMAND])
+	})
+})
+
+describe('prose_stale_scan.stale_terms — a deleted file', () => {
+	const DELETED = new Set([CODE])
+	const LOCAL_FUNCTION_LINE = 'function count(): number {'
+
+	function deleted_terms(old_lines: Array<string>): Array<Term> {
+		return prose_stale_scan.stale_terms([hunk(CODE, old_lines)], NONE, {
+			surviving: NONE,
+			deleted: DELETED,
+		})
+	}
+
+	it('drops a local declaration no other file could name', () => {
+		expect(deleted_terms([LOCAL_FUNCTION_LINE, 'const LOCAL_LIMIT = 3'])).toEqual([])
+	})
+
+	it('keeps a direct export and a member of an exported namespace object', () => {
+		const removed = [
+			'export const OLD_LIMIT = 3',
+			OLD_FUNCTION_LINE,
+			LOCAL_FUNCTION_LINE,
+			'const space = {',
+			'\told_name,',
+			'}',
+			'export { space }',
+		]
+
+		expect(deleted_terms(removed)).toEqual([NAME, { kind: 'name', word: 'space' }, CONSTANT])
+	})
+
+	it('keeps a local declaration of a file the change did not delete', () => {
+		expect(terms([hunk(CODE, [OLD_FUNCTION_LINE])])).toEqual([NAME])
 	})
 })
 
