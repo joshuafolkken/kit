@@ -15,10 +15,11 @@ import { run_ship_group } from './run-ship-group'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
 import { run_ship_lap } from './run-ship-lap'
+import type { PreDetachResult } from './run-ship-pre-detach'
 import { run_ship_pre_detach_pinned } from './run-ship-pre-detach-pinned'
-import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
+import { run_ship_reship } from './run-ship-reship'
 import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
@@ -223,7 +224,9 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 async function record_stop(args: ShipArguments, stage: Stage, failed?: ShipSection): Promise<void> {
 	const issue = Number(args.number)
 
-	await lane_ledger_write.record_stop(run_ship_stop_cause.record_of(issue, stage, failed))
+	await lane_ledger_write.record_stop(
+		await run_ship_reship.with_base(run_ship_stop_cause.record_of(issue, stage, failed)),
+	)
 	review_stop_log.record({ issue, stage, findings: run_ship_stop_cause.details_of(stage, failed) })
 }
 
@@ -353,11 +356,9 @@ async function pre_detach_stop(
 async function pre_detach_checks(
 	args: ShipArguments,
 	preflight: ShipSection,
+	checks_of: (args: ShipArguments) => Promise<PreDetachResult>,
 ): Promise<ReadonlyArray<ShipSection>> {
-	const result = await run_ship_pre_detach_timed.checks(
-		args.number,
-		run_ship_pre_detach_pinned.checks_for(args),
-	)
+	const result = await checks_of(args)
 	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
 
 	if (run_ship.exit_code([checks, preflight]) !== SUCCESS_EXIT_CODE) {
@@ -403,11 +404,19 @@ async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<S
 		])
 	}
 
-	return await pre_detach_checks(args, preflight)
+	return await pre_detach_checks(args, preflight, run_ship_pre_detach_pinned.timed_checks)
 }
 
+// A re-ship after a review failure on an unmoved base passes over both but a `--review` ship's
+// `test:pinned` (`run-ship-reship.ts`).
 async function detach_after_preflight(args: ShipArguments): Promise<number> {
-	const sections = await pre_detach_sections(args)
+	const sections = (await run_ship_reship.is_due(args.number))
+		? await pre_detach_checks(
+				args,
+				await run_ship_reship.skipped(args.number),
+				run_ship_reship.checks,
+			)
+		: await pre_detach_sections(args)
 	const code = run_ship.exit_code(sections)
 
 	if (code === SUCCESS_EXIT_CODE) return await detach(args)
