@@ -56,7 +56,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		usage: {
 			examples: [
 				{
-					arguments: '4134 --body-file plan.md --title "Add issue:plan" --planned',
+					arguments: '4134 --body-file .josh/tmp/plan.md --title "Add issue:plan" --planned',
 					note: "kickoff's three writes",
 				},
 			],
@@ -152,9 +152,12 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		],
 		usage: {
 			examples: [
-				{ arguments: '"<title>" --body-file body.md' },
-				{ arguments: '"<title>" --body-file body.md --route tier-a --repo joshuafolkken/kit' },
-				{ arguments: '"<title>" --body-file body.md --distinct 2801,2795' },
+				{ arguments: '"<title>" --body-file .josh/tmp/body.md' },
+				{
+					arguments:
+						'"<title>" --body-file .josh/tmp/body.md --route tier-a --repo joshuafolkken/kit',
+				},
+				{ arguments: '"<title>" --body-file .josh/tmp/body.md --distinct 2801,2795' },
 				{ arguments: '--batch .josh/tmp/deferred --route tier-a' },
 				{ arguments: '--batch .josh/tmp/deferred.md --route tier-a' },
 			],
@@ -242,7 +245,10 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		usage: {
 			examples: [
-				{ arguments: '2304 "<root-cause title>" --repo joshuafolkken/kit --body-file body.md' },
+				{
+					arguments:
+						'2304 "<root-cause title>" --repo joshuafolkken/kit --body-file .josh/tmp/body.md',
+				},
 			],
 			flags: [
 				{ names: [REPO], description: 'the upstream repository. Required.' },

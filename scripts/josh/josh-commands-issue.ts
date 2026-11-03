@@ -75,7 +75,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '"Stop the gate re-running after every edit"' },
 				{ arguments: '"<title>" --body "parent: #1246"' },
-				{ arguments: '"<title>" --body-file draft.md' },
+				{ arguments: '"<title>" --body-file .josh/tmp/draft.md' },
 			],
 			flags: [
 				{

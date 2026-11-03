@@ -7,6 +7,7 @@ import { claude_token } from '#scripts/auth/claude-token'
 import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { fresh_machine_docker } from './fresh-machine-docker'
@@ -24,7 +25,7 @@ const USAGE =
 	'Usage: josh fresh:run <pattern> | --spec <file.json> [--package-version <version>] [--log-dir <dir>] [--rebuild] | --list'
 // The scratch directory kit's distributed `.gitignore` already ignores, so a log is never committed
 // from kit or from a consumer toolkit.
-const DEFAULT_LOG_DIRECTORY = '.josh/tmp/fresh-machine'
+const DEFAULT_LOG_DIRECTORY = `${JOSH_TMP_DIRECTORY}/fresh-machine`
 const NO_GITHUB_TOKEN =
 	'This scenario uses GitHub and `gh auth token` printed no token. Run `gh auth login` on this machine first.'
 const NO_CLAUDE_TOKEN = `This scenario uses Claude Code and neither the macOS keychain nor ${claude_token.VARIABLE} holds a token. ${claude_token.SETUP_HINT}`

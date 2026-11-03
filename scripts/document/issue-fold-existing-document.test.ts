@@ -41,7 +41,7 @@ describe('existing issue fold procedure', () => {
 	})
 
 	it('documents complete-draft input and the ordinary filing fallback', () => {
-		expect(REFERENCE).toContain('--body-file draft.md')
+		expect(REFERENCE).toContain('--body-file .josh/tmp/draft.md')
 		expect(REFERENCE).toContain('`separate` returns to the ordinary filing path')
 	})
 })

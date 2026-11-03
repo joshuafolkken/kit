@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 
@@ -164,7 +165,7 @@ function describe_handoff(handoff: Handoff): string {
 // Where a handoff file is written: `.josh/tmp/` is ignored, so `josh git`, which stages every
 // untracked non-ignored file, cannot commit the note with the code. A refusal that asked for "a file"
 // and named no place got one written beside the code and committed (joshuafolkken/kit#3603).
-const HANDOFF_PATH = '.josh/tmp/handoff-<N>.json'
+const HANDOFF_PATH = `${JOSH_TMP_DIRECTORY}/handoff-<N>.json`
 const ISSUE_PLACEHOLDER = '<N>'
 
 // The handoff path for one issue, relative to the checkout — the path `HANDOFF_PATH` tells the run
