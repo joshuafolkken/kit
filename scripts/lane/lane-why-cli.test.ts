@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 	implement_rate: vi.fn(),
 	issue_get_body: vi.fn<() => Promise<string | undefined>>(),
 	read_issues: vi.fn(),
+	timing_of: vi.fn(),
 }))
 
 vi.mock(import('./lane-net-read'), async (import_original) => {
@@ -37,6 +38,11 @@ vi.mock(import('./lane-sinks-issues'), async (import_original) => {
 	const { lane_sinks_issues } = await import_original()
 
 	return { lane_sinks_issues: { ...lane_sinks_issues, read: mocks.read_issues } }
+})
+vi.mock(import('#scripts/ci/ci-timing'), async (import_original) => {
+	const { ci_timing } = await import_original()
+
+	return { ci_timing: { ...ci_timing, timing_of: mocks.timing_of } }
 })
 
 const ISSUE = 6050
@@ -66,6 +72,7 @@ beforeEach(() => {
 	mocks.implement_rate.mockResolvedValue(undefined)
 	mocks.issue_get_body.mockResolvedValue(undefined)
 	mocks.read_issues.mockResolvedValue(undefined)
+	mocks.timing_of.mockRejectedValue(new Error('gh failed'))
 })
 
 describe('lane_why_cli.run', () => {
@@ -74,6 +81,11 @@ describe('lane_why_cli.run', () => {
 		expect(console.info).toHaveBeenCalledWith(
 			expect.stringContaining('| implement | 51.0 min | 12 min |  |  |  |  |'),
 		)
+	})
+
+	it('reads the lane branch CI timing and still prints the table when ci:timing throws', async () => {
+		await expect(lane_why_cli.run([String(ISSUE)])).resolves.toBe(0)
+		expect(mocks.timing_of).toHaveBeenCalledWith(`${String(ISSUE)}-lane`)
 	})
 
 	it('prints one line when no stage ran over its budget', async () => {

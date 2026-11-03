@@ -94,5 +94,5 @@ removed first, so the next ask can offer it.
 **Exactly one session does the end-of-epic work: the one standing in the repository that owns the
 epic** — the start and completion notifications, `josh propagate`, and `pnpm josh release:scope` once
 after the last merge (`followup.md` → "When `pnpm josh release` runs"). **Never compose the summary by
-hand — `pnpm josh run:report` generates it**; pass it to `pnpm josh notify
---body-file`.
+hand — `pnpm josh run:report` generates it**; write its output to `.josh/tmp/report.md` for
+`pnpm josh notify --body-file .josh/tmp/report.md`.

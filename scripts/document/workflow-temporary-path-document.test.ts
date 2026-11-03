@@ -16,8 +16,8 @@ function is_file_flag(token: string): boolean {
 
 // Commands live in code spans, so the text between backticks is read and prose is not — a fence's
 // three backticks flip the parity once, like one. A flag that opens its span is an option named
-// bare (a table cell); anywhere else it is a command, and the token after it is its argument. A
-// flag that ends its span names no path to check yet (joshuafolkken/kit#6125).
+// bare (a table cell); anywhere else it is a command, and the token after it is its argument — a
+// flag that ends its span reads as an empty argument, so it fails (joshuafolkken/kit#6125).
 function code_spans(text: string): Array<string> {
 	return text.split('`').filter((_segment, index) => index % 2 === 1)
 }
@@ -30,7 +30,7 @@ function span_file_arguments(span: string): Array<string> {
 
 	return tokens
 		.map((token, index) => ({ token, value: tokens[index + 1] ?? '' }))
-		.filter((pair, index) => index > 0 && pair.value !== '' && is_file_flag(pair.token))
+		.filter((pair, index) => index > 0 && is_file_flag(pair.token))
 		.map((pair) => pair.value)
 }
 
@@ -57,7 +57,7 @@ describe('workflow-commands name .josh/tmp/ for the files they have a session wr
 		expect(span_file_arguments('pnpm josh notify --body-file=.josh/tmp/a.md')).toStrictEqual([
 			'.josh/tmp/a.md',
 		])
-		expect(span_file_arguments('gh issue edit <N> --body-file')).toStrictEqual([])
+		expect(span_file_arguments('gh issue edit <N> --body-file')).toStrictEqual([''])
 		expect(span_file_arguments('--notify-message-file')).toStrictEqual([])
 	})
 

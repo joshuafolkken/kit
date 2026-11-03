@@ -694,6 +694,8 @@ The first positional is the `"<title> #<N>"` string `git -y` and `followup` take
 
 A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate.
 
+A detached re-ship (`--detach`, or any lane child's) whose last ship mark was a review failure (`check` / `finding`) on an unmoved base hands off without the pre-detach preflight and fast checks, printing `pre-detach: skipped (re-ship after review failure)` (`run-ship-reship.ts`). A `--review` ship still runs its `test:pinned` there; the supervised preflight and the review stage's gate still run.
+
 One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
 
 In scope, run the `lane:plan` command the stop prints (every path, as a re-run replaces the record) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.
@@ -1303,6 +1305,8 @@ pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation commen
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
+A ship stop closes the ship stage open at it. A blocking `lane:plan` wait on a holder is its own `lane:plan wait (#<M>)` row, cut out of the stage it fell in (`lane-plan-wait-event.ts`).
+
 Under the waits taken out, the yield wait splits into `yield wait: holder remaining` and `yield wait: redispatch gap (offer + launch)`; a wait whose note names no holder gets a `no holder named, unsplit` line (`lane-yield-split.ts`).
 
 A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column. Between the two, its `lane first lint:related` row takes each lane's first timed `lint:related`, over the lanes that ran one.
@@ -1340,7 +1344,7 @@ pnpm josh lane:why 6050   # the cause table an overrun investigation joins by ha
 
 One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`), longest first, no model run.
 
-The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last, a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
+The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last and the lane branch's longest CI job and that job's longest step (`ci:timing`, the branch's latest commit), a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
 
 A missing record, or an Issue listing that cannot be read, leaves its cell blank. A lane with no stage over budget prints one line; one the ledger holds no dispatch and merge of exits non-zero (`lane-why.ts`).
 
