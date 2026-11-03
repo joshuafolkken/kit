@@ -1,8 +1,8 @@
 {
-	"reason": "New egress pretool-guard row (egress-guard.ts, nested-commands.ts) and its delivered prose for #5999",
+	"reason": "egress pretool-guard row plus round-1 review fixes: launcher/env-flag resolution and disguised-name normalization so wrapped curl/wget cannot slip through",
 	"date": "2026-11-03",
 	"growth": {
-		"scripts.code_lines": 230,
+		"scripts.code_lines": 283,
 		"ai_cost.on_demand_bytes": 263
 	}
 }

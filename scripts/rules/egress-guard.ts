@@ -18,6 +18,20 @@ import { nested_commands } from './nested-commands'
 
 const GH_COMMAND = 'gh'
 const ENV_COMMAND = 'env'
+// `env`'s flags that take a separate value (`env -u NAME`).
+const ENV_VALUE_FLAGS: ReadonlySet<string> = new Set(['-u', '--unset', '-C', '--chdir'])
+// Launchers `program_of` does not skip, which run a program named among their words.
+const LAUNCHERS: ReadonlySet<string> = new Set([
+	'busybox',
+	'command',
+	'nice',
+	'nohup',
+	'stdbuf',
+	'timeout',
+	'xargs',
+])
+// A quoted or escaped program name (`"curl"`, `c\url`) still runs the program.
+const NAME_NOISE = /["'\\]/gu
 const FLAG_PREFIX = '-'
 const NEXT = 1
 // Programs whose purpose is to reach another host.
@@ -222,12 +236,70 @@ function is_environment_dump(_segment: string, call: ProgramCall): boolean {
 	return DUMP_CHECKS.get(call.name)?.(call.args) ?? false
 }
 
-// A bare `env` (or one with only flags and assignments) prints the environment: `program_of` skips
-// `env` as a wrapper, so it finds no program, or a flag in the program's place.
-function is_environment_listing(segment: string, call: ProgramCall | undefined): boolean {
-	if (call !== undefined && !call.name.startsWith(FLAG_PREFIX)) return false
+// The programs this row reads, looked for among a launcher's words.
+const WATCHED_PROGRAMS: ReadonlySet<string> = new Set([
+	...NETWORK_PROGRAMS,
+	...INLINE_FLAGS.keys(),
+	...DUMP_CHECKS.keys(),
+	RSYNC_COMMAND,
+	GH_COMMAND,
+	ENV_COMMAND,
+])
 
-	return git_argv.words_of(segment).some((word) => word.split('/').at(-1) === ENV_COMMAND)
+function plain_name(word: string): string {
+	return word.replaceAll(NAME_NOISE, '').split('/').at(-1) ?? ''
+}
+
+function is_environment_operand(words: ReadonlyArray<string>, index: number): boolean {
+	const word = words[index] ?? ''
+
+	return (
+		!word.startsWith(FLAG_PREFIX) &&
+		!word.includes('=') &&
+		!ENV_VALUE_FLAGS.has(words[index - NEXT] ?? '')
+	)
+}
+
+// The first word is a flag, so the rest is shorter; no operand left is a bare `env`.
+function past_environment_flags(words: ReadonlyArray<string>): ReadonlyArray<string> {
+	const index = words.findIndex((_word, position) => is_environment_operand(words, position))
+
+	return index === -1 ? [] : words.slice(index)
+}
+
+function past_launcher(call: ProgramCall): ReadonlyArray<string> | undefined {
+	if (!LAUNCHERS.has(call.name)) return undefined
+
+	const index = call.args.findIndex((word) => WATCHED_PROGRAMS.has(plain_name(word)))
+
+	return index === -1 ? undefined : call.args.slice(index)
+}
+
+// The words from the program a call hands over to: past `env`'s flags, which `program_of` takes for
+// the program (`env -u X pnpm test`), or past a launcher it does not skip (`timeout 5 curl …`).
+// `undefined` when the call runs its own program.
+function inner_words_of(call: ProgramCall | undefined): ReadonlyArray<string> | undefined {
+	if (call === undefined) return undefined
+	if (call.name.startsWith(FLAG_PREFIX)) return past_environment_flags([call.name, ...call.args])
+
+	return past_launcher(call)
+}
+
+function named_call(call: ProgramCall | undefined): ProgramCall | undefined {
+	return call === undefined ? undefined : { name: plain_name(call.name), args: call.args }
+}
+
+// Each round reads a shorter word list, so the loop ends.
+function resolved_call(segment: string): ProgramCall | undefined {
+	let call = named_call(git_argv.program_of(segment))
+	let inner = inner_words_of(call)
+
+	while (inner !== undefined) {
+		call = named_call(git_argv.program_of(inner.join(' ')))
+		inner = inner_words_of(call)
+	}
+
+	return call
 }
 
 const PROGRAM_CHECKS: ReadonlyArray<ProgramCheck> = [
@@ -235,13 +307,15 @@ const PROGRAM_CHECKS: ReadonlyArray<ProgramCheck> = [
 	is_inline_network,
 	is_gh_credential,
 	is_environment_dump,
-	is_environment_listing,
 ]
 
+// A segment that runs no program but names `env` prints the environment (`env`, `env -0`).
 function is_egress_segment(segment: string): boolean {
-	const call = git_argv.program_of(segment)
+	const call = resolved_call(segment)
 
-	if (call === undefined) return is_environment_listing(segment, call)
+	if (call === undefined) {
+		return git_argv.words_of(segment).some((word) => plain_name(word) === ENV_COMMAND)
+	}
 
 	return PROGRAM_CHECKS.some((check) => check(segment, call))
 }
@@ -267,7 +341,7 @@ const ROW = {
 		fires:
 			'`curl` / `wget` / `nc` / `ssh` / `scp` / a remote `rsync` and the like, a network call in an inline `node -e` / `python -c` script, `gh auth token`, `gh` sent to a host other than github.com, or a print of the environment or a `*TOKEN*` / `*SECRET*` / `*KEY*` variable — nested in `bash -c`, `eval`, `$(…)` or a heredoc as well. Every occurrence',
 		quiet:
-			'`gh` against github.com, `git fetch` / `push`, `pnpm` / `npx`, `curl` to localhost or GitHub, and `env X=1 <command>`',
+			'`gh` against github.com, `git fetch` / `push`, `pnpm` / `npx`, and `env X=1 <command>`. A plain `curl` / `wget` is still refused by the `.claude/settings.json` deny list, even to localhost; the hook lets localhost or GitHub through only for spellings that list does not reach',
 	},
 }
 
