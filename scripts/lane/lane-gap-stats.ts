@@ -3,11 +3,11 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_ledger, type LedgerEntry, type MergeEntry } from './lane-ledger'
-import { lane_net_time } from './lane-net-time'
 import { lane_spans, type Span } from './lane-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stop_stats } from './lane-stop-stats'
+import { lane_yield_split, type YieldParts } from './lane-yield-split'
 
 // How long a lane slot waited on the lane machinery rather than on work, printed by `josh lane:stats`
 // (joshuafolkken/kit#4395). Three hand-offs, each timed from the moment the slot's next step could run:
@@ -20,7 +20,9 @@ import { lane_stop_stats } from './lane-stop-stats'
 //   writes none, so a gap over the offer interval is a full pool or no driver, never the hand-over
 //   (joshuafolkken/kit#4410). The ship's cap park and the driver's collection of it are each timed.
 // - `yield → redispatch`: a yield (`lane:plan` gave the seat back) until its issue's next `dispatch`, the
-//   wait `josh lane:net` takes out (`lane-net-time.ts`, joshuafolkken/kit#5216).
+//   wait `josh lane:net` takes out (`lane-net-time.ts`, joshuafolkken/kit#5216). Its rows below split it
+//   into the holder running, the wait for the next offer and the launch, a yield naming no holder
+//   counted apart (`lane-yield-split.ts`, joshuafolkken/kit#5984).
 // - `followup → merge`: the ship's last `followup` stage before the merge until the parent wrote the
 //   `merge` line, the step that releases the slot. A merge with no `followup` stage has no start.
 // - `start → first lane`: a `backlogrun` session's `starting session` until its first `opening lane`
@@ -34,6 +36,12 @@ const RELAUNCH = 'cut → resume'
 const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
 const YIELD = 'yield → redispatch'
+const YIELD_PART = {
+	HOLDER: 'yield: holder running',
+	OFFER: 'yield: offer wait',
+	LAUNCH: 'yield: launch',
+	UNKNOWN: 'yield: holder unknown',
+} as const
 const MERGE = 'followup → merge'
 const FIRST_LANE = 'start → first lane'
 const FOLLOWUP_STAGE = 'followup'
@@ -124,8 +132,8 @@ function is_in(span: Span, window: StatsWindow): boolean {
 	return span.from_ms >= window.since_ms && span.from_ms <= window.until_ms
 }
 
-function gap_row(name: string, spans: ReadonlyArray<Span>, window: StatsWindow): string {
-	const started = spans.filter((span) => is_in(span, window))
+// `started` is the spans already reduced to the period.
+function span_row(name: string, started: ReadonlyArray<Span>): string {
 	const ended = started
 		.map((span) => (span.end_ms === undefined ? undefined : span.end_ms - span.from_ms))
 		.filter((value) => is_number(value))
@@ -137,6 +145,45 @@ function gap_row(name: string, spans: ReadonlyArray<Span>, window: StatsWindow):
 		seconds(lane_stats.peak(ended)),
 		String(started.length - ended.length),
 	])
+}
+
+function gap_row(name: string, spans: ReadonlyArray<Span>, window: StatsWindow): string {
+	return span_row(
+		name,
+		spans.filter((span) => is_in(span, window)),
+	)
+}
+
+function waits_of(parts: ReadonlyArray<YieldParts>): Array<Span> {
+	return parts.map((part) => part.wait)
+}
+
+// The yield row, then its parts (`lane-yield-split.ts`): each split by the yield's own start, so a
+// yield the period holds keeps every part, and the split and the unknown counts add up to its count.
+function yield_rows(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	window: StatsWindow,
+): Array<string> {
+	const inside = lane_yield_split.parts(entries, events).filter((part) => is_in(part.wait, window))
+	const unknown = inside.filter((part) => part.holder === undefined)
+
+	return [
+		span_row(YIELD, waits_of(inside)),
+		span_row(
+			YIELD_PART.HOLDER,
+			inside.flatMap((part) => part.holder ?? []),
+		),
+		span_row(
+			YIELD_PART.OFFER,
+			inside.flatMap((part) => part.offer ?? []),
+		),
+		span_row(
+			YIELD_PART.LAUNCH,
+			inside.flatMap((part) => part.launch ?? []),
+		),
+		span_row(YIELD_PART.UNKNOWN, waits_of(unknown)),
+	]
 }
 
 // The period's table: `entries` is the whole ledger and `events` the whole run-event stream, both
@@ -152,7 +199,7 @@ function table(
 		gap_row(RELAUNCH, relaunch_spans(events), window),
 		gap_row(OUTAGE, outage_spans(events), window),
 		gap_row(PARK, park_spans(entries, events), window),
-		gap_row(YIELD, lane_net_time.yield_spans(entries, events), window),
+		...yield_rows(entries, events, window),
 		gap_row(MERGE, merge_spans(entries), window),
 		gap_row(FIRST_LANE, run_event_setup.first_lane_spans(events), window),
 	].join('\n')

@@ -1,0 +1,135 @@
+import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { LedgerEntry } from './lane-ledger'
+import { lane_net_time } from './lane-net-time'
+import type { IssueAt, Span } from './lane-spans'
+import { lane_stage_stats } from './lane-stage-stats'
+import { lane_stop_stats } from './lane-stop-stats'
+import { lane_yield } from './lane-yield'
+
+// Where a `yield → redispatch` wait went (joshuafolkken/kit#5984), split at two instants:
+//
+// - `holder`: the yield note until the holder's lane ended — its `merge` line, or an event the driver
+//   reads as a finished lane (`backlog-drive-restore.ts` → `DONE_KINDS`). A redispatch before any such
+//   end closes it there: the holder ran through the whole wait.
+// - `offer`: that end until the driver opened a lane for the yielded issue (`opening lane #N`), any
+//   `offer:watch:*` hold between them included.
+// - `launch`: the opening until the issue's `dispatch` line, the wait's own end.
+//
+// The holder is named only in the note's text (`lane-plan-check.ts` → `overlap_text`); a note naming
+// none has no split, and its wait is counted whole. A part nothing ended stays not ended, and the part
+// after it is absent.
+
+const { EVENT_KIND } = run_event_stream
+const NAMED_ISSUE = /#([1-9]\d*)\b/gu
+
+interface YieldParts {
+	wait: Span
+	holder?: Span
+	offer?: Span
+	launch?: Span
+}
+
+interface YieldPoints {
+	ends: ReadonlyArray<IssueAt>
+	openings: ReadonlyArray<IssueAt>
+}
+
+// The last issue the note cites other than the yielder: the overlap text names the holder last.
+function holder_of(note: RunEvent): number | undefined {
+	const yielder = lane_stop_stats.issue_of(note)
+
+	return [...note.text.matchAll(NAMED_ISSUE)]
+		.map((match) => Number(match[1]))
+		.findLast((issue) => issue !== yielder)
+}
+
+function points_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+): YieldPoints {
+	const merges = entries
+		.filter((entry) => lane_stage_stats.is_merge(entry))
+		.map((entry) => ({ issue: entry.issue, at_ms: Date.parse(entry.at) }))
+	const openings = events.filter((event) =>
+		run_event_setup.is_stage(event, run_event_setup.LANE_STAGE.OPENING),
+	)
+
+	const done = events
+		.filter((event) => backlog_drive_restore.DONE_KINDS.has(event.kind))
+		.map((event) => ({ issue: lane_stop_stats.issue_of(event), at_ms: Date.parse(event.at) }))
+
+	return {
+		ends: [...merges, ...done],
+		openings: lane_stop_stats.events_of(openings, EVENT_KIND.SETUP),
+	}
+}
+
+// The earliest instant of `issue` in `points` from `from_ms` up to `until_ms`.
+function first_at(
+	points: ReadonlyArray<IssueAt>,
+	issue: number,
+	from_ms: number,
+	until_ms: number,
+): number | undefined {
+	const inside = points.filter(
+		(point) => point.issue === issue && point.at_ms >= from_ms && point.at_ms <= until_ms,
+	)
+
+	return inside.length === 0 ? undefined : Math.min(...inside.map((point) => point.at_ms))
+}
+
+// The offer and launch parts after the holder's end at `ended_ms`.
+function after_holder(
+	wait: Span,
+	yielder: number,
+	ended_ms: number,
+	points: YieldPoints,
+): YieldParts {
+	const opened_ms = first_at(points.openings, yielder, ended_ms, wait.end_ms ?? Infinity)
+
+	return {
+		wait,
+		holder: { from_ms: wait.from_ms, end_ms: ended_ms },
+		offer: { from_ms: ended_ms, end_ms: opened_ms },
+		...(opened_ms !== undefined && { launch: { from_ms: opened_ms, end_ms: wait.end_ms } }),
+	}
+}
+
+function split_of(wait: Span, issues: [number, number], points: YieldPoints): YieldParts {
+	const [yielder, holder] = issues
+	const ended_ms = first_at(points.ends, holder, wait.from_ms, wait.end_ms ?? Infinity)
+
+	return ended_ms === undefined
+		? { wait, holder: { from_ms: wait.from_ms, end_ms: wait.end_ms } }
+		: after_holder(wait, yielder, ended_ms, points)
+}
+
+function parts_of(note: RunEvent, wait: Span | undefined, points: YieldPoints): Array<YieldParts> {
+	if (wait === undefined) return []
+
+	const holder = holder_of(note)
+
+	return holder === undefined
+		? [{ wait }]
+		: [split_of(wait, [lane_stop_stats.issue_of(note), holder], points)]
+}
+
+// Every yield's wait with its parts. `yield_spans` keeps the notes' order, one wait per note.
+function parts(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+): Array<YieldParts> {
+	const waits = lane_net_time.yield_spans(entries, events)
+	const points = points_of(entries, events)
+
+	return events
+		.filter((event) => lane_yield.is_yield_note(event))
+		.flatMap((note, index) => parts_of(note, waits[index], points))
+}
+
+const lane_yield_split = { parts }
+
+export { lane_yield_split }
+export type { YieldParts }

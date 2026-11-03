@@ -130,6 +130,7 @@ const run_event_setup = {
 	first_lane_ms,
 	first_lane_spans,
 	installing,
+	is_stage,
 	no_child,
 	opening_lane,
 }
