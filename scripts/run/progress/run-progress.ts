@@ -46,6 +46,15 @@ const DEFAULT_INTERVAL_MINUTES = 20
 // spellings of it.
 const INTERVAL_KEY = 'JOSH_PROGRESS_INTERVAL_MINUTES'
 const DEFAULT_INTERVAL_MS = DEFAULT_INTERVAL_MINUTES * MS_PER_MINUTE
+// **A decline deliberately does not move the report clock** — the first child to appear is reported at
+// once rather than waiting out an interval the repository spent idle. Without a cooldown, though, that
+// same property re-reads GitHub on every poll for the watcher's whole life, and a batch stacks one
+// fresh watcher per child, so the listings accumulate into secondary-rate-limit territory and would
+// themselves start producing the unreadable listings the watcher's decline (`run-progress-cli.ts`) exists to handle. Two minutes keeps
+// "reported at once" true to within a fraction of the twenty-minute interval and takes the call count
+// down with it. Kept here, not in `run-progress-cli.ts`, so `run:board` reads it without the watcher's
+// imports (joshuafolkken/kit#5987).
+const DECLINE_RETRY_SECONDS = 120
 // The switch that silences every progress report — the watcher's and `run:board --every`'s alike.
 const DISABLED_KEY = 'JOSH_PROGRESS'
 const DISABLED_VALUE = '0'
@@ -344,6 +353,7 @@ function is_disabled(): boolean {
 }
 
 const run_progress = {
+	DECLINE_RETRY_SECONDS,
 	DEFAULT_INTERVAL_MINUTES,
 	DEFAULT_INTERVAL_MS,
 	DISABLED_KEY,

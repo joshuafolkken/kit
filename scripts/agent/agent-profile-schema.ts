@@ -34,7 +34,8 @@ const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
 // **Pinned model ids, never a floating alias**. An alias such as `opus` moves
 // whenever the CLI moves it, so a run log could not say which model produced it and a model migration
 // could not be measured apart from everything else. A new lane records the id it resolved; a lane
-// created before a migration keeps the model it recorded (`with_phase` moves it only by a phase key).
+// created before a migration keeps the model it recorded (`with_phase` moves it only into a phase's
+// own model — pre-gate's Sonnet default, or `JOSH_WORKER_SHIP_MODEL`).
 const OPENAI_MODEL = 'gpt-6.1-sol'
 const ANTHROPIC_MODEL = 'claude-opus-5-5'
 

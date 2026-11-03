@@ -99,7 +99,7 @@ function printed_errors(): string {
 
 // **The relaunch starts the child at the effort of the phase it resumes into**, so
 // the expected profile is resolved for that phase — the default pre-gate cut lowers the worker to the
-// ship/bookkeeping effort (and `JOSH_WORKER_SHIP_MODEL`, when set), which is the branch every relaunch
+// ship/bookkeeping effort and model (Sonnet, or `JOSH_WORKER_SHIP_MODEL`), which is the branch every relaunch
 // case here takes.
 function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv' }> {
 	const phase = run_cut.PRE_GATE_PHASE
