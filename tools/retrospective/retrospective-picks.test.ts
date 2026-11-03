@@ -47,9 +47,9 @@ function inputs(overrides: Partial<PickInputs>): PickInputs {
 const FULL = inputs({
 	audit_summary: `Cost audit (7d): $12.0000 (+30.0%); regressions: total\n${REGRESSION_LINE}`,
 	guards: [
-		{ guard: 'batching', refusals: 2, stops: 0, usd: 0.5 },
-		{ guard: 'lane plan', refusals: 1, stops: 0, usd: 3 },
-		{ guard: "unsafe `sed -i` on $HOME's file", refusals: 4, stops: 1, usd: 1.25 },
+		{ guard: 'batching', refusals: 2, stops: 0, rephrased: 0, usd: 0.5 },
+		{ guard: 'lane plan', refusals: 1, stops: 0, rephrased: 0, usd: 3 },
+		{ guard: "unsafe `sed -i` on $HOME's file", refusals: 4, stops: 1, rephrased: 0, usd: 1.25 },
 	],
 	waiting: [waiting_role('wake', 0.25, 0.52)],
 	findings: [

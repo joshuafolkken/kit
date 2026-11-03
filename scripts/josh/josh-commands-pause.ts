@@ -1,8 +1,7 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
-// `run:pause`, `run:split`, `run:stale` and `tree:status`, split out of `josh-commands-run.ts` so that file stays under its
-// 300-code-line limit, as `PROGRESS_COMMANDS` is. `RUN_COMMANDS` spreads this in after `run:release`,
-// so the map keeps the order the run reads them in.
+// `run:pause`, `run:split`, `run:stale` and `tree:status`. `RUN_COMMANDS` spreads this in after
+// `run:release`, so the map keeps the order the run reads them in.
 
 const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 	'run:pause': {
