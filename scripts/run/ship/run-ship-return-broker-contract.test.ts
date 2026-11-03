@@ -42,7 +42,7 @@ const ARGS = {
 	title: `Accept the stop cause #${ISSUE}`,
 	notify: [],
 	body: [],
-	body_path: 'scratchpad/evidence.md',
+	body_path: '.josh/tmp/evidence.md',
 	cites: [],
 	is_review: true,
 	is_detach: true,

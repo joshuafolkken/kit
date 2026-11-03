@@ -44,7 +44,7 @@ const { run_ship_return } = await import('./run-ship-return')
 // fresh session re-reads the run; a session that ended is relaunched as before.
 
 const TITLE = `Return a stopped review #${ISSUE}`
-const BODY_PATH = 'scratchpad/evidence.md'
+const BODY_PATH = '.josh/tmp/evidence.md'
 const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: true }
 const OUTPUT = 'High: scripts/run/ship/run-ship-return.ts'
 const STAGE = 'review'

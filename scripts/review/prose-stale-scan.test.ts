@@ -20,8 +20,8 @@ function hunk(file: string, old_lines: Array<string>, new_lines: Array<string> =
 	return { file, new_start: 1, new_count: new_lines.length, old_lines, new_lines }
 }
 
-function terms(hunks: Array<Hunk>, registered = NONE): Array<Term> {
-	return prose_stale_scan.stale_terms(hunks, registered)
+function terms(hunks: Array<Hunk>, registered = NONE, surviving = NONE): Array<Term> {
+	return prose_stale_scan.stale_terms(hunks, registered, surviving)
 }
 
 function hit(path: string, excerpt: string): Hit {
@@ -100,6 +100,17 @@ describe('prose_stale_scan.stale_terms — a word the diff still writes is kept'
 		const prefixed = hunk(CODE, [OLD_LIMIT_LINE], ['const OLD_LIMIT_MS = 3'])
 
 		expect(terms([prefixed])).toEqual([{ ...CONSTANT, renamed_to: 'OLD_LIMIT_MS' }])
+	})
+})
+
+describe('prose_stale_scan.stale_terms — a name the working tree still declares', () => {
+	it('drops a name a changed file still declares on an unchanged line, renamed or not', () => {
+		const removed = [
+			hunk(CODE, [OLD_LIMIT_LINE, OLD_FUNCTION_LINE], [NEW_FUNCTION_LINE]),
+			hunk(OTHER_CODE, [`// josh ${OLD_COMMAND}`]),
+		]
+
+		expect(terms(removed, NONE, new Set(['OLD_LIMIT', 'old_name']))).toEqual([COMMAND])
 	})
 })
 

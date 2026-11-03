@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
 import { disposition_batch, type BatchFinding } from './disposition-batch'
 
 // The branch-2 half of `josh disposition --batch`: for each finding it routes to `file`, a body that
@@ -10,14 +11,13 @@ import { disposition_batch, type BatchFinding } from './disposition-batch'
 // runs and an untraced bug owes a reproduction this cannot run, so the draft is declared non-bug; the
 // filer reclassifies it once the origin is traced.
 
-const BODY_DIRECTORY = '.josh/tmp'
 const FOUND_DURING_FLAG = '--found-during'
 const SECURITY_CATEGORY = 'security:'
 // A `'` inside a single-quoted shell word: close the quote, an escaped quote, reopen.
 const ESCAPED_QUOTE = String.raw`'\''`
 const MISSING_FOUND_DURING =
 	'a finding routes to `file`: pass `--found-during <N>`, the issue whose review found it'
-const FILE_HEADING = `File commands (bodies drafted under ${BODY_DIRECTORY}/ — read each before filing):`
+const FILE_HEADING = `File commands (bodies drafted under ${JOSH_TMP_DIRECTORY}/ — read each before filing):`
 
 interface Filing {
 	title: string
@@ -96,7 +96,7 @@ function body_path_of(directory: string, issue: number, index: number): string {
 function write_filings(
 	findings: ReadonlyArray<BatchFinding>,
 	issue: number,
-	directory: string = BODY_DIRECTORY,
+	directory: string = JOSH_TMP_DIRECTORY,
 ): ReadonlyArray<Filing> {
 	mkdirSync(directory, { recursive: true })
 
@@ -120,7 +120,7 @@ function found_during_of(argv: ReadonlyArray<string>): number | undefined {
 function filing_lines(
 	findings: ReadonlyArray<BatchFinding>,
 	argv: ReadonlyArray<string>,
-	directory: string = BODY_DIRECTORY,
+	directory: string = JOSH_TMP_DIRECTORY,
 ): ReadonlyArray<string> | undefined {
 	const filed = findings.filter((finding) => disposition_batch.branch_of(finding) === 'file')
 

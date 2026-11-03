@@ -17,6 +17,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { session_cite } from '#scripts/issue/session-cite'
+import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_auto_triage } from './backlog-auto-triage'
 import { backlog_defect_priority } from './backlog-defect-priority'
@@ -453,7 +454,7 @@ async function context_of(
 		return undefined
 	}
 
-	return { opted_in, tracking, repo, exclude }
+	return { opted_in, tracking, repo, exclude, implement_rate: await lane_net_read.implement_rate() }
 }
 
 async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {
