@@ -694,6 +694,8 @@ The first positional is the `"<title> #<N>"` string `git -y` and `followup` take
 
 A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate.
 
+A detached re-ship (`--detach`, or any lane child's) whose last ship mark was a review failure (`check` / `finding`) on an unmoved base hands off without the pre-detach preflight and fast checks, printing `pre-detach: skipped (re-ship after review failure)` (`run-ship-reship.ts`). A `--review` ship still runs its `test:pinned` there; the supervised preflight and the review stage's gate still run.
+
 One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
 
 In scope, run the `lane:plan` command the stop prints (every path, as a re-run replaces the record) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.

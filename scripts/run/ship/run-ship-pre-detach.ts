@@ -210,6 +210,7 @@ const run_ship_pre_detach = {
 	UNPINNED,
 	checks,
 	failure_prefix,
+	with_pinned,
 }
 
 export type { PinnedCheck, PreDetachCheck, PreDetachResult }
