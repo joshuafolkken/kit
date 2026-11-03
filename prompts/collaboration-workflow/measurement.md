@@ -23,11 +23,11 @@ PR の効果を測る後続 Issue の起票:
 - 計測宣言のある本文の `- 実施可能日:` → 起票から 7 日以内、`- 実施可能条件:` と併記しない（`issue:file` が refuse）。
 - 受け入れ条件の集計は固定日数でなく `pnpm josh lane:stats --period <days>`、`<days>` は元 PR のマージからの経過日数（小数可）。
 
-計測を記録し終えた → `pnpm josh issue:measured <N> --evidence-file <path>`。`.claude/skills/workflow-commands/issue-comments.md` →「A measurement-only Issue」。
+計測を記録し終えた → `pnpm josh issue:measured <N> --evidence-file .josh/tmp/evidence.md`。`.claude/skills/workflow-commands/issue-comments.md` →「A measurement-only Issue」。
 
 ## 期待効果に届かなかったとき
 
-- 計測が期待効果に届かなかった → `pnpm josh issue:measured <N> --unmet --evidence-file <path>`。
+- 計測が期待効果に届かなかった → 同じ `issue:measured` に `--unmet` を足す。
 - 届かなかった機構の撤去候補を起票する → `pnpm josh effect:audit --draft <元 Issue>`（元 Issue が 30 日より前に閉じたときは `--days <N>` を足す）、表示された `issue:file` の行で起票する（重複は scout が止める）。
 - 時間短縮 Issue の効果を一覧する → `pnpm josh effect:audit [--days <N>]`。
 

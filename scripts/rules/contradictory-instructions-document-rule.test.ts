@@ -36,7 +36,7 @@ const CORRECTIONS: ReadonlyArray<Correction> = [
 	{ document_path: ENTRY_SEQUENCE, present: 'pnpm josh latest:if-required', absent: 'pnpm latest' },
 	{
 		document_path: PLAN_COMMENT,
-		present: 'pnpm josh issue:plan <N> --body-file <path>',
+		present: 'pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md',
 		absent: '-f body="',
 	},
 	{ document_path: UPSTREAM, present: 'pnpm josh repo:party', absent: 'kit / app-kit / game-kit' },
