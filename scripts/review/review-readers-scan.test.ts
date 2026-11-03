@@ -92,6 +92,14 @@ describe('review_readers_scan.reachable_names', () => {
 			'issue_merged',
 		])
 	})
+
+	it('reads the members of a namespace object exported in place', () => {
+		const source = ['function finish(): void {}', 'export const drive = {', '\tfinish,', '}'].join(
+			'\n',
+		)
+
+		expect(review_readers_scan.reachable_names(source)).toEqual(['finish', 'drive'])
+	})
 })
 
 const COMMENTED = [

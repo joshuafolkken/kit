@@ -11,8 +11,8 @@ import { review_readers_scan } from './review-readers-scan'
 // on any removed line, and a `.md` file's `#` heading. **A word the diff still writes is not removed**: an
 // identifier or command any added line carries, a heading an added `.md` line still titles, and a command
 // the registry still holds, and a name a changed code file still declares in the working tree, an
-// unchanged line included (joshuafolkken/kit#6077). **A deleted file names only what it exported**
-// (joshuafolkken/kit#6130): its local declarations were never reachable from prose. **A renamed declaration is removed unless an added line declares it again**
+// unchanged line included (joshuafolkken/kit#6077). **A deleted file names only what another module
+// could import** (joshuafolkken/kit#6130). **A renamed declaration is removed unless an added line declares it again**
 // (joshuafolkken/kit#5540): a hunk whose removed lines declare a name its added lines do not, beside
 // one they declare anew, renamed it, and the old name an added comment or a local still carries as a
 // token is stale all the same.

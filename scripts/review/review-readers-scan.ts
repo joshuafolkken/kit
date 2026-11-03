@@ -87,7 +87,10 @@ function exported_names(source: string): Set<string> {
 // The members of `const <name> = { … }`, or `undefined` where `name` is not an object literal. `name`
 // is a `\w+` match, so it carries no pattern syntax.
 function namespace_members(source: string, name: string): Array<string> | undefined {
-	const literal = new RegExp(String.raw`^const\s+${name}\s*=\s*\{(?<body>[^}]*)\}`, 'mu')
+	const literal = new RegExp(
+		String.raw`^(?:export\s+)?const\s+${name}\s*=\s*\{(?<body>[^}]*)\}`,
+		'mu',
+	)
 	const body = literal.exec(source)?.groups?.['body']
 
 	return body === undefined ? undefined : list_names(body)
@@ -161,15 +164,15 @@ function edited(source: string, diff: string): Array<Edited> {
 
 // The declared names another module can reach: a direct export, an `export { … }` entry, or a member of
 // an exported namespace object — what a deleted file can still be named by (joshuafolkken/kit#6130).
+// A namespace object exported in place (`export const ns = { … }`) counts as one listed in `export { ns }`.
 function reachable_names(source: string): Array<string> {
-	const exported = exported_names(source)
+	const found = declarations(source)
+	const direct = found.filter((declaration) => declaration.is_exported).map((entry) => entry.name)
+	const exported = new Set([...exported_names(source), ...direct])
 	const members = [...namespaces(source, exported).values()].flat()
 	const reachable = new Set([...exported, ...members])
-	const found = declarations(source).filter(
-		(declaration) => declaration.is_exported || reachable.has(declaration.name),
-	)
 
-	return found.map((declaration) => declaration.name)
+	return found.map((entry) => entry.name).filter((name) => reachable.has(name))
 }
 
 const review_readers_scan = {
