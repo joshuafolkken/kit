@@ -137,6 +137,47 @@ describe('lane_breakdown_implement.plan_calls', () => {
 	})
 })
 
+// joshuafolkken/kit#6119: #6050's start to plan ran over budget, most of it outside its calls, and no
+// line said so. The row now carries the time outside every call and wait.
+describe('lane_breakdown_implement.plan_outside', () => {
+	it('takes the calls and the waits out of the start to plan, each minute once', () => {
+		const calls = [bash(1, 3, RUN_PREP), call(2, 3, { tool: 'Read' }), bash(20, 9, TEST_RELATED)]
+		const breakdown = { ...BREAKDOWN, waits: [{ from_ms: 8 * MINUTE_MS, to_ms: 9 * MINUTE_MS }] }
+
+		expect(lane_breakdown_implement.plan_outside(calls, breakdown)).toStrictEqual({
+			ms: 5 * MINUTE_MS,
+			background: 0,
+		})
+	})
+
+	it('answers nothing for a lane whose calls were not read', () => {
+		expect(lane_breakdown_implement.plan_outside([], BREAKDOWN)).toBeUndefined()
+	})
+
+	it('prints the outside minutes on the start to plan line', () => {
+		vi.spyOn(lane_breakdown_implement, 'read').mockReturnValue([bash(2, 3, RUN_PREP)])
+
+		const report = lane_breakdown_text.report_of(1, BREAKDOWN, [])
+		const lines = lane_breakdown_text.comment(1, 61, report).split('\n')
+
+		expect(lines).toContain('- start to plan 10.0 min, over budget +7 min (outside calls 7.0 min)')
+		vi.restoreAllMocks()
+	})
+
+	it('names the backgrounded calls whose waits the outside minutes hold', () => {
+		const backgrounded = call(2, 0, { tool: 'Agent', background: true, duration_ms: undefined })
+		const report = {
+			breakdown: BREAKDOWN,
+			detail: lane_breakdown_implement.of([], BREAKDOWN),
+			plan_outside: lane_breakdown_implement.plan_outside([backgrounded], BREAKDOWN),
+		}
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			'start to plan 10.0 min, over budget +7 min (outside calls 10.0 min, 1 backgrounded calls, their waits in it)',
+		)
+	})
+})
+
 // joshuafolkken/kit#5717: a lane's first `lint:related` falls in the implementation, so its row carries
 // the timing line too.
 describe('lane_breakdown_implement.of — lint:related detail', () => {
