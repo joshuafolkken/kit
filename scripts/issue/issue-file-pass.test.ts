@@ -15,6 +15,8 @@ const DECLARED = 2795
 const DUPLICATE_A = 2801
 const DUPLICATE_B = 2802
 const SOURCE_PROBLEM = 'the start condition cites an issue'
+const DISTINCT = '--distinct'
+const NO_DUPLICATES = { report: 'Duplicates: none', candidates: [] }
 
 // Opted into `auto-ok` with no run label named, and missing every section after the background.
 const REFUSED_BODY = '## 背景\n\n- 種別: 不具合\n- 人の判断: 不要\n'
@@ -53,10 +55,7 @@ beforeEach(() => {
 	vi.spyOn(issue_file_lane_hint, 'lines_of').mockResolvedValue([])
 	vi.spyOn(issue_sample_source, 'problem').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
-	vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue({
-		report: 'Duplicates: none',
-		candidates: [],
-	})
+	vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue(NO_DUPLICATES)
 })
 
 afterEach(() => {
@@ -95,7 +94,7 @@ describe('issue_file_pass.labels_in_one_pass — every refusal in one call', () 
 			report: 'Duplicates: 3',
 			candidates: [DECLARED, DUPLICATE_A, DUPLICATE_B],
 		})
-		const filing = filing_of(CLEAR_BODY, args_of(['--distinct', String(DECLARED)]))
+		const filing = filing_of(CLEAR_BODY, args_of([DISTINCT, String(DECLARED)]))
 
 		expect(await issue_file_pass.labels_in_one_pass(filing)).toBeUndefined()
 		const pasted = [DECLARED, DUPLICATE_A, DUPLICATE_B].map(String).join(',')
@@ -106,5 +105,27 @@ describe('issue_file_pass.labels_in_one_pass — every refusal in one call', () 
 	it('answers the labels when no step refuses', async () => {
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeDefined()
 		expect(console.error).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6008: an open issue declaring the same measurement holds the filing, and no
+// `--distinct` releases it.
+describe('issue_file_pass.labels_in_one_pass — a measurement already declared', () => {
+	it('refuses it and names the open issue, --distinct notwithstanding', async () => {
+		vi.mocked(issue_scout_cli.scout).mockResolvedValue({
+			...NO_DUPLICATES,
+			measure_twins: [DUPLICATE_A],
+		})
+		const filing = filing_of(CLEAR_BODY, args_of([DISTINCT, String(DUPLICATE_A)]))
+
+		expect(await issue_file_pass.labels_in_one_pass(filing)).toBeUndefined()
+		expect(printed()).toContain(`#${String(DUPLICATE_A)}`)
+		expect(printed()).toContain('issue:comment')
+	})
+
+	it('answers the labels when no open issue declares it', async () => {
+		vi.mocked(issue_scout_cli.scout).mockResolvedValue({ ...NO_DUPLICATES, measure_twins: [] })
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeDefined()
 	})
 })

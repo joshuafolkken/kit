@@ -8,6 +8,7 @@ import { issue_sample_required } from './issue-sample-required'
 import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli, type ScoutOutcome } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
+import { measure_twin } from './measure-twin'
 import { size_estimate } from './size-estimate'
 
 // The one pass of `josh issue:file`: every check the body and the arguments are answered by — the
@@ -97,20 +98,38 @@ async function scout_filing(filing: Filing): Promise<ScoutOutcome | undefined> {
 	return await issue_scout_cli.scout({ title: filing.args.title, body: filing.body }, filing.target)
 }
 
-// The scout's report is printed whatever it finds — by `issue:file --batch` for a filing it scouted —
-// and the filing is held until every candidate it names is declared separate.
-async function is_scout_clear(filing: Filing): Promise<boolean> {
-	const outcome = filing.scouted ?? (await scout_filing(filing))
+// A measurement an open issue already declares is held whatever `--distinct` says: the same command
+// against the same bound is one measurement, never a separate deliverable (joshuafolkken/kit#6008).
+function is_measure_clear(outcome: ScoutOutcome): boolean {
+	const problem = measure_twin.problem(outcome.measure_twins ?? [])
 
-	if (outcome === undefined) return false
-	if (filing.scouted === undefined) console.info(outcome.report)
-	point_listings_at(filing)
+	if (problem === undefined) return true
+	console.error(`✖ ${problem}`)
+
+	return false
+}
+
+function is_candidate_clear(filing: Filing, outcome: ScoutOutcome): boolean {
 	const answered = issue_file.acknowledged(filing.args, filing.target, filing.current)
 	const open = issue_file.unacknowledged(outcome.candidates, answered)
 
 	if (open.length > 0) console.error(unacknowledged_message(open, filing.args.distinct))
 
 	return open.length === 0
+}
+
+// The scout's report is printed whatever it finds — by `issue:file --batch` for a filing it scouted —
+// and the filing is held until every candidate it names is declared separate and no open issue
+// declares its measurement.
+async function is_scout_clear(filing: Filing): Promise<boolean> {
+	const outcome = filing.scouted ?? (await scout_filing(filing))
+
+	if (outcome === undefined) return false
+	if (filing.scouted === undefined) console.info(outcome.report)
+	point_listings_at(filing)
+	const verdicts = [is_candidate_clear(filing, outcome), is_measure_clear(outcome)]
+
+	return verdicts.every(Boolean)
 }
 
 // Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label.
