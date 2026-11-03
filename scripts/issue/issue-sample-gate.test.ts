@@ -237,6 +237,14 @@ describe('the sample declaration in issue:lint', () => {
 		expect(issue_lint_cli.problems(body_with(`- 実施可能条件: ${value}`))).toEqual([])
 	})
 
+	// An issue filed before the cap keeps waiting on its condition rather than being released.
+	it('still reads a condition over the cap it refuses', () => {
+		const body = body_with('- 実施可能条件: #4313 のマージ後 40 マージ')
+
+		expect(issue_sample_gate.cited_number(body)).toBe(4313)
+		expect(issue_sample_gate.problems(body)).not.toEqual([])
+	})
+
 	it.each([
 		'#4313 のマージ後 0 マージ',
 		'#4313 のマージ後 31 マージ',
