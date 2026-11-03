@@ -129,6 +129,16 @@ describe('create_base_config — command tables block', () => {
 	})
 })
 
+// joshuafolkken/kit#6030: every command table and fixture breaks the naming rule by design.
+describe('create_base_config — naming-convention by file kind block', () => {
+	const naming_block = build_config().find((block) => has_file_pattern(block, '-fixture.ts'))
+
+	it('turns off naming-convention for the command tables and the fixtures', () => {
+		expect(naming_block?.files).toContain('scripts/josh/josh-commands-*.ts')
+		expect(rules_of(naming_block)).toStrictEqual({ '@typescript-eslint/naming-convention': 'off' })
+	})
+})
+
 // joshuafolkken/kit#3047: the local gate reports what Sonar's S9382 reports.
 describe('create_base_config — global block', () => {
 	it('reports an await inside a loop as an error', () => {
