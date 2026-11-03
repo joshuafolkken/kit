@@ -33,9 +33,10 @@ const STDIN_CLAIM = '`-` reads stdin'
 // Named once: the enumeration, the residency list and this suite have to agree on the command.
 const GUARD_COMMAND = 'pnpm josh pretool:guard'
 const ROW_REFERENCE = '`shell-body` row of `pnpm josh rule:list`'
-// The single safe spelling the rule steers every caller toward — asserted in the delivered text and
-// again at the topic file, so it is named once here rather than duplicated across the two.
+// The single safe spelling the rule steers every caller toward, asserted in the delivered text.
 const ISSUE_COMMENT_SPELLING = 'pnpm josh issue:comment <N> --body-file <path>'
+// The topic file spells the same call with the body in git-ignored `.josh/tmp/` (#6115).
+const TOPIC_ISSUE_COMMENT_SPELLING = 'pnpm josh issue:comment <N> --body-file .josh/tmp/'
 // The measurement the rule rests on, and the most quotable part of it — so it is the first thing that
 // would be pasted back into an always-loaded document.
 const MEASUREMENT = '履歴展開は非対話では無効'
@@ -100,7 +101,7 @@ describe(`${CANONICAL} — carries the damage, the measurement and the safe spel
 		'**テキストが実行されること**',
 		// Both call sites, because fixing one and leaving the other is what the Issue was filed over.
 		'--notify-message',
-		ISSUE_COMMENT_SPELLING,
+		TOPIC_ISSUE_COMMENT_SPELLING,
 		// `$'…'` stays correct, so the rule cannot be read as deprecating the form `CLAUDE.md` uses.
 		"**`$'…'` も安全である。**",
 		// The reader that makes the two call sites one implementation rather than two.

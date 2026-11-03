@@ -55,7 +55,7 @@
 1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。本文の検査、分類ラベルの付与、重複探し、`epic:bundle` はコマンドが行う（`docs/josh-commands-backlog.md` → `josh issue:file`）。
 
    ```bash
-   pnpm josh issue:file "<title>" --body-file <body-file> --route interrupt
+   pnpm josh issue:file "<title>" --body-file .josh/tmp/issue.md --route interrupt
    ```
 
    `--blocks-finder` は付けない。発見したランを塞がない割り込みに起票元の `blocked-by` を書くと、偽の依存関係になる。
