@@ -32,10 +32,11 @@ interface SizeMeasurement {
 // once a lane estimated at 6 files / 250 lines merged at about 23 files / 390 lines (joshuafolkken/kit#5384).
 const FILE_GUIDE = 8
 const LINE_GUIDE = 200
-// The cap, three times the guide: past it a declared reason no longer keeps an Issue as one. A lane
-// declared past it with a reason overran both its time budget and its declared files by far
-// (joshuafolkken/kit#5502).
-const CAP_FACTOR = 3
+// The cap, one and a half times the guide: past it a declared reason no longer keeps an Issue as one. A
+// lane declared past it with a reason overran both its time budget and its declared files by far
+// (joshuafolkken/kit#5502). Lowered from 3 once the projected implement time became the main bar — the
+// cap is the backstop where no rate is measured (joshuafolkken/kit#6066).
+const CAP_FACTOR = 1.5
 const FILE_CAP = FILE_GUIDE * CAP_FACTOR
 const LINE_CAP = LINE_GUIDE * CAP_FACTOR
 // The correction a declared size estimate takes before it is judged — the filing's guide and cap
