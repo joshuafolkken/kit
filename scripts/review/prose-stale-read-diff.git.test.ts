@@ -12,6 +12,7 @@ const TIMEOUT_MS = 30_000
 const WORKSPACE_PREFIX = 'kit-prose-stale-'
 const CODE = 'scripts/a.ts'
 const GONE_DOC = 'docs/gone.md'
+const GONE_CODE = 'scripts/gone.ts'
 
 const { git, MAIN_BRANCH } = git_fixture_workspace
 
@@ -30,14 +31,18 @@ async function write(file: string, content: string): Promise<void> {
 	await writeFile(path.join(fixture.root, file), content)
 }
 
+async function commit(message: string): Promise<void> {
+	await git(fixture.root, ['add', '--all'])
+	await git(fixture.root, ['commit', '--no-verify', '-m', message])
+}
+
 // A name, a heading, and the prose and code that still name them.
 async function commit_base(): Promise<void> {
 	await write(CODE, 'function old_name(): void {}\n')
 	await write(GONE_DOC, '## Old heading\n')
 	await write('docs/a.md', 'Call old_name, as → "Old heading" says.\n')
 	await write('scripts/b.ts', '// old_name reads it\nold_name()\n')
-	await git(fixture.root, ['add', '--all'])
-	await git(fixture.root, ['commit', '--no-verify', '-m', 'base'])
+	await commit('base')
 }
 
 beforeEach(async () => {
@@ -85,6 +90,28 @@ describe('prose_stale_read.references against real git', () => {
 			const found = await found_references()
 
 			expect(prose_stale_scan.report(found)).toEqual({ text: 'ok', exit_code: 0 })
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// joshuafolkken/kit#6077: a deleted file's constant another changed file still declares is kept.
+describe('prose_stale_read.references — a name an unchanged line still declares', () => {
+	it(
+		'keeps PATH the kept file still declares, and reports SIZE no file declares',
+		async () => {
+			const kept = 'scripts/kept.ts'
+
+			await write(GONE_CODE, 'const PATH = 1\n')
+			await write(kept, 'const PATH = 2\nconst SIZE = 3\n')
+			await write('docs/b.md', 'PATH and SIZE.\n')
+			await commit('constants')
+			await rm(path.join(fixture.root, GONE_CODE))
+			await write(kept, 'const PATH = 2\n')
+
+			const found = await found_references()
+
+			expect(prose_stale_scan.report(found).text).toBe('docs/b.md:1 constant SIZE')
 		},
 		TIMEOUT_MS,
 	)
