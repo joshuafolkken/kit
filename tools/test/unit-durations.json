@@ -7,7 +7,6 @@
 	"eslint/config-fingerprint.test.ts": 960,
 	"eslint/english-only-prose-document.test.ts": 199,
 	"eslint/function-style-resolution.test.ts": 2717,
-	"eslint/quality-limits-document.test.ts": 2288,
 	"eslint/refactor-scan-prompt-sync.test.ts": 32,
 	"eslint/rules/code-quality.test.ts": 32,
 	"eslint/rules/early-return-one-liner.test.ts": 335,

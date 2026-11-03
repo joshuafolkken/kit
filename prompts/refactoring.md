@@ -19,7 +19,7 @@ pnpm josh refactor:scan
 - inline config: gate と同じ設定を使い、外部形式のキーなどに付けた有効な例外は候補に数えない。抑制されていない規約違反は引き続き報告する。
 - 収束判定: 高・中優先度の候補が0件なら `verdict: clear`、残れば `verdict: candidates`。低優先度は報告のみで数えない。
 
-行数はコード行数（`max-lines` / `max-lines-per-function` は `skipBlankLines` と `skipComments` 有効）。`wc -l` ではなくこのコマンドの報告で判断する。
+行数はコード行数（<!-- lint: line-counting -->`max-lines` / `max-lines-per-function`<!-- /lint --> は `skipBlankLines` と `skipComments` 有効）。`wc -l` ではなくこのコマンドの報告で判断する。
 
 ---
 

@@ -5,9 +5,11 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { derived_artifacts } from './derived-artifacts'
 import { CATALOG_FILE, generate_catalog } from './generate-catalog'
 import { generate_command_usage } from './generate-command-usage'
+import { generate_lint_prose } from './generate-lint-prose'
 import { usage_span_placement } from './usage-span-placement'
 
-// `josh command:derive` — write every artifact derived from the command map in one run, then print
+// `josh command:derive` — write every artifact derived from the command map and the lint prose spans
+// derived from the lint config in one run, then print
 // each written page's bytes beside its ceiling.
 
 const { page_path, USAGE_PAGES } = generate_command_usage
@@ -22,6 +24,14 @@ function write_usage_pages(pages: ReadonlyMap<string, string>): void {
 
 	for (const [page, text] of placed) {
 		writeFileSync(page_path(page), generate_command_usage.fill_usage_blocks(text))
+	}
+}
+
+function write_lint_prose_pages(): void {
+	for (const page of generate_lint_prose.LINT_PROSE_PAGES) {
+		const text = readFileSync(page_path(page), 'utf8')
+
+		writeFileSync(page_path(page), generate_lint_prose.fill_lint_spans(text))
 	}
 }
 
@@ -52,6 +62,7 @@ function main(): number {
 
 	write_usage_pages(pages)
 	writeFileSync(CATALOG_FILE, generate_catalog())
+	write_lint_prose_pages()
 
 	return report_bytes()
 }

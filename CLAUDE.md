@@ -32,7 +32,7 @@ Naming, exports, file names and content rules are enforced by `eslint/rules/`; t
 
 ### Quality limits
 
-- Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4 · statements per function ≤10 · cognitive complexity ≤4 — line counts are code lines, not physical lines; test functions allow 35 code lines.
+- <!-- lint: quality-limits -->Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4 · statements per function ≤10 · cognitive complexity ≤4 — line counts are code lines, not physical lines; test functions allow 35 code lines<!-- /lint -->.
 - No magic numbers beyond `0`, `1`, `-1` · no `any` · restricted `as` · explicit param and return types · single short early return → one-liner `if (x) return y`.
 
 ## Package-First Development
