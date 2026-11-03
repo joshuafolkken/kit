@@ -326,7 +326,7 @@ describe('run_prep_cli.run saved investigation', () => {
 
 		expect(printed()).not.toContain(DELEGATE_STEP)
 		expect(printed()).not.toContain(run_prep.INVESTIGATION_SAVE_STEP)
-		expect(run_prep.INVESTIGATION_SAVED_LEAD).toContain('where main moved since')
+		expect(printed()).toContain('where main moved since re-read only the cited files')
 	})
 })
 
