@@ -60,7 +60,7 @@ const OPEN_STATE: IssueState = { state: 'OPEN', labels: ['auto-ok'], is_human_re
 const SKIP_DECISION = { scope: 'skip', reason: 'ran 2 hours ago; window is 12h' }
 const LOCATIONS = 'run:prep\n  scripts/josh/josh-commands-ai.ts:42  run:prep'
 const DELEGATE_STEP = 'Delegate before the first read'
-const RECORD_PATH = '/repo/.git/worktrees/1978/josh-investigation-1978.md'
+const RECORD_PATH = '/repo/.git/josh/run-state/josh-investigation-record-1978.md'
 const FINDINGS = '- `run:prep` builds its report in scripts/run/run-prep.ts:97'
 const CLASSIFICATION_PROBLEM = 'Add "- リリース分類: <label>" to the Issue body.'
 const REVIEW_STATE: IssueState = {
@@ -314,6 +314,19 @@ describe('run_prep_cli.run saved investigation', () => {
 
 		expect(printed()).toContain(`${run_prep.INVESTIGATION_SAVED_LEAD}\n${FINDINGS}`)
 		expect(load_mock).toHaveBeenCalledWith(ISSUE)
+	})
+
+	// joshuafolkken/kit#6153 (ac-a6f8fbf5): a lane dispatched again after a yield reads the saved
+	// conclusion, so its entry names no investigator dispatch and only the diff to re-read.
+	it('names no investigator dispatch for a re-dispatched lane with a saved conclusion', async () => {
+		stub_ok()
+		load_mock.mockResolvedValue({ path: RECORD_PATH, findings: FINDINGS })
+
+		await run_prep_cli.run([ISSUE])
+
+		expect(printed()).not.toContain(DELEGATE_STEP)
+		expect(printed()).not.toContain(run_prep.INVESTIGATION_SAVE_STEP)
+		expect(printed()).toContain('where main moved since re-read only the cited files')
 	})
 })
 

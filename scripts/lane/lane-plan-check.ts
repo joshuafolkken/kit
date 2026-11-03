@@ -13,6 +13,7 @@ import { lane_plan_probe } from './lane-plan-probe'
 import { lane_plan_size, type Oversize } from './lane-plan-size'
 import { lane_plan_wait } from './lane-plan-wait'
 import { lane_plan_wait_event } from './lane-plan-wait-event'
+import { lane_plan_wait_until } from './lane-plan-wait-until'
 import { lane_yield, type YieldAt } from './lane-yield'
 
 // The check `josh lane:plan <issue> <path>...` runs (`lane-plan-cli.ts`) — record the files a lane child
@@ -146,20 +147,6 @@ function sized_of(plan: LanePlan, issues: ReadonlyArray<OpenIssueData> | undefin
 	return is_judged ? { ...plan, sized: true } : plan
 }
 
-// The deadline `plan` waits on `holder` until — the one its first wait recorded, else a fresh one —
-// or undefined once it passed or the lane does not wait (`lane-plan-wait.ts`).
-async function wait_until(plan: LanePlan, holder: number): Promise<string | undefined> {
-	const now_ms = Date.now()
-
-	if (plan.waits_until !== undefined) {
-		return Date.parse(plan.waits_until) > now_ms ? plan.waits_until : undefined
-	}
-
-	const deadline = await lane_plan_wait.deadline(plan.issue, holder, now_ms)
-
-	return deadline === undefined ? undefined : new Date(deadline).toISOString()
-}
-
 function held(plan: LanePlan, clash: Clash, until: string): number {
 	console.error(
 		`${lane_plan_probe.overlap_text(plan.issue, clash)}; this lane was dispatched first and holds commits, so it keeps its seat until ${until}: run this \`lane:plan\` again now — it waits inside, and answers \`clear\` once that lane ends, or \`yield\` past the deadline.`,
@@ -182,7 +169,7 @@ async function is_free(plan: LanePlan, directory: string): Promise<boolean> {
 // A clash yields, unless the lane waits a bounded time on a later-dispatched holder, blocking here
 // (joshuafolkken/kit#5986).
 async function settle(plan: LanePlan, clash: Clash, directory: string): Promise<number> {
-	const until = await wait_until(plan, clash.holder)
+	const until = await lane_plan_wait_until.until(plan, clash.holder)
 
 	if (until === undefined) return await give_back(plan, clash, directory, 'summary')
 	const waiting = { ...plan, waits_until: until }
