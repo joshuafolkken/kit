@@ -442,6 +442,8 @@ Its `=== ship preconditions ===` section asks, ahead of the ship, the refusals `
 
 Its `=== investigation ===` section names, before the first read, the step the investigation guard otherwise names only on its refusal: the limit and the `investigator` dispatch — the same wording, from `delegation-policy.ts`.
 
+The investigator's saved conclusion is a durable run record keyed by repository and Issue, so a lane dispatched again after a yield prints it and skips the investigator; it is removed once the PR merges or a closed Issue's lane is withdrawn, and pruned after 14 days unwritten.
+
 ### `josh run:entry`
 
 <!-- usage: run:entry -->
@@ -1346,7 +1348,9 @@ One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`
 
 The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last and the lane branch's longest CI job and that job's longest step (`ci:timing`, the branch's latest commit), a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
 
-A missing record, or an Issue listing that cannot be read, leaves its cell blank. A lane with no stage over budget prints one line; one the ledger holds no dispatch and merge of exits non-zero (`lane-why.ts`).
+A ship total table follows, printed even when no stage ran over: the ship stages and the time between them, the scoped pair's runs and minutes, the core-budget waits and the `test:related` cap overrun with its hub, all summed over the whole ship (`lane-why-ship.ts`). Stages each within their budget that add up past the lane's target show there.
+
+A missing record, or an Issue listing that cannot be read, leaves its cell blank. A lane with no stage over budget prints one line before the ship total; one the ledger holds no dispatch and merge of exits non-zero (`lane-why.ts`).
 
 ### `josh lane:plan`
 

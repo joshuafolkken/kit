@@ -1,23 +1,28 @@
 import { readFile, rm } from 'node:fs/promises'
-import path from 'node:path'
-import { git_command } from '#scripts/git/git-command'
+import { git_common_directory } from '#scripts/git/git-common-directory'
+import { durable_state } from '#scripts/josh/durable-state'
 
 // **The investigator's conclusion, kept where a later read of the run finds it.** The plan phase's
 // `file:line` findings lived only in the session that delegated them, so the implement phase delegated
 // the same reading again — four times in one lane (joshuafolkken/kit#5765). The run writes the
-// conclusion to a file in the work tree's own git directory — outside the tree, as the ship body draft
-// is (`run-ship-body-draft.ts`) — and `run:prep` prints it instead of asking for a second delegation.
+// conclusion to a file outside the tree and `run:prep` prints it instead of asking for a second
+// delegation. **The file is a durable run record, not one in the work tree's own git directory**: a
+// lane that yields has its work tree removed, and the re-dispatched lane redid the whole reading
+// (joshuafolkken/kit#6153).
 
-const RECORD_PREFIX = 'josh-investigation-'
 const RECORD_SUFFIX = '.md'
 const NO_GIT_DIRECTORY = 'no git directory to hold the investigation record'
 
-async function path_of(issue_number: string): Promise<string> {
-	const [git_directory] = await git_command.git_directories()
+function path_of(issue_number: string): string {
+	const repository = git_common_directory.repository()
 
-	if (git_directory === undefined) throw new Error(NO_GIT_DIRECTORY)
+	if (repository === undefined) throw new Error(NO_GIT_DIRECTORY)
 
-	return path.join(git_directory, `${RECORD_PREFIX}${issue_number}${RECORD_SUFFIX}`)
+	return durable_state.path(
+		durable_state.PREFIX.INVESTIGATION,
+		repository,
+		`-${issue_number}${RECORD_SUFFIX}`,
+	)
 }
 
 // Where the record goes and what it holds — `findings` is `undefined` when none was written or it holds
@@ -40,7 +45,7 @@ async function findings_at(record_path: string): Promise<string | undefined> {
 // `undefined` only where no git directory answers, so `run:prep` still prints the rest of its bundle.
 async function load(issue_number: string): Promise<InvestigationRecord | undefined> {
 	try {
-		const record_path = await path_of(issue_number)
+		const record_path = path_of(issue_number)
 
 		return { path: record_path, findings: await findings_at(record_path) }
 	} catch {
@@ -48,10 +53,11 @@ async function load(issue_number: string): Promise<InvestigationRecord | undefin
 	}
 }
 
-// Removed once the pull request merged, as the ship body draft is: a record left in a git directory no
-// lane close prunes (the main checkout's `.git`) would hand a reopened issue's run the old findings.
+// Removed once the pull request merged, as the ship body draft is, and once a closed issue's lane is
+// withdrawn: a record left behind would hand a reopened issue's run the old findings. One no path
+// removes is pruned after the durable state's retention (`durable-state-migrate.ts`).
 async function remove(issue_number: string): Promise<void> {
-	await rm(await path_of(issue_number), { force: true })
+	await rm(path_of(issue_number), { force: true })
 }
 
 const run_investigation_record = { load, remove }

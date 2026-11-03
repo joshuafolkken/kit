@@ -25,6 +25,9 @@ const { BRIEF_PATH, pinned_run, launch_gate, brief_run, launch_pinned, clear_pin
 vi.mock('#scripts/gate/metrics-totals', () => ({
 	metrics_totals: { totals_refusal: async () => undefined },
 }))
+vi.mock('./run-review-unplanned', () => ({
+	run_review_unplanned: { refusal: async () => undefined },
+}))
 vi.mock('#scripts/test/test-pinned', () => ({ test_pinned: { run: pinned_run } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
 	stamp_file: { remove_stamp: vi.fn(), write_text_stamp: vi.fn() },

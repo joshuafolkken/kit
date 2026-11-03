@@ -95,6 +95,13 @@ describe('lane_why_cli.run', () => {
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('ran over its budget'))
 	})
 
+	it('prints the ship total even when no stage ran over its budget', async () => {
+		mocks.read_records.mockResolvedValue({ entries: lane(1), events: [] })
+
+		await expect(lane_why_cli.run([String(ISSUE)])).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('| ship total |'))
+	})
+
 	it('refuses a lane the ledger holds no dispatch and merge of', async () => {
 		mocks.read_records.mockResolvedValue({ entries: [], events: [] })
 

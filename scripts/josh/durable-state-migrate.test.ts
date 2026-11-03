@@ -18,6 +18,7 @@ import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 const TEST_PREFIX = 'josh-durable-state-migrate-test-'
 const LANE_STATE_PREFIX = 'josh-lane-state-'
 const PREFIXES = [LANE_STATE_PREFIX, 'josh-run-wake-log-']
+const INVESTIGATION_PREFIX = 'josh-investigation-record-'
 const LEGACY_TEXT = '{"state":"running"}'
 const DURABLE_TEXT = '{"state":"ended"}'
 const LANE_STATE_NAME = `${LANE_STATE_PREFIX}0123456789abcdef-4743.json`
@@ -126,5 +127,18 @@ describe('durable_state_migrate.prune_stale_logs', () => {
 		expect(existsSync(stale_log)).toBe(false)
 		expect(existsSync(fresh_log)).toBe(true)
 		expect(existsSync(stale_record)).toBe(true)
+	})
+
+	// joshuafolkken/kit#6153: an investigation record its issue's ship never removed does not live on.
+	it('removes an investigation note older than the retention and keeps a fresh one', () => {
+		const directory = directory_of('prune-note')
+		const prefixes = [...PREFIXES, INVESTIGATION_PREFIX]
+		const stale_note = write_aged(path.join(directory, `${INVESTIGATION_PREFIX}a-1.md`), STALE_DAYS)
+		const fresh_note = write_aged(path.join(directory, `${INVESTIGATION_PREFIX}a-2.md`), 1)
+
+		durable_state_migrate.prune_stale_logs(directory, prefixes, NOW_MS)
+
+		expect(existsSync(stale_note)).toBe(false)
+		expect(existsSync(fresh_note)).toBe(true)
 	})
 })

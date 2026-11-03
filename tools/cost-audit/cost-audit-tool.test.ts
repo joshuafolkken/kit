@@ -21,6 +21,7 @@ describe('cost_audit_tool.category_of — a tool call is filed by the work it di
 	it.each([
 		['pnpm josh lint:related a.ts', VERIFICATION],
 		['pnpm josh gate', VERIFICATION],
+		['pnpm josh ga', VERIFICATION],
 		['pnpm josh issue:read 1', ISSUE_OPS],
 		['pnpm josh doc:section a.md "b"', DOC_READ],
 		['pnpm josh run:step 1', ORCHESTRATION],

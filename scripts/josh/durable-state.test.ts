@@ -147,6 +147,15 @@ describe('durable_state.PREFIX — the lane plan', () => {
 		expect(durable_state.PREFIX.LANE_PLAN).toBe('josh-lane-plan-')
 		expect(prefixes.filter((prefix) => prefix === durable_state.PREFIX.LANE_PLAN)).toHaveLength(1)
 	})
+
+	// joshuafolkken/kit#6153: the investigator's conclusion outlives a yielded lane's work tree.
+	it('names the investigation record with a prefix no other record starts with', () => {
+		const { INVESTIGATION } = durable_state.PREFIX
+		const others = Object.values(durable_state.PREFIX).filter((prefix) => prefix !== INVESTIGATION)
+
+		expect(INVESTIGATION).toBe('josh-investigation-record-')
+		expect(others.filter((prefix) => INVESTIGATION.startsWith(prefix))).toStrictEqual([])
+	})
 })
 
 describe('the run records kept across a reboot', () => {

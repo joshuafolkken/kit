@@ -33,9 +33,10 @@ const INVESTIGATION_BODY = `Delegate before the first read — the guard refuses
 const INVESTIGATION_PLANNED_BODY =
 	'Skip the investigator — the plan is recorded (`run:planned` or a plan comment): the recorded plan in the issue (body or plan comment) is the investigation; read in the main line only the files this run will edit.'
 // The investigator's conclusion an earlier read of this run saved (`run-investigation-record.ts`), so
-// the implement phase reads it rather than delegating the same reading again (joshuafolkken/kit#5765).
+// the implement phase reads it rather than delegating the same reading again (joshuafolkken/kit#5765) —
+// a lane dispatched again after a yield among them, whose base may have moved (joshuafolkken/kit#6153).
 const INVESTIGATION_SAVED_LEAD =
-	'Skip the investigator — its conclusion is saved below; read in the main line only the files this run will edit, and delegate only what it does not answer:'
+	'Skip the investigator — its conclusion is saved below; read in the main line only the files this run will edit, where main moved since re-read only the cited files its diff touches, and delegate only what it does not answer:'
 const INVESTIGATION_SAVE_STEP =
 	"Save the investigator's conclusion (its `file:line` citations) with the Write tool to"
 const SHIP_HEADER = '=== ship preconditions ==='
