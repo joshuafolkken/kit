@@ -53,7 +53,13 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n')
 }
 
-const lane_implement_rate = { rate, table }
+// The implement minutes `lines` take at the measured rate — the filing-time projection
+// (joshuafolkken/kit#6025).
+function minutes_for(lines: number, measured: ImplementRate): number {
+	return (lines * measured.median) / LINES_PER_RATE
+}
+
+const lane_implement_rate = { minutes_for, rate, table }
 
 export type { ImplementRate }
 export { lane_implement_rate }

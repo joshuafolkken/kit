@@ -1,8 +1,11 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { lane_implement_rate, type ImplementRate } from './lane-implement-rate'
 import { lane_ledger } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
+import { lane_plan_signals } from './lane-plan-signals'
 import type { MeasureContext } from './lane-sampler'
+import { lane_stats } from './lane-stats'
 
 // The ledger and the event stream the lane measurements read, and the one lane's net minutes read from
 // them — `josh lane:net` and the causing-lane line `josh issue:file --found-during` prints
@@ -43,7 +46,19 @@ async function net_minutes_of(
 	return lane_net_time.net_minutes(await read_ledger(context), events, issue)
 }
 
+// The recent implement rate — the window `lane:plan`'s lines ratio reads — that `issue:file` projects a
+// declared size by (joshuafolkken/kit#6025); `undefined` when no merged lane in it measured one.
+async function implement_rate(
+	context: ReadContext = {},
+	now_ms: number = Date.now(),
+): Promise<ImplementRate | undefined> {
+	const window = lane_stats.window_of(lane_plan_signals.RATIO_PERIOD_DAYS, now_ms)
+
+	return lane_implement_rate.rate(await read_ledger(context), window)
+}
+
 const lane_net_read = {
+	implement_rate,
 	net_minutes_of,
 	read_events,
 	read_ledger,

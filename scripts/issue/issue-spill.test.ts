@@ -67,6 +67,22 @@ describe('issue_spill.unchecked_lines', () => {
 	})
 })
 
+describe('issue_spill.checked_count', () => {
+	it('counts the checked criteria of the acceptance section only', () => {
+		const body = `${BODY}\n- [x] checked outside the section`
+
+		expect(issue_spill.checked_count(body)).toBe(2)
+	})
+
+	it('counts no fenced line', () => {
+		expect(issue_spill.checked_count(`${ACCEPTANCE}\n\n\`\`\`\n- [x] fenced\n\`\`\``)).toBe(0)
+	})
+
+	it('is zero without an acceptance section', () => {
+		expect(issue_spill.checked_count('## 背景\n\n- [x] not here')).toBe(0)
+	})
+})
+
 describe('issue_spill.kept_body', () => {
 	it('replaces the unchecked criteria with one link line where the first stood', () => {
 		const kept = issue_spill.kept_body(BODY, 6100)

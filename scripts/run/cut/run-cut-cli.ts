@@ -15,6 +15,7 @@ import { run_step_section } from '#scripts/run/run-step-section'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { run_cut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
+import { run_cut_budget } from './run-cut-budget'
 import { run_cut_decline } from './run-cut-decline'
 import { run_cut_digest } from './run-cut-digest'
 import { run_cut_handoff } from './run-cut-handoff'
@@ -38,6 +39,7 @@ import { run_cut_review } from './run-cut-review'
 const ARGV_OFFSET = 2
 const COMMAND = 'run:cut'
 
+const { BUDGET_OVER_VERDICT } = run_cut_budget
 const {
 	BAD_HANDOFF_VERDICT,
 	BUSY_VERDICT,
@@ -79,12 +81,17 @@ const {
 //
 // **A noticed Issue answers the split notice first** (joshuafolkken/kit#4695): the pre-gate cut is the
 // boundary the notice names, so a lane that neither split nor recorded why is refused whether or not
-// the cut itself would be taken. Returns the answer given without cutting, or `undefined`.
+// the cut itself would be taken. **An implementation past its budget with a green part ships it**
+// (joshuafolkken/kit#6026) rather than resuming into the rest. Returns the answer given without cutting,
+// or `undefined`.
 async function pre_gate_answer(issue: string, phase: string): Promise<number | undefined> {
 	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
 	const split_note = await split_resolution.ledger_refusal(Number(issue))
 
 	if (split_note !== undefined) return report_split_unresolved(split_note)
+	const over = await run_cut_budget.over_minutes(Number(issue))
+
+	if (over !== undefined) return run_cut_budget.report_over(issue, over)
 
 	return cost_cli.session_verdict() === cost_verdict.UNDER_VERDICT
 		? report_under_threshold()
@@ -377,6 +384,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const run_cut_cli = {
 	BAD_HANDOFF_VERDICT,
+	BUDGET_OVER_VERDICT,
 	BUSY_VERDICT,
 	CUT_VERDICT,
 	ENDED_VERDICT,

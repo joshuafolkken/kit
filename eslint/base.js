@@ -42,6 +42,8 @@ const FILE_PATTERNS = {
 	// file that was failing anyway.
 	tests: ['**/*.test.ts', '**/*.e2e.ts'],
 	eslint_rules: ['eslint/**/*.ts', 'eslint/rules/**/*.js'],
+	// joshuafolkken/kit#6028: the josh command tables — one object per command, no control flow.
+	command_tables: ['scripts/josh/josh-commands-*.ts'],
 	// joshuafolkken/kit#3294: the SvelteKit convention files, whose named exports — route handlers,
 	// `load`, `handle`, `match` — are typed through a const annotation (`export const GET:
 	// RequestHandler = …`). That idiom is the one place `func-style` allows an arrow const.
@@ -241,6 +243,14 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				'@typescript-eslint/naming-convention': 'off',
 				'@typescript-eslint/no-magic-numbers': 'off',
 			},
+		},
+		{
+			// `max-lines` bounds the reading load of functions and branches, which a data table has
+			// none of; splitting one only to stay under it scattered a table across files. The
+			// function, complexity and nesting limits still apply.
+			files: FILE_PATTERNS.command_tables,
+			ignores: FILE_PATTERNS.tests,
+			rules: { 'max-lines': 'off' },
 		},
 		{
 			// `.mjs` / `.cjs` too (joshuafolkken/kit#2693): the typed parser options above reach only
