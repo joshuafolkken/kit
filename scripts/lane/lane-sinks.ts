@@ -108,7 +108,7 @@ function table(
 	].join('\n')
 }
 
-const lane_sinks = { DEFAULT_MINUTES, over_issues, sinks_of, table }
+const lane_sinks = { DEFAULT_MINUTES, base_name, over_issues, sinks_of, table }
 
 export { lane_sinks }
 export type { Sink, SinkRecords }

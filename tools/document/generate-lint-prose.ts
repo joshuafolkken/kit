@@ -1,5 +1,7 @@
 import { code_quality_rules, code_quality_test_rules } from '#eslint/rules/code-quality.js'
+import { JAPANESE_RATIONALE_DIRECTORY } from '#eslint/rules/english-only-prose.js'
 import { sonarjs_rules } from '#eslint/rules/sonarjs.js'
+import { refactor_lint } from '#scripts/refactor/refactor-lint'
 import { z } from 'zod'
 import { derived_artifacts } from './derived-artifacts'
 
@@ -9,7 +11,11 @@ import { derived_artifacts } from './derived-artifacts'
 // around it stays hand-written prose — and a stale-page test failure names REGENERATE_COMMAND.
 
 const REGENERATE_COMMAND = derived_artifacts.DERIVE_COMMAND
-const LINT_PROSE_PAGES: ReadonlyArray<string> = ['CLAUDE.md', 'prompts/refactoring.md']
+const LINT_PROSE_PAGES: ReadonlyArray<string> = [
+	'CLAUDE.md',
+	'prompts/coding-standards.md',
+	'prompts/refactoring.md',
+]
 const LINT_SPAN = /<!-- lint: (?<name>\S+) -->.*?<!-- \/lint -->/gu
 
 // The two rules whose unit is a line: the documents call it a code line, so both must skip blank
@@ -60,9 +66,26 @@ function line_counting(): string {
 	}).join(' / ')
 }
 
+// The refactoring prompt's candidate-aggregation bullet: each `refactor:scan` category with the rules
+// it queries, the low-priority one marked, so the prompt can never name a rule the oracle skips.
+function refactor_scan_rules(): string {
+	return refactor_lint.CATEGORIES.map((category) => {
+		const rules = category.rules.map((rule) => `\`${rule}\``).join(' / ')
+		const marker = category.priority === 'low' ? '低優先度: ' : ''
+
+		return `${category.label}（${marker}${rules}）`
+	}).join('、')
+}
+
+function english_only_exemption(): string {
+	return `\`${JAPANESE_RATIONALE_DIRECTORY}\``
+}
+
 const RENDERERS: Readonly<Record<string, () => string>> = {
 	'quality-limits': quality_limits,
 	'line-counting': line_counting,
+	'refactor-scan-rules': refactor_scan_rules,
+	'english-only-exemption': english_only_exemption,
 }
 
 function render(name: string): string {

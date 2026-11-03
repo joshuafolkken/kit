@@ -240,7 +240,7 @@ function line(report: Report): string {
 		.join('; ')}.`
 }
 
-const lane_breakdown_text = { comment, line, report_of }
+const lane_breakdown_text = { budget_of, comment, line, report_of }
 
 export { lane_breakdown_text }
 export type { Report }

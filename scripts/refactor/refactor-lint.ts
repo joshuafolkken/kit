@@ -13,8 +13,8 @@ import { z } from 'zod'
 // spawned — its findings, its rule severities — so this can never disagree with `pnpm josh gate`
 // about what is there. `local/namespace-object-export` is now among the rules queried — the rule
 // exists, so the oracle reads it like any other rather than deferring it to the gate. Only the two
-// priorities with no rule stay prose (side-effect idempotency and "similar UI structure"), and
-// `refactor-scan-prompt-sync.test.ts` fails if this list and the prompt drift apart.
+// priorities with no rule stay prose (side-effect idempotency and "similar UI structure"), and the
+// prompt's rule list is generated from CATEGORIES (`tools/document/generate-lint-prose.ts`).
 
 const ESLINT_BIN = 'eslint'
 const PNPM = 'pnpm'
@@ -36,8 +36,7 @@ interface RefactorCategory {
 
 // The refactoring priorities ESLint decides, each with the rules that populate it — the high- and
 // medium-priority convergence items plus the one low-priority item (unused code), which is reported
-// but never counted toward convergence. `refactor-scan-prompt-sync.test.ts` pins this list against
-// the prompt, so a rule added here without the prompt (or the reverse) fails.
+// but never counted toward convergence. `pnpm josh command:derive` writes this list into the prompt.
 const CATEGORIES: ReadonlyArray<RefactorCategory> = [
 	{
 		key: 'lines-complexity',

@@ -7,7 +7,7 @@
 - Naming: `snake_case` variables / functions / params · `PascalCase` types / classes / interfaces / enums · `UPPER_CASE` enum members · booleans prefixed `is_` / `has_` / `should_` / `can_` / `will_` / `did_` · constants `UPPER_CASE` or `snake_case`
 - Functions & exports: multiple functions → a namespace object `export { my_module }` (constants exempt) · no `export default`
 - Files: Svelte `PascalCase.svelte(.ts)` · TypeScript `kebab-case.ts` · tests `*.test.ts` / `*.svelte.test.ts`, colocated, never `*.spec.ts` (`prompts/testing-guide.md`) · in `scripts/`, no `../` imports — use `#scripts/*`
-- Content rules: user-visible strings use i18n message keys in every locale · comments / test titles English only (`eslint/rules/` may explain rationale in Japanese) · no duplication; `/* @refactor-ignore */` at file top excludes a file from refactoring
+- Content rules: user-visible strings use i18n message keys in every locale · comments / test titles English only (<!-- lint: english-only-exemption -->`eslint/rules/`<!-- /lint --> may explain rationale in Japanese) · no duplication; `/* @refactor-ignore */` at file top excludes a file from refactoring
 
 ## 📝 基本方針
 

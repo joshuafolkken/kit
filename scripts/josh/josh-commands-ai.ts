@@ -566,6 +566,22 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'lane:why': {
+		script: 'scripts/lane/lane-why-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			"Print a merged lane's stages over budget, one row each, beside the records that say why",
+		category: 'AI tools',
+		reference: ['<issue>', 'maintainer', ['processes', 'network']],
+		usage: {
+			examples: [
+				{
+					arguments: '6050',
+					note: 'the cause table an overrun investigation joins by hand',
+				},
+			],
+		},
+	},
 	'run:watcher:guard': {
 		script: 'scripts/run/run-watcher-guard-cli.ts',
 		description:
