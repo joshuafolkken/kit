@@ -4,18 +4,14 @@
 
 既存の非自明なロジック（別ファイル・別モジュール・上流依存を含む別パッケージにあるもの）を、ソースを変えずに済ませるために**コピー・移植・再実装しない**。複製したくなったら、全消費者が import する共有モジュール／export／パッケージへ単一ソース化する。
 
-- 既存の重複は再重複の理由にならない（例: josh-game が kit をコピー）。3 つ目のコピーを足さず、重複を surface する
-- 「上流を参照する」は再利用することで、コードを貼り付けることではない
-- 「X を触るな」という制約でクローンを黙って正当化しない。「クリーンな修正は kit の変更が必要、代替はクローン、どちらにする？」と先に提示する
-- 複製は、単一ソース化の代替案とコストを提示し、ユーザーの明示承認を得た後にのみ行う
+- 既存の重複は再重複の理由にならない。3 つ目のコピーを足さず、重複を surface する
+- 「X を触るな」という制約でクローンを黙って正当化しない。単一ソース化の代替案とコストを先に提示し、ユーザーの明示承認を得た後にのみ複製する
 
 計測は `pnpm josh clone:scan`（`pnpm josh oracle:list` の決定オラクル）。リポジトリ内と `JOSH_REPO_PATHS` の他リポジトリを跨いだ複製の件数と各 `file:line`（`[same-file|cross-file|cross-repo]`、なしは `clean`）を印字する。
 
 ## elegant-design — 設計はエレガント・シンプルを第一目標にする
 
 フック・ガード・ルール・抽象化を足す前に、**原因側を直せばその仕組みが要らなくならないか**を問う。要らなくなるなら足さず、原因を直す。検出・通知・叱責を強化する前に、その入力を生んでいる側を断つ。
-
-書かれたコードの可読性は `prompts/coding-standards.md` の担当で、ここはどの仕組みをどこへ足すかの規則である。互いの本文を写さず、指すだけにする。
 
 ## automate-first — 判断の要らない手順は AI に渡さず自動化する
 
@@ -77,20 +73,18 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
 - **相談の主セッションは相談・起票・運用を担当する。実装は実装レーンが担当し、主セッション自身で実装を開始しない。** 「起票して」は起票を実行し、「対応してください」は合意した起票・Issue 更新・レーン操作として処理する。実装が必要なら Issue に範囲と計画を残し、既存の実装レーンへ引き渡す
 - 明示されたワークフローキーワード（`kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun`）は `workflow-commands` skill の既存手順へ渡す。主セッションが実装する根拠には読み替えない。`kickoff` は起票・計画で停止し、実装系の実行は実装レーンへ引き渡す
 - 判別できないときは相談として扱う。承認済みの起票・Issue 更新・レーン操作と、実装レーン内の Tier A 判断は再確認せず進める。実行が指示された後の判断点は `CLAUDE.md` → "Decision autonomy" の Tier で決まる
-- 相談スコープのシェルが通すのは、書き込み先が無いと判定できる読み取りだけ → `scripts/hooks/implementation-shell.ts`。通る: 読み取りプログラム、`-exec` / `-delete` の無い `find`、`pnpm view`、`-X` 無しまたは `-X GET` の `gh api`、`pnpm -s josh <読み取り>`、`cd <dir> &&`、`time`、読み取りプログラムだけにループ変数を渡す `for`。拒否: リダイレクト、`cd` と並ぶ書き込み、書き込み系 josh コマンド、GET 以外の `gh api`、`node` などの任意実行
+- 相談スコープのシェルが通すのは書き込み先の無い読み取りだけで、`scripts/hooks/implementation-shell.ts` が強制する
 
 ## latest-first — 最新優先・fix-forward（pin-back は最終手段）
 
-依存・ツールチェーンは**既定で最新版を採用する**。`dependency-update` skill → "4. When the bump breaks something — fix forward" はこの節を指す。
+依存・ツールチェーンは**既定で最新版を採用する**。古い版に留まらず、戻さない。
 
-1. 適応の手間を避けるために古いバージョンに留まったり戻したりしない
-2. バンプで lint クラッシュ・新規ルール・型エラー等が出たら fix-forward で解消する:
+1. バンプ起因の破壊（lint クラッシュ・新規ルール・型エラー等）は同じセッション内で fix-forward する:
    - 新ルール／エラーが正当なら消費者コードを直す
    - ルール上書きが要るなら kit / app-kit の共有設定でスコープする。消費者リポジトリで一回限りの disable にしない
-   - first-party パッケージ（kit / app-kit）起因なら、そこに Issue を立てて直す（→ `upstream-interrupt.md`）
-3. **pin-back は最終手段**: fix-forward が不可能／ブロックされている（例: 未リリースの上流修正待ち）ときだけ固定し、理由を記録して最新へ戻すトラッキング Issue を立てる。pin-back を既定の推奨にしない
-4. fix-forward は保護された pin を黙って書き換える許可ではない。overrides と `devEngines` の承認ゲートは `CLAUDE.md` → "Decision autonomy" と `dependency-update` skill に従う
-5. バンプ起因の破壊は同じセッション内で対処し、pin の裏に先送りしない
+   - first-party パッケージ起因なら、そこに Issue を立てて直す（→ `upstream-interrupt.md`）
+2. pin-back は fix-forward が不可能／ブロックされているときだけ。理由を記録し、最新へ戻すトラッキング Issue を立てる
+3. overrides と `devEngines` は fix-forward でも黙って書き換えない → `CLAUDE.md` → "Decision autonomy"
 
 ## durable-rules — 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く
 
@@ -107,9 +101,7 @@ docs・prompts・skills・拒否文・Issue・PR の文章に適用する。
 
 ## エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` / `.cursorrules` は導線）
 
-**規則の本体は `CLAUDE.md` にしか無い。** `AGENTS.md`・`GEMINI.md`・`.cursorrules` は「規則は `CLAUDE.md` にある。作業前に全文を読むこと」と「規則を書き戻さない」だけを書いた導線である（`.cursorrules` は Svelte MCP の案内だけを足す）。
-
-- 規則の追加・変更・節の追加は `CLAUDE.md` に 1 回だけ書き、導線文書には書き戻さない
+**規則の本体は `CLAUDE.md` にしか無い。** 規則は `CLAUDE.md` に 1 回だけ書き、導線の `AGENTS.md`・`GEMINI.md`・`.cursorrules` には書き戻さない。
 
 ### Claude Code 以外のエージェントでの読み替え
 
