@@ -17,6 +17,18 @@ function max_of(entry: unknown): string {
 	return String(MAX_OPTION.parse(entry)[1].max)
 }
 
+function expected_limits(): Array<string> {
+	return [
+		`Function complexity ≤${String(code_quality_rules.complexity[1])}`,
+		`nesting ≤${String(code_quality_rules['max-depth'][1])}`,
+		`function ≤${max_of(code_quality_rules['max-lines-per-function'])} lines`,
+		`file ≤${max_of(code_quality_rules[MAX_LINES])} lines`,
+		`params ≤${String(code_quality_rules['max-params'][1])}`,
+		`statements per function ≤${String(code_quality_rules['max-statements'][1])}`,
+		`cognitive complexity ≤${String(sonarjs_rules['sonarjs/cognitive-complexity'][1])}`,
+	]
+}
+
 function page_text(page: string): string {
 	return readFileSync(generate_command_usage.page_path(page), 'utf8')
 }
@@ -43,12 +55,7 @@ describe('generate lint prose', () => {
 			'<!-- lint: quality-limits --><!-- /lint -->',
 		)
 
-		expect(filled).toContain(`Function complexity ≤${String(code_quality_rules.complexity[1])}`)
-		expect(filled).toContain(`nesting ≤${String(code_quality_rules['max-depth'][1])}`)
-		expect(filled).toContain(`file ≤${max_of(code_quality_rules[MAX_LINES])} lines`)
-		expect(filled).toContain(
-			`cognitive complexity ≤${String(sonarjs_rules['sonarjs/cognitive-complexity'][1])}`,
-		)
+		expect(filled).toContain(`<!-- lint: quality-limits -->${expected_limits().join(' · ')} — `)
 		expect(filled).toContain(
 			`test functions allow ${max_of(code_quality_test_rules['max-lines-per-function'])} code lines`,
 		)
