@@ -94,6 +94,9 @@ describe('protected_files.is_protected_file_call — the wider readers', () => {
 		'/bin/cat .env',
 		'true | cat .env',
 		'x & cat .env',
+		"bash -c 'cat .env'",
+		'eval "cat .env"',
+		'diff <(cat .env) x',
 	])('refuses the read in %j', (command) => {
 		const call = { name: 'Bash', input: { command } }
 

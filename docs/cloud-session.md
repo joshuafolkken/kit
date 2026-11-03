@@ -97,7 +97,9 @@ saying nobody was notified while the merge carries on. See
 Two exceptions, and only two:
 
 - **`gh auth token`** reads the credential the local CLI already holds. It contacts no endpoint, so
-  there is no REST call it could be written as.
+  there is no REST call it could be written as. Only a script reading it in its own process may run
+  it; an agent's `Bash` call to it is refused by the `egress` guard row
+  (`scripts/rules/egress-guard.ts`).
 - **GitHub Actions workflows.** They run on a runner where `gh` works normally, and
   `gh pr merge --auto` uses an API that exists only in GraphQL.
 
