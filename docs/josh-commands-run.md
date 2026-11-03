@@ -1349,11 +1349,11 @@ On a clash the child gives its lane back instead of polling with its seat taken:
 - Its plan stays recorded, uncleared and marked yielded: `backlog:next` holds the issue back on it and offers it again once the holder's lane ends. Unlike `lane:withdraw`, a yield keeps the issue in the run.
 - The note ends `· at: summary`, or `· at: entry` for the entry probe below.
 
-A lane dispatched before its holder and holding commits waits instead, keeping its seat (`scripts/lane/lane-plan-wait.ts`):
+A lane dispatched before its holder, with commits, waits instead, keeping its seat (`scripts/lane/lane-plan-wait.ts`):
 
-- It waits when the holder's estimated remaining time (the median lane of the last 3 days less the holder's elapsed time) is no more than its own worked time, capped at 30 minutes.
-- The first such ask records a deadline that far ahead on the plan. `lane:plan` then blocks, re-reading the holders once a minute, for at most 9 minutes per ask.
-- It answers `clear` once the holder's lane ends, `yield` once the deadline passes, or `wait` when the ask's own 9 minutes run out first — the child runs `lane:plan` again at once.
+- It waits when the holder's estimated time left (3-day median lane less its elapsed time) is at most its own worked time, capped at 30 minutes.
+- The first such ask records that deadline on the plan; `lane:plan` then blocks, re-reading holders each minute, up to 9 minutes per ask.
+- It answers `clear` once the holder's lane ends, `yield` past the deadline, or `wait` when the 9 minutes run out first: ask again.
 
 `--probe` answers the same check and writes nothing. A lane child's `run:entry` runs it once, before the issue report, on the paths dispatch gated on; on a clash it gives the lane back as above and exits 2.
 
