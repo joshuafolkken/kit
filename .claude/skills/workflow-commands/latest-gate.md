@@ -17,7 +17,7 @@ judgement that the dependencies are probably still fresh.
 - **No record answers `required`.**
 - **The record is written by `josh latest` itself**, as the last step of its chain, so a chain that
   failed leaves nothing behind.
-- **The window is 12 hours**, moved by `JOSH_LATEST_MAX_AGE_HOURS`.
+- **The window is 12 hours**, moved by `JOSH_LATEST_MAX_AGE_HOURS` (a non-positive value falls back to 12).
 
 ## What runs when the answer is `required`
 

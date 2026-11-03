@@ -17,7 +17,7 @@ Review results and successful pushes are never turn boundaries.
    Never load the review skill in the main line.
 2. Once the review returns, `pnpm josh run:chain <N> --join` (`--fixing`: round-1 fixes); follow what
    it prints (`scripts/run/review/run-chain-join.ts`). Never version-bump a child (`pnpm josh release` decides).
-3. A round `review:attest --check` answers `missing` or `mismatch` for is discarded uncounted; rerun
+3. A round for which `review:attest --check` answers `missing` or `mismatch` is discarded uncounted; rerun
    against the brief's checkout. A review error receives a `confirmation` Telegram and stops.
 4. Route the attested verdict mechanically:
    - Clean or Low-only round 1: no second round. Fix, file, or drop each Low with a one-line reason.
