@@ -7,6 +7,7 @@ import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_net_read } from './lane-net-read'
 import { lane_sinks_issues } from './lane-sinks-issues'
 import { lane_why, type WhyRecords } from './lane-why'
+import { lane_why_ci } from './lane-why-ci'
 
 // `josh lane:why <issue>` — a merged lane's stages over budget, each beside its causes
 // (joshuafolkken/kit#6120).
@@ -24,7 +25,9 @@ async function records_of(issue: number): Promise<WhyRecords | undefined> {
 	const body = await git_gh_issue_read.issue_get_body(String(issue))
 	const projected = lane_why.projected_of(body, await lane_net_read.implement_rate())
 
-	return { issue, entries, breakdown, projected, issues: await lane_sinks_issues.read() }
+	const [issues, timing] = await Promise.all([lane_sinks_issues.read(), lane_why_ci.read(issue)])
+
+	return { issue, entries, breakdown, projected, issues, timing }
 }
 
 async function print(issue: string): Promise<number> {
