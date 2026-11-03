@@ -21,12 +21,12 @@ afterEach(() => {
 })
 
 describe('a stored lane profile across a cut', () => {
-	it('relaunches on the recorded model, taking only the phase effort', () => {
+	it('relaunches on the ship default model with the phase effort', () => {
 		check.mockReturnValue({ kind: 'ready' })
 		const built = agent_argv.resume_argv(INVOCATION, LEGACY_WORKER, PRE_GATE_PHASE, LANE)
 
-		expect(built).toMatchObject({ kind: 'argv', profile: { model: LEGACY_MODEL, effort: 'low' } })
-		expect(built.kind === 'argv' && built.argv.args).toContain(LEGACY_MODEL)
+		expect(built).toMatchObject({ kind: 'argv', profile: { model: SONNET, effort: 'low' } })
+		expect(built.kind === 'argv' && built.argv.args).toContain(SONNET)
 	})
 
 	// joshuafolkken/kit#5343: the ship key moves the pre-gate relaunch off the recorded model.

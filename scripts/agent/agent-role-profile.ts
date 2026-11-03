@@ -112,10 +112,10 @@ const PHASE_EFFORT: PhaseTable<AgentEffort> = {
 }
 
 // **The ship phase may run on a model of its own** (joshuafolkken/kit#5343), read from its key ahead of
-// the role's and applied on the same cut relaunch as `SHIP_EFFORT`. Unset, the phase keeps the role's
-// model, so the default is unchanged.
-const PHASE_MODEL_KEYS: PhaseTable<string> = {
-	worker: { [PRE_GATE_PHASE]: 'JOSH_WORKER_SHIP_MODEL' },
+// the role's and applied on the same cut relaunch as `SHIP_EFFORT`. Unset, the phase runs on its default:
+// Sonnet held the ship phase's duration and stop rates against Opus across a lane trial (joshuafolkken/kit#5346).
+const PHASE_MODELS: PhaseTable<PhaseModel> = {
+	worker: { [PRE_GATE_PHASE]: { key: 'JOSH_WORKER_SHIP_MODEL', value: SONNET_MODEL } },
 }
 
 const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> = {
@@ -127,7 +127,9 @@ const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> =
 const LEGACY_WORKER_KEYS = { model: 'JOSH_LANE_MODEL', effort: 'JOSH_LANE_EFFORT' }
 
 function phase_model_keys(): ReadonlyArray<string> {
-	return Object.values(PHASE_MODEL_KEYS).flatMap((phases) => Object.values(phases))
+	return Object.values(PHASE_MODELS).flatMap((phases) =>
+		Object.values(phases).map(({ key }) => key),
+	)
 }
 
 // Every env key a profile is read from. The unit suite blanks them so a lane's model and effort never
@@ -184,19 +186,18 @@ function phase_entry<Value>(
 	return parsed.success ? table[role]?.[parsed.data] : undefined
 }
 
-// The phase's own model key when it is set; `undefined` for a phase with no key, an unset key, or an
-// OpenAI session, whose model is never read from env.
+// The phase's own model — its key when set, else its default; `undefined` for a phase with no entry or
+// an OpenAI session, whose model is never read from env.
 function phase_model(
 	role: AgentRole,
 	provider: AgentProvider,
 	phase: string | undefined,
 	environment: AgentEnvironment,
 ): PhaseModel | undefined {
-	const key = provider === OPENAI_PROVIDER ? undefined : phase_entry(PHASE_MODEL_KEYS, role, phase)
-	if (key === undefined) return undefined
-	const value = trimmed(environment[key])
+	const entry = provider === OPENAI_PROVIDER ? undefined : phase_entry(PHASE_MODELS, role, phase)
+	if (entry === undefined) return undefined
 
-	return value === undefined ? undefined : { key, value }
+	return { key: entry.key, value: trimmed(environment[entry.key]) ?? entry.value }
 }
 
 function model_override(
@@ -261,7 +262,7 @@ function overridden_effort(
 }
 
 // A stored profile resolved for the phase the run is entering: its effort, and its model only where the
-// phase's own model key is set — the role's model key never moves a lane off the model it recorded.
+// phase has a model of its own — the role's model key never moves a lane off the model it recorded.
 function with_phase(
 	profile: AgentProfile,
 	phase: string,
