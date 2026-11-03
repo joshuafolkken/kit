@@ -46,7 +46,7 @@ A failed read (rate-limit, network) prints `unreadable: <reason>`, distinct from
 
 ## Step C: optional — mark SAFE via API if a token is available
 
-With `SONAR_TOKEN` exported (SonarCloud user token with write scope):
+With `SONAR_TOKEN` exported (SonarCloud user token with write scope), the user runs it — an agent's `curl` → ask the user (`scripts/rules/egress-guard.ts`):
 
 ```bash
 curl -sS -u "$SONAR_TOKEN:" -X POST \

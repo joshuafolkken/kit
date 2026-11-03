@@ -156,6 +156,7 @@ kit ships with permission prompts off, so the unattended commands (`fullrun`, `b
 - `.vscode/settings.json` sets `claudeCode.initialPermissionMode` to `bypassPermissions` and `claudeCode.allowDangerouslySkipPermissions` to `true`.
 - `.claude/settings.json` allows `Bash(*)`. It ships no `permissions.defaultMode`, so `josh sync` leaves your own mode as it is. A file synced before kit stopped shipping it keeps the `bypassPermissions` line; that line is now yours, and deleting it survives a sync.
 - `backlogrun` starts its sessions with `--permission-mode bypassPermissions`.
+- The `egress` guard row refuses an agent's `Bash` call that sends data off the machine (`curl` / `wget` / `nc` / `ssh` to another host, a network call in `node -e`) or prints a credential (`gh auth token`, `printenv`), nested spellings included; `.claude/settings.json` denies the plain forms as a backstop. See [SECURITY.md](../SECURITY.md#secrets).
 
 The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).
 
