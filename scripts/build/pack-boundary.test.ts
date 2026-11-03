@@ -123,6 +123,14 @@ function packed_paths(raw: string): Set<string> {
 	return new Set((report?.files ?? []).map((entry) => entry.path))
 }
 
+// A tracked file deleted from the tree is not copied, nor an untracked nested repository, which the
+// listing names as a directory.
+function is_copyable(file: string): boolean {
+	const stats = lstatSync(path.join(REPO_ROOT, file), { throwIfNoEntry: false })
+
+	return stats !== undefined && !stats.isDirectory()
+}
+
 // A hook launch or a build in this checkout prunes the previous `dist/hooks` chunks, so a pack of
 // the checkout itself fails to read a chunk it listed (joshuafolkken/kit#6168). The boundary concerns
 // the sources, so it packs a copy of the tracked and unignored files, which the ignored `dist/` never
@@ -134,7 +142,7 @@ function listed_sources(): Array<string> {
 		{ cwd: REPO_ROOT, encoding: 'utf8' },
 	)
 
-	return listing.split('\0').filter((file) => file !== '' && existsSync(path.join(REPO_ROOT, file)))
+	return listing.split('\0').filter((file) => file !== '' && is_copyable(file))
 }
 
 // A tracked symlink is copied as a link, which pack skips here as it does in the checkout.
