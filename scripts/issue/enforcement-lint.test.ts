@@ -4,11 +4,20 @@ import { enforcement_lint } from './enforcement-lint'
 const ENFORCEMENT = '- 強制: `pnpm josh issue:lint`'
 const MEASUREMENT = '- 計測: `pnpm josh lane:stats` の違反件数'
 const MEASUREMENT_ONLY = '- 強制: 計測のみ'
+const ENFORCEMENT_KEY = '- 強制:'
+const MEASUREMENT_KEY = '- 計測:'
 
 function body_with(lines: ReadonlyArray<string>): string {
 	return ['## 背景', '', '- 種別: 振る舞い変更', ...lines, '', 'なぜ必要か', '', '## 現象'].join(
 		'\n',
 	)
+}
+
+// The one problem a body has, so a case pins which declaration it names.
+function sole_problem(lines: ReadonlyArray<string>): string | undefined {
+	const found = enforcement_lint.problems(body_with(lines))
+
+	return found.length === 1 ? found[0] : undefined
 }
 
 describe('enforcement_lint.problems', () => {
@@ -21,18 +30,25 @@ describe('enforcement_lint.problems', () => {
 	})
 
 	it('refuses a body missing either line', () => {
-		expect(enforcement_lint.problems(body_with([MEASUREMENT]))).toHaveLength(1)
-		expect(enforcement_lint.problems(body_with([ENFORCEMENT]))).toHaveLength(1)
+		expect(sole_problem([MEASUREMENT])).toContain(ENFORCEMENT_KEY)
+		expect(sole_problem([ENFORCEMENT])).toContain(MEASUREMENT_KEY)
 		expect(enforcement_lint.problems(body_with([]))).toHaveLength(2)
 	})
 
-	it('refuses a none or empty value', () => {
-		expect(enforcement_lint.problems(body_with(['- 強制: なし', MEASUREMENT]))).toHaveLength(1)
-		expect(enforcement_lint.problems(body_with([ENFORCEMENT, '- 計測:']))).toHaveLength(1)
+	it('refuses a none, empty or unfilled placeholder value', () => {
+		expect(sole_problem(['- 強制: なし', MEASUREMENT])).toContain(ENFORCEMENT_KEY)
+		expect(sole_problem([ENFORCEMENT, '- 計測:'])).toContain(MEASUREMENT_KEY)
+		expect(sole_problem(['- 強制: <hook・lint・gate>', MEASUREMENT])).toContain(ENFORCEMENT_KEY)
 	})
 
 	it('refuses measurement-only enforcement with no measurement as prose alone', () => {
-		expect(enforcement_lint.problems(body_with([MEASUREMENT_ONLY, '- 計測: なし']))).toHaveLength(1)
+		expect(sole_problem([MEASUREMENT_ONLY, '- 計測: なし'])).toContain(MEASUREMENT_KEY)
+	})
+
+	it('does not read a fenced example as the declaration', () => {
+		const fenced = ['```md', ENFORCEMENT, MEASUREMENT, '```']
+
+		expect(enforcement_lint.problems(body_with(fenced))).toHaveLength(2)
 	})
 
 	it('ignores the lines outside the background section', () => {
