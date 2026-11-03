@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
-import { time_shell } from '#scripts/time-runtime/time-shell'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { shell_segments } from './shell-segments'
 
 // Which shell commands are broad investigation (joshuafolkken/kit#5351): a search over a tree, a
@@ -161,7 +161,7 @@ function reads_past_cap(
 }
 
 function is_broad_segment(segment: string, is_piped: boolean): boolean {
-	if (time_shell.josh_command_of(segment).startsWith(ANALYSIS_PREFIX)) return true
+	if (time_josh_names.josh_command_of(segment).startsWith(ANALYSIS_PREFIX)) return true
 	const [name = '', ...rest] = words_of(segment)
 
 	return ALWAYS_BROAD.has(name) || reads_past_cap(segment, name, rest, is_piped)

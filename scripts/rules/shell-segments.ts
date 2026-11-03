@@ -1,3 +1,4 @@
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 
 // **A shell line carries several commands, and each has to be judged on its own.** Every trigger in
@@ -80,14 +81,14 @@ function first_of(command: string): string | undefined {
 	return (cut === -1 ? command : command.slice(0, cut)).trim()
 }
 
-// **Both spellings match, and the expansion is not this file's.** `josh_command_of` expands the alias
+// **Both spellings match, and the expansion is not this file's.** `time_josh_names` expands the alias
 // in the command it reads, so `pnpm josh ga` arrives as `josh gate` and a caller's canonical set
 // matches it as it is. Widening as well would be a second copy of one rule, and the caller that
 // forgot it would be the one that stops seeing `pnpm josh ga` at all — which is why each caller's own
 // suite names a call in its alias spelling.
 /** Whether this segment invokes one of the named josh subcommands, in either spelling. */
 function is_josh_command(segment: string, names: ReadonlySet<string>): boolean {
-	const named = time_shell.josh_command_of(segment)
+	const named = time_josh_names.josh_command_of(segment)
 
 	if (!named.startsWith(time_shell.JOSH_PREFIX)) return false
 

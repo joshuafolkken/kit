@@ -2,6 +2,7 @@ import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import type { FollowupStage } from '#scripts/followup/git-followup-stages'
 import { time_background } from './time-background'
 import { time_followup_stage } from './time-followup-stage'
+import { time_josh_names } from './time-josh-names'
 import { time_reported_failure } from './time-reported-failure'
 import { time_shell } from './time-shell'
 import { time_tool_call, type ToolCall } from './time-tool-call'
@@ -398,8 +399,8 @@ const time_spans = {
 	// Re-exported so the suites that measure how a command is read keep asking one namespace, and so
 	// `time-shell.ts` moving out of this file changed no call site.
 	bash_label: time_shell.bash_label,
-	josh_command_of: time_shell.josh_command_of,
-	josh_commands_of: time_shell.josh_commands_of,
+	josh_command_of: time_josh_names.josh_command_of,
+	josh_commands_of: time_josh_names.josh_commands_of,
 	to_tool_call,
 	parse_line,
 	parse_timeline,
