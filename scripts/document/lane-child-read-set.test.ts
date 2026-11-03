@@ -12,13 +12,13 @@ import { lane_child_read_set } from './lane-child-read-set'
 // `backlogrun-progress.md`, so a margin over a bare `fullrun` measured that over-count, not the trim.
 // The required saving is what the trim itself saves: the SKILL.md sections, `latest-gate.md`, the two
 // decision documents and `progress-watcher.md`. The pinned saving is lowered whenever the skipped
-// documents shrink for every entry (joshuafolkken/kit#3174, #3566, #3871 and #3928): skipping a smaller document saves less
+// documents shrink for every entry (joshuafolkken/kit#3174, #3566, #3871, #3928 and #6102): skipping a smaller document saves less
 // while the child reads less in absolute terms.
 
 const ROOT = process.cwd()
 const FULLRUN = 'fullrun'
 const BYTES_PER_KB = 1024
-const REQUIRED_SAVING_BYTES = 15 * BYTES_PER_KB
+const REQUIRED_SAVING_BYTES = 14 * BYTES_PER_KB
 const MAX_INITIAL_TOKENS = 24_000
 // The total counts every document the child really opens, at the entry and at its points of use, so
 // it moves only when that set does (joshuafolkken/kit#2119, #2289, #2357 and #3399 each moved it);
@@ -81,7 +81,7 @@ describe('lane_child_read_set.costed — the SKILL.md section trim', () => {
 })
 
 describe('lane_child_read_set.costed — the whole reduction', () => {
-	it('reads at least 15KB less than a fullrun that also read what the child reaches', () => {
+	it('reads at least 14KB less than a fullrun that also read what the child reaches', () => {
 		const child = lane_child_read_set.costed(ROOT)
 		const reached = child.point_of_use
 			.filter((one) => lane_child_read_set.REACHED_POINT_OF_USE.has(one.file))

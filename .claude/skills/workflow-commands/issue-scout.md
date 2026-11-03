@@ -2,8 +2,7 @@
 
 Read this file when an Issue title exists and before the `pnpm josh issue:file` call that files it.
 Every filing asks whether the work already exists and which epic owns it; the command runs the
-`issue:scout` scan on the title and body first and holds the filing until every printed candidate is
-named in `--distinct`:
+`issue:scout` scan first and prints what holds the filing:
 
 ```bash
 pnpm josh issue:file "<title>" --body-file <complete-draft.md> [--route <route>]
@@ -15,15 +14,13 @@ pnpm josh issue:file "<title>" --body-file <complete-draft.md> --distinct 2801,2
   Telegram and "Please run `fullrun #<existing>` to execute this Issue." A compatible addition follows
   that file's fold path; a separate deliverable follows the ordinary filing path. A title match alone
   never authorizes an edit.
-- **`--distinct` records that each candidate was read.** Reissue the call listing every candidate you
-  read and judged separate; never list one you have not read.
+- **`--distinct` names only candidates you read and judged separate.**
 - **A candidate marked `(closed)` is a different answer.** The scan covers what closed recently as
   well as what is open, because the work most likely to be filed twice is the work that just finished.
   A closed candidate that covers the same work means **the work is already done** — so there is nothing
   to run. Verify it against the merged code, then take the exit in `issue-comments.md` → "When the work
   turns out to be already merged". A closed candidate that does *not* cover the work is noted in one
   line, named in `--distinct`, and the filing carries on.
-- **`none` is an answer.** The command reports no candidate rather than the closest miss.
 - **`Epic:` front-loads the placement.** Its recommendation is `epic:bundle`'s, which makes
   `add_to_epic` / `create_epic` / `ask` Tier A, in exactly the reading `into-target.md`'s
   `into <target>` suffix would have given by hand. Where the user typed `into <target>`, that naming wins.
