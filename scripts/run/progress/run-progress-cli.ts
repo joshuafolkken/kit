@@ -42,18 +42,10 @@ const FAILURE_EXIT_CODE = 1
 const TICK_SECONDS = 30
 // How long a tick that printed nothing waits before it reads again.
 //
-// **A decline deliberately does not move the report clock** — the first child to appear is reported at
-// once rather than waiting out an interval the repository spent idle. Without a cooldown, though, that
-// same property re-reads GitHub on every poll for the watcher's whole life, and a batch stacks one
-// fresh watcher per child, so the listings accumulate into secondary-rate-limit territory and would
-// themselves start producing the unreadable listings this branch exists to handle. Two minutes keeps
-// "reported at once" true to within a fraction of the twenty-minute interval and takes the call count
-// down with it.
-const DECLINE_RETRY_SECONDS = 120
 // The clock a fresh loop starts with: nothing has declined yet, so nothing is being waited out.
 const NO_RETRY = 0
 const { DEFAULT_WAIT_MAX_HOURS } = run_progress_args
-const { DISABLED_KEY, DISABLED_VALUE, is_disabled } = run_progress
+const { DECLINE_RETRY_SECONDS, DISABLED_KEY, DISABLED_VALUE, is_disabled } = run_progress
 
 // A malformed `--wait` exits at once, and read as "started" it would leave a person without progress
 // until someone looked at the exit — so the refusal says the relay is down.
@@ -505,7 +497,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 const run_progress_cli = {
-	DECLINE_RETRY_SECONDS,
 	DEFAULT_WAIT_MAX_HOURS,
 	DISABLED_NOTICE,
 	FAILED_TICK_PREFIX,

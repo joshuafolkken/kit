@@ -7,7 +7,8 @@ import { document_section_cli } from '#scripts/document/document-section-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
-import { run_step_section } from '#scripts/run/run-step-section'
+import { run_step_section_driver } from '#scripts/run/run-step-section-driver'
+import { run_step_section_table } from '#scripts/run/run-step-section-table'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_wake_driver } from './run-wake-driver'
 
@@ -64,7 +65,7 @@ test('claims the carry record and supplies a judgment branch with its resume mat
 
 	expect(result).toStrictEqual({
 		kind: 'judgment',
-		material: `Driver result: ${OUTPUT}\nNext: ${DEFAULT_NEXT}\n${run_step_section.driver_sections('merge over #2509')}\nDetails: budget spent`,
+		material: `Driver result: ${OUTPUT}\nNext: ${DEFAULT_NEXT}\n${run_step_section_driver.driver_sections('merge over #2509')}\nDetails: budget spent`,
 	})
 	expect(run_carry.read_carry(scratch.target)).toMatchObject({
 		kind: 'carried',
@@ -225,7 +226,7 @@ test.each([
 // joshuafolkken/kit#5920: the woken session spends no `doc:section` turn — each governing section's
 // text rides in the hand-off, after the next move and before the details.
 test.each([
-	...run_step_section.DRIVER_SECTIONS.map(
+	...run_step_section_table.DRIVER_SECTIONS.map(
 		([prefix, sections]) => [`${prefix}1`, sections] as const,
 	),
 	['offer', [{ document: 'backlogrun-steps.md', heading: 'The loop' }]] as const,

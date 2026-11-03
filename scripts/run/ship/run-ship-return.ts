@@ -10,7 +10,7 @@ import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_wake_driver } from '#scripts/run/wake/run-wake-driver'
+import { run_wake_window } from '#scripts/run/wake/run-wake-window'
 import type { ShipSection } from './run-ship'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_next, type ShipResume } from './run-ship-next'
@@ -52,7 +52,7 @@ const SERVING_POLLS = 60
 // successor's first lane scan. A driver that reruns a busy merge holds the pass longer still, and a ship
 // past the wait is re-dispatched with the version mismatch named.
 const RELOAD_POLLS =
-	(run_wake_driver.WINDOW_MS + backlog_budget.OFFER_INTERVAL_MS) / SERVING_POLL_MS + SERVING_POLLS
+	(run_wake_window.WINDOW_MS + backlog_budget.OFFER_INTERVAL_MS) / SERVING_POLL_MS + SERVING_POLLS
 const VERSION_MISMATCH_NOTE =
 	'the lane broker runs older code than this ship (a version mismatch), and no broker on the current code read the request within the wait'
 

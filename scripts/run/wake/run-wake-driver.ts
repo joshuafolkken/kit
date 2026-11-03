@@ -1,11 +1,11 @@
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
-import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_invocation } from '#scripts/run/run-invocation'
-import { run_step_section } from '#scripts/run/run-step-section'
+import { run_step_section_driver } from '#scripts/run/run-step-section-driver'
 import type { DriveResult } from './run-wake-loop'
+import { run_wake_window } from './run-wake-window'
 
 const SUCCESS = 0
 const FIRST_LINE = 0
@@ -14,11 +14,7 @@ const DETAILS_TAIL_LENGTH = 2048
 const TRUNCATION_MARK = '... '
 // The prefix `backlog-drive-cli.ts` gives the exception it catches.
 const ERROR_PREFIX = 'error '
-// **The driver is bounded so the supervisor reaches its pass boundary between dispatches**
-// (joshuafolkken/kit#4509): unbounded, `backlog:drive` dispatches, collects and merges lanes in its own
-// loop until a judgment hand-off, and the code check at the pass boundary would wait for that.
-const WINDOW_MINUTES = 5
-const WINDOW_MS = WINDOW_MINUTES * MS_PER_MINUTE
+const { WINDOW_MINUTES } = run_wake_window
 const WINDOW_VERDICT = 'window'
 const { TRIAGE_VERDICT } = epic_triage
 
@@ -55,7 +51,7 @@ function details_tail(details: string): string {
 
 // **The hand-off names its next move and carries the sections that govern it** (joshuafolkken/kit#5920),
 // so the woken session neither searches the procedure nor spends a `doc:section` turn on it
-// (`run_step_section.driver_sections`). Whatever the branch, the session acts on it and ends its
+// (`run_step_section_driver.driver_sections`). Whatever the branch, the session acts on it and ends its
 // turn, whose stop hook writes the cut that hands the loop back to the supervisor
 // (`run_headless.hand_back_at_turn_end`); only a person's stop ends the run instead.
 //
@@ -89,7 +85,7 @@ function handoff_material(verdict: string, resume: string, details: string): str
 		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> before continuing to the next named item.'
 		: ''
 
-	const sections = `\n${run_step_section.driver_sections(verdict)}`
+	const sections = `\n${run_step_section_driver.driver_sections(verdict)}`
 
 	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict)}${sections}${context}`
 }
@@ -261,4 +257,4 @@ async function drive(
 	return await drive_with(target, wait, is_parent_planning)
 }
 
-export const run_wake_driver = { RERUN_LIMIT, WINDOW_MS, drive, driver_args, driver_result }
+export const run_wake_driver = { RERUN_LIMIT, drive, driver_args, driver_result }

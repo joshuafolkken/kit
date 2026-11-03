@@ -121,7 +121,7 @@ the `Driver result:` line hands a branch back. The supervisor has already claime
 the session (`run-wake-handoff.ts`), so it claims nothing and never runs `run:carry --begin`: act on
 the row, then end the turn — its `Stop` hook writes the cut that hands the loop back
 (`run_headless.hand_back_at_turn_end`). The hand-off carries the sections its row needs
-(`scripts/run/run-step-section.ts`) wherever the document ships, so the session searches none:
+(`scripts/run/run-step-section-table.ts` → `DRIVER_SECTIONS`) wherever the document ships, so the session searches none:
 
 | Handed back | What the session does |
 | --- | --- |
