@@ -4,7 +4,6 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 // command's usage moved onto its entry (#4185). `RUN_COMMANDS` spreads this in at the same place, so
 // the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 	'run:progress': {
 		script: 'scripts/run/progress/run-progress-main.ts',
@@ -136,6 +135,5 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { PROGRESS_COMMANDS }

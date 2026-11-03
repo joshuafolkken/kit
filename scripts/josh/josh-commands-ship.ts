@@ -8,7 +8,6 @@ const ISSUE_WITH_OPTIONS = '<issue> [options]'
 // command's usage moved onto its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the
 // map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:merge': {
 		script: 'scripts/run/merge/run-merge-main.ts',
@@ -292,6 +291,5 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { SHIP_COMMANDS }

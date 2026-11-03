@@ -4,7 +4,6 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 // 300-code-line limit, as `PROGRESS_COMMANDS` is. `RUN_COMMANDS` spreads this in after `run:release`,
 // so the map keeps the order the run reads them in.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 	'run:pause': {
 		script: 'scripts/run/pause/run-pause-cli.ts',
@@ -73,6 +72,5 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '' }] },
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { PAUSE_COMMANDS }
