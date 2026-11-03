@@ -1,3 +1,4 @@
+import type { TimingAnswer } from '#scripts/ci/ci-timing'
 import { describe, expect, it } from 'vitest'
 import { lane_breakdown, type Breakdown } from './lane-breakdown'
 import type { LedgerEntry } from './lane-ledger'
@@ -11,6 +12,8 @@ const START = Date.parse('2026-11-03T05:00:00.000Z')
 const MINUTE_MS = 60_000
 const PROJECTED = 20.25
 const SHIP_STAGE = 'ship review'
+const RUN = { id: 1, head_sha: 'abc', html_url: 'https://example.test/run/1' }
+const TIMED_ROW = { name: 'e2e', seconds: 300, conclusion: 'success' }
 
 function at(minute: number): string {
 	return new Date(START + minute * MINUTE_MS).toISOString()
@@ -63,6 +66,7 @@ function records_of(overrides: Partial<WhyRecords> = {}): WhyRecords {
 		breakdown: breakdown_of(),
 		projected: PROJECTED,
 		issues: [{ number: 6124, title: 'Speed up the implement stage' }],
+		timing: undefined,
 		...overrides,
 	}
 }
@@ -104,6 +108,22 @@ describe('lane_why.table', () => {
 		const breakdown = { ...breakdown_of(), stages: [{ name: 'implement', ms: MINUTE_MS }] }
 
 		expect(lane_why.table(records_of({ breakdown }))).toBeUndefined()
+	})
+})
+
+describe('lane_why.table followup CI cell', () => {
+	it('adds the longest CI job and step after the last check', () => {
+		const timing: TimingAnswer = {
+			kind: 'timed',
+			runs: [{ run: RUN, jobs: [{ ...TIMED_ROW, steps: [{ ...TIMED_ROW, name: 'playwright' }] }] }],
+		}
+		const entries = [...LANE, ...SHIP_ROWS]
+		const breakdown = with_stages([lane_breakdown.FOLLOWUP_STAGE])
+		const rows = lane_why.table(records_of({ entries, breakdown, timing }))?.split('\n')
+
+		expect(rows?.[2]).toContain(
+			'| (last check: e2e 150.0s); longest job: e2e 300s, step: playwright 300s |',
+		)
 	})
 })
 

@@ -1,3 +1,4 @@
+import type { TimingAnswer } from '#scripts/ci/ci-timing'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_related } from './lane-breakdown-related'
@@ -9,6 +10,7 @@ import { lane_sinks } from './lane-sinks'
 import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
 import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 import { lane_stats } from './lane-stats'
+import { lane_why_ci } from './lane-why-ci'
 
 // `josh lane:why <issue>` (joshuafolkken/kit#6120): one row per stage of a merged lane that ran past
 // its budget, each beside the records that say why — the join a person made by hand over
@@ -27,6 +29,8 @@ interface WhyRecords {
 	projected: number | undefined
 	// The open Issues, `undefined` when the listing was unreadable.
 	issues: ReadonlyArray<OpenIssue> | undefined
+	// The lane branch's CI timing, `undefined` when `ci:timing` was unreadable.
+	timing: TimingAnswer | undefined
 }
 
 type StopRow = Extract<LedgerEntry, { kind: typeof lane_ledger.KIND.STOP }>
@@ -72,6 +76,15 @@ function ship_cell(records: WhyRecords): string {
 	return [...stops, related].filter((part) => part !== BLANK).join(SHIP_SEPARATOR)
 }
 
+// The followup's last check and the lane's longest CI job and step.
+function ci_cell(records: WhyRecords): string {
+	const last_check = lane_ci_path_stats.last_check_text(records.entries, records.issue).trim()
+
+	return [last_check, lane_why_ci.cell(records.timing)]
+		.filter((part) => part !== BLANK)
+		.join(SHIP_SEPARATOR)
+}
+
 function projected_cell(records: WhyRecords): string {
 	return records.projected === undefined ? BLANK : `${records.projected.toFixed(1)} min`
 }
@@ -81,14 +94,12 @@ function issues_cell(name: string, issues: WhyRecords['issues']): string {
 }
 
 function row_of({ stage, budget }: OverStage, records: WhyRecords): string {
-	const ci = lane_ci_path_stats.last_check_text(records.entries, records.issue).trim()
-
 	return lane_stats.to_row([
 		stage.name,
 		lane_breakdown.minutes_text(stage.ms),
 		`${String(lane_stage_budget.BUDGET_MINUTES[budget])} min`,
 		budget === 'implement' ? projected_cell(records) : BLANK,
-		budget === 'followup' ? ci : BLANK,
+		budget === 'followup' ? ci_cell(records) : BLANK,
 		budget === 'ship' ? ship_cell(records) : BLANK,
 		issues_cell(stage.name, records.issues),
 	])
