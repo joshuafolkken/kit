@@ -122,6 +122,41 @@ describe('lane_breakdown.of — #4970', () => {
 	})
 })
 
+// joshuafolkken/kit#5835: a docs-only lane writes no `plan` event, so its first edit opens the
+// implementation; a lane whose `plan` event did keeps the stages it had.
+describe('lane_breakdown.of — the first edit', () => {
+	const unplanned = events_4970().slice(2)
+
+	it('opens the implementation at the first edit where no plan event did', () => {
+		const breakdown = lane_breakdown.of(lane(), unplanned, ISSUE, Date.parse(at(10)))
+
+		expect(minutes_of(breakdown)).toStrictEqual(STAGES_4970)
+	})
+
+	it('leaves everything before the first ship stage in start to plan without an edit', () => {
+		const breakdown = lane_breakdown.of(lane(), unplanned, ISSUE)
+
+		expect(stage_minutes(breakdown, START_TO_PLAN)).toBe(61)
+		expect(stage_minutes(breakdown, IMPLEMENT)).toBeUndefined()
+	})
+
+	it('keeps a planned lane’s stages, an earlier or a later edit alike', () => {
+		for (const edit_minute of [5, 20]) {
+			const breakdown = lane_breakdown.of(lane(), events_4970(), ISSUE, Date.parse(at(edit_minute)))
+
+			expect(minutes_of(breakdown)).toStrictEqual(STAGES_4970)
+		}
+	})
+
+	it('ignores an edit after the first ship stage or outside the lane', () => {
+		for (const edit_minute of [65, 90]) {
+			const breakdown = lane_breakdown.of(lane(), unplanned, ISSUE, Date.parse(at(edit_minute)))
+
+			expect(stage_minutes(breakdown, IMPLEMENT)).toBeUndefined()
+		}
+	})
+})
+
 // joshuafolkken/kit#5296: the ship review's event line says why it ran or was skipped.
 describe('lane_breakdown.of — ship stage reasons', () => {
 	const REUSED = 'reused: round 1 attested on this branch, its tree held'

@@ -225,3 +225,25 @@ describe('lane_breakdown_implement.read — window', () => {
 		spy.mockRestore()
 	})
 })
+
+function edit(minute: number, tool: string): ToolCall {
+	return call({ minute, minutes: undefined, tool })
+}
+
+// joshuafolkken/kit#5835: a docs-only lane writes no `plan` event, so its first edit opens the
+// implementation.
+describe('lane_breakdown_implement.first_edit_ms', () => {
+	const span = { from_ms: IMPLEMENT_FROM, to_ms: IMPLEMENT_TO }
+
+	it('answers the earliest Edit or Write started inside the span', () => {
+		const calls = [edit(5, 'Edit'), edit(12, 'Read'), edit(20, 'Edit'), edit(15, 'Write')]
+
+		expect(lane_breakdown_implement.first_edit_ms(calls, span)).toBe(15 * MINUTE_MS)
+	})
+
+	it('answers undefined when no edit started inside the span', () => {
+		const calls = [edit(12, 'Read'), edit(30, 'Bash'), edit(90, 'Edit')]
+
+		expect(lane_breakdown_implement.first_edit_ms(calls, span)).toBeUndefined()
+	})
+})
