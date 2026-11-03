@@ -18,6 +18,8 @@ const CAP_MINUTES = 30
 const SHORT_WORK_MINUTES = 5
 const EARLIER_MS = Date.parse('2026-11-02T10:00:00Z')
 const HOUR_MINUTES = 60
+// A holder listing as slow as the one round 2 measured.
+const SLOW_READ_MS = 7000
 
 function minutes_ago(minutes: number): number {
 	return NOW_MS - minutes * MS_PER_MINUTE
@@ -166,10 +168,17 @@ describe('lane_plan_wait.hold', () => {
 		expect(is_free).not.toHaveBeenCalled()
 	})
 
-	it('answers `again` once the ask itself runs out before the deadline', async () => {
-		const is_free = vi.fn().mockResolvedValue(false)
+	it.each([0, SLOW_READ_MS])(
+		'answers `again` within the ask before the deadline, each read taking %i ms',
+		async (read_ms) => {
+			const is_free = vi.fn(async () => {
+				await advance(read_ms)
 
-		expect(await lane_plan_wait.hold(NOW_MS + ASK_MS * 2, is_free, advance)).toBe('again')
-		expect(is_free).toHaveBeenCalledTimes(9)
-	})
+				return false
+			})
+
+			expect(await lane_plan_wait.hold(NOW_MS + ASK_MS * 2, is_free, advance)).toBe('again')
+			expect(Date.now() - NOW_MS).toBeLessThanOrEqual(ASK_MS + read_ms)
+		},
+	)
 })

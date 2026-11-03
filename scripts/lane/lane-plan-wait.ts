@@ -97,7 +97,9 @@ async function deadline(
 }
 
 // Block until `is_free` answers yes, the deadline passes or this ask's time runs out, re-reading once
-// a minute; `sleeper` lets a test cost no wall clock.
+// a minute; `sleeper` lets a test cost no wall clock. The ask ends before a sleep that would carry it
+// past `ASK_MS`, read on the clock after each read, so a slow listing cannot stretch it to the Bash
+// timeout.
 async function hold(
 	until_ms: number,
 	is_free: () => Promise<boolean>,
@@ -107,12 +109,10 @@ async function hold(
 
 	return await poll.wait_for<HoldEnd>(
 		async () => {
-			const now_ms = Date.now()
+			if (Date.now() >= until_ms) return 'expired'
+			if (await is_free()) return 'free'
 
-			if (now_ms >= until_ms) return 'expired'
-			if (now_ms >= ask_end_ms) return 'again'
-
-			return (await is_free()) ? 'free' : undefined
+			return Date.now() + MS_PER_MINUTE > ask_end_ms ? 'again' : undefined
 		},
 		{ interval_ms: MS_PER_MINUTE, sleeper },
 	)
