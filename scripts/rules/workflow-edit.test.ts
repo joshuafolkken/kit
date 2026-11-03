@@ -42,6 +42,10 @@ const REFUSED_COMMANDS = [
 	'cp -t .github/workflows /tmp/pass.yml',
 	'cp --target-directory=.github/workflows /tmp/pass.yml',
 	'install -t.github/workflows /tmp/pass.yml',
+	'cp -rt .github/workflows /tmp/pass.yml',
+	'install -Dt .github/workflows /tmp/pass.yml',
+	`perl -Mstrict -pi -e 's/a/b/' ${WORKFLOW}`,
+	`rsync -rt /tmp/pass.yml ${WORKFLOW}`,
 	`dd if=/tmp/pass.yml of=${WORKFLOW}`,
 	`patch ${WORKFLOW} /tmp/pass.patch`,
 	`unlink ${WORKFLOW}`,
@@ -61,6 +65,10 @@ const ALLOWED_COMMANDS = [
 	'echo x > docs/workflows.md',
 	'cd /repo/scripts',
 	`dd if=${WORKFLOW} of=/tmp/review.yml`,
+	`perl -Mstrict -ne print ${WORKFLOW}`,
+	`perl -MList::Util -ne print ${WORKFLOW}`,
+	`rsync -rt ${WORKFLOW} /tmp/review.yml`,
+	`cp -rt /tmp ${WORKFLOW}`,
 ]
 
 describe('workflow_edit.is_workflow_edit_call — a lane child', () => {

@@ -40,10 +40,15 @@ const PATH_WRITERS: ReadonlySet<string> = new Set([
 ])
 // Programs whose last argument, or the directory of `-t` / `--target-directory`, is the file written.
 const COPIERS: ReadonlySet<string> = new Set(['cp', 'install', 'ln', 'rsync'])
-const TARGET_FLAG = /^(?:-t|--target-directory=?)/u
-// Programs that write their file arguments only with an in-place flag (`-i`, `-i.bak`, `-pi`).
+// `rsync -t` keeps times rather than naming a target, so only its last argument is written.
+const RSYNC = 'rsync'
+// `-t` alone, attached (`-tDIR`) or bundled after other short flags (`-rt`, `-Dt`).
+const TARGET_FLAG = /^(?:--target-directory=?|-[A-Za-z]*?t)/u
+// Programs that write their file arguments only with an in-place flag (`-i`, `-i.bak`, `-pi`, `-Ei`).
+// The letters before `i` leave out perl's `-I`, `-M` and `-m`, whose value may hold an `i`
+// (`-Mstrict`).
 const IN_PLACE_EDITORS: ReadonlySet<string> = new Set(['perl', 'sed'])
-const IN_PLACE_FLAG = /^(?:-[A-Za-z]*i|--in-place)/u
+const IN_PLACE_FLAG = /^(?:-[A-HJ-LN-Za-ln-z]*i|--in-place)/u
 const DD_OUTPUT = /^of=/u
 const DIRECTORY_CHANGERS: ReadonlySet<string> = new Set(['cd', 'pushd'])
 const GIT_WRITERS: ReadonlySet<string> = new Set(['checkout', 'mv', 'restore', 'rm'])
@@ -62,13 +67,13 @@ function target_directory(args: ReadonlyArray<string>, index: number): string {
 	return attached === '' ? (args[index + NEXT] ?? '') : attached
 }
 
-function copier_destinations(args: ReadonlyArray<string>): ReadonlyArray<string> {
-	// A word that is no `-t` maps to '', which names no workflow.
-	const flagged = args.map((word, index) =>
-		TARGET_FLAG.test(word) ? target_directory(args, index) : '',
-	)
+function copier_destinations(call: ProgramCall): ReadonlyArray<string> {
+	const { args } = call
 
-	return [...args.slice(LAST), ...flagged]
+	const index = call.name === RSYNC ? LAST : args.findIndex((word) => TARGET_FLAG.test(word))
+
+	// With `-t` every other path is a source, so only its directory is written.
+	return index === LAST ? args.slice(LAST) : [target_directory(args, index)]
 }
 
 function in_place_files(args: ReadonlyArray<string>): ReadonlyArray<string> {
@@ -81,7 +86,7 @@ function dd_outputs(args: ReadonlyArray<string>): ReadonlyArray<string> {
 
 function written_args(call: ProgramCall): ReadonlyArray<string> {
 	if (PATH_WRITERS.has(call.name)) return call.args
-	if (COPIERS.has(call.name)) return copier_destinations(call.args)
+	if (COPIERS.has(call.name)) return copier_destinations(call)
 	if (IN_PLACE_EDITORS.has(call.name)) return in_place_files(call.args)
 
 	return call.name === 'dd' ? dd_outputs(call.args) : []
