@@ -2,7 +2,7 @@ import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { detached_launch } from '#scripts/run/detached-launch'
-import { run_step_section } from '#scripts/run/run-step-section'
+import { run_step_section_driver } from '#scripts/run/run-step-section-driver'
 import { describe, expect, it, vi } from 'vitest'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_session } from './run-wake-session'
@@ -248,7 +248,7 @@ describe('run_wake_session.wake_argv — a hand-off carrying its governing secti
 			const material = result.kind === 'judgment' ? result.material : ''
 			const prompt = handoff_prompt_of(material)
 
-			expect(prompt).toContain(run_step_section.driver_sections(verdict))
+			expect(prompt).toContain(run_step_section_driver.driver_sections(verdict))
 			expect(prompt).toContain(`\nline #${String(LONG_STDERR_LINES - 1)}`)
 		},
 	)

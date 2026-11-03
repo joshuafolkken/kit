@@ -11,7 +11,7 @@
 // section level, and the point-of-use documents a leaf never reaches dropped — applied by the shared
 // `read-set-trim`, which the `backlogrun` parent trim uses too.
 
-import { run_step_section } from '#scripts/run/run-step-section'
+import { run_step_section_table } from '#scripts/run/run-step-section-table'
 import type { ReadSetCost, SectionReference } from './entry-read-set'
 import { read_set_trim } from './read-set-trim'
 
@@ -70,8 +70,8 @@ const REACHED_POINT_OF_USE: ReadonlySet<string> = new Set(['backlogrun-park.md',
 // **The child reads `pre-gate-cut.md` only as the sections `run:cut` prints** (joshuafolkken/kit#5953),
 // read off the command's own rows so the two never drift.
 function printed_sections(): Array<SectionReference> {
-	const rows = [run_step_section.CUT, run_step_section.RESUME].map((key) =>
-		run_step_section.GOVERNING_SECTIONS.get(key),
+	const rows = [run_step_section_table.CUT, run_step_section_table.RESUME].map((key) =>
+		run_step_section_table.GOVERNING_SECTIONS.get(key),
 	)
 
 	return rows
