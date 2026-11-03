@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { hook_command_rewrite } from './hook-command-rewrite'
 import { hook_launch } from './hook-launch'
 
 const GIT_INIT_TIMEOUT_MS = 10_000
@@ -126,8 +127,16 @@ function run_in_temporary_checkout(
 	}
 }
 
+// The command a consumer's file carries once the rewrite has run over a file holding `command`.
+function consumer_command(command: string, is_codex = false): string {
+	const text = hook_command_rewrite.rewrite_hook_commands(JSON.stringify({ command }), is_codex)
+
+	return (JSON.parse(text) as { command: string }).command
+}
+
 const hook_command_bootstrap = {
 	PROJECT_DIRECTORY_VARIABLE,
+	consumer_command,
 	fresh_git_environment,
 	initialize_repository,
 	run_in_temporary_checkout,

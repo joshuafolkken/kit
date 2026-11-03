@@ -104,7 +104,7 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pret
 		"hooks": [
 			{
 				"type": "command",
-				"command": "<project-root prefix> sh scripts/hooks/run-hook.sh pretool-guard",
+				"command": "sh \"$CLAUDE_PROJECT_DIR/scripts/hooks/run-hook.sh\" pretool-guard",
 				"timeout": 20
 			}
 		]
@@ -114,8 +114,8 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pret
 
 Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/init/hook-launch.ts`):
 
-- **`<project-root prefix>`** — `cd`s to `CLAUDE_PROJECT_DIR`, else (Codex) `git rev-parse --show-toplevel`, so a hook run in a subdirectory finds its paths. It exports the launch directory as `JOSH_HOOK_CWD`, from which the launcher moves into a Claude Code worktree (`.claude/worktrees/<name>`).
-- **The launcher** (`scripts/hooks/run-hook.sh <name>`) clears a git hook's location variables when git resolves without them, then runs the ready gate, falling back to `pnpm josh <command>`.
+- **The root** — `CLAUDE_PROJECT_DIR`; Codex names none, so `.codex/hooks.json` asks `git rev-parse --show-toplevel`.
+- **The launcher** (`scripts/hooks/run-hook.sh <name>`) exports the launch directory as `JOSH_HOOK_CWD`, moves to the root it sits under (or into the Claude Code worktree `.claude/worktrees/<name>` the hook was launched in), clears a git hook's location variables when git resolves without them, then runs the ready gate, falling back to `pnpm josh <command>`.
 - **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its digest matches the source, and when stale runs the old build once while a background rebuild replaces it (in-process only when no whole build exists).
 - A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on `dist/hooks/` (published bundles have no source to be stale against) and whose fallback is the `dist/josh.js` dispatcher.
 
@@ -222,7 +222,7 @@ pnpm josh codex:hook-adapter posttool   # a Codex PostToolUse payload on stdin
 
 <!-- /usage -->
 
-It answers in Codex's hook format. `.codex/hooks.json` launches it as `sh scripts/hooks/run-hook.sh codex-hook-adapter <pretool|posttool>`; this command is the fallback when the bundle cannot run.
+It answers in Codex's hook format. `.codex/hooks.json` launches it as `sh <git root>/scripts/hooks/run-hook.sh codex-hook-adapter <pretool|posttool>`; this command is the fallback when the bundle cannot run.
 
 The adapter normalizes patch and shell calls into the same authority check. Opaque orchestration is
 refused for non-workers. Hosts that skip PreToolUse, including nested tool calls, have no verified

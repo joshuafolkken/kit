@@ -34,6 +34,8 @@ const LAUNCH_LOG = 'launches.log'
 const FOREIGN_GIT_DIR = '/elsewhere'
 // Every program a hook launch could start through PATH, each logged by name when it starts.
 const COUNTED_PROGRAMS = ['node', 'git', 'env', 'dirname'] as const
+// A launch environment without the root Claude Code names, as Codex launches a hook.
+const NO_NAMED_ROOT = { [hook_command_bootstrap.PROJECT_DIRECTORY_VARIABLE]: undefined }
 
 // Each stub reports its name, its arguments and whether the git location reached it, then exits with
 // STUB_EXIT. In kit's checkout the gate is the whole launch: it runs the bundle or the fallback itself.
@@ -126,10 +128,13 @@ function launch(launcher: string, overrides: NodeJS.ProcessEnv = {}): LaunchResu
 	return run_launcher([launcher, 'demo-hook', 'first', 'second'], workspace.root, overrides)
 }
 
-// The whole hook command as settings.json holds it: the root prefix, then the launcher — launched as
-// Claude Code launches it, naming the root, unless the overrides take that away.
-function launch_hook_command(overrides: NodeJS.ProcessEnv = {}): LaunchResult {
-	const command = hook_launch.hook_launch_command('demo-hook first second')
+// The whole hook command as settings.json holds it, under `root` — launched as Claude Code launches it,
+// naming the root, unless the overrides take that away.
+function launch_hook_command(
+	overrides: NodeJS.ProcessEnv = {},
+	root = hook_launch.CLAUDE_ROOT,
+): LaunchResult {
+	const command = hook_launch.hook_launch_command('demo-hook first second', root)
 	const named_root = { [hook_command_bootstrap.PROJECT_DIRECTORY_VARIABLE]: workspace.root }
 
 	return run_launcher(['-c', command], workspace.root, { ...named_root, ...overrides })
@@ -219,13 +224,13 @@ describe('the hook command launch', () => {
 	})
 
 	it.each([
-		['the root is named', {}, 0],
-		['Codex names no root', { [hook_command_bootstrap.PROJECT_DIRECTORY_VARIABLE]: undefined }, 1],
-		['a git location variable is set', { GIT_DIR: FOREIGN_GIT_DIR }, 1],
+		['the root is named', {}, hook_launch.CLAUDE_ROOT, 0],
+		['Codex names no root', NO_NAMED_ROOT, hook_launch.CODEX_ROOT, 1],
+		['a git location variable is set', { GIT_DIR: FOREIGN_GIT_DIR }, hook_launch.CLAUDE_ROOT, 1],
 	])(
 		'starts node once and git as often as needed when %s',
-		(_case, overrides: NodeJS.ProcessEnv, git_launches) => {
-			const result = launch_hook_command(overrides)
+		(_case, overrides: NodeJS.ProcessEnv, root, git_launches) => {
+			const result = launch_hook_command(overrides, root)
 
 			expect(result.stdout).toBe(GATE_RAN)
 			expect(result.launches).toEqual({ node: 1, git: git_launches, env: 0, dirname: 0 })
@@ -250,10 +255,10 @@ describe('the hook command and git location variables', () => {
 	it('clears them for a launch from a git hook, which names no root', () => {
 		initialize_repository(['init', '-q'])
 
-		const result = launch_hook_command({
-			[hook_command_bootstrap.PROJECT_DIRECTORY_VARIABLE]: undefined,
-			GIT_DIR: '.git',
-		})
+		const result = launch_hook_command(
+			{ ...NO_NAMED_ROOT, GIT_DIR: '.git' },
+			hook_launch.CODEX_ROOT,
+		)
 
 		expect(result.stdout).toBe(GATE_RAN)
 	})

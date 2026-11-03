@@ -1,39 +1,11 @@
 #!/bin/sh
-# Launch one kit hook by name: `sh scripts/hooks/run-hook.sh <name> [arguments...]`
-# (joshuafolkken/kit#3184).
-#
-# A hook command in `.claude/settings.json` / `.codex/hooks.json` only moves to the project root
-# (`scripts/init/hook-launch.ts`) and calls this script, so everything every hook shares lives here once:
-#
-# - The git location variables a git hook exports are cleared when the checkout resolves without
-#   them, so the hook's own git calls act on the checkout it stands in, and kept when the git metadata
-#   lives outside the work tree. `git` starts only when one of them is set — a hook runs on every tool
-#   call (joshuafolkken/kit#3946, joshuafolkken/kit#4187). The list is `GIT_LOCATION_VARIABLES`
-#   (`scripts/git/git-location-environment.ts`), held to it by `run-hook.test.ts`.
-# - The pre-built bundle `dist/hooks/<name>.js` runs once its gate passes; otherwise the live source
-#   runs through josh, whose command is the name with its first `-` turned into `:`
-#   (`pretool-guard` → `pretool:guard`).
-# - In kit's own checkout the gate is the kit-only `tools/hooks/hook-bundle-ready.ts`, which rebuilds stale bundles
-#   (joshuafolkken/kit#2984) — in the background while a stale but whole build runs (joshuafolkken/kit#5628)
-#   — and then runs the bundle — or the josh fallback — itself, so a hook call
-#   starts node once (joshuafolkken/kit#3327). In an installed package it is a presence check: the
-#   published bundles cannot be stale against a source the consumer never edits, and Node strips no
-#   types under `node_modules`.
-# - In kit's checkout node keeps a compile cache under `node_modules/.cache` (`NODE_COMPILE_CACHE`):
-#   the type stripping of the gate's TypeScript is most of its load, and the cache keeps the stripped
-#   output and the bundle's compiled code across launches. Node checks each entry against the source,
-#   so an edited file is compiled afresh; the bundles' freshness stays the gate's (joshuafolkken/kit#5663).
-#   The node processes a hook starts inherit the variable and share the cache, which is safe for the
-#   same reason.
-# - Nothing is spawned that the shell can do itself: the directory is a parameter expansion rather than
-#   `dirname`, and `node` replaces this shell through `exec` rather than running beside it.
-# - An `if`/`else`, never `&&`/`||`: a guard's refusal is a non-zero exit, and a chain would read it as
-#   a missing bundle and run the hook twice.
-# - A hook launched inside one of Claude Code's own worktrees (`EnterWorktree`, an
-#   `isolation: "worktree"` subagent) runs in that worktree. Claude Code keeps `CLAUDE_PROJECT_DIR` on
-#   the main checkout there, so the prefix lands on it and hands over where the hook was launched in
-#   `JOSH_HOOK_CWD` (joshuafolkken/kit#4617). The code still comes from the project root — a fresh
-#   worktree has no install and no bundles — so only the working directory moves.
+# Launch one kit hook: `sh <root>/scripts/hooks/run-hook.sh <name> [arguments...]` is the whole hook
+# command (`scripts/init/hook-launch.ts`). Move to the project root this script sits under — into the
+# Claude Code worktree the hook was launched in, if any, with the launch directory in `JOSH_HOOK_CWD` —
+# clear the git location variables (`GIT_LOCATION_VARIABLES`) when the checkout resolves without them,
+# then run `dist/hooks/<name>.js`, or josh with `<name>`'s first `-` as `:`. kit's checkout gates the
+# bundles with `tools/hooks/hook-bundle-ready.ts`. No process the shell can do itself, and `if`/`else`
+# rather than `&&`/`||`: a guard's refusal is a non-zero exit that must not run the hook twice.
 
 hook_name=$1
 shift
@@ -42,10 +14,14 @@ case $0 in
 */*) hooks_dir=$PWD/${0%/*} ;;
 *) hooks_dir=$PWD ;;
 esac
-package_dir="$hooks_dir/../.."
+package_dir=${hooks_dir%/scripts/hooks}
 bundle="$package_dir/dist/hooks/$hook_name.js"
 josh_command="${hook_name%%-*}:${hook_name#*-}"
 
+launch_directory=$PWD
+cd "${package_dir%/node_modules/*/*}" || exit
+# A command from before joshuafolkken/kit#6033 exports the launch directory itself, then moves to the root.
+if [ "$launch_directory" != "$PWD" ] || [ -z "$JOSH_HOOK_CWD" ]; then export JOSH_HOOK_CWD="$launch_directory"; fi
 worktrees_dir=$PWD/.claude/worktrees/
 case $JOSH_HOOK_CWD in
 "$worktrees_dir"?*)

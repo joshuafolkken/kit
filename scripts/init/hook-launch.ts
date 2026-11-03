@@ -3,34 +3,36 @@
 // Each hook is pre-built to its own `dist/hooks/<name>.js`
 // (`scripts/build/build-hooks.ts`) and launched directly with `node`.
 //
-// **The command starts from the project root, never from wherever the session happens to be**.
-// Every path after the prefix is relative, so a hook fired from a subdirectory would otherwise miss its
-// script. Claude Code names the root in `CLAUDE_PROJECT_DIR`, so its hooks start no `git` to find it;
-// Codex runs a hook in the session's directory and names no root, so there the root is git's — asked
-// first without the git location variables a git hook leaks, since a relative or bare `GIT_DIR` read
-// from a subdirectory names the wrong work tree, and with them only when the checkout does not resolve
-// without them (its metadata lives outside the work tree). A lookup that fails ends the command before
-// the launcher (joshuafolkken/kit#4187). Inside one of Claude Code's own worktrees `CLAUDE_PROJECT_DIR`
-// still names the main checkout, so the prefix exports where the hook was launched as `JOSH_HOOK_CWD`
-// and the launcher moves the hook's working directory into that worktree (joshuafolkken/kit#4617).
-//
-// **Everything after the root is one script** (`scripts/hooks/run-hook.sh`): the git location
-// variables a git hook exports, the bundle-ready gate and the live-source fallback live there once, so
-// each hook command names only its hook. The consumer rewrite (`hook-command-rewrite.ts`) keeps this
-// prefix, so both sides stay one mechanism for Claude Code and Codex alike.
-
-import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
+// **The command only names the launcher by its absolute path**; everything else — the move to the
+// project root, the launch directory a worktree hook needs, the git location variables a git hook
+// leaks — lives once in `scripts/hooks/run-hook.sh`. Claude Code names the root in
+// `CLAUDE_PROJECT_DIR`, so its hooks start no `git` to find the launcher. Codex runs a hook in the
+// session's directory and names no root, so `.codex/hooks.json` asks git — first without the two
+// variables that place a checkout, since a relative or foreign `GIT_DIR` read from a subdirectory names
+// the wrong work tree, and with them only when the checkout does not resolve without them (its metadata
+// lives outside the work tree). The lookup is scoped to its subshell; the hook's own environment is the
+// launcher's to clear.
 
 const HOOK_DIST_DIR = 'dist/hooks'
 const RUN_HOOK_SCRIPT = 'scripts/hooks/run-hook.sh'
 const ROOT_LOOKUP = 'git rev-parse --show-toplevel'
-const CODEX_ROOT = `$( (unset ${GIT_LOCATION_VARIABLES.join(' ')}; ${ROOT_LOOKUP} 2>/dev/null) || ${ROOT_LOOKUP})`
-const PROJECT_ROOT_PREFIX = `export JOSH_HOOK_CWD="$PWD" && project_root="\${CLAUDE_PROJECT_DIR:-${CODEX_ROOT}}" && cd "$project_root" && `
+const CLAUDE_ROOT = '$CLAUDE_PROJECT_DIR'
+const CODEX_ROOT = `$( (unset GIT_DIR GIT_WORK_TREE; ${ROOT_LOOKUP} 2>/dev/null) || ${ROOT_LOOKUP})`
+
+// A path under `root` as a hook command names it: quoted, so a root with spaces stays one word.
+function rooted_path(root: string, relative_path: string): string {
+	return `"${root}/${relative_path}"`
+}
 
 // `name` is the hook's bundle under `dist/hooks` without `.js` (e.g. `pretool-guard`), followed by any
 // arguments it takes (e.g. `codex-hook-adapter pretool`).
-function hook_launch_command(name: string): string {
-	return `${PROJECT_ROOT_PREFIX}sh ${RUN_HOOK_SCRIPT} ${name}`
+function hook_launch_command(name: string, root = CLAUDE_ROOT): string {
+	return `sh ${rooted_path(root, RUN_HOOK_SCRIPT)} ${name}`
+}
+
+// The same command as Codex runs it, which names no root.
+function codex_command(command: string): string {
+	return command.split(`"${CLAUDE_ROOT}/`).join(`"${CODEX_ROOT}/`)
 }
 
 // The josh subcommand the launcher falls back to for hook `name`: its first `-` becomes `:`
@@ -41,10 +43,13 @@ function fallback_command(name: string): string {
 }
 
 const hook_launch = {
+	CLAUDE_ROOT,
+	codex_command,
+	CODEX_ROOT,
 	fallback_command,
 	HOOK_DIST_DIR,
 	hook_launch_command,
-	PROJECT_ROOT_PREFIX,
+	rooted_path,
 	RUN_HOOK_SCRIPT,
 }
 
