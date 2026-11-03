@@ -13,6 +13,7 @@ describe('josh read-only invocations', () => {
 		[['ca']],
 		[['read:set', 'fullrun']],
 		[['read:set', 'fullrun', '--bytes']],
+		[['exports:unused']],
 	])('passes %j', (args) => {
 		expect(josh_read_only.refusal(args)).toBeUndefined()
 	})

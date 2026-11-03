@@ -363,7 +363,7 @@ A released park prints `backlogrun-park.md` → "park and continue" after the re
 Stop for a defect in another package in one call: stash, file the upstream issue, backlink it on the finder, send the confirmation.
 
 ```bash
-pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit --body-file body.md
+pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit --body-file .josh/tmp/body.md
 ```
 
 **Options:**
