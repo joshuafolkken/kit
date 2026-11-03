@@ -1,0 +1,7 @@
+{
+	"reason": "lane:stats --over adds lane-over.ts and its tests (#5988)",
+	"date": "2026-11-03",
+	"growth": {
+		"scripts.code_lines": 165
+	}
+}

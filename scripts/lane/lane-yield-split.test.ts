@@ -112,3 +112,22 @@ describe('lane_yield_split.parts -- the parts not ended', () => {
 		expect(part?.launch).toBeUndefined()
 	})
 })
+
+describe('lane_yield_split.of_issue', () => {
+	it('names the #5953 holder and its 14-minute redispatch gap', () => {
+		const events = [yield_note(HOLDER), opening(YIELDER)]
+
+		expect(lane_yield_split.of_issue([MERGE, DISPATCH], events, YIELDER)).toStrictEqual([
+			{ holder: HOLDER, gap_ms: 14 * MS_PER_MINUTE },
+		])
+	})
+
+	it('leaves the gap unknown while the holder runs, and skips another issue', () => {
+		const events = [yield_note(HOLDER)]
+
+		expect(lane_yield_split.of_issue([], events, YIELDER)).toStrictEqual([
+			{ holder: HOLDER, gap_ms: undefined },
+		])
+		expect(lane_yield_split.of_issue([], events, HOLDER)).toStrictEqual([])
+	})
+})

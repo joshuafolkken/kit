@@ -1188,11 +1188,12 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals of the lanes over a net-minute threshold.
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals, or with --over the ledger chains, of the lanes over a net-minute threshold.
 
 ```bash
-pnpm josh lane:stats --period 7           # a 7-day period's stage medians and maxima
-pnpm josh lane:stats --period 1 --sinks   # stage totals of the lanes over 30 net min
+pnpm josh lane:stats --period 7             # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 1 --sinks     # stage totals of the lanes over 30 net min
+pnpm josh lane:stats --period 1 --over 40   # ledger chains of lanes over 40 net min
 ```
 
 <!-- /usage -->
@@ -1203,6 +1204,14 @@ lanes over that many net minutes, the total, the lane count and the median per l
 
 The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive), from one
 listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`).
+
+`--over <minutes>` prints one row per merged lane of the period over that many net minutes, the longest first: its
+net and waited minutes, the ledger chain behind them, its longest stage and the open Issues that stage matches as
+`--sinks` matches a row (`lane-over.ts`).
+
+The chain names `split-notice ×N`, `split-filed <child>`, `round 1 blocking`, `unplanned-notice ×N`, each yield's
+holder and redispatch gap (`gap open` until the lane is dispatched again) and each `hub over cap <file>` of
+`test:related`.
 
 A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
 only, not by Bash kind, since a transcript call names no lane.
