@@ -1,6 +1,6 @@
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { bash_triggers } from './bash-triggers'
 import { lane_park } from './lane-park'
 import { shell_segments } from './shell-segments'
@@ -95,7 +95,7 @@ function is_candidate(command: string): boolean {
 // must never park its epic, so the route is always "return the split", never a reissue.
 function decide(_call: unknown, run: GuardRun): boolean {
 	const issue = lane_child_marker.marked_issue()
-	const commands = tail_commands.prior_bash_commands(time_density_hook.read_tail(run.transcript))
+	const commands = tail_commands.prior_bash_commands(transcript_tail.read_tail(run.transcript))
 
 	return issue !== undefined && promoted_issues(commands).has(issue)
 }

@@ -5,7 +5,7 @@ import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { vi } from 'vitest'
 
 const UNREAD_TRANSCRIPT = 'transcript-not-read'
@@ -25,7 +25,7 @@ function quiet_world(tail = ''): void {
 	vi.spyOn(run_headless, 'hand_back_at_turn_end').mockResolvedValue(false)
 	vi.spyOn(run_headless, 'is_backlog_parent').mockResolvedValue(false)
 	vi.spyOn(run_headless, 'is_headless').mockReturnValue(true)
-	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue(tail)
+	vi.spyOn(transcript_tail, 'read_tail').mockReturnValue(tail)
 	vi.spyOn(repo_party, 'current_owner').mockReturnValue('joshuafolkken')
 }
 

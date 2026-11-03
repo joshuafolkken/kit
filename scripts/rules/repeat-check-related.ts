@@ -1,5 +1,5 @@
 import type { GuardRun } from '#scripts/josh/hook-decision'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { bash_triggers } from './bash-triggers'
 import { round_one_check_related } from './round-one-check-related'
 
@@ -30,7 +30,7 @@ function repeats_before_brief(tail: string): boolean {
 
 // Refused on every occurrence: the way on is one check by name, never a reissue.
 function decide(_call: unknown, run: GuardRun): boolean {
-	return repeats_before_brief(time_density_hook.read_tail(run.transcript))
+	return repeats_before_brief(transcript_tail.read_tail(run.transcript))
 }
 
 const REPEAT_CHECK_RELATED_REASON =

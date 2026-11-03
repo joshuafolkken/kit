@@ -26,8 +26,8 @@ import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
-import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 
 // The `Stop` hook entry: one process that delivers the stop-time rules, running the fixed ones itself
 // (`stop-actions.ts`).
@@ -76,10 +76,10 @@ async function hold_facts(
 
 // A `confirmation` notify sits on this run's transcript tail. The tail is derived exactly as the
 // PreToolUse guards derive it, and the judgement is `lane-park`'s, reused rather than re-spelled.
-function transcript_tail(transcript_path: string): string {
+function session_tail(transcript_path: string): string {
 	const transcript = time_hook_transcript.transcript_of(transcript_path, undefined)
 
-	return time_density_hook.read_tail(transcript)
+	return transcript_tail.read_tail(transcript)
 }
 
 // An Issue was filed on this turn — the tail from the last prompt on. The count is `turn_filings`', so
@@ -124,7 +124,7 @@ async function build_context(
 	transcript_path: string,
 	payload_tail: { stop_hook_active: boolean; message: string },
 ): Promise<PassContext> {
-	const tail = transcript_tail(transcript_path)
+	const tail = session_tail(transcript_path)
 
 	return {
 		...(await hold_facts(tail)),
