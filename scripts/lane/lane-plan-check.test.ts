@@ -13,6 +13,7 @@ import { lane_plan } from './lane-plan'
 import { lane_plan_check } from './lane-plan-check'
 import { lane_plan_cli } from './lane-plan-cli'
 import { lane_plan_signals } from './lane-plan-signals'
+import { lane_plan_wait } from './lane-plan-wait'
 import { lane_yield } from './lane-yield'
 
 // joshuafolkken/kit#5211: joshuafolkken/kit#5171 investigated for six minutes before `lane:plan` found
@@ -38,6 +39,11 @@ const info = vi.spyOn(console, 'info')
 const budgets = vi.spyOn(line_budget, 'budgets_for')
 const signals_of = vi.spyOn(lane_plan_signals, 'signals_of')
 const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice')
+// A lane yields unless a test hands it a deadline (`lane-plan-wait.ts`).
+const deadline = vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(undefined)
+const hold = vi.spyOn(lane_plan_wait, 'hold')
+const WAIT_AHEAD_MS = 600_000
+const WAIT = 'wait'
 const QUIET = { hunk_files: [], committed_files: [], lines_ratio: undefined, split_filed: false }
 const PROBED = 'scripts/lane/probed.ts'
 const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
@@ -110,7 +116,78 @@ describe('lane:plan --probe', () => {
 		fetch_opted_in.mockResolvedValue({ kind: 'unreadable' })
 
 		expect(await lane_plan_cli.run([String(LATER), HELD, PROBE], directory)).toBe(FAILURE)
-		expect(info).toHaveBeenCalledWith('wait')
+		expect(info).toHaveBeenCalledWith(WAIT)
+	})
+})
+
+const until_ms = Date.now() + WAIT_AHEAD_MS
+const until = new Date(until_ms).toISOString()
+
+function hold_by_holder(): void {
+	fetch_opted_in.mockResolvedValue(holding(''))
+}
+
+describe('lane:plan bounded wait on a later-dispatched holder (#5986)', () => {
+	beforeEach(hold_by_holder)
+
+	it('answers `wait`, keeping its hold and recording the deadline, when the ask runs out', async () => {
+		deadline.mockResolvedValueOnce(until_ms)
+		hold.mockResolvedValueOnce('again')
+
+		expect(await lane_plan_cli.run([String(LATER), HELD], directory)).toBe(FAILURE)
+		expect(info).toHaveBeenCalledWith(WAIT)
+		expect(record_yield).not.toHaveBeenCalled()
+		expect(release).not.toHaveBeenCalled()
+		expect(lane_plan.read(LATER, directory)?.waits_until).toBe(until)
+	})
+
+	it('clears, dropping the deadline, once the holder lets go during the wait', async () => {
+		deadline.mockResolvedValueOnce(until_ms)
+		hold.mockResolvedValueOnce('free')
+
+		expect(await lane_plan_cli.run([String(LATER), HELD], directory)).toBe(SUCCESS)
+		expect(lane_plan.read(LATER, directory)).toMatchObject({ cleared: true })
+		expect(lane_plan.read(LATER, directory)?.waits_until).toBeUndefined()
+	})
+
+	it('yields once the wait reaches its deadline', async () => {
+		deadline.mockResolvedValueOnce(until_ms)
+		hold.mockResolvedValueOnce('expired')
+
+		expect(await lane_plan_cli.run([String(LATER), HELD], directory)).toBe(
+			lane_plan_cli.YIELD_EXIT_CODE,
+		)
+		expect(record_yield).toHaveBeenCalled()
+	})
+})
+
+describe('lane:plan bounded wait on a recorded deadline (#5986)', () => {
+	beforeEach(hold_by_holder)
+
+	it('keeps the recorded deadline on a re-ask before it, without asking for a new one', async () => {
+		const planned_at = '2001-01-01T00:00:02.000Z'
+
+		lane_plan.record({ issue: LATER, paths: [HELD], planned_at, waits_until: until }, directory)
+		hold.mockResolvedValueOnce('again')
+
+		expect(await lane_plan_cli.run([String(LATER), HELD], directory)).toBe(FAILURE)
+		expect(deadline).not.toHaveBeenCalled()
+		expect(hold).toHaveBeenCalledWith(until_ms, expect.any(Function))
+	})
+
+	it('yields on a re-plan past the recorded deadline, without asking for a new one', async () => {
+		const past = '2001-01-01T00:00:01.000Z'
+
+		lane_plan.record(
+			{ issue: LATER, paths: [HELD], planned_at: past, waits_until: past },
+			directory,
+		)
+
+		expect(await lane_plan_cli.run([String(LATER), HELD], directory)).toBe(
+			lane_plan_cli.YIELD_EXIT_CODE,
+		)
+		expect(deadline).not.toHaveBeenCalled()
+		expect(lane_plan.read(LATER, directory)?.waits_until).toBeUndefined()
 	})
 })
 

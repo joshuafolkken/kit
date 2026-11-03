@@ -13,6 +13,7 @@ import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_signals } from './lane-plan-signals'
 import { lane_plan_size, type Oversize } from './lane-plan-size'
+import { lane_plan_wait } from './lane-plan-wait'
 import { lane_yield, type YieldAt } from './lane-yield'
 
 // The check `josh lane:plan <issue> <path>...` runs (`lane-plan-cli.ts`) — record the files a lane child
@@ -26,6 +27,11 @@ import { lane_yield, type YieldAt } from './lane-yield'
 // yielded, releases its hold, prints `yield` and the child ends; the issue is offered again once the
 // holder's lane ends. A document under `docs/` is never a clash (`backlog-overlap.ts` →
 // `is_shared_document`).
+//
+// **A lane dispatched before its holder, with commits, may wait instead** (joshuafolkken/kit#5986,
+// `lane-plan-wait.ts`): when the holder's estimated remaining time fits the lane's own worked time, it
+// keeps its seat, records the wait's deadline on its plan and prints `wait`; an ask past the deadline
+// yields as above.
 //
 // **`--probe` answers the same question and records nothing** (joshuafolkken/kit#5211) — no plan, no
 // yield, no release. **`run:entry` gives the lane back at the entry** in a lane child, before any
@@ -97,7 +103,7 @@ async function give_back(
 ): Promise<number> {
 	const overlap = overlap_text(plan.issue, clash)
 
-	lane_plan.record({ ...plan, yielded: true }, directory)
+	lane_plan.record({ ...plan, yielded: true, waits_until: undefined }, directory)
 	await lane_yield.record_yield(plan.issue, overlap, at)
 	await run_hold_cli.run([RELEASE_FLAG, String(plan.issue)])
 	console.error(
@@ -115,7 +121,10 @@ function clear_answer(): number {
 }
 
 function clear(plan: LanePlan, directory: string): number {
-	lane_plan.record({ ...plan, cleared: true, yielded: undefined }, directory)
+	lane_plan.record(
+		{ ...plan, cleared: true, yielded: undefined, waits_until: undefined },
+		directory,
+	)
 
 	return clear_answer()
 }
@@ -194,6 +203,57 @@ function sized_of(plan: LanePlan, issues: ReadonlyArray<OpenIssueData> | undefin
 	return is_judged ? { ...plan, sized: true } : plan
 }
 
+// The deadline `plan` waits on `holder` until — the one its first wait recorded, else a fresh one —
+// or undefined once it passed or the lane does not wait (`lane-plan-wait.ts`).
+async function wait_until(plan: LanePlan, holder: number): Promise<string | undefined> {
+	const now_ms = Date.now()
+
+	if (plan.waits_until !== undefined) {
+		return Date.parse(plan.waits_until) > now_ms ? plan.waits_until : undefined
+	}
+
+	const deadline = await lane_plan_wait.deadline(plan.issue, holder, now_ms)
+
+	return deadline === undefined ? undefined : new Date(deadline).toISOString()
+}
+
+function held(plan: LanePlan, clash: Clash, until: string): number {
+	console.error(
+		`${overlap_text(plan.issue, clash)}; this lane was dispatched first and holds commits, so it keeps its seat until ${until}: run this \`lane:plan\` again now — it waits inside, and answers \`clear\` once that lane ends, or \`yield\` past the deadline.`,
+	)
+	console.info('wait')
+
+	return FAILURE_EXIT_CODE
+}
+
+// Whether no running lane holds `plan`'s files any more; an unread listing proves nothing.
+async function is_free(plan: LanePlan, directory: string): Promise<boolean> {
+	const issues = await opted_in()
+
+	return issues !== undefined && clash_among(plan, running_of(issues), directory) === undefined
+}
+
+// A clash yields, unless the lane waits a bounded time on a later-dispatched holder, blocking here
+// (joshuafolkken/kit#5986).
+async function settle(plan: LanePlan, clash: Clash, directory: string): Promise<number> {
+	const until = await wait_until(plan, clash.holder)
+
+	if (until === undefined) return await give_back(plan, clash, directory, 'summary')
+	const waiting = { ...plan, waits_until: until }
+
+	lane_plan.record(waiting, directory)
+	const end = await lane_plan_wait.hold(
+		Date.parse(until),
+		async () => await is_free(waiting, directory),
+	)
+
+	if (end === 'free') return clear(waiting, directory)
+
+	return end === 'expired'
+		? await give_back(waiting, clash, directory, 'summary')
+		: held(waiting, clash, until)
+}
+
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
 	const issues = await opted_in()
@@ -207,9 +267,7 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 
 	if (found === UNREAD) return unread()
 
-	return found === undefined
-		? clear(sized, directory)
-		: await give_back(sized, found, directory, 'summary')
+	return found === undefined ? clear(sized, directory) : await settle(sized, found, directory)
 }
 
 // `--probe`'s answer: the same tokens and exit codes as the plan's, with nothing written.
@@ -241,6 +299,7 @@ function placed(plan: LanePlan, directory: string): LanePlan {
 		...plan,
 		planned_at: recorded.planned_at,
 		yielded: recorded.yielded,
+		waits_until: recorded.waits_until,
 		sized: lane_plan.is_sized(recorded),
 	}
 }
