@@ -13,7 +13,7 @@ import globals from 'globals'
 import ts from 'typescript-eslint'
 import { checkout_rooted_parser } from './checkout-rooted-parser.js'
 import { config_fingerprint } from './config-fingerprint.js'
-import { code_quality_rules } from './rules/code-quality.js'
+import { code_quality_rules, code_quality_test_rules } from './rules/code-quality.js'
 import { early_return_one_liner_rule } from './rules/early-return-one-liner.js'
 import { formatting_rules } from './rules/formatting.js'
 import { import_rules } from './rules/import.js'
@@ -222,7 +222,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			files: FILE_PATTERNS.tests,
 			rules: {
 				'@typescript-eslint/no-magic-numbers': 'off',
-				'max-lines-per-function': ['error', { max: 35, skipBlankLines: true, skipComments: true }],
+				...code_quality_test_rules,
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
 				// vi mock/stub patterns require explicit undefined (mockResolvedValue/stubGlobal)
 				'unicorn/no-useless-undefined': 'off',
