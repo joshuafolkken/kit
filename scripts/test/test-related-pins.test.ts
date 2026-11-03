@@ -61,7 +61,7 @@ describe('test_related_pins.REGISTRY_TESTS', () => {
 
 describe('test_related_pins.pinned_tests', () => {
 	it('pins the registry tests once to a change touching two command tables', () => {
-		const changed = [COMMAND_TABLE, 'scripts/josh/josh-commands-lane.ts']
+		const changed = [COMMAND_TABLE, 'scripts/josh/josh-commands-ai.ts']
 
 		expect(test_related_pins.pinned_tests(changed)).toEqual(REGISTRY_TESTS)
 	})

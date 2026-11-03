@@ -1,9 +1,7 @@
 import type { CommandEntry } from './josh-command-types'
 
-// The document-reading and -editing command registry, split out of `josh-commands-ai.ts` so that file
-// stays under its 300-code-line limit, exactly as `SPLIT_COMMANDS` was for the same reason.
-// It is spread into
-// `AI_COMMANDS` so the commands stay grouped under the 'AI tools' category. `read:files` and
+// The document-reading and -editing command registry. It is spread into `AI_COMMANDS` so the
+// commands stay grouped under the 'AI tools' category. `read:files` and
 // `edit:files` are the read/write halves of the round-trip fold.
 
 /* eslint-disable @typescript-eslint/naming-convention */

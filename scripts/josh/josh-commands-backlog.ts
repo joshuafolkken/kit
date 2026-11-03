@@ -5,10 +5,8 @@ const JUST_MERGED = 'skip the issue just merged'
 const EXCLUDE_1630 = '--exclude 1630'
 const BUDGET = '--answer candidates --started "$started" --active "$active"'
 
-// The `backlog:*` command registry, split out of `josh-commands-ai.ts` so that file stays under its
-// 300-code-line limit, exactly as `LANE_COMMANDS` and `SPLIT_COMMANDS` were for the same reason.
-// It is spread into `AI_COMMANDS` so the commands
-// stay grouped with the other AI tools under the 'AI tools' category.
+// The `backlog:*` command registry. It is spread into `AI_COMMANDS` so the commands stay grouped
+// with the other AI tools under the 'AI tools' category.
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
