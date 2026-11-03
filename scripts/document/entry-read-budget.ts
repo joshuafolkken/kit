@@ -52,9 +52,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// `fullrun`, `halfrun`, `prrun` and `backlogrun` by a block each.
 	{ entry: 'fullrun', bytes: 49_152 },
 	{ entry: 'halfrun', bytes: 45_056 },
-	// joshuafolkken/kit#6035 wrapped the generated lint prose in CLAUDE.md and refactoring.md in
-	// markers, raising `prrun` past its block.
-	{ entry: 'prrun', bytes: 53_248 },
+	{ entry: 'prrun', bytes: 49_152 },
 	// joshuafolkken/kit#5843 removed the duplicated backlogrun procedures, lowering the read by a block;
 	// joshuafolkken/kit#5920 moved the loop's section pointers into the driver hand-off, by another;
 	// joshuafolkken/kit#5946 moved the lane child's step 0 out of the chain section, by another
