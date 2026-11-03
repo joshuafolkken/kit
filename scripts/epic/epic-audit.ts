@@ -272,6 +272,7 @@ const epic_audit_logic = {
 	parse_issue_references,
 	parse_references,
 	acceptance_section,
+	is_acceptance_heading,
 	signal_references,
 	has_parent_marker,
 	depends_on,

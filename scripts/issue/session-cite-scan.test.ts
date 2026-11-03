@@ -55,6 +55,10 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The stash name `stash:pop` matches, and the finder backlink comment and its Telegram copy; the
 	// stash line it prints goes through `session_cite.text`.
 	['issue/upstream-interrupt-cli.ts', 3],
+	// The follow-up's title, background line and moved-criteria link, and the split epic's title and
+	// rationale — all rendered by GitHub.
+	['issue/issue-spill.ts', 3],
+	['issue/issue-spill-cli.ts', 2],
 	// The stash name `stash:pop` matches; the stop report prints it inside a command to copy verbatim.
 	['run/entry/run-entry-sync.ts', 1],
 	// A person reads it on Telegram.
