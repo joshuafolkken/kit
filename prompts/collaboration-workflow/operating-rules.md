@@ -64,4 +64,4 @@
 - **Tier C との境界**: マージ・ブランチ削除・force push・スコープ外の変更は、自分が招いた問題でも Tier C。確認を外しても監査証跡は外さない
 - blocked-by 関係の削除 → `pnpm josh backlog:triage --apply <N> --unblock <M> --reason <text>`。`--blocked-by` で戻せるので取り消し可能。生の `gh api -X DELETE …/dependencies/blocked_by/…` は `destructive-command` 行が拒否する（`scripts/rules/destructive-command.ts`）
 - **major のバージョン bump は Tier C**: `pnpm josh bump major` は自分の判断で実行も提案もしない。既定は minor / patch で、major はユーザーがそのターンで明示したときだけ（0.x の major は 1.0.0 になり戻せない）。`josh bump` が版を変えたら、変わった挙動の `docs/` をコミット前に更新する
-- 自動判断を記録する Issue コメントは `pnpm josh issue:comment <N> --body-file <path>` で投稿する
+- 自動判断を記録する Issue コメントは `pnpm josh issue:comment <N> --body-file .josh/tmp/comment.md` で投稿する

@@ -1,6 +1,6 @@
 ## Step 1: Issue 作成テンプレ
 
-タイトルは簡潔で明瞭な英語にする（「出力の言語（`JOSH_SESSION_LANG`）」の例外）。日本語や改善できるタイトルは実装開始前に `pnpm josh issue:plan <N> --body-file <path> --title "<title>"` で計画と一緒に書き換える。本文は次のテンプレートの節をすべて含める:
+タイトルは簡潔で明瞭な英語にする（「出力の言語（`JOSH_SESSION_LANG`）」の例外）。日本語や改善できるタイトルは実装開始前に `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --title "<title>"` で計画と一緒に書き換える。本文は次のテンプレートの節をすべて含める:
 
 ````md
 ## 背景
@@ -67,7 +67,7 @@
 
 ### `## 背景` 直下の宣言と分類ラベル
 
-起票は `pnpm josh issue:file "<title>" --body-file <本文ファイル>` で行い、本文の検査（`pnpm josh issue:lint <path>` と同じ）と下表のラベル付与はコマンドが行う。**宣言は起票者が選ぶ。** `- 人の判断:` の行は必須で、`issue:file` が検査し `auto-ok` の判定に使う（`scripts/issue/issue-auto-ok.ts`、`docs/how-to/run-backlog.md`）。`不要` を宣言する起票には `--label run:lane`（kit 自身の検証が `main` で毎回決まって誤った答えを出す不具合なら `run:solo`。時々出る誤判定は `run:lane` と `priority:critical`）も付ける — 無ければ `issue:file` が拒否する。
+起票は `pnpm josh issue:file "<title>" --body-file .josh/tmp/issue.md` で行い（置き場は `shell-body.md`）、本文の検査（`pnpm josh issue:lint <path>` と同じ）と下表のラベル付与はコマンドが行う。**宣言は起票者が選ぶ。** `- 人の判断:` の行は必須で、`issue:file` が検査し `auto-ok` の判定に使う（`scripts/issue/issue-auto-ok.ts`、`docs/how-to/run-backlog.md`）。`不要` を宣言する起票には `--label run:lane`（kit 自身の検証が `main` で毎回決まって誤った答えを出す不具合なら `run:solo`。時々出る誤判定は `run:lane` と `priority:critical`）も付ける — 無ければ `issue:file` が拒否する。
 
 | 宣言                                                     | 付くラベル                             | 選ぶ基準                                                                                                  |
 | -------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
