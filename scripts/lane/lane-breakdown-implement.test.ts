@@ -16,6 +16,7 @@ const GIT_STATUS = 'git status'
 const OTHER_BASH = 'other bash'
 const GENERAL_PURPOSE = 'subagent: general-purpose'
 const REVIEWER = 'subagent: reviewer'
+const RUN_REVIEW = 'run:review'
 
 const BREAKDOWN: Breakdown = {
 	stages: [{ name: 'implement', ms: IMPLEMENT_TO - IMPLEMENT_FROM }],
@@ -80,7 +81,7 @@ describe('lane_breakdown_implement.of — run:review and ship', () => {
 
 		expect(kinds_of(calls)).toStrictEqual([
 			[REMAINDER, 29],
-			['run:review', 12],
+			[RUN_REVIEW, 12],
 			['ship / ship:wait', 9],
 			[OTHER_BASH, 1],
 		])
@@ -93,6 +94,25 @@ describe('lane_breakdown_implement.of — run:review and ship', () => {
 		expect(kinds_of(calls)).toStrictEqual([
 			[REMAINDER, 41],
 			['test', 10],
+		])
+	})
+})
+
+// joshuafolkken/kit#6152: one compound call counts once, under one kind, and run:chain is review time.
+describe('lane_breakdown_implement.of — run:chain', () => {
+	it('counts a chained call once, under run:review when it runs run:chain', () => {
+		const calls = [
+			bash(11, 5, 'pnpm josh run:chain 1'),
+			bash(
+				20,
+				5,
+				'pnpm josh issue:comment 1 --body-file b.md && pnpm josh test:unit a.test.ts && pnpm josh run:chain 1',
+			),
+		]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 41],
+			[RUN_REVIEW, 10],
 		])
 	})
 })
