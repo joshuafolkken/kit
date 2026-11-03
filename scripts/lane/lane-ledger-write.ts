@@ -27,9 +27,9 @@ import type {
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
-// `josh ship` stage, per stopped `josh ship`, per round-2 decision, per core-budget wait and per
-// `josh test:related` run, read back by `josh lane:stats` through `lane-ledger.ts`. Each line's shape
-// is `lane-ledger-schema.ts`.
+// `josh ship` stage, per stopped `josh ship`, per round-2 decision, per core-budget wait, per
+// `josh test:related` run and per lane-limit start or change (`limit`), read back by
+// `josh lane:stats` through `lane-ledger.ts`. Each line's shape is `lane-ledger-schema.ts`.
 //
 // **The writers' leaf, apart from the reader** (joshuafolkken/kit#5202). The gate, `followup`, `josh
 // ship`, the dispatch and the backlog driver write here, and dozens of suites import them; the reading
