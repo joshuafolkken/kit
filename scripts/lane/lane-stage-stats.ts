@@ -47,6 +47,11 @@ const STAGES = [
 	STAGE.REPORT,
 ] as const
 
+interface Implement {
+	issue: number
+	ms: number
+}
+
 interface Measured {
 	implement: ReadonlyArray<number>
 	stages: ReadonlyArray<StageEntry>
@@ -94,15 +99,25 @@ function implement_ms(
 	return starts.length === 0 ? undefined : Math.min(...starts) - from_ms
 }
 
-function implement_durations(
-	dispatches: ReadonlyArray<DispatchEntry>,
-	stages: ReadonlyArray<StageEntry>,
-): Array<number> {
-	const sorted = dispatches.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
+// Each dispatch's implementation in dispatch order, a dispatch no ship stage followed left out.
+function implements_of(entries: ReadonlyArray<LedgerEntry>): Array<Implement> {
+	const stages = entries.filter(is_stage)
+	const sorted = entries
+		.filter(is_dispatch)
+		.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
 
 	return sorted
-		.map((dispatch, index) => implement_ms(dispatch, next_dispatch_ms(sorted, index), stages))
-		.filter(is_number)
+		.map((dispatch, index) => ({
+			issue: dispatch.issue,
+			ms: implement_ms(dispatch, next_dispatch_ms(sorted, index), stages),
+		}))
+		.filter((implement): implement is Implement => implement.ms !== undefined)
+}
+
+// Each issue's implementation over every entry given — the latest dispatch's, so a reissued lane
+// reads as the run that shipped (joshuafolkken/kit#6021).
+function implement_by_issue(entries: ReadonlyArray<LedgerEntry>): ReadonlyMap<number, number> {
+	return new Map(implements_of(entries).map(({ issue, ms }) => [issue, ms] as const))
 }
 
 function durations_of(stage: string, measured: Measured): ReadonlyArray<number> {
@@ -129,9 +144,10 @@ function stage_row(stage: string, measured: Measured): string {
 }
 
 function measured_of(entries: ReadonlyArray<LedgerEntry>): Measured {
-	const stages = entries.filter(is_stage)
-
-	return { implement: implement_durations(entries.filter(is_dispatch), stages), stages }
+	return {
+		implement: implements_of(entries).map(({ ms }) => ms),
+		stages: entries.filter(is_stage),
+	}
 }
 
 // The period's table: `entries` is the whole ledger, filtered here to `window`.
@@ -164,6 +180,7 @@ const lane_stage_stats = {
 	NOT_MEASURED,
 	STAGES,
 	cell,
+	implement_by_issue,
 	is_dispatch,
 	is_merge,
 	is_number,
