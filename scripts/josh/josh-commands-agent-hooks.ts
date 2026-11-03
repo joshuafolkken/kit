@@ -6,7 +6,6 @@ const PRE_TOOL_USE = 'run by the PreToolUse hook, the pending tool call as JSON 
 // command's usage moved onto its entry (#4185). `DEV_COMMANDS` spreads this in at the same place, so
 // the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 	'format:edited': {
 		script: 'scripts/hooks/format-edited-cli.ts',
@@ -78,6 +77,5 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		// above: it runs before every guarded Codex call.
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { AGENT_HOOK_COMMANDS }

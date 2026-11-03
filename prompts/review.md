@@ -11,15 +11,12 @@ Review policy: the level, the round count, and what happens to a finding after t
 
 ## When to run
 
-When: `CLAUDE.md` → "Pre-commit Self-Review"; in a workflow, the order is what `run:chain` and
-`run:review` print (`.claude/skills/workflow-commands/chain-rule.md` → "Run the review-to-merge
-chain"): a `reviewer` agent type (round 2: `reviewer-verification`), never nested, with the model
-`pnpm josh review:brief` prints
-(`.claude/agents/reviewer.md`).
+When: `CLAUDE.md` → "Pre-commit Self-Review"; in a workflow, as `run:chain` and `run:review` print.
+The reviewer is a `reviewer` agent (round 2: `reviewer-verification`), never nested, on the model
+`pnpm josh review:brief` prints.
 
 Re-run after fixes until **no high or medium findings remain or the round cap below is reached** (the
-first review counts), whichever comes first. Round 2 is a verification pass over the fixes
-(`prompts/review-rubric.md` → "The second round is a verification pass, not a second full review").
+first review counts).
 
 ---
 
@@ -28,9 +25,7 @@ first review counts), whichever comes first. Round 2 is a verification pass over
 Answer these ten over your own diff before the scoped pair that precedes round 1 — question 1 once
 `pnpm josh run:review --join` prints its lines after the review, or, under `--join --fixing` or a
 check `--join` restarted on a moved tree, the ship's pre-detach — and fix what an
-answer turns up (about four in five of 100 sampled High/Medium findings that stopped lane reviews
-fell under one; `pnpm josh lane:stats` counts the kinds that still stop). The review, its severity
-tests and the round cap are unchanged.
+answer turns up. The review, its severity tests and the round cap are unchanged.
 
 1. **Tests pin the change** — read the `unpinned` and `unchecked` lines `pnpm josh run:review --join`
    prints from `pnpm josh test:pinned` (each unchecked place is listed in its `full output:` log) (`docs/josh-commands.md` → "`josh test:pinned`"), and check a pinning test's fixture reaches its branch (no assert on a string the code
@@ -73,8 +68,6 @@ merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本�
 
 Use the level `pnpm josh review:brief --level-only [--staged] [--json]` prints: `low` gets 1 round, `medium` up to 2; a documentation diff stays `medium`.
 
-**A confirmed High blocks regardless of round count**, whatever the cap.
-
 ---
 
 ## Interaction review
@@ -88,15 +81,14 @@ by the three-way disposition below, and record the pass with
 
 ## Review round cap (2 rounds)
 
-Two rounds is the ceiling, not the schedule: every fix creates new surface a further round would find
-something in. Whether round 2 is due is `pnpm josh review:round2`'s answer (below). The interaction
-review is not one of the two.
+Two rounds is the ceiling, not the schedule; whether round 2 is due is `pnpm josh review:round2`'s
+answer (below). The interaction review is not one of the two.
 
 ### A merge-conflict resolution review is not one of the two
 
 When `pnpm josh followup` reports `PR checks failed (merge conflict)`, the child resolves the conflict
-in its own lane and reviews the resolution — **that round does not count against the cap**, since it
-reads what merging a moved `main` did, not the change. Procedure and the four step-back conditions:
+in its own lane and reviews the resolution — **that round does not count against the cap**. Procedure
+and the four step-back conditions:
 `.claude/skills/workflow-commands/backlogrun-recovery.md` → "Conflicts are not predicted".
 `pnpm josh review:attest --check` must answer `ok` before the merge is re-issued; a confirmed High parks
 the child rather than buying a further round.
@@ -115,21 +107,19 @@ the reason line says why. The `required` cases and the two `skip` arms are defin
 ### Three-way disposition after the cap
 
 After round 2, place every remaining non-High finding in exactly one exit, decided by what the finding
-is. **The default exit is branch 3, and branch 2 has to be earned**. "It might matter later" is branch 3.
+is. **The default exit is branch 3; branch 2 has to be earned.**
 
 1. **Fix it in place** — it closes in a few lines inside a file the diff already changed, with no
    design decision (a stale comment, a name, an unused export). A fix-in-place never starts a new
-   review round. A finding that cannot close under both limits is filed, not fixed in place.
-2. **File it as an Issue** — a **confirmed defect that reaches a runtime code path** — both halves, and neither on its own.
-   Confirmed: the failure scenario is stated in concrete inputs and state.
-   **Reaching is read exactly as the rubric's Severity test 1 reads it** (a runtime code path, a
-   distributed artifact a consumer reads, or the verification that guards either), so a defect in a
-   distributed document is branch 2. `pnpm josh disposition <path>` answers `runtime` / `non-runtime`
-   from the finding's paths (the review level's inert set). **"It needs a decision" is no longer a branch-2 condition on its own**:
-   a design question with no defect under it takes branch 3.
-3. **Drop it with a one-line note in the PR body** — **This is the default, and it takes everything the other two branches did not**:
-   a Low that does not reach the user, a design preference, an unproven suspicion. **The note is not optional**:
-   one line naming the finding and why it was dropped.
+   review round; a finding that cannot close under both limits is not fixed in place.
+2. **File it as an Issue** — a **confirmed defect that reaches a runtime code path**, both halves.
+   Confirmed: the failure scenario is stated in concrete inputs and state. Reaching is the rubric's
+   Severity test 1 (a runtime code path, a distributed artifact a consumer reads, or the verification
+   that guards either); `pnpm josh disposition <path>` answers `runtime` / `non-runtime` from the
+   finding's paths. A design question with no defect under it is branch 3.
+3. **Drop it with a one-line note in the PR body** — everything the other two did not take: a Low that
+   does not reach the user, a design preference, an unproven suspicion, "it might matter later". The
+   note, naming the finding and why it was dropped, is required.
 
 Two or more findings remain after branch 1 → `pnpm josh disposition --batch <file>` prints each one's branch and
 the drop notes for the PR body (`docs/josh-commands-backlog.md` → `josh disposition`).
@@ -141,8 +131,7 @@ Branch 2 only:
 
 - File a follow-up Issue whose `parent: #N` line names the current one — a mention in its background
   is not read by `epic:bundle`; the current Issue completes.
-- An Issue in no epic is never offered by `epic:next`, so filing continues to the epic. Run these steps
-  inside the CI wait: in `fullrun` / `backlogrun` after `pnpm josh git -y` and before
+- Filing continues to the epic: run these steps inside the CI wait — in `fullrun` / `backlogrun` after `pnpm josh git -y` and before
   `pnpm josh followup`; in `halfrun` or a standalone pre-commit self-review as soon as the disposition
   is decided. They may run delegated — `pnpm josh delegate followup-filing`.
 - A second follow-up from one round folds into the first by default
@@ -156,15 +145,13 @@ Branch 2 only:
      (`--found-during` leaves the deferral note on the current Issue the ship reviewer reads). It lints
      the body, applies the declared labels, runs the duplicate scan and `epic:bundle`
      (`docs/josh-commands-backlog.md` → `josh issue:file`). A security finding declares its
-     `- セキュリティ:` line (`issue-template.md` → H). `epic:bundle` reads open issues only, so
-     after the parent closes it answers `none` permanently.
+     `- セキュリティ:` line (`issue-template.md` → H).
   2. Act on the printed `epic:bundle` answer with `pnpm josh epic:bundle <new> --apply` — never a
-     hand edit of the epic body, which leaves the task list and `blocked-by` relations disagreeing
-     (`epic:next` returns `error`). Tier A, no confirmation; what each answer does is
+     hand edit of the epic body. Tier A, no confirmation; what each answer does is
      `.claude/skills/epic-commands/SKILL.md` → "`josh epic:bundle <N>` — does this new issue belong
      with one already filed?". Non-zero exit, or any ⚠ warning above `Nothing to bundle.` → stop and
      report what it said; a `none` after such a warning is not "nothing to bundle".
 
-**A confirmed High is never deferred** — it blocks the merge, never fixed-in-place, filed or dropped.
+**A confirmed High blocks regardless of round count** — never deferred, fixed-in-place, filed or dropped.
 If one still stands after round 2, do not start a third: stop, send a `confirmation` Telegram, and put
 the scope back to the user (usually: split the Issue).

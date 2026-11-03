@@ -17,7 +17,6 @@ const JSON_FLAG = { names: ['--json'], description: 'print the verdict and reaso
 // cross-repo flag. One constant, so they cannot drift and the literal is not duplicated.
 const ISSUES_WITH_REPO = '<issue...> [--repo <owner/repo>]'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:ack': {
 		script: 'scripts/issue/issue-ack-cli.ts',
@@ -239,6 +238,5 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { ISSUE_COMMANDS }

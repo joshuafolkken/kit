@@ -1,9 +1,7 @@
 import type { CommandEntry } from './josh-command-types'
 
-// The clone-detection commands, kept in their own module so `josh-commands-ai.ts` stays under its
-// line ceiling as the AI-tools set grows. Spread into `COMMAND_MAP` in
-// `josh-command-map.ts` alongside the other command groups.
-/* eslint-disable @typescript-eslint/naming-convention */
+// The clone-detection commands. Spread into `COMMAND_MAP` in `josh-command-map.ts` alongside the
+// other command groups.
 const CLONE_COMMANDS: Record<string, CommandEntry> = {
 	'clone:scan': {
 		script: 'scripts/clone/clone-scan-cli.ts',
@@ -14,6 +12,5 @@ const CLONE_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '' }] },
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { CLONE_COMMANDS }

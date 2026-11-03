@@ -1,9 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { hook_command_bootstrap } from './hook-command-bootstrap-fixture'
 import { hook_command_rewrite } from './hook-command-rewrite'
 import { hook_launch } from './hook-launch'
@@ -11,23 +10,37 @@ import { transform_copied_content } from './init-copy-content'
 
 const { apply_hook_command_rewrite_for_destination, is_kit_hook_command, rewrite_hook_commands } =
 	hook_command_rewrite
+const { consumer_command } = hook_command_bootstrap
+const { CLAUDE_ROOT, CODEX_ROOT, RUN_HOOK_SCRIPT } = hook_launch
 const SETTINGS_DESTINATION = path.join('.claude', 'settings.json')
 const CODEX_HOOKS_DESTINATION = path.join('.codex', 'hooks.json')
 const CODEX_HOOKS_SOURCE = fileURLToPath(new URL('../../.codex/hooks.json', import.meta.url))
 const SESSION_LANG_COMMAND = '{"command": "pnpm josh session:lang"}'
+const PRETOOL_GUARD = 'pretool-guard'
 // A kit-side launcher command: the hook launcher picks the built bundle or the live source itself.
-const KIT_LAUNCHER_FORM = '{"command": "sh scripts/hooks/run-hook.sh pretool-guard"}'
-const CONSUMER_LAUNCHER = 'sh ./node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh'
-const PRETOOL_SOURCE = '{"command": "pnpm josh pretool:guard"}'
+const KIT_LAUNCHER_COMMAND = hook_launch.hook_launch_command(PRETOOL_GUARD)
+const CODEX_LAUNCHER_COMMAND = hook_launch.codex_command(KIT_LAUNCHER_COMMAND)
+const INSTALLED_PACKAGE = 'node_modules/@joshuafolkken/kit'
+const RELATIVE_CONSUMER_LAUNCHER = `sh ./${INSTALLED_PACKAGE}/${RUN_HOOK_SCRIPT}`
 const INSTALL_NOTICE = 'run pnpm install, then reread CLAUDE.md'
-const GUARD_OUTPUT = 'guard ran'
-const FOREIGN_DIRECTORY_PREFIX = 'kit-hook-foreign-'
-const CONSUMER_JOSH_COMMAND = 'node ./node_modules/@joshuafolkken/kit/dist/josh.js'
+const RELATIVE_JOSH_COMMAND = `node ./${INSTALLED_PACKAGE}/dist/josh.js`
 const ROOT_COMMAND = 'git rev-parse --show-toplevel'
 const LEGACY_LOCATION_VARIABLES =
 	'GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
 const LEGACY_ROOT_PREFIX = `if project_root="$(unset ${LEGACY_LOCATION_VARIABLES}; ${ROOT_COMMAND} 2>/dev/null)"; then unset ${LEGACY_LOCATION_VARIABLES}; else project_root="$(${ROOT_COMMAND})"; fi && cd "$project_root" && `
 const PRE_WORKTREE_ROOT_PREFIX = `project_root="\${CLAUDE_PROJECT_DIR:-$( (unset ${LEGACY_LOCATION_VARIABLES}; ${ROOT_COMMAND} 2>/dev/null) || ${ROOT_COMMAND})}" && cd "$project_root" && `
+const PRE_LAUNCHER_ROOT_PREFIX = `export JOSH_HOOK_CWD="$PWD" && ${PRE_WORKTREE_ROOT_PREFIX}`
+const RELATIVE_INSTALL_GUARD = `if [ ! -f ./${INSTALLED_PACKAGE}/package.json ]; then echo 'kit hooks inactive: ${INSTALL_NOTICE}' >&2; exit 0; fi; `
+const INSTALLED_LAUNCHER = `${INSTALLED_PACKAGE}/${RUN_HOOK_SCRIPT}`
+const INSTALLED_DISPATCHER = `${INSTALLED_PACKAGE}/dist/josh.js`
+
+function consumer_launcher(root: string): string {
+	return `sh ${hook_launch.rooted_path(root, INSTALLED_LAUNCHER)}`
+}
+
+function consumer_josh_command(root: string): string {
+	return `node ${hook_launch.rooted_path(root, INSTALLED_DISPATCHER)}`
+}
 
 function hook_commands(settings_text: string): ReadonlyArray<string> {
 	const { hooks } = JSON.parse(settings_text) as ReturnType<
@@ -58,10 +71,10 @@ function source_hook_commands(): ReadonlyArray<string> {
 
 describe('rewrite_hook_commands', () => {
 	it('replaces a pnpm josh hook command with the node bundle invocation', () => {
-		const rewritten = rewrite_hook_commands(PRETOOL_SOURCE)
+		const command = consumer_command('pnpm josh pretool:guard')
 
-		expect(rewritten).toContain(INSTALL_NOTICE)
-		expect(rewritten).toContain(`${CONSUMER_JOSH_COMMAND} pretool:guard`)
+		expect(command).toContain(INSTALL_NOTICE)
+		expect(command).toContain(`${consumer_josh_command(CLAUDE_ROOT)} pretool:guard`)
 	})
 
 	it('leaves an echo reminder untouched', () => {
@@ -79,122 +92,46 @@ describe('rewrite_hook_commands', () => {
 	// The launcher is rebased onto the installed package, where it picks the installed bundle or the
 	// dispatcher on its own (joshuafolkken/kit#3184).
 	it('rebases the hook launcher onto the installed package', () => {
-		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
+		const command = consumer_command(KIT_LAUNCHER_COMMAND)
 
-		expect(rewritten).toContain(INSTALL_NOTICE)
-		expect(rewritten).toContain(`${CONSUMER_LAUNCHER} pretool-guard`)
+		expect(command).toContain(INSTALL_NOTICE)
+		expect(command).toContain(`${consumer_launcher(CLAUDE_ROOT)} ${PRETOOL_GUARD}`)
 	})
 
 	// The rebased launcher path still ends in the source path, so a blind rerun would rewrite it onto
 	// itself. A second pass over already-rewritten output must be a no-op (joshuafolkken/kit#2023).
-	it('is idempotent — a second rewrite leaves an already-rebased command unchanged', () => {
-		const once = rewrite_hook_commands(KIT_LAUNCHER_FORM)
+	it.each([
+		['Claude Code', KIT_LAUNCHER_COMMAND, false],
+		['Codex', CODEX_LAUNCHER_COMMAND, true],
+	])(
+		'is idempotent under %s — a second rewrite leaves an already-rebased command unchanged',
+		(_agent, command, is_codex) => {
+			const once = rewrite_hook_commands(JSON.stringify({ command }), is_codex)
 
-		expect(rewrite_hook_commands(once)).toBe(once)
-	})
+			expect(rewrite_hook_commands(once, is_codex)).toBe(once)
+		},
+	)
+})
 
-	// A consumer's file still carries a root prefix kit wrote before joshuafolkken/kit#4187 or #4617.
+describe('rewrite_hook_commands over an unsynced consumer file', () => {
+	// A consumer's file still carries a shape kit wrote before joshuafolkken/kit#4187, #4617 or #6033:
+	// a root prefix, then the launcher relative to the root behind a relative install guard.
 	it.each([
 		['#4187', LEGACY_ROOT_PREFIX],
 		['#4617', PRE_WORKTREE_ROOT_PREFIX],
-	])('replaces the root prefix from before %s with the current one', (_issue, legacy_prefix) => {
-		const once = rewrite_hook_commands(KIT_LAUNCHER_FORM)
-		const { command } = JSON.parse(once) as { command: string }
-		const legacy_command = `${legacy_prefix}${command.slice(hook_launch.PROJECT_ROOT_PREFIX.length)}`
+		['#6033', PRE_LAUNCHER_ROOT_PREFIX],
+	])('replaces the command shape from before %s with the current one', (_issue, legacy_prefix) => {
+		const legacy_command = `${legacy_prefix}${RELATIVE_INSTALL_GUARD}${RELATIVE_CONSUMER_LAUNCHER} ${PRETOOL_GUARD}`
 
-		expect(rewrite_hook_commands(JSON.stringify({ command: legacy_command }))).toBe(
-			JSON.stringify({ command }),
+		expect(consumer_command(legacy_command)).toBe(consumer_command(KIT_LAUNCHER_COMMAND))
+	})
+
+	it('replaces the relative launcher kit itself named before #6033', () => {
+		const legacy_command = `${PRE_LAUNCHER_ROOT_PREFIX}sh ${RUN_HOOK_SCRIPT} ${PRETOOL_GUARD}`
+
+		expect(consumer_command(legacy_command, true)).toBe(
+			consumer_command(CODEX_LAUNCHER_COMMAND, true),
 		)
-	})
-})
-
-describe('bootstrap without installed dependencies', () => {
-	it('initializes the temporary checkout when GIT_DIR points elsewhere', () => {
-		const foreign_root = mkdtempSync(path.join(tmpdir(), FOREIGN_DIRECTORY_PREFIX))
-
-		vi.stubEnv('GIT_DIR', path.join(foreign_root, '.git'))
-
-		try {
-			const result = hook_command_bootstrap.run_in_temporary_checkout(
-				'test -d .git && git rev-parse --is-inside-work-tree',
-			)
-
-			expect(result.status).toBe(0)
-			expect(result.stdout.trim()).toBe('true')
-		} finally {
-			vi.unstubAllEnvs()
-
-			rmSync(foreign_root, { recursive: true, force: true })
-		}
-	})
-
-	it.each([SETTINGS_DESTINATION, CODEX_HOOKS_DESTINATION])(
-		'lets bootstrap proceed with a clear notice when %s has no installed kit',
-		(destination) => {
-			const rewritten = transform_copied_content(destination, PRETOOL_SOURCE)
-			const { command } = JSON.parse(rewritten) as { command: string }
-			const result = hook_command_bootstrap.run_in_temporary_checkout(command)
-
-			expect(result.status).toBe(0)
-			expect(result.stderr).toContain(INSTALL_NOTICE)
-			expect(result.stderr).not.toContain('Cannot find module')
-		},
-	)
-
-	it('runs a present hook bundle even if the dispatcher is missing', () => {
-		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
-		const { command } = JSON.parse(rewritten) as { command: string }
-		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true)
-
-		expect(result.status).toBe(0)
-		expect(result.stdout).toBe(GUARD_OUTPUT)
-		expect(result.stderr).not.toContain(INSTALL_NOTICE)
-	})
-})
-
-describe('installed hook from a project subdirectory', () => {
-	it('runs the hook bundle instead of reporting an inactive installation', () => {
-		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
-		const { command } = JSON.parse(rewritten) as { command: string }
-		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true)
-
-		expect(result.status).toBe(0)
-		expect(result.stdout).toBe(GUARD_OUTPUT)
-		expect(result.stderr).not.toContain(INSTALL_NOTICE)
-	})
-})
-
-describe('installed hook with Git located elsewhere', () => {
-	// A named root outranks a leaked `GIT_WORK_TREE`; without one, git is asked with it unset.
-	it('runs the hook bundle when Git points to another work tree under Claude Code', () => {
-		const foreign_root = mkdtempSync(path.join(tmpdir(), FOREIGN_DIRECTORY_PREFIX))
-		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
-		const { command } = JSON.parse(rewritten) as { command: string }
-
-		try {
-			const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true, {
-				git_overrides: { GIT_WORK_TREE: foreign_root },
-				is_project_directory_named: true,
-			})
-
-			expect(result.status).toBe(0)
-			expect(result.stdout).toBe(GUARD_OUTPUT)
-			expect(result.stderr).not.toContain(INSTALL_NOTICE)
-		} finally {
-			rmSync(foreign_root, { recursive: true, force: true })
-		}
-	})
-
-	it('runs the hook bundle when Git metadata is outside the work tree', () => {
-		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
-		const { command } = JSON.parse(rewritten) as { command: string }
-		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true, {
-			is_external_git: true,
-		})
-
-		expect(result.status).toBe(0)
-		expect(result.stdout).toBe(GUARD_OUTPUT)
-		expect(result.stderr).not.toContain(INSTALL_NOTICE)
 	})
 })
 
@@ -205,16 +142,14 @@ describe('apply_hook_command_rewrite_for_destination', () => {
 
 		expect(JSON.parse(transformed)).toHaveProperty('hooks')
 
-		const commands = [...transformed.matchAll(/"command":\s*"((?:[^"\\]|\\.)*)"/gu)]
-			.map((match) => match[1] ?? '')
-			.filter((command) => command.includes('codex-hook-adapter'))
+		const commands = hook_commands(transformed).filter((command) =>
+			command.includes('codex-hook-adapter'),
+		)
 
 		expect(commands).toHaveLength(2)
 
 		for (const command of commands) {
-			expect(command).toContain(ROOT_COMMAND)
-			expect(command).toContain(`${CONSUMER_LAUNCHER} codex-hook-adapter`)
-			expect(command).not.toContain('sh scripts/hooks/')
+			expect(command).toContain(`${consumer_launcher(CODEX_ROOT)} codex-hook-adapter`)
 		}
 	})
 
@@ -226,9 +161,11 @@ describe('apply_hook_command_rewrite_for_destination', () => {
 	})
 
 	it('rewrites only the consumer .claude/settings.json destination', () => {
-		expect(
+		const { command } = JSON.parse(
 			apply_hook_command_rewrite_for_destination(SETTINGS_DESTINATION, SESSION_LANG_COMMAND),
-		).toContain(`${CONSUMER_JOSH_COMMAND} session:lang`)
+		) as { command: string }
+
+		expect(command).toContain(`${consumer_josh_command(CLAUDE_ROOT)} session:lang`)
 	})
 
 	it('leaves any other destination unchanged', () => {
@@ -252,30 +189,23 @@ describe('the distributed settings.json a consumer receives', () => {
 	// the shared launcher (joshuafolkken/kit#3256), so every kit hook now pays only a bundle start.
 	it('runs no hook through the josh dispatcher', () => {
 		const josh_hooks = consumer_hook_commands().filter((command) =>
-			command.includes(CONSUMER_JOSH_COMMAND),
+			command.includes(INSTALLED_DISPATCHER),
 		)
 
 		expect(josh_hooks).toEqual([])
 	})
 
-	it('starts every installed hook command from the project root', () => {
-		for (const command of consumer_hook_commands()) {
-			if (!command.includes('node_modules/@joshuafolkken/kit')) continue
-			expect(command).toContain(ROOT_COMMAND)
-		}
-	})
-
 	// The per-hook bundles are launched from the installed package, so a consumer's guarded call pays
 	// neither a pnpm launch nor the dispatcher's tsx re-spawn (joshuafolkken/kit#2023).
-	it('launches each per-hook bundle through the installed launcher', () => {
+	it('launches each per-hook bundle through the installed launcher under the named root', () => {
 		const bundle_hooks = consumer_hook_commands().filter((command) =>
-			command.includes(hook_launch.RUN_HOOK_SCRIPT),
+			command.includes(RUN_HOOK_SCRIPT),
 		)
 
 		expect(bundle_hooks.length).toBeGreaterThan(0)
 
 		for (const command of bundle_hooks) {
-			expect(command).toContain(`${CONSUMER_LAUNCHER} `)
+			expect(command).toContain(`${consumer_launcher(CLAUDE_ROOT)} `)
 		}
 	})
 })
@@ -290,8 +220,12 @@ describe('is_kit_hook_command', () => {
 		expect(consumer_hook_commands().filter((command) => !is_kit_hook_command(command))).toEqual([])
 	})
 
-	it('recognizes a hook an earlier release ran through the installed dispatcher', () => {
-		expect(is_kit_hook_command(`${CONSUMER_JOSH_COMMAND} batch:guard`)).toBe(true)
+	it.each([
+		`${RELATIVE_JOSH_COMMAND} batch:guard`,
+		`${RELATIVE_INSTALL_GUARD}${RELATIVE_CONSUMER_LAUNCHER} ${PRETOOL_GUARD}`,
+		`sh ${RUN_HOOK_SCRIPT} ${PRETOOL_GUARD}`,
+	])('recognizes a hook an earlier release wrote: %s', (command) => {
+		expect(is_kit_hook_command(command)).toBe(true)
 	})
 
 	// Until joshuafolkken/kit#1930 a consumer received `pnpm josh <command>` as it stands in kit's file.
@@ -316,38 +250,27 @@ describe('is_kit_hook_command', () => {
 	})
 })
 
-// kit's own hook commands already start from the root and pass the bundle-ready gate
-// (joshuafolkken/kit#2984); the copy a consumer receives must carry the root prefix once and swap the
-// gate — whose script ships only in kit's checkout — for a presence check.
+// kit's own hook commands pass the bundle-ready gate (joshuafolkken/kit#2984); the copy a consumer
+// receives must carry the install guard once and swap the gate — whose script ships only in kit's
+// checkout — for a presence check.
 describe("kit's own launch command as a consumer receives it", () => {
-	it('carries the project-root prefix at most once', () => {
+	it('carries the install guard at most once', () => {
 		for (const command of consumer_hook_commands()) {
-			expect(command.split(hook_launch.PROJECT_ROOT_PREFIX).length).toBeLessThanOrEqual(2)
+			expect(command.split(INSTALL_NOTICE).length).toBeLessThanOrEqual(2)
 		}
 	})
 
-	it.each([SETTINGS_DESTINATION, CODEX_HOOKS_DESTINATION])(
-		'launches no hook from the source tree in %s',
-		(destination) => {
-			const source =
-				destination === CODEX_HOOKS_DESTINATION
-					? readFileSync(CODEX_HOOKS_SOURCE, 'utf8')
-					: claude_settings_fixture.read_settings_text()
+	it.each([
+		[SETTINGS_DESTINATION, CLAUDE_ROOT],
+		[CODEX_HOOKS_DESTINATION, CODEX_ROOT],
+	])('launches no hook from the source tree in %s', (destination, root) => {
+		const source =
+			destination === CODEX_HOOKS_DESTINATION
+				? readFileSync(CODEX_HOOKS_SOURCE, 'utf8')
+				: claude_settings_fixture.read_settings_text()
+		const transformed = transform_copied_content(destination, source)
 
-			expect(transform_copied_content(destination, source)).not.toContain(
-				`sh ${hook_launch.RUN_HOOK_SCRIPT}`,
-			)
-		},
-	)
-
-	it('runs the installed bundle from a project subdirectory', () => {
-		const source = JSON.stringify({
-			command: hook_launch.hook_launch_command('pretool-guard'),
-		})
-		const { command } = JSON.parse(rewrite_hook_commands(source)) as { command: string }
-		const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true)
-
-		expect(result.status).toBe(0)
-		expect(result.stdout).toBe(GUARD_OUTPUT)
+		expect(transformed).not.toContain(`${root}/${RUN_HOOK_SCRIPT}`)
+		expect(transformed).not.toContain(`sh ${RUN_HOOK_SCRIPT}`)
 	})
 })

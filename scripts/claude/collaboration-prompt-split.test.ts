@@ -13,9 +13,9 @@ import { package_file } from './skill-fixture'
 // Topic files keep workflow reads focused (joshuafolkken/kit#965). Renaming a topic can leave a
 // citation unresolved, so this suite checks the index and pointers together.
 
-const INDEX = 'prompts/collaboration-workflow.md'
+const INDEX = 'docs/collaboration-workflow.md'
 const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
-// The index exists to be read instead of the corpus, so it has to stay far smaller than it.
+// The index only picks a topic file, so it has to stay far smaller than the corpus it indexes.
 //
 // A share of the corpus was tried for this and is wrong, because the two quantities move in
 // opposite directions. The index grows only by table rows — the suite below requires every topic
@@ -53,7 +53,7 @@ function citing_documents(): ReadonlyArray<string> {
 
 // The index lists its topics as markdown links, not as paths in backticks, so the citation pattern
 // used everywhere else finds only whatever path happens to sit in its code fence.
-const INDEX_ROW_PATTERN = /\]\(\.\/collaboration-workflow\/([a-z0-9-]+\.md)\)/gu
+const INDEX_ROW_PATTERN = /\]\(\.\.\/prompts\/collaboration-workflow\/([a-z0-9-]+\.md)\)/gu
 
 function index_citations(): ReadonlyArray<string> {
 	const found: Array<string> = []
@@ -88,11 +88,11 @@ describe('the canonical workflow document is split by topic', () => {
 
 	// The reason for the split, stated where the next editor will read it.
 	it('says the index is not where a rule is defined', () => {
-		expect(read_index()).toContain('規則を定める場所ではない')
+		expect(read_index()).toContain('it is not where a rule is defined')
 	})
 
 	it.each(topic_files())('is listed in the index — %s', (file_name) => {
-		expect(read_index()).toContain(`(./collaboration-workflow/${file_name})`)
+		expect(read_index()).toContain(`(../${WORKFLOW_PROMPT_DIRECTORY}/${file_name})`)
 	})
 
 	it('lists nothing in the index that does not exist', () => {

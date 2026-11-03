@@ -52,9 +52,15 @@ describe('package ships the agent definitions', () => {
 	})
 })
 
-describe.each([AGENT_PATH, DELEGATION_PATH])('investigation handoff in %s', (relative) => {
+// joshuafolkken/kit#6094: the agent definition is the single source of what the unit returns;
+// delegation.md points to it rather than restating it.
+describe('investigation handoff', () => {
+	it('delegation.md points to the agent definition for what the unit returns', () => {
+		expect(read(DELEGATION_PATH)).toContain(AGENT_PATH)
+	})
+
 	it('requests callable signatures and reusable test fixtures with citations', () => {
-		const document = read(relative)
+		const document = read(AGENT_PATH)
 
 		expect(document).toContain('existing function signatures')
 		expect(document).toContain('parameters, return types')
@@ -66,7 +72,7 @@ describe.each([AGENT_PATH, DELEGATION_PATH])('investigation handoff in %s', (rel
 	})
 
 	it('asks for explicit absence instead of invented interfaces', () => {
-		const document = read(relative)
+		const document = read(AGENT_PATH)
 
 		expect(document).toContain('does not apply or was not found')
 		expect(document).toContain('invent')

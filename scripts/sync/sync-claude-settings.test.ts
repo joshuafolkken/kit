@@ -30,7 +30,9 @@ const SETTINGS_FILE = '.claude/settings.json'
 const OWN_COMMAND = 'sh scripts/notify-team.sh'
 const OWN_DENY = 'Bash(terraform destroy*)'
 const KIT_DENY = 'Bash(git commit*)'
+// The launcher as an earlier release wrote it, and the end of the one a sync writes now.
 const KIT_LAUNCHER = 'sh ./node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh'
+const SYNCED_LAUNCHER_END = 'scripts/hooks/run-hook.sh"'
 const STATUS_LINE = { type: 'command', command: 'sh status.sh' }
 const OWN_SETTINGS = {
 	permissions: { deny: [OWN_DENY] },
@@ -107,7 +109,7 @@ describe('josh sync on a .claude/settings.json the project has added to', () => 
 		write_own_settings()
 		await run_sync()
 
-		expect(stop_commands().map((command) => command.split(KIT_LAUNCHER).at(-1))).toEqual([
+		expect(stop_commands().map((command) => command.split(SYNCED_LAUNCHER_END).at(-1))).toEqual([
 			' stop-guard',
 			OWN_COMMAND,
 		])
