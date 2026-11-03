@@ -32,6 +32,14 @@ describe('existing issue fold procedure', () => {
 		expect(PROCEDURE).not.toContain('confirm no comment has arrived')
 	})
 
+	it('names the required assessment fields in the procedure and the reference', () => {
+		const required =
+			'`content`, `has_complete_read`, `existing_body`, `comment_fingerprint`, `draft_body` and `verification` are required; an assessment without one exits 1'
+
+		expect(PROCEDURE).toContain(required)
+		expect(REFERENCE).toContain(required)
+	})
+
 	it('documents complete-draft input and the ordinary filing fallback', () => {
 		expect(REFERENCE).toContain('--body-file draft.md')
 		expect(REFERENCE).toContain('`separate` returns to the ordinary filing path')

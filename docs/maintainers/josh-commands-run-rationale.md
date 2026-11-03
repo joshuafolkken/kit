@@ -208,6 +208,15 @@ Measure a lane limit: a per-repository ledger holds merges, gates, each lane's d
 
 The gap table (`lane-gap-stats.ts`) times each wait on the lane machinery rather than on work. Its `start → first lane` row runs from a `backlogrun` session's `starting session` to its first `opening lane`, read off the run-event stream (`run_event_setup.first_lane_spans`); `run:board` draws the newest session's span as `🛫` on the header's first line, once that first opening began.
 
+Under its `yield → redispatch` row, four rows split each yield by where its wait went (`lane-yield-split.ts`, joshuafolkken/kit#5984):
+
+- `yield: holder running` — until the lane of the issue the yield note names as the holder ended: its `merge` line, or an event `backlog:drive` reads as a finished lane (`merge`, `park`, `human-review`, `split`, `withdraw`); a redispatch before any of them ends it there.
+- `yield: offer wait` — from that end until the driver opened a lane for the yielded issue (`opening lane #N`), any `offer:watch:*` hold included.
+- `yield: launch` — from that opening until the issue's `dispatch` line.
+- `yield: holder unknown` — a note naming no holder, counted whole, so its count and the holder count add up to the yield row's.
+
+A part nothing ended is counted as not ended, and the parts after it are absent.
+
 ## `josh lane:net` in detail
 
 Each wait runs from the park, outage or usage-limit stop to the issue's next ship stage, re-dispatch or next of the two — the wait `josh lane:stats` derives for a stop — and a wait nothing ended stops at the merge. A ship stop's wait stays in: the relaunched child spends it on the fix. The minutes are the whole number an Issue's `- 原因のレーン: <分> 分（#<N>）` line declares (`prompts/collaboration-workflow/issue-template.md`). A usage-limit stop is read off its `usage-limit` event on the run's stream (joshuafolkken/kit#4745), as an outage is. The host's sleep is taken out of every lane it falls in, whatever the issue (joshuafolkken/kit#5032): `backlog:drive`'s load sampler records a `sleep` event when the gap between its once-a-minute ticks exceeds three intervals, spanning from the tick that was due to the late one (`lane-sleep.ts`). A yield — `lane:plan` gave the seat back — waits from the child's yield note until the issue's next dispatch, no seat held, and is taken out too (joshuafolkken/kit#5216); the note, not the withdrawal `run:merge` closes the lane with, starts it, since that withdrawal can be missing (joshuafolkken/kit#5755); `josh lane:stats` times it as its `yield → redispatch` gap. Overlapping waits — a park the host slept through, or an outage and a park — are joined and taken out once.
