@@ -6,6 +6,7 @@ import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_cut_stats } from './lane-cut-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
+import { lane_implement_rate } from './lane-implement-rate'
 import { lane_implement_stats } from './lane-implement-stats'
 import type { lane_ledger } from './lane-ledger'
 import { lane_paused_spans } from './lane-paused-spans'
@@ -45,6 +46,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_round_two_stats.table(entries, window),
 		lane_split_stats.table(entries, window),
 		lane_size_stats.table(entries, window),
+		lane_implement_rate.table(entries, window),
 		lane_held_stats.table(entries, window),
 		lane_core_wait_stats.table(entries, window),
 		lane_process_stats.table(entries, window),

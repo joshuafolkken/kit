@@ -117,6 +117,8 @@ beforeEach(() => {
 	read_sync_mock.mockReset().mockResolvedValue(undefined)
 	record_mock.mockReset()
 	unmoved_mock.mockReset().mockReturnValue(true)
+	// The pair prints its settled and reused lines to the ship log; caught here, never the test output.
+	vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 	forget_ship_memory()
 })
 
@@ -174,17 +176,14 @@ describe('run_ship_scoped.scoped_pair — after a merge with the default branch'
 	const READING = { checks: [], synced: [MOVED], overlap: [MOVED] }
 
 	it('runs neither check when the merge shares nothing with the branch', async () => {
-		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
-
 		missing_mock.mockReturnValue([LINT, TEST])
 		read_sync_mock.mockResolvedValue(READING)
 		settle_mock.mockReturnValue(SETTLED)
 
 		expect(await run_ship_scoped.scoped_pair()).toStrictEqual({ code: OK, out: SETTLED })
 		expect(commands()).toStrictEqual([])
-		expect(write).toHaveBeenCalledWith(`${SETTLED}\n`)
+		expect(process.stdout.write).toHaveBeenCalledWith(`${SETTLED}\n`)
 		expect(settle_mock).toHaveBeenCalledWith(READING, { files: {}, base: 'base' })
-		write.mockRestore()
 	})
 
 	// joshuafolkken/kit#5531: the commit stage's merge meeting the branch in one file.
@@ -281,8 +280,11 @@ describe('run_ship_scoped.scoped_pair — the lap', () => {
 
 describe('run_ship_scoped.scoped_pair', () => {
 	it('runs nothing when both checks are already green on this tree', async () => {
-		expect(await run_ship_scoped.scoped_pair()).toStrictEqual({ code: OK, out: '' })
+		const { REUSED_PAIR } = run_ship_scoped
+
+		expect(await run_ship_scoped.scoped_pair()).toStrictEqual({ code: OK, out: REUSED_PAIR })
 		expect(commands()).toStrictEqual([])
+		expect(process.stdout.write).toHaveBeenCalledWith(`${REUSED_PAIR}\n`)
 	})
 
 	it('runs only the checks not yet green, then passes', async () => {
