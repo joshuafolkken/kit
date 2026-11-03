@@ -14,6 +14,9 @@ import { run_review_steps } from './run-review-steps'
 // joshuafolkken/kit#4920: the reason given after the join stopped, on the tree it stopped on and its
 // green gate, judges the finished answer, and neither the check nor the pair runs again.
 
+vi.mock('#scripts/gate/metrics-totals', () => ({
+	metrics_totals: { totals_refusal: async () => undefined },
+}))
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 
