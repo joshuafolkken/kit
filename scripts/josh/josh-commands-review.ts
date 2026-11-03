@@ -10,7 +10,6 @@ const RECORD = '--record'
 // moved onto its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the map keeps its
 // order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 	'review:brief': {
 		script: 'scripts/review/review-brief-main.ts',
@@ -207,6 +206,5 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { REVIEW_COMMANDS }

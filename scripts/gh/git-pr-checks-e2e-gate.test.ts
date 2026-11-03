@@ -10,7 +10,7 @@ import {
 // (joshuafolkken/kit#902; `prompts/testing-guide.md` → "Closing the E2E gate without a human run"
 // → "The gate is not weakened").
 //
-// **Two separate mechanisms hold the gate closed, and each fixture below picks one.** `E2E` is
+// **Two separate mechanisms hold the gate closed, and each E2E fixture below picks one.** `E2E` is
 // deliberately not in `DEFAULT_REQUIRED_CHECKS`. A *failed* E2E job is caught by
 // `collect_blocking_failures` since joshuafolkken/kit#990, which short-circuits `evaluate_pr_state`
 // before the merge state is consulted at all. A *non-passing but not failed* one — still running, or
@@ -60,6 +60,83 @@ function use_required_checks(value: string): void {
 		vi.unstubAllEnvs()
 	})
 }
+
+// joshuafolkken/kit#4351: GitHub reports UNSTABLE while an optional check — default-setup `CodeQL`,
+// about thirty minutes beside a six-minute CI — is still running. The merge gate proceeds once
+// every check the base branch's rules require has passed, and stays strict where none are known.
+const REQUIRED_CONTEXTS = ['Checks', SONAR_QUBE]
+const CHECKS_PASSED: RollupCheck = { name: 'Checks', status: 'pass' }
+const SONAR_PASSED: RollupCheck = { name: SONAR_QUBE, status: 'pass' }
+const CODEQL_RUNNING: RollupCheck = { name: 'CodeQL', status: 'pending' }
+
+function unstable(
+	rollup: Array<RollupCheck>,
+	required_contexts: Array<string> = REQUIRED_CONTEXTS,
+): PrStateSnapshot {
+	return {
+		rollup,
+		merge_state_status: UNSTABLE,
+		review_decision: undefined,
+		required_contexts,
+	}
+}
+
+describe('evaluate_pr_state — an optional check still running', () => {
+	it('returns success when every required context passed and only an optional check runs', () => {
+		const snapshot = unstable([CHECKS_PASSED, SONAR_PASSED, CODEQL_RUNNING])
+
+		expect(evaluate_pr_state(snapshot)).toBe(SUCCESS)
+	})
+
+	it('returns success when the required context passed as a nested suite job', () => {
+		const snapshot = unstable([
+			{ name: 'Checks / lint', status: 'pass' },
+			SONAR_PASSED,
+			CODEQL_RUNNING,
+		])
+
+		expect(evaluate_pr_state(snapshot)).toBe(SUCCESS)
+	})
+
+	it('returns failure when an optional check has failed', () => {
+		const snapshot = unstable([CHECKS_PASSED, SONAR_PASSED, { name: 'CodeQL', status: 'fail' }])
+
+		expect(evaluate_pr_state(snapshot)).toBe('failure')
+	})
+})
+
+describe('evaluate_pr_state — the gate stays strict', () => {
+	it('returns pending while a required context is still running', () => {
+		const snapshot = unstable([{ name: 'Checks', status: 'pending' }, SONAR_PASSED, CODEQL_RUNNING])
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+
+	it('returns pending while a required context has not reported', () => {
+		const snapshot = unstable([SONAR_PASSED, CODEQL_RUNNING])
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+
+	it('returns pending when no required context is known', () => {
+		const snapshot: PrStateSnapshot = {
+			rollup: [CHECKS_PASSED, SONAR_PASSED, CODEQL_RUNNING],
+			merge_state_status: UNSTABLE,
+			review_decision: undefined,
+		}
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+
+	it('returns pending on BLOCKED however the rollup reads', () => {
+		const snapshot = {
+			...unstable([CHECKS_PASSED, SONAR_PASSED, CODEQL_RUNNING]),
+			merge_state_status: 'BLOCKED',
+		}
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+})
 
 describe('a non-passing E2E job keeps the merge closed', () => {
 	it.each([
@@ -141,8 +218,8 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 // exercises that rule against the supported layouts.
 //
 // It would add nothing to the failure path either. A red E2E already ends the wait at once
-// (joshuafolkken/kit#990) and can never reach `success`, which is what the first two describes here
-// assert — and they assert it without `E2E` being required.
+// (joshuafolkken/kit#990) and can never reach `success`, which is what the first E2E describe here
+// asserts — and it asserts it without `E2E` being required.
 //
 // And it would cost a repository that does not use this workflow its whole merge budget. With no
 // `E2E` context reported at all the required entry resolves to `missing`, which is never `pass`, so

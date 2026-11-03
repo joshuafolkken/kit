@@ -56,15 +56,16 @@ const SPLIT_RATIONALE_MARKERS: ReadonlyArray<string> = [
 // are both pinned: the bar alone still reads as "file unless obviously droppable", and the default
 // alone leaves "or it needs a decision" as a second live route into filing.
 const REVIEW_MARKERS: ReadonlyArray<string> = [
-	'**The default exit is branch 3, and branch 2 has to be earned**',
-	'**confirmed defect that reaches a runtime code path** — both halves, and neither on its own',
+	'**The default exit is branch 3; branch 2 has to be earned.**',
+	'**confirmed defect that reaches a runtime code path**, both halves',
 	// The narrowing is in what *confirmed* means, never in what *reaching* means. Without this the
 	// bar reads as excluding distributed documents, which would contradict the severity test and the
 	// level rule in a repository whose product is its documents.
-	"**Reaching is read exactly as the rubric's Severity test 1 reads it**",
-	'**"It needs a decision" is no longer a branch-2 condition on its own**',
-	'**This is the default, and it takes everything the other two branches did not**',
-	'**The note is not optional**',
+	"Reaching is the rubric's Severity test 1",
+	'a distributed artifact a consumer reads, or the verification',
+	'A design question with no defect under it is branch 3.',
+	'everything the other two did not take',
+	'The note, naming the finding and why it was dropped, is required.',
 ]
 
 // The asymmetry that decides the trade, and the half a later reader mines for a reason to revert. It

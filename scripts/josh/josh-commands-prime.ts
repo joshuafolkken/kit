@@ -1,10 +1,8 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
-// `run:tidy` and `run:prime`, the once-per-repository sweep and the preparation that runs it, split
-// out of `josh-commands-run.ts` so that file stays under its 300-code-line limit, as
-// `PAUSE_COMMANDS` is. `RUN_COMMANDS` spreads this in after `PAUSE_COMMANDS`, so the map keeps its order.
+// `run:tidy` and `run:prime`, the once-per-repository sweep and the preparation that runs it.
+// `RUN_COMMANDS` spreads this in after `PAUSE_COMMANDS`, so the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const PRIME_COMMANDS: Record<string, CommandEntry> = {
 	'run:tidy': {
 		script: 'scripts/run/tidy/run-tidy-main.ts',
@@ -26,6 +24,5 @@ const PRIME_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { PRIME_COMMANDS }

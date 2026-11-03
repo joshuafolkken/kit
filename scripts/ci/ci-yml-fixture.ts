@@ -2,10 +2,9 @@ import { readFileSync } from 'node:fs'
 import { package_path } from '#scripts/init/init-paths'
 import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
 
-// GitHub spells some workflow keys in kebab-case. They are declared verbatim — with the naming
-// rule disabled on the line, as elsewhere for external field names — rather than reached through
-// an index signature, which would silently turn every misspelled key in these guards into
-// `undefined` and make a `toBeUndefined()` assertion pass without testing anything.
+// GitHub spells some workflow keys in kebab-case. They are declared verbatim — a fixture's glob
+// turns the naming rule off — rather than reached through an index signature, which would
+// silently turn every misspelled key in these guards into `undefined` and make a `toBeUndefined()` assertion pass without testing anything.
 interface WorkflowStep {
 	id?: string
 	name?: string
@@ -15,7 +14,6 @@ interface WorkflowStep {
 	shell?: string
 	uses?: string
 	with?: Record<string, string | number>
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
 	'continue-on-error'?: string | boolean
 }
 
@@ -32,19 +30,16 @@ interface WorkflowJob {
 	needs?: string | ReadonlyArray<string>
 	steps?: ReadonlyArray<WorkflowStep>
 	strategy?: WorkflowStrategy
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
 	'timeout-minutes'?: number
 }
 
 interface WorkflowStrategy {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
 	'fail-fast'?: boolean
 	matrix?: Record<string, ReadonlyArray<string | number>>
 }
 
 interface WorkflowConcurrency {
 	group?: string
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
 	'cancel-in-progress'?: boolean | string
 }
 

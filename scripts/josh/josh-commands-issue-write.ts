@@ -10,7 +10,6 @@ const EVIDENCE_REFERENCE = `<issue> ${EVIDENCE_FILE}`
 // `josh-commands-issue.ts` when each command's usage moved onto its entry (#4185). `ISSUE_COMMANDS`
 // spreads this in at the same place, so the map keeps its order.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:comment': {
 		script: 'scripts/issue/issue-comment-main.ts',
@@ -261,6 +260,5 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { ISSUE_WRITE_COMMANDS }

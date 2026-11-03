@@ -3,7 +3,6 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 const CHECK = '--check'
 const JSON_FLAG = '--json'
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 	doctor: {
 		script: 'scripts/doctor/doctor.ts',
@@ -228,6 +227,5 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		usage: { examples: [{ arguments: '', note: 'update dependencies only' }] },
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { MAINTENANCE_COMMANDS }

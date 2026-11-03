@@ -8,7 +8,6 @@ const BUDGET = '--answer candidates --started "$started" --active "$active"'
 // The `backlog:*` command registry. It is spread into `AI_COMMANDS` so the commands stay grouped
 // with the other AI tools under the 'AI tools' category.
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 	// Started from a terminal: the `backlogrun` keyword's launcher, and the board.
 	backlogrun: {
@@ -179,6 +178,5 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export { BACKLOG_COMMANDS }

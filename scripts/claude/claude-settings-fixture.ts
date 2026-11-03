@@ -26,15 +26,10 @@ interface HookMatcher {
 // The hook events are named as declared fields rather than through an index signature so a
 // misspelled event here fails to compile instead of reading as an absent hook.
 interface HooksBlock {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	SessionStart?: ReadonlyArray<HookMatcher>
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	UserPromptSubmit?: ReadonlyArray<HookMatcher>
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	PreToolUse?: ReadonlyArray<HookMatcher>
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	PostToolUse?: ReadonlyArray<HookMatcher>
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
 	Stop?: ReadonlyArray<HookMatcher>
 }
 
@@ -43,7 +38,6 @@ interface HooksBlock {
 // number the cap is compared against, so a value that is not a number fails there rather than
 // silently reading as an absent cap.
 interface EnvironmentBlock {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code environment variable name
 	BASH_MAX_OUTPUT_LENGTH?: string
 }
 
