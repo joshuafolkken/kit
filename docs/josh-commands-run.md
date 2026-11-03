@@ -1340,7 +1340,7 @@ pnpm josh lane:why 6050   # the cause table an overrun investigation joins by ha
 
 One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`), longest first, no model run.
 
-The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last, a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
+The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last and the lane branch's longest CI job and that job's longest step (`ci:timing`, the branch's latest commit), a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
 
 A missing record, or an Issue listing that cannot be read, leaves its cell blank. A lane with no stage over budget prints one line; one the ledger holds no dispatch and merge of exits non-zero (`lane-why.ts`).
 
