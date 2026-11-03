@@ -7,7 +7,7 @@
 // namespace object (`export { issue_merged }`) as `issue_merged.read_merged`. The namespace object
 // itself is skipped — a member added to it changes none of its readers.
 //
-// `declarations` and `exported_names` are also read by `prose-stale-scan.ts` over a diff's removed lines.
+// `declarations`, `exported_names` and `reachable_names` are also read by `prose-stale-scan.ts` over a diff's removed lines.
 
 const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@/u
 const DECLARATION =
@@ -159,7 +159,26 @@ function edited(source: string, diff: string): Array<Edited> {
 	return found_targets.filter((entry): entry is Edited => entry.target !== undefined)
 }
 
-const review_readers_scan = { changed_lines, declarations, edited, exported_names }
+// The declared names another module can reach: a direct export, an `export { … }` entry, or a member of
+// an exported namespace object — what a deleted file can still be named by (joshuafolkken/kit#6130).
+function reachable_names(source: string): Array<string> {
+	const exported = exported_names(source)
+	const members = [...namespaces(source, exported).values()].flat()
+	const reachable = new Set([...exported, ...members])
+	const found = declarations(source).filter(
+		(declaration) => declaration.is_exported || reachable.has(declaration.name),
+	)
+
+	return found.map((declaration) => declaration.name)
+}
+
+const review_readers_scan = {
+	changed_lines,
+	declarations,
+	edited,
+	exported_names,
+	reachable_names,
+}
 
 export type { Declaration, Edited }
 export { review_readers_scan }

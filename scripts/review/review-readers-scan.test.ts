@@ -83,6 +83,17 @@ describe('review_readers_scan.edited', () => {
 	})
 })
 
+describe('review_readers_scan.reachable_names', () => {
+	it('keeps a direct export, an export-list entry and a namespace member, and drops the locals', () => {
+		expect(review_readers_scan.reachable_names(SOURCE)).toEqual([
+			'read_merged',
+			'direct',
+			'Shape',
+			'issue_merged',
+		])
+	})
+})
+
 const COMMENTED = [
 	'export function first(): void {}',
 	'',
