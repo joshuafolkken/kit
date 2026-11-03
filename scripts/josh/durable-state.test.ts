@@ -10,7 +10,7 @@ import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { run_wake } from '#scripts/run/wake/run-wake'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { durable_state } from './durable-state'
 import { PLATFORM_TEMP_ROOT, platform_temporary } from './platform-temporary'
 import { stamp_file } from './stamp-file'
@@ -101,10 +101,12 @@ describe('durable_state.root', () => {
 	it('resolves inside the test run temp root, never the real common git directory', () => {
 		const repository = vi.spyOn(git_common_directory, 'repository')
 
+		onTestFinished(() => {
+			repository.mockRestore()
+		})
 		expect(process.env[platform_temporary.TEMP_ROOT_KEY]).toBe(PLATFORM_TEMP_ROOT)
 		expect(durable_state.root()).toBe(path.join(PLATFORM_TEMP_ROOT, OVERRIDE_STATE_DIRECTORY))
 		expect(repository).not.toHaveBeenCalled()
-		repository.mockRestore()
 	})
 })
 
