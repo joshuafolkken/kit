@@ -73,6 +73,7 @@ describe('measure_declaration.problems', () => {
 		DECLARED,
 		`${BACKGROUND}- 種別: 非不具合\n`,
 		`${BACKGROUND}- 計測宣言: \`pnpm josh count 2>&1 < input.txt\` < 5\n`,
+		`${BACKGROUND}- 計測宣言: \`wc -l <in.txt >out.txt\` < 5\n`,
 	])('finds no problem in %j', (body) => {
 		expect(measure_declaration.problems(body)).toStrictEqual([])
 	})

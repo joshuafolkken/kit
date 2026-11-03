@@ -23,8 +23,9 @@ const NUMBER_PATTERN = /^-?\d+(?:\.\d+)?$/u
 const EXAMPLE = `${PREFIX} \`pnpm josh lane:net 5168\` <= 40`
 const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 // joshuafolkken/kit#6016: the drive runs the command as written, so a `<merge instant>` left in it is a
-// shell syntax error the drive hands to a lane — refused at filing instead.
-const PLACEHOLDER_PATTERN = /<[^\s<>][^<>]*>/u
+// shell syntax error the drive hands to a lane — refused at filing instead. A path never reads as one,
+// so a redirect pair such as `<in.txt >out.txt` still files.
+const PLACEHOLDER_PATTERN = /<[^\s<>./][^<>./]*>/u
 const declaration_schema = z.object({
 	command: z.string().trim(),
 	operator: z.enum(['<=', '<', '>=', '>']),
