@@ -7,7 +7,8 @@ import { project_checks } from './project-checks'
 // time, and a growth first met at the pre-detach stop costs a ship re-run beside the
 // `josh metrics --accept` (joshuafolkken/kit#4594). `josh lint:related` reports it as a notice, never a
 // failure, so a total that grows again within the loop does not demand an accept per edit;
-// `josh run:review`'s open is the stop, the pre-detach check its backstop (`totals_check`). A consumer's kit has no `josh metrics`, so it runs in kit alone.
+// `josh run:review`'s open is the stop, the pre-detach check its backstop (`totals_check`). A
+// consumer's kit has no `josh metrics`, so it runs in kit alone.
 
 const METRICS_TOTALS_COMMAND: ReadonlyArray<string> = ['josh', 'metrics', '--totals-only']
 // The form ship runs before the detach and before each scoped pair: it also re-records a growth the
@@ -33,8 +34,8 @@ async function growth_notice(directory: string): Promise<string | undefined> {
 
 // The totals' stop, one judgment for the two places that stop on it: `josh run:review`'s open, right
 // after the implementation and before the review's brief, and the ship's pre-detach, kept as the
-// backstop (joshuafolkken/kit#6023). The re-record form, so a growth the branch's approval already names
-// passes both. `undefined` outside kit.
+// backstop (joshuafolkken/kit#6023). The re-record form, so a growth the branch's approval already
+// names passes both. `undefined` outside kit.
 async function totals_check(directory: string): Promise<BufferedProcessResult | undefined> {
 	if (!project_checks.is_kit_repository(directory)) return undefined
 

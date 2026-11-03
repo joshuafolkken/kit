@@ -221,7 +221,7 @@ A tree it already answered runs no check, as in `josh lint:related`. A check who
 
 `lint:related` and `test:related` read their own scoped records, the type check and `cspell:dot` the gate's per-check records (written here on a pass). A record holds only for the same changed files (`.josh/` records included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`.
 
-In kit, `lint:related`'s metrics growth notice prints again above the verdict line, which then says the ship's pre-detach stops on it and names `josh metrics --accept`.
+In kit, `lint:related`'s metrics growth notice prints again above the verdict line, which then says `josh run:review`'s open stops on it (the ship's pre-detach as the backstop) and names `josh metrics --accept`.
 
 Unpinned places a `josh test:pinned` already answered on the current tree, which the ship's pre-detach would stop on, print there too, with the `josh ship --review … --unpinned-ok "<reason>"` form for the first ship; one still running prints nothing and is not waited on.
 

@@ -38,10 +38,10 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 // In kit the metrics ratchet's totals join them: a feature grows a total almost every time, and here
 // the session that grew the total writes the reason itself rather than a relaunched one —
 // `josh lint:related` has already reported the growth in the loop and `josh run:review`'s open has
-// stopped on it (`metrics-totals.ts`), so this is the backstop for a growth neither settled. A total the branch's approval already names is
-// re-recorded at its growth here rather than stopped (`--rerecord`, joshuafolkken/kit#4716). The
-// durations are left out: they read the gate ledger, stale before the detach, so they stay with the
-// supervised gate.
+// stopped on it (`metrics-totals.ts`), so this is the backstop for a growth neither settled. A total
+// the branch's approval already names is re-recorded at its growth here rather than stopped
+// (`--rerecord`, joshuafolkken/kit#4716). The durations are left out: they read the gate ledger,
+// stale before the detach, so they stay with the supervised gate.
 
 interface PreDetachCheck {
 	list: ReadonlyArray<string>

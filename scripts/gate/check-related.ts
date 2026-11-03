@@ -42,7 +42,7 @@ const TOUCHED_CHECKS: ReadonlyArray<string> = CHECKS.map((command) =>
 const REUSED = 'reused'
 const VERDICT_RECORD = tree_verdict.record_path('check-related')
 const METRICS_STOP =
-	'`josh ship`\'s pre-detach stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`); the accept needs no `check:related` re-run, as the notice changed no exit code'
+	'`josh run:review`\'s open (and the ship\'s pre-detach behind it) stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`); the accept needs no `check:related` re-run, as the notice changed no exit code'
 
 type CheckExecutor = (command: string) => Promise<CheckResult>
 type ProcessRunner = (
@@ -162,7 +162,8 @@ function reused_suffix(reused: ReadonlySet<string>): string {
 }
 
 // A notice is never a failure, so a passing verdict line alone hid it from a reader of the last lines,
-// and the ship's pre-detach stopped on it (joshuafolkken/kit#4987).
+// and `josh run:review`'s open (the ship's pre-detach as the backstop) stops on it
+// (joshuafolkken/kit#4987, joshuafolkken/kit#6023).
 function verdict_line(
 	results: ReadonlyArray<CheckResult>,
 	has_metrics_notice: boolean,
@@ -174,8 +175,8 @@ function verdict_line(
 }
 
 // `josh lint:related` ends its section with the metrics growth notice, which the sections after it
-// bury; it is repeated above the verdict so the tail still carries what stops `josh ship`
-// (joshuafolkken/kit#4939).
+// bury; it is repeated above the verdict so the tail still carries what `josh run:review`'s open
+// stops on, the ship's pre-detach as the backstop (joshuafolkken/kit#4939, joshuafolkken/kit#6023).
 function metrics_notice(results: ReadonlyArray<CheckResult>): string | undefined {
 	const output = results.find((result) => result.command === LINT_RELATED)?.output ?? ''
 	const start = output.indexOf(metrics_totals.NOTICE_HEADING)
