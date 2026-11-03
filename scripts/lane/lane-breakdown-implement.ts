@@ -60,6 +60,11 @@ interface ImplementDetail {
 	calls?: ReadonlyMap<string, ReadonlyArray<CallGroup>>
 }
 
+interface PlanOutside {
+	ms: number
+	background: number
+}
+
 function command_kind(command: string): string {
 	return COMMAND_KINDS.find(([pattern]) => pattern.test(command))?.[1] ?? OTHER_BASH
 }
@@ -181,13 +186,36 @@ function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDeta
 	}
 }
 
+// The start to plan's timed calls, each cut at its span.
+function plan_parts(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array<TimedPart> {
+	const placed = placed_of(calls, breakdown.plan ?? [])
+
+	return placed.flatMap(([call, span]) => timed_part(call, span, TOOL_KINDS))
+}
+
 // The longest call groups of the start to plan (joshuafolkken/kit#5539), a `lint:related` among them
 // with its timing line (joshuafolkken/kit#5712).
 function plan_calls(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array<CallGroup> {
-	const placed = placed_of(calls, breakdown.plan ?? [])
-	const timed = placed.flatMap(([call, span]) => timed_part(call, span, TOOL_KINDS))
+	const timed = plan_parts(calls, breakdown)
 
 	return lane_breakdown_calls.with_lint_detail(lane_breakdown_calls.top_of(timed), timed)
+}
+
+// The start to plan's time no timed call and no wait covered (joshuafolkken/kit#6119), and the calls
+// backgrounded in it, whose waits fall in that time — `undefined` when no calls were read: its time is
+// not known to be off-call.
+function plan_outside(
+	calls: ReadonlyArray<ToolCall>,
+	breakdown: Breakdown,
+): PlanOutside | undefined {
+	if (calls.length === 0) return undefined
+
+	const spans = breakdown.plan ?? []
+
+	return {
+		ms: remainder_ms(plan_parts(calls, breakdown), spans, breakdown.waits),
+		background: placed_of(calls, spans).filter(([call]) => call.background).length,
+	}
 }
 
 // The calls run inside `spans`, by the implementation's kinds and an edit's own — the fixes, re-ships,
@@ -267,9 +295,10 @@ const lane_breakdown_implement = {
 	first_edit_ms,
 	of,
 	plan_calls,
+	plan_outside,
 	read,
 	transcript_directories,
 }
 
 export { lane_breakdown_implement }
-export type { ImplementDetail }
+export type { ImplementDetail, PlanOutside }

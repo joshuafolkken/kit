@@ -1,6 +1,10 @@
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
-import { lane_breakdown_implement, type ImplementDetail } from './lane-breakdown-implement'
+import {
+	lane_breakdown_implement,
+	type ImplementDetail,
+	type PlanOutside,
+} from './lane-breakdown-implement'
 import { lane_breakdown_laps, type Laps } from './lane-breakdown-laps'
 import { lane_breakdown_pinned } from './lane-breakdown-pinned'
 import { lane_breakdown_related } from './lane-breakdown-related'
@@ -19,6 +23,7 @@ const YIELDED = 'of which yield wait'
 const HOLDER = 'yield wait: holder remaining'
 const GAP = 'yield wait: redispatch gap (offer + launch)'
 const UNSPLIT = 'yield wait: no holder named, unsplit'
+const OUTSIDE = 'outside calls'
 
 interface Report {
 	breakdown: Breakdown
@@ -35,6 +40,9 @@ interface Report {
 	laps?: Laps
 	// The start to plan's longest call groups (joshuafolkken/kit#5539).
 	plan_calls?: ReadonlyArray<CallGroup>
+	// The start to plan's time outside every call and wait, absent when no calls were read
+	// (joshuafolkken/kit#6119).
+	plan_outside?: PlanOutside | undefined
 }
 
 // A stage's line, the laps printed under it, and the call groups printed under it in the bullets
@@ -90,9 +98,23 @@ function reason_text(reason: string | undefined): string {
 	return reason === undefined ? '' : ` (${reason})`
 }
 
+// The start to plan's time outside its calls, and the backgrounded calls whose waits it holds,
+// `undefined` when it is not known.
+function outside_text(outside: PlanOutside | undefined): string | undefined {
+	if (outside === undefined) return undefined
+
+	const minutes = `${OUTSIDE} ${lane_breakdown.minutes_text(outside.ms)}`
+	const count = String(outside.background)
+	const background =
+		outside.background > 0 ? [`${count} backgrounded calls, their waits in it`] : []
+
+	return ` (${[minutes, ...background].join(', ')})`
+}
+
 // The detail a stage's line carries after its minutes, `''` for a stage with none.
 function suffix_of(name: string, report: Report): string {
 	const suffixes: Record<string, string | undefined> = {
+		[lane_breakdown.PLAN_STAGE]: outside_text(report.plan_outside),
 		[lane_breakdown.IMPLEMENT_STAGE]: detail_text(report.detail),
 		[lane_breakdown.PRE_DETACH_STAGE]: report.pinned,
 		[lane_breakdown.FOLLOWUP_STAGE]: report.critical,
@@ -195,6 +217,7 @@ function report_of(
 		related: lane_breakdown_related.over_cap_text(entries, issue),
 		critical: lane_ci_path_stats.last_check_text(entries, issue),
 		plan_calls: lane_breakdown_implement.plan_calls(calls, breakdown),
+		plan_outside: lane_breakdown_implement.plan_outside(calls, breakdown),
 	}
 }
 
