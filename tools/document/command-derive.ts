@@ -8,9 +8,8 @@ import { generate_command_usage } from './generate-command-usage'
 import { generate_lint_prose } from './generate-lint-prose'
 import { usage_span_placement } from './usage-span-placement'
 
-// `josh command:derive` — write every artifact derived from the command map and the lint prose spans
-// derived from the lint config in one run, then print
-// each written page's bytes beside its ceiling.
+// `josh command:derive` — write every artifact derived from the command map, and the lint prose spans
+// derived from the lint config, in one run, then print each command page's bytes beside its ceiling.
 
 const { page_path, USAGE_PAGES } = generate_command_usage
 const CATALOG_PAGE = 'docs/josh-command-catalog.md'
@@ -27,12 +26,18 @@ function write_usage_pages(pages: ReadonlyMap<string, string>): void {
 	}
 }
 
-function write_lint_prose_pages(): void {
-	for (const page of generate_lint_prose.LINT_PROSE_PAGES) {
-		const text = readFileSync(page_path(page), 'utf8')
+// Filled before anything is written: a span the lint config cannot render throws here, not midway.
+function filled_lint_prose_pages(): ReadonlyMap<string, string> {
+	return new Map(
+		generate_lint_prose.LINT_PROSE_PAGES.map((page) => [
+			page,
+			generate_lint_prose.fill_lint_spans(readFileSync(page_path(page), 'utf8')),
+		]),
+	)
+}
 
-		writeFileSync(page_path(page), generate_lint_prose.fill_lint_spans(text))
-	}
+function write_pages(pages: ReadonlyMap<string, string>): void {
+	for (const [page, text] of pages) writeFileSync(page_path(page), text)
 }
 
 // Non-zero when a written page is over its ceiling, so the run names the page to shrink.
@@ -60,9 +65,11 @@ function main(): number {
 		return 1
 	}
 
+	const lint_prose_pages = filled_lint_prose_pages()
+
 	write_usage_pages(pages)
 	writeFileSync(CATALOG_FILE, generate_catalog())
-	write_lint_prose_pages()
+	write_pages(lint_prose_pages)
 
 	return report_bytes()
 }
