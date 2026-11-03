@@ -1,0 +1,7 @@
+{
+	"reason": "#6050 adds the workflow-edit pretool-guard row (a new security guard) and the shared shell-redirects reading it uses with protected-files",
+	"date": "2026-11-03",
+	"growth": {
+		"scripts.code_lines": 101
+	}
+}
