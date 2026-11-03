@@ -121,6 +121,7 @@ function restore(
 }
 
 export const backlog_drive_restore = {
+	DONE_KINDS,
 	active_issues,
 	mentioned_issues,
 	offer_exclude,

@@ -48,7 +48,8 @@ turn, and the resumed run does not see the notice:
 - Keep it one Issue — it must land together: one Issue comment with the line
   `- 分割しない理由: <理由>`, citing the counts.
 - Carve the rest out — the unimplemented part merges separately: `pnpm josh issue:file --route split --found-during <N>`
-  it, narrow this Issue's acceptance criteria to this branch, then gate.
+  it, narrow this Issue's acceptance criteria to this branch, then gate. On its direction refusal →
+  `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.
 
 Neither on record: the pre-gate `run:cut` answers `split-unresolved`. The notice never creates an epic.
 

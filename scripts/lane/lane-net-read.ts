@@ -25,6 +25,14 @@ async function read_events(context: ReadContext): Promise<ReadonlyArray<RunEvent
 	return await run_event_stream_emit.all_events()
 }
 
+// The ledger beside the event stream — the records `lane:stats --sinks` and `--over` read.
+async function read_records(context: ReadContext): Promise<{
+	entries: ReturnType<typeof lane_ledger.read_entries>
+	events: ReadonlyArray<RunEvent>
+}> {
+	return { entries: await read_ledger(context), events: await read_events(context) }
+}
+
 // The lane's net minutes, whole; `undefined` when the ledger holds no dispatch and merge of it.
 async function net_minutes_of(
 	issue: number,
@@ -39,6 +47,7 @@ const lane_net_read = {
 	net_minutes_of,
 	read_events,
 	read_ledger,
+	read_records,
 }
 
 export { lane_net_read }

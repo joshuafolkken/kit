@@ -117,7 +117,7 @@ Four steps, in order: set the work aside — on `<issue>`'s own lane branch (`<i
 
 ## `josh run:cut` in detail
 
-The relaunched child is started at the **effort of the phase it resumes into**: a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while an `--impl` resume into implementation keeps the role default. A stored lane profile takes the phase's effort and keeps its model unless the phase's own model key (`JOSH_WORKER_SHIP_MODEL` for pre-gate) is set, and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names live in `scripts/agent/agent-profile-schema.ts` and the phase→effort and phase→model tables in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
+The relaunched child is started at the **effort of the phase it resumes into**: a pre-gate resume drives the gate, commit, PR and merge — the mechanical ship/bookkeeping region, lowered — while an `--impl` resume into implementation keeps the role default. A stored lane profile takes the phase's effort and the phase's model where the phase has one — pre-gate runs on `claude-sonnet-5-5`, overridden by `JOSH_WORKER_SHIP_MODEL`; a Codex lane keeps its model — and a person's `JOSH_WORKER_EFFORT` still wins over the phase value. The phase names live in `scripts/agent/agent-profile-schema.ts` and the phase→effort and phase→model tables in `scripts/agent/agent-role-profile.ts`, single-sourced so the phase a cut records and the phase the effort is keyed on cannot drift.
 
 Output / exit codes: stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready` (clean or default-branch tree), `busy`, `failed`, or `bad-handoff` (an unreadable or oversized `--handoff`, or an `--impl` cut given none — its resume would answer `incomplete` — or one over a review round attested on the branch but neither `review:record`ed nor carried under the handoff's `findings`). `--setup` is a usage error: a lane child's context is bounded by the threshold-gated implementation cut alone ("`josh run:cut` lost its setup-phase cut" above). `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` (matched the tree but carried no instruction), or `over` (an implementation cut asked for by a session still over the context-cut threshold; the record is kept for a fresh session).
 
@@ -207,6 +207,15 @@ Open and close a lane: one linked git work tree with its own branch and its own 
 Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch, ship stages and ship stops, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n> | --sinks [<minutes>]]` prints a period as one table row, under it the median and maximum of each stage of a lane, and under those how long a stopped `josh ship` waited to resume, per stop reason. Procedure and columns: [lane-limit-measurement.md](./lane-limit-measurement.md).
 
 The gap table (`lane-gap-stats.ts`) times each wait on the lane machinery rather than on work. Its `start → first lane` row runs from a `backlogrun` session's `starting session` to its first `opening lane`, read off the run-event stream (`run_event_setup.first_lane_spans`); `run:board` draws the newest session's span as `🛫` on the header's first line, once that first opening began.
+
+Under its `yield → redispatch` row, four rows split each yield by where its wait went (`lane-yield-split.ts`, joshuafolkken/kit#5984):
+
+- `yield: holder running` — until the lane of the issue the yield note names as the holder ended: its `merge` line, or an event `backlog:drive` reads as a finished lane (`merge`, `park`, `human-review`, `split`, `withdraw`); a redispatch before any of them ends it there.
+- `yield: offer wait` — from that end until the driver opened a lane for the yielded issue (`opening lane #N`), any `offer:watch:*` hold included.
+- `yield: launch` — from that opening until the issue's `dispatch` line.
+- `yield: holder unknown` — a note naming no holder, counted whole, so its count and the holder count add up to the yield row's.
+
+A part nothing ended is counted as not ended, and the parts after it are absent.
 
 ## `josh lane:net` in detail
 

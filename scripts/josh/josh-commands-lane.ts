@@ -246,10 +246,10 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			"Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals of the lanes over a net-minute threshold",
+			"Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals, or with --over the ledger chains, of the lanes over a net-minute threshold",
 		category: 'AI tools',
 		reference: [
-			'--period <days> [--limit <lane-limit> | --sinks [<minutes>]]',
+			'--period <days> [--limit <lane-limit> | --sinks [<minutes>] | --over <minutes>]',
 			'maintainer',
 			['none'],
 		],
@@ -258,6 +258,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '--period 7', note: "a 7-day period's stage medians and maxima" },
 				{ arguments: '--period 1 --sinks', note: 'stage totals of the lanes over 30 net min' },
+				{ arguments: '--period 1 --over 40', note: 'ledger chains of lanes over 40 net min' },
 			],
 		},
 	},

@@ -1,4 +1,4 @@
-import { followup_section } from '#scripts/followup/followup-section'
+import { followup_ship_environment } from '#scripts/followup/followup-ship-environment'
 import { git_gh_code_scanning } from '#scripts/gh/git-gh-code-scanning'
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import {
@@ -306,7 +306,7 @@ async function marked_followup(
 			['followup', title, ...notify],
 			should_forward_stderr,
 			undefined,
-			followup_section.SHIPPED_ENVIRONMENT,
+			followup_ship_environment.SHIPPED_ENVIRONMENT,
 		)
 	} finally {
 		mark(false)

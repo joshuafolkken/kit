@@ -1129,7 +1129,9 @@ version is checked against the model it will run: `claude-opus-5-5` needs Claude
 refuses launch with that update named — never a quiet switch to an older model. A lane keeps the
 profile it recorded at dispatch: a cut, resume or wake of a lane created before a migration stays on
 its recorded model (a model the floor table does not name is not version-checked), and only a newly
-dispatched lane takes the new default. `JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
+dispatched lane takes the new default. The one exception is a pre-gate cut of a Claude lane: it moves
+to the ship phase's default, `claude-sonnet-5-5`, or to `JOSH_WORKER_SHIP_MODEL` when that is set.
+`JOSH_{ROLE}_MODEL` overrides reach new Claude Code launches
 only; they never rewrite a recorded lane. Legacy
 `JOSH_LANE_MODEL/EFFORT` is worker-only; migrate to `JOSH_WORKER_MODEL/EFFORT`.
 
@@ -1188,11 +1190,12 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals of the lanes over a net-minute threshold.
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals, or with --over the ledger chains, of the lanes over a net-minute threshold.
 
 ```bash
-pnpm josh lane:stats --period 7           # a 7-day period's stage medians and maxima
-pnpm josh lane:stats --period 1 --sinks   # stage totals of the lanes over 30 net min
+pnpm josh lane:stats --period 7             # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 1 --sinks     # stage totals of the lanes over 30 net min
+pnpm josh lane:stats --period 1 --over 40   # ledger chains of lanes over 40 net min
 ```
 
 <!-- /usage -->
@@ -1203,6 +1206,15 @@ lanes over that many net minutes, the total, the lane count and the median per l
 
 The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive), from one
 listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`).
+
+`--over <minutes>` prints one row per merged lane of the period over that many net minutes, the longest first: its
+net and waited minutes, the ledger chain behind them, its longest stage and the open Issues that stage matches as
+`--sinks` matches a row (`lane-over.ts`).
+
+The chain names `split-notice ×N`, `split-filed <child>`, `round 1 blocking`, `unplanned-notice ×N`, each yield's
+holder and redispatch gap (`dispatched before holder end` when the lane came back first, `gap open` while either is
+pending) and each `hub over cap <file>` of
+`test:related`.
 
 A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
 only, not by Bash kind, since a transcript call names no lane.
