@@ -4,13 +4,17 @@ import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { session_cite } from '#scripts/issue/session-cite'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { file_reader } from '#scripts/lib/read-file'
 
 // **A split whose kept Issue depends on what it splits off** (joshuafolkken/kit#5985) — the reverse of
 // `epic-split-reach.ts`. joshuafolkken/kit#5953 filed the `run:entry` relay off as an independent
 // split, while the criteria it kept still needed the relay: review round 1 blocked, and the file came
 // back. Before a `josh issue:file --route split --found-during <N>` lands, the
-// kept Issue's expected result and criteria are read for the module names of the files the child
-// declares; a hit refuses the independent split and points at `run:split --prerequisite`.
+// kept Issue's expected result and criteria are read for the names of the files the child declares —
+// each file's module name and the `josh` commands it registers or names (joshuafolkken/kit#5992:
+// #5953's criteria named `run:cut`, which the relay passes on, and never its module); a hit refuses
+// the independent split and points at `run:split --prerequisite`.
 
 const KEPT_HEADINGS = ['## 期待結果', '## 受け入れ条件']
 const CODE_SPAN = /`([^`]+)`/gu
@@ -18,6 +22,9 @@ const NOT_A_NAME = /[\s:]/u
 const LINE_SUFFIX = /:\d+(?:[-:]\d+)?$/u
 const SEPARATOR = '/'
 const EXTENSION = /\.[^.]*$/u
+const WORD = /\s+/u
+const COMMAND_WORD = /[\w:-]+/gu
+const COMMAND_SEPARATOR = ':'
 
 interface SplitFiling {
 	route: string | undefined
@@ -26,7 +33,7 @@ interface SplitFiling {
 
 interface Reference {
 	path: string
-	module: string
+	name: string
 }
 
 // `run_entry_cli` and `run-entry-cli` name the same module.
@@ -49,28 +56,54 @@ function stem_of(span: string): string | undefined {
 	return stem === '' ? undefined : normalized(stem)
 }
 
+function is_command(word: string): boolean {
+	return word.includes(COMMAND_SEPARATOR) && Object.hasOwn(COMMAND_MAP, word)
+}
+
+// The `josh` commands a span's words name: `pnpm josh run:cut --resume <N>` names `run:cut`.
+function commands_of(span: string): Array<string> {
+	return span.split(WORD).filter((word) => is_command(word))
+}
+
 // The names the kept Issue's expected result and criteria write in code spans.
 function kept_names(body: string): ReadonlySet<string> {
 	const text = KEPT_HEADINGS.flatMap((heading) => markdown_section.section_lines(body, heading))
 	const spans = [...text.join('\n').matchAll(CODE_SPAN)].map((match) => match[1] ?? '')
+	const stems = spans.map((span) => stem_of(span)).filter((stem) => stem !== undefined)
 
-	return new Set(spans.map((span) => stem_of(span)).filter((stem) => stem !== undefined))
+	return new Set([...stems, ...spans.flatMap((span) => commands_of(span))])
 }
 
-// Each file `child_body` declares whose module name the kept Issue's criteria name.
+// The commands that run `path`, and the commands its source names — an absent file names none.
+function commands_for(path: string): Array<string> {
+	const registered = Object.entries(COMMAND_MAP)
+		.filter(([, entry]) => entry.script === path)
+		.map(([command]) => command)
+	const source = file_reader.read_if_readable(path) ?? ''
+	const named = [...source.matchAll(COMMAND_WORD)].map((match) => match[0])
+
+	return [...new Set([...registered, ...named.filter((word) => is_command(word))])]
+}
+
+// The names a split-off file goes by: its module name, then its commands.
+function names_of(path: string): Array<string> {
+	return [module_of(path), ...commands_for(path)]
+}
+
+// The first name of each file `child_body` declares that the kept Issue's criteria name.
 function references(kept_body: string, child_body: string): Array<Reference> {
-	const names = kept_names(kept_body)
+	const kept = kept_names(kept_body)
 	const files = [...backlog_overlap.declared_paths(child_body)].filter(
 		(path) => !path.endsWith(SEPARATOR),
 	)
 
 	return files
-		.map((path) => ({ path, module: module_of(path) }))
-		.filter((reference) => names.has(reference.module))
+		.map((path) => ({ path, name: names_of(path).find((candidate) => kept.has(candidate)) ?? '' }))
+		.filter((reference) => reference.name !== '')
 }
 
 function format_refusal(kept: string, found: ReadonlyArray<Reference>): string {
-	const named = found.map(({ path, module }) => `\`${module}\` (\`${path}\`)`).join(', ')
+	const named = found.map(({ path, name }) => `\`${name}\` (\`${path}\`)`).join(', ')
 
 	return [
 		`✖ ${session_cite.issue(kept)}'s expected result or acceptance criteria name what this split takes off: ${named}. The kept Issue depends on the split-off part, so it cannot merge first.`,
