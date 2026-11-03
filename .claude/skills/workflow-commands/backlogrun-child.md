@@ -27,7 +27,7 @@ or more always means an epic", then
 - **Every guard applies unchanged** (`backlogrun.md` → "Guards").
 - **`fullrun` does not promote itself** — it files and **stops** (`split-assessment.md` → "Finding a
   split mid-run stops the run").
-- **A bare Issue named beside an epic is a mistyped command.** Named alone, the refusal is the answer;
+- **A bare Issue named beside an epic is a mistyped command.** Named alone, `epic:next`'s refusal is the answer;
   among several, it is **skipped** — `backlogrun #<E> --only #<N>` exits 0, notes the skip on stderr
   and **never runs `#<N>`**. To do both, type `backlogrun #<N>` after the epic.
 
