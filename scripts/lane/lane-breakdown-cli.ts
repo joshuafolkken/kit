@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { lane_breakdown } from './lane-breakdown'
+import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text } from './lane-breakdown-text'
 import { lane_cut_stats } from './lane-cut-stats'
 import { lane_ledger } from './lane-ledger'
@@ -33,7 +33,7 @@ function missing(issue: string): number {
 async function print(issue: string): Promise<number> {
 	const [entries, events] = [await read_ledger(), await run_event_stream_emit.all_events()]
 	const minutes = lane_net_time.net_minutes(entries, events, Number(issue))
-	const breakdown = lane_breakdown.of(entries, events, Number(issue))
+	const breakdown = lane_breakdown_implement.breakdown_of(entries, events, Number(issue))
 
 	if (minutes === undefined || breakdown === undefined) return missing(issue)
 

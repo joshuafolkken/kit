@@ -396,6 +396,8 @@ Prints `ok` and the labels to apply when the headings and one `- 種別:` declar
 
 A `実施可能条件` or `実施可能日` heading exits 1 and shows the `## 背景` declaration line to write instead.
 
+A `- 実施可能条件:` whose K is over 30 exits 1; its paste-ready line uses K = 10. In a body with `- 計測宣言:` or `- 計測宣言なし:`, a `- 実施可能日:` more than 7 days after now (the filing time) exits 1 with a date 7 days ahead, and one beside a `- 実施可能条件:` exits 1.
+
 A non-epic body without a well-formed `- 規模見積もり: 約 <N> ファイル / <M> 行（テスト除く）` line under `## 背景` exits 1. An epic (a body with `## Split rationale`) declares none.
 
 A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベースライン` (a re-runnable `` `<command>` → <value> ``) and `## 再現` (a command with its actual output). [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline after merge.

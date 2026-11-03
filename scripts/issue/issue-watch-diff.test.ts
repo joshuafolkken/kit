@@ -260,3 +260,24 @@ describe('issue_watch_diff.baseline_of', () => {
 		expect(issue_watch_diff.baseline_of(snapshot()).last_comment_id).toBe(0)
 	})
 })
+
+describe('issue_watch_diff.landed_times', () => {
+	const BODY_AT = '2026-10-14T01:00:00Z'
+
+	it('answers a new person comment alone with its created_at, not the issue time', () => {
+		const comments = [comment({}), comment({ id: BASELINE_COMMENT_ID, created_at: BODY_AT })]
+
+		expect(
+			issue_watch_diff.landed_times(baseline(), snapshot({ comments }), BODY_AT),
+		).toStrictEqual([CREATED_AT])
+	})
+
+	it('adds the issue time when the body changed', () => {
+		const edited = snapshot({ body: EDITED_BODY, comments: [comment({})] })
+
+		expect(issue_watch_diff.landed_times(baseline(), edited, BODY_AT)).toStrictEqual([
+			BODY_AT,
+			CREATED_AT,
+		])
+	})
+})

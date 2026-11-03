@@ -232,21 +232,37 @@ describe('the sample declaration in issue:lint', () => {
 		expect(issue_lint_cli.problems(body)).toEqual([])
 	})
 
-	it.each(['#4313 のマージ後 0 マージ', '4313 のマージ後 3 マージ', '#4313 の 3 日後', ''])(
-		'refuses %j',
-		(value) => {
-			const found = issue_lint_cli.problems(body_with(`- 実施可能条件: ${value}`))
+	// joshuafolkken/kit#6007: K is capped at 30.
+	it.each(['#4313 のマージ後 30 マージ', '#4313 のマージ後 10 マージ'])('accepts %j', (value) => {
+		expect(issue_lint_cli.problems(body_with(`- 実施可能条件: ${value}`))).toEqual([])
+	})
 
-			expect(found).toEqual([expect.stringContaining(issue_sample_gate.CLOSING_FORMAT)])
-		},
-	)
+	// An issue filed before the cap keeps waiting on its condition rather than being released.
+	it('still reads a condition over the cap it refuses', () => {
+		const body = body_with('- 実施可能条件: #4313 のマージ後 40 マージ')
+
+		expect(issue_sample_gate.cited_number(body)).toBe(4313)
+		expect(issue_sample_gate.problems(body)).not.toEqual([])
+	})
+
+	it.each([
+		'#4313 のマージ後 0 マージ',
+		'#4313 のマージ後 31 マージ',
+		'4313 のマージ後 3 マージ',
+		'#4313 の 3 日後',
+		'',
+	])('refuses %j', (value) => {
+		const found = issue_lint_cli.problems(body_with(`- 実施可能条件: ${value}`))
+
+		expect(found).toEqual([expect.stringContaining(issue_sample_gate.CLOSING_FORMAT)])
+	})
 
 	// joshuafolkken/kit#5225: the refusal's last line is an example the lint admits as pasted.
 	it('ends the refusal in a one-line example the lint admits', () => {
 		const [found = ''] = issue_lint_cli.problems(body_with('- 実施可能条件: soon'))
 		const example = found.split('\n').at(-1) ?? ''
 
-		expect(example).toBe('- 実施可能条件: #5198 のマージ後 30 マージ')
+		expect(example).toBe('- 実施可能条件: #5198 のマージ後 10 マージ')
 		expect(issue_lint_cli.problems(body_with(example))).toEqual([])
 	})
 })

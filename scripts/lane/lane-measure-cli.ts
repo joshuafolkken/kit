@@ -8,6 +8,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { lane_capacity } from './lane-capacity'
 import { lane_net_read } from './lane-net-read'
+import { lane_over } from './lane-over'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_sinks } from './lane-sinks'
 import { lane_sinks_issues } from './lane-sinks-issues'
@@ -42,6 +43,7 @@ const USAGE = [
 	'Usage: josh lane:sample [--every <seconds>]',
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
 	'       josh lane:stats --period <days> --sinks [<minutes>]',
+	'       josh lane:stats --period <days> --over <minutes>',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
 	`       josh lane:value ${CELL_METRIC} --table <title> [--row <label>] [--where <header>=<text>] --column <header> [--item <label>] [--zero] --since <instant>`,
 	'       josh lane:net <issue>',
@@ -52,6 +54,7 @@ const STATS_OPTIONS = {
 	period: { type: 'string' },
 	limit: { type: 'string' },
 	sinks: { type: 'boolean' },
+	over: { type: 'string' },
 } as const
 const VALUE_OPTIONS = {
 	since: { type: 'string' },
@@ -151,6 +154,8 @@ interface StatsRequest {
 	limit: string | undefined
 	// The `--sinks` threshold in minutes, `undefined` for the period's row and tables.
 	sinks: number | undefined
+	// The `--over` threshold in minutes, `undefined` without the flag.
+	over: number | undefined
 }
 
 // The sinks table labels no lane limit, so `--limit` beside `--sinks` is refused.
@@ -181,6 +186,20 @@ function sink_choice(
 	return positionals.length === 0 ? { minutes: undefined } : undefined
 }
 
+// `--over` reads a positive threshold and labels no lane limit nor sink, so either beside it is refused.
+function over_choice(values: {
+	over?: string | undefined
+	sinks?: boolean | undefined
+	limit?: string | undefined
+}): { minutes: number | undefined } | undefined {
+	if (values.over === undefined) return { minutes: undefined }
+
+	const minutes = positive(values.over)
+	const is_alone = values.sinks !== true && values.limit === undefined
+
+	return minutes === undefined || !is_alone ? undefined : { minutes }
+}
+
 function stats_request(rest: ReadonlyArray<string>): StatsRequest | undefined {
 	const parsed = cli_flags.arguments_of(rest, STATS_OPTIONS)
 
@@ -188,27 +207,37 @@ function stats_request(rest: ReadonlyArray<string>): StatsRequest | undefined {
 
 	const period_days = positive(parsed.values.period)
 	const choice = sink_choice(parsed.values, parsed.positionals)
+	const over = over_choice(parsed.values)
 
-	if (period_days === undefined || choice === undefined) return undefined
+	if (period_days === undefined || choice === undefined || over === undefined) return undefined
 
-	return { period_days, limit: parsed.values.limit, sinks: choice.minutes }
+	return { period_days, limit: parsed.values.limit, sinks: choice.minutes, over: over.minutes }
 }
 
-// The sinks table reads the ledger and the event stream alone — no lane's transcript (`lane-sinks.ts`).
+type LedgerTable = typeof lane_sinks.table
+
+// The `--over` or `--sinks` table with its threshold, `undefined` for the period's row and tables.
+function table_choice(request: StatsRequest): { table: LedgerTable; minutes: number } | undefined {
+	if (request.over !== undefined) return { table: lane_over.table, minutes: request.over }
+
+	return request.sinks === undefined
+		? undefined
+		: { table: lane_sinks.table, minutes: request.sinks }
+}
+
 async function stats_text(
 	request: StatsRequest,
 	context: MeasureContext,
 	window: StatsWindow,
 ): Promise<string> {
-	if (request.sinks !== undefined) {
-		const sources = {
-			entries: await lane_net_read.read_ledger(context),
-			events: await lane_net_read.read_events(context),
-		}
+	const choice = table_choice(request)
 
+	// The ledger and the event stream alone — no lane's transcript (`lane-sinks.ts`, `lane-over.ts`).
+	if (choice !== undefined) {
+		const sources = await lane_net_read.read_records(context)
 		const issues = await lane_sinks_issues.read()
 
-		return session_cite.text(lane_sinks.table(sources, window, request.sinks, issues))
+		return session_cite.text(choice.table(sources, window, choice.minutes, issues))
 	}
 
 	const records = await period_records(context, window)
