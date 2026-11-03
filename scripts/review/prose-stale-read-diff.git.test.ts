@@ -116,3 +116,21 @@ describe('prose_stale_read.references — a name an unchanged line still declare
 		TIMEOUT_MS,
 	)
 })
+
+// joshuafolkken/kit#6130: a deleted file's local name is not searched; its exported one is.
+describe('prose_stale_read.references — a deleted file', () => {
+	it(
+		'reports the exported name prose still carries, not the local one',
+		async () => {
+			await write(GONE_CODE, 'function count(): number {}\nexport function gone_name(): void {}\n')
+			await write('docs/c.md', 'count gone_name\n')
+			await commit('gone')
+			await rm(path.join(fixture.root, GONE_CODE))
+
+			const found = await found_references()
+
+			expect(prose_stale_scan.report(found).text).toBe('docs/c.md:1 name gone_name')
+		},
+		TIMEOUT_MS,
+	)
+})

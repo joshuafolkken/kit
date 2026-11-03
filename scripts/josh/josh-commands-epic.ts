@@ -42,7 +42,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--rationale-file <path|->'],
-					description: 'split rationale prose (`-` reads stdin).',
+					description: 'split rationale prose, written under `.josh/tmp/` (`-` reads stdin).',
 				},
 				{
 					names: ['--origin <owner/repo#N>'],
@@ -73,7 +73,8 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--decision-file <path|->'],
-					description: 'with `--add`: record why the child was placed.',
+					description:
+						'with `--add`: record why the child was placed, written under `.josh/tmp/` (`-` reads stdin).',
 				},
 				{
 					names: ['--remove <E> <M> <N> [<N2> …]'],
