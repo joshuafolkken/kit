@@ -16,7 +16,12 @@ vi.mock('#scripts/gh/git-gh-code-scanning', () => ({
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch: async () => '3221-lane' } }))
 vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
-vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_gate: scoped_mock } }))
+vi.mock('./run-ship-scoped', () => ({
+	run_ship_scoped: {
+		scoped_gate: scoped_mock,
+		scoped_pair: async (): Promise<{ code: number; out: string }> => ({ code: 0, out: '' }),
+	},
+}))
 const { run_ship_sync } = await import('./run-ship-sync')
 
 // joshuafolkken/kit#3221: `josh ship` merges the default branch again before the gate and on a

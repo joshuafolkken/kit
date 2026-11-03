@@ -5,6 +5,7 @@ import { gate_plan } from '#scripts/gate/gate-plan'
 import { gate_skip, type GateReuse } from '#scripts/gate/gate-skip'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { hook_gate_reuse } from '#scripts/gate/hook-gate-reuse'
+import { scoped_green, type ScopedSources } from '#scripts/gate/scoped-green'
 import type { PushMissRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
@@ -183,27 +184,62 @@ async function record_miss(scope: PushMissRecord['scope'], kind: string): Promis
 	await lane_ledger_write.record_push_miss({ scope, reason: kind })
 }
 
-async function run_miss(
-	reason: string,
-	kind: string,
-	extra_arguments: ReadonlyArray<string>,
-): Promise<number> {
-	if (is_related_requested(extra_arguments)) {
-		process.stdout.write(`${format_related(reason)}\n`)
-		await record_miss('related', kind)
+interface PushMiss {
+	reason: string
+	kind: string
+	extra_arguments: ReadonlyArray<string>
+	tree: PushTree
+	// The scoped records to read, overridable for the same reason `source` is.
+	scoped: ScopedSources | undefined
+}
 
-		return await run_related()
+// joshuafolkken/kit#6121: a round-2 fix leaves the gate's record on an older tree while the scoped
+// pair is green on the pushed one, so the related run asks `test:related`'s own record before
+// re-running it. The match is `scoped_green.green_scripts`, the one the scoped pair's re-run reads,
+// and a push still requires a clean tree so HEAD is the tree that record describes.
+function is_related_green(tree: PushTree, scoped: ScopedSources | undefined): boolean {
+	if (!tree.is_clean) return false
+
+	return scoped_green
+		.green_scripts(tree.files, tree.base, scoped)
+		.includes(scoped_green.TEST_SCRIPT)
+}
+
+function format_related_reuse(): string {
+	return (
+		`✔ the related unit tests already passed on this tree (\`${scoped_green.TEST_COMMAND}\`), ` +
+		'and this push carries that same tree.\n' +
+		'  Reusing that result; nothing was re-run. ' +
+		`\`${FORCE_ENV}=1 git push\` runs the whole suite anyway.`
+	)
+}
+
+async function run_related_miss(miss: PushMiss): Promise<number> {
+	if (is_related_green(miss.tree, miss.scoped)) {
+		process.stdout.write(`${format_related_reuse()}\n`)
+
+		return 0
 	}
 
-	process.stdout.write(`${format_miss(reason)}\n`)
-	await record_miss('whole', kind)
+	process.stdout.write(`${format_related(miss.reason)}\n`)
+	await record_miss('related', miss.kind)
 
-	return await run_reserved_suite(forwarded_arguments(extra_arguments))
+	return await run_related()
+}
+
+async function run_miss(miss: PushMiss): Promise<number> {
+	if (is_related_requested(miss.extra_arguments)) return await run_related_miss(miss)
+
+	process.stdout.write(`${format_miss(miss.reason)}\n`)
+	await record_miss('whole', miss.kind)
+
+	return await run_reserved_suite(forwarded_arguments(miss.extra_arguments))
 }
 
 async function run_pre_push_unit(
 	extra_arguments: ReadonlyArray<string> = [],
 	source?: string,
+	scoped?: ScopedSources,
 ): Promise<number> {
 	const tree = await read_push_tree()
 	const reuse = push_reuse(tree, extra_arguments, source)
@@ -214,7 +250,7 @@ async function run_pre_push_unit(
 			force_env: FORCE_ENV,
 		})
 
-		return await run_miss(reuse.miss, kind, extra_arguments)
+		return await run_miss({ reason: reuse.miss, kind, extra_arguments, tree, scoped })
 	}
 
 	process.stdout.write(`${format_skip(reuse.stamp.taken_at)}\n`)
