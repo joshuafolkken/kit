@@ -1,10 +1,8 @@
 # Code Review Rubric
 
 The rubric the reviewer applies: severity, output format, the nine categories and stop conditions.
-`pnpm josh review:brief` prints its absolute path for `/code-review`, which runs in a forked process
-reading no other repository document, so this file stands alone. Orchestration (when a review runs,
-which round is due, the gate, the PR) is in `prompts/review.md` and the `workflow-commands` skill,
-already resolved into the brief.
+It stands alone — the reviewer needs no other repository document; orchestration is already resolved
+into the brief.
 
 **Default hypothesis: this diff contains at least one non-trivial issue.** Your job is to find it, not
 to confirm correctness. Assume each category is wrong until proven otherwise; declare one clean only
@@ -15,14 +13,11 @@ the whole diff (see "The second round is a verification pass" below).
 
 ## Severity (decided by a test, never by discretion)
 
-`medium` blocks opening the PR, so a borderline `medium` costs a whole round — decide it by test.
-
 **A finding is `medium` or higher only when both of these hold:**
 
 1. **It reaches something real** — a runtime code path, a distributed artifact a consumer reads, or
    the verification that guards either (a test, fixture or CI check whose defect lets one of the first
-   two ship unnoticed). `package.json` does not ship `**/*.test.ts` or `**/*-fixture.ts`, so without
-   this third member a vacuous or wrongly-pinned suite could never exceed `low`.
+   two ship unnoticed).
 2. **You can write the concrete failure scenario** — the inputs or state, and the wrong output,
    breakage or misreading that follows. Not "this could be confusing": the actual sequence.
 
@@ -34,22 +29,16 @@ that passes test 1, and when the attempt fails write "no failure scenario — <w
 on a test-1 finding without that line is a skipped step.
 
 Distributed artifacts — `CLAUDE.md`, `prompts/**`, `.claude/**`, `docs/**` — are reviewed at the same
-level as runtime code: a dangling pointer or a citation naming the wrong file reaches every consumer,
-and no test covers prose.
+level as runtime code: a dangling pointer or a citation naming the wrong file is a defect.
 
-`high` is fixed before committing and blocks the merge regardless of round count. A `low` that fails
-test 1 (does not reach the user) may be dropped with a one-line reason; a `low` that passed test 1 and
-lacks only a failure scenario still reaches the user, so if it closes in a few lines inside a file the
-diff already touches, fix it.
+A `low` that fails test 1 may be dropped with a one-line reason; a `low` that passed test 1 and lacks
+only a failure scenario is fixed when it closes in a few lines inside a file the diff already touches.
 
 ---
 
 ## The second round is a verification pass, not a second full review
 
-Read twice under "assume it is wrong", one diff returns new findings whether or not the code changed,
-so round 2 asks a different question. **The question changes, never the standard**: a confirmed High
-still blocks the merge, the cap in `prompts/review.md` → "Review round cap" still holds, and every rule
-here applies unchanged.
+**The question changes, never the standard**: every rule here applies unchanged.
 
 |                | First round          | Second round                                                                                                          |
 | -------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -125,8 +114,6 @@ No issues — `parse_ids` returns what its name says; no near-copy of `split_ids
 ---
 
 ## Review categories (must all be checked)
-
-Round 1 checks all nine; round 2 checks category 1 plus the categories its fix delta touches.
 
 ### 1. Bug risks & logic errors
 
@@ -207,7 +194,7 @@ concerns"; if nothing is uncertain, trace the logic path that gives that confide
 - **A checkout that cannot be attested** (`pnpm josh review:attest <nonce>` exits non-zero) → report
   `REVIEW TARGET MISMATCH`, no findings and no verdict of any kind: the review read a tree the brief did
   not describe.
-- High findings → must fix before committing
+- High findings → must fix before committing; a High blocks the merge regardless of round count
 - Medium findings → must fix before opening the PR
 - A finding wholly covered by an open follow-up this Issue filed (a `先送り: #M <title>` comment on
   it, which `issue:file --found-during <N>` posts) → record it as `low` citing `#M`, never `medium`
