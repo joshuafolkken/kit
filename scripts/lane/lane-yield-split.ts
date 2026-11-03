@@ -116,20 +116,69 @@ function parts_of(note: RunEvent, wait: Span | undefined, points: YieldPoints): 
 		: [split_of(wait, [lane_stop_stats.issue_of(note), holder], points)]
 }
 
+// Every yield note in the stream, beside its wait (`undefined` when `yield_spans` found none).
+function notes_with_waits(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+): Array<{ note: RunEvent; wait: Span | undefined }> {
+	const waits = lane_net_time.yield_spans(entries, events)
+
+	return events
+		.filter((event) => lane_yield.is_yield_note(event))
+		.map((note, index) => ({ note, wait: waits[index] }))
+}
+
 // Every yield's wait with its parts. `yield_spans` keeps the notes' order, one wait per note.
 function parts(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
 ): Array<YieldParts> {
-	const waits = lane_net_time.yield_spans(entries, events)
 	const points = points_of(entries, events)
 
-	return events
-		.filter((event) => lane_yield.is_yield_note(event))
-		.flatMap((note, index) => parts_of(note, waits[index], points))
+	return notes_with_waits(entries, events).flatMap(({ note, wait }) => parts_of(note, wait, points))
 }
 
-const lane_yield_split = { parts }
+// The holder's end until the redispatch — the offer and launch parts together, an opening the
+// stream lacks included; `undefined` while the holder's lane or the redispatch has not happened.
+function gap_ms({ wait, offer }: YieldParts): number | undefined {
+	return offer === undefined || wait.end_ms === undefined ? undefined : wait.end_ms - offer.from_ms
+}
+
+// The yielder was dispatched again while its holder still ran, so no gap followed the holder's end.
+function is_early({ wait, holder, offer }: YieldParts): boolean {
+	return holder !== undefined && offer === undefined && wait.end_ms !== undefined
+}
+
+// One yield of `issue`: the holder it yielded to and the redispatch gap after the holder's end, or
+// `is_early` when the redispatch came first.
+interface IssueYield {
+	holder: number | undefined
+	gap_ms: number | undefined
+	is_early: boolean
+}
+
+function issue_yield(note: RunEvent, split: YieldParts | undefined): IssueYield {
+	return {
+		holder: holder_of(note),
+		gap_ms: split === undefined ? undefined : gap_ms(split),
+		is_early: split !== undefined && is_early(split),
+	}
+}
+
+// The yields `issue` took, in the notes' order (joshuafolkken/kit#5988).
+function of_issue(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+): Array<IssueYield> {
+	const points = points_of(entries, events)
+
+	return notes_with_waits(entries, events)
+		.filter(({ note }) => lane_stop_stats.issue_of(note) === issue)
+		.map(({ note, wait }) => issue_yield(note, parts_of(note, wait, points).at(0)))
+}
+
+const lane_yield_split = { parts, of_issue }
 
 export { lane_yield_split }
-export type { YieldParts }
+export type { IssueYield, YieldParts }
