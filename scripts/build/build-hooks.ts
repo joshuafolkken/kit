@@ -202,11 +202,12 @@ function place_build(out_directory: string, files: ReadonlyArray<OutputFile>, st
 // This script is an input too: it rewrites what it loads, so an edit to it changes the bundles while
 // every bundled source stays byte-identical. So is the toolchain (`toolchain-inputs.ts`): the manifest
 // maps the `#scripts/*` imports esbuild resolves, and the lockfile pins esbuild itself.
-function build_inputs(): Map<string, Uint8Array> {
+function build_inputs(build_script: string = BUILD_SCRIPT): Map<string, Uint8Array> {
 	const toolchain = toolchain_inputs.paths(PACKAGE_DIR)
 
 	return new Map<string, Uint8Array>([
 		[path.relative(PACKAGE_DIR, BUILD_SCRIPT), readFileSync(BUILD_SCRIPT)],
+		[path.relative(PACKAGE_DIR, build_script), readFileSync(build_script)],
 		...toolchain.map((input) => [input, readFileSync(path.join(PACKAGE_DIR, input))] as const),
 	])
 }
@@ -236,4 +237,14 @@ async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 }
 
 export type { HookBundle }
-export { build_hooks, HOOK_BUNDLES, INLINED_PACKAGES, OUT_DIR, outfile_for, STAGING_PREFIX }
+export {
+	build_hooks,
+	build_inputs,
+	place_build,
+	source_recorder,
+	HOOK_BUNDLES,
+	INLINED_PACKAGES,
+	OUT_DIR,
+	outfile_for,
+	STAGING_PREFIX,
+}
