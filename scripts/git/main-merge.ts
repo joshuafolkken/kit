@@ -162,7 +162,7 @@ function failure_text(outcome: MergeOutcome): string | undefined {
 // point a run can act on it.
 async function measured_notice(): Promise<string | undefined> {
 	const measurement = await split_measure.read_branch()
-	const notice = split_assess.notice(measurement)
+	const notice = split_assess.notice(measurement, await split_early_notice.declared())
 
 	if (notice !== undefined) await split_early_notice.record(measurement)
 

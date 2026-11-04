@@ -40,8 +40,9 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 ## Over the guide before the gate
 
 **Trigger: `pnpm josh main:merge` prints a `split notice`** — the branch's diff, untracked files
-included, answers `split` on `split:assess`; the first `pnpm josh lint:related` or `pnpm josh
-test:related` past the guide prints it earlier, once per Issue. Take one action on it, before `pnpm josh run:cut <N>`
+included, passes the Issue's declared size × the growth factor, capped at the guide (no declaration:
+the guide), on either axis; the first `pnpm josh lint:related` or `pnpm josh test:related` past that bar prints it earlier,
+once per Issue. Take one action on it, before `pnpm josh run:cut <N>`
 (`chain-rule.md` step 1; `run:chain` holds on it and names the cut to reissue) — the cut ends the
 turn, and the resumed run does not see the notice:
 

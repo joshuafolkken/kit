@@ -41,6 +41,8 @@ const { lane_install } = await import('#scripts/lane/lane-install')
 
 // The notice's ledger record; its marker and ledger writes are `split-early-notice.test.ts`'s.
 const record_notice = vi.spyOn(split_early_notice, 'record').mockResolvedValue()
+// The branch Issue's declared size, none by default so the guide is the bar.
+const declared_size = vi.spyOn(split_early_notice, 'declared').mockResolvedValue(undefined)
 
 const CHANGED_FILE = 'scripts/a.ts'
 const MODIFIED_STATUS = ` M ${CHANGED_FILE}`
@@ -315,6 +317,18 @@ describe('the split notice before the gate', () => {
 		await main_merge.run(NO_ARGUMENTS)
 
 		expect(record_notice).toHaveBeenCalledWith(expect.objectContaining({ files: OVER_GUIDE_FILES }))
+	})
+
+	// joshuafolkken/kit#6206: the branch Issue's declared size, grown, is the bar under the guide too.
+	it('warns past the declared size grown even under the guide', async () => {
+		declared_size.mockResolvedValueOnce({ files: 1, lines: 10 })
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(
+			`${UNDER_GUIDE_NUMSTAT}\n${String(LINES_PER_FILE)}\t0\tscripts/b.ts`,
+		)
+
+		await main_merge.run(NO_ARGUMENTS)
+
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('declared 1 files'))
 	})
 
 	it('prints nothing for a diff under the guide', async () => {

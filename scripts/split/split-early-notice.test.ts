@@ -21,12 +21,15 @@ vi.mock('#scripts/git/change-base', () => ({
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
+const { issue_declared_size } = await import('#scripts/issue/issue-declared-size')
 const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 const { split_assess } = await import('./split-assess')
 const { split_early_notice } = await import('./split-early-notice')
 const { split_measure } = await import('./split-measure')
 
 const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice')
+// The Issue body read; no declared size by default, so the guide is the bar.
+const read_declared = vi.spyOn(issue_declared_size, 'read')
 
 const ISSUE_NUMBER = 4642
 const ISSUE_BRANCH = `${String(ISSUE_NUMBER)}-lane`
@@ -59,10 +62,17 @@ beforeEach(() => {
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
 	vi.mocked(git_command.diff_numstat_since).mockResolvedValue(OVER_GUIDE_NUMSTAT)
 	record_split_notice.mockResolvedValue()
+	read_declared.mockResolvedValue(undefined)
 })
 
 afterEach(async () => {
 	await rm(marker(), { force: true })
+	await rm(
+		path.join(GIT_DIRECTORY, `${split_early_notice.DECLARED_PREFIX}${String(ISSUE_NUMBER)}`),
+		{
+			force: true,
+		},
+	)
 })
 
 afterAll(async () => {
@@ -138,6 +148,69 @@ describe('split_early_notice.surface under the guide', () => {
 		await split_early_notice.surface()
 
 		expect(console.warn).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6206: the bar is the branch Issue's declared size grown, under the guide too.
+describe('split_early_notice.surface against a declared size', () => {
+	it('shows the notice at 7 files for an issue declaring 3', async () => {
+		read_declared.mockResolvedValue({ files: 3, lines: 400 })
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(numstat_of(7))
+		await split_early_notice.surface()
+
+		expect(read_declared).toHaveBeenCalledWith(String(ISSUE_NUMBER))
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('declared 3 files'))
+	})
+
+	it('falls back to the guide when the body cannot be read', async () => {
+		read_declared.mockRejectedValue(new Error('gh down'))
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(OVER_GUIDE_NUMSTAT)
+		await split_early_notice.surface()
+
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('guide 8 files'))
+	})
+})
+
+describe('split_early_notice.declared', () => {
+	it('reads the branch issue declared size', async () => {
+		read_declared.mockResolvedValue({ files: 3, lines: 40 })
+
+		expect(await split_early_notice.declared()).toEqual({ files: 3, lines: 40 })
+	})
+
+	it('is undefined on a branch with no issue', async () => {
+		vi.mocked(git_command.branch).mockResolvedValue('main')
+
+		expect(await split_early_notice.declared()).toBeUndefined()
+		expect(read_declared).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6206: a scoped check runs after every edit batch, so the Issue is read once.
+describe('split_early_notice keeps the declared size', () => {
+	it('reads the issue once across runs under the bar', async () => {
+		read_declared.mockResolvedValue({ files: 3, lines: 40 })
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
+		await split_early_notice.surface()
+		await split_early_notice.surface()
+
+		expect(read_declared).toHaveBeenCalledOnce()
+		expect(await split_early_notice.declared()).toEqual({ files: 3, lines: 40 })
+	})
+
+	it('keeps an issue with no declaration as none', async () => {
+		await split_early_notice.declared()
+
+		expect(await split_early_notice.declared()).toBeUndefined()
+		expect(read_declared).toHaveBeenCalledOnce()
+	})
+
+	it('reads again after a read that threw', async () => {
+		read_declared.mockRejectedValueOnce(new Error('gh down'))
+		await split_early_notice.declared()
+		await split_early_notice.declared()
+
+		expect(read_declared).toHaveBeenCalledTimes(2)
 	})
 })
 

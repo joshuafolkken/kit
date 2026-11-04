@@ -121,7 +121,7 @@ describe('reason', () => {
 	})
 })
 
-// joshuafolkken/kit#4302: the pre-gate notice fires on the split verdict only.
+// joshuafolkken/kit#4302: the pre-gate notice fires past the guide when the Issue declares no size.
 describe('notice', () => {
 	it('names the measurement and the two actions when both guides are exceeded', () => {
 		const notice = split_assess.notice({ files: 12, lines: 500, verdict: 'split' })
@@ -134,8 +134,69 @@ describe('notice', () => {
 		expect(notice).toContain('Over the guide before the gate')
 	})
 
-	it('prints nothing under the guide', () => {
-		expect(split_assess.notice({ files: 12, lines: 30, verdict: 'single' })).toBeUndefined()
+	it('prints nothing at the guide on both axes', () => {
+		expect(split_assess.notice({ files: 8, lines: 200, verdict: 'single' })).toBeUndefined()
+	})
+
+	it('falls back to the guide for a declaration of zero files', () => {
+		const declared = { files: 0, lines: 0 }
+
+		expect(
+			split_assess.notice({ files: 8, lines: 200, verdict: 'single' }, declared),
+		).toBeUndefined()
+		expect(split_assess.notice({ files: 9, lines: 10, verdict: 'split' }, declared)).toContain(
+			'guide 8 files / 200 lines',
+		)
+	})
+})
+
+// joshuafolkken/kit#6206: a declared size moves the bar to the declaration grown by the factor.
+describe('notice against a declared size', () => {
+	const DECLARED = { files: 3, lines: 40 }
+
+	it('fires at 7 files, past 3 declared files × 2', () => {
+		const notice = split_assess.notice({ files: 7, lines: 40, verdict: 'single' }, DECLARED)
+
+		expect(notice).toContain('declared 3 files / 40 lines × 2 = 6 files / 80 lines')
+	})
+
+	it('fires at 81 lines, past 40 declared lines × 2', () => {
+		expect(split_assess.notice({ files: 1, lines: 81, verdict: 'single' }, DECLARED)).toBeDefined()
+	})
+
+	it('prints nothing at the grown bar on both axes', () => {
+		expect(
+			split_assess.notice({ files: 6, lines: 80, verdict: 'single' }, DECLARED),
+		).toBeUndefined()
+	})
+})
+
+// A declaration never lifts the bar past the guide, which held before the declaration counted.
+describe('notice against a declaration grown past the guide', () => {
+	it('caps a declaration grown past the guide at the guide', () => {
+		const notice = split_assess.notice(
+			{ files: 9, lines: 40, verdict: 'split' },
+			{ files: 8, lines: 200 },
+		)
+
+		expect(notice).toContain('(guide 8 files / 200 lines)')
+	})
+
+	it('caps only the axis grown past the guide', () => {
+		const notice = split_assess.notice(
+			{ files: 1, lines: 201, verdict: 'split' },
+			{ files: 3, lines: 150 },
+		)
+
+		expect(notice).toContain(
+			'declared 3 files / 150 lines × 2, capped at the guide = 6 files / 200 lines',
+		)
+	})
+
+	it('falls back to the guide for a declaration of zero lines', () => {
+		expect(
+			split_assess.notice({ files: 1, lines: 1, verdict: 'single' }, { files: 2, lines: 0 }),
+		).toBeUndefined()
 	})
 })
 
