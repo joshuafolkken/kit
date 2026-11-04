@@ -147,14 +147,14 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 })
 
 describe('run_ship_review_steps.review_stage — a finding or a refusal stops it', () => {
-	// joshuafolkken/kit#3159: the description reaches the stopped log, never the ledger record.
-	it('records a High finding by its spec, then stops and lists it with its description', async () => {
+	// joshuafolkken/kit#6325: the description reaches both recording and the stopped log.
+	it('records a High finding with its description, then stops and lists it', async () => {
 		const described = `${HIGH} — the handle leaks on the early return`
 
 		stamps.read_stamp_text.mockReturnValue(described)
 
 		expect(await stage()).toHaveProperty('out', expect.stringContaining(described))
-		expect(commands()).toContain(`${RECORD} ${HIGH}`)
+		expect(commands()).toContain(`${RECORD} ${described}`)
 	})
 
 	// joshuafolkken/kit#4431: a stop on no finding is tagged with its step's own cause.

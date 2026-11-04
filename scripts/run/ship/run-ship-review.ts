@@ -349,12 +349,12 @@ function read_verdict(text: string | undefined): ReviewVerdict {
 	}
 }
 
-// The specs `review:record` is given: a stopped round's `fixed` marks are dropped, since a fix the scoped
+// The whole findings `review:record` is given: a stopped round's `fixed` marks are dropped, since a fix the scoped
 // pair turned down, or one beside a finding still blocking, has not closed what it marks.
 function recorded_specs(verdict: ScoredVerdict, outcome: RoundOutcome): ReadonlyArray<string> {
-	if (outcome.is_passing) return verdict.specs
+	if (outcome.is_passing) return verdict.report
 
-	return verdict.specs.map((spec) =>
+	return verdict.report.map((spec) =>
 		spec.startsWith(FIXED_PREFIX) ? spec.slice(FIXED_PREFIX.length) : spec,
 	)
 }
