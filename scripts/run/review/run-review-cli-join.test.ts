@@ -3,8 +3,9 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_ship_planned, type Unplanned } from '#scripts/run/ship/run-ship-planned'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { GATE_GREEN, GATE_MOVED, run_review } from './run-review'
+import { GATE_GREEN, GATE_MOVED, GATE_RED, run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
+import { run_review_join_ready } from './run-review-join-ready'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
@@ -19,6 +20,7 @@ const GATE_TAKEN_AT = '2026-09-23T10:40:07.855Z'
 const GATE_LOG = '✔ verification gate passed (8 checks)'
 
 beforeEach(() => {
+	vi.spyOn(run_review_join_ready, 'read').mockResolvedValue(undefined)
 	vi.spyOn(run_review_pinned_steps, 'wait_for_answer').mockResolvedValue(undefined)
 	vi.spyOn(run_review_pinned_steps, 'launched_reason').mockReturnValue(undefined)
 	// No launch, so the join never reads this checkout's own record nor starts a real check.
@@ -206,6 +208,37 @@ describe('run --join on the background test:pinned', () => {
 
 		expect(await run_review_cli.run(['--join'])).toBe(0)
 		expect(errored()).toBe(LIST)
+	})
+})
+
+describe('run --join with all checks already green', () => {
+	it('consumes the finished answer without waiting or repeating the unplanned check', async () => {
+		vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		vi.mocked(run_review_join_ready.read).mockResolvedValue({ text: LIST, unpinned: [] })
+
+		expect(await run_review_cli.run(['--join'])).toBe(0)
+		expect(run_review_steps.wait_for_gate_finish).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.wait_for_answer).not.toHaveBeenCalled()
+		expect(run_ship_planned.unplanned).not.toHaveBeenCalled()
+		expect(printed()).toContain('Gate green')
+		expect(errored()).toBe(LIST)
+	})
+
+	it('keeps the original wait and refusal when the ready answer is missing', async () => {
+		vi.mocked(run_review_steps.wait_for_gate_finish).mockResolvedValue(GATE_RED)
+
+		expect(await run_review_cli.run(['--join'])).toBe(1)
+		expect(run_review_steps.wait_for_gate_finish).toHaveBeenCalledOnce()
+		expect(run_ship_planned.unplanned).toHaveBeenCalledOnce()
+	})
+
+	it('keeps fixing joins on the original path', async () => {
+		vi.spyOn(run_review_pinned_steps, 'answer_now').mockReturnValue(undefined)
+
+		await run_review_cli.run(['--join', '--fixing'])
+
+		expect(run_review_join_ready.read).toHaveBeenCalledWith(true)
+		expect(run_review_steps.wait_for_gate_finish).toHaveBeenCalledOnce()
 	})
 })
 
