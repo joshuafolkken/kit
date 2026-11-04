@@ -113,6 +113,20 @@ describe('split_resolution.ledger_refusal', () => {
 })
 
 describe('split_resolution.record_child', () => {
+	it('reports the existing child URL and a recovery command when recording fails', async () => {
+		const child = 'https://github.com/joshuafolkken/kit/issues/4700'
+
+		record_split_filed.mockRejectedValueOnce(new Error('append failed'))
+
+		await expect(
+			split_resolution.record_child({
+				route: SPLIT_ROUTE_LABEL,
+				found_during: String(ISSUE),
+				child,
+			}),
+		).rejects.toThrow(`pnpm josh split:recover ${String(ISSUE)} ${child}`)
+	})
+
 	it('records a split child against the lane it was found in', async () => {
 		const filing = { route: SPLIT_ROUTE_LABEL, found_during: String(ISSUE), child: '#4700' }
 

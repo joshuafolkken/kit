@@ -1,5 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { file_reader } from '#scripts/lib/read-file'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { split_direction } from './split-direction'
@@ -56,6 +56,16 @@ function stub_kept(body: string | undefined): ReturnType<typeof vi.fn> {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+})
+
+describe('split_direction.refusal_of — a split prerequisite', () => {
+	it('admits an explicitly declared split prerequisite (ac-a6f82ac3)', async () => {
+		const read = stub_kept(kept_body(MODULE_SPAN))
+		const filing = { ...SPLIT_FILING, labels: [TIER_A_ROUTE_LABEL] }
+
+		expect(await split_direction.refusal_of(filing, CHILD_BODY)).toBeUndefined()
+		expect(read).not.toHaveBeenCalled()
+	})
 })
 
 describe('split_direction.refusal_of', () => {

@@ -1,10 +1,13 @@
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { review_code_tree } from '#scripts/review/review-code-tree'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { test_pinned } from './test-pinned'
+import { test_pinned_carry } from './test-pinned-carry'
 import { test_pinned_logic } from './test-pinned-logic'
+import { test_pinned_snapshot } from './test-pinned-snapshot'
 
 // joshuafolkken/kit#4647: without `typescript` (an optional peer in a consumer) an added file's
 // functions cannot be read, so it is reported unchecked rather than passed as pinned, and a changed
@@ -22,6 +25,21 @@ const COMMENT_DIFF = [
 	'',
 ].join('\n')
 const MOVE_DIFF = `--- a/${CHANGED}\n+++ b/${CHANGED}\n@@ -2 +1,0 @@\n-role\n@@ -3,0 +3 @@\n+role\n`
+
+// These parser tests mock every git read as diff text; carry persistence has its own fixture tests.
+beforeEach(() => {
+	vi.spyOn(test_pinned_carry, 'record').mockReturnValue(undefined)
+	vi.spyOn(test_pinned_snapshot, 'with_snapshot').mockImplementation(async (action) => {
+		return await action({
+			head: 'HEAD',
+			tree: 'parser',
+			tree_hash: 'parser',
+			cache_file: git_spawn_sync
+				.run(['rev-parse', '--git-path', 'josh-test-pinned-verdicts.json'])
+				.stdout.trim(),
+		})
+	})
+})
 
 afterEach(() => {
 	vi.restoreAllMocks()

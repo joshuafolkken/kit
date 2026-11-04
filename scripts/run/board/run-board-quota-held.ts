@@ -149,7 +149,7 @@ interface ReadBack {
 // The files done since the sample's oldest reading, which its rise was spent by
 // (joshuafolkken/kit#5826): the list is widened until a file ended before it, every file is listed, or
 // `FILES_LIMIT` is reached. A wider list goes on past the files the narrower one read; every file is
-// listed once widening adds none, as a list shorter than its limit may leave out a Codex child's log.
+// listed once widening adds none; a source may return a short page without exhausting its results.
 async function read_back(
 	back: ReadBack,
 	limit: number,

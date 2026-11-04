@@ -206,8 +206,8 @@ function has_parent_marker(line: string): boolean {
 const PARENT_REFERENCE = /(?:親|Parent|parent)\**[:：]\**\s*(?:[\w.-]+\/[\w.-]+)?#\d+/gu
 
 function parent_references(body: string): string {
-	return markdown_section
-		.unfenced_lines(body)
+	return issue_citation
+		.prose_lines(body)
 		.flatMap((line) => [...line.matchAll(PARENT_REFERENCE)].map((match) => match[0]))
 		.join('\n')
 }
@@ -271,6 +271,7 @@ const epic_audit_logic = {
 	known_repos,
 	parse_issue_references,
 	parse_references,
+	parent_references,
 	acceptance_section,
 	is_acceptance_heading,
 	signal_references,

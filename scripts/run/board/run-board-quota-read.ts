@@ -164,17 +164,21 @@ function codex_heads(text: string): Array<QuotaReading> {
 		.filter((reading) => reading !== undefined)
 }
 
-function json_ms(line: string): number | undefined {
+function json_stamp(line: string): string | undefined {
 	if (!line.includes(TIMESTAMP_MARK)) return undefined
 
-	return time_instant.parse_instant(json_value.parse_with(line, TIMED_LINE)?.timestamp)
+	return json_value.parse_with(line, TIMED_LINE)?.timestamp
 }
 
 // The time a line carries: the launcher's header's, or a JSON line's own `timestamp`.
-function line_ms(line: string): number | undefined {
+function line_stamp(line: string): string | undefined {
 	const stamp = LAUNCH_HEADER.exec(line)?.groups?.['stamp']
 
-	return stamp === undefined ? json_ms(line) : time_instant.parse_instant(stamp)
+	return stamp ?? json_stamp(line)
+}
+
+function line_ms(line: string): number | undefined {
+	return time_instant.parse_instant(line_stamp(line))
 }
 
 // The nearest time among `lines` before `index`; the header heads the log, so it is reached last.
@@ -300,14 +304,21 @@ async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
 
 // The newest logs of lane children Claude ran, in the run-state directory. A Codex child logs under
 // the same name and writes no `rate_limit_event`, so its logs are passed over by their last header.
+// Only Claude logs spend `limit`; every search examines at most `FILES_LIMIT` launch headers.
 async function claude_files(
 	root: string = durable_state.root(),
 	limit: number = FILES_SCANNED,
 ): Promise<Array<QuotaFile>> {
-	const scanned = newest(await files_in(root, is_lane_log), limit)
-	const claude = await Promise.all(scanned.map(async (file) => await claude_log(file)))
+	const scanned = newest(await files_in(root, is_lane_log), FILES_LIMIT)
+	const claude: Array<QuotaFile> = []
 
-	return claude.flat()
+	for (const file of scanned) {
+		if (claude.length >= limit) break
+		// eslint-disable-next-line no-await-in-loop -- Stop reading headers as soon as enough Claude logs are found.
+		claude.push(...(await claude_log(file)))
+	}
+
+	return claude
 }
 
 function is_rollout(name: string): boolean {
@@ -398,6 +409,7 @@ const run_board_quota_read = {
 	codex_heads,
 	codex_reading,
 	read_head,
+	line_stamp,
 	read_tail,
 	reading_in,
 }

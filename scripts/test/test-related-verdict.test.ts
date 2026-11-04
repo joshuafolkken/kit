@@ -4,6 +4,7 @@ import path from 'node:path'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { tree_verdict } from '#scripts/gate/tree-verdict'
+import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
@@ -128,6 +129,41 @@ describe('test_related_verdict.run — scoped stamp refresh', () => {
 	})
 })
 
+describe('test_related_verdict.run — touched review record', () => {
+	it('records fresh and replayed touched greens separately from the full reach', async () => {
+		await test_related_verdict.run(['--touched'], fresh)
+		await test_related_verdict.run(['--touched'], fresh)
+		expect(fresh).toHaveBeenCalledTimes(1)
+		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledTimes(2)
+		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledWith(
+			TREE.files,
+			test_related_verdict.touched_target(),
+			TREE.base,
+			undefined,
+		)
+		await test_related_verdict.run([], fresh)
+		expect(fresh).toHaveBeenCalledTimes(2)
+	})
+
+	it.each([
+		['--touched', SOURCE],
+		['--touched', '--silent'],
+	])('never records narrowed touched arguments %j for review', async (...given) => {
+		await test_related_verdict.run(given, fresh)
+		await test_related_verdict.run(given, fresh)
+		expect(review_stamps.test_related_stamp.write).not.toHaveBeenCalled()
+	})
+
+	it('does not record a failed touched run or one whose tree moved', async () => {
+		fresh.mockResolvedValue(FAILED)
+		await test_related_verdict.run(['--touched'], fresh)
+		fresh.mockResolvedValue(0)
+		vi.mocked(gate_tree.read_gate_tree).mockResolvedValue({ ...TREE, base: 'moved' })
+		await test_related_verdict.run(['--touched'], fresh)
+		expect(review_stamps.test_related_stamp.write).not.toHaveBeenCalled()
+	})
+})
+
 describe('test_related_verdict.run — scope isolation', () => {
 	it('does not let explicit files or flags answer another scope', async () => {
 		await test_related_verdict.run([SOURCE], fresh)
@@ -172,5 +208,35 @@ describe('test_related_verdict.run — ship telemetry', () => {
 		expect(lane_ledger_write.record_ship_lap).toHaveBeenCalledWith(
 			expect.objectContaining({ step: 'josh git › test:related', is_reused: true }),
 		)
+	})
+})
+
+function plant_lint_green(): void {
+	vi.spyOn(review_stamps.lint_related_stamp, 'read').mockReturnValue({ ...TREE, taken_at: 'now' })
+	vi.spyOn(review_stamps.lint_related_stamp, 'describes_inputs').mockReturnValue(true)
+}
+
+describe('test_related_verdict.run — review prerequisites', () => {
+	it('admits a review-fix check without satisfying full-reach checks', async () => {
+		let touched: FileMapStamp | undefined
+
+		vi.mocked(review_stamps.test_related_stamp.write).mockImplementation((files, target, base) => {
+			if (target === test_related_verdict.touched_target()) {
+				touched = { files, taken_at: 'now', ...(base !== undefined && { base }) }
+			}
+
+			return 'unused'
+		})
+		vi.mocked(review_stamps.test_related_stamp.read).mockImplementation((target) =>
+			target === test_related_verdict.touched_target() ? touched : undefined,
+		)
+		plant_lint_green()
+		const sources = { test: test_related_verdict.touched_target() }
+
+		expect(scoped_green.refusal_for(TREE.files, TREE.base, sources)).toBeDefined()
+		await test_related_verdict.run(['--touched'], fresh)
+		expect(scoped_green.refusal_for(TREE.files, TREE.base, sources)).toBeUndefined()
+		expect(scoped_green.refusal_for(TREE.files, TREE.base)).toBeDefined()
+		expect(scoped_green.refusal_for({ [SOURCE]: 'moved' }, TREE.base, sources)).toBeDefined()
 	})
 })

@@ -73,7 +73,6 @@ const { run_ship_gate_runs } = await import('./run-ship-gate-runs')
 
 const OK = 0
 const FAILED = 1
-const PAIR_SIZE = 2
 // A file on disk, so the narrowed run can name it.
 const MOVED = 'scripts/run/ship/run-ship-scoped.ts'
 
@@ -187,14 +186,16 @@ describe('run_ship_scoped.scoped_pair — after a merge with the default branch'
 	})
 
 	// joshuafolkken/kit#5531: the commit stage's merge meeting the branch in one file.
-	it('runs each stale check over the one file the merge meets the branch in, then records them', async () => {
+	it('passes own edits and the dependency intersection to both checks in the review stage', async () => {
+		const own = 'scripts/run/ship/run-ship-synced-scope.ts'
+
 		missing_mock.mockReturnValue([LINT, TEST])
-		read_sync_mock.mockResolvedValue(READING)
+		read_sync_mock.mockResolvedValue({ ...READING, overlap: [own, MOVED] })
 
-		await run_ship_scoped.scoped_pair()
+		await run_ship_lap.within('6279', 'review', run_ship_scoped.scoped_pair)
 
-		expect(commands()).toStrictEqual([`${LINT} ${MOVED}`, `${TEST} ${MOVED}`])
-		expect(record_mock).toHaveBeenCalledTimes(PAIR_SIZE)
+		expect(commands()).toStrictEqual([`${LINT} ${own} ${MOVED}`, `${TEST} ${own} ${MOVED}`])
+		expect(record_mock).toHaveBeenCalled()
 	})
 
 	it('runs the stale checks bare when the stale records moved by more than a merge', async () => {

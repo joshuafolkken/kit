@@ -48,12 +48,11 @@ describe('chain-rule — a lane child records and ships after a round-1 fix', ()
 		expect(lane_step()).not.toContain('run:review --pinned')
 	})
 
-	// Step 0 alone is exempt: a lane child whose ship failed falls to step 1 and may reach `git -y`.
-	it('scopes the round-1 fix gate before git -y to runs outside step 0', () => {
+	it('checks review fixes before the first commit with the touched scope', () => {
 		const content = read_unwrapped(CHAIN_RULE)
 
 		expect(content).toContain(
-			'Outside step 0, round-1 fixes run one scoped check and the gate before `git -y`.',
+			'After the last pre-commit review fix: `pnpm josh test:related --touched` once.',
 		)
 		expect(content).not.toContain('Any round-1 fix runs its affected scoped check and the gate')
 	})
@@ -62,9 +61,9 @@ describe('chain-rule — a lane child records and ships after a round-1 fix', ()
 describe('chain-rule — a review round’s fixes are checked once', () => {
 	// joshuafolkken/kit#4949: a lane child ran check:related after each round-1 finding it fixed,
 	// and the earlier run added nothing the later one did not answer.
-	it('checks a round’s fixes with one check:related after the last, not one per finding', () => {
+	it('leaves the full reach after review fixes to ship', () => {
 		expect(read_unwrapped(CHAIN_RULE)).toContain(
-			"once before `run:review`, a review round's fixes once after the last",
+			"ship's scoped pair runs full reach after review fixes",
 		)
 	})
 })

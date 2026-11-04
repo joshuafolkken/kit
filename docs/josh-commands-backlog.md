@@ -860,27 +860,30 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog
 
 <!-- usage: backlog:triage -->
 
-Apply backlogrun's triage verdict to one issue: clear the park, comment the reason, apply the run label.
+Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict.
 
 ```bash
+pnpm josh backlog:triage --pass
+pnpm josh backlog:triage --decide --defect yes --verification yes --every-run no
 pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
-pnpm josh backlog:triage --apply 913 --solo --reason "<why>" --clear     # its question answered
-pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"   # the blocker lands first
-pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"      # a dependency a person dropped
+pnpm josh backlog:triage --apply 913 --solo --reason "<why>" --clear
+pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"
+pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
 ```
 
 **Options:**
 
-- `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label — the flags and the label write are `auto-ok:judge --apply`'s.
-- `--clear` — first takes the park off, as `run:park <N> --clear` does — only once the issue already answers its `needs-decision` question.
+- `--pass [--exclude <N>]` — settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Failed or incomplete reads exit 1.
+- `--decide --defect <answer> --verification <answer> --every-run <answer>` — yes/no/unknown evidence: three yes → run:solo; any no → run:lane; otherwise judge. Read-only.
+- `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label (`auto-ok:judge --apply`).
+- `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
 - `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
 
 <!-- /usage -->
 
-The triage step of `backlogrun-steps.md` → "Resolve what the plan can resolve", in one call.
-Without `--clear` a `needs-decision` issue keeps its park, so a question left for a person is never offered once labelled.
-The comment lands before the label, as `auto-ok:judge`'s does. Prints `triage #N — <label> · blocked by #M` (whichever were given); a failed write exits 1 naming it.
+The parent follows `--pass`'s stdout command; diagnostics go to stderr. Apply prints
+`triage #N — <label> · blocked by #M`; without `--clear`, the park stays.
 
 ### `josh backlog:budget`
 

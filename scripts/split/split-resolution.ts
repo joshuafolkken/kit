@@ -68,7 +68,15 @@ interface Filing {
 // other route, and a filing found in no lane, record nothing.
 async function record_child({ route, found_during, child }: Filing): Promise<void> {
 	if (route !== SPLIT_ROUTE_LABEL || found_during === undefined) return
-	await lane_ledger_write.record_split_filed({ issue: Number(found_during), child })
+
+	try {
+		await lane_ledger_write.record_split_filed({ issue: Number(found_during), child })
+	} catch (error) {
+		throw new Error(
+			`Created ${child}, but split-child evidence could not be recorded. Do not create another child. Recover with \`pnpm josh split:recover ${found_during} ${child}\`.`,
+			{ cause: error },
+		)
+	}
 }
 
 const split_resolution = { ledger_refusal, notices, record_child, refusal, split_issues }

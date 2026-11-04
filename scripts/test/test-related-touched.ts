@@ -8,8 +8,8 @@ import { related_scope, type RelatedScope } from './test-related-scope'
 // minutes apart. **The touched scope reads no test-read map and no import graph**: it is the diff's own
 // test files and, for each changed module `foo.ts`, its colocated `foo.test.ts` and `foo.*.test.ts`,
 // plus the tests the change pins (`test-related-pins.ts`).
-// What an edit breaks further away is the full-reach run's to find, so a touched run leaves no green
-// record (`scoped-green.ts`) and is recorded in the lane ledger under its own kind.
+// The full-reach run checks further away. A touched green admits review round 2, and the lane ledger
+// records it under its own kind.
 
 const TOUCHED_FLAG = '--touched'
 const TOUCHED_KIND = 'touched'
