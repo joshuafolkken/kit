@@ -9,6 +9,7 @@ import { epic_lane_occupancy } from './epic-lane-occupancy'
 import { epic_stopped_fixture } from './epic-stopped-fixture'
 
 const { RUNNING, STOPPED, lane, record, records } = epic_stopped_fixture
+const HUMAN_REVIEW = 'human-review'
 
 function reading(): BusyRead {
 	return {
@@ -51,15 +52,28 @@ describe('epic_lane_occupancy.read', () => {
 })
 
 describe('epic_lane_occupancy.read — protected holders', () => {
-	it('keeps human review after its process exits', async () => {
+	it('releases human review after its process exits', async () => {
 		const states = records()
 
-		states.set(STOPPED, record(STOPPED, 'human-review'))
+		states.set(STOPPED, record(STOPPED, HUMAN_REVIEW))
 		vi.mocked(lane_state.read_states).mockResolvedValue(states)
 
 		const result = await epic_lane_occupancy.read(reading(), true)
 
-		expect(result.use?.occupied).toBe(epic_stopped_fixture.LIMIT)
+		expect(result.read).toMatchObject({ kind: 'busy', issues: [{ number: Number(RUNNING) }] })
+		expect(result.use).toMatchObject({ occupied: 1, seated: 1 })
+	})
+
+	it('counts human review while its worker is still alive', async () => {
+		const states = records()
+
+		states.set(RUNNING, record(RUNNING, HUMAN_REVIEW))
+		vi.mocked(lane_state.read_states).mockResolvedValue(states)
+
+		const result = await epic_lane_occupancy.read(reading(), true)
+
+		expect(result.read).toMatchObject({ kind: 'busy', issues: [{ number: Number(RUNNING) }] })
+		expect(result.use).toMatchObject({ occupied: 1, seated: 1 })
 	})
 
 	it('keeps a holder whose seat is still held', async () => {

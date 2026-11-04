@@ -24,7 +24,7 @@ transcript**; the named-epic flags are dropped for the opted-in backlog. It clos
 | `wait` | Wait for the next wake |
 | `complete` | Record the root done (`backlogrun-steps.md` → "The session cut is inside the invocation") and post the epic summary |
 | `over` | Hand the lanes over and take the cut — "The hand-off" below |
-| human-review child | Keep its lane and `in-progress`; `run:merge` offers the next children and the stopped lane keeps one place under the limit |
+| human-review child | Keep its lane and `in-progress`; `run:merge` offers the next children and the stopped lane holds no execution place once its worker exits |
 | `stop` / `environment` | Report the parked children (or the outage, or the `/login` an authentication failure needs) and stop |
 | `resumed` | `lane:await <N>` it again |
 | `retry` / `busy` | Re-read the child |

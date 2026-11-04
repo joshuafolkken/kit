@@ -5,7 +5,7 @@ Rationale behind `.claude/skills/workflow-commands/backlogrun-park.md`.
 ## Why `needs-human-review` keeps its lane instead of parking
 
 The stopped child's uncommitted work is the artifact a person has to look at. Its lane keeps its
-hold and counts in use, while the parent launches other children in the remaining free lanes.
+hold, while its ended worker releases the execution place for other children.
 Committing or opening a PR would change the artifact the person was asked to review.
 
 The stop report and the Telegram name the lane directory because a person told to look at a working
