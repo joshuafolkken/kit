@@ -245,6 +245,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh ship:evidence` | `<N> [--fresh] -- <command...>` | automation | files, processes | Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code) |
 | `josh ship:wait` | `<N>` | automation | files, processes | Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned \| passed \| ended \| pending) |
 | `josh split:assess` | `[--json]` | automation | none | Measure the branch change size (tests excluded) and answer the split assessment size question: split \| single |
+| `josh split:recover` | `<origin> <child-issue-url>` | automation | network, files | Recover split-child evidence after verifying an existing child URL, split route and parent |
 | `josh stash:pop` | `<message>` | automation | git | Pop the stash matching this message, not whichever a shared stack has on top |
 | `josh stash:push` | `<message>` | automation | git | Stash the working tree, untracked files included, leaving the observation ledger |
 | `josh time` · `josh tm` · **kit only** | `[options]` | maintainer | none | Report where a run's wall clock went: model wait, tool execution, human wait |
