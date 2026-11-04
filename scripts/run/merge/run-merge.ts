@@ -224,7 +224,7 @@ function park_comment(reason: ParkReason): string {
 		`- Why: ${reason.cause}`,
 		'- Read: the issue is OPEN, carries no park label, `needs-human-review` or `epic`, no merged pull request’s `closes #N` names it, and it declares no open blocker, start date still ahead or sample condition not yet met.',
 		streak_line(reason.carry),
-		`- Next: read the child’s transcript${transcript}, ${run_stalled.next_step(reason.child)}.`,
+		`- Next: read the child’s transcript${transcript}, ${run_stalled.next_step(reason.child, reason.cause)}.`,
 	].join('\n')
 }
 
