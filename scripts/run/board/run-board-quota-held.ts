@@ -6,7 +6,7 @@ import {
 	type QuotaReading,
 	type Quotas,
 } from './run-board-quota-read'
-import { run_board_quota_spent, type QuotaSpan } from './run-board-quota-spent'
+import { run_board_quota_spent, type QuotaEnd, type QuotaSpan } from './run-board-quota-spent'
 import { run_board_quota_status } from './run-board-quota-status'
 
 // The usage-limit gauges' readings as the board holds them (joshuafolkken/kit#5395): a redraw draws
@@ -44,11 +44,6 @@ interface QuotaMark {
 	file: QuotaFile
 	reading: QuotaReading | undefined
 	span: QuotaSpan
-	lane: string | undefined
-}
-
-interface QuotaEnd {
-	end_ms: number
 	lane: string | undefined
 }
 
@@ -187,10 +182,7 @@ function reading_with(
 
 	if (reading === undefined) return undefined
 
-	const per_task = run_board_quota_spent.per_task_of(
-		marks.map((mark) => mark.span),
-		ends.map((end) => end.end_ms),
-	)
+	const per_task = run_board_quota_spent.per_lane_of(marks, ends)
 
 	return Object.keys(per_task).length === 0 ? reading : { ...reading, per_task }
 }
