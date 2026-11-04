@@ -2,8 +2,10 @@
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_breakdown } from './lane-breakdown'
+import { lane_breakdown_estimate } from './lane-breakdown-estimate'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text } from './lane-breakdown-text'
 import { lane_cut_stats } from './lane-cut-stats'
@@ -34,6 +36,12 @@ async function read_ledger(): Promise<ReturnType<typeof lane_ledger.read_entries
 	return path === undefined ? [] : lane_ledger.read_entries(path)
 }
 
+function cut_lines(events: ReadonlyArray<RunEvent>, issue: number): ReadonlyArray<string> {
+	const cuts = lane_cut_stats.line(events, issue)
+
+	return cuts === undefined ? [] : [`- ${cuts}`]
+}
+
 function missing(issue: string): number {
 	const lane = session_cite.issue(issue)
 
@@ -43,22 +51,29 @@ function missing(issue: string): number {
 }
 
 async function print(issue: string): Promise<number> {
-	const [entries, events] = [await read_ledger(), await run_event_stream_emit.all_events()]
+	const timeline = await lane_breakdown_estimate.read(
+		await read_ledger(),
+		await run_event_stream_emit.all_events(),
+		Number(issue),
+	)
+	if (timeline === undefined) return missing(issue)
+	const { entries, events, notice } = timeline
 	const minutes = lane_net_time.net_minutes(entries, events, Number(issue))
 	const breakdown = lane_breakdown_implement.breakdown_of(entries, events, Number(issue))
 
 	if (minutes === undefined || breakdown === undefined) return missing(issue)
 
 	const report = lane_breakdown_text.report_of(Number(issue), breakdown, entries)
-	const cuts = lane_cut_stats.line(events, Number(issue))
-	const cut_lines = cuts === undefined ? [] : [`- ${cuts}`]
 
 	console.info(
 		[
+			notice,
 			lane_breakdown_text.comment(Number(issue), minutes, report),
 			sinks_line({ entries, events }, Number(issue)),
-			...cut_lines,
-		].join('\n'),
+			...cut_lines(events, Number(issue)),
+		]
+			.filter((line) => line !== '')
+			.join('\n'),
 	)
 
 	return 0

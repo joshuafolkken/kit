@@ -6,9 +6,16 @@ import type { LedgerEntry } from './lane-ledger'
 // same breakdown its overrun investigation comments on its Issue.
 
 const mocks = vi.hoisted(() => ({
+	evidence: vi.fn(),
+	closing: vi.fn(),
 	all_events: vi.fn(),
 	read_entries: vi.fn<(path: string) => ReadonlyArray<LedgerEntry>>(),
 	target: vi.fn<() => Promise<string | undefined>>(),
+}))
+
+vi.mock('./historical-evidence', () => ({ historical_evidence: { read: mocks.evidence } }))
+vi.mock('#scripts/issue/issue-closing-pr', () => ({
+	issue_closing_pr: { read_closing_number: mocks.closing },
 }))
 
 vi.mock(import('./lane-ledger'), async (import_original) => {
@@ -49,6 +56,8 @@ function followup_lap(ended: number, minutes: number, step: string): LedgerEntry
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	mocks.evidence.mockResolvedValue({ evidence: [], unreadable: [] })
+	mocks.closing.mockResolvedValue(undefined)
 	vi.spyOn(console, 'error').mockReturnValue(undefined)
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
 	mocks.target.mockResolvedValue('/ledger.jsonl')
@@ -74,6 +83,7 @@ describe('lane_breakdown_cli.run', () => {
 				'- Largest time sinks (stages and laps overlap): implement 51.0 min; start to plan 10.0 min',
 			].join('\n'),
 		)
+		expect(mocks.evidence).not.toHaveBeenCalled()
 	})
 
 	it('refuses a lane the ledger holds no dispatch and merge of', async () => {
@@ -89,6 +99,77 @@ describe('lane_breakdown_cli.run', () => {
 		await expect(lane_breakdown_cli.run(['x'])).resolves.toBe(FAILURE)
 		expect(console.error).toHaveBeenCalledWith(lane_breakdown_cli.USAGE)
 	})
+})
+
+it('prints comment, commit and log sources without changing the ledger (ac-89e55522)', async () => {
+	const entries: ReadonlyArray<LedgerEntry> = []
+
+	mocks.read_entries.mockReturnValue(entries)
+	mocks.all_events.mockResolvedValue([])
+	mocks.closing.mockResolvedValue(1)
+	mocks.evidence.mockResolvedValue({
+		evidence: [
+			{ kind: 'handoff', at: at(0), source: 'comment/1' },
+			{ kind: 'plan', at: at(10), source: 'comment/2' },
+			{ kind: 'commit', at: at(20), source: 'commit/1' },
+			{ kind: 'ship-review', at: at(50), source: '/review.log:1' },
+			{ kind: 'merge', at: at(61), source: 'pull/1' },
+		],
+		unreadable: [],
+	})
+
+	await expect(lane_breakdown_cli.run([String(ISSUE)])).resolves.toBe(0)
+
+	expect(console.info).toHaveBeenCalledWith(
+		expect.stringMatching(
+			/^Estimated timeline.*\nSources: handoff: comment\/1; plan: comment\/2; commit: commit\/1; ship-review: \/review.log:1; merge: pull\/1/u,
+		),
+	)
+	expect(console.info).toHaveBeenCalledWith(expect.stringContaining('implement 40.0 min'))
+	expect(console.info).toHaveBeenCalledWith(expect.stringContaining('ship review 11.0 min'))
+	expect(entries).toEqual([])
+})
+
+it.each(['dispatch', 'merge'] as const)(
+	'fills only the missing %s boundary (ac-4b1b2d87)',
+	async (kind) => {
+		mocks.read_entries.mockReturnValue([
+			{
+				kind: kind === 'dispatch' ? 'merge' : 'dispatch',
+				at: at(kind === 'dispatch' ? 61 : 0),
+				issue: ISSUE,
+			},
+		])
+		mocks.evidence.mockResolvedValue({
+			evidence: [
+				{ kind: 'handoff', at: at(10), source: 'comment/1' },
+				{ kind: 'merge', at: at(50), source: 'pull/1' },
+			],
+			unreadable: [],
+		})
+
+		await expect(lane_breakdown_cli.run([String(ISSUE)])).resolves.toBe(0)
+
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining(`${kind === 'dispatch' ? '51' : '50'} min of net time`),
+		)
+	},
+)
+
+it('explains insufficient evidence and unreadable sources (ac-4b1b2d87)', async () => {
+	mocks.read_entries.mockReturnValue([])
+	mocks.evidence.mockResolvedValue({
+		evidence: [{ kind: 'commit', at: at(10), source: 'commit/1' }],
+		unreadable: ['pull', 'logs'],
+	})
+
+	await expect(lane_breakdown_cli.run([String(ISSUE)])).resolves.toBe(FAILURE)
+
+	expect(console.info).not.toHaveBeenCalled()
+	expect(console.error).toHaveBeenCalledWith(
+		expect.stringContaining('Insufficient historical evidence'),
+	)
+	expect(console.error).toHaveBeenCalledWith(expect.stringContaining('unreadable: pull, logs'))
 })
 
 // joshuafolkken/kit#6303: reuse the sinks classification, with overlapping laps summed by name.
