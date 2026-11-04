@@ -5,6 +5,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { test_pinned_cache_logic } from './test-pinned-cache-logic'
 import type { PinnedOrigin } from './test-pinned-ledger'
 import { test_pinned_logic, type PinnedReport, type ReportParts } from './test-pinned-logic'
+import { test_pinned_snapshot } from './test-pinned-snapshot'
 
 // The answer `josh test:pinned --record` leaves for `josh run:review --join` (joshuafolkken/kit#4770):
 // the printed report and its unpinned count, keyed to the checkout. `run:review` starts the check in
@@ -142,12 +143,16 @@ function remaining_of(record: Record<string, unknown>): Pick<PinnedSummary, 'rem
 	return typeof remaining === 'number' ? { remaining } : {}
 }
 
+function snapshot_of(record: Record<string, unknown>): Pick<PinnedSummary, 'tree_hash'> {
+	return typeof record['tree_hash'] === 'string' ? { tree_hash: record['tree_hash'] } : {}
+}
+
 function to_summary(record: Record<string, unknown>): PinnedSummary | undefined {
 	const { text, unpinned, is_cut } = record
 
 	if (typeof text !== 'string' || !is_text_list(unpinned)) return undefined
 	const unchecked = record['is_unchecked'] === true ? { is_unchecked: true } : {}
-	const summary = { text, unpinned, ...tail_of(record), ...unchecked }
+	const summary = { text, unpinned, ...tail_of(record), ...unchecked, ...snapshot_of(record) }
 
 	return is_cut === true ? { ...summary, is_cut, ...remaining_of(record) } : summary
 }
@@ -164,13 +169,25 @@ function parsed(raw: string): Record<string, unknown> | undefined {
 	}
 }
 
-function read(token: string, root: string = PROJECT_ROOT): PinnedSummary | undefined {
+function read_summary(token: string, root: string): PinnedSummary | undefined {
 	const raw = stamp_file.read_stamp_text(record_path(token, root))
 	const record = raw === undefined ? undefined : parsed(raw)
 
 	if (record?.['token'] !== token) return undefined
 
 	return to_summary(record)
+}
+
+function fresh_summary(summary: PinnedSummary, root: string): PinnedSummary {
+	if (summary.tree_hash === undefined) return summary
+
+	return { ...summary, is_stale: test_pinned_snapshot.current_hash(root) !== summary.tree_hash }
+}
+
+function read(token: string, root: string = PROJECT_ROOT): PinnedSummary | undefined {
+	const summary = read_summary(token, root)
+
+	return summary === undefined ? undefined : fresh_summary(summary, root)
 }
 
 function clear(token: string, root: string = PROJECT_ROOT): void {
