@@ -66,6 +66,8 @@ const AUTO_OK_LABEL = 'auto-ok'
 // checkout and must go on holding the repository. Read as parked in either place, the next child
 // would start on top of that work.
 const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review'
+// The PR is ready for a person to inspect and merge on GitHub.
+const NEEDS_HUMAN_MERGE_LABEL = 'needs-human-merge'
 // Marks an issue whose work a run verified is **already merged**. Closing
 // an Issue is Tier C, so a run that reaches that conclusion may not act on it — this label is its
 // exit that is not Tier C.
@@ -249,6 +251,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Implement and verify, but stop before committing so a person can look',
 	},
 	{
+		name: NEEDS_HUMAN_MERGE_LABEL,
+		color: 'd93f0b',
+		description: 'Pull request open: a person must inspect the diff and merge on GitHub',
+	},
+	{
 		name: ALREADY_DONE_LABEL,
 		color: '6f42c1',
 		description: 'Verified already merged — a person closes it',
@@ -380,6 +387,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	RUN_STALLED_LABEL,
 	AUTO_OK_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	ALREADY_DONE_LABEL,
 	MEASURED_LABEL,
 	MEASURED_UNMET_LABEL,
@@ -428,6 +436,7 @@ export {
 	MEASURED_UNMET_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	OTHER_CHANGE_LABEL,
