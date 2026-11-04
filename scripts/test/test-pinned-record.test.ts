@@ -27,7 +27,7 @@ afterEach(() => {
 describe('test_pinned_record', () => {
 	it('reduces a report to its printed text and its unpinned places', () => {
 		expect(test_pinned_record.summary_of(REPORT)).toStrictEqual({
-			text: 'unpinned a.ts:4 — reverting it left every related test green\n',
+			text: 'unpinned a.ts:4 — reverting it left every related test green; related tests unavailable; add or strengthen a regression test that fails when this change is reverted\n',
 			counts: 'unpinned 1 · unchecked 0',
 			log: undefined,
 			unpinned: [expect.stringMatching(/^a\.ts [\da-f]{16}$/u)],
