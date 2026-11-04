@@ -29,6 +29,7 @@ import { review_level, type ReviewLevel } from './review-level'
 import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round } from './review-round'
 import { review_round_one_blobs } from './review-round-one-blobs'
+import { review_round_one_skip } from './review-round-one-skip'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 import { review_untouched_readers, type ReadersRead } from './review-untouched-readers'
@@ -441,15 +442,23 @@ const REVIEWER_REFUSAL =
 	'review:brief refused: this is a reviewer session (JOSH_AGENT_ROLE=reviewer). A new brief would drop the attestation this review already left — review the brief you were handed and report.'
 
 async function run_brief(argv: ReadonlyArray<string>, emit: Emit): Promise<number> {
+	if (argv.length === 0) {
+		return await review_round_one_skip.run(
+			await review_round_one_skip.eligible_issue(),
+			async (round, is_full_change) =>
+				await run_review(round, await read_change(), emit, { is_full_change }),
+		)
+	}
+
 	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction(emit)
 
 	const round = review_round.parse_round(argv)
 
 	if (round === undefined) return report_error(USAGE)
 
-	return await run_review(round, await read_change(), emit, {
-		is_full_change: argv.includes(review_round.FULL_CHANGE_FLAG),
-	})
+	const is_full_change = argv.includes(review_round.FULL_CHANGE_FLAG)
+
+	return await run_review(round, await read_change(), emit, { is_full_change })
 }
 
 // `emit` takes the brief: `josh run:review` writes it to a file, because its two briefs together exceed
