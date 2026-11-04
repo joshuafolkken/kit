@@ -15,8 +15,9 @@ run's next single action. `chain-rule.md`, `followup.md`, `background-commands.m
 
 ## The lane-child seam
 
-- **A lane child asks whether it is a resume first — `pnpm josh run:cut --resume <N>`** (`run:entry` asks it
-  before the hold), and takes the cut with `pnpm josh run:cut <N>` at the pre-gate boundary of
+- **A lane child enters once with `pnpm josh run:entry <N>`**, which checks the carried cut before
+  the hold and completes the fresh entry itself; never call `run:cut --resume` separately. It takes
+  the cut with `pnpm josh run:cut <N>` at the pre-gate boundary of
   `chain-rule.md` step 1. On a non-trivial answer `run:cut` prints the section that acts on it. A run
   that is not a lane child never reads the cut's document.
 - **`resume: halfrun`** adopted a stopped `halfrun`: gate in full; `resume: prrun-*` a stopped

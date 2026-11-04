@@ -70,7 +70,7 @@ function is_openai_lane(lane: LaneInfo): boolean {
 }
 
 // The relaunch after a cut: the resume-specific prompt, not the record's bare `fullrun #<N>`,
-// so the successor goes straight to `run:cut --resume` without reading the
+// so the successor goes straight to `run:entry` without reading the
 // workflow-commands entry documents. Shared by `run:cut` and the `run:merge` fallback.
 async function resume(
 	lane: LaneInfo,

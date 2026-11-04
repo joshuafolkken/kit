@@ -61,7 +61,7 @@ function review_invocation(issue: string): string {
 }
 
 function resume_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue ${issue_cite.plain(issue)} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:cut --resume ${issue}\` before anything else and follow the matching verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Only on \`fresh\` proceed as an ordinary`
+	const preamble = `Resuming the lane child for issue ${issue_cite.plain(issue)} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:entry ${issue}\` once before anything else; it checks the carried cut and completes the entry on \`fresh\`. Follow its resume verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Continue this`
 
 	return `${preamble} ${child_invocation(issue)}`
 }

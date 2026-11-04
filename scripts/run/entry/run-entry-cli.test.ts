@@ -123,7 +123,7 @@ beforeEach(() => {
 })
 
 describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and step into one report', () => {
-	it('claims the tree, reads the budget, gathers the reads and prints one composite', async () => {
+	it('opens a fresh run with one entry call (ac-b726d0b0)', async () => {
 		josh_run_mock
 			.mockResolvedValueOnce(FRESH)
 			.mockResolvedValueOnce(HELD)
@@ -257,10 +257,12 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 // refused the fresh session `busy` by its own run's hold and the resume was never asked.
 describe('run_entry_cli.run — a carried cut is resumed before the hold is claimed', () => {
 	it.each([
+		['resume', OK],
 		['resume-impl', OK],
 		['over', 1],
-	])('answers %j with its exit code and claims nothing', async (token, exit) => {
+	])('answers %j from one entry call and claims nothing (ac-b726d0b0)', async (token, exit) => {
 		josh_run_mock.mockResolvedValueOnce({ code: exit, out: token })
+		is_child_mock.mockReturnValue(true)
 
 		const code = await run_entry_cli.run([ISSUE])
 
