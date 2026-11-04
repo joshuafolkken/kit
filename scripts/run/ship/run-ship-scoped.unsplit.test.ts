@@ -35,11 +35,16 @@ vi.mock(import('./run-ship-synced-scope'), async (import_original) => {
 const { run_ship_scoped } = await import('./run-ship-scoped')
 const { run_ship_pair_runs } = await import('./run-ship-pair-runs')
 const { run_ship_narrowed } = await import('./run-ship-narrowed')
+const { run_ship_synced_scope } = await import('./run-ship-synced-scope')
+const { run_ship_lap } = await import('./run-ship-lap')
+const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 
 // joshuafolkken/kit#6185: a merge the import graph could not split named every synced module — 2536
 // files in one ship. It now names nothing, runs the pair as before and logs why.
 
-const UNSPLIT = 'scoped pair: the import graph could not split the merge (no import graph).'
+const FAILURE = 'no import graph could be built'
+const UNSPLIT = run_ship_synced_scope.unsplit_line(FAILURE)
+const NAMED_FILE = 'scripts/run/ship/run-ship-scoped.ts'
 
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
@@ -58,7 +63,7 @@ describe('run_ship_scoped.scoped_pair — a merge the import graph could not spl
 			checks: [],
 			synced: ['a.ts'],
 			overlap: undefined,
-			unsplit: UNSPLIT,
+			unsplit: FAILURE,
 		})
 
 		await run_ship_scoped.scoped_pair()
@@ -74,5 +79,52 @@ describe('run_ship_scoped.scoped_pair — a merge the import graph could not spl
 
 		expect(commands()).toStrictEqual([LINT, TEST])
 		expect(process.stdout.write).not.toHaveBeenCalledWith(`${UNSPLIT}\n`)
+	})
+})
+
+// joshuafolkken/kit#6196: `lane:stats --pairs` reads the named-file count and the split failure off the lap.
+const PAIR_STEP = 'scoped pair'
+
+function lap(): unknown {
+	return vi.mocked(lane_ledger_write.record_ship_lap).mock.calls[0]?.[0]
+}
+
+describe('run_ship_scoped.scoped_pair — the lap of a merge-scoped pair', () => {
+	beforeEach(() => {
+		vi.mocked(lane_ledger_write.record_ship_lap).mockClear()
+	})
+
+	it('records how many files a named run was narrowed to', async () => {
+		read_sync_mock.mockResolvedValue({ checks: [], synced: [NAMED_FILE], overlap: [NAMED_FILE] })
+
+		await run_ship_lap.within('6196', 'gate', run_ship_scoped.scoped_pair)
+
+		expect(commands()).toStrictEqual([`${LINT} ${NAMED_FILE}`, `${TEST} ${NAMED_FILE}`])
+		expect(lap()).toMatchObject({ step: PAIR_STEP, named: 1 })
+		expect(lap()).not.toHaveProperty('unsplit')
+	})
+
+	it('records how many files moved since the pair was last green on this base', async () => {
+		read_sync_mock.mockResolvedValue(undefined)
+		run_ship_narrowed.remember({ files: { [NAMED_FILE]: 'before' }, base: 'base' })
+
+		await run_ship_lap.within('6196', 'gate', run_ship_scoped.scoped_pair)
+
+		expect(commands()).toStrictEqual([`${LINT} ${NAMED_FILE}`, `${TEST} ${NAMED_FILE}`])
+		expect(lap()).toMatchObject({ step: PAIR_STEP, named: 1 })
+	})
+
+	it('records the failure of a merge the import graph could not split', async () => {
+		read_sync_mock.mockResolvedValue({
+			checks: [],
+			synced: ['a.ts'],
+			overlap: undefined,
+			unsplit: FAILURE,
+		})
+
+		await run_ship_lap.within('6196', 'gate', run_ship_scoped.scoped_pair)
+
+		expect(lap()).toMatchObject({ step: PAIR_STEP, unsplit: FAILURE })
+		expect(lap()).not.toHaveProperty('named')
 	})
 })
