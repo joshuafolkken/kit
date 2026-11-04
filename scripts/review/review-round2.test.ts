@@ -38,6 +38,45 @@ function snapshot_of(files: Record<string, string>): FileMapStamp {
 const IMPLEMENTATION = tree_of([SOURCE, BEFORE], [CHANGELOG, BEFORE])
 const SNAPSHOT = snapshot_of(IMPLEMENTATION)
 
+describe('low review level', () => {
+	it('skips verification of a live fix after round one closes', () => {
+		const result = review_round2.decide({
+			level: 'low',
+			base: BASE,
+			is_round_one_closed: true,
+			snapshot: SNAPSHOT,
+			tree: { [SOURCE]: AFTER },
+		})
+
+		expect(result).toMatchObject({ verdict: 'skip', code: 'low', delta: [CHANGELOG, SOURCE] })
+		expect(result.reason).toBe(`low review level has one round: ${CHANGELOG}, ${SOURCE}`)
+	})
+
+	it('keeps unresolved findings required even at low level', () => {
+		const result = review_round2.decide({
+			level: 'low',
+			base: BASE,
+			is_round_one_closed: false,
+			snapshot: SNAPSHOT,
+			tree: { [SOURCE]: AFTER },
+		})
+
+		expect(result.verdict).toBe('required')
+	})
+
+	it('keeps a live fix required at medium level', () => {
+		const result = review_round2.decide({
+			level: 'medium',
+			base: BASE,
+			is_round_one_closed: true,
+			snapshot: SNAPSHOT,
+			tree: { [SOURCE]: AFTER },
+		})
+
+		expect(result).toMatchObject({ verdict: 'required', code: 'live' })
+	})
+})
+
 describe('review_round2.decide — the round is required unless something says otherwise', () => {
 	it('requires the round when the caller did not assert round 1 closed', () => {
 		const decision = review_round2.decide({

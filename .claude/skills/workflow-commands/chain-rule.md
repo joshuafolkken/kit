@@ -23,6 +23,8 @@ Review results and successful pushes are never turn boundaries.
 3. A round for which `review:attest --check` answers `missing` or `mismatch` is discarded uncounted; rerun
    against the brief's checkout. A review error receives a `confirmation` Telegram and stops.
 4. Route the attested verdict mechanically:
+   - Full-change final brief: apply round 2's disposition; record with `--comment`.
+     Interaction stays independent.
    - Clean or Low-only round 1: no second round. Fix, file, or drop each Low with a one-line reason.
    - High/Medium round 1: fix and record it (below), then `ship --review` (step 5) asks
      `review:round2 --record <N>` and runs a due round 2 as `reviewer-verification`.

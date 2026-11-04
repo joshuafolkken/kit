@@ -124,6 +124,7 @@ describe('initial full-change final review', () => {
 		final_brief(findings)
 		expect(await run_ship_review_steps.review_stage(ISSUE)).toHaveProperty('code', OK)
 		expect(commands()).toContain(recorded)
+		expect(record_round_one_mock).not.toHaveBeenCalled()
 	})
 	it.each([
 		[HIGH, HIGH],
