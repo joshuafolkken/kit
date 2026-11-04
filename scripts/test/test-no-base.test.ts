@@ -41,6 +41,12 @@ describe('test_no_base.touching', () => {
 		])
 	})
 
+	it('keeps a base module that imports neither root itself', () => {
+		const wrapper = path.join('scripts', 'git', 'changed-file-scope.ts')
+
+		expect(test_no_base.touching(ROOT, [wrapper])).toStrictEqual([wrapper])
+	})
+
 	it('reads a file the tree no longer holds as touching nothing', () => {
 		expect(test_no_base.touching(ROOT, ['scripts/no-such-file.ts'])).toStrictEqual([])
 	})
@@ -54,9 +60,11 @@ describe('test_no_base.imports_base', () => {
 	it('keeps a file that imports a base-resolution module, by alias or relative path', () => {
 		const aliased = "import { change_base } from '#scripts/git/change-base'\n"
 		const relative = "import { git_diff_reads } from '../git/git-diff-reads'\n"
+		const named_type = "import type from '#scripts/git/change-base'\n"
 
 		expect(test_no_base.imports_base(aliased, FILE, IMPORTS)).toBe(true)
 		expect(test_no_base.imports_base(relative, FILE, IMPORTS)).toBe(true)
+		expect(test_no_base.imports_base(named_type, FILE, IMPORTS)).toBe(true)
 	})
 
 	it.each([

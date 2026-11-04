@@ -31,7 +31,7 @@ const BASE_MODULES: ReadonlySet<string> = new Set([
 ])
 
 // A type-only import erases at run time, so it resolves nothing.
-const TYPE_ONLY_IMPORT = /^import type [^"']*["'][^"']*["']/gmu
+const TYPE_ONLY_IMPORT = /^import type (?!from )[^"']*["'][^"']*["']/gmu
 
 // Kept for `test-related.ts`'s own reading of which files name another: a file it cannot read
 // names nothing.
