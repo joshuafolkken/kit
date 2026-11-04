@@ -154,6 +154,7 @@ const lane_sinks = {
 	over_issues,
 	sinks_of,
 	table,
+	total_ms,
 }
 
 export { lane_sinks }
