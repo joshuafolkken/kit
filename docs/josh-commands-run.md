@@ -1233,6 +1233,10 @@ Under the stage table, the implement stage is broken down from the lane transcri
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
 `review-fix` from `run:review` on, each call's span counted from the previous call's end, less its `lane:pause` time.
 
+The `implement read` table under it splits `read` by lane medians (`lane-implement-read.ts`): the calls' own run time
+(`tool`), the turns before them (`thinking`), the distinct files `Read` opened (`files read`), and how many of those an
+investigator's report cited by `path:line` (`investigator-cited`).
+
 Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts, per check that settled last in `followup`'s CI wait,
 its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
 left to the `coderabbit-wait` row (`followup-ci-path.ts`).
@@ -1327,7 +1331,7 @@ The label is the josh commands a Bash call chains, a `reserved-run` as what it w
 
 `editing & thinking` has no calls, so no lines; the overrun prompt's one-line form leaves them out (`lane-breakdown-calls.ts`).
 
-The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs, hub <file>` — the hub the most capped runs recorded, left off where none did — and none when no run capped a file (`lane-breakdown-related.ts`).
+The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs, hub <file>` — `<N>` the widest run's count, the hub the most capped runs recorded, left off where none did — and none when no run capped a file (`lane-breakdown-related.ts`).
 
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 

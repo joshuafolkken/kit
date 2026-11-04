@@ -39,6 +39,7 @@ describe('lane_transcript_calls.parse — timing', () => {
 				command,
 				subagent: undefined,
 				output: 'ok',
+				file_path: undefined,
 			},
 		])
 	})
@@ -69,6 +70,16 @@ describe('lane_transcript_calls.parse — tool name', () => {
 
 		expect(call?.tool).toBe('Edit')
 		expect(call?.duration_ms).toBe(SEVEN_AND_A_HALF_SECONDS)
+	})
+
+	// joshuafolkken/kit#6188: the implement's read counts the files it read.
+	it('keeps the file path a call names', () => {
+		const file_path = '/repo/a.ts'
+		const block = { type: 'tool_use', id: 'r', name: 'Read', input: { file_path } }
+		const use = JSON.stringify({ timestamp: START, message: { content: [block] } })
+		const [call] = lane_transcript_calls.parse(SOURCE, use)
+
+		expect(call?.file_path).toBe(file_path)
 	})
 })
 
