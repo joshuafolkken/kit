@@ -315,7 +315,7 @@ function report_error(message: string): number {
 // `review:level` command so `--level-only` says why rather than only what.
 function format_reason(paths: ReadonlyArray<string>, level: ReviewLevel): string {
 	if (level === review_level.REDUCED_LEVEL) {
-		return 'every changed path is inert — it neither executes nor instructs'
+		return 'every changed path is inert, documentation, a prompt or a test'
 	}
 
 	const deciding = review_level.deciding_paths(paths)
@@ -337,6 +337,7 @@ async function run_level(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 interface ChangeReading {
+	level: ReviewLevel
 	base: string
 	commit: string | undefined
 	paths: ReadonlyArray<string>
@@ -361,7 +362,7 @@ async function read_change(): Promise<ChangeReading> {
 	const paths = await changed_paths.read_changed_paths(false)
 	const tree = await review_tree.read_changed_tree(paths)
 
-	return { base, commit, paths, tree }
+	return { base, commit, paths, tree, level: review_level.level_for(paths) }
 }
 
 async function record_review(
@@ -377,27 +378,24 @@ async function record_review(
 
 // An interaction brief records nothing: the round-one and briefed stamps describe `/code-review`'s
 // round, which already ran, and retaking them would move the delta round 2 is measured from.
+type ReviewOptions = Pick<ComposeRequest, 'interaction' | 'is_full_change'>
+
 async function run_review(
 	round: number,
 	reading: ChangeReading,
 	emit: Emit,
-	{
-		interaction,
-		is_full_change,
-	}: { interaction?: ReadonlyArray<string>; is_full_change?: boolean } = {},
+	options: ReviewOptions = {},
 ): Promise<number> {
-	const { base, commit, paths, tree } = reading
+	const { commit, tree, level } = reading
 	const refusal = refusal_for_round(reading, round)
 
 	if (refusal !== undefined) return report_error(refusal)
-	const resolved = agent_role_profile.resolve_review(round)
+	const resolved = agent_role_profile.resolve_review(round, process.env, level === 'low')
 
 	if (resolved.kind === 'rejected') return report_error(resolved.note)
 	agent_role_profile.warn_of_default()
-	const { profile } = resolved
-
-	emit(await compose_brief({ round, paths, tree, base, profile, interaction, is_full_change }))
-	if (interaction === undefined) await record_review(round, tree, commit)
+	emit(await compose_brief({ ...reading, round, profile: resolved.profile, ...options }))
+	if (options.interaction === undefined) await record_review(round, tree, commit)
 
 	return 0
 }
