@@ -17,6 +17,8 @@ const OTHER_BASH = 'other bash'
 const GENERAL_PURPOSE = 'subagent: general-purpose'
 const REVIEWER = 'subagent: reviewer'
 const RUN_REVIEW = 'run:review'
+const CHAIN_OPEN = 'run:chain open'
+const OPEN_COMMAND = 'pnpm josh run:chain 1'
 
 const BREAKDOWN: Breakdown = {
 	stages: [{ name: 'implement', ms: IMPLEMENT_TO - IMPLEMENT_FROM }],
@@ -100,9 +102,9 @@ describe('lane_breakdown_implement.of — run:review and ship', () => {
 
 // joshuafolkken/kit#6152: one compound call counts once, under one kind, and run:chain is review time.
 describe('lane_breakdown_implement.of — run:chain', () => {
-	it('counts a chained call once, under run:review when it runs run:chain', () => {
+	it('counts a chained call once, under run:chain open when it runs run:chain', () => {
 		const calls = [
-			bash(11, 5, 'pnpm josh run:chain 1'),
+			bash(11, 5, OPEN_COMMAND),
 			bash(
 				20,
 				5,
@@ -112,7 +114,30 @@ describe('lane_breakdown_implement.of — run:chain', () => {
 
 		expect(kinds_of(calls)).toStrictEqual([
 			[REMAINDER, 41],
-			[RUN_REVIEW, 10],
+			[CHAIN_OPEN, 10],
+		])
+	})
+
+	it('separates open and join, including fixing and resumed joins', () => {
+		const calls = [
+			bash(11, 5, OPEN_COMMAND),
+			bash(20, 2, 'pnpm josh run:chain 1 --join --fixing'),
+			bash(25, 1, 'pnpm josh run:chain 1 --from review:attest --join'),
+		]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 43],
+			[CHAIN_OPEN, 5],
+			['run:chain join', 3],
+		])
+	})
+
+	it('keeps a join flag on a separate command out of the chain arguments', () => {
+		const calls = [bash(11, 5, 'pnpm josh run:chain 1 && pnpm josh run:review --join')]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 46],
+			[CHAIN_OPEN, 5],
 		])
 	})
 })

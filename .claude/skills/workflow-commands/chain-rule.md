@@ -16,7 +16,10 @@ Review results and successful pushes are never turn boundaries.
    (`.claude/agents/reviewer.md`; never a guessed type name).
    Never load the review skill in the main line.
 2. Once the review returns, `pnpm josh run:chain <N> --join` (`--fixing`: round-1 fixes); follow what
-   it prints (`scripts/run/review/run-chain-join.ts`). Never version-bump a child (`pnpm josh release` decides).
+   it prints (`scripts/run/review/run-chain-join.ts`). A complete green gate and pinned answer with no
+   unplanned files on the same tree return without waiting; every miss uses the normal join and its
+   exit codes. Attestation and finding disposition still follow. `lane:breakdown` counts the halves as
+   `run:chain open` and `run:chain join`. Never version-bump a child (`pnpm josh release` decides).
 3. A round for which `review:attest --check` answers `missing` or `mismatch` is discarded uncounted; rerun
    against the brief's checkout. A review error receives a `confirmation` Telegram and stops.
 4. Route the attested verdict mechanically:
