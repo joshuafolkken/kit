@@ -1,5 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
 import { run_board_render } from './run-board-render'
@@ -35,6 +35,13 @@ function line_of(state: ItemStatus['state'], reason?: string, columns = WIDTH): 
 }
 
 describe('run_board_render — finished reasons', () => {
+	beforeEach(() => {
+		vi.stubEnv('TZ', 'UTC')
+	})
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
 	it.each(['withdrawn', 'done'] as const)('ends %s with its reason (ac-0dc7a1df)', (state) => {
 		expect(line_of(state, REASON)).toMatch(new RegExp(`nothing to do · ${state}: ${REASON}$`, 'u'))
 	})
@@ -45,7 +52,7 @@ describe('run_board_render — finished reasons', () => {
 
 	it('preserves a merged row without adding a reason (ac-6fb88544)', () => {
 		expect(line_of('merged')).toBe(
-			'    ✅ 10-08 18:09 6227       Explain why each finished run needs no further …  2°09′00″',
+			'    ✅ 10-08 11:09 6227       Explain why each finished run needs no further …  2°09′00″',
 		)
 		expect(line_of('merged')).not.toContain('nothing to do')
 	})
