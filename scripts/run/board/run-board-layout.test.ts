@@ -225,14 +225,14 @@ describe('run_board_layout.layout_of ending reasons', () => {
 	])
 	const layout = run_board_layout.layout_of(plan_of([]), statuses)
 
-	it('draws the ending reason on a parked or withdrawn row, and none where it gave none', () => {
+	it('draws the ending reason and supplies a withdrawn fallback (ac-2cf701b4)', () => {
 		const reasons = layout.active.map((row) => [row.number, row.reason])
 
 		expect(reasons).toStrictEqual([
 			[1, { tail: CAP }],
 			[4, undefined],
-			[3, undefined],
-			[2, { tail: 'superseded' }],
+			[3, { tail: 'nothing to do · withdrawn: run withdrawn' }],
+			[2, { tail: 'nothing to do · withdrawn: superseded' }],
 		])
 	})
 
