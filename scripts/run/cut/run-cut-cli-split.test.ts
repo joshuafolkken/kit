@@ -17,10 +17,10 @@ const {
 run_cut_cli_fixture.install()
 
 const FAILURE_EXIT_CODE = 1
-const NOTE = 'got the split notice and has neither a recorded reason nor a split child'
+const NOTE = 'got the split notice and has no split child'
 
 // joshuafolkken/kit#4695: the pre-gate cut is the boundary the split notice names, so a lane that got
-// it and neither split nor recorded why stops there — cut or no cut — and is told how to answer.
+// it without a split child stops there — cut or no cut — and is told how to answer.
 describe('the pre-gate cut of a lane that got the split notice', () => {
 	it('refuses an unanswered notice without cutting or relaunching', async () => {
 		split_refusal.mockResolvedValue(NOTE)
