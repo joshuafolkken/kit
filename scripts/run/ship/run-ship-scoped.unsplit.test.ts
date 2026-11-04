@@ -104,6 +104,16 @@ describe('run_ship_scoped.scoped_pair — the lap of a merge-scoped pair', () =>
 		expect(lap()).not.toHaveProperty('unsplit')
 	})
 
+	it('records how many files moved since the pair was last green on this base', async () => {
+		read_sync_mock.mockResolvedValue(undefined)
+		run_ship_narrowed.remember({ files: { [NAMED_FILE]: 'before' }, base: 'base' })
+
+		await run_ship_lap.within('6196', 'gate', run_ship_scoped.scoped_pair)
+
+		expect(commands()).toStrictEqual([`${LINT} ${NAMED_FILE}`, `${TEST} ${NAMED_FILE}`])
+		expect(lap()).toMatchObject({ step: PAIR_STEP, named: 1 })
+	})
+
 	it('records the failure of a merge the import graph could not split', async () => {
 		read_sync_mock.mockResolvedValue({
 			checks: [],
