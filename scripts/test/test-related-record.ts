@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { test_related_cap } from './test-related-cap'
 import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { unit_count_file } from './unit-count-file'
@@ -104,7 +105,9 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 // **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): a synced file
 // the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what
 // neither a main sync nor the map's tree joined.
-function own_of(input: RunInput): ReadonlyArray<string> {
+function own_of(
+	input: Pick<RunInput, 'changed' | 'synced' | 'since_map' | 'branch'>,
+): ReadonlyArray<string> {
 	const { changed = [], branch } = input
 	const joined = new Set([...input.synced, ...input.since_map])
 
@@ -137,15 +140,14 @@ function reuse_record(reuse: TestReuse | undefined): Partial<TestRelatedRecord> 
 	}
 }
 
-// How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699). The hub is the widest
-// of the run's own change (joshuafolkken/kit#5756): the cap reads the whole input, a main merge and the
-// map's tree among it, and a file the lane never edited is no hub of its run.
+// How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699) — the one the run's
+// summary line names (`test_related_cap.hub_of`).
 function over_cap_record(
 	over_cap: ReadonlyArray<string> | undefined,
 	own: ReadonlyArray<string>,
 ): Pick<TestRelatedRecord, 'over_cap' | 'over_cap_hub'> {
 	if (over_cap === undefined) return {}
-	const hub = over_cap.find((file) => own.includes(file))
+	const hub = test_related_cap.hub_of(over_cap, own)
 	const count = { over_cap: over_cap.length }
 
 	return hub === undefined ? count : { ...count, over_cap_hub: hub }
@@ -176,7 +178,7 @@ async function record_run(input: RunInput, result: RunResult, ledger?: string): 
 	await lane_ledger_write.record_test_related({ ...record_of(input, result), issue }, ledger)
 }
 
-const test_related_record = { record_of, record_run, with_test_count }
+const test_related_record = { own_of, record_of, record_run, with_test_count }
 
 export type { RunInput, RunResult }
 export { test_related_record }

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { test_related_cap } from './test-related-cap'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope } from './test-related-scope'
 import { unit_count_file } from './unit-count-file'
@@ -156,6 +157,20 @@ describe('test_related_record.record_of — the reach cap', () => {
 
 		expect(record.over_cap).toBe(2)
 		expect(record).not.toHaveProperty('over_cap_hub')
+	})
+})
+
+// joshuafolkken/kit#6187: the record carries the count and the hub the run's summary line printed.
+describe('test_related_record.record_of — the summary line of the same run', () => {
+	it('records the count and the hub the summary line of the same run names', () => {
+		const over_cap = [SYNCED_CHANGE, SINCE_MAP_CHANGE, OWN_CHANGE]
+		const input: RunInput = { ...related_input(), branch: [OWN_CHANGE], over_cap }
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+		const capped = { importers: new Map(over_cap.map((file) => [file, [READER_TEST]])), over_cap }
+		const line = test_related_cap.over_cap_line(capped, test_related_record.own_of(input))
+
+		expect(line).toContain(`${String(record.over_cap)} over cap`)
+		expect(line).toContain(`hub ${String(record.over_cap_hub)} —`)
 	})
 })
 

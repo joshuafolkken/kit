@@ -79,7 +79,7 @@ describe('test_related_cap.capped_importers at and past the cap', () => {
 
 		expect(capped.over_cap).toEqual([WIDE_MODULE])
 		expect(scope_of(workspace, capped).files).toEqual([path.join(workspace, DIRECT_TEST)])
-		expect(test_related_cap.over_cap_line(capped)).toContain('1 over cap')
+		expect(test_related_cap.over_cap_line(capped, [WIDE_MODULE])).toContain('1 over cap')
 	})
 
 	it('leaves a file at the cap to vitest, as before', async () => {
@@ -93,7 +93,7 @@ describe('test_related_cap.capped_importers at and past the cap', () => {
 
 		expect(capped.over_cap).toEqual([])
 		expect(scope_of(workspace, capped).files).toEqual([path.join(workspace, WIDE_MODULE)])
-		expect(test_related_cap.over_cap_line(capped)).toBeUndefined()
+		expect(test_related_cap.over_cap_line(capped, [WIDE_MODULE])).toBeUndefined()
 	})
 })
 
@@ -117,9 +117,39 @@ describe('test_related_cap.over_cap_line naming the hub', () => {
 			reader_of(MAX_TEST_FILES + 1),
 		)
 
-		expect(test_related_cap.over_cap_line(capped)).toContain(
+		expect(test_related_cap.over_cap_line(capped, [WIDE_MODULE])).toContain(
 			`hub ${WIDE_MODULE} — 1 test files run`,
 		)
+	})
+})
+
+// joshuafolkken/kit#6187: the line names the hub the lane ledger records — the widest capped file of
+// the run's own change, not a wider one a main merge brought in.
+describe('test_related_cap.over_cap_line and the ledger hub', () => {
+	const merged = 'scripts/merged-hub.ts'
+	const capped = {
+		importers: new Map([
+			[merged, [DIRECT_TEST]],
+			[WIDE_MODULE, [DIRECT_TEST]],
+		]),
+		over_cap: [merged, WIDE_MODULE],
+	}
+
+	it('names the widest capped file of the own change, as the ledger does', () => {
+		const own = [WIDE_MODULE]
+
+		expect(test_related_cap.hub_of(capped.over_cap, own)).toBe(WIDE_MODULE)
+		expect(test_related_cap.over_cap_line(capped, own)).toContain(
+			`2 over cap (${String(MAX_TEST_FILES)} test files), hub ${WIDE_MODULE} — 1 test files run`,
+		)
+	})
+
+	it('names no hub where no capped file is of the own change', () => {
+		const line = test_related_cap.over_cap_line(capped, [])
+
+		expect(test_related_cap.hub_of(capped.over_cap, [])).toBeUndefined()
+		expect(line).toContain('2 over cap')
+		expect(line).not.toContain('hub ')
 	})
 })
 

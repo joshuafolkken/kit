@@ -26,11 +26,13 @@ function row(issue: number, over_cap?: number): LedgerEntry {
 }
 
 describe('lane_breakdown_related.over_cap_text', () => {
-	it('sums the over cap files of the lane runs alone', () => {
+	// joshuafolkken/kit#6187: the count is the widest run's, the one its summary line printed, not a sum
+	// counting one capped file once a run.
+	it('prints the widest over cap count of the lane runs alone', () => {
 		const entries = [row(ISSUE, 1), row(ISSUE), row(ISSUE, 2), row(OTHER_ISSUE, 4)]
 
 		expect(lane_breakdown_related.over_cap_text(entries, ISSUE)).toBe(
-			'test:related 3 over cap, in 2 of 3 runs',
+			'test:related 2 over cap, in 2 of 3 runs',
 		)
 	})
 
@@ -43,7 +45,7 @@ describe('lane_breakdown_related.over_cap_text', () => {
 		]
 
 		expect(lane_breakdown_related.over_cap_text(entries, ISSUE)).toBe(
-			`test:related 4 over cap, in 3 of 3 runs, hub ${SECOND_HUB}`,
+			`test:related 2 over cap, in 3 of 3 runs, hub ${SECOND_HUB}`,
 		)
 	})
 
