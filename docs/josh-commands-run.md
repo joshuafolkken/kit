@@ -977,7 +977,7 @@ pnpm josh run:handoff backlogrun <E> --only                         # josh backl
 
 <!-- /usage -->
 
-For a session on a consultation model (Fable / Astra): the child runs on its provider at the role profile's model (`kickoff` scheduler, else worker). Background a `kickoff`; it can outlast the Bash timeout.
+Consultation main (Fable / Astra): uses its provider's role profile (`kickoff` scheduler, else worker). Background `kickoff`. Lane children cannot use `run:handoff`: exit 1 before launch; continue in the current session.
 
 **Output / exit codes:** exits 0 once the child starts (`kickoff`: once it exits 0); `backlogrun` exits with `josh backlogrun`'s code. A bad argument, an unreadable brief, an unresolvable profile, no git repository, a failed start, or a tree hold that blocks the child's `run:entry` claim exits 1.
 

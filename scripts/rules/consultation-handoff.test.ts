@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { consultation_handoff } from './consultation-handoff'
 import { delivered_rules } from './delivered-rules'
 
@@ -113,6 +114,19 @@ describe('consultation-handoff — a Codex payload', () => {
 
 	it('lets run:entry through on Sol 6.1', () => {
 		expect(codex_delivered(SOL, ENTRY)).not.toBe(ROW.reason)
+	})
+})
+
+describe('consultation-handoff — lane children', () => {
+	it.each([FABLE, ASTRA])('lets a lane child on %s enter its own run', (model) => {
+		const child = vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+
+		try {
+			expect(codex_delivered(model, ENTRY)).not.toBe(ROW.reason)
+			expect(codex_delivered(model, 'pnpm josh run:hold 12')).not.toBe(ROW.reason)
+		} finally {
+			child.mockRestore()
+		}
 	})
 })
 
