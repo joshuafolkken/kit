@@ -101,6 +101,27 @@ describe('lane_implement_rate.minutes_for', () => {
 	})
 })
 
+describe('lane_implement_rate.lines_for', () => {
+	it('inverts the measured minutes using the shared rate unit', () => {
+		const measured = { median: 17.7, lanes: 1 }
+		const lines = lane_implement_rate.lines_for(12, measured)
+
+		expect(lines).toBeCloseTo(1200 / 17.7)
+		expect(lane_implement_rate.minutes_for(lines ?? 0, measured)).toBeCloseTo(12)
+	})
+
+	it('has no projection without a measurement', () => {
+		expect(lane_implement_rate.lines_for(12, undefined)).toBeUndefined()
+	})
+
+	it.each([0, -1, NaN, Infinity, -Infinity])(
+		'has no projection for an invalid rate %s',
+		(median) => {
+			expect(lane_implement_rate.lines_for(12, { median, lanes: 1 })).toBeUndefined()
+		},
+	)
+})
+
 describe('lane_implement_rate.table', () => {
 	it('prints the lane count and the median, a dash when none is measured', () => {
 		expect(row([...lane(1, 30, 200)])).toBe('| 1 | 15.0 |')
