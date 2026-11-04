@@ -109,26 +109,42 @@ function capped_test_count(capped: CappedImporters): number {
 	return new Set(tests).size
 }
 
+// **The hub is the widest capped file of the run's own change** (joshuafolkken/kit#5756): the cap reads
+// the whole input, a main merge and the map's tree among it, and a file the lane never edited is no hub
+// of its run. The summary line and the lane ledger both name it, so `josh lane:why` reads the hub the
+// run printed (joshuafolkken/kit#6187).
+function hub_of(over_cap: ReadonlyArray<string>, own: ReadonlyArray<string>): string | undefined {
+	return over_cap.find((file) => own.includes(file))
+}
+
 // The summary line of a capped run, none where the cap narrowed nothing: the hub, and how many test
 // files ran in place of the reach (joshuafolkken/kit#5699).
-function over_cap_line(capped: CappedImporters): string | undefined {
+function over_cap_line(capped: CappedImporters, own: ReadonlyArray<string>): string | undefined {
 	const { over_cap } = capped
-	const [hub] = over_cap
-	if (hub === undefined) return undefined
+	if (over_cap.length === 0) return undefined
 	const { COMMAND_LABEL } = related_scope
 	const cap = String(test_pinned_logic.MAX_TEST_FILES)
 	const ran = String(capped_test_count(capped))
+	const hub = hub_of(over_cap, own)
+	const hub_part = hub === undefined ? '' : `, hub ${hub}`
 
-	return `${COMMAND_LABEL}: ${String(over_cap.length)} over cap (${cap} test files), hub ${hub} — ${ran} test files run, the rest unchecked: ${over_cap.join(', ')}`
+	return `${COMMAND_LABEL}: ${String(over_cap.length)} over cap (${cap} test files)${hub_part} — ${ran} test files run, the rest unchecked: ${over_cap.join(', ')}`
 }
 
-function report_over_cap(capped: CappedImporters): void {
-	const line = over_cap_line(capped)
+function report_over_cap(capped: CappedImporters, own: ReadonlyArray<string>): void {
+	const line = over_cap_line(capped, own)
 
 	if (line !== undefined) process.stdout.write(`${line}\n`)
 }
 
-const test_related_cap = { NO_CAP, capped_importers, over_cap_line, over_cap_of, report_over_cap }
+const test_related_cap = {
+	NO_CAP,
+	capped_importers,
+	hub_of,
+	over_cap_line,
+	over_cap_of,
+	report_over_cap,
+}
 
 export type { CappedImporters, CountReader }
 export { test_related_cap }

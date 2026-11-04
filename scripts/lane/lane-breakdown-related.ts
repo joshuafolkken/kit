@@ -1,7 +1,7 @@
 import { lane_ledger, type LedgerEntry, type TestRelatedEntry } from './lane-ledger'
 
 // What a lane's `josh test:related` runs left unchecked (joshuafolkken/kit#5532): the changed files
-// past the reach cap, run by their direct importers alone, summed over the lane's runs.
+// past the reach cap, run by their direct importers alone, over the lane's runs.
 
 const LABEL = 'test:related'
 
@@ -21,10 +21,12 @@ function top_hub(rows: ReadonlyArray<TestRelatedEntry>): string | undefined {
 	return [...tally].toSorted((first, second) => second[1] - first[1])[0]?.[0]
 }
 
-// The line `josh lane:breakdown` prints, `''` when no run of `issue` capped a file.
+// The line `josh lane:breakdown` prints, `''` when no run of `issue` capped a file. The count is the
+// widest run's, the number its own summary line printed: a sum over runs counts one capped file once a
+// run (joshuafolkken/kit#6187).
 function over_cap_text(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
 	const rows = entries.filter((entry) => is_lane_row(entry, issue))
-	const over_cap = rows.reduce((sum, row) => sum + (row.over_cap ?? 0), 0)
+	const over_cap = Math.max(0, ...rows.map((row) => row.over_cap ?? 0))
 	if (over_cap === 0) return ''
 	const capped = rows.filter((row) => (row.over_cap ?? 0) > 0).length
 	const hub = top_hub(rows)

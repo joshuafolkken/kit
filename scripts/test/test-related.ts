@@ -13,6 +13,7 @@ import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_cap, type CappedImporters } from './test-related-cap'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
+import { test_related_record } from './test-related-record'
 import { test_related_red, type RedReading, type RelatedInput } from './test-related-red'
 import { test_related_reuse } from './test-related-reuse'
 import { test_related_run } from './test-related-run'
@@ -292,6 +293,11 @@ function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
 	return red?.owed ?? []
 }
 
+// The summary line names the hub the ledger records: the widest capped file of the run's own change.
+function report_capped(capped: CappedImporters, change: ChangeReading): void {
+	test_related_cap.report_over_cap(capped, test_related_record.own_of(change))
+}
+
 async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
@@ -301,12 +307,11 @@ async function read_run_input(
 	const red = await test_related_red.read_red(before)
 	const change = await read_change(root, command_arguments, is_whole, red)
 	const capped = await capped_of(root, change, is_whole)
+	const { changed, synced = [], since_map = [], branch } = change
 
-	test_related_cap.report_over_cap(capped)
+	report_capped(capped, change)
 	const scope = await resolve_change(root, change, capped)
 	const reuse = await test_related_reuse.read(root, scope, red === undefined ? before : undefined)
-
-	const { changed, synced = [], since_map = [], branch } = change
 
 	return {
 		scope,
