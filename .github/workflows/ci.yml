@@ -668,22 +668,23 @@ jobs:
           SCOPE_RESULT: ${{ needs.change-scope.result }}
           RUNTIME_CHANGED: ${{ needs.change-scope.outputs.runtime }}
         run: |
+          readonly SUCCESS='success'
           echo "Reuse PR Checks: ${REUSE_RESULT}"
           echo "Static Checks: ${STATIC_RESULT}"
           echo "Unit Tests: ${UNIT_RESULT}"
           echo "Node builds: ${NODE_RESULT}"
-          if [ "${SCOPE_RESULT}" != 'success' ]; then
+          if [ "${SCOPE_RESULT}" != "${SUCCESS}" ]; then
             echo "::error::change classification did not pass"
             exit 1
           fi
-          if [ "${NODE_RESULT}" != 'success' ]; then
+          if [ "${NODE_RESULT}" != "${SUCCESS}" ]; then
             echo "::error::the Node build matrix did not pass"
             exit 1
           fi
-          if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'success' ]; then
+          if [ "${STATIC_RESULT}" = "${SUCCESS}" ] && [ "${UNIT_RESULT}" = "${SUCCESS}" ]; then
             exit 0
           fi
-          if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'skipped' ] && [ "${RUNTIME_CHANGED}" = 'false' ]; then
+          if [ "${STATIC_RESULT}" = "${SUCCESS}" ] && [ "${UNIT_RESULT}" = 'skipped' ] && [ "${RUNTIME_CHANGED}" = 'false' ]; then
             exit 0
           fi
           if [ "${REUSE_RESULT}" = 'true' ] && [ "${STATIC_RESULT}" = 'skipped' ] && \

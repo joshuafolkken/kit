@@ -36,6 +36,18 @@ function aggregate_exit_status(results: Readonly<Record<string, string>>): numbe
 }
 
 describe('the Checks job fails unless the Node build matrix passed', () => {
+	it('rejects failed static checks even when documentation unit shards are skipped', () => {
+		expect(
+			aggregate_exit_status({
+				...FRESH_RUN,
+				NODE_RESULT: 'success',
+				STATIC_RESULT: 'failure',
+				UNIT_RESULT: 'skipped',
+				RUNTIME_CHANGED: 'false',
+			}),
+		).not.toBe(0)
+	})
+
 	it('accepts skipped unit shards only for proven documentation changes', () => {
 		const skipped = { ...FRESH_RUN, NODE_RESULT: 'success', UNIT_RESULT: 'skipped' }
 
