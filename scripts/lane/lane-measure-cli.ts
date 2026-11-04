@@ -9,10 +9,12 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { lane_limit_history } from './lane-limit-history'
 import { lane_net_read } from './lane-net-read'
 import { lane_over } from './lane-over'
+import { lane_pairs } from './lane-pairs'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_sinks } from './lane-sinks'
 import { lane_sinks_issues } from './lane-sinks-issues'
 import { lane_stats, type StatsWindow } from './lane-stats'
+import { lane_stats_request, type StatsRequest } from './lane-stats-request'
 import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
@@ -44,18 +46,13 @@ const USAGE = [
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
 	'       josh lane:stats --period <days> --sinks [<minutes>]',
 	'       josh lane:stats --period <days> --over <minutes>',
+	'       josh lane:stats --period <days> --pairs',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
 	`       josh lane:value ${CELL_METRIC} --table <title> [--row <label>] [--where <header>=<text>] --column <header> [--item <label>] [--zero] --since <instant>`,
 	'       josh lane:net <issue>',
 ].join('\n')
 
 const SAMPLE_OPTIONS = { every: { type: 'string' } } as const
-const STATS_OPTIONS = {
-	period: { type: 'string' },
-	limit: { type: 'string' },
-	sinks: { type: 'boolean' },
-	over: { type: 'string' },
-} as const
 const VALUE_OPTIONS = {
 	since: { type: 'string' },
 	table: { type: 'string' },
@@ -74,13 +71,6 @@ function refuse(): number {
 	return FAILURE_EXIT_CODE
 }
 
-// A positive finite number, or `undefined` for anything else — a typo must not become a zero period.
-function positive(text: string | undefined): number | undefined {
-	const value = Number(text)
-
-	return text !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
-}
-
 // The `--every` interval: `{ seconds: undefined }` for a single sample, `undefined` for a refusal.
 function sample_interval(rest: ReadonlyArray<string>): { seconds: number | undefined } | undefined {
 	const values = cli_flags.values_of(rest, SAMPLE_OPTIONS)
@@ -89,7 +79,7 @@ function sample_interval(rest: ReadonlyArray<string>): { seconds: number | undef
 
 	if (values.every === undefined) return { seconds: undefined }
 
-	const seconds = positive(values.every)
+	const seconds = lane_stats_request.positive(values.every)
 
 	return seconds === undefined ? undefined : { seconds }
 }
@@ -139,71 +129,6 @@ async function period_records(
 	}
 }
 
-interface StatsRequest {
-	period_days: number
-	limit: string | undefined
-	// The `--sinks` threshold in minutes, `undefined` for the period's row and tables.
-	sinks: number | undefined
-	// The `--over` threshold in minutes, `undefined` without the flag.
-	over: number | undefined
-}
-
-// The sinks table labels no lane limit, so `--limit` beside `--sinks` is refused.
-function sink_threshold(
-	limit: string | undefined,
-	positionals: ReadonlyArray<string>,
-): number | undefined {
-	const [given, ...more] = positionals
-
-	if (limit !== undefined) return undefined
-
-	if (given === undefined) return lane_sinks.DEFAULT_MINUTES
-
-	return more.length === 0 ? positive(given) : undefined
-}
-
-// `--sinks` reads one optional threshold after it; without the flag a positional is refused.
-function sink_choice(
-	values: { sinks?: boolean | undefined; limit?: string | undefined },
-	positionals: ReadonlyArray<string>,
-): { minutes: number | undefined } | undefined {
-	if (values.sinks === true) {
-		const minutes = sink_threshold(values.limit, positionals)
-
-		return minutes === undefined ? undefined : { minutes }
-	}
-
-	return positionals.length === 0 ? { minutes: undefined } : undefined
-}
-
-// `--over` reads a positive threshold and labels no lane limit nor sink, so either beside it is refused.
-function over_choice(values: {
-	over?: string | undefined
-	sinks?: boolean | undefined
-	limit?: string | undefined
-}): { minutes: number | undefined } | undefined {
-	if (values.over === undefined) return { minutes: undefined }
-
-	const minutes = positive(values.over)
-	const is_alone = values.sinks !== true && values.limit === undefined
-
-	return minutes === undefined || !is_alone ? undefined : { minutes }
-}
-
-function stats_request(rest: ReadonlyArray<string>): StatsRequest | undefined {
-	const parsed = cli_flags.arguments_of(rest, STATS_OPTIONS)
-
-	if (parsed === undefined) return undefined
-
-	const period_days = positive(parsed.values.period)
-	const choice = sink_choice(parsed.values, parsed.positionals)
-	const over = over_choice(parsed.values)
-
-	if (period_days === undefined || choice === undefined || over === undefined) return undefined
-
-	return { period_days, limit: parsed.values.limit, sinks: choice.minutes, over: over.minutes }
-}
-
 type LedgerTable = typeof lane_sinks.table
 
 // The `--over` or `--sinks` table with its threshold, `undefined` for the period's row and tables.
@@ -235,6 +160,7 @@ async function stats_text(
 	const choice = table_choice(request)
 
 	if (choice !== undefined) return await threshold_text(choice, context, window)
+	if (request.is_pairs) return lane_pairs.table(await lane_net_read.read_ledger(context), window)
 
 	const records = await period_records(context, window)
 	const limit = await lane_limit_history.label(request.limit, records.entries, window)
@@ -248,7 +174,7 @@ async function stats_command(
 	rest: ReadonlyArray<string>,
 	context: MeasureContext,
 ): Promise<number> {
-	const request = stats_request(rest)
+	const request = lane_stats_request.stats_request(rest)
 
 	if (request === undefined) return refuse()
 
