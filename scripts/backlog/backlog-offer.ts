@@ -39,6 +39,7 @@ interface OfferAnswer {
 	issues: ReadonlyArray<string>
 	// The consecutive-retry count after this ask — reset to zero by any answer that is not `retry`.
 	retries: number
+	not_before_ms?: number
 	// Why a `wait` answer started nothing, where `backlog:next` said: `solo` for the `run:solo` gate,
 	// so `lane:stats` rows that wait apart from every other one (joshuafolkken/kit#4396); `chain`,
 	// `gate` or `chain+gate` for the waits `backlog-wait-cause.ts` names (joshuafolkken/kit#4513).
@@ -97,13 +98,19 @@ function without_triage(tokens: ReadonlyArray<string>): ReadonlyArray<string> {
 
 // What `backlog:next`'s stderr says a blocked wait was for: the `run:solo` gate's notice first, then
 // the waiting issues' causes, or nothing when it names neither.
-function blocked_cause(error: string): Pick<OfferAnswer, 'cause' | 'waiting'> {
+function blocked_cause(error: string): Pick<OfferAnswer, 'cause' | 'waiting' | 'not_before_ms'> {
 	if (epic_solo.is_solo_wait(error)) return { cause: SOLO_CAUSE }
 
 	const causes = backlog_wait_cause.parse(error)
 	const tag = backlog_wait_cause.tag_of(causes)
 
-	return tag === undefined ? {} : { cause: tag, waiting: backlog_wait_cause.numbers_of(causes) }
+	return tag === undefined
+		? {}
+		: {
+				cause: tag,
+				waiting: backlog_wait_cause.numbers_of(causes),
+				...(causes.not_before_ms !== undefined && { not_before_ms: causes.not_before_ms }),
+			}
 }
 
 // A `wait` answer marked with its cause. An `exhausted` wait is marked too: the idle watch it opens

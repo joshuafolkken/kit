@@ -13,7 +13,9 @@ import { issue_not_before } from '#scripts/issue/issue-not-before'
 
 type WaitCause = 'chain' | 'gate'
 
-type WaitCauses = Readonly<Record<WaitCause, ReadonlyArray<number>>>
+type WaitCauses = Readonly<Record<WaitCause, ReadonlyArray<number>>> & {
+	not_before_ms?: number
+}
 
 const CAUSES: ReadonlyArray<WaitCause> = ['chain', 'gate']
 const MARKS: Readonly<Record<WaitCause, string>> = {
@@ -23,6 +25,7 @@ const MARKS: Readonly<Record<WaitCause, string>> = {
 const TAG_SEPARATOR = '+'
 const ISSUE_PATTERN = /#(\d+)/gu
 const CLOSED_STATE = 'CLOSED'
+const DEADLINE_MARK = 'Next start time: '
 
 // `blocked_by` keeps a relation after its blocker closes, so a candidate the overlap separation moved
 // to `waiting` would read as a chain on the closed relation alone.
@@ -37,6 +40,15 @@ function cause_of(child: EpicChild): WaitCause | undefined {
 	return has_open_blocker(child) ? 'chain' : undefined
 }
 
+function deadline_of(children: ReadonlyArray<EpicChild>): { not_before_ms?: number } {
+	const dates = children
+		.filter((child) => cause_of(child) === 'gate')
+		.map((child) => issue_not_before.waiting_ms(child.body))
+		.filter((date): date is number => date !== undefined)
+
+	return dates.length === 0 ? {} : { not_before_ms: Math.min(...dates) }
+}
+
 function numbers_with(children: ReadonlyArray<EpicChild>, cause: WaitCause): Array<number> {
 	return children.filter((child) => cause_of(child) === cause).map((child) => child.number)
 }
@@ -45,7 +57,11 @@ function numbers_with(children: ReadonlyArray<EpicChild>, cause: WaitCause): Arr
 function classify(children: ReadonlyArray<EpicChild>, repo: string): WaitCauses {
 	const here = children.filter((child) => child.repo === repo)
 
-	return { chain: numbers_with(here, 'chain'), gate: numbers_with(here, 'gate') }
+	return {
+		chain: numbers_with(here, 'chain'),
+		gate: numbers_with(here, 'gate'),
+		...deadline_of(here),
+	}
 }
 
 function cited(numbers: ReadonlyArray<number>): string {
@@ -53,9 +69,13 @@ function cited(numbers: ReadonlyArray<number>): string {
 }
 
 function lines_of(causes: WaitCauses): ReadonlyArray<string> {
-	return CAUSES.filter((cause) => causes[cause].length > 0).map(
+	const lines = CAUSES.filter((cause) => causes[cause].length > 0).map(
 		(cause) => `${MARKS[cause]} ${cited(causes[cause])}`,
 	)
+
+	return causes.not_before_ms === undefined
+		? lines
+		: [...lines, `${DEADLINE_MARK}${String(causes.not_before_ms)}`]
 }
 
 // The numbers on the cause's line; a linkified `[#N](…/issues/N)` still reads as one `#N`.
@@ -66,7 +86,14 @@ function numbers_on(text: string, cause: WaitCause): ReadonlyArray<number> {
 }
 
 function parse(text: string): WaitCauses {
-	return { chain: numbers_on(text, 'chain'), gate: numbers_on(text, 'gate') }
+	const deadline = text.split('\n').find((line) => line.startsWith(DEADLINE_MARK))
+	const not_before_ms = Number(deadline?.slice(DEADLINE_MARK.length))
+
+	return {
+		chain: numbers_on(text, 'chain'),
+		gate: numbers_on(text, 'gate'),
+		...(Number.isFinite(not_before_ms) && { not_before_ms }),
+	}
 }
 
 // `chain`, `gate` or `chain+gate` — the held reason's last part — or `undefined` when neither applies.

@@ -29,6 +29,7 @@ import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-lau
 import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
+import { backlog_offer_timing, type LoopRun, type OfferTiming } from './backlog-offer-timing'
 
 const { MERGE_TOKEN } = run_merge_token
 const { HANDOFF_TOKENS, IMMEDIATE_TOKENS, TOKEN_HANDLING } = backlog_drive_token_handling
@@ -52,7 +53,7 @@ const TRIAGE_TOKEN = epic_triage.TRIAGE_VERDICT
 const USAGE_LIMIT_REASON = 'usage-limit'
 const { launch_all } = backlog_drive_launch_pass
 
-interface OfferRead extends HeldWaiting {
+interface OfferRead extends HeldWaiting, OfferTiming {
 	verdict: string
 	issues: ReadonlyArray<string>
 	retries: number
@@ -69,7 +70,7 @@ interface OfferRead extends HeldWaiting {
 	is_finish?: boolean | undefined
 }
 
-interface DriveState {
+interface DriveState extends OfferTiming {
 	// The children this run has in flight — seeded from the open lanes, so a restarted loop resumes them.
 	in_flight: Array<string>
 	// Every child merged, fed back to `backlog:offer` because GitHub closes a merged issue late. A parked
@@ -325,7 +326,13 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 
 	if (read === undefined) return ended('offer', state)
 
-	const next = { ...state, retries: read.retries, is_memory_held: false }
+	const next = {
+		...state,
+		retries: read.retries,
+		is_memory_held: false,
+		not_before_ms: read.not_before_ms,
+		idle_until_ms: read.idle_until_ms,
+	}
 
 	if (read.verdict === RUN_VERDICT) return await run_then_judge(read, next, ports)
 	if (await backlog_drive_judge.is_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
@@ -383,30 +390,20 @@ interface LoopPorts extends DrivePorts {
 	on_state: (state: DriveState) => void
 }
 
-interface LoopRun {
-	state: DriveState
-	started_ms: number
-	offered_ms: number
-}
-
 const WINDOW_END: DriveEnd = { reason: 'window', token: undefined, issue: undefined }
-
-function is_window_spent(run: LoopRun, config: LoopConfig, now_ms: number): boolean {
-	if (config.window_ms === undefined) return false
-
-	return now_ms - run.started_ms >= config.window_ms
-}
 
 type LoopStep = { kind: 'end'; end: DriveEnd } | { kind: 'next'; run: LoopRun }
 
-// One pass of the loop: the offer is due on the first pass and then no oftener than `offer_ms`, bar the
-// passes that collected a child and the one that finds a memory hold cleared. A `next` carries the run
-// to sleep on and pass again.
+// A dated wait asks again at its deadline; other waits keep `offer_ms`. A collected child or cleared
+// memory hold can still ask immediately.
 async function loop_step(run: LoopRun, config: LoopConfig, ports: LoopPorts): Promise<LoopStep> {
 	const now_ms = ports.now().getTime()
-	const is_due =
-		now_ms - run.offered_ms >= config.offer_ms ||
-		(await backlog_drive_memory.is_cleared(run.state, ports))
+	const due_ms = backlog_offer_timing.due_ms(
+		backlog_offer_timing.deadline_of(run.state),
+		run.offered_ms,
+		config.offer_ms,
+	)
+	const is_due = now_ms >= due_ms || (await backlog_drive_memory.is_cleared(run.state, ports))
 	const result = await run_pass(run.state, is_due, ports)
 
 	ports.on_state(result.state)
@@ -415,7 +412,7 @@ async function loop_step(run: LoopRun, config: LoopConfig, ports: LoopPorts): Pr
 
 	const next = { ...run, state: result.state, offered_ms: is_due ? now_ms : run.offered_ms }
 
-	return is_window_spent(next, config, ports.now().getTime())
+	return backlog_offer_timing.is_window_spent(next, config, ports.now().getTime())
 		? { kind: 'end', end: WINDOW_END }
 		: { kind: 'next', run: next }
 }
@@ -434,7 +431,13 @@ async function run_loop(
 
 			return step.kind === 'end' ? step.end : undefined
 		},
-		{ interval_ms: config.poll_ms, sleeper: ports.sleep },
+		{
+			interval_ms: config.poll_ms,
+			sleeper: backlog_offer_timing.sleeper(
+				() => backlog_offer_timing.deadline_of(progress.run.state),
+				ports,
+			),
+		},
 	)
 
 	if (end.reason === STOP_VERDICT) await ports.finish(end)
