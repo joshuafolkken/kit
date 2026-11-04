@@ -46,6 +46,19 @@ describe('run_stalled.row_text', () => {
 })
 
 describe('run_stalled.next_step', () => {
+	it('repairs the dedicated stale hand-off cause before retry (ac-ee2a4e59)', () => {
+		const step = run_stalled.next_step(CHILD, run_stalled.STALE_HANDOFF.why)
+
+		expect(step).toContain('repair the stale hand-off cut record with `pnpm josh run:cut --end`')
+		expect(step).toContain('(retry alone does not clear it), then use')
+	})
+
+	it('preserves ordinary cause recovery (ac-f1c11e14)', () => {
+		expect(run_stalled.next_step(CHILD, CAUSE)).toBe(
+			'fix the cause, then use `pnpm josh run:add 4188 --retry` in the live backlogrun or resume it with `fullrun #4188`',
+		)
+	})
+
 	it('names the standalone resume and the live backlog retry command', () => {
 		const step = run_stalled.next_step(CHILD)
 
