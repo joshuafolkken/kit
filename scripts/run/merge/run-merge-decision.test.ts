@@ -48,8 +48,15 @@ const EXECUTED_ENTRY_COMMANDS = [
 	`bash -c "${ENTRY_COMMAND}"`,
 	`cd /tmp && ${ENTRY_COMMAND}`,
 	`cd /tmp && /bin/zsh -lc '${ENTRY_COMMAND}'`,
+	`${ENTRY_COMMAND} # completed && ignored`,
+	`printf '%s' '#' && ${ENTRY_COMMAND}`,
 ]
 const SKIPPED_ENTRY_COMMANDS = [
+	`${READ_LOG_COMMAND} # && ${ENTRY_COMMAND}`,
+	`${ENTRY_COMMAND} # completed\n${READ_LOG_COMMAND}`,
+	`/bin/sh -c '${READ_LOG_COMMAND}' '&& ${ENTRY_COMMAND}'`,
+	`/bin/sh -c '${READ_LOG_COMMAND} # && ${ENTRY_COMMAND}'`,
+	`/bin/sh -c '${READ_LOG_COMMAND} "&& ${ENTRY_COMMAND}"'`,
 	`false && ${ENTRY_COMMAND}; ${READ_LOG_COMMAND}`,
 	`false && ${ENTRY_COMMAND} || ${READ_LOG_COMMAND}`,
 	`${ENTRY_COMMAND}; ${READ_LOG_COMMAND}`,

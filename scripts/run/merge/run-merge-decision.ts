@@ -48,10 +48,14 @@ function asks(message: string): boolean {
 function successful_last(command: string): string | undefined {
 	const joined = shell_segments.joined_continuations(command)
 	const plain = time_shell.blanked(joined)
+	if (plain === undefined || plain.includes('\n')) return undefined
+	const comment = plain.search(/(?:^|[\s;|&])#/u)
+	const end = comment === -1 ? joined.length : comment
+	const syntax = plain.slice(0, end)
 
-	if (plain === undefined || /[;|&\n]/u.test(plain.replaceAll('&&', ''))) return undefined
+	if (/[;|&\n]/u.test(syntax.replaceAll('&&', ''))) return undefined
 
-	return shell_segments.quote_aware_commands_of(joined).at(-1)
+	return shell_segments.quote_aware_commands_of(joined.slice(0, end)).at(-1)
 }
 
 function is_entry(command: string): boolean {
