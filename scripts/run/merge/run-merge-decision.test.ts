@@ -12,6 +12,57 @@ const NORMAL = 'Implementation ended before completion.'
 const HEADER = '\n=== 2026-11-04T00:00:00Z · started by process 42 · codex ===\n'
 const NOTIFY = 'pnpm josh notify --task-type confirmation --body-file .josh/tmp/question.md'
 const ITEM_COMPLETED = 'item.completed'
+const ENTRY_COMMAND = 'pnpm josh run:entry 6339'
+const READ_LOG_COMMAND = 'cat previous-run.log'
+const HANDED_OFF =
+	'entry [#6339](https://github.com/joshuafolkken/kit/issues/6339) — resume: handed-off'
+const CLAUDE_CALL = JSON.stringify({
+	type: 'assistant',
+	message: {
+		content: [{ type: 'tool_use', id: 'entry', name: 'Bash', input: { command: ENTRY_COMMAND } }],
+	},
+})
+const CLAUDE_RESULT = JSON.stringify({
+	type: 'user',
+	message: { content: [{ type: 'tool_result', tool_use_id: 'entry', content: HANDED_OFF }] },
+})
+const HANDOFF_OUTPUTS = [
+	JSON.stringify({
+		type: ITEM_COMPLETED,
+		item: {
+			type: 'command_execution',
+			command: ENTRY_COMMAND,
+			aggregated_output: HANDED_OFF,
+			exit_code: 0,
+		},
+	}),
+	`${CLAUDE_CALL}\n${CLAUDE_RESULT}`,
+]
+const HANDOFF_NEGATIVES = [
+	transcript(HANDED_OFF),
+	CLAUDE_RESULT,
+	`${CLAUDE_CALL}\n${CLAUDE_RESULT.replace('"type":"tool_result"', '"type":"tool_result","is_error":true')}`,
+	`${CLAUDE_CALL.replace(ENTRY_COMMAND, () => READ_LOG_COMMAND)}\n${CLAUDE_RESULT}`,
+	JSON.stringify({
+		type: ITEM_COMPLETED,
+		item: {
+			type: 'command_execution',
+			command: READ_LOG_COMMAND,
+			aggregated_output: HANDED_OFF,
+			exit_code: 0,
+		},
+	}),
+	JSON.stringify({
+		type: ITEM_COMPLETED,
+		item: {
+			type: 'command_execution',
+			command: ENTRY_COMMAND,
+			aggregated_output: HANDED_OFF,
+			exit_code: 1,
+		},
+	}),
+	`${HANDOFF_OUTPUTS[0] ?? ''}\n${(HANDOFF_OUTPUTS[0] ?? '').replace('handed-off', 'fresh')}`,
+]
 
 beforeEach(() => {
 	vi.spyOn(run_ending, 'read_transcript').mockReturnValue(undefined)
@@ -84,6 +135,45 @@ describe('run_merge_decision — confirmation evidence', () => {
 		`📱 stop:guard sent the confirmation notify (#6268).${HEADER}${transcript(NORMAL)}`,
 	])('ignores documentation, failed sends and prior launches: %s', (text) => {
 		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(text)
+
+		expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
+	})
+})
+
+describe('run_merge_decision — stale hand-off', () => {
+	it.each(HANDOFF_NEGATIVES)(
+		'ignores quoted, failed and superseded hand-offs (ac-dc87fe75): %s',
+		(text) => {
+			vi.spyOn(run_ending, 'read_transcript').mockReturnValue(text)
+
+			expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
+		},
+	)
+	it.each(HANDOFF_OUTPUTS)('names the stale cut record (ac-94c3f036): %s', (text) => {
+		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(text)
+
+		expect(run_merge_decision.cause(OUTPUT).short).toBe('stale hand-off')
+	})
+
+	it('explains the stale cut cause (ac-5358d4e9)', () => {
+		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(HANDOFF_OUTPUTS[0])
+		const judgment = run_merge_decision.cause(OUTPUT)
+		const options = run_merge_decision.park_options(judgment, {
+			child: '6339',
+			cause: judgment.why,
+			carry: undefined,
+			output: OUTPUT,
+		})
+
+		expect(options.comment).toContain(
+			'- Why: the child stopped at `resume: handed-off` because an old hand-off cut record was already adopted.',
+		)
+	})
+
+	it('ignores hand-offs from earlier launches (ac-dc87fe75)', () => {
+		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(
+			`${HANDOFF_OUTPUTS[0] ?? ''}${HEADER}${transcript(NORMAL)}`,
+		)
 
 		expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
 	})

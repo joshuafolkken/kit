@@ -1,8 +1,11 @@
 import { agent_event } from '#scripts/agent/agent-event'
+import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { json_value } from '#scripts/lib/json-value'
+import { transcript_record, type TranscriptBlock } from '#scripts/lib/transcript-record'
 import { lane_park } from '#scripts/rules/lane-park'
+import { shell_segments } from '#scripts/rules/shell-segments'
 import { stop_decision } from '#scripts/rules/stop-decision'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
@@ -12,6 +15,8 @@ import { z } from 'zod'
 import { run_merge, type ParkReason } from './run-merge'
 
 const HOOK_CONFIRMATION = '📱 stop:guard sent the confirmation notify ('
+const ENTRY_COMMANDS: ReadonlySet<string> = new Set(['run:entry'])
+const INPUT_SCHEMA = z.object({ command: z.string() })
 const AWAITING_CONFIRMATION =
 	/(?:確認|回答|返答|承認)(?:[をの]?待っています|待ちです|後に(?:続行|再開)します)/u
 const COMMAND_SCHEMA = z.looseObject({
@@ -20,6 +25,7 @@ const COMMAND_SCHEMA = z.looseObject({
 		type: z.literal('command_execution'),
 		command: z.string(),
 		exit_code: z.literal(0),
+		aggregated_output: z.string().optional(),
 	}),
 })
 
@@ -37,6 +43,65 @@ function asks(message: string): boolean {
 	)
 }
 
+function is_entry(command: string): boolean {
+	return shell_segments
+		.segments_of(command)
+		.some((segment) => shell_segments.is_josh_command(segment, ENTRY_COMMANDS))
+}
+
+function entry_ids(latest: string): ReadonlySet<string> {
+	const records = latest.split('\n').flatMap((line) => transcript_record.parse(line) ?? [])
+	const calls = records
+		.filter((record) => record.type === 'assistant')
+		.flatMap((record) => transcript_record.tool_calls_of(record))
+	const entries = calls.filter(
+		(block) =>
+			block.name === 'Bash' && is_entry(INPUT_SCHEMA.safeParse(block.input).data?.command ?? ''),
+	)
+
+	return new Set(entries.flatMap((block) => block.id ?? []))
+}
+
+function is_entry_result(block: TranscriptBlock | undefined, ids: ReadonlySet<string>): boolean {
+	return (
+		block?.type === transcript_record.TOOL_RESULT_TYPE &&
+		block.is_error !== true &&
+		ids.has(block.tool_use_id ?? '')
+	)
+}
+
+function claude_output(line: string, ids: ReadonlySet<string>): string {
+	const record = transcript_record.parse(line)
+	if (record?.type !== 'user') return ''
+	const blocks = transcript_record.blocks_of(record)
+
+	return cost_blocks
+		.parse_line(line)
+		.filter((_block, index) => is_entry_result(blocks[index], ids))
+		.map((block) => block.text)
+		.join('\n')
+}
+
+function tool_output(line: string, ids: ReadonlySet<string>): string {
+	const command = COMMAND_SCHEMA.safeParse(json_value.parse_or_undefined(line))
+	if (!command.success) return claude_output(line, ids)
+
+	return is_entry(command.data.item.command) ? (command.data.item.aggregated_output ?? '') : ''
+}
+
+function unfinished(latest: string): StallCause {
+	const ids = entry_ids(latest)
+	const outputs = latest
+		.split('\n')
+		.map((line) => tool_output(line, ids))
+		.join('\n')
+	const resumes = [...outputs.matchAll(/^entry [^\n]+ — resume: ([\w-]+)$/gmu)]
+
+	return resumes.at(-1)?.[1] === 'handed-off'
+		? run_stalled.STALE_HANDOFF
+		: run_stalled.SESSION_UNFINISHED
+}
+
 // The same fallback judges both the park and its event. Restrict it to the latest launch so an
 // earlier session's unanswered question cannot turn a later mechanical failure into a decision.
 function judged(transcript: string): StallCause {
@@ -44,7 +109,7 @@ function judged(transcript: string): StallCause {
 	const message = agent_event.read(latest).last_message ?? ''
 	const is_confirmed = latest.split('\n').some((line) => confirms(line))
 
-	if (!is_confirmed && !asks(message)) return run_stalled.SESSION_UNFINISHED
+	if (!is_confirmed && !asks(message)) return unfinished(latest)
 
 	return {
 		short: NEEDS_DECISION_LABEL,

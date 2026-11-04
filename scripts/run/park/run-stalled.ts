@@ -20,6 +20,10 @@ const CUT_NOT_RELAUNCHED: StallCause = {
 	short: 'cut not relaunched',
 	why: 'its lane held a declared cut, but no successor could be relaunched from it (or it already was once).',
 }
+const STALE_HANDOFF: StallCause = {
+	short: 'stale hand-off',
+	why: 'the child stopped at `resume: handed-off` because an old hand-off cut record was already adopted.',
+}
 
 const RESUME_COMMAND = 'fullrun'
 const CAUSE_LEAD = `${RUN_STALLED_LABEL}: `
@@ -57,6 +61,7 @@ function row_text(child: number | string, cause = '', is_backlog_live = false): 
 const run_stalled = {
 	CUT_NOT_RELAUNCHED,
 	SESSION_UNFINISHED,
+	STALE_HANDOFF,
 	cause_of,
 	next_step,
 	park_event,

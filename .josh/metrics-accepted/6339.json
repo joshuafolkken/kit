@@ -1,0 +1,7 @@
+{
+	"reason": "Diagnose stale hand-offs with successful entry-call provenance, including Claude tool-use/result IDs; regression tests reject quoted logs and failed or unmatched results. Recovery wording is split into #6351.",
+	"date": "2026-11-04",
+	"growth": {
+		"scripts.code_lines": 60
+	}
+}
