@@ -15,7 +15,7 @@ const mocked_create = vi.mocked(no_base_checkout.create)
 const mocked_remove = vi.mocked(no_base_checkout.remove)
 const mocked_run = vi.mocked(test_unit_guard.run_vitest_in)
 
-// Real files of this repository: one resolves the base, one never names it.
+// Real files of this repository: one resolves the base, one never imports it.
 const ROOT = process.cwd()
 const BASE_FILE = path.join('scripts', 'git', 'change-base.ts')
 const OTHER_FILE = path.join('scripts', 'gate', 'busy-average.ts')
@@ -35,7 +35,7 @@ afterEach(() => {
 })
 
 describe('test_no_base.touching', () => {
-	it('keeps only the code files that name the base branch or its resolution', () => {
+	it('keeps only the code files that are or import the base branch resolution', () => {
 		expect(test_no_base.touching(ROOT, [BASE_FILE, OTHER_FILE, DOCUMENT])).toStrictEqual([
 			BASE_FILE,
 		])

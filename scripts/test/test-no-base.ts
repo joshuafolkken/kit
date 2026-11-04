@@ -31,9 +31,9 @@ const BASE_MODULES: ReadonlySet<string> = new Set([
 ])
 
 // A type-only import erases at run time, so it resolves nothing.
-const TYPE_ONLY_IMPORT = /\bimport\s+type\s[^;]*?\bfrom\s*["'][^"']+["']/gu
+const TYPE_ONLY_IMPORT = /^import type [^"']*["'][^"']*["']/gmu
 
-// Shared with `test-related.ts`'s own reading of which files name another: a file it cannot read
+// Kept for `test-related.ts`'s own reading of which files name another: a file it cannot read
 // names nothing.
 function text_of(file_path: string): string {
 	try {
