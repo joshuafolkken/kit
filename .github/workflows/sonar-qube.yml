@@ -66,6 +66,14 @@ jobs:
         run: |
           version=$(jq -r '.version // empty' package.json)
           echo "args=${version:+-Dsonar.projectVersion=$version}" >> "$GITHUB_OUTPUT"
+      # Keep analyzer downloads across source changes; a workflow change (including the pinned
+      # scanner action version) rotates the cache key.
+      - name: Cache SonarQube scanner
+        if: env.SONAR_TOKEN != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar-${{ hashFiles('.github/workflows/sonar-qube.yml') }}
       - name: SonarQube Scan
         if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
