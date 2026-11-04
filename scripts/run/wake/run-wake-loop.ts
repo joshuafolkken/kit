@@ -212,14 +212,39 @@ async function run_pass(
 // supervisor is already serving, and only then finding the write-back refused. Read as owned or not
 // at all, the replaced loop ends here, quietly and before it does anything: the run is not
 // unattended, because the supervisor that took the record over is watching it.
+// A driver window already waited. Recheck ownership and reload code immediately before the next
+// driver, so the supervisor's interval cannot hide a not_before deadline between windows.
+function without_release_gap(ports: LoopPorts): LoopPorts {
+	let is_released = false
+
+	return {
+		...ports,
+		drive: async () => {
+			const result = await ports.drive()
+
+			is_released = result.kind === 'released'
+
+			return result
+		},
+		sleep: async (milliseconds) => {
+			const duration = is_released ? 0 : milliseconds
+
+			is_released = false
+			await ports.sleep(duration)
+		},
+	}
+}
+
 async function run_loop(target: string, ports: LoopPorts, interval_ms: number): Promise<LoopStop> {
+	const continuous = without_release_gap(ports)
+
 	return await poll.wait_for(
 		async () => {
 			const wake = run_wake.read_own_wake(target)
 
-			return wake === undefined ? STOPPED_BY_PERSON : await run_pass(target, wake, ports)
+			return wake === undefined ? STOPPED_BY_PERSON : await run_pass(target, wake, continuous)
 		},
-		{ interval_ms, sleeper: ports.sleep },
+		{ interval_ms, sleeper: continuous.sleep },
 	)
 }
 

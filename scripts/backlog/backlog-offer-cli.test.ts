@@ -24,6 +24,7 @@ const { shared_cache } = await import('#scripts/josh/shared-cache')
 const { shared_cache_fixture } = await import('#scripts/josh/shared-cache-fixture')
 const { backlog_next_shared } = await import('./backlog-next-shared')
 const { backlog_offer_cli } = await import('./backlog-offer-cli')
+const { backlog_drive_cli } = await import('./backlog-drive-cli')
 
 const OK = 0
 const FAILED = 1
@@ -36,6 +37,7 @@ const EXCLUDE_FLAG = '--exclude'
 const EXCLUDED = '1630'
 const MERGED = ['--merged', '3']
 const CANDIDATES = 'candidates'
+const FUTURE_START = '2999-01-01T00:00Z'
 
 interface JoshResult {
 	code: number
@@ -83,6 +85,46 @@ async function answer_for(
 
 	return budget_args[budget_args.indexOf(ANSWER_FLAG) + 1] ?? ''
 }
+
+describe('backlog_offer_cli.run — dated waits', () => {
+	it('transports an earlier idle deadline alongside the start date', async () => {
+		const not_before_ms = Date.parse(FUTURE_START)
+		const idle_until_ms = not_before_ms - 1
+
+		josh_run_mock.mockResolvedValueOnce({
+			code: OK,
+			out: 'wait',
+			err: `Waiting on a start condition: #12\nNext start time: ${String(not_before_ms)}`,
+		})
+		josh_run_mock.mockResolvedValueOnce({
+			code: OK,
+			out: JSON.stringify({ budget: 'watch', reason: 'idle', is_finish: false, idle_until_ms }),
+		})
+
+		await backlog_offer_cli.run([...BASE, '--json'])
+
+		expect(backlog_drive_cli.to_offer(info_lines[0] ?? '')).toMatchObject({
+			not_before_ms,
+			idle_until_ms,
+		})
+	})
+
+	it('passes a dated wait through the offer JSON into the driver', async () => {
+		const not_before_ms = Date.parse(FUTURE_START)
+
+		await answer_for(
+			{
+				code: OK,
+				out: 'wait',
+				err: `Waiting on a start condition: #12\nNext start time: ${String(not_before_ms)}`,
+			},
+			'watch',
+			['--json'],
+		)
+
+		expect(backlog_drive_cli.to_offer(info_lines[0] ?? '')?.not_before_ms).toBe(not_before_ms)
+	})
+})
 
 describe('backlog_offer_cli.run — the loop table maps each backlog:next answer to a budget word', () => {
 	it('maps issue numbers to candidates', async () => {

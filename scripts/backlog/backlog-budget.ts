@@ -221,6 +221,12 @@ function answer_decision(input: BudgetInput): BudgetDecision {
 	return FIXED_DECISIONS[input.answer] ?? idle_decision(input)
 }
 
+function idle_until_ms(input: BudgetInput): number | undefined {
+	if (FIXED_DECISIONS[input.answer] !== undefined || input.answer === 'candidates') return undefined
+
+	return input.idle_budget_ms === undefined ? undefined : input.active_at_ms + input.idle_budget_ms
+}
+
 function decide(input: BudgetInput): BudgetDecision {
 	return max_decision(input) ?? answer_decision(input)
 }
@@ -241,6 +247,7 @@ const backlog_budget = {
 	decide,
 	draining_reason,
 	idle_expired_reason,
+	idle_until_ms,
 	idle_watch_reason,
 	is_finish,
 	max_reached_reason,

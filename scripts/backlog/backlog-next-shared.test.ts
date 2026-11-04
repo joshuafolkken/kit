@@ -50,6 +50,40 @@ describe('backlog_next_shared.read', () => {
 	})
 })
 
+async function cache_wait(not_before_ms: number): Promise<JoshResult> {
+	const wait = { code: 0, out: 'wait', err: `Next start time: ${String(not_before_ms)}` }
+
+	vi.useFakeTimers({ now: Date.parse(AT) })
+	vi.mocked(josh_command.josh_run).mockResolvedValueOnce(wait).mockResolvedValue(RUN)
+	await backlog_next_shared.read(ARGV)
+
+	return wait
+}
+
+describe('backlog_next_shared.read at a deadline', () => {
+	it('refreshes a dated wait at the TTL to discover work changed outside the local stream', async () => {
+		const not_before_ms = Date.parse(AT) + MINUTE_MS * 10
+		const wait = await cache_wait(not_before_ms)
+
+		vi.setSystemTime(Date.parse(AT) + MINUTE_MS - 1)
+		expect(await backlog_next_shared.read(ARGV)).toEqual(wait)
+		expect(josh_command.josh_run).toHaveBeenCalledOnce()
+		vi.setSystemTime(Date.parse(AT) + MINUTE_MS)
+		expect(await backlog_next_shared.read(ARGV)).toEqual(RUN)
+		expect(josh_command.josh_run).toHaveBeenCalledTimes(2)
+	})
+
+	it('invalidates a dated wait before the normal cache TTL expires', async () => {
+		const not_before_ms = Date.parse(AT) + 1
+
+		await cache_wait(not_before_ms)
+		vi.setSystemTime(not_before_ms)
+		await backlog_next_shared.read(ARGV)
+
+		expect(josh_command.josh_run).toHaveBeenCalledTimes(2)
+	})
+})
+
 describe('backlog_next_shared.read once its answer is stale', () => {
 	it('reads again once a new event lands on the stream', async () => {
 		await backlog_next_shared.read(ARGV)

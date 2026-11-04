@@ -114,6 +114,13 @@ const CHAIN_LINE = 'Waiting on a dependency chain: [#4496](https://github.com/o/
 const GATE_LINE = 'Waiting on a start condition: #4487'
 
 describe('backlog_offer.answer_of — the chain and gate causes', () => {
+	it('carries the deadline of a dated gate wait', () => {
+		const not_before_ms = Date.parse('2999-01-01T00:00Z')
+		const read = wait_with(`${GATE_LINE}\nNext start time: ${String(not_before_ms)}`, NO_RUNNING)
+
+		expect(read.not_before_ms).toBe(not_before_ms)
+	})
+
 	it('marks a blocked wait with its cause and the issues it waited on', () => {
 		expect(wait_with(`${CHAIN_LINE}\n${GATE_LINE}`, SOME_RUNNING)).toStrictEqual({
 			answer: 'blocked',
