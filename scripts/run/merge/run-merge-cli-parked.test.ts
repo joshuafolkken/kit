@@ -14,6 +14,16 @@ const emit_mock = vi.hoisted(() => vi.fn())
 const events_mock = vi.hoisted(() => vi.fn())
 const restart_mock = vi.hoisted(() => vi.fn())
 const merge_state_mock = vi.hoisted(() => vi.fn())
+const transcript_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/run/run-ending', () => ({
+	run_ending: {
+		read_transcript: transcript_mock,
+		read_exit: vi.fn(),
+		ended_mid_turn: vi.fn(),
+		written_at: vi.fn(),
+	},
+}))
 
 vi.mock('./run-merge-restart', () => ({
 	run_merge_restart: { is_host_restart: restart_mock },
@@ -122,6 +132,8 @@ beforeEach(() => {
 	merge_state_mock.mockReset().mockResolvedValue(true)
 })
 
+beforeEach(() => transcript_mock.mockReset().mockReturnValue(undefined))
+
 // joshuafolkken/kit#3908: a child a person withdrew is settled by `lane:withdraw`, so `run:merge` offers
 // the next child and counts, parks and records nothing — whatever GitHub's state reads.
 describe('run_merge_cli.merge_child — a child a person withdrew', () => {
@@ -169,6 +181,19 @@ describe('run_merge_cli.merge_child — a child waiting on an open blocker', () 
 
 // joshuafolkken/kit#4215: the park event carries the cause, so the board row can name it.
 describe('run_merge_cli.merge_child — a park that gave no cause', () => {
+	it('records a question as needs-decision and ignores the existing failure guard', async () => {
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS]))
+		transcript_mock.mockReturnValue(
+			JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'Proceed?' } }),
+		)
+		do_failed_mock.mockResolvedValue({ carry: { failures: 3 }, is_parked: true, waits: [] })
+
+		const result = await run_merge_cli.merge_child({ ...context(), output: '/stub/question.log' })
+
+		expect(result.token).toBe('2039')
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
+	})
+
 	it('names a session that ended unfinished', async () => {
 		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS]))
 		do_failed_mock.mockResolvedValue({

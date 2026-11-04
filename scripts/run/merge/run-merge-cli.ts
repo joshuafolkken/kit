@@ -13,6 +13,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_auth } from './run-merge-auth'
+import { run_merge_decision } from './run-merge-decision'
 import { run_merge_driver } from './run-merge-driver'
 import { run_merge_human_review } from './run-merge-human-review'
 import { run_merge_signals } from './run-merge-signals'
@@ -274,14 +275,13 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 		return emit(MERGE_TOKEN.STOP, FAILURE_EXIT_CODE)
 	}
 
-	const cause = result.cause ?? run_stalled.SESSION_UNFINISHED.short
+	const cause = result.cause ?? run_merge_decision.cause(ctx.output).short
 
-	await run_event_stream_emit.emit(
-		run_event_stream.EVENT_KIND.PARK,
-		run_stalled.park_event(ctx.child, cause),
-	)
+	const park = run_merge_decision.park_event(ctx.child, cause)
 
-	if (result.carry !== undefined && run_merge.is_guard_tripped(result.carry.failures)) {
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.PARK, park)
+
+	if (run_merge_decision.is_guard_tripped(cause, result.carry)) {
 		return emit(MERGE_TOKEN.STOP, SUCCESS_EXIT_CODE)
 	}
 
