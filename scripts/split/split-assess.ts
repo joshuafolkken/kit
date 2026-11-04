@@ -160,13 +160,13 @@ function grown_bar(declared: DeclaredSize): NoticeBar {
 	}
 }
 
-// The bar the notice fires past (joshuafolkken/kit#6206): the Issue's declared size grown, as
-// `lane:plan` grows it, so a lane that outgrows its own declaration is told so even under the guide.
-// No declaration, one with a zero axis, or one whose grown size reaches the guide is the guide.
 function is_sized(declared: DeclaredSize | undefined): declared is DeclaredSize {
 	return declared !== undefined && declared.files > 0 && declared.lines > 0
 }
 
+// The bar the notice fires past (joshuafolkken/kit#6206): the Issue's declared size grown, as
+// `lane:plan` grows it, so a lane that outgrows its own declaration is told so even under the guide.
+// No declaration, one with a zero axis, or one whose grown size reaches the guide is the guide.
 function notice_bar(declared: DeclaredSize | undefined): NoticeBar {
 	if (!is_sized(declared)) return GUIDE_BAR
 	const bar = grown_bar(declared)

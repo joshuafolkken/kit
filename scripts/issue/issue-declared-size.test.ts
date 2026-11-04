@@ -30,9 +30,21 @@ describe('issue_declared_size.read', () => {
 		expect(await issue_declared_size.read('6206')).toBeUndefined()
 	})
 
-	it('is undefined for an unread body', async () => {
+	it('is undefined for an empty body', async () => {
 		body_read.mockResolvedValue({ kind: 'read', text: undefined })
 
 		expect(await issue_declared_size.read('6206')).toBeUndefined()
+	})
+
+	it('throws for an unreadable body', async () => {
+		body_read.mockResolvedValue({ kind: 'unreadable', reason: 'unreachable', status: 429 })
+
+		await expect(issue_declared_size.read('6206')).rejects.toThrow('unreadable')
+	})
+
+	it('throws for a missing issue', async () => {
+		body_read.mockResolvedValue({ kind: 'missing' })
+
+		await expect(issue_declared_size.read('6206')).rejects.toThrow('missing')
 	})
 })
