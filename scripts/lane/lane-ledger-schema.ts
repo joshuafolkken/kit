@@ -6,7 +6,7 @@ import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
 
 const { KIND } = lane_ledger_kind
-const { ship_lap_schema, size_schema, stop_schema, unplanned_notice_schema } =
+const { early_push_schema, ship_lap_schema, size_schema, stop_schema, unplanned_notice_schema } =
 	lane_ledger_schema_ship
 const { pinned_origin_schema } = lane_ledger_pinned_origin
 
@@ -256,6 +256,7 @@ const push_miss_schema = z.object({
 // The lane limit a run started under or `lane:limit` set it to (`lane-limit-history.ts`, joshuafolkken/kit#6139).
 const limit_schema = z.object({ kind: z.literal(KIND.LIMIT), at: z.string(), limit: z.number() })
 const entry_schema = z.discriminatedUnion('kind', [
+	early_push_schema,
 	merge_schema,
 	gate_schema,
 	load_schema,
