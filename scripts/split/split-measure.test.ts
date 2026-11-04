@@ -12,6 +12,11 @@ vi.mock('#scripts/git/git-command', () => ({
 }))
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved_through_merge: vi.fn() } }))
+vi.mock('./split-relocations', () => ({
+	split_relocations: {
+		without_relocations: vi.fn(async (_root: string, _base: string, numstat: string) => numstat),
+	},
+}))
 
 const { change_base } = await import('#scripts/git/change-base')
 const { git_command } = await import('#scripts/git/git-command')

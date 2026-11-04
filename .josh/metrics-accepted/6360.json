@@ -1,0 +1,7 @@
+{
+	"reason": "Exact relocation matching requires byte hashes and a shared Git path quoting helper so special-character paths use the same representation.",
+	"date": "2026-11-04",
+	"growth": {
+		"scripts.code_lines": 122
+	}
+}
