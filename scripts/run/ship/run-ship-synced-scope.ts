@@ -161,9 +161,10 @@ async function overlap_of(
 		return { overlap: undefined, unsplit: unsplit_line(split.failure) }
 	}
 
-	return {
-		overlap: [...both, ...split.shared, ...unsplit, ...check_overlap(checks, synced, split, map)],
-	}
+	// `shared` is the tests within `meeting`: a file both name counts once (joshuafolkken/kit#6197).
+	const named = [...both, ...split.shared, ...unsplit, ...check_overlap(checks, synced, split, map)]
+
+	return { overlap: [...new Set(named)] }
 }
 
 function checks_of(scripts: ReadonlyArray<string>): ReadonlyArray<SyncedCheck> {

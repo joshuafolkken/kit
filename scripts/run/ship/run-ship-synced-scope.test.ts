@@ -204,6 +204,21 @@ describe('run_ship_synced_scope.settle — what only one check reads', () => {
 	})
 })
 
+// joshuafolkken/kit#6197: the shared tests sit inside the meeting, and one ship logged 119 for 68.
+describe('run_ship_synced_scope.read_sync — a file the split names twice', () => {
+	it('names a shared test that also sits in the meeting once', async () => {
+		split.mockResolvedValue({
+			left: [SYNCED_CODE],
+			shared: [SHARED_TEST],
+			meeting: [SHARED_TEST, OWN],
+		})
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, [LINT])
+
+		expect(reading?.overlap).toStrictEqual([SHARED_TEST, OWN])
+	})
+})
+
 describe('run_ship_synced_scope.settle — what cannot be read settles nothing', () => {
 	it('runs the pair when the branch side moved since its record', async () => {
 		read_parts.mockResolvedValue(synced_parts([SYNCED_CODE], [OWN]))

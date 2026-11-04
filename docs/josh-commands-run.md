@@ -1194,12 +1194,13 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals, or with --over the ledger chains, of the lanes over a net-minute threshold.
+Print lane throughput, gate duration and machine load over a period, the per-stage durations, the wait after each ship stop reason, and each gate check's duration, reuse count and core claim against the cores it used; with --sinks the stage totals, or with --over the ledger chains, of the lanes over a net-minute threshold; with --pairs the scoped pair runs.
 
 ```bash
 pnpm josh lane:stats --period 7             # a 7-day period's stage medians and maxima
 pnpm josh lane:stats --period 1 --sinks     # stage totals of the lanes over 30 net min
 pnpm josh lane:stats --period 1 --over 40   # ledger chains of lanes over 40 net min
+pnpm josh lane:stats --period 7 --pairs     # a 7-day period's scoped pair runs
 ```
 
 <!-- /usage -->
@@ -1209,7 +1210,9 @@ lanes over that many net minutes, the total, the lane count and the median per l
 (`lane-sinks.ts`).
 
 The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive), from one
-listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`).
+listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`). The `scoped pair`
+row also lists each one whose title contains the file name of an `over_cap_hub` the `test-related` runs of those
+lanes recorded.
 
 `--over <minutes>` prints one row per merged lane of the period over that many net minutes, the longest first: its
 net and waited minutes, the ledger chain behind them, its longest stage and the open Issues that stage matches as
@@ -1219,6 +1222,11 @@ The chain names `split-notice ×N`, `split-filed <child>`, `round 1 blocking`, `
 holder and redispatch gap (`dispatched before holder end` when the lane came back first, `gap open` while either is
 pending) and each `hub over cap <file>` of
 `test:related`.
+
+`--pairs` prints one table instead: the period's scoped pair runs by named-file count (`<50`, `50-1000`, `>1000`), by
+the reason the import-graph split failed (its detail after `: ` dropped) and by the over-cap hub `test:related` logged,
+each with its runs and total minutes (`lane-pairs.ts`), from the `named` and `unsplit` fields of the ship lap and the
+hub of the `test:related` record.
 
 A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
 only, not by Bash kind, since a transcript call names no lane.

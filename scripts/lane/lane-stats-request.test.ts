@@ -1,0 +1,46 @@
+import { describe, expect, it } from 'vitest'
+import { lane_stats_request } from './lane-stats-request'
+
+// The `josh lane:stats` flags read into one request, `--pairs` among the tables (joshuafolkken/kit#6189).
+
+describe('lane_stats_request.stats_request', () => {
+	it('reads the period alone as the period row and tables', () => {
+		expect(lane_stats_request.stats_request(['--period', '7'])).toStrictEqual({
+			period_days: 7,
+			limit: undefined,
+			sinks: undefined,
+			over: undefined,
+			is_pairs: false,
+		})
+	})
+
+	it('reads --pairs as the pairs table', () => {
+		expect(lane_stats_request.stats_request(['--period', '1', '--pairs'])?.is_pairs).toBe(true)
+	})
+
+	it.each([['--limit', '4'], ['--sinks'], ['--over', '40']])(
+		'refuses --pairs beside %s',
+		(...flags) => {
+			expect(
+				lane_stats_request.stats_request(['--period', '1', '--pairs', ...flags]),
+			).toBeUndefined()
+		},
+	)
+
+	it('reads the --sinks threshold and refuses a positional without it', () => {
+		expect(lane_stats_request.stats_request(['--period', '1', '--sinks', '45'])?.sinks).toBe(45)
+		expect(lane_stats_request.stats_request(['--period', '1', '45'])).toBeUndefined()
+	})
+
+	it('refuses a period that is not positive', () => {
+		expect(lane_stats_request.stats_request(['--period', '0'])).toBeUndefined()
+	})
+})
+
+describe('lane_stats_request.positive', () => {
+	it('reads a positive number and refuses the rest', () => {
+		expect(lane_stats_request.positive('2.5')).toBe(2.5)
+		expect(lane_stats_request.positive('-1')).toBeUndefined()
+		expect(lane_stats_request.positive(undefined)).toBeUndefined()
+	})
+})

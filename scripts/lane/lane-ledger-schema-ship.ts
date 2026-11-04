@@ -42,7 +42,10 @@ const unplanned_notice_schema = z.object({
 // this ship process ran the scoped pair's checks, this one included, and `rerun` names why a run after
 // the first ran again (`run-ship-pair-runs.ts`, joshuafolkken/kit#5538) — both absent on a lap that ran none.
 // On a `josh gate` lap `rerun` names why the gate ran and `reused_tree` the tree hash of a gate the ship
-// reused rather than started (`run-ship-gate-runs.ts`, joshuafolkken/kit#5567).
+// reused rather than started (`run-ship-gate-runs.ts`, joshuafolkken/kit#5567). On a scoped pair lap
+// `named` counts the files the pair was narrowed to, and `unsplit` is the reason the import graph could
+// not split a merge (`test-related-synced.ts`), both absent where neither happened — read by
+// `lane:stats --pairs` (joshuafolkken/kit#6189), written by the ship (joshuafolkken/kit#6196).
 const ship_lap_schema = z.object({
 	kind: z.literal(KIND.SHIP_LAP),
 	at: z.string(),
@@ -54,6 +57,8 @@ const ship_lap_schema = z.object({
 	runs: z.number().optional(),
 	rerun: z.string().optional(),
 	reused_tree: z.string().optional(),
+	named: z.number().optional(),
+	unsplit: z.string().optional(),
 })
 
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's
