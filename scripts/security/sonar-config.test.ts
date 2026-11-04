@@ -22,6 +22,14 @@ function load_sonar_properties(file = SONAR_PROPERTIES_FILE): Record<string, str
 	return Object.fromEntries(entries)
 }
 
+describe.each([SONAR_PROPERTIES_FILE, SONAR_TEMPLATE_FILE])('%s generated data', (file) => {
+	it('excludes non-code .josh data from analysis (ac-f337e461)', () => {
+		const properties = load_sonar_properties(file)
+
+		expect(properties['sonar.exclusions']?.split(',')).toContain('.josh/**')
+	})
+})
+
 describe(SONAR_PROPERTIES_FILE, () => {
 	const properties = load_sonar_properties()
 	const exclusions = (properties['sonar.exclusions'] ?? '').split(',').map((entry) => entry.trim())
