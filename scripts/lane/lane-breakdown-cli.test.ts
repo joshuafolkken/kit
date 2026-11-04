@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./historical-evidence', () => ({ historical_evidence: { read: mocks.evidence } }))
 vi.mock('#scripts/issue/issue-closing-pr', () => ({
-	issue_closing_pr: { read_closing_number: mocks.closing },
+	issue_closing_pr: { read_closing_number_result: mocks.closing },
 }))
 
 vi.mock(import('./lane-ledger'), async (import_original) => {
@@ -57,7 +57,7 @@ function followup_lap(ended: number, minutes: number, step: string): LedgerEntry
 beforeEach(() => {
 	vi.clearAllMocks()
 	mocks.evidence.mockResolvedValue({ evidence: [], unreadable: [] })
-	mocks.closing.mockResolvedValue(undefined)
+	mocks.closing.mockResolvedValue({ kind: 'read', number: undefined })
 	vi.spyOn(console, 'error').mockReturnValue(undefined)
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
 	mocks.target.mockResolvedValue('/ledger.jsonl')
@@ -106,7 +106,7 @@ it('prints comment, commit and log sources without changing the ledger (ac-89e55
 
 	mocks.read_entries.mockReturnValue(entries)
 	mocks.all_events.mockResolvedValue([])
-	mocks.closing.mockResolvedValue(1)
+	mocks.closing.mockResolvedValue({ kind: 'read', number: 1 })
 	mocks.evidence.mockResolvedValue({
 		evidence: [
 			{ kind: 'handoff', at: at(0), source: 'comment/1' },
@@ -152,6 +152,23 @@ it.each(['dispatch', 'merge'] as const)(
 
 		expect(console.info).toHaveBeenCalledWith(
 			expect.stringContaining(`${kind === 'dispatch' ? '51' : '50'} min of net time`),
+		)
+	},
+)
+
+it.each(['read', 'unreadable'] as const)(
+	'reports PR discovery status with insufficient evidence: %s (ac-4b1b2d87)',
+	async (kind) => {
+		mocks.read_entries.mockReturnValue([])
+		mocks.closing.mockResolvedValue({ kind, number: undefined })
+		mocks.evidence.mockResolvedValue({ evidence: [], unreadable: [] })
+
+		await expect(lane_breakdown_cli.run([String(ISSUE)])).resolves.toBe(FAILURE)
+
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining(
+				`unreadable: ${kind === 'read' ? 'none' : 'closing pull request discovery'}`,
+			),
 		)
 	},
 )

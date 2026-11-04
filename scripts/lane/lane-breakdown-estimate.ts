@@ -120,10 +120,15 @@ async function read(
 ): Promise<Timeline | undefined> {
 	if (lane_net_time.span_of(entries, issue) !== undefined) return { entries, events, notice: '' }
 	if (lane_net_time.missing_reason(entries, issue) === 'cause unknown') return undefined
-	const pr_number = await issue_closing_pr.read_closing_number(issue)
+	const closing = await issue_closing_pr.read_closing_number_result(issue)
+	const pr_number = closing.kind === 'read' ? closing.number : undefined
 	const evidence = await historical_evidence.read({ issue, pr_number })
+	const unreadable =
+		closing.kind === 'unreadable'
+			? [...evidence.unreadable, 'closing pull request discovery']
+			: evidence.unreadable
 
-	return reconstruct(entries, events, issue, evidence)
+	return reconstruct(entries, events, issue, { ...evidence, unreadable })
 }
 
 const lane_breakdown_estimate = { read }

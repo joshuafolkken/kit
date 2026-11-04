@@ -40,6 +40,8 @@ const row_schema = z.union([reference_schema, reopen_schema])
 
 type MergedReference = z.infer<typeof reference_schema>
 type TimelineRow = z.infer<typeof row_schema>
+type ClosingRead = { kind: 'read'; url: string | undefined } | { kind: 'unreadable' }
+type ClosingNumberRead = { kind: 'read'; number: number | undefined } | { kind: 'unreadable' }
 
 function is_reference(row: TimelineRow): row is MergedReference {
 	return 'url' in row
@@ -67,9 +69,7 @@ function pick_closing_pr(
 	)?.url
 }
 
-// Every doubt falls to `undefined` — an unreadable timeline or repository name leaves the child
-// judged as it was, never closed on a guess.
-async function read_closing_pr(issue: string): Promise<string | undefined> {
+async function read_closing_result(issue: string): Promise<ClosingRead> {
 	try {
 		const [raw, repo] = await Promise.all([
 			git_gh_exec.exec_gh_api({
@@ -80,21 +80,37 @@ async function read_closing_pr(issue: string): Promise<string | undefined> {
 			git_gh_repo.repo_get_name_with_owner(),
 		])
 
-		if (repo === undefined) return undefined
+		if (repo === undefined) return { kind: 'unreadable' }
 
-		return pick_closing_pr(parse_references(raw), issue, repo)
+		return { kind: 'read', url: pick_closing_pr(parse_references(raw), issue, repo) }
 	} catch {
-		return undefined
+		return { kind: 'unreadable' }
 	}
+}
+
+// Legacy callers leave the child unchanged when discovery is unavailable.
+async function read_closing_pr(issue: string): Promise<string | undefined> {
+	const result = await read_closing_result(issue)
+
+	return result.kind === 'read' ? result.url : undefined
+}
+
+async function read_closing_number_result(issue: number): Promise<ClosingNumberRead> {
+	const result = await read_closing_result(String(issue))
+	if (result.kind === 'unreadable') return result
+	const number =
+		result.url === undefined ? undefined : Number(result.url.slice(result.url.lastIndexOf('/') + 1))
+
+	return { kind: 'read', number }
 }
 
 // The closing pull request's number, read off the URL `read_closing_pr` answers.
 async function read_closing_number(issue: number): Promise<number | undefined> {
-	const url = await read_closing_pr(String(issue))
+	const result = await read_closing_number_result(issue)
 
-	return url === undefined ? undefined : Number(url.slice(url.lastIndexOf('/') + 1))
+	return result.kind === 'read' ? result.number : undefined
 }
 
-const issue_closing_pr = { read_closing_number, read_closing_pr }
+const issue_closing_pr = { read_closing_number, read_closing_number_result, read_closing_pr }
 
 export { issue_closing_pr }

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ read: vi.fn(), closing: vi.fn() }))
 
 vi.mock('./historical-evidence', () => ({ historical_evidence: { read: mocks.read } }))
 vi.mock('#scripts/issue/issue-closing-pr', () => ({
-	issue_closing_pr: { read_closing_number: mocks.closing },
+	issue_closing_pr: { read_closing_number_result: mocks.closing },
 }))
 
 const ISSUE = 6302
@@ -18,6 +18,7 @@ const SHIP_STAGE = 'ship-stage'
 beforeEach(() => {
 	vi.resetAllMocks()
 	vi.spyOn(console, 'error').mockReturnValue(undefined)
+	mocks.closing.mockResolvedValue({ kind: 'read', number: undefined })
 	mocks.read.mockResolvedValue({ evidence: [], unreadable: [] })
 })
 
