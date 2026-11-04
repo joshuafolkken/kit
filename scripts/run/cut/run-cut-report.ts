@@ -193,8 +193,8 @@ function report_missing_supervisor(issue: string): number {
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 }
 
-// The lane got the split notice and has answered it neither way, so nothing was cut and the run does
-// not go on to the gate until it does (joshuafolkken/kit#4695). `note` says which answers it takes.
+// The lane got the split notice without filing a split child, so nothing was cut and the run does
+// not go on to the gate until it files one (joshuafolkken/kit#6212). `note` names the stop procedure.
 function report_split_unresolved(note: string): number {
 	console.error(note)
 

@@ -80,7 +80,7 @@ const {
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
 //
 // **A noticed Issue answers the split notice first** (joshuafolkken/kit#4695): the pre-gate cut is the
-// boundary the notice names, so a lane that neither split nor recorded why is refused whether or not
+// boundary the notice names, so a lane without a split child is refused whether or not
 // the cut itself would be taken. **An implementation past its budget with a green part ships it**
 // (joshuafolkken/kit#6026) rather than resuming into the rest. Returns the answer given without cutting,
 // or `undefined`.
