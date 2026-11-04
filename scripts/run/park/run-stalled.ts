@@ -24,13 +24,15 @@ const CUT_NOT_RELAUNCHED: StallCause = {
 const RESUME_COMMAND = 'fullrun'
 const CAUSE_LEAD = `${RUN_STALLED_LABEL}: `
 
-function resume_of(child: number | string): string {
-	return `${RESUME_COMMAND} ${issue_cite.plain(child)}`
+function resume_of(child: number | string, is_backlog_live = false): string {
+	return is_backlog_live
+		? `pnpm josh run:add ${String(child)} --retry`
+		: `${RESUME_COMMAND} ${issue_cite.plain(child)}`
 }
 
 // The next action as a clause, which a park comment's `Next:` and the plan's note end with.
 function next_step(child: number | string): string {
-	return `fix the cause, then use \`pnpm josh run:add ${String(child)} --retry\` in the live backlogrun or resume it with \`${resume_of(child)}\``
+	return `fix the cause, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
 }
 
 function park_event(child: number | string, cause: string): string {
@@ -46,8 +48,8 @@ function cause_of(reason: string): string | undefined {
 }
 
 // A stalled row leads with its resume action, followed by its recorded cause in parentheses.
-function row_text(child: number | string, cause = ''): string {
-	const resume = `→ resume: ${resume_of(child)}`
+function row_text(child: number | string, cause = '', is_backlog_live = false): string {
+	const resume = `→ resume: ${resume_of(child, is_backlog_live)}`
 
 	return cause === '' ? resume : `${resume} (${cause})`
 }

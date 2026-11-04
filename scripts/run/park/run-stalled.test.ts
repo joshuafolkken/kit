@@ -29,6 +29,13 @@ describe('run_stalled.cause_of', () => {
 })
 
 describe('run_stalled.row_text', () => {
+	it('selects the live retry command from the shared resume source (ac-e988f4c9)', () => {
+		expect(run_stalled.row_text(CHILD, CAUSE, true)).toBe(
+			'→ resume: pnpm josh run:add 4188 --retry (review failed)',
+		)
+		expect(run_stalled.next_step(CHILD)).toContain(`\`${run_stalled.resume_of(CHILD, true)}\``)
+	})
+
 	it('draws the resume action followed by its cause in parentheses', () => {
 		expect(run_stalled.row_text(CHILD, CAUSE)).toBe('→ resume: fullrun #4188 (review failed)')
 	})
