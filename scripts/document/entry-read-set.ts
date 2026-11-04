@@ -13,6 +13,7 @@
 
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { lane_instructions } from '#scripts/agent/lane-instructions'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { bash_output_cap_reader } from './bash-output-cap'
 import { document_section } from './document-section'
@@ -25,6 +26,7 @@ const { cost_of, scoped_file_cost, total } = read_set_cost
 
 const SKILL_DIRECTORY = path.join('.claude', 'skills', 'workflow-commands')
 const SKILL_FILE = 'SKILL.md'
+const LANE_CHILD = 'lane-child'
 const TABLE_SECTION = '1. Which file to read'
 const NOTHING = 0
 // How `read:set` names the union a point-of-use document is charged at: `file → "A" + "B"`.
@@ -197,6 +199,8 @@ function table_rows(root: string): Map<string, ReadonlyArray<string>> {
 // `backlogrun` lists `fullrun.md` and `split-assessment.md` in its row to document that a child reads
 // them, and the per-entry map takes them back out of the parent's entry cost.
 function files_for(root: string, entry: string): ReadonlyArray<string> {
+	if (entry === LANE_CHILD) return [path.basename(lane_instructions.WORKFLOW_ENTRY)]
+
 	const declared = table_rows(root).get(entry) ?? []
 
 	return unique([SKILL_FILE, ...declared]).filter((file) => !is_point_of_use(entry, file))
@@ -374,14 +378,17 @@ function point_of_use_references(
 	)
 }
 
+function entry_table_text(root: string): string {
+	return document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)?.text ?? ''
+}
+
 // `also` is what a role reaches beside its base entry's path (`read-set-trim.ts`).
 function point_of_use_costs(
 	root: string,
 	entry: string,
 	also: ReadonlySet<string>,
 ): Array<SectionCost> {
-	const table_text =
-		document_section.section(read_document(root, SKILL_FILE), TABLE_SECTION)?.text ?? ''
+	const table_text = entry === LANE_CHILD ? '' : entry_table_text(root)
 	const references = point_of_use_references(root, entry, table_text)
 	const named = path_texts(root, entry, table_text).flatMap((text) => names_in(text))
 	const cited = new Set([...also, ...named])
