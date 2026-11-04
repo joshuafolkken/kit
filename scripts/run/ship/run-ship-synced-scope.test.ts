@@ -249,3 +249,28 @@ describe('run_ship_synced_scope.settle — what cannot be read settles nothing',
 		expect(read_parts).not.toHaveBeenCalled()
 	})
 })
+
+// joshuafolkken/kit#6279: review can meet a merge and unchecked own edits together.
+describe('run_ship_synced_scope.read_sync — own edits after a merge', () => {
+	it('names own edits and excludes unrelated main files from the review pair', async () => {
+		read_parts.mockResolvedValue(synced_parts([SYNCED_CODE], [OWN, RUN_RECORD]))
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(reading?.overlap).toStrictEqual([OWN])
+		expect(await settle(TREE, PAIR)).toBeUndefined()
+		expect(record).not.toHaveBeenCalled()
+	})
+
+	it('keeps the main dependency intersection alongside edits from either stale check', async () => {
+		read_parts
+			.mockResolvedValueOnce(synced_parts([SYNCED_CODE], [OWN]))
+			.mockResolvedValueOnce(synced_parts([SYNCED_CODE], [COMPONENT]))
+		split.mockResolvedValue({ left: [SYNCED_CODE], shared: [SHARED_TEST], meeting: [] })
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(reading?.overlap).toStrictEqual([OWN, COMPONENT, SHARED_TEST])
+		expect(split).toHaveBeenCalledWith(ROOT, [SYNCED_CODE], [OWN], MAP)
+	})
+})

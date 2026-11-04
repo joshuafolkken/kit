@@ -54,7 +54,7 @@ edits, and a container does not set it:
 ```bash
 docker run --rm -it -e SHELL=/bin/bash buildpack-deps:bookworm-curl bash
 # inside the container
-curl -fsSL https://get.pnpm.io/install.sh | sh - && source ~/.bashrc
+(installer=$(mktemp) && trap 'rm -f "$installer"' EXIT && curl --proto '=https' -fsSL https://raw.githubusercontent.com/pnpm/get.pnpm.io/7c26e549143daf5cf072a38c428170ad8eccaf2d/install.sh -o "$installer" && (echo "53d3ad6ef67d49d6951f3326bd3180e5c504c8f695bcdf73bb61ec7a4d4c9407  $installer" | (if command -v sha256sum >/dev/null 2>&1; then sha256sum -c -; else shasum -a 256 -c -; fi)) && PNPM_VERSION=12.6.0 sh "$installer") && source ~/.bashrc
 pnpm runtime set node 22 -g
 mkdir /site && cd /site && printf '<!doctype html><html><body><h1>Hello</h1></body></html>\n' > index.html
 pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
@@ -81,7 +81,7 @@ checkout, since the published package may not hold the command yet. The bare `pa
 pnpm pack --pack-destination /tmp/kit-pack
 docker run --rm -it -e SHELL=/bin/bash -v /tmp/kit-pack:/kit:ro buildpack-deps:bookworm-curl bash
 # inside the container
-curl -fsSL https://get.pnpm.io/install.sh | sh - && source ~/.bashrc
+(installer=$(mktemp) && trap 'rm -f "$installer"' EXIT && curl --proto '=https' -fsSL https://raw.githubusercontent.com/pnpm/get.pnpm.io/7c26e549143daf5cf072a38c428170ad8eccaf2d/install.sh -o "$installer" && (echo "53d3ad6ef67d49d6951f3326bd3180e5c504c8f695bcdf73bb61ec7a4d4c9407  $installer" | (if command -v sha256sum >/dev/null 2>&1; then sha256sum -c -; else shasum -a 256 -c -; fi)) && PNPM_VERSION=12.6.0 sh "$installer") && source ~/.bashrc
 pnpm runtime set node 22 -g
 mkdir /site && cd /site && printf '<!doctype html><html><body><h1>Hello</h1></body></html>\n' > index.html
 printf '{ "private": true }\n' > package.json

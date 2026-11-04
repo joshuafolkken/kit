@@ -49,6 +49,7 @@ const AT = ' at '
 const SECTION_SEPARATOR = '\n\n'
 const LINE_SEPARATOR = '\n'
 const CRLF = '\r\n'
+const TASK_STATE_PATTERN = /^([\t ]*(?:[-*+]|\d+[.)])[\t ]+\[)[ xX](\](?:[\t ]|$))/gmu
 
 const comment_schema = z.looseObject({
 	id: z.number(),
@@ -142,18 +143,17 @@ function lines_missing_from(source: string, other: string): Array<string> {
 	return source.split(LINE_SEPARATOR).filter((line) => line.trim() !== '' && !present.has(line))
 }
 
-// GitHub stores a body saved in its web editor with CRLF line endings, so one edited line to a body
-// josh wrote over the API with LF would otherwise read as every line removed and added.
-function to_lf(body: string): string {
-	return body.split(CRLF).join(LINE_SEPARATOR)
+// Web-editor line endings and task completion do not change the issue's specification.
+function comparable_body(body: string): string {
+	return body.split(CRLF).join(LINE_SEPARATOR).replaceAll(TASK_STATE_PATTERN, '$1 $2')
 }
 
 // The lines that left and the lines that arrived — not a positional diff, which would need a
 // dependency in a hook that runs on every tool call, and a reader comparing a spec only needs which
 // sentences changed.
 function body_section(previous_raw: string, current_raw: string): string | undefined {
-	const previous = to_lf(previous_raw)
-	const current = to_lf(current_raw)
+	const previous = comparable_body(previous_raw)
+	const current = comparable_body(current_raw)
 
 	if (previous === current) return undefined
 
@@ -182,7 +182,7 @@ function new_person_comments(
 }
 
 function is_body_edited(baseline: WatchBaseline, snapshot: WatchSnapshot): boolean {
-	return to_lf(baseline.body) !== to_lf(snapshot.body)
+	return comparable_body(baseline.body) !== comparable_body(snapshot.body)
 }
 
 function unread_body(baseline: WatchBaseline, snapshot: WatchSnapshot): string | undefined {

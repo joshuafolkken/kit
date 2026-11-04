@@ -1,0 +1,98 @@
+import { describe, expect, it } from 'vitest'
+import { implementation_shell } from './implementation-shell'
+
+describe('consultation investigation command reads', () => {
+	it.each([
+		'sort notes.txt',
+		'sort -rn notes.txt',
+		'sort --check notes.txt',
+		"sed -n '1,20p' notes.txt",
+		"sed 's/old/new/g' notes.txt",
+		"sed -n '/pattern/p' notes.txt",
+		"find scripts -name '*.ts' -type f",
+		'rg -n pattern scripts',
+		"awk '{print $1}' notes.txt",
+		"awk -F: '{print $1}' notes.txt",
+		'time rg -n pattern scripts',
+		'/usr/bin/time -p cat notes.txt',
+		'sysctl -n kernel.hostname',
+		'sysctl -a',
+		'uniq -c notes.txt',
+		'uniq -f 1 notes.txt',
+		'uniq -s 1 -w 2 notes.txt',
+		'uniq -f 1 -',
+		'uniq -f 1 -- -notes.txt',
+		'uniq -',
+		'uniq -- -notes.txt',
+		'/usr/bin/./time -p cat notes.txt',
+		'time cat -output-is-a-filename',
+		'cut -d : -f 1 notes.txt',
+		"tr 'a-z' 'A-Z' < notes.txt",
+	])('allows the read: %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(false)
+	})
+})
+
+const WRITING_COMMANDS = [
+	String.raw`sort -\o app.ts notes.txt`,
+	"sort -'o' app.ts notes.txt",
+	'sort --out=app.ts notes.txt',
+	'sort --o app.ts notes.txt',
+	String.raw`sysctl -\w kernel.hostname=changed`,
+	String.raw`awk -\f script.awk notes.txt`,
+	'sort -o app.ts notes.txt',
+	'sort -ro app.ts notes.txt',
+	'sort --output=app.ts notes.txt',
+	'sort --compress-program=custom-editor notes.txt',
+	'sort --co=custom-editor notes.txt',
+	'sort --fil=notes.txt',
+	'sed -i s/a/b/ app.ts',
+	"sed 's/a/b/w app.ts' notes.txt",
+	"sed 's/a/b/e' notes.txt",
+	"sed 's/a/b/e;s/x/y/' notes.txt",
+	"sed 'w app.ts' notes.txt",
+	"sed 'e custom-editor' notes.txt",
+	'sed -f script.sed notes.txt',
+	'find . -delete',
+	"find . -exec custom-editor '{}' +",
+	"find . -execdir custom-editor '{}' +",
+	'find . -fprint app.ts',
+	'rg --pre=custom-editor pattern notes.txt',
+	'awk \'{print > "app.ts"}\' notes.txt',
+	'awk \'BEGIN {system("custom-editor")}\'',
+	'awk \'BEGIN {"custom-editor" | getline}\'',
+	'awk -f script.awk notes.txt',
+	"awk --dump-variables '{print}' notes.txt",
+	"awk -W dump-variables '{print}' notes.txt",
+	'awk \'@load "plugin"\' notes.txt',
+	'time -o app.ts cat notes.txt',
+	'/usr/bin/./time -o app.ts cat /dev/null',
+	'/usr/bin/time --out=app.ts cat /dev/null',
+	String.raw`time -\o app.ts cat /dev/null`,
+	'/usr/bin/time --output=app.ts cat notes.txt',
+	'time node script.ts',
+	'sysctl -w kernel.hostname=changed',
+	'sysctl --write kernel.hostname=changed',
+	'sysctl kernel.hostname=changed',
+	'sysctl -f settings.conf',
+	'sysctl -p settings.conf',
+	'sysctl --system',
+	'uniq notes.txt app.ts',
+	'uniq - app.ts',
+	'uniq - -app.ts',
+	'uniq notes.txt -app.ts',
+	'uniq notes.txt --',
+	'uniq -f 1 - -app.ts',
+	'uniq -s 1 -w 2 notes.txt -app.ts',
+	'uniq -- - -app.ts',
+	'uniq notes.txt -f app.ts',
+	'uniq -- notes.txt -app.ts',
+	'cut -f 1 notes.txt > app.ts',
+	'tr a b < notes.txt > app.ts',
+]
+
+describe('consultation investigation command writes', () => {
+	it.each(WRITING_COMMANDS)('refuses the write or external program: %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+})

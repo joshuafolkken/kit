@@ -41,13 +41,11 @@ const SCOPED_LABEL = 'scoped — referenced sections only'
 const TOTAL_READ_LABEL = 'total read — scoped entry plus point-of-use reached'
 const SECTION_LABEL = '-- sections referenced out of the set --'
 const POINT_OF_USE_LABEL = '-- read at the point of use, not at the entry --'
-// **The dispatched lane child reads a trimmed `fullrun` set** — the point-of-use documents the parent
-// owns are dropped and the entry-only `SKILL.md` sections are read section by section, so `total read`
-// falls well below a normal `fullrun`'s.
+// The lane child reads its own entry; the scheduler's procedures stay with the parent.
 const LANE_CHILD_NOTE: ReadonlyArray<string> = [
 	'  a dispatched lane child (`JOSH_LANE_CHILD`) reads this trimmed set:',
 	'  - skips the point-of-use documents the parent owns — child dispatch, lane opening, the progress watcher and the hand-off',
-	'  - omits SKILL.md §0/§3 — dispatch already authorized the run and a leaf child edits no rule',
+	'  - reads fullrun-lane.md instead of SKILL.md, fullrun.md and entry-sequence.md',
 ]
 // **The `backlogrun` parent reads a trimmed set of its own** — a scheduler that never implements, so
 // the implementer-only `SKILL.md` sections are read section by section rather than whole.

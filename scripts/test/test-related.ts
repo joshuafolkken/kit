@@ -357,8 +357,7 @@ function report_unhanded(
 }
 
 // **A `--touched` run is the implementation loop's** (`test-related-touched.ts`): it reads its scope off
-// the change alone and leaves no green record, so `josh review:brief` and the gate's reuse count only
-// a full-reach run.
+// the change alone. Its separate review-fix record never answers the gate's full-reach reuse.
 async function run_touched(given: ReadonlyArray<string>): Promise<number> {
 	const { TOUCHED_FLAG, TOUCHED_KIND } = test_related_touched
 	const command_arguments = given.filter((argument) => argument !== TOUCHED_FLAG)
@@ -390,9 +389,11 @@ async function run_fresh(
 }
 
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
-	if (given.includes(test_related_touched.TOUCHED_FLAG)) return await run_touched(given)
-
-	return await test_related_verdict.run(given, async (before) => await run_fresh(given, before))
+	return await test_related_verdict.run(given, async (before) =>
+		given.includes(test_related_touched.TOUCHED_FLAG)
+			? await run_touched(given)
+			: await run_fresh(given, before),
+	)
 }
 
 const test_related = { reaches_tests, run_related_tests }

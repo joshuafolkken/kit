@@ -14,8 +14,9 @@ import { test_related_synced, type SyncedSplit } from '#scripts/test/test-relate
 import { whole_suite_files } from '#scripts/test/whole-suite-files'
 import { run_ship_narrowed } from './run-ship-narrowed'
 
-// **A scoped pair whose records went stale only because a merge with the default branch moved the base
-// re-runs nothing when that merge shares nothing with this branch's change** (joshuafolkken/kit#4985).
+// **A scoped pair after a merge reads unchecked own edits and where the merge meets the branch**
+// (joshuafolkken/kit#4985, joshuafolkken/kit#6279). With no unchecked own edits, it
+// re-runs nothing when that merge shares nothing with this branch's change.
 // The sync, the commit stage's catch-up and a lane's own conflict merge each moved the base under a
 // pair green on the branch side, and the pair re-ran over the branch's related set — minutes of core
 // budget for main's files, which main's CI had already verified.
@@ -29,8 +30,8 @@ import { run_ship_narrowed } from './run-ship-narrowed'
 // gate still runs over the merged tree wherever it ran before (joshuafolkken/kit#4825), and CI runs
 // the whole suite.
 //
-// **Whatever cannot be read settles nothing**: a record that is absent or cannot be compared, a branch
-// side that moved since its record, a merge that changed a check's configuration, or a branch change
+// **Whatever cannot be read settles nothing**: a record that is absent or cannot be compared,
+// a merge that changed a check's configuration, or a branch change
 // git cannot read.
 
 interface SyncedCheck {
@@ -52,31 +53,27 @@ const CHECKS: ReadonlyArray<SyncedCheck> = [
 	},
 ]
 
-function is_sync_only(parts: MovedParts): boolean {
-	return (
-		parts.synced.length > 0 &&
-		parts.changed.every((relative) => run_record_path.is_run_record(relative))
-	)
-}
-
-async function synced_of(
-	check: SyncedCheck,
-	tree: GateTree,
-): Promise<ReadonlyArray<string> | undefined> {
-	const parts = await since_green.read_moved_parts(check.stamp, check.label, undefined, tree)
-
-	return parts !== undefined && is_sync_only(parts) ? parts.synced : undefined
-}
-
-// What the merge brought in, when every stale record moved by nothing else.
-async function synced_files(
+// Each stale record must be comparable; keep own edits from both checks alongside the merge.
+async function moved_files(
 	checks: ReadonlyArray<SyncedCheck>,
 	tree: GateTree,
-): Promise<ReadonlyArray<string> | undefined> {
-	const parts = await Promise.all(checks.map(async (check) => await synced_of(check, tree)))
-	const known = parts.filter((synced) => synced !== undefined)
+): Promise<MovedParts | undefined> {
+	const parts = await Promise.all(
+		checks.map(
+			async (check) =>
+				await since_green.read_moved_parts(check.stamp, check.label, undefined, tree),
+		),
+	)
+	const known = parts.filter((part) => part !== undefined)
 
-	return known.length > 0 && known.length === parts.length ? [...new Set(known.flat())] : undefined
+	if (known.length === 0 || known.length !== parts.length) return undefined
+
+	return {
+		changed: [...new Set(known.flatMap((part) => part.changed))].filter(
+			(file) => !run_record_path.is_run_record(file),
+		),
+		synced: [...new Set(known.flatMap((part) => part.synced))],
+	}
 }
 
 async function branch_change(): Promise<ReadonlyArray<string> | undefined> {
@@ -136,6 +133,12 @@ interface SyncReading {
 
 type Overlap = Pick<SyncReading, 'overlap' | 'unsplit'>
 
+function with_own_edits(overlap: Overlap, changed: ReadonlyArray<string>): Overlap {
+	if (overlap.overlap === undefined) return overlap
+
+	return { ...overlap, overlap: [...new Set([...changed, ...overlap.overlap])] }
+}
+
 function unsplit_line(failure: string): string {
 	return (
 		'scoped pair: the import graph could not split the merge with the default branch ' +
@@ -173,18 +176,27 @@ function checks_of(scripts: ReadonlyArray<string>): ReadonlyArray<SyncedCheck> {
 	return CHECKS.filter((check) => scripts.includes(check.script))
 }
 
-// `undefined` when the stale records moved by more than a merge, and the pair runs as before.
+// Unknown records or an absent merge keep the pair's existing fallback.
 async function read_sync(
 	tree: GateTree,
 	scripts: ReadonlyArray<string>,
 ): Promise<SyncReading | undefined> {
 	const checks = checks_of(scripts)
-	const synced = await synced_files(checks, tree)
-	const branch = synced === undefined ? undefined : await branch_change()
+	const parts = await moved_files(checks, tree)
 
-	if (synced === undefined || branch === undefined) return undefined
+	if (parts === undefined || parts.synced.length === 0) return undefined
 
-	return { checks, synced, ...(await overlap_of(checks, synced, branch)) }
+	const branch = await branch_change()
+
+	if (branch === undefined) return undefined
+
+	const overlap = await overlap_of(checks, parts.synced, branch)
+
+	return {
+		checks,
+		synced: parts.synced,
+		...with_own_edits(overlap, parts.changed),
+	}
 }
 
 function reason(checks: ReadonlyArray<SyncedCheck>, synced: ReadonlyArray<string>): string {

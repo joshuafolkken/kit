@@ -2,8 +2,9 @@ import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { test_pinned } from './test-pinned'
+import { test_pinned_carry } from './test-pinned-carry'
 import { test_pinned_logic } from './test-pinned-logic'
 
 // joshuafolkken/kit#4647: without `typescript` (an optional peer in a consumer) an added file's
@@ -22,6 +23,11 @@ const COMMENT_DIFF = [
 	'',
 ].join('\n')
 const MOVE_DIFF = `--- a/${CHANGED}\n+++ b/${CHANGED}\n@@ -2 +1,0 @@\n-role\n@@ -3,0 +3 @@\n+role\n`
+
+// These parser tests mock every git read as diff text; carry persistence has its own fixture tests.
+beforeEach(() => {
+	vi.spyOn(test_pinned_carry, 'record').mockReturnValue(undefined)
+})
 
 afterEach(() => {
 	vi.restoreAllMocks()

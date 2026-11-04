@@ -21,6 +21,10 @@ import { implementation_cut } from './implementation-cut'
 //
 // **It fires on every occurrence**: the remedy is one field on the same call.
 //
+// **VS Code has no background field at the first dispatch** (joshuafolkken/kit#6240). Its launcher
+// identifies itself through CLAUDE_CODE_ENTRYPOINT before any transcript exists. Other entrypoints
+// still need the tells below; an explicit background request always remains refused.
+//
 // **A build whose subagent tool has no such field stands it down** (joshuafolkken/kit#4889). Claude
 // Code 2.1.306 in VS Code declares no `run_in_background`: every dispatch there launched in the
 // background (64 of 64), the model wrote the field as the string `"false"`, and the parsed hook input
@@ -182,8 +186,11 @@ function remember_no_field(run: GuardRun): boolean {
 	return true
 }
 
-function is_remembered(run: GuardRun): boolean {
-	return NO_FIELD_STAMP.last_ms(NO_FIELD_STAMP.path(run.transcript)) !== hook_decision.NEVER_MS
+function is_known_no_field(run: GuardRun): boolean {
+	return (
+		process.env['CLAUDE_CODE_ENTRYPOINT'] === 'claude-vscode' ||
+		NO_FIELD_STAMP.last_ms(NO_FIELD_STAMP.path(run.transcript)) !== hook_decision.NEVER_MS
+	)
 }
 
 // True when this session's subagent tool declares no `run_in_background`, so no dispatch in it can run
@@ -193,7 +200,7 @@ function is_remembered(run: GuardRun): boolean {
 // call that names the background explicitly came through a build that declares the field.
 function lacks_background_field(tail: string, call: GuardedCall, run: GuardRun): boolean {
 	if (field_of(call.input, BACKGROUND_FIELD) === true) return false
-	if (is_remembered(run)) return true
+	if (is_known_no_field(run)) return true
 
 	const has_tell =
 		is_untyped_field(call.name, call.input) || tail_shows_no_field(tail, call, run.now_ms)
@@ -216,7 +223,7 @@ const ROW = {
 		fires:
 			'an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence',
 		quiet:
-			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session',
+			'another agent type, `run_in_background: false` set, VS Code identified by `CLAUDE_CODE_ENTRYPOINT=claude-vscode`, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session',
 	},
 }
 

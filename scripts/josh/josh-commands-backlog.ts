@@ -69,36 +69,45 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 	'backlog:triage': {
 		script: 'scripts/backlog/backlog-triage-cli.ts',
 		description:
-			"Apply backlogrun's triage verdict to one issue: clear the park, comment the reason, apply the run label",
+			"Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict",
 		category: 'AI tools',
 		reference: [
-			'--apply <n> [--lane | --solo] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear]',
+			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear]',
 			'automation',
 			['files', 'network'],
 		],
 		usage: {
 			examples: [
+				{ arguments: '--pass' },
+				{ arguments: '--decide --defect yes --verification yes --every-run no' },
 				{ arguments: '--apply 912 --lane --reason "<why>"' },
-				{ arguments: '--apply 913 --solo --reason "<why>" --clear', note: 'its question answered' },
+				{ arguments: '--apply 913 --solo --reason "<why>" --clear' },
 				{
 					arguments: '--apply 914 --blocked-by 912 --reason "<why>"',
-					note: 'the blocker lands first',
 				},
 				{
 					arguments: '--apply 914 --unblock 912 --reason "<why>"',
-					note: 'a dependency a person dropped',
 				},
 			],
 			flags: [
 				{
-					names: ['--apply <N> --lane|--solo --reason <text>'],
+					names: ['--pass [--exclude <N>]'],
 					description:
-						"comments the reason, then applies the run label — the flags and the label write are `auto-ok:judge --apply`'s.",
+						'settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Failed or incomplete reads exit 1.',
+				},
+				{
+					names: ['--decide --defect <answer> --verification <answer> --every-run <answer>'],
+					description:
+						'yes/no/unknown evidence: three yes → run:solo; any no → run:lane; otherwise judge. Read-only.',
+				},
+				{
+					names: ['--apply <N> --lane|--solo --reason <text>'],
+					description: 'comments the reason, then applies the run label (`auto-ok:judge --apply`).',
 				},
 				{
 					names: ['--clear'],
 					description:
-						'first takes the park off, as `run:park <N> --clear` does — only once the issue already answers its `needs-decision` question.',
+						'clears the park (`run:park <N> --clear`) only when the issue answers its decision question.',
 				},
 				{
 					names: ['--blocked-by <M>'],

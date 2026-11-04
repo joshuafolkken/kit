@@ -22,10 +22,6 @@ const PARENT_NEEDS: ReadonlyArray<string> = [
 	'2. What every one of them shares',
 ]
 
-function by_text(left: string, right: string): number {
-	return left.localeCompare(right)
-}
-
 function skill_bytes(report: ReturnType<typeof backlogrun_parent_read_set.costed>): number {
 	return report.files.find((one) => one.file === entry_read_set.SKILL_FILE)?.cost.bytes ?? NOTHING
 }
@@ -53,12 +49,9 @@ describe('backlogrun_parent_read_set.costed — the SKILL.md section trim', () =
 		expect(backlogrun_parent_read_set.UNUSED_SKILL_SECTIONS).not.toContain(heading)
 	})
 
-	// A different trim from the worker's: the parent keeps §0, which the lane child drops. The two sets
-	// must genuinely differ, not converge to one.
-	it('drops a different set of sections than the lane child', () => {
-		expect([...backlogrun_parent_read_set.UNUSED_SKILL_SECTIONS].toSorted(by_text)).not.toEqual(
-			[...lane_child_read_set.UNUSED_SKILL_SECTIONS].toSorted(by_text),
-		)
+	it('keeps the interactive entry while the lane child uses its dedicated entry', () => {
+		expect(skill_bytes(backlogrun_parent_read_set.costed(ROOT))).toBeGreaterThan(NOTHING)
+		expect(skill_bytes(lane_child_read_set.costed(ROOT))).toBe(NOTHING)
 	})
 })
 

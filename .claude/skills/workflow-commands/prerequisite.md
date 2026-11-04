@@ -40,9 +40,8 @@ so the observation row carries no `route:` label (`observation-filing.md`):
 pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --route tier-a
 ```
 
-The command lints the body against `prompts/collaboration-workflow/issue-template.md`, applies the
-classification labels it declares, and runs the duplicate scan and `epic:bundle` itself
-(`docs/josh-commands-backlog.md` → `josh issue:file`).
+If the size check requires a split, use `--route split --label route:tier-a` instead.
+Then run `pnpm josh run:split <M> --prerequisite <N>` to record that the kept Issue waits for it.
 
 Every *file the prerequisite* step below means that filing, and it always happens **first** — the
 later steps name its number. **Its duplicate scan is read exactly as it is for a `new` entry**

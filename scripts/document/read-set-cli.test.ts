@@ -180,6 +180,9 @@ describe('josh read:set — the lane-child entry', () => {
 		expect(out).toContain(`entry: ${LANE_CHILD}`)
 		expect(out).toContain(read_set_cli.TOTAL_READ_LABEL)
 		expect(out).toContain('JOSH_LANE_CHILD')
+		expect(out).toContain(
+			'reads fullrun-lane.md instead of SKILL.md, fullrun.md and entry-sequence.md',
+		)
 		expect(out).toMatch(/resident: lane instructions [\d,]+ tok in place of CLAUDE\.md/u)
 	})
 
