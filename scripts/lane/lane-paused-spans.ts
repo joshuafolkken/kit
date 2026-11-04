@@ -73,11 +73,18 @@ function by_lane(entries: ReadonlyArray<LedgerEntry>): PausedSpans {
 	)
 }
 
-// The spans of the lane a transcript directory (`<lane-root-slug>-<issue>`) belongs to.
-function of_lane(spans: PausedSpans, lane: string): ReadonlyArray<PausedSpan> {
+// The issue a transcript directory (`<lane-root-slug>-<issue>`) belongs to, `undefined` for none.
+function issue_of_lane(lane: string): number | undefined {
 	const issue = LANE_ISSUE_PATTERN.exec(lane)?.groups?.['issue']
 
-	return issue === undefined ? NONE : (spans.get(Number(issue)) ?? NONE)
+	return issue === undefined ? undefined : Number(issue)
+}
+
+// The spans of the lane a transcript directory belongs to.
+function of_lane(spans: PausedSpans, lane: string): ReadonlyArray<PausedSpan> {
+	const issue = issue_of_lane(lane)
+
+	return issue === undefined ? NONE : (spans.get(issue) ?? NONE)
 }
 
 // How much of `from_ms`…`to_ms` the spans cover.
@@ -91,7 +98,7 @@ function overlap_ms(spans: ReadonlyArray<PausedSpan>, from_ms: number, to_ms: nu
 	return sum
 }
 
-const lane_paused_spans = { by_lane, of_lane, overlap_ms }
+const lane_paused_spans = { by_lane, issue_of_lane, of_lane, overlap_ms }
 
 export type { PausedSpan, PausedSpans }
 export { lane_paused_spans }
