@@ -24,7 +24,7 @@ const plan_at_entry_mock = vi.hoisted(() =>
 const record_lap_mock = vi.hoisted(() => vi.fn(async (_lap: { step: string }) => undefined))
 
 vi.mock('#scripts/lane/lane-ledger-write', () => ({
-	lane_ledger_write: { record_ship_lap: record_lap_mock },
+	lane_ledger_write: { record_ship_lap: record_lap_mock, target: async () => undefined },
 }))
 vi.mock('#scripts/run/run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
 
