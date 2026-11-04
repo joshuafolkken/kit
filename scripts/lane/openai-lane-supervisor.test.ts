@@ -102,6 +102,30 @@ test('starts the review broker around the supervised lane', async () => {
 	expect(with_server).toHaveBeenCalledWith(lane(), expect.any(Function))
 })
 
+it('logs a late claim cancelled by the dispatcher before exiting', async () => {
+	const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	openai_lane_supervisor.cancel(lane_directory, 'late')
+
+	expect(await openai_lane_supervisor.supervise(lane(), profile, 'late')).toBe(0)
+	expect(error).toHaveBeenCalledWith(expect.stringContaining('late claim — dispatcher cancelled'))
+	expect(launch).not.toHaveBeenCalled()
+	error.mockRestore()
+})
+
+it('logs an approval timeout separately from cancellation', async () => {
+	vi.useFakeTimers()
+	const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+	const pending = openai_lane_supervisor.supervise(lane(), profile, 'timeout')
+
+	await vi.runAllTimersAsync()
+
+	expect(await pending).toBe(0)
+	expect(error).toHaveBeenCalledWith(expect.stringContaining('approval timed out'))
+	expect(launch).not.toHaveBeenCalled()
+	error.mockRestore()
+	vi.useRealTimers()
+})
 describe('OpenAI lane supervisor generations', () => {
 	it('launches an ordinary initial generation through the lane-local adapter', async () => {
 		expect(await supervise('initial')).toBe(0)

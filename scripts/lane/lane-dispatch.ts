@@ -209,24 +209,24 @@ async function openai_dispatched_start(
 	request: StartRequest,
 	notes: ReadonlyArray<string>,
 	nonce: string | undefined,
+	pid: number,
 ): Promise<DispatchOutcome> {
-	const { lane } = request
-	const owner = await openai_lane_supervisor.wait_for_active(lane.directory)
+	const owner = await openai_lane_supervisor.wait_for_active(request.lane.directory, pid)
 
-	if (owner?.issue !== lane.issue) {
-		if (nonce !== undefined) openai_lane_supervisor.cancel(lane.directory, nonce)
+	if (owner?.issue !== request.lane.issue) {
+		if (nonce !== undefined) openai_lane_supervisor.cancel(request.lane.directory, nonce)
 
 		return failed_start(
 			request,
-			`the OpenAI supervisor did not claim lane ${session_cite.issue(lane.issue)}`,
+			`the OpenAI supervisor did not claim lane ${session_cite.issue(request.lane.issue)}`,
 			notes,
 		)
 	}
 
-	if (!openai_lane_supervisor.approve(lane.directory, owner.nonce)) {
+	if (!openai_lane_supervisor.approve(request.lane.directory, owner.nonce)) {
 		return failed_start(
 			request,
-			`the OpenAI supervisor for lane ${session_cite.issue(lane.issue)} was cancelled`,
+			`the OpenAI supervisor for lane ${session_cite.issue(request.lane.issue)} was cancelled`,
 			notes,
 		)
 	}
@@ -241,7 +241,7 @@ async function dispatched_start(
 	nonce: string | undefined,
 ): Promise<DispatchOutcome> {
 	return request.profile.provider === 'openai'
-		? await openai_dispatched_start(request, notes, nonce)
+		? await openai_dispatched_start(request, notes, nonce, pid)
 		: dispatched_of(request, pid, notes)
 }
 
