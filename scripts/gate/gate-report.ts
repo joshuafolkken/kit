@@ -93,6 +93,8 @@ function has_warnings(result: GateStepResult): boolean {
 // record on every CI run. The banner's lines are dropped before the match; a real warning on any
 // other line still withholds.
 const SAFE_CHAIN_BANNER = 'safe-chain is not available'
+// `changed_file_scope.describe_scope` lists lint inputs before the linters run.
+const LINT_FILE_PREFIX = '  - '
 
 function checker_lines(result: GateStepResult): ReadonlyArray<string> {
 	return result.output.split('\n').filter((line) => !line.includes(SAFE_CHAIN_BANNER))
@@ -101,9 +103,9 @@ function checker_lines(result: GateStepResult): ReadonlyArray<string> {
 function has_checker_warning(result: GateStepResult): boolean {
 	if (!gate_labels.WARNING_CHECKER_LABELS.includes(result.label)) return false
 
-	return checker_lines(result).some((line) =>
-		WARNING_MARKERS.some((marker) => line.includes(marker)),
-	)
+	return checker_lines(result)
+		.filter((line) => result.label !== gate_labels.LINT_LABEL || !line.startsWith(LINT_FILE_PREFIX))
+		.some((line) => WARNING_MARKERS.some((marker) => line.includes(marker)))
 }
 
 // The record's counterpart to `is_skip_notice`, narrower for the reason `has_checker_warning` is
