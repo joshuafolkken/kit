@@ -22,7 +22,6 @@ import { lane_yield } from './lane-yield'
 // after it is absent.
 
 const { EVENT_KIND } = run_event_stream
-const NAMED_ISSUE = /#([1-9]\d*)\b/gu
 
 interface YieldParts {
 	wait: Span
@@ -34,15 +33,6 @@ interface YieldParts {
 interface YieldPoints {
 	ends: ReadonlyArray<IssueAt>
 	openings: ReadonlyArray<IssueAt>
-}
-
-// The last issue the note cites other than the yielder: the overlap text names the holder last.
-function holder_of(note: RunEvent): number | undefined {
-	const yielder = lane_stop_stats.issue_of(note)
-
-	return [...note.text.matchAll(NAMED_ISSUE)]
-		.map((match) => Number(match[1]))
-		.findLast((issue) => issue !== yielder)
 }
 
 function points_of(
@@ -109,7 +99,7 @@ function split_of(wait: Span, issues: [number, number], points: YieldPoints): Yi
 function parts_of(note: RunEvent, wait: Span | undefined, points: YieldPoints): Array<YieldParts> {
 	if (wait === undefined) return []
 
-	const holder = holder_of(note)
+	const holder = lane_yield.holder_of(note)
 
 	return holder === undefined
 		? [{ wait }]
@@ -159,7 +149,7 @@ interface IssueYield {
 
 function issue_yield(note: RunEvent, split: YieldParts | undefined): IssueYield {
 	return {
-		holder: holder_of(note),
+		holder: lane_yield.holder_of(note),
 		gap_ms: split === undefined ? undefined : gap_ms(split),
 		is_early: split !== undefined && is_early(split),
 	}
