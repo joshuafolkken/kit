@@ -7,6 +7,15 @@ const PRE_TOOL_USE = 'run by the PreToolUse hook, the pending tool call as JSON 
 // the map keeps its order.
 
 const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
+	'usage:tee': {
+		script: 'scripts/usage/usage-tee-cli.ts',
+		description: 'Record account-wide Claude statusLine rate limits without printing output',
+		category: 'Development',
+		reference: ['', 'automation', ['files']],
+		usage: {
+			examples: [{ arguments: '', note: 'Claude statusLine JSON on stdin; stdout stays empty' }],
+		},
+	},
 	'format:edited': {
 		script: 'scripts/hooks/format-edited-cli.ts',
 		description: 'Claude Code hook: format the file just edited (reads the tool call on stdin)',

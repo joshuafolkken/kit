@@ -15,6 +15,7 @@ import { review_brief_paths } from './review-brief-paths'
 import { review_checkout } from './review-checkout'
 import { review_code_tree } from './review-code-tree'
 import { review_diff_write } from './review-diff-write'
+import { review_fix_round, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
 import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_stamps } from './review-stamps'
@@ -31,6 +32,19 @@ const INTERACTION_FLAG = '--interaction'
 const STALE_REFUSAL = 'issue-updated-after-round-one-sentinel'
 const INTERACTION_HEADING = '## Interaction review'
 const WHOLE_CHANGE = 'Target: the whole change'
+const RECORDED: RecordedRound = {
+	id: 'previous-round',
+	issue: 6286,
+	snapshot: JSON.stringify({ taken_at: '', files: {}, base: COMMIT }),
+	findings: [
+		{
+			category: 'bug-risks',
+			severity: 'medium',
+			file: OTHER_FILE,
+			description: 'Check the boundary.',
+		},
+	],
+}
 
 function stub_change(paths: ReadonlyArray<string>): void {
 	vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(COMMIT)
@@ -165,6 +179,24 @@ describe('review:brief --round 2 — the High-cited files', () => {
 
 // `josh run:review` hands `run_to` a writer, since its two briefs together exceed the Bash output cap
 // (joshuafolkken/kit#4863): every brief and the not-due line go to it, none to the console.
+describe('review:brief recorded findings', () => {
+	it('keeps the recorded findings before replacing the review contract', async () => {
+		stub_change([OTHER_FILE])
+		const resume = vi.spyOn(review_fix_round, 'resume').mockReturnValue(RECORDED)
+
+		vi.mocked(review_attest.record_target).mockImplementation(() => {
+			resume.mockReturnValue(undefined)
+
+			return 'replacement-nonce'
+		})
+		const compose = vi.spyOn(review_brief, 'compose')
+
+		await expect(review_brief_cli.run_to([], vi.fn())).resolves.toBe(0)
+		expect(compose).toHaveBeenCalledWith(expect.objectContaining({ fix_round: RECORDED }))
+		expect(resume).toHaveBeenCalledBefore(vi.mocked(review_attest.record_target))
+	})
+})
+
 describe('review:brief run_to', () => {
 	it('sends the code brief to emit, printing nothing', async () => {
 		stub_change([DUE_FILE, OTHER_FILE])

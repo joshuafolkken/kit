@@ -23,6 +23,7 @@ import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_code_tree } from './review-code-tree'
 import type { DiffParts } from './review-diff-parts'
 import { review_diff_write } from './review-diff-write'
+import { review_fix_round, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
 import { review_level, type ReviewLevel } from './review-level'
 import { review_reviewed_tree } from './review-reviewed-tree'
@@ -140,12 +141,9 @@ function record_round_one(
 			return false
 		}
 
-		review_stamps.round_one_stamp.write(
-			tree,
-			target,
-			base,
-			review_round_one_blobs.capture(Object.keys(tree)),
-		)
+		const blobs = review_round_one_blobs.capture(Object.keys(tree))
+
+		review_stamps.round_one_stamp.write(tree, target, base, blobs)
 
 		return true
 	} catch {
@@ -199,15 +197,18 @@ async function open_contract(slot: ReviewSlot): Promise<{
 	checkout: ReviewCheckout
 	nonce: string
 	resumed_from: FileMapStamp | undefined
+	fix_round: RecordedRound | undefined
 }> {
 	const checkout = await review_checkout.read_checkout()
-	const resumed_from = attested_tree(checkout)
+	const is_code = slot === review_attest.REVIEW_SLOT.CODE
+	const resumed_from = is_code ? attested_tree(checkout) : undefined
+	const fix_round = is_code ? review_fix_round.resume(checkout) : undefined
 	// Keyed on the root git just answered with, never on `process.cwd()`: the check made before the
 	// merge asks git the same question, and the two hash different keys the moment one of them runs
 	// from a subdirectory — a mismatch that would drop the guard with nothing printed.
 	const nonce = review_attest.record_target(checkout, checkout.root, slot)
 
-	return { checkout, nonce, resumed_from }
+	return { checkout, nonce, resumed_from, fix_round }
 }
 
 // Retaken on every round-1 brief, after the pointer it pairs with. Swallowed:
@@ -216,7 +217,9 @@ function record_briefed(round: number, tree: Record<string, string>, base?: stri
 	if (round !== FIRST_ROUND) return
 
 	try {
-		review_stamps.briefed_stamp.write(tree, undefined, base)
+		const blobs = review_round_one_blobs.capture(Object.keys(tree))
+
+		review_stamps.briefed_stamp.write(tree, undefined, base, blobs)
 	} catch {
 		/* no record widens the resume rather than narrowing it */
 	}
@@ -274,9 +277,8 @@ async function read_readers(
 
 async function compose_brief(request: ComposeRequest): Promise<string> {
 	const { round, paths, tree, base, profile, interaction } = request
-	const opened = await open_contract(slot_of(interaction))
+	const contract = await open_contract(slot_of(interaction))
 	// The interaction review reads the whole change, never a resume's narrowing (joshuafolkken/kit#4276).
-	const contract = interaction === undefined ? opened : { ...opened, resumed_from: undefined }
 	const stamps = {
 		gate: review_stamps.gate_stamp.read(),
 		in_flight: review_stamps.in_flight_stamp.read(),

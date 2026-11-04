@@ -4,6 +4,8 @@ import { removed_tests } from './removed-tests'
 import { review_brief_paths } from './review-brief-paths'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
+import { review_fix_hunks } from './review-fix-hunks'
+import { review_fix_round, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
 import { review_untouched_readers, type ReadersRead } from './review-untouched-readers'
 
@@ -363,33 +365,6 @@ function round_two_block(
 // 2 makes, measured from the tree that review was briefed on. Every reading that cannot narrow falls back to the whole
 // change: no record, a moved base, or an empty target. An empty target is included because a resumed
 // review that read nothing would report a clean verdict over the one already recorded.
-const RESUMED_HEADING =
-	'Resumed round 1 — a review of this branch was already attested, so this pass reads only what changed since the tree it read.'
-
-const RESUMED_QUESTION =
-	'Review these files in full against the rubric — they are the only code this pass has not already read.'
-
-function resumed_target(
-	snapshot: FileMapStamp | undefined,
-	tree: Record<string, string>,
-	root: string,
-	base: string,
-): string {
-	const scope = round_two_scope(snapshot, tree, base)
-
-	if (scope.recorded_at === undefined || scope.target.length === 0) {
-		return whole_change_target(root, base)
-	}
-
-	return [
-		RESUMED_HEADING,
-		`The attested review read the tree recorded at ${scope.recorded_at}.`,
-		`Target: only these files, which changed since that tree:\n${format_paths(root, scope.target)}`,
-		...reconciliation(root, base, scope),
-		RESUMED_QUESTION,
-	].join('\n')
-}
-
 interface BriefStamps {
 	gate: FileMapStamp | undefined
 	in_flight: FileMapStamp | undefined
@@ -413,6 +388,7 @@ interface BriefInput {
 	// The tree a finished, clean review of this branch was briefed on, so round 1 is a resume.
 	// Absent, round 1 reads the whole change.
 	resumed_from?: FileMapStamp | undefined
+	fix_round?: RecordedRound | undefined
 	// The files a recorded High cites (`review_reviewed_tree.high_cited`), named in round 2 as the
 	// High's fix. Absent or empty, no line.
 	high_cited?: ReadonlyArray<string> | undefined
@@ -433,10 +409,27 @@ const SECOND_ROUND = 2
 
 function round_one_target(input: BriefInput): string {
 	const { root } = input.checkout
+	const previous = input.fix_round
+
+	if (previous !== undefined) {
+		const scope = round_two_scope(review_fix_round.snapshot(previous), input.tree, input.base)
+		const paths = [...scope.target, ...scope.dropped]
+
+		return scope.recorded_at === undefined
+			? whole_change_target(root, input.base)
+			: (review_fix_hunks.block(previous, paths, root) ?? whole_change_target(root, input.base))
+	}
 
 	if (input.resumed_from === undefined) return whole_change_target(root, input.base)
 
-	return resumed_target(input.resumed_from, input.tree, root, input.base)
+	const scope = round_two_scope(input.resumed_from, input.tree, input.base)
+
+	return review_fix_hunks.resumed_block({
+		recorded_at: scope.recorded_at,
+		paths: format_paths(root, scope.target),
+		reconciliation: reconciliation(root, input.base, scope),
+		fallback: whole_change_target(root, input.base),
+	})
 }
 
 function target_block(input: BriefInput): string {
@@ -453,12 +446,13 @@ function target_block(input: BriefInput): string {
 // code that narrowing exists to keep out of scope. Decided by the target actually printed, not by
 // the round: every round that cannot narrow widens through `whole_change_target`, and that round
 // needs the parts as much as a first one does.
-function is_whole_change(input: BriefInput, target: string): boolean {
-	return target.includes(whole_change_target(input.checkout.root, input.base))
-}
-
 function diff_block(input: BriefInput, target: string): ReadonlyArray<string> {
-	if (!is_whole_change(input, target) || input.diff === undefined) return []
+	if (
+		!target.includes(whole_change_target(input.checkout.root, input.base)) ||
+		input.diff === undefined
+	) {
+		return []
+	}
 
 	return ['', review_diff_parts.reading_block(input.diff.parts, input.diff.cap)]
 }
@@ -466,7 +460,7 @@ function diff_block(input: BriefInput, target: string): ReadonlyArray<string> {
 // Beside a whole-change target only, for the reason `diff_block` gives: a narrowed round keeps the
 // rest of the change, and so its readers, out of scope.
 function readers_block(input: BriefInput, target: string): ReadonlyArray<string> {
-	if (!is_whole_change(input, target)) return []
+	if (!target.includes(whole_change_target(input.checkout.root, input.base))) return []
 
 	return review_untouched_readers.brief_block(input.readers)
 }
@@ -511,7 +505,7 @@ const review_brief = {
 	dropped_line,
 	EMPTY_DELTA_LINE,
 	gate_line,
-	RESUMED_HEADING,
+	RESUMED_HEADING: review_fix_hunks.RESUMED_HEADING,
 	matching_stamp,
 	no_snapshot_line,
 	NOTHING_LEFT_LINE,

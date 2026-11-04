@@ -75,7 +75,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	// `command:derive`'s usage section (joshuafolkken/kit#4970) crossed the 45056 block.
 	// `ui:shot`'s usage section (joshuafolkken/kit#5633) crossed the 49152 block.
-	{ path: 'docs/josh-commands-automation.md', bytes: 53_248 },
+	// `usage:tee`'s usage section (joshuafolkken/kit#6316) crossed the 53248 block.
+	{ path: 'docs/josh-commands-automation.md', bytes: 57_344 },
 	// The carried `--unpinned-ok` record (joshuafolkken/kit#4775) crossed the 73728 block.
 	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
 	// `lane:plan --probe` and the entry probe (joshuafolkken/kit#5211) crossed the 81920 block.
