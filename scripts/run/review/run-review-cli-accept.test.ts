@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GATE_GREEN, GATE_RED, run_review, type GateState } from './run-review'
 import { run_review_cli } from './run-review-cli'
 import { run_review_pinned } from './run-review-pinned'
+import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
@@ -97,6 +98,30 @@ describe('run with --unpinned-ok after the join stopped on this tree', () => {
 		expect(await run_review_cli.run(OK_ARGV)).toBe(FAILURE_EXIT_CODE)
 		expect(run_review_pinned_steps.launch).toHaveBeenCalledWith(PROJECT_ROOT, REASON, TREE)
 		expect(run_review_pinned_steps.carry_reason).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6207: the open's reason is the branch's record, so the ship carries it though a
+// round-1 fix moves the tree and `--join` judges nothing.
+describe('run — the launch records its reason for the branch', () => {
+	it('records the reason a new round is opened with', async () => {
+		vi.spyOn(run_review_pinned_join, 'finished_on_tree').mockResolvedValue(undefined)
+		const kept = vi.spyOn(run_review_pinned_accepted, 'keep_reason').mockResolvedValue(undefined)
+
+		spy_starts()
+		await run_review_cli.run(OK_ARGV)
+
+		expect(kept).toHaveBeenCalledWith(REASON)
+	})
+
+	it('records nothing for a round opened with no reason', async () => {
+		const kept = vi.spyOn(run_review_pinned_accepted, 'keep_reason').mockResolvedValue(undefined)
+
+		spy_starts()
+		await run_review_cli.run([])
+
+		expect(run_review_pinned_steps.launch).toHaveBeenCalledWith(PROJECT_ROOT, undefined, TREE)
+		expect(kept).not.toHaveBeenCalled()
 	})
 })
 

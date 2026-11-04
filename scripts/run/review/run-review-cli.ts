@@ -253,7 +253,8 @@ async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<numb
 	return code
 }
 
-// A fresh `josh test:pinned` on this tree in place of the last one.
+// A fresh `josh test:pinned` on this tree in place of the last one; its reason is recorded for the
+// branch, so the ship carries it (`run-review-pinned-accepted.ts` → `keep_reason`).
 async function launch_pinned(reason: string | undefined): Promise<void> {
 	const tree = await run_review_pinned_tree.key()
 
@@ -263,6 +264,8 @@ async function launch_pinned(reason: string | undefined): Promise<void> {
 	if (launched.kind === 'failed') {
 		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
 	}
+
+	if (reason !== undefined) await run_review_pinned_accepted.keep_reason(reason)
 }
 
 // `josh test:pinned` runs in the background beside the pair, `--unpinned-ok` or not, so the pair never
