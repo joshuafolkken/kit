@@ -165,8 +165,8 @@
   - silent: `gh secret list`, `gh variable get`, a `gh api` read — a `DELETE` is `destructive-command`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Network egress or credential print** (`egress`, `SECURITY.md` → "Secrets")
-  - fires: `pnpm josh pretool:guard` — `curl` / `wget` / `nc` / `ssh` / `scp` / a remote `rsync` and the like, a network call in an inline `node -e` / `python -c` script, `gh auth token`, `gh` sent to a host other than github.com, or a print of the environment or a `*TOKEN*` / `*SECRET*` / `*KEY*` variable — nested in `bash -c`, `eval`, `$(…)` or a heredoc as well. Every occurrence
-  - silent: `gh` against github.com, `git fetch` / `push`, `pnpm` / `npx`, and `env X=1 <command>`. A plain `curl` / `wget` is still refused by the `.claude/settings.json` deny list, even to localhost; the hook lets localhost or GitHub through only for spellings that list does not reach
+  - fires: `pnpm josh pretool:guard` — network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential or environment prints — in each shell segment and nested command. Every occurrence
+  - silent: ordinary reads, `gh` reads against github.com, `git fetch`, `git push origin`, named scripts and `pnpm josh` routes. A plain `curl` / `wget` is still refused by the deny list; the hook allows local or GitHub destinations with known flags
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Lane child changing a workflow** (`workflow-edit`, `SECURITY.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child changing `.github/workflows/**` — an `Edit` / `Write` of it, or a `Bash` write to it (a `>` redirect, `tee`, `cp` / `install` / `ln` to it, `dd of=`, `mv` / `rm` / `unlink` / `shred` / `touch` / `truncate` / `patch`, an in-place `sed` / `perl`, `git checkout` / `restore` / `rm` / `mv`), or a `cd` / `pushd` into `.github`, inside `bash -c`, `$()` or a heredoc too. Every occurrence

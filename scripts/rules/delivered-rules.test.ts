@@ -19,6 +19,7 @@ import {
 	FILING_COMMAND,
 	STATE_CHECK_COMMAND,
 } from './delivered-rules-fixture'
+import { egress_guard } from './egress-guard'
 
 // joshuafolkken/kit#1524: a rule that left residency has to *fire*, or the relocation deleted it. The
 // whole point of the Issue is that prose which is never read is indistinguishable from an absent
@@ -87,13 +88,11 @@ function comment_read_tail(issue: number): string {
 	return time_transcript_fixture.josh_call_line(1, time_transcript_fixture.BRANCH, command)
 }
 
-// **Only one refusal can leave a `PreToolUse` hook**, so a call two rows both claim would deliver
-// whichever comes first and silently drop the other. The enumeration stays safe only while no two
-// triggers match the same command — asserted over every row against every other row's fixtures, so a
-// third row is checked without anyone remembering to add a case.
+// Specific guidance stays disjoint; the egress backstop also refuses writes and inline execution
+// on every reissue after a one-time formatting rule has already delivered.
 function rules_claiming(command: string): number {
-	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: 'Bash', input: { command } }),
+	return delivered_rules.DELIVERED_RULES.filter(
+		(rule) => rule.id !== 'egress' && rule.is_trigger({ name: 'Bash', input: { command } }),
 	).length
 }
 
@@ -255,7 +254,7 @@ describe('delivered_rules.delivery — the masked verification at the call that 
 // same answer the other two guards give. A hook that spoke on these calls would cost every run.
 describe('delivered_rules.delivery — silent where nothing binds', () => {
 	it.each([
-		['a comment', 'gh api repos/joshuafolkken/kit/issues/1524/comments --field body=@/tmp/b.md'],
+		['a comment', 'pnpm josh issue:comment 1524 --body-file /tmp/b.md'],
 		['an ordinary command', 'pnpm josh gate'],
 		['a listing', 'gh issue list --state open'],
 	])('says nothing on %s', (label, command) => {
@@ -350,7 +349,7 @@ describe('delivered_rules.delivery — the shell-body rule at the call that woul
 		const payload = payload_of('shell-body-repeat', EVALUATED_BODY_COMMAND)
 
 		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.SHELL_BODY_REASON)
-		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBe(egress_guard.EGRESS_REASON)
 	})
 
 	// **Never wired to a write** (joshuafolkken/kit#1390), the same omission every row depends on.

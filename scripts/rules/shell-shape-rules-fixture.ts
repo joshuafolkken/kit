@@ -46,7 +46,7 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'repo-admin': [],
 	'protected-file': [HEREDOC],
 	'workflow-edit': [],
-	egress: ['curl-data-file'],
+	egress: ['curl-data-file', MULTILINE_FIELD, SEMICOLON, HEREDOC, 'name-prefix'],
 	'direct-pr-create': [SEMICOLON, HEREDOC],
 	'pr-merge': [SEMICOLON, HEREDOC],
 	'poll-loop': [],

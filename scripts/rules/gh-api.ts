@@ -79,13 +79,20 @@ function is_gh_api(segment: string): boolean {
 // a flag itself.
 function flags_of(segment: string): Array<[string, string]> {
 	const words = git_argv.arguments_of(segment, GH_COMMAND) ?? []
+	let has_value_pending = false
 
 	return words
 		.map((word, index): [string, string] => [word, words[index + NEXT] ?? ''])
-		.filter(([word], index) => {
-			if (!word.startsWith(FLAG_PREFIX)) return false
+		.filter(([word]) => {
+			if (has_value_pending) {
+				has_value_pending = false
 
-			return !API_VALUE_TAKING_FLAGS.has(words[index - NEXT] ?? '')
+				return false
+			}
+
+			has_value_pending = API_VALUE_TAKING_FLAGS.has(word)
+
+			return word.startsWith(FLAG_PREFIX)
 		})
 }
 
