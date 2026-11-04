@@ -2,8 +2,11 @@
 import { fileURLToPath } from 'node:url'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { session_cite } from '#scripts/issue/session-cite'
+import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { report_labels } from '#scripts/report/report-labels'
 import { run_tail, type TailSection } from './run-tail'
 
 // `josh run:tail [<N> ...]` — one call for the fixed post-merge sequence a run closes on.
@@ -97,13 +100,16 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	}
 
 	const sections = await close_run(issues)
+	const citations = issues.map((issue) => session_cite.issue(issue))
+	const templates = run_tail.template_sections(citations, report_labels.session_labels())
 
-	console.info(run_tail.format_report(sections))
+	console.info(run_tail.format_report([...sections, ...templates]))
 
 	return run_tail.exit_code(sections)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
+	josh_environment_file.load_environment_file()
 	process.exitCode = await run(argv)
 }
 
