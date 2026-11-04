@@ -496,6 +496,20 @@ The opposite direction — one consumer catching itself up from its own checkout
 
 AI-assisted git and notification helpers used in the day-to-day development loop.
 
+### `josh issue:tick`
+
+<!-- usage: issue:tick -->
+
+Tick selected acceptance checkboxes by their plan identifiers.
+
+```bash
+pnpm josh issue:tick 6233 ac-a1f32a2f ac-8647b0dd
+```
+
+<!-- /usage -->
+
+Use the `ac-…` identifiers printed in the plan's acceptance map. Unknown identifiers refuse the whole update. Repeating a checked criterion is a no-op. Other sections, formatting and line endings are preserved.
+
 ### `josh pr:classification`
 
 <!-- usage: pr:classification -->
