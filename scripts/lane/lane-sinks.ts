@@ -95,7 +95,7 @@ function hubs_of(
 ): Array<string> {
 	const named = entries
 		.filter((entry) => is_test_related(entry))
-		.filter((entry) => issues.some((issue) => entry.issue === issue))
+		.filter((entry) => entry.issue !== undefined && issues.includes(entry.issue))
 		.map((entry) => entry.over_cap_hub)
 		.filter((hub) => hub !== undefined)
 
