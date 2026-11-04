@@ -1,3 +1,4 @@
+import { git_path_quoting } from '#scripts/git/git-path-quoting'
 import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 
@@ -112,7 +113,9 @@ function parse_numstat(raw: string): Array<FileChange> {
 }
 
 function non_test_changes(changes: ReadonlyArray<FileChange>): Array<FileChange> {
-	return changes.filter((change) => !test_declared_logic.is_test_file(change.path))
+	return changes.filter(
+		(change) => !test_declared_logic.is_test_file(git_path_quoting.unquote(change.path)),
+	)
 }
 
 // `split` when **either** guide is exceeded — the AND form never fired, even on the lanes cut twice
