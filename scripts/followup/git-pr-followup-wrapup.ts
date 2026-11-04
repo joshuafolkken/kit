@@ -48,6 +48,7 @@ interface WrapupInput {
 	// that head moved before the merge (`git-pr-merge-checked.ts`, #4036).
 	checked?: PrStateSnapshot | undefined
 	wait_for_green: WaitForGreen
+	before_merge?: ((head?: string) => Promise<void>) | undefined
 	// The completion Telegram, its body already read, sent beside the merge.
 	send_completion: () => Promise<void>
 }
@@ -251,6 +252,7 @@ async function send_beside_merge(input: WrapupInput): Promise<string> {
 		return STAGE.telegram
 	}
 
+	await input.before_merge?.(input.checked?.head_sha)
 	await settled_together(input.send_completion(), merge_step(input))
 
 	return STAGE.telegram_and_merge

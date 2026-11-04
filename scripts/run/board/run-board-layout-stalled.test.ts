@@ -10,7 +10,7 @@ import type { ItemStatus } from './run-board-status'
 const REPO = 'joshuafolkken/kit'
 const STALLED = 33
 const NO_STATUSES: ReadonlyMap<number, ItemStatus> = new Map()
-const RESUME = { tail: 'fullrun #33' }
+const RESUME = { tail: '→ resume: fullrun #33' }
 
 function stalled_child(): EpicChild {
 	return { number: STALLED, repo: REPO, state: 'OPEN', labels: [RUN_STALLED_LABEL], blocked_by: [] }
@@ -53,8 +53,8 @@ describe('run_board_layout.layout_of — a stalled row’s resume action', () =>
 		expect(row?.reason).toStrictEqual(RESUME)
 	})
 
-	it('draws a parked row’s recorded cause before the resume action', () => {
-		const reason = 'review failed → fullrun #33'
+	it('draws a parked row’s recorded resume action and cause', () => {
+		const reason = '→ resume: fullrun #33 (review failed)'
 		const statuses = new Map<number, ItemStatus>([
 			[STALLED, { state: 'parked', started_ms: 1, reason }],
 		])

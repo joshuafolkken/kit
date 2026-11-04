@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { followup_human_merge, HumanMergeRequiredError } from './followup-human-merge'
 
 const RESOLVED_BRANCH = vi.hoisted(() => 'resolved-branch')
 // Deliberately not the real line's shape. What these two cases can prove is the wiring — that
@@ -7,9 +8,14 @@ const RESOLVED_BRANCH = vi.hoisted(() => 'resolved-branch')
 // realistic-looking string here would only prove the stub round-trips through `console.info`.
 const PENDING_SENTINEL = vi.hoisted(() => 'pending-release-line-sentinel')
 
+vi.mock(import('./followup-human-merge'), async (import_original) => ({
+	...(await import_original()),
+	followup_human_merge: { assert_allowed: vi.fn(async () => undefined) },
+}))
+
 vi.mock('node:util', async (import_original) => ({
 	...(await import_original<Record<string, unknown>>()),
-	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
+	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: ['6221'] }),
 }))
 
 const print_section_mock = vi.hoisted(() => vi.fn())
@@ -178,8 +184,18 @@ vi.mock('./git-followup-merged', () => ({
 const { git_followup_workflow } = await import('./git-followup-workflow')
 const { git_followup_flush } = await import('./git-followup-flush')
 const { lane_size_record } = await import('#scripts/lane/lane-size-record')
+const { git_pr_followup } = await import('./git-pr-followup')
+const before_merge_at_import = vi.mocked(git_pr_followup.run).mock.calls[0]?.[0]?.before_merge
 // Read at load, before the suite's per-test mock clearing can reset it.
 const prints_at_import = print_section_mock.mock.calls.length
+
+it('carries the checked head into the final workflow merge guard', async () => {
+	const head = 'checked-head'
+
+	expect(before_merge_at_import).toBeTypeOf('function')
+	await before_merge_at_import?.(head)
+	expect(followup_human_merge.assert_allowed).toHaveBeenLastCalledWith('main', '6221', head)
+})
 
 // joshuafolkken/kit#5645. The import ran `main` with no `--help`, so it opened on its governing section.
 describe('main — followup opens on its governing section', () => {
@@ -205,6 +221,24 @@ describe('main — followup opens on its governing section', () => {
 
 // joshuafolkken/kit#3023. A pull request a person merged by hand is finished by re-running `followup`;
 // the gates guard a merge this run no longer makes, and a ledger commit would land on a merged branch.
+it('stops an open workflow PR before every gate and ledger commit', async () => {
+	vi.mocked(followup_human_merge.assert_allowed).mockRejectedValueOnce(
+		new HumanMergeRequiredError('manual merge'),
+	)
+	attested_mock.mockClear()
+	vi.mocked(git_followup_flush.commit_ledger_step).mockClear()
+
+	await expect(
+		git_followup_workflow.prepare_merge(
+			{ is_merged: false, should_merge: true, merged_at: undefined },
+			'6221',
+			FEATURE_BRANCH,
+		),
+	).rejects.toThrow(HumanMergeRequiredError)
+	expect(attested_mock).not.toHaveBeenCalled()
+	expect(git_followup_flush.commit_ledger_step).not.toHaveBeenCalled()
+})
+
 describe('prepare_merge — a pull request that has already merged', () => {
 	const ISSUE = '3023'
 	const BRANCH = 'merged-branch'
@@ -241,32 +275,16 @@ describe('prepare_merge — a pull request that has already merged', () => {
 })
 
 describe('parse_issue_number_from_text', () => {
-	it('returns undefined for undefined input', () => {
-		expect(git_followup_workflow.parse_issue_number_from_text(undefined)).toBeUndefined()
-	})
-
-	it('returns undefined for empty string', () => {
-		expect(git_followup_workflow.parse_issue_number_from_text('')).toBeUndefined()
-	})
-
-	it('extracts number from "#42" format', () => {
-		expect(git_followup_workflow.parse_issue_number_from_text('#42')).toBe('42')
-	})
-
-	it('extracts number from bare digit string', () => {
-		expect(git_followup_workflow.parse_issue_number_from_text('42')).toBe('42')
-	})
-
-	it('extracts trailing issue number from title string', () => {
-		expect(git_followup_workflow.parse_issue_number_from_text('feat: fix bug #42')).toBe('42')
-	})
-
-	it('returns undefined when input has no issue number', () => {
-		expect(git_followup_workflow.parse_issue_number_from_text('no number here')).toBeUndefined()
-	})
-
-	it('trims whitespace before extracting', () => {
-		expect(git_followup_workflow.parse_issue_number_from_text('  #42  ')).toBe('42')
+	it.each([
+		['returns undefined for undefined input', undefined, undefined],
+		['returns undefined for empty string', '', undefined],
+		['extracts number from "#42" format', '#42', '42'],
+		['extracts number from bare digit string', '42', '42'],
+		['extracts trailing issue number from title string', 'feat: fix bug #42', '42'],
+		['returns undefined when input has no issue number', 'no number here', undefined],
+		['trims whitespace before extracting', '  #42  ', '42'],
+	])('%s', (_title, input, expected) => {
+		expect(git_followup_workflow.parse_issue_number_from_text(input)).toBe(expected)
 	})
 })
 

@@ -76,6 +76,7 @@ interface FollowupInput {
 	is_merged?: boolean | undefined
 	// When it merged — a completion report posted before it is the `prrun` stop's, not this tail's.
 	merged_at?: string | undefined
+	before_merge?: ((head?: string) => Promise<void>) | undefined
 }
 
 const { parse_closes_issue_number } = git_closes_keyword
@@ -363,6 +364,7 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 			send_completion: notify.send,
 			checked: checks.snapshot,
 			wait_for_green: wait_for_green_of(input, context, issue_number, log),
+			before_merge: input.before_merge,
 		},
 		log,
 	)

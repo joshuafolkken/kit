@@ -114,3 +114,20 @@ describe('git_pr_merge_checked.merge_when_green', () => {
 		expect(mocked_merge).toHaveBeenCalledWith(BRANCH, CHECKED_SHA)
 	})
 })
+
+it('rechecks the merge policy against every checked head, including a retry', async () => {
+	const before_merge = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(MERGE_REFUSED)
+	const wait_for_green = vi.fn<WaitForGreen>().mockResolvedValue(snapshot_at(PUSHED_SHA))
+
+	mocked_merge.mockRejectedValueOnce(HEAD_MOVED)
+	await expect(
+		git_pr_merge_checked.merge_checked({
+			branch_name: BRANCH,
+			checked: snapshot_at(CHECKED_SHA),
+			wait_for_green,
+			before_merge,
+		}),
+	).rejects.toBe(MERGE_REFUSED)
+	expect(before_merge.mock.calls).toStrictEqual([[CHECKED_SHA], [PUSHED_SHA]])
+	expect(merged_shas()).toStrictEqual([CHECKED_SHA])
+})

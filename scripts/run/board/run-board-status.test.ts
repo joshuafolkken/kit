@@ -132,7 +132,7 @@ describe('run_board_status.statuses_of withdrawn', () => {
 		]
 		const statuses = run_board_status.statuses_of(events, NO_LANES)
 
-		expect(statuses.get(3409)?.reason).toBe('BLOCKED: Checks missing → fullrun #3409')
+		expect(statuses.get(3409)?.reason).toBe('→ resume: fullrun #3409 (BLOCKED: Checks missing)')
 	})
 })
 

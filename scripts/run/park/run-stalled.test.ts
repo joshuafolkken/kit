@@ -29,12 +29,12 @@ describe('run_stalled.cause_of', () => {
 })
 
 describe('run_stalled.row_text', () => {
-	it('draws the cause, then the action that resumes the issue', () => {
-		expect(run_stalled.row_text(CHILD, CAUSE)).toBe('review failed → fullrun #4188')
+	it('draws the resume action followed by its cause in parentheses', () => {
+		expect(run_stalled.row_text(CHILD, CAUSE)).toBe('→ resume: fullrun #4188 (review failed)')
 	})
 
 	it('draws the action alone where no cause was recorded', () => {
-		expect(run_stalled.row_text(CHILD)).toBe('fullrun #4188')
+		expect(run_stalled.row_text(CHILD)).toBe('→ resume: fullrun #4188')
 	})
 })
 

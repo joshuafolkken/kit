@@ -17,10 +17,15 @@ bullets. Use the file option whenever it contains a command or path.
 
 It waits for required CI, checks CodeRabbit and top-level AI review comments, sends the completion
 Telegram, merges by default, posts the Issue report, closes completed epics, removes `in-progress`,
-and releases the hold. Only `--no-merge` stops the merge; `--merge` is a deprecated no-op. **A pull
+and releases the hold. `--no-merge` stops the merge; `--merge` is a deprecated no-op. **A pull
 request already merged by hand** (a `prrun` stop) runs only the post-merge tail; a report already on the
 Issue is not posted twice, so re-running is safe. Keep the default Issue target. Ignore a finding only
 after verifying it is inapplicable; rate-limit text is not a finding.
+
+**A PR changing `.github/workflows/**` waits for a human merge**, including additions, deletions and
+either side of a rename. `followup` leaves it open, labels its Issue `needs-human-merge`, prints the
+PR URL and exits successfully without a completion report. Read the diff on GitHub and merge there;
+`--merge` cannot bypass this stop. Re-run `followup` after the manual merge to finish the tail.
 
 **A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** `followup` waits
 out the window (≤30 min) and posts `@coderabbitai review` once per pull request. On its

@@ -29,16 +29,22 @@ describe('run_board_ending_reason.reason_of', () => {
 				'#13 parked (run:stalled: ship-stop cap)',
 				'#13 parked (run:stalled)',
 			]),
-		).toStrictEqual(['review failed → fullrun #13', 'ship-stop cap → fullrun #13', 'fullrun #13'])
+		).toStrictEqual([
+			'→ resume: fullrun #13 (review failed)',
+			'→ resume: fullrun #13 (ship-stop cap)',
+			'→ resume: fullrun #13',
+		])
 	})
 
 	// joshuafolkken/kit#5780: a park on a timed-out merge wait names the missing required context.
 	it('reads a park on a timed-out merge wait as the missing context and the resume action', () => {
 		expect(reasons(KIND.PARK, ['#13 parked (run:stalled: BLOCKED: Checks missing)'])).toStrictEqual(
-			['BLOCKED: Checks missing → fullrun #13'],
+			['→ resume: fullrun #13 (BLOCKED: Checks missing)'],
 		)
 	})
+})
 
+describe('run_board_ending_reason.reason_of — other ending events', () => {
 	it('reads a withdraw reason after its prefix, and none where it gives none', () => {
 		expect(
 			reasons(KIND.WITHDRAW, [
