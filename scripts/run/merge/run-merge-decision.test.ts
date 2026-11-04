@@ -42,8 +42,27 @@ const QUOTED_ENTRY_COMMANDS = [
 	`printf '%s\\n' 'quoted; ${ENTRY_COMMAND}; quoted\n${HANDED_OFF}'`,
 	`cat <<'EOF'\n${ENTRY_COMMAND}\n${HANDED_OFF}\nEOF`,
 ]
+const EXECUTED_ENTRY_COMMANDS = [
+	ENTRY_COMMAND,
+	`/bin/zsh -lc '${ENTRY_COMMAND}'`,
+	`bash -c "${ENTRY_COMMAND}"`,
+	`cd /tmp && ${ENTRY_COMMAND}`,
+	`cd /tmp && /bin/zsh -lc '${ENTRY_COMMAND}'`,
+]
+const SKIPPED_ENTRY_COMMANDS = [
+	`false && ${ENTRY_COMMAND}; ${READ_LOG_COMMAND}`,
+	`false && ${ENTRY_COMMAND} || ${READ_LOG_COMMAND}`,
+	`${ENTRY_COMMAND}; ${READ_LOG_COMMAND}`,
+	`${ENTRY_COMMAND} | ${READ_LOG_COMMAND}`,
+	`/bin/zsh -lc 'false && ${ENTRY_COMMAND}; ${READ_LOG_COMMAND}'`,
+]
+const EXECUTED_HANDOFFS = EXECUTED_ENTRY_COMMANDS.flatMap((command) =>
+	HANDOFF_OUTPUTS.map((output) =>
+		output.replace(JSON.stringify(ENTRY_COMMAND), () => JSON.stringify(command)),
+	),
+)
 const HANDOFF_NEGATIVES = [
-	...QUOTED_ENTRY_COMMANDS.flatMap((command) =>
+	...[...QUOTED_ENTRY_COMMANDS, ...SKIPPED_ENTRY_COMMANDS].flatMap((command) =>
 		HANDOFF_OUTPUTS.map((output) =>
 			output.replace(JSON.stringify(ENTRY_COMMAND), () => JSON.stringify(command)),
 		),
@@ -158,7 +177,7 @@ describe('run_merge_decision — stale hand-off', () => {
 			expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
 		},
 	)
-	it.each(HANDOFF_OUTPUTS)('names the stale cut record (ac-94c3f036): %s', (text) => {
+	it.each(EXECUTED_HANDOFFS)('names the stale cut record (ac-94c3f036): %s', (text) => {
 		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(text)
 
 		expect(run_merge_decision.cause(OUTPUT).short).toBe('stale hand-off')

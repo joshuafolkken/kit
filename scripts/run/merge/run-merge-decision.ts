@@ -4,7 +4,9 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { json_value } from '#scripts/lib/json-value'
 import { transcript_record, type TranscriptBlock } from '#scripts/lib/transcript-record'
+import { bash_triggers } from '#scripts/rules/bash-triggers'
 import { lane_park } from '#scripts/rules/lane-park'
+import { shell_segments } from '#scripts/rules/shell-segments'
 import { stop_decision } from '#scripts/rules/stop-decision'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
@@ -43,10 +45,28 @@ function asks(message: string): boolean {
 	)
 }
 
+function successful_last(command: string): string | undefined {
+	const joined = shell_segments.joined_continuations(command)
+	const plain = time_shell.blanked(joined)
+
+	if (plain === undefined || /[;|&\n]/u.test(plain.replaceAll('&&', ''))) return undefined
+
+	return shell_segments.quote_aware_commands_of(joined).at(-1)
+}
+
 function is_entry(command: string): boolean {
-	return time_josh_names
-		.josh_commands_of(time_shell.unquoted(command).replaceAll('\n', ';'))
-		.includes('josh run:entry')
+	for (let next = command; next !== '';) {
+		const last = successful_last(next) ?? ''
+		const script = bash_triggers.shell_script_of(last)
+
+		if (script === undefined) {
+			return time_josh_names.josh_command_of_segment(time_shell.unquoted(last)) === 'josh run:entry'
+		}
+
+		next = script
+	}
+
+	return false
 }
 
 function entry_ids(latest: string): ReadonlySet<string> {
