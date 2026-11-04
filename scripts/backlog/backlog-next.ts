@@ -181,7 +181,7 @@ function running_of(
 ): ReadonlySet<string> {
 	return (
 		views[0]?.running ??
-		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo, context.tracking.index)
+		backlog_pool.running_set(graphs, context.opted_in.issues, context, context.tracking.index)
 	)
 }
 
@@ -215,6 +215,7 @@ function combine(
 		exclude: context.exclude,
 		repo: context.repo,
 		running: running_of(views, graphs, context),
+		implement_rate: context.implement_rate,
 	})
 
 	// The same checkout map `epic:next` hands `build_result`. Without it every bundle heading reads
@@ -241,7 +242,7 @@ function settled_views(
 	const settled = backlog_pool.settle_standalone(
 		views[0]?.running ?? running,
 		context.opted_in.issues,
-		context.repo,
+		context,
 		context.tracking.index,
 	)
 
@@ -268,7 +269,7 @@ function views_from(
 
 	return settled_views(
 		reads,
-		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo, context.tracking.index),
+		backlog_pool.running_set(graphs, context.opted_in.issues, context, context.tracking.index),
 		context,
 	)
 }
@@ -298,7 +299,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 	// (joshuafolkken/kit#5502).
 	const untrusted = new Set([
 		...(await auto_ok_author.untrusted_child_keys(children, context.repo)),
-		...backlog_next_size.held_children(children),
+		...backlog_next_size.held_children(children, context.implement_rate),
 	])
 	// The defect priority and the ranking keys are applied here rather than when printing, so
 	// `backlog:plan` shows the order the run takes. The
