@@ -52,6 +52,15 @@ interface Implement {
 	ms: number
 }
 
+// A dispatch's implementation interval: it ends at the first ship stage that followed, else — still
+// open — at the issue's next dispatch, `Infinity` for none.
+interface ImplementSpan {
+	issue: number
+	from_ms: number
+	to_ms: number
+	is_open: boolean
+}
+
 interface Measured {
 	implement: ReadonlyArray<number>
 	stages: ReadonlyArray<StageEntry>
@@ -99,19 +108,32 @@ function implement_ms(
 	return starts.length === 0 ? undefined : Math.min(...starts) - from_ms
 }
 
-// Each dispatch's implementation in dispatch order, a dispatch no ship stage followed left out.
-function implements_of(entries: ReadonlyArray<LedgerEntry>): Array<Implement> {
+// Each dispatch's implementation interval in dispatch order.
+function implement_spans(entries: ReadonlyArray<LedgerEntry>): Array<ImplementSpan> {
 	const stages = entries.filter(is_stage)
 	const sorted = entries
 		.filter(is_dispatch)
 		.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
 
-	return sorted
-		.map((dispatch, index) => ({
+	return sorted.map((dispatch, index) => {
+		const from_ms = Date.parse(dispatch.at)
+		const until_ms = next_dispatch_ms(sorted, index)
+		const ms = implement_ms(dispatch, until_ms, stages)
+
+		return {
 			issue: dispatch.issue,
-			ms: implement_ms(dispatch, next_dispatch_ms(sorted, index), stages),
-		}))
-		.filter((implement): implement is Implement => implement.ms !== undefined)
+			from_ms,
+			to_ms: ms === undefined ? until_ms : from_ms + ms,
+			is_open: ms === undefined,
+		}
+	})
+}
+
+// Each dispatch's implementation in dispatch order, a dispatch no ship stage followed left out.
+function implements_of(entries: ReadonlyArray<LedgerEntry>): Array<Implement> {
+	return implement_spans(entries)
+		.filter((span) => !span.is_open)
+		.map(({ issue, from_ms, to_ms }) => ({ issue, ms: to_ms - from_ms }))
 }
 
 // Each issue's implementation over every entry given — the latest dispatch's, so a reissued lane
@@ -181,6 +203,7 @@ const lane_stage_stats = {
 	STAGES,
 	cell,
 	implement_by_issue,
+	implement_spans,
 	is_dispatch,
 	is_merge,
 	is_number,
