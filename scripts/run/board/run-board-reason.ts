@@ -10,6 +10,7 @@ import { lane_state } from '#scripts/lane/lane-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type Overlay, type ReasonOf, type RowReason } from './run-board-layout'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
@@ -316,10 +317,16 @@ function wait_of(
 
 // What each waiting row of one layout says, the pool-wide facts read once for all of them.
 function reader(read: ReasonRead): ReasonOf {
-	const pool = pool_of(read)
+	const current = { ...read, ...run_board_human_merge.overlay_of(read.plan, read.statuses) }
+	const pool = pool_of(current)
 
 	return function reason_of(child, waits) {
-		return stage_of(child, read) ?? planned_of(child, pool) ?? wait_of(child, waits, read, pool)
+		return (
+			run_board_human_merge.reason_of(child, current.plan) ??
+			stage_of(child, current) ??
+			planned_of(child, pool) ??
+			wait_of(child, waits, current, pool)
+		)
 	}
 }
 

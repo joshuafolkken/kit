@@ -2,8 +2,9 @@ import type { OptedIn } from '#scripts/backlog/backlog-gate-scope'
 import type { Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { IN_PROGRESS_LABEL, NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_plan, type PlanPorts } from './run-board-plan'
 
@@ -143,6 +144,23 @@ describe('run_board_plan.read_plan running issues', () => {
 		const plan = await run_board_plan.read_plan({ issues: [EPIC], only: false }, ports())
 
 		expect(plan?.waves.running).toStrictEqual([running])
+	})
+})
+
+describe('run_board_plan.read_plan human merge pull requests', () => {
+	it.each([true, false])('carries PR numbers from REST for only=%s', async (only) => {
+		const labelled = { ...row(SINGLE), labels: [{ name: NEEDS_HUMAN_MERGE_LABEL }] }
+		const read = {
+			...ports(),
+			fetch_open: vi.fn(async () => ({ rows: [labelled], is_capped: false })),
+		}
+
+		vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(
+			JSON.stringify([{ number: EPIC, body: `closes #${String(SINGLE)}` }]),
+		)
+		const plan = await run_board_plan.read_plan({ issues: only ? [SINGLE] : [], only }, read)
+
+		expect(plan?.human_merge_prs).toEqual(new Map([[SINGLE, EPIC]]))
 	})
 })
 

@@ -196,6 +196,13 @@ describe('backlog_drive_cli output', () => {
 
 // joshuafolkken/kit#4396: the `run:solo` cause reaches the hold the driver records.
 describe('backlog_drive_cli output — the offer’s cause', () => {
+	it('preserves the deadline in a dated wait', () => {
+		const not_before_ms = Date.parse('2999-01-01T00:00Z')
+		const offer = { verdict: 'watch', issues: [], retries: 0, not_before_ms }
+
+		expect(backlog_drive_cli.to_offer(JSON.stringify({ offer }))?.not_before_ms).toBe(not_before_ms)
+	})
+
 	it('reads the cause an offer that started nothing names', () => {
 		const offer = { verdict: 'watch', issues: [], retries: 0, answer: 'blocked', cause: 'solo' }
 

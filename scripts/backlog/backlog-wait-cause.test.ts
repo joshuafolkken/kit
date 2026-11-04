@@ -7,7 +7,9 @@ import { backlog_wait_cause } from './backlog-wait-cause'
 
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/other'
+const FUTURE_DATE = '2999-01-01T00:00Z'
 const FUTURE_BODY = '## 背景\n\n- 実施可能日: 2999-01-01T00:00Z\n'
+const IN_PROGRESS = 'in-progress'
 
 function child(number: number, overrides: Partial<EpicChild> = {}): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by: [], ...overrides }
@@ -20,12 +22,16 @@ describe('backlog_wait_cause.classify', () => {
 		const children = [
 			child(10, { blocked_by: [BLOCKER] }),
 			child(11, { body: FUTURE_BODY, blocked_by: [BLOCKER] }),
-			child(12, { labels: ['in-progress'], blocked_by: [BLOCKER] }),
+			child(12, { labels: [IN_PROGRESS], blocked_by: [BLOCKER] }),
 			child(13),
 			child(14, { repo: OTHER_REPO, blocked_by: [BLOCKER] }),
 		]
 
-		expect(backlog_wait_cause.classify(children, REPO)).toStrictEqual({ chain: [10], gate: [11] })
+		expect(backlog_wait_cause.classify(children, REPO)).toStrictEqual({
+			chain: [10],
+			gate: [11],
+			not_before_ms: Date.parse(FUTURE_DATE),
+		})
 	})
 
 	it('reads a child whose blockers have all closed as no chain wait', () => {
@@ -45,6 +51,21 @@ describe('backlog_wait_cause.classify', () => {
 })
 
 describe('backlog_wait_cause — the stderr line round trip', () => {
+	it('carries the nearest deadline and excludes running and foreign children', () => {
+		const children = [
+			child(10, { body: FUTURE_BODY }),
+			child(11, { body: FUTURE_BODY.replace('2999', '2998') }),
+			child(12, { body: FUTURE_BODY.replace('2999', '2997'), labels: [IN_PROGRESS] }),
+			child(13, { body: FUTURE_BODY.replace('2999', '2996'), repo: OTHER_REPO }),
+		]
+		const causes = backlog_wait_cause.classify(children, REPO)
+
+		expect(causes.not_before_ms).toBe(Date.parse('2998-01-01T00:00Z'))
+		expect(backlog_wait_cause.parse(backlog_wait_cause.lines_of(causes).join('\n'))).toStrictEqual(
+			causes,
+		)
+	})
+
 	it('reads back the issues the lines name, linkified or not', () => {
 		const causes = { chain: [10, 12], gate: [11] }
 		const text = ['explanation', ...backlog_wait_cause.lines_of(causes)].join('\n')
