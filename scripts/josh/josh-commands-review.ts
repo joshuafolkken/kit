@@ -5,6 +5,7 @@ const CHECK = '--check'
 const MACHINE_READABLE = 'the verdict and the reason, machine-readable'
 const JSON_FLAG = '--json'
 const RECORD = '--record'
+const FULL_CHANGE = '--full-change'
 
 // The review and delegation commands, split out of `josh-commands-ai.ts` when each command's usage
 // moved onto its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the map keeps its
@@ -17,7 +18,7 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			'Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone)',
 		category: 'AI tools',
 		reference: [
-			'[--round <1|2>] | --interaction | --level-only [--staged] [--json]',
+			'[--round <1|2> | --full-change] | --interaction | --level-only [--staged] [--json]',
 			'automation',
 			['files'],
 		],
@@ -25,11 +26,16 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '', note: 'round 1' },
 				{ arguments: '--round 2', note: 'verification pass, scoped to the fix delta' },
+				{ arguments: FULL_CHANGE, note: 'final round 2 over the whole change' },
 				{ arguments: '--interaction', note: 'the interaction review of a run-tooling change' },
 				{ arguments: LEVEL_ONLY, note: 'the level alone (pre-commit review)' },
 				{ arguments: '--level-only --json', note: 'level and reason, machine-readable' },
 			],
 			flags: [
+				{
+					names: [FULL_CHANGE],
+					description: 'final round 2 over the whole change (no `--round` or `--interaction`).',
+				},
 				{
 					names: ['--round 2'],
 					description:

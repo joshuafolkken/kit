@@ -147,6 +147,19 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+describe('run:review with a full-change final brief', () => {
+	it('hands a full-change final brief a read-only final opening', async () => {
+		brief_run_to.mockImplementationOnce(async (_argv, emit) => {
+			emit('medium\nReview round: 2 — final, whole change, read only.')
+
+			return 0
+		})
+
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(output.stdout.join('')).toContain(run_ship_review.final_opening(CODE_PATH))
+	})
+})
+
 describe('run:review where the interaction review is due', () => {
 	it('writes code’s brief, then the interaction brief, to their files, and the two-reviewer hint', async () => {
 		expect(await run_review_cli.run([])).toBe(0)

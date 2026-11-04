@@ -101,11 +101,11 @@ function done_template(changes: ReadonlyArray<ChangeInput>, labels: ReportLabels
 
 // A lane child's final message (`report:lint --child-summary`): the three labels and nothing GitHub
 // already holds, so no changed-file line — the paths are ignored.
-function child_template(labels: ReportLabels): string {
+function child_template(labels: ReportLabels, result = PLACEHOLDER): string {
 	return [
 		item(labels.cause, PLACEHOLDER),
 		item(labels.fix, PLACEHOLDER),
-		item(labels.result, PLACEHOLDER),
+		item(labels.result, result),
 	].join('\n')
 }
 
@@ -119,7 +119,7 @@ function build(
 	return kind === 'summary' ? summary_template(changes, labels) : done_template(changes, labels)
 }
 
-const report_template = { KINDS, build, is_kind }
+const report_template = { KINDS, build, child_template, is_kind }
 
 export type { ChangeInput, TemplateKind }
 export { report_template }
