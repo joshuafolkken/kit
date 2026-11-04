@@ -91,13 +91,17 @@ function has_warnings(result: GateStepResult): boolean {
 // `setup-ci` installed the shims but the binary cannot be reached, every `pnpm` a check spawns prints
 // "Warning: safe-chain is not available …" into that check's output, so a green lint withheld the
 // record on every CI run. The banner's lines are dropped before the match; a real warning on any
-// other line still withholds.
+// other line still withholds. pnpm script headers are not checker output either: their command
+// flags can contain warning names without reporting a finding.
 const SAFE_CHAIN_BANNER = 'safe-chain is not available'
+const PNPM_SCRIPT_HEADER = '$ '
 // `changed_file_scope.describe_scope` lists lint inputs before the linters run.
 const LINT_FILE_PREFIX = '  - '
 
 function checker_lines(result: GateStepResult): ReadonlyArray<string> {
-	return result.output.split('\n').filter((line) => !line.includes(SAFE_CHAIN_BANNER))
+	return result.output
+		.split('\n')
+		.filter((line) => !line.includes(SAFE_CHAIN_BANNER) && !line.startsWith(PNPM_SCRIPT_HEADER))
 }
 
 function has_checker_warning(result: GateStepResult): boolean {
@@ -138,14 +142,13 @@ function has_nothing_to_say(result: GateStepResult): boolean {
 // opens the captured output with `$ josh <target>`. Counted as a line, it made every spawned check one
 // that ran, and `not verified` unreachable in the very project it was written for.
 const IDLE_MARKERS: ReadonlyArray<string> = [test_unit_guard.SKIP_MARKER, NOTHING_TO_CHECK_MARKER]
-const PNPM_SCRIPT_HEADER = '$ '
 
 function is_idle_line(line: string): boolean {
 	return IDLE_MARKERS.some((marker) => line.includes(marker))
 }
 
 function is_tool_line(line: string): boolean {
-	return line.trim() !== '' && !line.startsWith(PNPM_SCRIPT_HEADER)
+	return line.trim() !== ''
 }
 
 function is_idle(result: GateStepResult): boolean {
