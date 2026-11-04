@@ -1,0 +1,3 @@
+- rf:comments | low | scripts/gh/git-pr-checks-e2e-gate.test.ts:19 | 2026-11-03 | #6079
+- rf:tests | low | scripts/gh/git-pr-checks-mocked-snapshot.test.ts:57 | 2026-11-03 | #6079
+- rf:none | none | - | 2026-11-03 | #6079

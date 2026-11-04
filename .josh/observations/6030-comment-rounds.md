@@ -1,0 +1,3 @@
+- rf:comments | low | scripts/ci/ci-yml-fixture.ts:7 | 2026-11-03 | #6030
+- rf:assumptions | low | eslint/base.js:259 | 2026-11-03 | #6030
+- rf:comments | low | scripts/ci/ci-yml-fixture.ts:7 | 2026-11-03 | #6030
