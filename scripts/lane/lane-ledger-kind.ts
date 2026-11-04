@@ -23,6 +23,7 @@ const KIND = {
 	UNPLANNED_NOTICE: 'unplanned-notice',
 	LANE_STATE: 'lane-state',
 	PUSH_MISS: 'push-miss',
+	EARLY_PUSH: 'early-push',
 	SHIP_LAP: 'ship-lap',
 	SIZE: 'size',
 	LIMIT: 'limit',

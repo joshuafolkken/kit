@@ -11,6 +11,7 @@ import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_detach_wait } from './run-ship-detach-wait'
+import { run_ship_early_push } from './run-ship-early-push'
 import { run_ship_group } from './run-ship-group'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
@@ -268,6 +269,8 @@ async function ship_stage(
 	if (failed !== undefined) {
 		return { sections: await stopped(sections, args, failed.step, context), is_handed_over: false }
 	}
+
+	set_state(context, await run_ship_early_push.refresh(step.stage, args.is_review, context.state))
 
 	if (step.stage !== STAGE.SYNC) return undefined
 	const handover = await run_ship_handover.hand_over(args, context.is_stale)

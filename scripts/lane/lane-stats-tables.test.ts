@@ -19,6 +19,7 @@ const FIRST_HEADER_CELLS = [
 	'cuts',
 	'round 1',
 	'round 2',
+	'early push',
 	'reason',
 	'measured lanes',
 	'implement-rate lanes',
