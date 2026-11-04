@@ -56,7 +56,7 @@ function rerun(issue: string, from?: string, mode: ReadonlyArray<string> = []): 
 
 // `main:merge` exits 0 on its split notice, which is answered before the cut (`split-assessment.md` →
 // "Over the guide before the gate"), so the chain holds on the check the cut refuses with
-// (`split-unresolved`): a notice on record with neither a recorded reason nor a split child.
+// (`split-unresolved`): a notice on record without a split child.
 async function split_hold(issue: string): Promise<HoldStop | undefined> {
 	const notice = await split_resolution.ledger_refusal(Number(issue))
 
@@ -65,7 +65,7 @@ async function split_hold(issue: string): Promise<HoldStop | undefined> {
 	return {
 		notice,
 		next: (target) =>
-			`answer the split notice, issue \`pnpm josh run:cut ${target}\` alone again, ${rerun(target, SELFCHECK)}`,
+			`stop implementation, file the rest as a split child, issue \`pnpm josh run:cut ${target}\` alone again, ${rerun(target, SELFCHECK)}`,
 	}
 }
 

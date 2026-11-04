@@ -42,17 +42,16 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 **Trigger: `pnpm josh main:merge` prints a `split notice`** — the branch's diff, untracked files
 included, passes the Issue's declared size × the growth factor, capped at the guide (no declaration:
 the guide), on either axis; the first `pnpm josh lint:related` or `pnpm josh test:related` past that bar prints it earlier,
-once per Issue. Take one action on it, before `pnpm josh run:cut <N>`
-(`chain-rule.md` step 1; `run:chain` holds on it and names the cut to reissue) — the cut ends the
-turn, and the resumed run does not see the notice:
+once per Issue. Stop implementation before `pnpm josh run:cut <N>`
+(`chain-rule.md` step 1; `run:chain` holds on it and names the cut to reissue):
 
-- Keep it one Issue — it must land together: one Issue comment with the line
-  `- 分割しない理由: <理由>`, citing the counts.
-- Carve the rest out — the unimplemented part merges separately: `pnpm josh issue:file --route split --found-during <N>`
-  it, narrow this Issue's acceptance criteria to this branch, then gate. On its direction refusal →
-  `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.
+- Keep only the green part: narrow this branch and this Issue's acceptance criteria to the verified work.
+- File the rest as a split child with `pnpm josh issue:file --route split --found-during <N>`.
+  On its direction refusal → `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.
+- Reissue the cut, then gate and ship the green part; do not resume implementing the rest.
 
-Neither on record: the pre-gate `run:cut` answers `split-unresolved`. The notice never creates an epic.
+Without a split child on record, the pre-gate `run:cut` answers `split-unresolved` even with a
+`- 分割しない理由:` comment. The notice never creates an epic.
 
 ## What each entry point does with the answer
 
