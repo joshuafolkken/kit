@@ -22,7 +22,7 @@ vi.mock('#scripts/run/run-preflight', () => ({
 	run_preflight: { CLEAN_VERDICT: 'clean', check: vi.fn() },
 }))
 
-vi.mock('#scripts/run/tidy/run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-cli-owner-test-'))
 const WORKTREE = path.join(scratch, '.git')

@@ -1,7 +1,6 @@
 import { git_followup_label } from '#scripts/followup/git-followup-label'
-import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
+import { run_maintenance } from './run-maintenance'
 
 // **The `in-progress` marker belongs to the commands that open and release a run**, so no manifest
 // spells the label's calls and none can forget it: `run:entry` applies it the moment the tree is held
@@ -23,7 +22,7 @@ function warn(action: string, issue: string, recovery: string): void {
 // `issue_add_label` creates the label when the repository lacks it (`lane-dispatch.ts`), so no
 // separate provisioning call is made here.
 async function mark(issue: string): Promise<boolean> {
-	const is_marked = await git_gh_command.issue_add_label(issue, IN_PROGRESS_LABEL)
+	const is_marked = await run_maintenance.label(issue)
 
 	if (!is_marked) warn('apply', issue, MARK_RECOVERY)
 

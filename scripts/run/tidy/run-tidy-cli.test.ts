@@ -1,6 +1,8 @@
 import { issue_merged } from '#scripts/issue/issue-merged'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_tidy_cli } from './run-tidy-cli'
 import { run_tidy_lanes } from './run-tidy-lanes'
@@ -12,6 +14,9 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 }))
 vi.mock('./run-tidy-lanes', () => ({ run_tidy_lanes: { tidy_lanes: vi.fn() } }))
 vi.mock('./run-tidy-stashes', () => ({ run_tidy_stashes: { tidy_stashes: vi.fn() } }))
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_ship_lap: vi.fn() },
+}))
 
 const errors: Array<string> = []
 const LANE_TARGET = 'lane #2583'
@@ -31,7 +36,21 @@ beforeEach(() => {
 	vi.mocked(run_tidy_stashes.tidy_stashes).mockResolvedValue([])
 })
 
-// joshuafolkken/kit#2701: the sweep runs inside `run:hold`, so it reports on stderr and never throws.
+describe('run_tidy_cli.sweep timing', () => {
+	it('records the entire sweep under its inherited hold scope', async () => {
+		await run_ship_lap.within('6255', 'run:entry', run_tidy_cli.sweep, 'run:entry › run:hold')
+
+		expect(lane_ledger_write.record_ship_lap).toHaveBeenCalledWith(
+			expect.objectContaining({
+				issue: 6255,
+				stage: 'run:entry',
+				step: 'run:entry › run:hold › sweep',
+			}),
+		)
+	})
+})
+
+// The detached sweep reports on stderr and never throws.
 describe('run_tidy_cli.sweep', () => {
 	it('reports cleaned lanes and stashes together on standard error', async () => {
 		vi.mocked(run_tidy_lanes.tidy_lanes).mockResolvedValue([

@@ -19,7 +19,7 @@ vi.mock('#scripts/run/run-preflight', () => ({
 	run_preflight: { CLEAN_VERDICT: 'clean', check: vi.fn() },
 }))
 
-vi.mock('#scripts/run/tidy/run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
 const unmark = vi.mocked(run_label.unmark)
