@@ -123,8 +123,10 @@ function check_overlap(
 
 // What a merge-only staleness reads: the stale checks, what the merge brought in, and where it meets
 // this branch's change — the files the pair is narrowed to (`run-ship-narrowed.ts`) when any. An
-// `overlap` of `undefined` is a merge the import graph could not split, `unsplit` the line saying why:
-// the pair runs as before rather than naming every synced module (joshuafolkken/kit#6185).
+// `overlap` of `undefined` is a merge the import graph could not split, `unsplit` the graph's failure
+// (`test-related-synced.ts`), which the ship logs in `unsplit_line` and records on its lap
+// (joshuafolkken/kit#6196): the pair runs as before rather than naming every synced module
+// (joshuafolkken/kit#6185).
 interface SyncReading {
 	checks: ReadonlyArray<SyncedCheck>
 	synced: ReadonlyArray<string>
@@ -158,7 +160,7 @@ async function overlap_of(
 	)
 
 	if (split.failure !== undefined && unsplit.length > 0) {
-		return { overlap: undefined, unsplit: unsplit_line(split.failure) }
+		return { overlap: undefined, unsplit: split.failure }
 	}
 
 	// `shared` is the tests within `meeting`: a file both name counts once (joshuafolkken/kit#6197).
@@ -203,7 +205,7 @@ function settle(reading: SyncReading, tree: GateTree): string | undefined {
 	return reason(reading.checks, reading.synced)
 }
 
-const run_ship_synced_scope = { checks_of, read_sync, settle }
+const run_ship_synced_scope = { checks_of, read_sync, settle, unsplit_line }
 
 export type { SyncedCheck, SyncReading }
 export { run_ship_synced_scope }
