@@ -7,6 +7,7 @@ import {
 	type Quotas,
 } from './run-board-quota-read'
 import { run_board_quota_spent, type QuotaSpan } from './run-board-quota-spent'
+import { run_board_quota_status } from './run-board-quota-status'
 
 // The usage-limit gauges' readings as the board holds them (joshuafolkken/kit#5395): a redraw draws
 // the held readings and reads no file; once a minute one read runs in the background
@@ -34,6 +35,7 @@ interface QuotaPorts {
 	read_tail: (file: string, bytes: number) => Promise<string>
 	read_head: (file: string, bytes: number) => Promise<string>
 	now: () => number
+	read_status?: () => Promise<QuotaReading | undefined>
 }
 
 // A file a provider was last read off, what its tail read and, once done, the readings it holds.
@@ -246,7 +248,9 @@ async function quotas_of(ports: QuotaPorts, marks: QuotaMarks): Promise<Quotas> 
 		PROVIDERS.map(async (provider) => await reading_of(provider, ports, marks)),
 	)
 
-	return { claude, codex }
+	const status = await ports.read_status?.()
+
+	return { claude: run_board_quota_status.newest(claude, status), codex }
 }
 
 function quota_reader(ports: QuotaPorts): () => Promise<Quotas> {
@@ -260,7 +264,7 @@ function quota_reader(ports: QuotaPorts): () => Promise<Quotas> {
 	})
 }
 
-// The production reader: the run-state directory's newest lane logs and Codex's newest rollout files.
+// The production reader: Claude's status record, lane/handoff logs and Codex's newest rollout files.
 function live_quota_reader(): () => Promise<Quotas> {
 	const { claude_files, claude_heads, claude_reading, codex_files, codex_heads, codex_reading } =
 		run_board_quota_read
@@ -282,6 +286,7 @@ function live_quota_reader(): () => Promise<Quotas> {
 		},
 		read_tail: run_board_quota_read.read_tail,
 		read_head: run_board_quota_read.read_head,
+		read_status: run_board_quota_status.read,
 		now: Date.now,
 	})
 }

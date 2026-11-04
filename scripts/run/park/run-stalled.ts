@@ -21,6 +21,10 @@ const CUT_NOT_RELAUNCHED: StallCause = {
 	short: 'cut not relaunched',
 	why: 'its lane held a declared cut, but no successor could be relaunched from it (or it already was once).',
 }
+const STALE_HANDOFF: StallCause = {
+	short: 'stale hand-off',
+	why: 'the child stopped at `resume: handed-off` because an old hand-off cut record was already adopted.',
+}
 
 const RESUME_COMMAND = 'fullrun'
 const CAUSE_LEAD = `${RUN_STALLED_LABEL}: `
@@ -31,11 +35,19 @@ function resume_of(child: number | string, is_backlog_live = false): string {
 		: `${RESUME_COMMAND} ${issue_cite.plain(child)}`
 }
 
-// The next action as a clause, which a park comment's `Next:` and the plan's note end with.
-function next_step(child: number | string, cause = ''): string {
-	const recovery = /cut.*(?:handed-off|already handed off)/iu.test(cause)
+function recovery_of(cause: string): string {
+	if (cause === STALE_HANDOFF.why) {
+		return `repair the stale hand-off cut record with \`${run_cut.END_COMMAND}\` (retry alone does not clear it)`
+	}
+
+	return /cut.*(?:handed-off|already handed off)/iu.test(cause)
 		? `clear the handed-off cut with \`${run_cut.END_COMMAND}\``
 		: 'fix the cause'
+}
+
+// The next action as a clause, which a park comment's `Next:` and the plan's note end with.
+function next_step(child: number | string, cause = ''): string {
+	const recovery = recovery_of(cause)
 
 	return `${recovery}, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
 }
@@ -68,6 +80,7 @@ function row_text(child: number | string, cause = '', is_backlog_live = false): 
 const run_stalled = {
 	CUT_NOT_RELAUNCHED,
 	SESSION_UNFINISHED,
+	STALE_HANDOFF,
 	cause_of,
 	next_step,
 	park_event,
