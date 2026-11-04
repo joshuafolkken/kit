@@ -8,6 +8,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { time_instant } from '#scripts/time-runtime/time-instant'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
+import { run_board_quota_lane } from './run-board-quota-lane'
 
 // The usage-limit windows Claude Code and Codex last reported, read off files they already write — no
 // API is asked (joshuafolkken/kit#5395). Claude's log readings come from lane and handoff stream-json
@@ -409,6 +410,7 @@ const run_board_quota_read = {
 	claude_reading,
 	codex_files,
 	codex_heads,
+	codex_lane: run_board_quota_lane.codex_lane,
 	codex_reading,
 	read_head,
 	line_stamp,
