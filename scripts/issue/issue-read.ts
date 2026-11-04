@@ -1,4 +1,5 @@
 import { gh_author_association } from '#scripts/gh/gh-author-association'
+import { gh_comment_input } from '#scripts/gh/gh-comment-input'
 import { parse_json_object_or_undefined, read_json_listing } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
@@ -151,7 +152,8 @@ function trusted_bodies(comments: ReadonlyArray<IssueComment>): ReadonlyArray<st
 }
 
 function format_comment(comment: IssueComment): string {
-	const heading = `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at}`
+	const trust = gh_comment_input.trust_of(comment.author, comment.is_trusted)
+	const heading = `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at} [${trust}]`
 
 	return `${heading}\n${comment.is_trusted === true ? comment.body : UNTRUSTED_COMMENT}`
 }

@@ -21,6 +21,7 @@ type Laps = ReadonlyMap<string, ReadonlyArray<Stage>>
 interface Placed {
 	at_ms: number
 	part: Stage
+	stage?: string | undefined
 }
 
 // A gate the ship reused rather than started (joshuafolkken/kit#5567), counted per stage (`counted`).
@@ -48,7 +49,13 @@ function lap_name(entry: ShipLapEntry): string {
 function lap_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
 	if (entry.kind !== KIND.SHIP_LAP || entry.issue !== issue) return []
 
-	return [{ at_ms: Date.parse(entry.at), part: { name: lap_name(entry), ms: entry.elapsed_ms } }]
+	return [
+		{
+			at_ms: Date.parse(entry.at),
+			part: { name: lap_name(entry), ms: entry.elapsed_ms },
+			stage: entry.stage === 'run:entry' ? lane_breakdown.PLAN_STAGE : undefined,
+		},
+	]
 }
 
 function wait_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
@@ -76,15 +83,22 @@ function stage_at(segments: ReadonlyArray<Segment>, at_ms: number): string | und
 	return segment?.stage === lane_breakdown.BETWEEN_STAGE ? undefined : segment?.stage
 }
 
+// Entry maintenance may finish after plan: keep its scope instead of charging it to the ship.
+function stage_for(place: Placed, segments: ReadonlyArray<Segment>): string | undefined {
+	if (place.stage === undefined) return stage_at(segments, place.at_ms)
+
+	return segments.some((segment) => segment.stage === place.stage) ? place.stage : undefined
+}
+
 function grouped(
 	placed: ReadonlyArray<Placed>,
 	segments: ReadonlyArray<Segment>,
 	groups = new Map<string, Array<Stage>>(),
 ): Map<string, Array<Stage>> {
-	for (const { at_ms, part } of placed) {
-		const stage = stage_at(segments, at_ms)
+	for (const place of placed) {
+		const stage = stage_for(place, segments)
 
-		if (stage !== undefined) groups.set(stage, [...(groups.get(stage) ?? []), part])
+		if (stage !== undefined) groups.set(stage, [...(groups.get(stage) ?? []), place.part])
 	}
 
 	return groups

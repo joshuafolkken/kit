@@ -39,3 +39,18 @@ describe('issue_read — a write-access lookup that failed', () => {
 		expect(issue_read.trusted_bodies(comments ?? [])).toEqual([])
 	})
 })
+
+describe('issue_read — comment trust labels', () => {
+	it.each([
+		{ author: 'owner', is_trusted: true, trust: 'trusted' },
+		{ author: 'app[bot]', is_trusted: false, trust: 'bot' },
+		{ author: 'stranger', is_trusted: undefined, trust: 'untrusted' },
+	])('labels $trust comments without exposing untrusted bodies', (input) => {
+		const comment = { ...input, body: COMMENT_BODY, created_at: 'then' }
+		const fields = { title: 'Title', state: 'open', body: BODY, is_body_trusted: true }
+		const block = issue_read.format_issue(ISSUE, fields, [comment])
+
+		expect(block).toContain(`at then [${input.trust}]`)
+		expect(block.includes(COMMENT_BODY)).toBe(input.is_trusted === true)
+	})
+})

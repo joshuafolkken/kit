@@ -1,15 +1,15 @@
 import { git_followup_label } from '#scripts/followup/git-followup-label'
-import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_label } from './run-label'
+import { run_maintenance } from './run-maintenance'
 
-vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { issue_add_label: vi.fn() } }))
+vi.mock('./run-maintenance', () => ({ run_maintenance: { label: vi.fn() } }))
 vi.mock('#scripts/followup/git-followup-label', () => ({
 	git_followup_label: { strip_in_progress: vi.fn() },
 }))
 
 const ISSUE = '3182'
-const add_label = vi.mocked(git_gh_command.issue_add_label)
+const add_label = vi.mocked(run_maintenance.label)
 const strip = vi.mocked(git_followup_label.strip_in_progress)
 const warnings: Array<string> = []
 
@@ -26,7 +26,7 @@ beforeEach(() => {
 describe('run_label.mark', () => {
 	it('applies in-progress to the issue and warns about nothing', async () => {
 		expect(await run_label.mark(ISSUE)).toBe(true)
-		expect(add_label).toHaveBeenCalledWith(ISSUE, 'in-progress')
+		expect(add_label).toHaveBeenCalledWith(ISSUE)
 		expect(warnings).toStrictEqual([])
 	})
 

@@ -59,6 +59,7 @@ const PATH_LAUNCHED_ENTRIES = [
 	'scripts/lane/openai-lane-supervisor-entry.ts',
 	'scripts/lint/eslint-warm-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',
+	'scripts/run/run-label-main.ts',
 ]
 
 // Shipped although no consumer entry reaches them: kit's own build and release entries, which run

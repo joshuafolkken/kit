@@ -58,10 +58,16 @@ function first_line(out: string): string {
 async function josh_line(step: string, argv: ReadonlyArray<string>): Promise<string> {
 	const result = await timed(
 		step,
-		async () => await josh_command.josh_run(argv, should_forward_stderr),
+		async () =>
+			await josh_command.josh_run(
+				argv,
+				should_forward_stderr,
+				undefined,
+				run_ship_lap.environment(`${ENTRY_SCOPE} › ${step}`),
+			),
 	)
 
-	return first_line(result.out)
+	return result.code === 0 ? first_line(result.out) : 'unknown'
 }
 
 // `run:hold <N>` prints one token — `hold`, `busy` or `unknown` — and forwards its explanation to
