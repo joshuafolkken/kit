@@ -69,6 +69,8 @@ const offer_read_schema = z.object({
 	answer: z.string().optional(),
 	cause: z.string().optional(),
 	waiting: z.array(z.number()).optional(),
+	not_before_ms: z.number().optional(),
+	idle_until_ms: z.number().optional(),
 	is_judgment_owed: z.boolean().optional(),
 	reason: z.string().optional(),
 	is_finish: z.boolean().optional(),

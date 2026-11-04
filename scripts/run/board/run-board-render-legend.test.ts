@@ -137,6 +137,7 @@ describe('run_board_render_legend.legend_of wait icons', () => {
 	})
 
 	it.each([
+		['🔏', 'human merge'],
 		['🚪', 'opening lane'],
 		['📥', 'installing'],
 		['📤', 'dispatching'],

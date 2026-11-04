@@ -60,12 +60,14 @@ describe('run_wake_loop.run_loop — deterministic driver', () => {
 
 	it('leaves a record released during the driver pause to the next pass', async () => {
 		const scripted = recorder([HANDED_OFF, ENDED])
-		const ports = { ...scripted.ports, drive: async () => ({ kind: 'released' as const }) }
+		const sleep = vi.fn(async () => undefined)
+		const ports = { ...scripted.ports, sleep, drive: async () => ({ kind: 'released' as const }) }
 
-		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
+		const stop = await run_wake_loop.run_loop(scratch.target, ports, run_wake.WAKE_GRACE_MS)
 
 		expect(stop.reason).toBe('ended')
 		expect(scripted.wakes).toStrictEqual([])
+		expect(sleep).toHaveBeenCalledExactlyOnceWith(0)
 	})
 })
 
