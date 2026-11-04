@@ -1,3 +1,4 @@
+import { claude_installer } from '#scripts/lib/claude-installer'
 import { shell_quote } from '#scripts/lib/shell-quote'
 import type { Scenario } from './fresh-machine-spec'
 
@@ -31,7 +32,8 @@ function probe_lines(probes: ReadonlyArray<string>): Array<string> {
 
 function build(scenario: Scenario): string {
 	const seed = Object.keys(scenario.files).length > 0 ? [COPY_SEED] : []
-	const commands = [...seed, ...scenario.commands].map((command) => required(command))
+	const claude = scenario.requires_claude ? [claude_installer.command()] : []
+	const commands = [...seed, ...claude, ...scenario.commands].map((command) => required(command))
 
 	return [...PREAMBLE, ...commands, ...probe_lines(scenario.probes), 'exit 0', ''].join('\n')
 }
