@@ -25,7 +25,13 @@ const DECLARED = '## 背景\n\n- 計測宣言: `pnpm josh count` <= 5\n'
 const UNREADABLE = 'Value: unreadable'
 
 function given(body: string, run: CommandRun): void {
-	vi.mocked(trusted_measure.read_trusted_body).mockResolvedValue({ kind: 'trusted', body })
+	vi.mocked(trusted_measure.read_trusted_body).mockResolvedValue({
+		kind: 'trusted',
+		body,
+		issue: ISSUE,
+		author: 'author',
+		editor: 'editor',
+	})
 	vi.mocked(trusted_measure.run_command).mockReturnValue(run)
 }
 

@@ -25,6 +25,7 @@ interface CheckedMerge {
 	wait_for_green: WaitForGreen
 	// The snapshot the gate already passed. Absent, the merge waits for one first.
 	checked?: PrStateSnapshot | undefined
+	before_merge?: ((head?: string) => Promise<void>) | undefined
 }
 
 function checked_head(snapshot: PrStateSnapshot): string {
@@ -34,11 +35,13 @@ function checked_head(snapshot: PrStateSnapshot): string {
 }
 
 // `false` is "the head moved"; every other failure is the caller's to see.
-async function try_merge(branch_name: string, snapshot: PrStateSnapshot): Promise<boolean> {
+async function try_merge(input: CheckedMerge, snapshot: PrStateSnapshot): Promise<boolean> {
 	const head_sha = checked_head(snapshot)
 
+	await input.before_merge?.(head_sha)
+
 	try {
-		await git_gh_command.pr_merge(branch_name, head_sha)
+		await git_gh_command.pr_merge(input.branch_name, head_sha)
 
 		return true
 	} catch (error) {
@@ -53,7 +56,7 @@ async function merge_checked(input: CheckedMerge): Promise<void> {
 
 	const is_merged = await poll.poll_until(
 		async () => {
-			if (await try_merge(input.branch_name, progress.snapshot)) return true
+			if (await try_merge(input, progress.snapshot)) return true
 
 			console.info(HEAD_MOVED_NOTE)
 			Object.assign(progress, { snapshot: await input.wait_for_green() })

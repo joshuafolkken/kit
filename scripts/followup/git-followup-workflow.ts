@@ -9,6 +9,7 @@ import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests_check } from '#scripts/review/removed-tests-check'
+import { followup_human_merge, HumanMergeRequiredError } from './followup-human-merge'
 import { parse_issue_number_from_text } from './followup-issue-number'
 import { followup_review_gates } from './followup-review-gates'
 import { followup_section } from './followup-section'
@@ -190,6 +191,7 @@ async function prepare_merge(
 ): Promise<void> {
 	if (plan.is_merged) return
 
+	if (plan.should_merge) await followup_human_merge.assert_allowed(branch_name, issue_number)
 	await assert_merge_gates(plan.should_merge, issue_number, branch_name)
 	if (is_valid_issue(issue_number)) await lane_size_record.record(plan.should_merge, issue_number)
 	await git_followup_flush.commit_ledger_step(plan.should_merge, issue_number)
@@ -232,6 +234,9 @@ async function main(): Promise<void> {
 		should_merge: plan.should_merge,
 		is_merged: plan.is_merged,
 		merged_at: plan.merged_at,
+		before_merge: async (head) => {
+			await followup_human_merge.assert_allowed(branch_name, issue_number, head)
+		},
 	})
 
 	await git_followup_finish.finish(used_issue_number ?? issue_number, plan.should_merge)
@@ -241,7 +246,8 @@ try {
 	await main()
 	console.info('')
 } catch (error) {
-	git_error.handle(error)
+	if (error instanceof HumanMergeRequiredError) console.info(error.message)
+	else git_error.handle(error)
 }
 
 const git_followup_workflow = {

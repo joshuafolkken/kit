@@ -2,6 +2,7 @@ import {
 	EPIC_LABEL,
 	has_label_name,
 	has_parked_label,
+	NEEDS_HUMAN_MERGE_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
@@ -127,7 +128,9 @@ function unfinished_outcome(signals: EndingSignals): ChildOutcome {
 }
 
 function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
-	if (state.is_human_review) return 'human-review'
+	if (state.is_human_review || has_label_name(state.labels, NEEDS_HUMAN_MERGE_LABEL)) {
+		return 'human-review'
+	}
 
 	if (has_label_name(state.labels, EPIC_LABEL)) return 'split'
 

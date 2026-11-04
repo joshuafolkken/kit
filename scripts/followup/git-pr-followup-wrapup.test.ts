@@ -108,6 +108,18 @@ describe('run_wrapup — the merge', () => {
 	})
 })
 
+it('stops a workflow PR before sending completion, merging or cleaning up', async () => {
+	const refusal = new Error('Read the diff on GitHub and merge there')
+	const before_merge = vi.fn().mockRejectedValue(refusal)
+
+	await expect(run_wrapup({ before_merge })).rejects.toBe(refusal)
+	expect(before_merge).toHaveBeenCalledExactlyOnceWith(CHECKED_HEAD_SHA)
+	expect(BASE_INPUT.send_completion).not.toHaveBeenCalled()
+	expect(git_gh_command.pr_merge).not.toHaveBeenCalled()
+	expect(mocked_ensure_closed).not.toHaveBeenCalled()
+	expect(mocked_strip_label).not.toHaveBeenCalled()
+})
+
 // joshuafolkken/kit#2770: GitHub stopped applying `closes #N` on some merges, so a merged run confirms
 // the issue closed; a run that merged nothing leaves the open issue alone.
 describe('run_wrapup — the merged issue close', () => {
