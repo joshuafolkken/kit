@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest'
+import { split_assess } from './split-assess'
+
+const BUDGET_MINUTES = 12
+const MEASURED = { median: 17.7, lanes: 1 }
+const GUIDE = split_assess.guide_for(BUDGET_MINUTES, MEASURED)
+const SMALL_GUIDE = split_assess.guide_for(BUDGET_MINUTES, { median: 24, lanes: 1 })
+const SMALL_GUIDE_TEXT = 'guide 2 files / 50 lines'
+
+describe('guide_for', () => {
+	it('derives both axes and caps from the measured implement budget (ac-b4d39f6d)', () => {
+		expect(GUIDE.lines).toBeCloseTo(1200 / 17.7)
+		expect(GUIDE.files).toBeCloseTo((1200 / 17.7) * (8 / 200))
+		expect(GUIDE.cap.lines).toBeCloseTo(GUIDE.lines * 1.5)
+		expect(GUIDE.cap.files).toBeCloseTo(GUIDE.files * 1.5)
+	})
+
+	it('keeps the legacy guide and caps when no rate is measured (ac-42e0410d)', () => {
+		expect(split_assess.guide_for(BUDGET_MINUTES)).toEqual({
+			files: 8,
+			lines: 200,
+			cap: { files: 12, lines: 300 },
+		})
+	})
+
+	it.each([0, -1, NaN, Infinity, -Infinity])(
+		'falls back to the legacy guide for an invalid rate %s (ac-52930f37)',
+		(median) => {
+			expect(split_assess.guide_for(BUDGET_MINUTES, { median, lanes: 1 })).toEqual(
+				split_assess.guide_for(BUDGET_MINUTES),
+			)
+		},
+	)
+})
+
+describe('a shared derived guide', () => {
+	it('judges each axis against the supplied guide and cap with strict boundaries', () => {
+		expect(split_assess.verdict_for(GUIDE.files, GUIDE.lines, GUIDE)).toBe('single')
+		expect(split_assess.verdict_for(GUIDE.files + 1, 0, GUIDE)).toBe('split')
+		expect(split_assess.verdict_for(0, GUIDE.lines + 1, GUIDE)).toBe('split')
+		expect(split_assess.is_over_cap(GUIDE.cap.files, GUIDE.cap.lines, GUIDE)).toBe(false)
+		expect(split_assess.is_over_cap(GUIDE.cap.files + 1, 0, GUIDE)).toBe(true)
+		expect(split_assess.is_over_cap(0, GUIDE.cap.lines + 1, GUIDE)).toBe(true)
+	})
+
+	it('uses the supplied guide for assessment, reasons and notices (ac-1c2e6b58)', () => {
+		const raw = '51\t0\tscripts/a.ts\n500\t0\tscripts/a.test.ts'
+		const measured = split_assess.assess(raw, SMALL_GUIDE)
+
+		expect(measured).toEqual({ files: 1, lines: 51, verdict: 'split' })
+		expect(split_assess.assess(raw).verdict).toBe('single')
+		expect(split_assess.reason(measured, SMALL_GUIDE)).toContain(SMALL_GUIDE_TEXT)
+		expect(split_assess.reason(measured, SMALL_GUIDE)).toContain('over the guide')
+		expect(split_assess.notice(measured, undefined, SMALL_GUIDE)).toContain(SMALL_GUIDE_TEXT)
+		expect(split_assess.notice(measured)).toBeUndefined()
+	})
+})
+
+describe('notices with a derived guide', () => {
+	it('prints no notice at the supplied guide and caps grown declarations at it', () => {
+		const measured = { files: 2, lines: 50, verdict: 'single' } as const
+
+		expect(split_assess.notice(measured, undefined, SMALL_GUIDE)).toBeUndefined()
+		expect(
+			split_assess.notice({ ...measured, lines: 51 }, { files: 8, lines: 200 }, SMALL_GUIDE),
+		).toContain(SMALL_GUIDE_TEXT)
+	})
+
+	it('keeps a smaller grown declaration on either axis under the supplied guide', () => {
+		const measured = { files: 1, lines: 41, verdict: 'single' } as const
+
+		expect(split_assess.notice(measured, { files: 2, lines: 20 }, SMALL_GUIDE)).toContain(
+			'declared 2 files / 20 lines × 2, capped at the guide = 2 files / 40 lines',
+		)
+		expect(split_assess.notice(measured, { files: 0, lines: 0 }, SMALL_GUIDE)).toBeUndefined()
+	})
+})
