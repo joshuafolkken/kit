@@ -1,3 +1,4 @@
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { TestPinnedRecord } from '#scripts/lane/lane-ledger'
 import { lane_ledger_pinned_origin } from '#scripts/lane/lane-ledger-pinned-origin'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
@@ -52,7 +53,7 @@ async function record(
 	elapsed_ms: number,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: lane_paths.issue_here(),
+		issue: lane_paths.issue_here(PROJECT_ROOT),
 		held: skipped.held,
 		rewired: skipped.rewired,
 		over_cap: skipped.over_cap ?? 0,
@@ -70,7 +71,7 @@ async function record_discarded(
 	origin: PinnedOrigin = BACKGROUND_ORIGIN,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: lane_paths.issue_here(),
+		issue: lane_paths.issue_here(PROJECT_ROOT),
 		held: 0,
 		probes: [],
 		elapsed_ms,

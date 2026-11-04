@@ -1,3 +1,4 @@
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +14,19 @@ const TYPE_CHECK: PinnedBy = 'type-check'
 
 afterEach(() => {
 	vi.restoreAllMocks()
+})
+
+describe('test_pinned_ledger.record snapshot context', () => {
+	it('keeps the initial checkout lane when a probe runs from a snapshot', async () => {
+		vi.spyOn(lane_paths, 'issue_here').mockImplementation((directory) =>
+			directory === PROJECT_ROOT ? 5078 : undefined,
+		)
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
+
+		await test_pinned_ledger.record({ held: 0, rewired: 0 }, [PROBE], 10)
+
+		expect(write).toHaveBeenCalledWith(expect.objectContaining({ issue: 5078 }))
+	})
 })
 
 describe('test_pinned_ledger.record', () => {

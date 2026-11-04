@@ -19,6 +19,7 @@ import {
 import { test_pinned_moves } from './test-pinned-moves'
 import { test_pinned_probe, type CheckOptions, type Probe } from './test-pinned-probe'
 import { test_pinned_reach, type Reach } from './test-pinned-reach'
+import { test_pinned_snapshot } from './test-pinned-snapshot'
 import type { Staged } from './test-pinned-stage'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
@@ -27,9 +28,8 @@ import type { RedProbe } from './test-red-logic'
 // the merge-base's lines, one at a time, run that file's related tests, and list the hunks no test went
 // red on, so reviews can identify changes whose behavior the tests do not pin.
 //
-// **The reverts happen in a detached worktree at HEAD, never the caller's checkout** (`base-tree.ts`).
-// The changed files are copied in from the working tree first, so what is reverted is the change as it
-// stands, committed or not, and each hunk's file is restored before the next one runs.
+// The entire read runs inside an immutable snapshot (`test-pinned-snapshot.ts`). Each probe gets a
+// detached tree at that snapshot's HEAD, and each hunk's file is restored before the next one runs.
 
 const HEAD = 'HEAD'
 
@@ -44,6 +44,7 @@ interface ProbeRead extends StubRead {
 }
 
 interface RunOptions {
+	cache_file?: string
 	max_hunks: number
 	is_cached_only: boolean
 	is_first_unpinned?: boolean
@@ -302,7 +303,7 @@ async function report_on(
 		changed.filter((file) => test_pinned_logic.is_target(file)),
 	)
 	const probes = await read_probes(base, targets)
-	const cache = await test_pinned_cache.load(base, probes.hunks)
+	const cache = await test_pinned_cache.load(base, probes.hunks, options.cache_file)
 	const { checked, unchecked } = await test_pinned_carry.select(cache, has_runner ? max_hunks : 0)
 	if (!options.is_cached_only) test_pinned_carry.record(cache, unchecked)
 	const outcome = await outcome_on(cache, paths, checked, { ...options, rewired: probes.rewired })
@@ -315,7 +316,13 @@ async function report(options: RunOptions): Promise<PinnedReport> {
 	const has_runner = test_red.has_runner()
 	if (base === undefined) return { ...NO_REPORT, max_hunks: options.max_hunks, has_runner }
 
-	return await report_on(base, options, has_runner)
+	const root = process.cwd()
+	const result = await test_pinned_snapshot.with_snapshot(async (snapshot) => ({
+		...(await report_on(base, { ...options, cache_file: snapshot.cache_file }, has_runner)),
+		tree_hash: snapshot.tree_hash,
+	}))
+
+	return { ...result, is_stale: test_pinned_snapshot.current_hash(root) !== result.tree_hash }
 }
 
 // No merge-base (not a repository, no default branch) checks nothing, as `josh test:red` does. The cap
