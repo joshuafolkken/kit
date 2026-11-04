@@ -109,6 +109,11 @@ describe('generate_playwright_config - CI detection helper', () => {
 })
 
 describe('get_ai_copy_files - AI and community files', () => {
+	it('distributes the dependency-free action used by Sonar classification', () => {
+		expect(init_logic.get_ai_copy_files()).toContain('.github/actions/change-scope/action.yml')
+		expect(init_logic.get_ai_copy_files()).toContain('scripts/gate/change-scope-action.ts')
+		expect(init_logic.get_ai_copy_files()).toContain('scripts/gate/toolchain-inputs.ts')
+	})
 	// CLAUDE.md is deliberately absent: since joshuafolkken/kit#1878 it is distributed by import, not
 	// byte-copied (its own guard lives in init-logic.transform.test.ts).
 	it('includes the AI markdown and community files it still byte-copies', () => {

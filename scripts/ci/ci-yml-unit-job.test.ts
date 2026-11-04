@@ -123,6 +123,7 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 			STATIC_JOB,
 			UNIT_JOB,
 			NODE_COMPAT_JOB,
+			'change-scope',
 		])
 	})
 

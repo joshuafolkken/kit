@@ -1,5 +1,6 @@
 {
 	"compilerOptions": {
+		"rewriteRelativeImportExtensions": true,
 		"strict": true,
 		// tsx uses bundler-like resolution; "bundler" is the correct pairing for module:ESNext.
 		// `module` is stated rather than inherited: TypeScript 5.x defaults it to a value "bundler"

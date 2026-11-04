@@ -32,6 +32,21 @@ env:
 # pnpm version resolution, the store cache, the safe-chain installer pin and the install
 # (joshuafolkken/kit#2982).
 jobs:
+  change-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    outputs:
+      runtime: ${{ steps.scope.outputs.runtime }}
+      publish: ${{ steps.scope.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/change-scope
+        id: scope
   # Every other job runs on the Node.js version `.github/actions/setup-node` names, while `engines`
   # and the esbuild target accept Node 22 and a consumer may already be on 26. This job builds the
   # package and starts the bundled CLI on both ends of that range, so a syntax or API the oldest
@@ -571,8 +586,8 @@ jobs:
   # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
   unit:
     name: Unit Tests (${{ matrix.shard }}/6)
-    needs: reuse-pr-checks
-    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
+    needs: [reuse-pr-checks, change-scope]
+    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' && needs.change-scope.outputs.runtime == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -635,7 +650,7 @@ jobs:
   # shell body is the pattern to keep out of a workflow regardless of the value's provenance.
   checks:
     name: Checks
-    needs: [reuse-pr-checks, static-checks, unit, node-compat]
+    needs: [reuse-pr-checks, static-checks, unit, node-compat, change-scope]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -650,16 +665,25 @@ jobs:
           STATIC_RESULT: ${{ needs.static-checks.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
           NODE_RESULT: ${{ needs.node-compat.result }}
+          SCOPE_RESULT: ${{ needs.change-scope.result }}
+          RUNTIME_CHANGED: ${{ needs.change-scope.outputs.runtime }}
         run: |
           echo "Reuse PR Checks: ${REUSE_RESULT}"
           echo "Static Checks: ${STATIC_RESULT}"
           echo "Unit Tests: ${UNIT_RESULT}"
           echo "Node builds: ${NODE_RESULT}"
+          if [ "${SCOPE_RESULT}" != 'success' ]; then
+            echo "::error::change classification did not pass"
+            exit 1
+          fi
           if [ "${NODE_RESULT}" != 'success' ]; then
             echo "::error::the Node build matrix did not pass"
             exit 1
           fi
           if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'success' ]; then
+            exit 0
+          fi
+          if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'skipped' ] && [ "${RUNTIME_CHANGED}" = 'false' ]; then
             exit 0
           fi
           if [ "${REUSE_RESULT}" = 'true' ] && [ "${STATIC_RESULT}" = 'skipped' ] && \
@@ -861,11 +885,12 @@ jobs:
 
   notify-auto-tag:
     name: Notify Auto Tag
-    needs: [checks, security, e2e-detect, e2e]
+    needs: [checks, security, e2e-detect, e2e, change-scope]
     if: |
       always() &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
+      needs.change-scope.outputs.publish == 'true' &&
       needs.checks.result == 'success' &&
       needs.security.result == 'success' &&
       needs.e2e-detect.result == 'success' &&
