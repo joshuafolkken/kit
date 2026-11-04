@@ -15,6 +15,33 @@ const INVALID_TIME = 'invalid'
 const UNKNOWN_TIME_TEST = 'keeps windows with unknown time for %s'
 const ASSISTANT = '{"type":"assistant"}'
 
+describe('run_board_quota_read.codex_lane', () => {
+	it.each(['/work/.kit-lanes/6375', '/work/.kit-lanes/6375/scripts'])(
+		'reads the lane of %s',
+		(cwd) => {
+			const head = JSON.stringify({ type: 'session_meta', payload: { cwd } })
+
+			expect(run_board_quota_read.codex_lane(`${head}\n${ASSISTANT}`, '')).toBe('6375')
+		},
+	)
+
+	it.each(['/work/kit', undefined, NULL_TIME, 123])(
+		'reads an absent or outside cwd as none: %s',
+		(cwd) => {
+			const head = JSON.stringify({ type: 'session_meta', payload: { cwd } })
+
+			expect(run_board_quota_read.codex_lane(head, '')).toBeUndefined()
+		},
+	)
+
+	it.each([ASSISTANT, '', '{"type":"session_meta"'])(
+		'reads missing metadata as none: %s',
+		(head) => {
+			expect(run_board_quota_read.codex_lane(head, '')).toBeUndefined()
+		},
+	)
+})
+
 function claude_line(five_hour: number, seven_day?: number, timestamp?: unknown): string {
 	const windows = {
 		five_hour: { utilization: five_hour, resetsAt: RESET_S },
