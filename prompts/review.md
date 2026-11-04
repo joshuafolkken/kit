@@ -84,6 +84,11 @@ by the three-way disposition below, and record the pass with
 Two rounds is the ceiling, not the schedule; whether round 2 is due is `pnpm josh review:round2`'s
 answer (below). The interaction review is not one of the two.
 
+A bare `review:brief` starts at full-change final round 2 when both declared size axes fit, no
+High/Medium exists in the issue's history, and the gate is local; it records `round1: skipped-in-size`.
+Missing or unreadable inputs keep round 1; explicit round flags win. Final disposition and the
+independent interaction review still apply.
+
 ### A merge-conflict resolution review is not one of the two
 
 When `pnpm josh followup` reports `PR checks failed (merge conflict)`, the child resolves the conflict

@@ -68,24 +68,31 @@ async function writer_path(now: Date, cwd: string = process.cwd()): Promise<stri
 }
 
 // A file whose last line has no newline would otherwise run into the next file's first line.
-async function read_file(target: string): Promise<string> {
+async function read_file(target: string, is_strict: boolean): Promise<string> {
 	try {
 		const content = await readFile(target, 'utf8')
 
 		return content.length === 0 || content.endsWith('\n') ? content : `${content}\n`
-	} catch {
+	} catch (error) {
+		if (is_strict) throw error
+
 		return ''
 	}
 }
 
-async function ledger_files(directory: string): Promise<ReadonlyArray<string> | undefined> {
+async function ledger_files(
+	directory: string,
+	is_strict: boolean,
+): Promise<ReadonlyArray<string> | undefined> {
 	try {
 		const names = await readdir(directory)
 
 		return names
 			.filter((name) => observation_ledger.is_ledger_file_name(name))
 			.toSorted((left, right) => left.localeCompare(right))
-	} catch {
+	} catch (error) {
+		if (is_strict) throw error
+
 		return undefined
 	}
 }
@@ -94,14 +101,14 @@ async function ledger_files(directory: string): Promise<ReadonlyArray<string> | 
 // count across all of them — a recurrence is a recurrence whichever issue's file each line sits in.
 // `undefined` when there is no directory: a checkout that keeps no ledger, which `review:record
 // --check` turns into `not-required`.
-async function read(cwd: string = process.cwd()): Promise<string | undefined> {
+async function read(cwd: string = process.cwd(), is_strict = false): Promise<string | undefined> {
 	const directory = ledger_directory(cwd)
-	const files = await ledger_files(directory)
+	const files = await ledger_files(directory, is_strict)
 
 	if (files === undefined) return undefined
 
 	const contents = await Promise.all(
-		files.map(async (name) => await read_file(path.join(directory, name))),
+		files.map(async (name) => await read_file(path.join(directory, name), is_strict)),
 	)
 
 	return contents.join('')

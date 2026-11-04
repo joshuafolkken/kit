@@ -238,7 +238,13 @@ function skipped(out: string): StepResult {
 // round whose `review:record` failed is not counted either: the relaunch re-runs it, and that run is
 // the one that ended.
 async function record_outcome(issue: string, verdict: string, cause?: string): Promise<void> {
-	if (verdict === run_ship_review.VERDICT.INVALID || cause === CAUSE.CHECK) return
+	if (
+		verdict === run_ship_review.VERDICT.INVALID ||
+		cause === CAUSE.CHECK ||
+		review_round.from_brief(stamp_file.read_stamp_text(paths(CODE).brief) ?? '') === ROUND_TWO
+	) {
+		return
+	}
 
 	await lane_ledger_write.record_round_one({ issue: Number(issue), verdict })
 }

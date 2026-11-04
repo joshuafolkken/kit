@@ -215,13 +215,17 @@ interface DisposedLine {
 
 // One issue's `- rf:` lines, each with its severity and disposition — `undefined` disposition for a
 // line written without one. `josh review:round2` reads round 1's closure from this.
-function issue_dispositions(content: string, issue: number): ReadonlyArray<DisposedLine> {
+function issue_dispositions(
+	content: string,
+	issue: number,
+	kind: LineKind = 'code',
+): ReadonlyArray<DisposedLine> {
 	const target = issue_field(issue)
 
 	return content
 		.split('\n')
-		.filter((line) => is_finding_line(line) && issue_of(line, 'code') === target)
-		.map((line) => well_formed_fields(line) ?? [])
+		.filter((line) => is_finding_line(line, kind) && issue_of(line, kind) === target)
+		.map((line) => well_formed_fields(line, kind) ?? [])
 		.map((fields) => ({
 			severity: fields[SEVERITY_FIELD_INDEX] ?? NONE,
 			disposition: fields[FIELD_COUNT],
