@@ -1,3 +1,5 @@
+import { shell_segments } from '#scripts/rules/shell-segments'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { lane_implement_subagents, type ImplementLane } from './lane-implement-subagents'
 import { lane_paused_spans, type PausedSpan, type PausedSpans } from './lane-paused-spans'
 import { lane_stage_stats } from './lane-stage-stats'
@@ -11,7 +13,7 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 // earlier calls to its own, the model's turn before it included — is put to one sub-stage, and `lane:stats` prints each one's
 // median over the period's lanes.
 //
-// **A lane's implement ends at its first `josh ship` call**, so a lane that never shipped in the period
+// **A lane's implement ends at its first `ship` or `run:chain --join --ship` call**, so a lane that never shipped in the period
 // has no implement here. **`review-fix` runs from `run:review` on** — the round's fixes and their scoped
 // checks; before it, an edit is `edit`, a scoped check or gate is `check`, and any other call is `plan`
 // before the first edit, `read` after it. **A session's first call spans its own duration**, so the gap
@@ -37,6 +39,9 @@ const CHECK_COMMANDS: ReadonlySet<string> = new Set([
 ])
 const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['review:brief', 'run:review'])
 const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
+const CHAIN_COMMANDS: ReadonlySet<string> = new Set(['run:chain'])
+const JOIN_FLAG = /\s--join(?:\s|$)/u
+const SHIP_FLAG = /\s--ship(?:\s|=|$)/u
 const FIRST_LINT_ROW = `lane first ${LINT_RELATED}`
 // `backgrounded` counts a subagent row's untimed calls (`lane-implement-subagents.ts`); a sub-stage has none.
 const COLUMNS = [
@@ -148,9 +153,26 @@ function lane_totals(calls: ReadonlyArray<ToolCall>, paused: ReadonlyArray<Pause
 	return totals
 }
 
-// One lane's calls before its first ship, or `undefined` when it never shipped.
+function chain_ships(segment: string): boolean {
+	return (
+		shell_segments.is_josh_command(segment, CHAIN_COMMANDS) &&
+		JOIN_FLAG.test(segment) &&
+		SHIP_FLAG.test(segment)
+	)
+}
+
+function starts_ship(call: ToolCall): boolean {
+	const spoken = time_shell.unquoted(call.command ?? '')
+
+	return (
+		runs_any(call, SHIP_COMMANDS) ||
+		shell_segments.commands_of(spoken).some((segment) => chain_ships(segment))
+	)
+}
+
+// One lane's calls before its first ship, including the clean join's ship option.
 function implement_calls(calls: ReadonlyArray<ToolCall>): ReadonlyArray<ToolCall> | undefined {
-	const ship = calls.findIndex((call) => runs_any(call, SHIP_COMMANDS))
+	const ship = calls.findIndex((call) => starts_ship(call))
 
 	return ship === -1 ? undefined : calls.slice(0, ship)
 }

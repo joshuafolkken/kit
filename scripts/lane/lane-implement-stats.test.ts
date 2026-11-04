@@ -55,6 +55,31 @@ const LANE_CALLS = [
 	call(16, { tool: 'Edit' }),
 ]
 
+function with_ship(command: string): Array<ToolCall> {
+	return LANE_CALLS.map((entry) =>
+		entry.command?.startsWith(SHIP) === true ? { ...entry, command } : entry,
+	)
+}
+
+describe('lane_implement_stats — a clean join that ships', () => {
+	it.each([
+		'pnpm josh run:chain 4887 --join --ship "Title #4887"',
+		'pnpm josh run:chain 4887 --ship="Title #4887" --join --fixing',
+		'echo ready && pnpm josh run:chain 4887 --join --ship "Title #4887"',
+	])('keeps the shipped lane in the implementation totals: %s', (command) => {
+		expect(minutes_of(with_ship(command))).toStrictEqual(minutes_of(LANE_CALLS))
+	})
+
+	it.each([
+		'pnpm josh run:chain 4887 --join',
+		'echo "pnpm josh run:chain 4887 --join --ship Title"',
+		'pnpm josh run:chain 4887 --ship "Title --join #4887"',
+		'pnpm josh run:chain 4887 --join; echo --ship',
+	])('does not infer a ship from another command or quoted flag: %s', (command) => {
+		expect(minutes_of(with_ship(command))).toStrictEqual({})
+	})
+})
+
 describe('lane_implement_stats.lane_totals_in — the sub-stages', () => {
 	it('puts each span, the turn before the call included, to its sub-stage, up to the ship', () => {
 		expect(minutes_of(LANE_CALLS)).toStrictEqual({
