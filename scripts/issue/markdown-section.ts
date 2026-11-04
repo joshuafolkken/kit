@@ -68,20 +68,44 @@ function has_line(body: string, text: string): boolean {
 // The lines between the first unfenced line `is_target` accepts and the next unfenced `## ` heading,
 // trimmed of the heading line itself; an empty array when no line is accepted. A `## ` line inside a
 // code fence is example text, so it neither opens nor closes a section.
+function section_bounds(
+	body: string,
+	is_target: (line: string) => boolean,
+): readonly [number, number] {
+	const visible = unfenced_lines(body)
+	const start = visible.findIndex((line) => is_target(line))
+
+	if (start === -1) return [0, 0]
+
+	const end = visible.slice(start + 1).findIndex((line) => is_heading(line))
+
+	return [start + 1, end === -1 ? visible.length : start + 1 + end]
+}
+
 function section_lines_matching(
 	body: string,
 	is_target: (line: string) => boolean,
 ): ReadonlyArray<string> {
 	const lines = lines_of(body)
-	const visible = unfenced_lines(body)
-	const start = visible.findIndex((line) => is_target(line))
+	const [start, end] = section_bounds(body, is_target)
 
-	if (start === -1) return []
+	return lines.slice(start, end)
+}
 
-	const rest = lines.slice(start + 1)
-	const end = visible.slice(start + 1).findIndex((line) => is_heading(line))
+// Keep each raw line's terminator, including mixed LF/CRLF, when editing a section.
+function map_section(
+	body: string,
+	is_target: (line: string) => boolean,
+	transform: (section: string) => string,
+): string {
+	const [start, end] = section_bounds(body, is_target)
+	const lines = body.split(/(?<=\n)/u)
 
-	return end === -1 ? rest : rest.slice(0, end)
+	return [
+		...lines.slice(0, start),
+		transform(lines.slice(start, end).join('')),
+		...lines.slice(end),
+	].join('')
 }
 
 // A heading matched inside a sentence is not the section heading, so only a line that is exactly the
@@ -91,6 +115,7 @@ function section_lines(body: string, heading: string): ReadonlyArray<string> {
 }
 
 const markdown_section = {
+	map_section,
 	section_lines,
 	section_lines_matching,
 	fence_free_lines,
