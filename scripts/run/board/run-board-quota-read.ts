@@ -304,14 +304,21 @@ async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
 
 // The newest logs of lane children Claude ran, in the run-state directory. A Codex child logs under
 // the same name and writes no `rate_limit_event`, so its logs are passed over by their last header.
+// Only Claude logs spend `limit`; every search examines at most `FILES_LIMIT` launch headers.
 async function claude_files(
 	root: string = durable_state.root(),
 	limit: number = FILES_SCANNED,
 ): Promise<Array<QuotaFile>> {
-	const scanned = newest(await files_in(root, is_lane_log), limit)
-	const claude = await Promise.all(scanned.map(async (file) => await claude_log(file)))
+	const scanned = newest(await files_in(root, is_lane_log), FILES_LIMIT)
+	const claude: Array<QuotaFile> = []
 
-	return claude.flat()
+	for (const file of scanned) {
+		if (claude.length >= limit) break
+		// eslint-disable-next-line no-await-in-loop -- Stop reading headers as soon as enough Claude logs are found.
+		claude.push(...(await claude_log(file)))
+	}
+
+	return claude
 }
 
 function is_rollout(name: string): boolean {
