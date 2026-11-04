@@ -207,7 +207,9 @@ describe('package.json scripts', () => {
 	const scripts = manifest.scripts ?? {}
 
 	it('exposes josh as the unified CLI entry point', () => {
-		expect(scripts['josh']).toBe('node --import tsx scripts/josh/josh.ts')
+		expect(scripts['josh']).toBe(
+			'node --disable-warning=ExperimentalWarning tools/josh/josh-ready.ts',
+		)
 	})
 
 	it('does not expose audit:security as a standalone script', () => {
