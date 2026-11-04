@@ -137,6 +137,14 @@ describe('read_package_minutes — the nearest declaring package.json, searched 
 })
 
 describe('read_package_minutes — an unusable answer falls through rather than throwing', () => {
+	it('reads the interval independently of an invalid review mode', () => {
+		const directory = directory_with(
+			JSON.stringify({ josh: { progress_interval_minutes: COMMITTED, review_gate: 'other' } }),
+		)
+
+		expect(run_progress_config.read_package_minutes(directory)).toBe(COMMITTED)
+	})
+
 	it.each([['0'], ['-5'], ['"fifteen"'], ['null']])('ignores %s as an interval', (literal) => {
 		const directory = directory_with(`{"josh":{"progress_interval_minutes":${literal}}}`)
 
