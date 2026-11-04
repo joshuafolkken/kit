@@ -1,7 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { has_label_name, NOT_BEFORE_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { has_label_name, NOT_BEFORE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_park } from '#scripts/issue/issue-park'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
@@ -28,6 +28,7 @@ import { run_label } from '#scripts/run/run-label'
 import { run_merge, type EndingSignals } from './run-merge'
 import { run_merge_cap } from './run-merge-cap'
 import { run_merge_close } from './run-merge-close'
+import { run_merge_decision } from './run-merge-decision'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
 // callers surface the refusal as a hard failure rather than silently continuing on a carry that was
@@ -125,11 +126,11 @@ async function apply_carry(
 
 	if (record === undefined) return { kind: 'none' }
 
-	if (change === undefined) return { kind: 'applied', carry: record.carry }
-
 	if (run_carry.is_count_refused(record.carry, ctx.owner)) {
 		return { kind: 'refused', carry: record.carry }
 	}
+
+	if (change === undefined) return { kind: 'applied', carry: record.carry }
 
 	const owned = run_carry_conversation.reclaim_owner(record.carry, ctx.owner)
 
@@ -333,16 +334,17 @@ async function do_waiting(ctx: MergeContext, waits: ReadonlyArray<string>): Prom
 	return { carry: undefined, is_parked: false, is_refused: false, waits }
 }
 
-// A failed child: count the failure, end whatever of its process is still running (a child judged
+// An unfinished child: count mechanical failures only, end whatever of its process is still running (a child judged
 // abandoned that hung on a wait loop would otherwise answer the pgrep liveness check `alive` for its
 // issue number forever), drop the stale `in-progress`, and park it with `run:stalled` so the next
-// offer does not hand the same child straight back. Not `needs-decision`: the failure is mechanical,
-// and nothing is asked of a person but to fix its cause (joshuafolkken/kit#4102). Returns the record
+// offer does not hand the same child straight back. A question parks with `needs-decision` without
+// increasing failures; mechanical failures use `run:stalled` (joshuafolkken/kit#6268). Returns the record
 // so the caller can read the streak against the guard. Returns `is_refused: true` without touching labels when the carry record
 // rejected the count. A park is always explained on the issue — `cause` says what was judged, and the
 // comment what was read and what a person does next.
 async function park_failed(ctx: MergeContext, cause: StallCause): Promise<FailedResult> {
-	const result = await apply_carry(ctx, run_merge.change_of('failed'))
+	const is_decision = run_merge_decision.is_decision(cause.short)
+	const result = await apply_carry(ctx, run_merge.change_of(is_decision ? 'parked' : 'failed'))
 
 	if (result.kind === 'refused') return refused_result(result.carry)
 
@@ -350,7 +352,8 @@ async function park_failed(ctx: MergeContext, cause: StallCause): Promise<Failed
 
 	await release_child(ctx.child)
 	const reason = { child: ctx.child, cause: cause.why, carry, output: ctx.output }
-	const park = await issue_park.apply(ctx.child, RUN_STALLED_LABEL, run_merge.park_comment(reason))
+	const { label, comment } = run_merge_decision.park_options(cause, reason)
+	const park = await issue_park.apply(ctx.child, label, comment)
 
 	return {
 		carry,
@@ -370,7 +373,10 @@ async function do_failed(ctx: MergeContext, cause?: StallCause): Promise<FailedR
 
 	if (waits.length > 0) return await do_waiting(ctx, waits)
 
-	return await park_failed(ctx, run_merge_cap.park_cause(ctx.child, cause, ctx.capped_note))
+	return await park_failed(
+		ctx,
+		run_merge_cap.park_cause(ctx.child, cause, ctx.capped_note, ctx.output),
+	)
 }
 
 // The outcome of counting an outage: the record to read the streak against, and whether the count was
