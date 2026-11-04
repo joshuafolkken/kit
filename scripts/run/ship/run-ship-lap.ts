@@ -81,8 +81,12 @@ function environment(parent: string): Record<string, string> {
 }
 
 // What a step's own result adds to its lap: why a check read the whole branch, and which run of the
-// scoped pair it was and why it ran again (`run-ship-scoped.ts`), and the tree a gate reused.
-type LapNote = Pick<ShipLapRecord, 'fallback' | 'rerun' | 'reused_tree' | 'runs'>
+// scoped pair it was, why it ran again, how many files it was named over or why a merge could not
+// split (`run-ship-scoped.ts`), and the tree a gate reused.
+type LapNote = Pick<
+	ShipLapRecord,
+	'fallback' | 'rerun' | 'reused_tree' | 'runs' | 'named' | 'unsplit'
+>
 
 function lap_of(current: LapScope, step: string, started_ms: number, note: LapNote): ShipLapRecord {
 	const { parent, ...place } = current

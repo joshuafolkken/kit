@@ -132,7 +132,7 @@ describe('run_ship_synced_scope.read_sync — a merge the import graph could not
 			const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
 
 			expect(reading?.overlap).toBeUndefined()
-			expect(reading?.unsplit).toContain(failure)
+			expect(reading?.unsplit).toBe(failure)
 			expect(await settle(TREE, PAIR)).toBeUndefined()
 			expect(record).not.toHaveBeenCalled()
 		},
