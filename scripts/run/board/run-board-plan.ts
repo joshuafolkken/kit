@@ -6,6 +6,7 @@ import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import { epic_classify } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { run_board_decision_read } from './run-board-decision-read'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
 
@@ -174,7 +175,7 @@ async function read_plan(
 	const plan =
 		named.issues.length === 0 ? await pool_board([], read) : await scoped_board(named, read)
 
-	return await run_board_human_merge.with_prs(plan)
+	return await run_board_decision_read.with_decisions(await run_board_human_merge.with_prs(plan))
 }
 
 const run_board_plan = { read_plan }

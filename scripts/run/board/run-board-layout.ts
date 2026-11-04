@@ -12,6 +12,7 @@ import {
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_board_decision } from './run-board-decision'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_human_merge } from './run-board-human-merge'
@@ -30,6 +31,8 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // tracks is drawn under its epic; a `blocked_by` edge is a DAG, so it stays a waiting-on note at the end of the row.
 
 interface BoardPlan {
+	decision_questions?: ReadonlyMap<number, string> | undefined
+	decision_waits?: ReadonlyMap<number, string> | undefined
 	is_backlog_live?: boolean | undefined
 	human_merge_prs?: ReadonlyMap<number, number> | undefined
 	waves: WavePlan
@@ -104,6 +107,7 @@ interface BoardLayout {
 
 // What an active row is named and classified by — each issue's title and labels.
 interface RowRead {
+	decision_questions?: ReadonlyMap<number, string> | undefined
 	is_backlog_live?: boolean | undefined
 	titles: ReadonlyMap<number, string>
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
@@ -153,6 +157,8 @@ function plan_reason(
 	overlay: Drawn,
 	waits: ReadonlyArray<string>,
 ): RowReason | undefined {
+	if (state === 'human') return run_board_decision.plan_reason(child.number, overlay.plan)
+
 	if (state === 'stopped') {
 		return run_board_ending_reason.stalled_reason(child.number, overlay.plan.is_backlog_live)
 	}
@@ -222,13 +228,15 @@ function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'
 }
 
 // A child parked on a decision is a 🙋 row: it waits on a person, as an untouched `needs-decision`
-// child does, and the section it is drawn in already says why, so its row draws no reason.
+// child does; its tail names the decision that resumes it.
 function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
 	const is_asked = status.state === 'parked' && is_decision(status.reason)
 	const labels = read.labels.get(number)
 
 	return {
-		...(!is_asked && run_board_ending_reason.row_reason(number, status, read)),
+		...(is_asked
+			? { reason: run_board_decision.reason_of(number, status.reason, read) }
+			: run_board_ending_reason.row_reason(number, status, read)),
 		...solo_flag(labels),
 		number,
 		title: read.titles.get(number),
@@ -333,9 +341,8 @@ function layout_of(
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
 	const read = {
+		...plan,
 		titles: plan.context.titles,
-		labels: plan.labels,
-		is_backlog_live: plan.is_backlog_live,
 	}
 
 	return {
