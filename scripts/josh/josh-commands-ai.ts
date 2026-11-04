@@ -591,6 +591,14 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'automation', ['none']],
 		usage: { examples: [BARE] },
 	},
+	'split:recover': {
+		script: 'scripts/split/split-child-recover-cli.ts',
+		description:
+			'Recover split-child evidence after verifying an existing child URL, split route and parent',
+		category: 'AI tools',
+		reference: ['<origin> <child-issue-url>', 'automation', ['network', 'files']],
+		usage: { examples: [{ arguments: '6212 https://github.com/joshuafolkken/kit/issues/6326' }] },
+	},
 	'split:assess': {
 		script: 'scripts/split/split-assess-cli.ts',
 		description:

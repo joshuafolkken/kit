@@ -102,9 +102,11 @@ function append(path: string, entry: object): void {
 	const descriptor = openSync(path, APPEND_FLAGS, LEDGER_FILE_MODE)
 
 	try {
-		if (stamp_file.is_own_regular_file(path)) {
-			writeSync(descriptor, `${JSON.stringify(entry)}${LINE_SEPARATOR}`)
+		if (!stamp_file.is_own_regular_file(path)) {
+			throw new Error('Ledger is not an owned regular file')
 		}
+
+		writeSync(descriptor, `${JSON.stringify(entry)}${LINE_SEPARATOR}`)
 	} finally {
 		closeSync(descriptor)
 	}
@@ -203,7 +205,10 @@ async function record_split_notice(notice: SplitNoticeRecord, path?: string): Pr
 }
 
 async function record_split_filed(filed: SplitFiledRecord, path?: string): Promise<void> {
-	await record({ kind: KIND.SPLIT_FILED, at: now_iso(), ...filed }, path)
+	const destination = path ?? (await target())
+
+	if (destination === undefined) throw new Error('Could not resolve the split-child ledger')
+	append(destination, { kind: KIND.SPLIT_FILED, at: now_iso(), ...filed })
 }
 
 async function record_push_miss(miss: PushMissRecord, path?: string): Promise<void> {
