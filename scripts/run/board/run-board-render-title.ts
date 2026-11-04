@@ -100,6 +100,9 @@ function reason_fitted(
 	draw: (cut: RowCut) => string,
 ): string {
 	const text = draw({ title_limit, reason_cut: 0 })
+
+	if (row.state === 'stopped' || row.state === 'parked') return text
+
 	const reason_cut = overrun_of(text, row.reason !== undefined, columns)
 
 	return reason_cut === 0 ? text : draw({ title_limit, reason_cut })
@@ -135,7 +138,7 @@ function fitted_limit(
 }
 
 // A row's line as `draw` draws it: whole, or — where it or its section runs past the pane — with its
-// title narrowed first and its reason cut after.
+// title narrowed first and its reason cut after; parked and stopped rows keep their whole tail.
 function fitted(
 	row: BoardRow,
 	columns: number | undefined,

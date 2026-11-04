@@ -243,15 +243,18 @@ describe('run_board_render.render — a stalled row’s cause and resume action'
 		const line = line_of(stalled, NARROW * 2)
 
 		expect(line).toContain(TITLE_START)
-		expect(line).toMatch(/… {2}.* {2}review failed → fullrun #3720$/u)
+		expect(line).toMatch(/… {2}.* {2}→ resume: fullrun #3720 \(review failed\)$/u)
 		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(NARROW * 2)
 	})
 
-	it('cuts the reason to an ellipsis once the title is at the floor', () => {
-		const line = line_of(stalled, NARROW)
+	it.each(['stopped', 'parked'] as const)(
+		'keeps a %s action whole past the title floor',
+		(state) => {
+			const line = line_of({ ...stalled, state }, NARROW)
 
-		expect(line).toContain(` ${TITLE_START.slice(0, -1)}… `)
-		expect(line.endsWith('…')).toBe(true)
-		expect(run_board_fit.width_of(line)).toBe(NARROW)
-	})
+			expect(line).toContain(` ${TITLE_START.slice(0, -1)}… `)
+			expect(line.endsWith(STALLED.tail ?? '')).toBe(true)
+			expect(run_board_fit.width_of(line)).toBeGreaterThan(NARROW)
+		},
+	)
 })

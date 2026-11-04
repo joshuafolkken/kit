@@ -23,7 +23,6 @@ const CUT_NOT_RELAUNCHED: StallCause = {
 
 const RESUME_COMMAND = 'fullrun'
 const CAUSE_LEAD = `${RUN_STALLED_LABEL}: `
-const NEXT_ARROW = ' → '
 
 function resume_of(child: number | string): string {
 	return `${RESUME_COMMAND} ${issue_cite.plain(child)}`
@@ -46,12 +45,11 @@ function cause_of(reason: string): string | undefined {
 	return reason.startsWith(CAUSE_LEAD) ? reason.slice(CAUSE_LEAD.length) : undefined
 }
 
-// A stalled row's right end: its cause, then the action that resumes it — the action alone where no
-// cause was recorded.
+// A stalled row leads with its resume action, followed by its recorded cause in parentheses.
 function row_text(child: number | string, cause = ''): string {
-	const resume = resume_of(child)
+	const resume = `→ resume: ${resume_of(child)}`
 
-	return cause === '' ? resume : `${cause}${NEXT_ARROW}${resume}`
+	return cause === '' ? resume : `${resume} (${cause})`
 }
 
 const run_stalled = {
