@@ -6,7 +6,7 @@ import {
 	type MeasureDeclaration,
 	type MeasureVerdict,
 } from '#scripts/issue/measure-declaration'
-import { trusted_measure, type CommandRun } from '#scripts/issue/trusted-measure'
+import { trusted_measure, type CommandRun, type TrustedBody } from '#scripts/issue/trusted-measure'
 import { error_text } from '#scripts/lib/error-message'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -31,18 +31,22 @@ interface Measurement {
 	verdict: MeasureVerdict
 }
 
-async function declared(issue: string): Promise<MeasureDeclaration | undefined> {
-	const read = await trusted_measure.read_trusted_body(issue)
-
-	return read.kind === 'trusted' ? measure_declaration.parse(read.body) : undefined
-}
-
-function measured(declaration: MeasureDeclaration): Measurement {
-	const run = trusted_measure.run_command(declaration.command)
+function measured(declaration: MeasureDeclaration, source: TrustedBody): Measurement {
+	const run = trusted_measure.run_command(declaration.command, source)
 	const verdict: MeasureVerdict =
 		run.kind === 'ok' ? measure_declaration.judge(declaration, run.output) : { kind: 'unreadable' }
 
 	return { declaration, run, verdict }
+}
+
+async function declared(issue: string): Promise<Measurement | undefined> {
+	const read = await trusted_measure.read_trusted_body(issue)
+
+	if (read.kind === 'refused') return undefined
+
+	const declaration = measure_declaration.parse(read.body)
+
+	return declaration === undefined ? undefined : measured(declaration, read)
 }
 
 function value_words(verdict: MeasureVerdict): string {
@@ -96,11 +100,9 @@ async function hand_over(issue: string, measurement: Measurement): Promise<false
 
 // Whether the drive closed the issue by its declaration; `false` launches its lane.
 async function closed(issue: string): Promise<boolean> {
-	const declaration = await declared(issue)
+	const measurement = await declared(issue)
 
-	if (declaration === undefined) return false
-
-	const measurement = measured(declaration)
+	if (measurement === undefined) return false
 
 	return measurement.verdict.kind === 'pass'
 		? await close_passed(issue, measurement)
