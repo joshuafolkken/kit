@@ -185,6 +185,19 @@ describe('metrics_duration_probe.baseline_path under a concurrent move', () => {
 })
 
 describe('metrics_duration_probe.measure', () => {
+	it('times the same launcher used by pnpm josh (ac-cbdaa1f2)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
+		vi.mocked(spawnSync).mockReturnValue(spawnSync(process.execPath, ['--version']))
+
+		await metrics_duration_probe.measure(scratch, true)
+
+		expect(spawnSync).toHaveBeenCalledWith(
+			'node',
+			['--disable-warning=ExperimentalWarning', 'tools/josh/josh-ready.ts', '--help'],
+			expect.objectContaining({ cwd: scratch }),
+		)
+		vi.mocked(spawnSync).mockReset()
+	})
 	it('holds a startup that ran past the timeout at the timeout instead of leaving it unmeasured', async () => {
 		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
 		// A real run killed at a 1 ms timeout, handed back for every startup the probe times.

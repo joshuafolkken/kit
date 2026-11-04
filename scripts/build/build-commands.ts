@@ -1,9 +1,10 @@
-import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { BUNDLED_COMMAND_DIRECTORY, josh_in_process } from '#scripts/josh/josh-in-process'
 import { build } from 'esbuild'
+import { build_inputs, place_build, source_recorder } from './build-hooks'
+import { hook_bundle_stamp } from './hook-bundle-stamp'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const OUT_DIR = path.join(PACKAGE_DIR, BUNDLED_COMMAND_DIRECTORY)
@@ -31,21 +32,30 @@ function entry_point(script: string): { in: string; out: string } {
 	return { in: path.join(PACKAGE_DIR, script), out }
 }
 
-// Nothing in this checkout launches `dist/commands/` (kit's own `pnpm josh` runs the source), so the
-// directory is emptied first rather than pruned after, which drops the output of a command no longer
-// bundled.
+// Place complete files before the stamp: kit's own dispatcher may launch these during a build.
+// Prune removed entries after placement so a launch never finds an emptied directory.
 async function build_commands(out_directory: string = OUT_DIR): Promise<string> {
-	rmSync(out_directory, { recursive: true, force: true })
-	await build({
+	const sources = build_inputs(fileURLToPath(import.meta.url))
+	const entries = bundled_scripts().map((script) => entry_point(script))
+	const entry_paths = new Set(entries.map((entry) => entry.in))
+	const { outputFiles: files } = await build({
 		absWorkingDir: PACKAGE_DIR,
-		entryPoints: bundled_scripts().map((script) => entry_point(script)),
+		entryPoints: entries,
 		outdir: out_directory,
 		bundle: true,
 		platform: 'node',
 		format: 'esm',
 		target: 'node22',
 		packages: 'external',
+		write: false,
+		plugins: [source_recorder(sources, entry_paths)],
 	})
+	const stamp = hook_bundle_stamp.stamp_text(
+		sources,
+		files.map((file) => file.path),
+	)
+
+	place_build(out_directory, files, stamp)
 
 	return out_directory
 }

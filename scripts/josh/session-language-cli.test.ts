@@ -1,4 +1,5 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { session_language_cli, type LivePorts } from './session-language-cli'
 
@@ -103,7 +104,28 @@ describe('prompt_lines', () => {
 		expect(info.mock.calls.flat().join('\n')).toContain('pnpm josh run:handoff fullrun')
 		info.mockRestore()
 	})
+})
 
+describe('lane child prompt guidance', () => {
+	it.each(['claude-fable-5-1', 'gpt-6.1-astra'])(
+		'omits consultation handoff guidance for a lane child on %s',
+		async (model) => {
+			const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+			const child = vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+
+			try {
+				await print_prompt_lines(async () => JSON.stringify({ prompt: 'fullrun #1', model }))
+
+				expect(info.mock.calls.flat().join('\n')).not.toContain('Consultation model:')
+			} finally {
+				child.mockRestore()
+				info.mockRestore()
+			}
+		},
+	)
+})
+
+describe('board line bound', () => {
 	it('keeps the board line within its bound', () => {
 		expect(BOARD_LINE.length).toBeLessThanOrEqual(BOARD_LINE_LIMIT)
 	})

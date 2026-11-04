@@ -1,22 +1,21 @@
 # Running josh commands without tsx
 
-kit ships `scripts/` as TypeScript and runs it with `tsx`. In kit's own checkout that costs one tsx
-start per `pnpm josh` call: the dispatcher is loaded as TypeScript and imports each script in its
-own process (joshuafolkken/kit#1342). A consumer pays twice. Its `josh` bin is the bundled
+kit ships `scripts/` as TypeScript and uses pre-built bundles where available. Its `josh` bin is the bundled
 `dist/josh.js`, which runs under plain node and cannot load a `.ts` script, so it spawns a tsx child
 for every script command — about 0.16 s per call on top of the command's own work
 (joshuafolkken/kit#3328).
 
-## kit's own checkout — tsx as a loader, never `dist/`
+## kit's own checkout — fresh bundles, source fallback
 
-kit's `pnpm josh` script is `node --import tsx scripts/josh/josh.ts` (joshuafolkken/kit#5632): tsx is
-registered as a loader in the one node process, where the `tsx` CLI started a second node process
-to run the dispatcher. It reads the sources on every call, so an edit is never run through a stale
-build.
+kit's `pnpm josh` script starts `tools/josh/josh-ready.ts` under plain node. The launcher shares
+`hook_bundle_stamp.is_fresh` with `run-hook.sh`'s launcher and checks both `dist/` and
+`dist/commands/`. Each build records the bytes it bundled, its toolchain inputs and emitted files.
+A fresh build runs `dist/josh.js`; missing inputs or outputs and edited inputs select the source dispatcher,
+registering tsx in the same process. Arguments and exit codes follow the selected dispatcher.
 
 The gate's steps and lefthook's commands are `pnpm josh <command>` calls, so they take the
-same path. `dist/josh.js` is not used here: every command not yet pre-built would spawn a tsx child
-from it, slower than the in-process import (`rule:list`: about 550 ms against 300 ms).
+same path. With fresh bundles, commands not yet pre-built still spawn a tsx child. Run `pnpm build`
+to refresh the bundles after editing source.
 
 Measured on 2026-11-01 (node 26.12.1, macOS), `pnpm josh doc:section CLAUDE.md Communication`, 15
 runs interleaved between the two scripts:
