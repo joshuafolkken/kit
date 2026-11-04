@@ -61,6 +61,12 @@ function is_question(prompt: string): boolean {
 	return QUESTION_ENDING.test(prompt.trim())
 }
 
+// A final reply can append a recommendation after its question on the same line.
+// An ASCII question mark inside a URL query is not a sentence boundary.
+function contains_question(message: string): boolean {
+	return message.split(/(?<=[？。])|(?<=\?)(?=\s)|\n/u).some((sentence) => is_question(sentence))
+}
+
 // **A held stop with no decision line is sent back once rather than announced.** Either it waits on a
 // person and has to say on what, or it waits on nobody and the notify would be the noise this rule
 // exists to end; only the run can tell which, so the reason hands it both answers.
@@ -71,7 +77,7 @@ const DECISION_REASON =
 	'it waits on nobody, continue the run, or say in one line that nothing is awaited. Do not repeat ' +
 	'your previous reply.'
 
-const stop_decision = { DECISION_REASON, decision_of, is_question }
+const stop_decision = { DECISION_REASON, contains_question, decision_of, is_question }
 
 export type { StopDecision }
 export { stop_decision }
