@@ -80,6 +80,22 @@ afterEach(() => {
 })
 
 describe('lane_room.read — the lane state record', () => {
+	it.each(['running', 'human-review'] as const)(
+		'excludes an absent worker recorded %s from lane:limit occupancy (ac-f3ca9060)',
+		async (state) => {
+			arrange_records([record_of(IDLE, state), record_of(RUNNING, 'running')])
+			vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
+			vi.spyOn(run_ship_detach, 'read_result').mockReturnValue(undefined)
+
+			const room = await lane_room.read([lane_of(IDLE), lane_of(RUNNING)], async () =>
+				lane_process_table.parse(LISTING),
+			)
+
+			expect(room.use.occupied).toBe(1)
+			expect(room.occupied.map((lane) => lane.issue)).toEqual([RUNNING])
+		},
+	)
+
 	it('counts a lane whose processes are stopped but whose record is running', async () => {
 		arrange_records([record_of(PAUSED, 'running'), record_of(RUNNING, 'running')])
 
