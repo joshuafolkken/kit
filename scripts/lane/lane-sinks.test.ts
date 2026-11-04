@@ -8,6 +8,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
+import { lane_over } from './lane-over'
 import { lane_sinks } from './lane-sinks'
 
 // joshuafolkken/kit#5701: the stages the period's lanes over the threshold spent their time in, summed
@@ -19,6 +20,7 @@ const WINDOW = { since_ms: START, until_ms: START + 1000 * MINUTE_MS }
 const LONG = 101
 const LONGER = 102
 const SHORT = 103
+const HUB_LANE = 104
 const THRESHOLD = 30
 const FOLLOWUP_CI = 'followup CI'
 
@@ -135,6 +137,92 @@ describe('lane_sinks.table', () => {
 		const rows = lane_sinks.table(RECORDS, WINDOW, THRESHOLD, issues).split('\n')
 
 		expect(rows[2]).toBe('| implement | 50.0 | 2 | 25.0 | #7 |')
+	})
+})
+
+function test_related(issue: number, minute: number, over_cap_hub: string): LedgerEntry {
+	return {
+		kind: 'test-related',
+		at: at(minute),
+		issue,
+		scope: 'related',
+		changed: 3,
+		synced: 0,
+		since_map: 0,
+		readers: 1,
+		over_cap: 2,
+		over_cap_hub,
+		elapsed_ms: 1000,
+	}
+}
+
+const SCOPED_PAIR = 'scoped pair'
+const ALIASES_HUB = 'scripts/josh/josh-aliases.ts'
+const HUB_ISSUES = [
+	{ number: 21, title: 'Narrow the josh-aliases.ts test reach' },
+	{ number: 22, title: 'Narrow the short-hub.ts test reach' },
+]
+
+function scoped_pair_lap(issue: number, ended: number, minutes: number): LedgerEntry {
+	return {
+		kind: 'ship-lap',
+		at: at(ended),
+		issue,
+		stage: 'followup',
+		step: SCOPED_PAIR,
+		elapsed_ms: minutes * MINUTE_MS,
+	}
+}
+
+// joshuafolkken/kit#6198: the scoped pair row also cites the Issues naming the period's over-cap hubs.
+describe('lane_sinks.table — the scoped pair row', () => {
+	const records = {
+		entries: [
+			...RECORDS.entries,
+			scoped_pair_lap(LONG, 46, 1),
+			test_related(LONG, 20, ALIASES_HUB),
+			test_related(SHORT, 210, 'scripts/lane/short-hub.ts'),
+		],
+		events: RECORDS.events,
+	}
+	const rows = lane_sinks.table(records, WINDOW, THRESHOLD, HUB_ISSUES).split('\n')
+
+	it('cites the Issue naming an over-threshold lane hub on the scoped pair row alone', () => {
+		expect(rows).toContain('| scoped pair | 1.0 | 1 | 1.0 | #21 |')
+		expect(rows.filter((row) => row.includes('#21'))).toHaveLength(1)
+	})
+
+	it('leaves out the hub of a lane under the threshold', () => {
+		expect(rows.some((row) => row.includes('#22'))).toBe(false)
+	})
+
+	it('matches a lane whose top stage is the scoped pair the same way under --over', () => {
+		const lane = { issue: HUB_LANE, from: 300, plan: 301, followup: 302, merge: 352 }
+		const lane_records = {
+			entries: [
+				...lane_entries(lane),
+				scoped_pair_lap(HUB_LANE, 351, 60),
+				test_related(HUB_LANE, 301, ALIASES_HUB),
+			],
+			events: lane_events(lane),
+		}
+
+		expect(lane_over.table(lane_records, WINDOW, THRESHOLD, HUB_ISSUES)).toContain(
+			'| scoped pair | #21 |',
+		)
+	})
+})
+
+describe('lane_sinks.hubs_of', () => {
+	it('lists each distinct hub of the named lanes, the first named first', () => {
+		const entries = [
+			test_related(LONG, 1, 'b.ts'),
+			test_related(LONGER, 2, 'a.ts'),
+			test_related(LONG, 3, 'b.ts'),
+			test_related(SHORT, 4, 'c.ts'),
+		]
+
+		expect(lane_sinks.hubs_of(entries, [LONG, LONGER])).toStrictEqual(['b.ts', 'a.ts'])
 	})
 })
 

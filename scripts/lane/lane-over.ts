@@ -77,10 +77,7 @@ function yield_part({ entries, events }: SinkRecords, issue: number): Array<stri
 }
 
 function hub_part({ entries }: SinkRecords, issue: number): Array<string> {
-	const hubs = of_kind(entries, KIND.TEST_RELATED, issue).map((entry) => entry.over_cap_hub)
-	const named = hubs.filter((hub) => hub !== undefined)
-
-	return [...new Set(named)].map((hub) => `hub over cap ${hub}`)
+	return lane_sinks.hubs_of(entries, [issue]).map((hub) => `hub over cap ${hub}`)
 }
 
 const CHAIN_PARTS: ReadonlyArray<ChainPart> = [
@@ -124,7 +121,9 @@ function lane_row(
 		lane_stage_stats.cell(wait_ms(records, issue, net_ms)),
 		chain_of(records, issue),
 		stage,
-		top === undefined ? lane_sinks_issues.NONE : lane_sinks_issues.cell(stage, issues),
+		top === undefined
+			? lane_sinks_issues.NONE
+			: lane_sinks.issues_cell(stage, issues, lane_sinks.hubs_of(records.entries, [issue])),
 	])
 }
 

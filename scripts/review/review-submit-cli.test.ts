@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { PassThrough, Readable } from 'node:stream'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The stamp files live in memory, so the test never writes the findings file a real ship in this
@@ -105,12 +106,6 @@ describe('review_submit_cli — a refusal writes nothing', () => {
 		expect(console.error).toHaveBeenCalledWith(review_submit_cli.EMPTY_NOTE)
 	})
 
-	it('refuses --none passed with findings', () => {
-		expect(review_submit_cli.run([NONE_FLAG], MEDIUM)).toBe(FAILED)
-
-		expect(stamps.size).toBe(0)
-	})
-
 	it.each([
 		[['--code']],
 		[[INTERACTION_FLAG, 'extra']],
@@ -128,6 +123,39 @@ describe('review_submit_cli — a refusal writes nothing', () => {
 
 	it('names the absolute review path in its usage', () => {
 		expect(review_submit_cli.USAGE).toContain('--review <absolute-path>')
+	})
+})
+
+// joshuafolkken/kit#6204: an agent's shell leaves stdin open without end, so `--none` must not wait on it.
+describe('review_submit_cli — findings_of reads stdin only when findings are expected', () => {
+	it('returns no findings for --none without reading a stdin that never ends', async () => {
+		const open_stdin = new PassThrough()
+
+		await expect(review_submit_cli.findings_of([NONE_FLAG], open_stdin)).resolves.toBe('')
+
+		open_stdin.destroy()
+	})
+
+	it('reads the findings on stdin without --none', async () => {
+		const findings = review_submit_cli.findings_of([], Readable.from([MEDIUM]))
+
+		await expect(findings).resolves.toBe(MEDIUM)
+	})
+
+	it('reads no stdin for arguments run refuses', async () => {
+		const open_stdin = new PassThrough()
+
+		await expect(review_submit_cli.findings_of([ROUND_FLAG, '2'], open_stdin)).resolves.toBe('')
+
+		open_stdin.destroy()
+	})
+
+	it('reads nothing from a terminal', async () => {
+		const terminal = Object.assign(new PassThrough(), { isTTY: true })
+
+		await expect(review_submit_cli.findings_of([], terminal)).resolves.toBe('')
+
+		terminal.destroy()
 	})
 })
 
