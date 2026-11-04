@@ -106,10 +106,10 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 // the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what
 // neither a main sync nor the map's tree joined.
 function own_of(
-	input: Pick<RunInput, 'changed' | 'synced' | 'since_map' | 'branch'>,
+	input: Pick<RunInput, 'changed' | 'branch'> & Partial<Pick<RunInput, 'synced' | 'since_map'>>,
 ): ReadonlyArray<string> {
-	const { changed = [], branch } = input
-	const joined = new Set([...input.synced, ...input.since_map])
+	const { changed = [], branch, synced = [], since_map = [] } = input
+	const joined = new Set([...synced, ...since_map])
 
 	return changed.filter((file) => branch?.includes(file) ?? !joined.has(file))
 }

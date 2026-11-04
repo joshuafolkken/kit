@@ -295,12 +295,7 @@ function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
 
 // The summary line names the hub the ledger records: the widest capped file of the run's own change.
 function report_capped(capped: CappedImporters, change: ChangeReading): void {
-	const { synced = [], since_map = [] } = change
-
-	test_related_cap.report_over_cap(
-		capped,
-		test_related_record.own_of({ ...change, synced, since_map }),
-	)
+	test_related_cap.report_over_cap(capped, test_related_record.own_of(change))
 }
 
 async function read_run_input(
