@@ -113,7 +113,7 @@ function tool_output(line: string, ids: ReadonlySet<string>): string {
 	return is_entry(command.data.item.command) ? (command.data.item.aggregated_output ?? '') : ''
 }
 
-function unfinished(latest: string): StallCause {
+function unfinished(latest: string, message: string): StallCause {
 	const ids = entry_ids(latest)
 	const outputs = latest
 		.split('\n')
@@ -123,7 +123,7 @@ function unfinished(latest: string): StallCause {
 
 	return resumes.at(-1)?.[1] === 'handed-off'
 		? run_stalled.STALE_HANDOFF
-		: run_stalled.SESSION_UNFINISHED
+		: run_stalled.session_unfinished(message)
 }
 
 // The same fallback judges both the park and its event. Restrict it to the latest launch so an
@@ -133,7 +133,7 @@ function judged(transcript: string): StallCause {
 	const message = agent_event.read(latest).last_message ?? ''
 	const is_confirmed = latest.split('\n').some((line) => confirms(line))
 
-	if (!is_confirmed && !asks(message)) return unfinished(latest)
+	if (!is_confirmed && !asks(message)) return unfinished(latest, message)
 
 	return {
 		short: NEEDS_DECISION_LABEL,

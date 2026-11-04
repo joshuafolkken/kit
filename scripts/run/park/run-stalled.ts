@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { run_cut } from '#scripts/run/cut/run-cut'
 
 // What a `run:stalled` park says, written and read in one place (joshuafolkken/kit#4215): the park
 // event carries the cause's short name after the label, the park comment its whole `Why:`, and the
@@ -35,8 +36,18 @@ function resume_of(child: number | string, is_backlog_live = false): string {
 }
 
 // The next action as a clause, which a park comment's `Next:` and the plan's note end with.
-function next_step(child: number | string): string {
-	return `fix the cause, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
+function next_step(child: number | string, cause = ''): string {
+	const recovery = /cut.*(?:handed-off|already handed off)/iu.test(cause)
+		? `clear the handed-off cut with \`${run_cut.END_COMMAND}\``
+		: 'fix the cause'
+
+	return `${recovery}, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
+}
+
+function session_unfinished(message: string): StallCause {
+	const first = message.split(/\r?\n/u, 1)[0]?.trim() ?? ''
+
+	return first === '' ? SESSION_UNFINISHED : { short: first, why: first }
 }
 
 function park_event(child: number | string, cause: string): string {
@@ -67,6 +78,7 @@ const run_stalled = {
 	park_event,
 	resume_of,
 	row_text,
+	session_unfinished,
 }
 
 export { run_stalled }
