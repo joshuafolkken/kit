@@ -51,6 +51,15 @@ describe('parse_numstat', () => {
 })
 
 describe('measure excludes test files from both counts', () => {
+	it.each(['quote"name.test.ts', 'tab\tname.e2e.ts', 'line\nname.test.ts'])(
+		'excludes a C-quoted test path: %j',
+		(file) => {
+			const raw = add_row(201, JSON.stringify(file))
+
+			expect(split_assess.assess(raw)).toStrictEqual({ files: 0, lines: 0, verdict: 'single' })
+		},
+	)
+
 	it('drops *.test.ts and *.e2e.ts from files and lines', () => {
 		const raw = [
 			add_row(40, A_TS),
