@@ -45,6 +45,21 @@ afterEach(async () => {
 	await rm(fixture.root, { recursive: true, force: true })
 })
 
+describe('read_branch excludes quoted tests', () => {
+	it('excludes an untracked C-quoted test file over the line guide', async () => {
+		const file = 'quote"name.test.ts'
+
+		await writeFile(path.join(fixture.root, file), lines_of(201))
+		vi.mocked(git_command.untracked_names).mockResolvedValue(JSON.stringify(file))
+
+		expect(await split_measure.read_branch()).toStrictEqual({
+			files: 0,
+			lines: 0,
+			verdict: 'single',
+		})
+	})
+})
+
 describe('read_branch', () => {
 	it('counts the untracked files a branch created, so new modules reach split', async () => {
 		const names = Array.from(
