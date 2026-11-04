@@ -64,8 +64,20 @@ describe('run_board_layout.layout_of — a stalled row’s resume action', () =>
 
 		expect(row?.reason).toStrictEqual({ tail: '→ resume: fullrun #33 (review failed)' })
 	})
+})
 
-	it('draws no reason on a stopped row that is not stalled, nor on a decision park', () => {
+describe('run_board_layout stop and decision reasons', () => {
+	it('passes the shared comment question to a park without its own question', () => {
+		const plan = { ...plan_of([]), decision_questions: new Map([[1, 'Choose the account']]) }
+		const parked = new Map<number, ItemStatus>([
+			[1, { state: 'parked', reason: NEEDS_DECISION_LABEL }],
+		])
+		const [park] = run_board_layout.layout_of(plan, parked).active
+
+		expect(park?.reason?.tail).toBe('→ decide: Choose the account')
+	})
+
+	it('keeps a non-stalled stop bare and names a decision park question', () => {
 		const reason = `${NEEDS_DECISION_LABEL}: pick one`
 		const statuses = new Map<number, ItemStatus>([
 			[1, { state: 'stopped', started_ms: 1 }],
@@ -73,7 +85,10 @@ describe('run_board_layout.layout_of — a stalled row’s resume action', () =>
 		])
 		const layout = run_board_layout.layout_of(plan_of([]), statuses)
 
-		expect(layout.active.map((row) => row.reason)).toStrictEqual([undefined, undefined])
+		expect(layout.active.map((row) => row.reason)).toStrictEqual([
+			undefined,
+			{ tail: '→ decide: pick one' },
+		])
 	})
 })
 
