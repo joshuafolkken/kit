@@ -9,7 +9,7 @@ const josh_run_mock = vi.hoisted(() =>
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 
-const SPLIT_REFUSAL = 'split notice unresolved: record a reason or file a split child'
+const SPLIT_REFUSAL = 'split notice unresolved: file a split child'
 const ISSUE_NUMBER = 5630
 
 const MAIN_MERGE = 'main:merge'
@@ -120,7 +120,7 @@ describe('run_chain_cli.run — main:merge', () => {
 		expect(ran()).toStrictEqual([[MAIN_MERGE]])
 		expect(error_lines.join('\n')).toContain(`stopped at main:merge (${SPLIT_REFUSAL})`)
 		expect(error_lines.join('\n')).toContain(
-			'issue `pnpm josh run:cut 5630` alone again, then rerun `pnpm josh run:chain 5630 --from review:selfcheck`',
+			'stop implementation, file the rest as a split child, issue `pnpm josh run:cut 5630` alone again, then rerun `pnpm josh run:chain 5630 --from review:selfcheck`',
 		)
 	})
 })

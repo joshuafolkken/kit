@@ -22,12 +22,16 @@ describe('split-assessment.md points to the split:assess command', () => {
 // joshuafolkken/kit#4302: the steps a run takes on the pre-gate notice live in one section, and the
 // notice points at exactly that heading.
 describe('split-assessment.md carries the pre-gate notice steps', () => {
-	it('has the section the notice names, with both actions', () => {
+	it('requires stopping, splitting the rest and shipping the green part (ac-816d7c3f)', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
 		expect(document).toContain(`## ${split_assess.NOTICE_SECTION}`)
-		expect(document).toContain('Keep it one Issue')
-		expect(document).toContain('Carve the rest out')
+		expect(document).toContain('Stop implementation before')
+		expect(document).toContain('Keep only the green part')
+		expect(document).toContain('pnpm josh issue:file --route split --found-during <N>')
+		expect(document).toContain('gate and ship the green part')
+		expect(document).toContain('`split-unresolved` even with a')
+		expect(document).not.toContain('Keep it one Issue')
 	})
 })
 
