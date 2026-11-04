@@ -6,6 +6,7 @@ import { z } from 'zod'
 const DECISION_PREFIX = 'josh-openai-lane-supervisor-decision-'
 const APPROVAL_POLL_MS = 50
 const APPROVAL_POLL_LIMIT = 200
+// Approval polling starts after claim; cold start consumes only the dispatcher's claim window.
 const schema = z.object({
 	nonce: z.string(),
 	decision: z.enum(['approved', 'cancelled']),
@@ -40,19 +41,24 @@ function cancel(lane_directory: string, nonce: string): boolean {
 	return decide(lane_directory, nonce, 'cancelled')
 }
 
-async function is_approved(lane_directory: string, nonce: string): Promise<boolean> {
-	const decision = await poll.poll_for(() => read(lane_directory, nonce)?.decision, {
+async function wait_for_decision(
+	lane_directory: string,
+	nonce: string,
+): Promise<Decision['decision'] | undefined> {
+	return await poll.poll_for(() => read(lane_directory, nonce)?.decision, {
 		attempts: APPROVAL_POLL_LIMIT,
 		interval_ms: APPROVAL_POLL_MS,
 	})
+}
 
-	return decision === 'approved'
+async function is_approved(lane_directory: string, nonce: string): Promise<boolean> {
+	return (await wait_for_decision(lane_directory, nonce)) === 'approved'
 }
 
 function remove(lane_directory: string, nonce: string): void {
 	stamp_file.remove_stamp(target(lane_directory, nonce))
 }
 
-const openai_lane_supervisor_decision = { approve, cancel, is_approved, remove }
+const openai_lane_supervisor_decision = { approve, cancel, is_approved, remove, wait_for_decision }
 
 export { openai_lane_supervisor_decision }

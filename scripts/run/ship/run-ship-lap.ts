@@ -85,7 +85,7 @@ function environment(parent: string): Record<string, string> {
 // split (`run-ship-scoped.ts`), and the tree a gate reused.
 type LapNote = Pick<
 	ShipLapRecord,
-	'fallback' | 'rerun' | 'reused_tree' | 'runs' | 'named' | 'unsplit'
+	'fallback' | 'rerun' | 'reused_tree' | 'runs' | 'named' | 'unsplit' | 'is_reused'
 >
 
 function lap_of(current: LapScope, step: string, started_ms: number, note: LapNote): ShipLapRecord {

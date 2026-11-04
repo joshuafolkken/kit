@@ -3,7 +3,6 @@ import path from 'node:path'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
-import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green, type FallbackReason } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -20,6 +19,7 @@ import { test_related_run } from './test-related-run'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
+import { test_related_verdict } from './test-related-verdict'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
 // The narrowing itself is `test-related-scope.ts` over the shared
@@ -373,19 +373,26 @@ async function run_touched(given: ReadonlyArray<string>): Promise<number> {
 
 // A green run records the tree it was green on, a red one the files it failed on
 // (`test-related-red.ts`), so the run after a fix reads only those and what moved.
-async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
-	if (given.includes(test_related_touched.TOUCHED_FLAG)) return await run_touched(given)
-
+async function run_fresh(
+	given: ReadonlyArray<string>,
+	tree: GateTree | undefined,
+): Promise<number> {
 	const { KEEP_WHOLE_SUITE_FLAG } = gate_labels
 	const command_arguments = given.filter((argument) => argument !== KEEP_WHOLE_SUITE_FLAG)
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const before = await scoped_green.read_before(command_arguments)
+	const before = command_arguments.length === 0 ? tree : undefined
 	const is_whole = given.includes(KEEP_WHOLE_SUITE_FLAG)
 	const input = await read_run_input(root, command_arguments, is_whole, before)
 
 	report_unhanded(root, command_arguments, input)
 
 	return await test_related_run.run_and_vouch(input, command_arguments, before)
+}
+
+async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
+	if (given.includes(test_related_touched.TOUCHED_FLAG)) return await run_touched(given)
+
+	return await test_related_verdict.run(given, async (before) => await run_fresh(given, before))
 }
 
 const test_related = { reaches_tests, run_related_tests }

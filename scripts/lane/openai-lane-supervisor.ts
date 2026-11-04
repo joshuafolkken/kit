@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
+import { session_cite } from '#scripts/issue/session-cite'
 import { process_identity } from '#scripts/josh/process-identity'
 import { poll } from '#scripts/lib/poll'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
@@ -17,7 +18,7 @@ import { openai_lane_supervisor_owner, type SupervisorOwner } from './openai-lan
 
 const { claim, read_state, release, update } = openai_lane_supervisor_owner
 const CHILD_POLL_MS = 250
-const SUPERVISOR_SCRIPT = fileURLToPath(new URL('openai-lane-supervisor-cli.ts', import.meta.url))
+const SUPERVISOR_SCRIPT = fileURLToPath(new URL('openai-lane-supervisor-entry.ts', import.meta.url))
 
 function handed_off(cut: RunCut | undefined, issue: string): boolean {
 	return (
@@ -178,12 +179,23 @@ async function run_claimed(
 	return await run_generations({ lane, profile, owner, is_resume, epoch })
 }
 
+async function is_approved(lane: LaneInfo, nonce: string): Promise<boolean> {
+	const decision = await openai_lane_supervisor_decision.wait_for_decision(lane.directory, nonce)
+	if (decision === 'approved') return true
+	const reason =
+		decision === 'cancelled' ? 'late claim — dispatcher cancelled' : 'approval timed out'
+
+	console.error(`OpenAI supervisor ${session_cite.issue(lane.issue)}: ${reason}; exiting`)
+
+	return false
+}
+
 async function supervise(lane: LaneInfo, profile: AgentProfile, nonce: string): Promise<number> {
 	const owner = claim(lane.issue, lane.directory, nonce)
 	if (owner === undefined) return 0
 
 	try {
-		if (!(await openai_lane_supervisor_decision.is_approved(lane.directory, nonce))) return 0
+		if (!(await is_approved(lane, nonce))) return 0
 
 		return await lane_session_broker.with_server(
 			lane,
