@@ -67,6 +67,15 @@ function lane_log(root: string, name: number): string {
 describe('run_board_quota_read.claude_files by provider', () => {
 	const root_of = temporary_root()
 
+	it('reads rate limit events from a handoff log', async () => {
+		const file = path.join(root_of(), 'josh-run-handoff-log-6318-fullrun-1.log')
+		const handoff = await launched(file, 100, [ANTHROPIC, CLAUDE_EVENT])
+		const found = await claude_files(root_of())
+
+		expect(found.map((entry) => entry.path)).toEqual([handoff])
+		expect(claude_reading(await readFile(handoff, 'utf8'))?.windows).toHaveLength(2)
+	})
+
 	it('passes over logs whose last launch ran Codex, so an older Claude log still reads', async () => {
 		const root = root_of()
 		const claude = await launched(lane_log(root, 1), 100, [ANTHROPIC, CLAUDE_EVENT])
