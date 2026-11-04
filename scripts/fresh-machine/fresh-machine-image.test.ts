@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { package_path } from '#scripts/init/init-paths'
+import { pnpm_installer } from '#scripts/lib/pnpm-installer'
 import { describe, expect, it } from 'vitest'
 import { fresh_machine_image } from './fresh-machine-image'
 
@@ -20,6 +21,22 @@ function guide_commands(): Array<string> {
 		.slice(1)
 		.filter((line) => line.trim() !== '' && !line.startsWith('#'))
 }
+
+describe('fresh_machine_image installer guides', () => {
+	it('uses the shared verified installer in every maintained install guide', () => {
+		const guides = [
+			PREREQUISITES,
+			'docs/maintainers/fresh-machine.md',
+			'docs/maintainers/guide-verification.md',
+		]
+
+		for (const guide of guides) {
+			expect(readFileSync(package_path(guide), 'utf8')).toContain(pnpm_installer.command())
+		}
+
+		expect(fresh_machine_image.dockerfile(false)).toContain(`RUN ${pnpm_installer.command()}`)
+	})
+})
 
 describe('fresh_machine_image.dockerfile', () => {
 	it('reads at least the three commands of the guide', () => {
@@ -47,7 +64,7 @@ describe('fresh_machine_image.dockerfile', () => {
 		const dockerfile = fresh_machine_image.dockerfile(false)
 
 		expect(dockerfile).not.toContain('apt-get')
-		expect(dockerfile).not.toContain('git')
+		expect(dockerfile).not.toMatch(/\bgit\b/u)
 	})
 
 	it('installs git, procps and gh as root, before the user exists, for a GitHub scenario', () => {
