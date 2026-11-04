@@ -90,17 +90,19 @@ from, printed in the session language. Relay all four sections as printed, with 
 
 ### Resolve what the plan can resolve
 
-**Settle every `needs-decision` issue the plan listed in one pass** — after the first offer is fine,
-since a labelled issue is never offered — from one `pnpm josh issue:read <N>
-<N> …` call (`issue-comments.md`):
+**Run `pnpm josh backlog:triage --pass`** after the first offer and follow its one stdout command.
+It settles mechanical lane candidates and batches the remaining judgments and `needs-decision`
+issues into one body-and-comments read. After recording answers, repeat it with `--exclude <N>`
+for decisions left parked in this pass; when none remain it prints `pnpm josh backlog:plan --waves`.
+The reader supplies semantic evidence; the command cannot infer a person's answer or prove a main failure:
 
 - **An answer already in the issue** — record it as a comment and **remove the label** with `pnpm josh run:park <N> --clear` (Tier A).
   **Never measure in order to decide**: a question needing a benchmark or a run stays labelled.
 - **A person's judgement** — apply `needs-decision` (`backlogrun-park.md` → "Only a person's judgement
   carries `needs-decision`").
 - **Order and isolate** — a native `blocked-by` where one must land first (`--blocked-by <M>`);
-  `run:solo` on all three `backlogrun-lanes.md` → "A solo run" conditions, **every other one
-  `run:lane`**, in one call with the reason (`--clear` folds in the answered park): `pnpm josh backlog:triage`
+  the label from `pnpm josh backlog:triage --decide` (`backlogrun-lanes.md` → "A solo run"),
+  in one call with the reason (`--clear` folds in the answered park): `pnpm josh backlog:triage`
   (`docs/josh-commands-backlog.md` → "`josh backlog:triage`").
 - **`priority:critical` / `priority:high`** are applied at filing by `pnpm josh issue:file` from the
   body's `- 優先度:` declaration (`issue-template.md`); **only a person removes them**.
@@ -120,7 +122,7 @@ run `run:carry --begin`; act on the row, then end the turn:
 
 | Handed back | What the session does |
 | --- | --- |
-| `triage` | Answer each issue stderr names with `pnpm josh backlog:triage --apply <N> --lane\|--solo --reason "<why>"` (`--blocked-by <M>` where `#M` must land first, with or without the label) |
+| `triage` | Run `pnpm josh backlog:triage --pass` and follow its next command; record the answers with `--apply` as above |
 | `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` |
 | `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** |
 | `launch #N` | Read the lane's log and park `#N` |

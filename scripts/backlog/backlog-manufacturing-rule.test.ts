@@ -270,6 +270,11 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 // `read_unwrapped` collapses whitespace, so every marker here is written as the single line the
 // wrapped source reads as — which is also why a hard-wrapped sentence can be pinned at all.
 const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
+	{ doc: LANES_DOC, marker: 'pnpm josh backlog:triage --decide --defect <answer>' },
+	{
+		doc: '.claude/skills/workflow-commands/backlogrun-steps.md',
+		marker: 'pnpm josh backlog:triage --pass',
+	},
 	{
 		doc: LANES_DOC,
 		marker:
