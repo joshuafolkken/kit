@@ -223,6 +223,10 @@ function slot_prompt(
 }
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
+function final_opening(brief_path: string): string {
+	return `${round_one_opening(brief_path)} This is the final round-2 verification pass; read the scope the brief names. Do not edit any file.`
+}
+
 function verification_prompt(
 	brief_path: string,
 	slot: ReviewSlot,
@@ -230,10 +234,7 @@ function verification_prompt(
 	findings_path?: string,
 ): string {
 	return [
-		`${review_prompt_level.opening(brief_path)}Review this checkout as a /code-review — the round-2 verification pass over the round-1 fixes: read the`,
-		`review brief at ${brief_path} and follow it exactly — the level on its first line, the rubric it`,
-		'names, the checkout it pins and its review:attest step. Do not edit any file.',
-		IN_SESSION_CLAUSE,
+		final_opening(brief_path),
 		issue_read_instruction(issue),
 		...review_prior_findings.prompt_clauses(issue),
 		findings_instruction(slot, '', findings_path),
@@ -392,6 +393,7 @@ function round_two_outcome(verdict: ScoredVerdict): RoundOutcome {
 }
 
 const run_ship_review = {
+	final_opening,
 	FIXED_PREFIX,
 	OTHER_SITES_CLAUSE,
 	SWEEP_INSTRUCTION,

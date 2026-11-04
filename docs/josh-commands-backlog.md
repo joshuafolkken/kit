@@ -975,6 +975,7 @@ Print the whole /code-review invocation: level, what the gate already proved, ta
 ```bash
 pnpm josh review:brief                       # round 1
 pnpm josh review:brief --round 2             # verification pass, scoped to the fix delta
+pnpm josh review:brief --full-change         # final round 2 over the whole change
 pnpm josh review:brief --interaction         # the interaction review of a run-tooling change
 pnpm josh review:brief --level-only          # the level alone (pre-commit review)
 pnpm josh review:brief --level-only --json   # level and reason, machine-readable
@@ -982,13 +983,14 @@ pnpm josh review:brief --level-only --json   # level and reason, machine-readabl
 
 **Options:**
 
+- `--full-change` — final round 2 over the whole change (no `--round` or `--interaction`).
 - `--round 2` — target is round 1's fixes and nothing else (widened back to the whole change when the record's change base no longer matches).
 - `--level-only` — print the level alone (level to stdout, reason to stderr); bypasses the scoped-green refusal.
 - `--staged` / `--json` — the staged diff; machine-readable level and reason.
 
 <!-- /usage -->
 
-Pass the output to `/code-review`; the level is on line one. It refuses to compose a brief when the scoped checks have never been green on this tree; run `pnpm josh lint:related && pnpm josh test:related`, then reissue. Pass the `reviewer` profile it prints (model and effort) explicitly to the review subagent.
+Pass output to `/code-review` with its reviewer model and effort; line one is the level. If scoped checks are not green on this tree, run `pnpm josh lint:related && pnpm josh test:related` and reissue.
 
 #### The review level
 
