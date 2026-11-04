@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
@@ -19,6 +18,7 @@ import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinne
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_early_push } from './run-review-early-push'
 import { run_review_join_read, type JoinVerdict } from './run-review-join-read'
+import { run_review_join_ready } from './run-review-join-ready'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
@@ -311,7 +311,8 @@ function report_timing(timing: ReviewTiming | undefined): void {
 }
 
 async function run_join(is_fixing = false): Promise<number> {
-	const state = await run_review_steps.wait_for_gate_finish()
+	const ready = await run_review_join_ready.read(is_fixing)
+	const state = await run_review_join_ready.gate_state(ready)
 	const timing = run_review_steps.complete_timing({
 		gate_ended_at: gate_ended_at(settled_note(state) !== undefined),
 		review_ended_at: now_iso(),
@@ -321,9 +322,9 @@ async function run_join(is_fixing = false): Promise<number> {
 	report_timing(timing)
 
 	// An unpinned change stops the round whatever the gate answered; a tree a fix moved is checked again.
-	const is_unpinned = await show_pinned(run_review_join_read.read(PROJECT_ROOT, is_fixing))
+	const is_unpinned = await show_pinned(run_review_join_ready.verdict(ready, is_fixing))
 
-	await check_related_unplanned.show()
+	await run_review_join_ready.show_unplanned(ready)
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
 }
