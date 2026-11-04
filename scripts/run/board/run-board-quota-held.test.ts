@@ -280,7 +280,7 @@ describe('run_board_quota_held.quota_reader — a newest file holding no reading
 })
 
 describe('run_board_quota_held.quota_reader — lane metadata', () => {
-	it('reads done heads for lane metadata without changing the spend per file', async () => {
+	it('reads done heads for lane metadata and shares the spend per lane', async () => {
 		const { files, ports } = fixture_of()
 		const lane_of = vi.fn(() => '6375')
 
@@ -293,7 +293,7 @@ describe('run_board_quota_held.quota_reader — lane metadata', () => {
 		const { codex } = await quota_reader(ports)()
 
 		expect(lane_of.mock.calls).toEqual([['a_log'], ['b_log']])
-		expect(codex?.per_task).toEqual({ [WINDOW.minutes]: 8 })
+		expect(codex?.per_task).toEqual({ [WINDOW.minutes]: 16 })
 	})
 })
 

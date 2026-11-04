@@ -374,6 +374,7 @@ async function record_review(
 
 	if (is_snapshot_written) await review_code_tree.record(Object.keys(tree), commit)
 	record_briefed(tree, commit)
+	review_round.record(round)
 }
 
 // An interaction brief records nothing: the round-one and briefed stamps describe `/code-review`'s
