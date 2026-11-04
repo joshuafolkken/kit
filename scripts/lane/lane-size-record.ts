@@ -1,5 +1,4 @@
-import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { size_estimate } from '#scripts/issue/size-estimate'
+import { issue_declared_size } from '#scripts/issue/issue-declared-size'
 import { split_measure } from '#scripts/split/split-measure'
 import { lane_ledger_write } from './lane-ledger-write'
 
@@ -8,17 +7,8 @@ import { lane_ledger_write } from './lane-ledger-write'
 // against real lanes (joshuafolkken/kit#5384). Best-effort, like every ledger line: an unreadable
 // Issue, an Issue with no estimate or an unmeasurable branch records nothing and never blocks a merge.
 
-async function declared_of(issue: string): Promise<{ files: number; lines: number } | undefined> {
-	const read = await git_gh_command.issue_get_body_classified(issue)
-
-	if (read.kind !== 'read' || read.text === undefined) return undefined
-	const estimate = size_estimate.declared_size(read.text)
-
-	return estimate === undefined ? undefined : { files: estimate.files, lines: estimate.lines }
-}
-
 async function measure_and_record(issue: string): Promise<void> {
-	const declared = await declared_of(issue)
+	const declared = await issue_declared_size.read(issue)
 
 	if (declared === undefined) return
 	const { files, lines } = await split_measure.read_branch()

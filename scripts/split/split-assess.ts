@@ -27,6 +27,12 @@ interface SizeMeasurement {
 	verdict: SplitVerdict
 }
 
+// A size as an Issue declares it, or as a bar a measurement is compared with.
+interface DeclaredSize {
+	files: number
+	lines: number
+}
+
 // The guide's single source: `split-assessment.md` states these once and a test pins the two equal.
 // Strictly greater than: "more than" puts the bar above the number, not at it. Lowered from 10 / 400
 // once a lane estimated at 6 files / 250 lines merged at about 23 files / 390 lines (joshuafolkken/kit#5384).
@@ -116,14 +122,56 @@ const SPLIT_TAIL =
 	'over the guide — the size condition for a split is met (separability is a separate judgement)'
 const SINGLE_TAIL = 'under the guide on both axes — one Issue, however separable'
 
+// What was counted. Test files are already dropped from the counts, so the text says so.
+function counted(measurement: SizeMeasurement): string {
+	return `${String(measurement.files)} changed file(s), ${String(measurement.lines)} changed line(s), tests excluded`
+}
+
+const GUIDE_TEXT = `guide ${String(FILE_GUIDE)} files / ${String(LINE_GUIDE)} lines`
+
 // The sentence printed on stderr: what was counted, against which guide, and what the verdict does
-// and does not mean. Test files are already dropped from the counts, so the reason says so.
+// and does not mean.
 function reason(measurement: SizeMeasurement): string {
-	const counted = `${String(measurement.files)} changed file(s), ${String(measurement.lines)} changed line(s), tests excluded`
-	const guide = `guide ${String(FILE_GUIDE)} files / ${String(LINE_GUIDE)} lines`
 	const tail = measurement.verdict === SPLIT_VERDICT ? SPLIT_TAIL : SINGLE_TAIL
 
-	return `${counted} (${guide}) — ${tail}`
+	return `${counted(measurement)} (${GUIDE_TEXT}) — ${tail}`
+}
+
+interface NoticeBar extends DeclaredSize {
+	text: string
+}
+
+const GUIDE_BAR: NoticeBar = { files: FILE_GUIDE, lines: LINE_GUIDE, text: GUIDE_TEXT }
+
+// The declared size grown by `DECLARED_GROWTH_FACTOR`, each axis capped at the guide: a large
+// declaration never lifts the bar past the guide, which the notice held before the declaration counted.
+function grown_bar(declared: DeclaredSize): NoticeBar {
+	const grown_files = declared.files * DECLARED_GROWTH_FACTOR
+	const grown_lines = declared.lines * DECLARED_GROWTH_FACTOR
+	const files = Math.min(grown_files, FILE_GUIDE)
+	const lines = Math.min(grown_lines, LINE_GUIDE)
+	const capped = files < grown_files || lines < grown_lines ? ', capped at the guide' : ''
+	const declaration = `declared ${String(declared.files)} files / ${String(declared.lines)} lines`
+
+	return {
+		files,
+		lines,
+		text: `${declaration} × ${String(DECLARED_GROWTH_FACTOR)}${capped} = ${String(files)} files / ${String(lines)} lines`,
+	}
+}
+
+// The bar the notice fires past (joshuafolkken/kit#6206): the Issue's declared size grown, as
+// `lane:plan` grows it, so a lane that outgrows its own declaration is told so even under the guide.
+// No declaration, one with a zero axis, or one whose grown size reaches the guide is the guide.
+function is_sized(declared: DeclaredSize | undefined): declared is DeclaredSize {
+	return declared !== undefined && declared.files > 0 && declared.lines > 0
+}
+
+function notice_bar(declared: DeclaredSize | undefined): NoticeBar {
+	if (!is_sized(declared)) return GUIDE_BAR
+	const bar = grown_bar(declared)
+
+	return bar.files === FILE_GUIDE && bar.lines === LINE_GUIDE ? GUIDE_BAR : bar
 }
 
 // The `split-assessment.md` headings the notice and a filing refusal point at; the document-rule test
@@ -135,12 +183,14 @@ const QUESTION_SECTION = 'The question'
 const REASON_PREFIX = '- 分割しない理由:'
 const NOTICE_ACTION = `record why it stays one Issue in an Issue comment line \`${REASON_PREFIX} <理由>\`, or carve the rest out with \`pnpm josh issue:file --route split\` — split-assessment.md → "${NOTICE_SECTION}"`
 
-// The pre-gate notice `josh main:merge` prints for a diff over the guide — the `split` verdict, so the
-// one bar this file draws is the one the notice fires on, and a diff under it prints nothing.
-function notice(measurement: SizeMeasurement): string | undefined {
-	if (measurement.verdict !== SPLIT_VERDICT) return undefined
+// The pre-gate notice `josh main:merge` prints for a diff past `notice_bar` on either axis — strictly
+// greater than, as the guide is — and a diff at or under it prints nothing.
+function notice(measurement: SizeMeasurement, declared?: DeclaredSize): string | undefined {
+	const bar = notice_bar(declared)
 
-	return `split notice: ${reason(measurement)}. Before the run:cut, ${NOTICE_ACTION}`
+	if (measurement.files <= bar.files && measurement.lines <= bar.lines) return undefined
+
+	return `split notice: ${counted(measurement)} (${bar.text}) — over the bar. Before the run:cut, ${NOTICE_ACTION}`
 }
 
 const split_assess = {
@@ -162,5 +212,5 @@ const split_assess = {
 	verdict_for,
 }
 
-export type { FileChange, SizeMeasurement, SplitVerdict }
+export type { DeclaredSize, FileChange, SizeMeasurement, SplitVerdict }
 export { split_assess }

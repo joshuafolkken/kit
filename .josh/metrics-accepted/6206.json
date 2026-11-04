@@ -1,0 +1,8 @@
+{
+	"reason": "Review round 1: cap the declared bar at the guide per axis and keep the declared size beside the notice marker so scoped checks read the Issue once; the doc Trigger line names the cap",
+	"date": "2026-11-04",
+	"growth": {
+		"scripts.code_lines": 64,
+		"ai_cost.on_demand_bytes": 84
+	}
+}
