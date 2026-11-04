@@ -1,6 +1,7 @@
 // cspell:words coderabbit coderabbitai
 import { ai_review_pull_comment_schema } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
+import { gh_comment_input } from './gh-comment-input'
 import {
 	classify_ai_review_comments,
 	type ClassifiedFinding,
@@ -35,9 +36,11 @@ function to_review_comment(raw: AiReviewPullComment): ReviewComment {
 }
 
 function format_ai_review_finding(finding: ClassifiedFinding): string {
-	const suffix = finding.url === undefined ? '' : ` — ${finding.url}`
-
-	return `- ${finding.author_login}: ${finding.summary}${suffix}`
+	return gh_comment_input.format({
+		author: finding.author_login,
+		body: finding.summary,
+		url: finding.url,
+	})
 }
 
 // Temporary: CodeRabbit findings are surfaced as console info and audit notes for the
@@ -52,7 +55,7 @@ function log_info_findings(infos: ReadonlyArray<ClassifiedFinding>): Array<strin
 		console.warn(format_ai_review_finding(info))
 	}
 
-	return infos.map((info) => `CodeRabbit skipped (kit#753): ${info.summary}`)
+	return infos.map((info) => `CodeRabbit skipped (kit#753): ${format_ai_review_finding(info)}`)
 }
 
 function build_ai_review_blocker_body(blockers: ReadonlyArray<ClassifiedFinding>): string {
@@ -76,7 +79,7 @@ function build_ai_review_ignore_comment(
 	]
 
 	for (const blocker of blockers) {
-		lines.push(`- ${blocker.author_login}: ${blocker.summary} (${blocker.url ?? 'no-url'})`)
+		lines.push(format_ai_review_finding(blocker))
 	}
 
 	return lines.join('\n')
