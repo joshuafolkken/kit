@@ -20,6 +20,11 @@ const BRANCH_DATA = path.join('docs', 'guide.md')
 const DATA_READER = path.join('scripts', 'document', 'guide-reader.ts')
 const COMPONENT = path.join('src', 'lib', 'Card.svelte')
 const NOTHING_LEFT = { left: [], shared: [], meeting: [] }
+const { FAILURE } = test_related_synced
+
+function failed(failure: string): object {
+	return { ...NOTHING_LEFT, failure }
+}
 
 // The files whose imports reach each file, the file itself included: the shared test reaches the
 // synced module through a helper, and reads the branch's data file through a recorded reader.
@@ -143,11 +148,12 @@ describe('test_related_synced.split — what it splits', () => {
 
 		await expect(
 			test_related_synced.split(ROOT, [synced], [BRANCH_MODULE, SYNCED_MODULE], MAP),
-		).resolves.toEqual(NOTHING_LEFT)
+		).resolves.toEqual(failed(FAILURE.NOTHING_VOUCHED))
 		expect(create).not.toHaveBeenCalled()
 	})
 })
 
+// joshuafolkken/kit#6185: each way the split leaves nothing out says why, for `josh ship` to log.
 describe('test_related_synced.split — where it leaves nothing out', () => {
 	it.each([
 		['the branch change cannot be read', undefined, MAP],
@@ -158,25 +164,37 @@ describe('test_related_synced.split — where it leaves nothing out', () => {
 		with_graph()
 
 		await expect(test_related_synced.split(ROOT, [SYNCED_MODULE], branch, map)).resolves.toEqual(
-			NOTHING_LEFT,
+			failed(FAILURE.OWN_UNREAD),
 		)
 	})
 
 	it('when the work tree holds a component the graph cannot follow', async () => {
 		with_graph([COMPONENT])
 
-		await expect(split([BRANCH_MODULE])).resolves.toEqual(NOTHING_LEFT)
+		await expect(split([BRANCH_MODULE])).resolves.toEqual(
+			failed(`${FAILURE.UNRESOLVED}: ${COMPONENT}`),
+		)
 	})
 
 	it('when building the graph fails', async () => {
 		vi.spyOn(import_graph, 'create').mockRejectedValue(new Error('not a git repository'))
 
-		await expect(split([BRANCH_MODULE])).resolves.toEqual(NOTHING_LEFT)
+		await expect(split([BRANCH_MODULE])).resolves.toEqual(
+			failed(`${FAILURE.THREW}: not a git repository`),
+		)
 	})
 
 	it('where no graph can be built', async () => {
 		vi.spyOn(import_graph, 'create').mockResolvedValue(undefined)
 
-		await expect(split([BRANCH_MODULE])).resolves.toEqual(NOTHING_LEFT)
+		await expect(split([BRANCH_MODULE])).resolves.toEqual(failed(FAILURE.NO_GRAPH))
+	})
+
+	it('carries no failure where the graph split', async () => {
+		with_graph()
+
+		const result = await split([BRANCH_MODULE])
+
+		expect(result.failure).toBeUndefined()
 	})
 })
