@@ -34,18 +34,7 @@ the green part `budget-over` reads:
 pnpm josh run:cut <N>
 ```
 
-- `cut` (0) — record written and handed to the lane's launch owner (OpenAI supervisor starts the
-  successor after this process exits; Anthropic relaunches directly). **End the turn immediately.**
-- `under-threshold` (0) — the newest request's billed input is under the `pnpm josh cost --cut` threshold; **continue to the gate.**
-- `not-a-lane` (0) — not a dispatched child. **Continue to the gate.**
-- `unready` (1) — the tree is clean or on the default branch. Continue to the gate.
-- `busy` (1) — a cut is already in flight for this tree. Do not relaunch.
-- `failed` (1) — no live OpenAI supervisor, or the Anthropic relaunch could not start. Continue.
-- `unknown` (1) — the git directory could not be read. Continue to the gate.
-- `split-unresolved` (1) — `split-assessment.md` → "Over the guide before the gate".
-- `budget-over` (0) — implement past its stage budget with a criterion checked; nothing was cut. Run
-  what it prints, then continue to the gate on this tree.
-
+**Follow the printed `next:` line.** The verdict stays on stdout; its next action is on stderr.
 **`cut` is the only verdict that ends the turn.**
 
 ### The gate refuses until the cut has been taken

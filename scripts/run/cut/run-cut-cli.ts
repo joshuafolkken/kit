@@ -19,6 +19,7 @@ import { run_cut_budget } from './run-cut-budget'
 import { run_cut_decline } from './run-cut-decline'
 import { run_cut_digest } from './run-cut-digest'
 import { run_cut_handoff } from './run-cut-handoff'
+import { run_cut_next } from './run-cut-next'
 import { run_cut_ready } from './run-cut-ready'
 import { run_cut_report } from './run-cut-report'
 import { run_cut_resume } from './run-cut-resume'
@@ -358,6 +359,14 @@ function refuse(): number {
 	return FAILURE_EXIT_CODE
 }
 
+function print_next(request: Request): void {
+	if (request.kind !== 'cut' || request.is_implementation || agent_session_role.is_reviewer()) {
+		return
+	}
+
+	run_cut_next.print_next(last_verdict(), request.issue)
+}
+
 // Every path out prints exactly one token, including the ones nobody planned: an empty standard
 // output matches no verdict, which a resume entry check reads as "not a resume" and would let a fresh
 // process re-implement over a cut it should have carried. The token stays `unknown`, and the failure
@@ -375,6 +384,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return await answer(request)
 	} catch (error) {
 		return report_fault(run_cli_fault.message(COMMAND, error))
+	} finally {
+		print_next(request)
 	}
 }
 
