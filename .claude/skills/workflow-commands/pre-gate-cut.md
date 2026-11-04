@@ -4,8 +4,8 @@ The **pre-gate cut**: a dispatched lane child ends its process the moment implem
 **fresh** process resumes the same lane from the gate onward, without the implementation's accumulated
 context.
 
-`run:cut` takes the boundary, `run:cut --resume` is the fresh
-process's entry check. A second boundary — the implementation-phase cut, _during_ implementation — is
+`run:cut` takes the boundary; `run:entry` checks it internally with `run:cut --resume` for the fresh
+process. A second boundary — the implementation-phase cut, _during_ implementation — is
 below; it states only what differs.
 
 ## Where the boundary is
@@ -56,13 +56,14 @@ row: `prompts/collaboration-workflow/rule-delivery.md`.
 
 ## Resuming — the fresh process's entry check
 
-A fresh `fullrun #<N>` runs this **at its entry, before `run:hold` and the session-boundary check**:
+`fullrun #<N>` enters once. It checks the carried cut internally
+**before `run:hold` and the session-boundary check**; never call `run:cut --resume` separately:
 
 ```bash
-pnpm josh run:cut --resume <N>
+pnpm josh run:entry <N>
 ```
 
-- `fresh` (0) — an ordinary run; normal entry.
+- `fresh` (0) — normal entry completes; follow its stage and entry report.
 - `resume` (0) — a verified pre-gate cut. **Skip the title, the plan, the fresh hold claim and the
   implementation**; re-read the issue body and comments, then go straight to `pnpm josh gate`.
 - `resume-impl` (0) — the cut was taken **during** implementation. Skip the title, the plan, the
