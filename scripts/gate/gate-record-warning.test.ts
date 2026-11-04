@@ -25,6 +25,7 @@ const VITE_DEPRECATION =
 	"(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`.\n" +
 	'Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.'
 const ESLINT_WARNING = 'src/a.ts:1:1  warning  Unexpected console statement'
+const PNPM_HEADER = '$ node --disable-warning=ExperimentalWarning tools/josh/josh-ready.ts lint'
 const EXPORTS_LABEL = 'exports'
 const UNIT_SKIP_NOTICE = `josh test:unit: vitest is not installed ${SKIP_MARKER} vitest unit tests.`
 
@@ -50,6 +51,26 @@ async function record_with(results: ReadonlyArray<GateStepResult>): Promise<void
 
 beforeEach(RECORDS.clear)
 afterEach(RECORDS.clear)
+
+describe('record_green_gate — pnpm script headers are not checker findings', () => {
+	it('writes the reusable record for a header containing ExperimentalWarning', async () => {
+		await record_with([green_saying(gate_labels.LINT_LABEL, PNPM_HEADER)])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeDefined()
+	})
+
+	it('withholds the record for a real warning following the header', async () => {
+		await record_with([green_saying(gate_labels.LINT_LABEL, `${PNPM_HEADER}\n${ESLINT_WARNING}`)])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+
+	it('withholds the record for an unverified skip following the header', async () => {
+		await record_with([green_saying(gate_labels.LINT_LABEL, `${PNPM_HEADER}\n${UNIT_SKIP_NOTICE}`)])
+
+		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
+	})
+})
 
 describe('record_green_gate — a benign warning does not withhold the record', () => {
 	it('writes the reusable record when a non-checker step forwarded a benign warning', async () => {
