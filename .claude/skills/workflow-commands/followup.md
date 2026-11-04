@@ -6,14 +6,13 @@ stops before the commit.
 
 ## Run `pnpm josh followup`
 
-Run it in the foreground after `pnpm josh git` and after every required review disposition:
+After `pnpm josh git` and required review dispositions, run:
 
 ```bash
 pnpm josh followup "<title> #<N>" --notify-message-file .josh/tmp/report.md
 ```
 
-The report uses the session language: plain `Cause:`, `Fix:` and `Result:` lines, then `Details:`
-bullets. Use the file option whenever it contains a command or path.
+Write the report in the session language; use the shape and file option in "The options" below.
 
 It waits for required CI, checks CodeRabbit and top-level AI review comments, sends the completion
 Telegram, merges by default, posts the Issue report, closes completed epics, removes `in-progress`,
@@ -39,7 +38,7 @@ A CI job red only on tests outside the change → `followup` reruns it once, aft
 when main moved a failed test (`scripts/followup/followup-main-move.ts`).
 
 After the merge `run:tail` returns to the default branch — `ship` runs it; after a bare `followup`, run
-`pnpm josh run:tail <N>`. In a lane the parent uses `pnpm josh lane:close <N>`. Never delete the branch unless requested. The sections below are read when the output needs reading.
+`pnpm josh run:tail <N>`. In a lane the parent uses `pnpm josh lane:close <N>`. Never delete the branch unless requested.
 
 ## The options
 
