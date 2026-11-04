@@ -1,4 +1,5 @@
 import { run_board_fit } from './run-board-fit'
+import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 
 // A row's title and the reason it makes room for — pure. A title is cut to the title column; a row
@@ -19,6 +20,11 @@ interface RowCut {
 }
 
 const WHOLE: RowCut = { title_limit: TITLE_LIMIT, reason_cut: 0 }
+const WHOLE_TAIL_STATES: ReadonlySet<string> = new Set(['stopped', 'parked', 'human'])
+
+function keeps_tail(row: BoardRow): boolean {
+	return WHOLE_TAIL_STATES.has(row.state) || row.reason?.icon === run_board_labels.STATE_ICONS.human
+}
 
 // A title cut to the title column, so every time after it starts in one column.
 function title_of(title = '', limit = TITLE_LIMIT): string {
@@ -101,7 +107,7 @@ function reason_fitted(
 ): string {
 	const text = draw({ title_limit, reason_cut: 0 })
 
-	if (row.state === 'stopped' || row.state === 'parked') return text
+	if (keeps_tail(row)) return text
 
 	const reason_cut = overrun_of(text, row.reason !== undefined, columns)
 

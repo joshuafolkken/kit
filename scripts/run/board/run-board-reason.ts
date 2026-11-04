@@ -294,6 +294,19 @@ function blocker_icon(child: EpicChild, pool: Pool): string {
 	return pool.withheld.has(child.number) ? STATE_ICONS.human : WAIT_ICONS.blocker
 }
 
+function blocker_reason(
+	child: EpicChild,
+	waits: ReadonlyArray<string>,
+	read: ReasonRead,
+	pool: Pool,
+): RowReason {
+	const tail = pool.withheld.has(child.number)
+		? read.plan.decision_waits?.get(child.number)
+		: undefined
+
+	return { icon: blocker_icon(child, pool), issues: waits, ...(tail !== undefined && { tail }) }
+}
+
 // `✋`: an issue nobody has judged, due and unblocked, held alone for its judgment while `backlog:next`
 // offers the triaged candidates (`epic-triage.ts`); `❓ 4183` where a blocker still stands, naming the
 // first, or `❓` alone where its start time is ahead.
@@ -310,7 +323,7 @@ function wait_of(
 	pool: Pool,
 ): RowReason | undefined {
 	if (!epic_triage.is_triaged(child)) return untriaged_of(child, waits, read)
-	if (waits.length > 0) return { icon: blocker_icon(child, pool), issues: waits }
+	if (waits.length > 0) return blocker_reason(child, waits, read, pool)
 
 	return not_before_of(child, read.now_ms) ?? offer_wait(child, read, pool)
 }

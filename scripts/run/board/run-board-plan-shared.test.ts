@@ -16,6 +16,8 @@ const MINUTE_MS = 60_000
 const AUTO_OK = 'auto-ok'
 
 const PLAN: BoardPlan = {
+	decision_questions: new Map([[2, 'Choose the account']]),
+	decision_waits: new Map([[3, '→ decide #2: Choose the account']]),
 	waves: {
 		waves: [
 			[{ number: 2, repo: REPO, state: 'OPEN', labels: [AUTO_OK], blocked_by: [], body: 'b' }],
