@@ -31,10 +31,7 @@ function confirms(line: string): boolean {
 }
 
 function asks(message: string): boolean {
-	return (
-		AWAITING_CONFIRMATION.test(message) ||
-		message.split('\n').some((line) => stop_decision.is_question(line))
-	)
+	return AWAITING_CONFIRMATION.test(message) || stop_decision.contains_question(message)
 }
 
 // The same fallback judges both the park and its event. Restrict it to the latest launch so an
