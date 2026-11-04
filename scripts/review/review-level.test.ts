@@ -14,25 +14,29 @@ describe('review_level.level_for', () => {
 		expect(review_level.level_for([CODE])).toBe(review_level.DEFAULT_LEVEL)
 	})
 
-	// One executable or instruction file in the diff decides the whole change: a review reads the
+	// One executable file without a size measurement decides the whole change: a review reads the
 	// change, not a subset of it.
 	it('keeps the default level when one non-inert path is mixed in', () => {
 		expect(review_level.level_for([EDITOR_SETTING, CODE])).toBe(review_level.DEFAULT_LEVEL)
 	})
 
-	// The opposite of what the "Non-runtime updates" testing exception does with documentation, and
-	// deliberately so: kit#963 and #965 were documentation-only and a `medium` review found ten real
-	// defects in each, in artifacts distributed to every consumer.
 	it.each([
 		RULES_DOCUMENT,
 		'AGENTS.md',
 		'prompts/review.md',
 		'.claude/skills/x/SKILL.md',
 		'docs/sync.md',
-	])('does not reduce the level for %s', (path) => {
-		expect(review_level.level_for([path])).toBe(review_level.DEFAULT_LEVEL)
+		'docs/example.txt',
+		'tests/fixtures/example.ts',
+		'prompts/example.txt',
+		'scripts/example.test.ts',
+		'tests/example.spec.ts',
+	])('reduces the level for %s', (path) => {
+		expect(review_level.level_for([path])).toBe(review_level.REDUCED_LEVEL)
 	})
+})
 
+describe('review level empty paths', () => {
 	// Answering `low` here would hand a reduced level to a caller that failed to read the diff.
 	it('keeps the default level for an empty diff', () => {
 		expect(review_level.level_for([])).toBe(review_level.DEFAULT_LEVEL)

@@ -151,6 +151,23 @@ describe('review_round2_cli.run', () => {
 
 		expect(decide).toHaveBeenCalledWith(expect.objectContaining({ base: BASE }))
 	})
+
+	it('skips the second round for a documentation fix on a closed low review', async () => {
+		plant_decision({ is_closed: true, reason: '' })
+		const document = 'docs/guide.md'
+
+		vi.mocked(review_tree.read_changed_tree).mockResolvedValue({ [document]: 'after' })
+		vi.mocked(review_stamps.round_one_stamp.read).mockReturnValue({
+			base: BASE,
+			taken_at: '',
+			files: { [document]: 'before' },
+		})
+		await review_round2_cli.run(['--json'])
+
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining('"round2":"skip","code":"low"'),
+		)
+	})
 })
 
 // joshuafolkken/kit#5286: round 1's closure is read from the ledger, for --record's issue or the
