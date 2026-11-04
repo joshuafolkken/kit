@@ -24,6 +24,8 @@ const MERGE_MEETS_BRANCH = "where the merge with the default branch meets this b
 const REUSED_PAIR = 'scoped pair: reused — both checks are green on this tree'
 
 type Phase = () => Promise<JoshResult>
+// A pair's result with the files it was named over, or why a merge could not split, for its lap.
+type PairResult = JoshResult & { note?: Pick<LapNote, 'named' | 'unsplit'> }
 
 async function run_phases(phases: ReadonlyArray<Phase>): Promise<JoshResult> {
 	let last: JoshResult = { code: SUCCESS_EXIT_CODE, out: '' }
@@ -98,10 +100,14 @@ async function named_files(
 async function unnamed_pair(
 	scripts: ReadonlyArray<string>,
 	sync: SyncReading | undefined,
-): Promise<JoshResult> {
-	if (sync?.unsplit !== undefined) printed(sync.unsplit)
+): Promise<PairResult> {
+	const unsplit = sync?.unsplit
 
-	return await bare_pair(scripts)
+	if (unsplit === undefined) return await bare_pair(scripts)
+
+	printed(run_ship_synced_scope.unsplit_line(unsplit))
+
+	return { ...(await bare_pair(scripts)), note: { unsplit } }
 }
 
 // A tree that moved while the checks ran — a reviewer's edit beside the gate — was not the one they
@@ -114,7 +120,7 @@ async function narrowed_or_bare(
 	tree: GateTree,
 	scripts: ReadonlyArray<string>,
 	sync: SyncReading | undefined,
-): Promise<JoshResult> {
+): Promise<PairResult> {
 	const named = await named_files(tree, scripts, sync)
 
 	if (named === undefined) return await unnamed_pair(scripts, sync)
@@ -128,10 +134,10 @@ async function narrowed_or_bare(
 		run_ship_narrowed.record(checks, tree)
 	}
 
-	return result
+	return { ...result, note: { named: named.files.length } }
 }
 
-async function stale_pair(tree: GateTree, scripts: ReadonlyArray<string>): Promise<JoshResult> {
+async function stale_pair(tree: GateTree, scripts: ReadonlyArray<string>): Promise<PairResult> {
 	const sync = await run_ship_synced_scope.read_sync(tree, scripts)
 	const settled = sync === undefined ? undefined : run_ship_synced_scope.settle(sync, tree)
 
@@ -151,7 +157,7 @@ async function stale_pair(tree: GateTree, scripts: ReadonlyArray<string>): Promi
 // base runs nothing when the merge shares nothing with the branch (`run-ship-synced-scope.ts`), and
 // only where the two meet when they do; a pair stale since this ship last met it green on this base
 // runs over what moved since (`run-ship-narrowed.ts`).
-async function settled_pair(): Promise<JoshResult> {
+async function settled_pair(): Promise<PairResult> {
 	const tree = await rerecorded_tree()
 	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
 
@@ -172,9 +178,9 @@ async function settled_pair(): Promise<JoshResult> {
 	return result
 }
 
-function pair_note(result: JoshResult): LapNote {
-	const reasons = since_green.fallbacks_of(result.out)
-	const run = run_ship_pair_runs.current()
+function pair_note({ out, note }: PairResult): LapNote {
+	const reasons = since_green.fallbacks_of(out)
+	const run = { ...run_ship_pair_runs.current(), ...note }
 
 	return reasons.length === 0 ? run : { ...run, fallback: reasons.join(', ') }
 }
