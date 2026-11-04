@@ -1,8 +1,10 @@
+import path from 'node:path'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
 import { lane_breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_laps } from './lane-breakdown-laps'
-import type { LedgerEntry } from './lane-ledger'
+import { lane_ledger, type LedgerEntry, type TestRelatedEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
 import { lane_stage_stats } from './lane-stage-stats'
@@ -18,6 +20,7 @@ const DEFAULT_MINUTES = 30
 // lane's run of a step sums into one row.
 const NOTE_LEAD = ' ('
 const COLUMNS = ['stage', 'total min', 'lanes', 'median min', 'open issues']
+const { SCOPED_PAIR } = run_ship_lap.STEP
 
 interface Sink {
 	name: string
@@ -81,13 +84,47 @@ function sinks_of(records: SinkRecords, issues: ReadonlyArray<number>): Array<Si
 		.toSorted((left, right) => total_ms(right) - total_ms(left))
 }
 
-function sink_row(sink: Sink, issues: ReadonlyArray<OpenIssue> | undefined): string {
+function is_test_related(entry: LedgerEntry): entry is TestRelatedEntry {
+	return entry.kind === lane_ledger.KIND.TEST_RELATED
+}
+
+// Each distinct hub the `test:related` runs of `issues` named past the reach cap, the first named first.
+function hubs_of(
+	entries: ReadonlyArray<LedgerEntry>,
+	issues: ReadonlyArray<number>,
+): Array<string> {
+	const named = entries
+		.filter((entry) => is_test_related(entry))
+		.filter((entry) => entry.issue !== undefined && issues.includes(entry.issue))
+		.map((entry) => entry.over_cap_hub)
+		.filter((hub) => hub !== undefined)
+
+	return [...new Set(named)]
+}
+
+// The open Issues that name stage `name`. The scoped pair stage is also known by the files that put
+// its `test:related` past the cap (joshuafolkken/kit#6198) — an Issue names a hub by its file name.
+function issues_cell(
+	name: string,
+	issues: ReadonlyArray<OpenIssue> | undefined,
+	hubs: ReadonlyArray<string>,
+): string {
+	const also = name === SCOPED_PAIR ? hubs.map((hub) => path.basename(hub)) : []
+
+	return lane_sinks_issues.cell(name, issues, also)
+}
+
+function sink_row(
+	sink: Sink,
+	issues: ReadonlyArray<OpenIssue> | undefined,
+	hubs: ReadonlyArray<string>,
+): string {
 	return lane_stats.to_row([
 		sink.name,
 		lane_stage_stats.cell(total_ms(sink)),
 		String(sink.per_lane_ms.length),
 		lane_stage_stats.cell(lane_stats.median(sink.per_lane_ms)),
-		lane_sinks_issues.cell(sink.name, issues),
+		issues_cell(sink.name, issues, hubs),
 	])
 }
 
@@ -99,16 +136,25 @@ function table(
 	minutes: number,
 	issues: ReadonlyArray<OpenIssue> | undefined,
 ): string {
-	const sinks = sinks_of(records, over_issues(records, window, minutes))
+	const lanes = over_issues(records, window, minutes)
+	const hubs = hubs_of(records.entries, lanes)
 
 	return [
 		lane_stats.to_row(COLUMNS),
 		lane_stats.to_row(COLUMNS.map(() => '---')),
-		...sinks.map((sink) => sink_row(sink, issues)),
+		...sinks_of(records, lanes).map((sink) => sink_row(sink, issues, hubs)),
 	].join('\n')
 }
 
-const lane_sinks = { DEFAULT_MINUTES, base_name, over_issues, sinks_of, table }
+const lane_sinks = {
+	DEFAULT_MINUTES,
+	base_name,
+	hubs_of,
+	issues_cell,
+	over_issues,
+	sinks_of,
+	table,
+}
 
 export { lane_sinks }
 export type { Sink, SinkRecords }

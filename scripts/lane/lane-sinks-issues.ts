@@ -27,12 +27,19 @@ async function read(): Promise<ReadonlyArray<OpenIssue> | undefined> {
 		: json_value.parse_with(outcome.json, open_issues_schema)
 }
 
-// The `#N` of each open Issue whose title contains `stage`, case-insensitively.
-function cell(stage: string, issues: ReadonlyArray<OpenIssue> | undefined): string {
+// The `#N` of each open Issue whose title contains `stage` or one of `also`, case-insensitively — `also`
+// carries the names a row is known by besides its stage, such as its over-cap hubs.
+function cell(
+	stage: string,
+	issues: ReadonlyArray<OpenIssue> | undefined,
+	also: ReadonlyArray<string> = [],
+): string {
 	if (issues === undefined) return UNREAD
 
-	const needle = stage.toLowerCase()
-	const named = issues.filter((issue) => issue.title.toLowerCase().includes(needle))
+	const needles = [stage, ...also].map((name) => name.toLowerCase())
+	const named = issues.filter((issue) =>
+		needles.some((needle) => issue.title.toLowerCase().includes(needle)),
+	)
 
 	return named.length === 0
 		? NONE

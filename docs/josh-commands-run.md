@@ -1210,7 +1210,9 @@ lanes over that many net minutes, the total, the lane count and the median per l
 (`lane-sinks.ts`).
 
 The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive), from one
-listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`).
+listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`). The `scoped pair`
+row also lists each one whose title contains the file name of an `over_cap_hub` the `test-related` runs of those
+lanes recorded.
 
 `--over <minutes>` prints one row per merged lane of the period over that many net minutes, the longest first: its
 net and waited minutes, the ledger chain behind them, its longest stage and the open Issues that stage matches as
