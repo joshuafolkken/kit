@@ -20,7 +20,7 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 }))
 
 vi.mock('#scripts/version/latest-scope-cli', () => ({
-	latest_scope_cli: { decide: decide_mock },
+	latest_scope_cli: { scope_decision: decide_mock },
 }))
 
 vi.mock('./run-prep-locate', () => ({
