@@ -59,6 +59,19 @@ function minutes_of(
 }
 
 describe('lane_breakdown_laps.of — the start to plan', () => {
+	it.each([7, 12])('keeps a background sweep ending at minute %s under entry', (ended) => {
+		const sweep = `${HOLD_STEP} › sweep`
+
+		expect(minutes_of([lap(sweep, 1, ended)])).toEqual([[lane_breakdown.PLAN_STAGE, [[sweep, 1]]]])
+	})
+	it('shows the hold stages as separate entry rows (ac-3f4fdc3c)', () => {
+		const stages = ['preflight', 'take_tree', 'sweep']
+		const entries = stages.map((stage) => lap(`${HOLD_STEP} › ${stage}`, 1, 4))
+
+		expect(minutes_of(entries)).toEqual([
+			[lane_breakdown.PLAN_STAGE, stages.map((stage) => [`${HOLD_STEP} › ${stage}`, 1])],
+		])
+	})
 	it("groups run:entry's laps under the start to plan, longest first", () => {
 		expect(minutes_of([lap(HOLD_STEP, 1, 2), lap(PREP_STEP, 2, 4)])).toStrictEqual([
 			[

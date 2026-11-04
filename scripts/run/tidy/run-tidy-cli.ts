@@ -1,6 +1,7 @@
 import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
 import { run_tidy } from './run-tidy'
 import { run_tidy_lanes, type IsMerged } from './run-tidy-lanes'
 import { run_tidy_stashes } from './run-tidy-stashes'
@@ -29,7 +30,7 @@ function memoized(read: IsMerged): IsMerged {
 	}
 }
 
-async function sweep(): Promise<void> {
+async function sweep_residue(): Promise<void> {
 	try {
 		const is_merged = memoized(issue_merged.read_merged)
 		const in_flight = backlog_drive_restore.active_issues(
@@ -43,6 +44,10 @@ async function sweep(): Promise<void> {
 	} catch (error) {
 		console.error(FAILURE_NOTE, error)
 	}
+}
+
+async function sweep(): Promise<void> {
+	await run_ship_lap.timed('sweep', sweep_residue)
 }
 
 const run_tidy_cli = { sweep }

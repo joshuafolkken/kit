@@ -3,9 +3,10 @@ import { lane_state } from '#scripts/lane/lane-state'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_label } from '#scripts/run/run-label'
+import { run_maintenance } from '#scripts/run/run-maintenance'
 import { run_preflight, type PreflightDecision } from '#scripts/run/run-preflight'
 import { run_prrun_resume } from '#scripts/run/run-prrun-resume'
-import { run_tidy_cli } from '#scripts/run/tidy/run-tidy-cli'
+import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
 import { test_e2e_stamp } from '#scripts/test/test-e2e-stamp'
 import { run_hold, type HoldRead, type RunHold } from './run-hold'
 import { run_hold_adopt } from './run-hold-adopt'
@@ -34,7 +35,7 @@ import { run_stop_notify } from './run-stop-notify'
 // `unknown` — and every explanation goes to standard error, so `answer=$(pnpm josh run:hold 1091)`
 // captures something a loop can branch on.
 //
-// **A successful claim then sweeps merged residue** — `run:tidy`. After the
+// **A successful claim launches a detached sweep of merged residue** — `run:tidy`. After the
 // claim rather than before it: the sweep may append to the primary checkout's observation ledger, and
 // doing that ahead of the preflight would turn a clean primary checkout into a `reclaim`.
 
@@ -254,7 +255,10 @@ async function preflight_gate(issue: string, is_linked: boolean): Promise<number
 }
 
 async function claim(target: string, request: ClaimRequest, is_linked: boolean): Promise<number> {
-	const gate = await preflight_gate(request.issue, is_linked)
+	const gate = await run_ship_lap.timed(
+		'preflight',
+		async () => await preflight_gate(request.issue, is_linked),
+	)
 
 	if (gate !== undefined) return gate
 
@@ -263,9 +267,9 @@ async function claim(target: string, request: ClaimRequest, is_linked: boolean):
 
 	if (blocked !== undefined) return report_busy(blocked)
 
-	const code = take_tree(target, request, read)
+	const code = await run_ship_lap.timed('take_tree', async () => take_tree(target, request, read))
 
-	if (code === SUCCESS_EXIT_CODE) await run_tidy_cli.sweep()
+	if (code === SUCCESS_EXIT_CODE) run_maintenance.sweep()
 
 	return code
 }

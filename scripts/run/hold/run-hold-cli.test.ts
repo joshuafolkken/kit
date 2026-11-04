@@ -18,7 +18,7 @@ vi.mock('#scripts/run/run-preflight', () => ({
 }))
 
 // The sweep a successful claim runs reads git and GitHub; `run-hold-cli-tidy.test.ts` pins the call.
-vi.mock('#scripts/run/tidy/run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 
 // A numbered release strips the issue's `in-progress` on GitHub; `run-hold-cli-release.test.ts` pins it.
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))

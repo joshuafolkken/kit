@@ -15,6 +15,43 @@ const ISSUE = '5831'
 
 beforeEach(() => {
 	record_ship_lap.mockClear()
+	josh_run.mockClear()
+})
+
+describe('run_entry_children.claim_hold', () => {
+	it('forwards the hold lap scope without imposing a timeout on the tree claim', async () => {
+		josh_run.mockResolvedValueOnce({ code: 0, out: 'hold' })
+
+		await run_entry_children.within(
+			ISSUE,
+			async () =>
+				await run_entry_children.claim_hold({
+					issue_number: ISSUE,
+					command: 'fullrun',
+					is_adopt: false,
+				}),
+		)
+
+		expect(josh_run).toHaveBeenCalledWith(['run:hold', ISSUE, '--fullrun'], true, undefined, {
+			JOSH_SHIP_LAP_SCOPE: JSON.stringify({
+				issue: Number(ISSUE),
+				stage: 'run:entry',
+				parent: 'run:entry › run:hold',
+			}),
+		})
+	})
+
+	it('refuses a failed or timed out claim despite hold on stdout (ac-cc244c8b)', async () => {
+		josh_run.mockResolvedValueOnce({ code: 1, out: 'hold' })
+
+		expect(
+			await run_entry_children.claim_hold({
+				issue_number: ISSUE,
+				command: 'fullrun',
+				is_adopt: false,
+			}),
+		).toBe('unknown')
+	})
 })
 
 describe('run_entry_children.STEP — the lap names lane:breakdown prints', () => {

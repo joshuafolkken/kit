@@ -2,8 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
+import { run_maintenance } from '#scripts/run/run-maintenance'
 import { run_preflight } from '#scripts/run/run-preflight'
-import { run_tidy_cli } from '#scripts/run/tidy/run-tidy-cli'
+import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
@@ -16,10 +17,10 @@ vi.mock('#scripts/run/run-preflight', () => ({
 	run_preflight: { CLEAN_VERDICT: 'clean', check: vi.fn() },
 }))
 
-vi.mock('#scripts/run/tidy/run-tidy-cli', () => ({ run_tidy_cli: { sweep: vi.fn() } }))
+vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn() } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
-const sweep = vi.mocked(run_tidy_cli.sweep)
+const sweep = vi.mocked(run_maintenance.sweep)
 const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-cli-tidy-test-'))
 const WORKTREE = path.join(scratch, '.git')
 const ISSUE = '2701'
@@ -54,6 +55,14 @@ describe('the merged-residue sweep after a claim', () => {
 		await run_hold_cli.run([ISSUE])
 
 		expect(sweep).toHaveBeenCalledOnce()
+	})
+
+	it('records the preflight and exclusive claim as separate laps', async () => {
+		const timed = vi.spyOn(run_ship_lap, 'timed')
+
+		await run_hold_cli.run([ISSUE])
+
+		expect(timed.mock.calls.map(([step]) => step)).toEqual(['preflight', 'take_tree'])
 	})
 
 	it('does not sweep when the preflight stops the claim', async () => {
