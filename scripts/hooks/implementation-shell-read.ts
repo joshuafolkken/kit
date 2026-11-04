@@ -37,19 +37,18 @@ function uniq_input(args: ReadonlyArray<string>, index: number): boolean {
 
 	const argument = args[index] ?? ''
 
-	return argument === '-' || !argument.startsWith('-')
+	return ['-', '--'].includes(argument) || !argument.startsWith('-')
 }
 
 function uniq_operands(args: ReadonlyArray<string>): Array<string> {
-	const end = args.indexOf('--')
+	const start = args.findIndex((_, index) => uniq_input(args, index))
+	if (start === -1) return []
 
-	return args.filter((_, index) => (end !== -1 && index > end) || uniq_input(args, index))
+	return args.slice(start + Number(args[start] === '--'))
 }
 
 function is_uniq_read(args: ReadonlyArray<string>): boolean {
-	const operands = uniq_operands(args)
-
-	return operands.length <= 1
+	return uniq_operands(args).length <= 1
 }
 
 const CHECKS: ReadonlyMap<string, (args: ReadonlyArray<string>) => boolean> = new Map([
