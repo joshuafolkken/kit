@@ -35,11 +35,19 @@ function resume_of(child: number | string, is_backlog_live = false): string {
 		: `${RESUME_COMMAND} ${issue_cite.plain(child)}`
 }
 
-// The next action as a clause, which a park comment's `Next:` and the plan's note end with.
-function next_step(child: number | string, cause = ''): string {
-	const recovery = /cut.*(?:handed-off|already handed off)/iu.test(cause)
+function recovery_of(cause: string): string {
+	if (cause === STALE_HANDOFF.why) {
+		return `repair the stale hand-off cut record with \`${run_cut.END_COMMAND}\` (retry alone does not clear it)`
+	}
+
+	return /cut.*(?:handed-off|already handed off)/iu.test(cause)
 		? `clear the handed-off cut with \`${run_cut.END_COMMAND}\``
 		: 'fix the cause'
+}
+
+// The next action as a clause, which a park comment's `Next:` and the plan's note end with.
+function next_step(child: number | string, cause = ''): string {
+	const recovery = recovery_of(cause)
 
 	return `${recovery}, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
 }
