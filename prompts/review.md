@@ -66,7 +66,7 @@ merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本�
 
 ## Review level (decided by `pnpm josh review:brief --level-only`, never by judgement)
 
-Use the level `pnpm josh review:brief --level-only [--staged] [--json]` prints: `low` gets 1 round with Sonnet (Anthropic default), `medium` up to 2. Documentation, prompts and tests only get `low`; a change containing executable code stays `medium`. Model overrides still apply.
+Use the level `pnpm josh review:brief --level-only [--staged] [--json]` prints: `low` gets 1 round with Sonnet (Anthropic default), `medium` up to 2. Documentation, prompts and tests only get `low`; executable changes also get `low` at 20 added/deleted lines or fewer, including tests. Larger executable diffs, binary files and unreadable sizes stay `medium`. Model overrides still apply.
 
 ---
 
