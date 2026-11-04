@@ -26,6 +26,10 @@ describe('lane_sinks_issues.cell', () => {
 	it('prints unread, not none, when the listing could not be read', () => {
 		expect(lane_sinks_issues.cell('implement', undefined)).toBe(lane_sinks_issues.UNREAD)
 	})
+
+	it('also lists the Issues a further name matches, each once', () => {
+		expect(lane_sinks_issues.cell('implement', ISSUES, ['JOSH GATE', 'ci'])).toBe('#11, #12, #13')
+	})
 })
 
 describe('lane_sinks_issues.read', () => {
