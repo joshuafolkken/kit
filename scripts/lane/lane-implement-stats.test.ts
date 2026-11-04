@@ -15,6 +15,8 @@ const SHIP = 'pnpm josh ship'
 const LINT_RELATED = 'pnpm josh lint:related scripts/lane'
 const LANE_ISSUE = 4887
 const NO_PAUSE: PausedSpans = new Map()
+const CHAIN_SHIPPED = 'run:chain 4887 — ran run:review → review:attest → review:record → ship'
+const CHAIN_SHIP = 'pnpm josh run:chain 4887 --join --ship "Title #4887"'
 
 // A call that starts at `start` minutes and runs for one minute.
 function call(start: number, fields: Partial<ToolCall>): ToolCall {
@@ -54,6 +56,60 @@ const LANE_CALLS = [
 	call(14, { command: 'pnpm josh ship --detach "Title #4887"' }),
 	call(16, { tool: 'Edit' }),
 ]
+
+function with_ship(command: string, output = CHAIN_SHIPPED): Array<ToolCall> {
+	return LANE_CALLS.map((entry) =>
+		entry.command?.startsWith(SHIP) === true ? { ...entry, command, output } : entry,
+	)
+}
+
+describe('lane_implement_stats — a clean join that ships', () => {
+	it.each([
+		CHAIN_SHIP,
+		'pnpm josh run:chain 4887 --ship="Title #4887" --join --fixing',
+		'echo ready && pnpm josh run:chain 4887 --join --ship "Title #4887"',
+		'if pnpm josh run:chain 4887 --join --ship "Title #4887"; then echo shipped; fi',
+		'(pnpm josh run:chain 4887 --join --ship "Title #4887")',
+		'{ pnpm josh run:chain 4887 --join --ship "Title #4887"; }',
+	])('keeps the shipped lane in the implementation totals: %s', (command) => {
+		expect(minutes_of(with_ship(command))).toStrictEqual(minutes_of(LANE_CALLS))
+	})
+})
+
+describe('lane_implement_stats — a join that stops', () => {
+	it.each([
+		'',
+		'run:chain 4887 — stopped at run:review --join (held)',
+		'run:chain 4887 — stopped at run:review --join (exit 1)',
+		'run:chain 4887 — stopped at review:attest (exit 1)',
+		'run:chain 4887 — stopped at review:record (exit 1)',
+	])('keeps an unshipped join out of the totals: %s', (output) => {
+		expect(minutes_of(with_ship(CHAIN_SHIP, output))).toStrictEqual({})
+	})
+
+	it('retains fixes after a refused join until a later ship', () => {
+		const calls = [...with_ship(CHAIN_SHIP, ''), call(18, { command: SHIP })]
+
+		expect(minutes_of(calls)['review-fix']).toBe(8)
+	})
+
+	it('counts a ship stage that ran and refused', () => {
+		const calls = with_ship(CHAIN_SHIP, 'run:chain 4887 — stopped at ship (exit 1)')
+
+		expect(minutes_of(calls)).toStrictEqual(minutes_of(LANE_CALLS))
+	})
+})
+
+describe('lane_implement_stats — commands that do not ship', () => {
+	it.each([
+		'pnpm josh run:chain 4887 --join',
+		'echo "pnpm josh run:chain 4887 --join --ship Title"',
+		'pnpm josh run:chain 4887 --ship "Title --join #4887"',
+		'pnpm josh run:chain 4887 --join; echo --ship',
+	])('does not infer a ship from another command or quoted flag: %s', (command) => {
+		expect(minutes_of(with_ship(command))).toStrictEqual({})
+	})
+})
 
 describe('lane_implement_stats.lane_totals_in — the sub-stages', () => {
 	it('puts each span, the turn before the call included, to its sub-stage, up to the ship', () => {

@@ -22,6 +22,7 @@ const FROM = '--from'
 const MAIN_LINE = [[MAIN_MERGE], [SELFCHECK], [CHECK_RELATED], [RUN_REVIEW]]
 const STOP_EXIT = 2
 const UNPINNED_OK = ['--unpinned-ok', 'only logs']
+const TITLE = 'Title #5630'
 const RESUME_PAST_SELFCHECK = '`pnpm josh run:chain 5630 --from check:related`'
 
 const info_lines: Array<string> = []
@@ -148,6 +149,11 @@ describe('run_chain_cli.run — refusals', () => {
 		['an unknown flag', [ISSUE, '--bogus']],
 		['--fixing without --join', [ISSUE, '--fixing']],
 		['--unpinned-ok on the join', [ISSUE, '--join', ...UNPINNED_OK]],
+		['--ship without --join', [ISSUE, '--ship', TITLE]],
+		['--ship without a title', [ISSUE, '--join', '--ship']],
+		['--ship without an issue suffix', [ISSUE, '--join', '--ship', 'Title']],
+		['--ship for another issue', [ISSUE, '--join', '--ship', 'Title #5631']],
+		['--ship with opening flags', [ISSUE, '--join', '--ship', TITLE, ...UNPINNED_OK]],
 	])('refuses %s with the usage and runs nothing', async (_label, argv) => {
 		await expect(run_chain_cli.run(argv)).resolves.toBe(1)
 
@@ -157,6 +163,7 @@ describe('run_chain_cli.run — refusals', () => {
 
 	it('names the --join form in the usage', () => {
 		expect(run_chain_cli.USAGE).toContain('<N> --join [--fixing] [--from <stage>]')
+		expect(run_chain_cli.USAGE).toContain('[--ship "<title> #<N>"]')
 	})
 
 	it('refuses a --from no stage carries and runs nothing', async () => {
