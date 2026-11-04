@@ -1,19 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { document_section } from './document-section'
 import { entry_read_set } from './entry-read-set'
 import { lane_child_read_set } from './lane-child-read-set'
 
-// joshuafolkken/kit#2021. The dispatched lane child reads a trimmed `fullrun` set: the point-of-use
-// documents the parent owns are dropped, and the entry-only `SKILL.md` sections are read at the
-// section level. What is pinned here is that the trim is real and derived — the child set is built
-// off `fullrun`'s own figures, so it cannot drift away from them. The saving is measured against a
-// `fullrun` that also read what the child reaches beyond it (joshuafolkken/kit#3172): `pre-gate-cut.md`
-// left `fullrun`'s path for the child's alone, and `fullrun` stopped being charged for the whole of
-// `backlogrun-progress.md`, so a margin over a bare `fullrun` measured that over-count, not the trim.
-// The required saving is what the trim itself saves: the SKILL.md sections, `latest-gate.md`, the two
-// decision documents and `progress-watcher.md`. The pinned saving is lowered whenever the skipped
-// documents shrink for every entry (joshuafolkken/kit#3174, #3566, #3871, #3928 and #6102): skipping a smaller document saves less
-// while the child reads less in absolute terms.
+// The dedicated entry must retain the child's shipping and park procedures while reducing reads.
 
 const ROOT = process.cwd()
 const FULLRUN = 'fullrun'
@@ -24,7 +15,6 @@ const MAX_INITIAL_TOKENS = 24_000
 // it moves only when that set does (joshuafolkken/kit#2119, #2289, #2357 and #3399 each moved it);
 // the saving vs `fullrun` the trim exists for (#2021) is pinned above.
 const MAX_TOTAL_TOKENS = 14_000
-const NOTHING = 0
 
 function total_read_bytes(report: ReturnType<typeof entry_read_set.costed>): number {
 	return entry_read_set.total([report.scoped, ...report.point_of_use.map((one) => one.cost)]).bytes
@@ -53,30 +43,26 @@ describe('lane_child_read_set.costed — the point-of-use trim', () => {
 	)
 })
 
-describe('lane_child_read_set.costed — the SKILL.md section trim', () => {
-	// Every unused section must resolve: a miss would silently under-count the saving, so this pins
-	// that every heading is one the document actually carries.
-	const skill = document_section.read_optional(
-		entry_read_set.document_path(ROOT, entry_read_set.SKILL_FILE),
-	)
+describe('lane_child_read_set.costed — the dedicated entry', () => {
+	it('counts the split question printed by run:entry at its section cost', () => {
+		const file = 'split-assessment.md'
+		const heading = 'The question'
+		const text = readFileSync(entry_read_set.document_path(ROOT, file), 'utf8')
+		const section = document_section.section(text, heading)?.text ?? ''
+		const row = lane_child_read_set.costed(ROOT).point_of_use.find((one) => one.file === file)
 
-	it.each([...lane_child_read_set.UNUSED_SKILL_SECTIONS])(
-		'resolves the unused section %j',
-		(heading) => {
-			expect(document_section.section(skill ?? '', heading)).toBeDefined()
-		},
-	)
+		expect(section).not.toBe('')
+		expect(row).toEqual({ file, heading, cost: entry_read_set.cost_of(section), is_resolved: true })
+	})
 
-	it('charges the child less for SKILL.md than a full fullrun read', () => {
-		const base = entry_read_set.costed(ROOT, FULLRUN)
+	it('counts the actual dedicated entry without the interactive entry documents', () => {
+		const report = lane_child_read_set.costed(ROOT)
+		const file = 'fullrun-lane.md'
+		const text = readFileSync(entry_read_set.document_path(ROOT, file), 'utf8')
 
-		function skill_of(report: ReturnType<typeof entry_read_set.costed>): number {
-			const skill_row = report.files.find((one) => one.file === entry_read_set.SKILL_FILE)
-
-			return skill_row?.cost.bytes ?? NOTHING
-		}
-
-		expect(skill_of(lane_child_read_set.costed(ROOT))).toBeLessThan(skill_of(base))
+		expect(report.files).toEqual([{ file, cost: entry_read_set.cost_of(text) }])
+		expect(report.sections.every((one) => one.is_resolved)).toBe(true)
+		expect(report.point_of_use.every((one) => one.is_resolved)).toBe(true)
 	})
 })
 

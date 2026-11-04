@@ -99,6 +99,32 @@ describe('josh backlog:triage — the arguments', () => {
 	})
 })
 
+describe('josh backlog:triage --decide', () => {
+	it('shows both new modes and their evidence flags on an empty invocation', async () => {
+		await backlog_triage_cli.run([], DIRECTORY)
+
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('--pass [--exclude <N>]'))
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining(
+				'--decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown',
+			),
+		)
+	})
+
+	it('routes a pass and refuses invalid options without writing', async () => {
+		expect(await backlog_triage_cli.run(['--pass', '--force'], DIRECTORY)).toBe(FAILURE_EXIT_CODE)
+		expect(order).toStrictEqual([])
+	})
+
+	it('routes the three-condition decision without writing a verdict', async () => {
+		const args = ['--decide', '--defect', 'yes', '--verification', 'yes', '--every-run', 'no']
+
+		expect(await backlog_triage_cli.run(args, DIRECTORY)).toBe(SUCCESS_EXIT_CODE)
+		expect(console.info).toHaveBeenCalledWith(RUN_LANE_LABEL)
+		expect(order).toStrictEqual([])
+	})
+})
+
 describe('josh backlog:triage --apply', () => {
 	it('on --clear clears the park, comments the reason, then applies the run label', async () => {
 		expect(await backlog_triage_cli.run(CLEAR_ARGV, DIRECTORY)).toBe(SUCCESS_EXIT_CODE)

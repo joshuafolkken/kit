@@ -95,6 +95,8 @@ function has_warnings(result: GateStepResult): boolean {
 // flags can contain warning names without reporting a finding.
 const SAFE_CHAIN_BANNER = 'safe-chain is not available'
 const PNPM_SCRIPT_HEADER = '$ '
+// `changed_file_scope.describe_scope` lists lint inputs before the linters run.
+const LINT_FILE_PREFIX = '  - '
 
 function checker_lines(result: GateStepResult): ReadonlyArray<string> {
 	return result.output
@@ -105,9 +107,9 @@ function checker_lines(result: GateStepResult): ReadonlyArray<string> {
 function has_checker_warning(result: GateStepResult): boolean {
 	if (!gate_labels.WARNING_CHECKER_LABELS.includes(result.label)) return false
 
-	return checker_lines(result).some((line) =>
-		WARNING_MARKERS.some((marker) => line.includes(marker)),
-	)
+	return checker_lines(result)
+		.filter((line) => result.label !== gate_labels.LINT_LABEL || !line.startsWith(LINT_FILE_PREFIX))
+		.some((line) => WARNING_MARKERS.some((marker) => line.includes(marker)))
 }
 
 // The record's counterpart to `is_skip_notice`, narrower for the reason `has_checker_warning` is
