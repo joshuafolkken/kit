@@ -92,6 +92,16 @@ function activity_here(local: LocalRead): RunActivity {
 	)
 }
 
+// The already-read supervisor or parent drives retries until the run stops or becomes stranded.
+function is_backlog_live(local: LocalRead): boolean {
+	const roots = local.roots ?? {}
+
+	return (
+		!activity_here(local).is_stopped &&
+		(roots.supervisor !== undefined || roots.parent !== undefined)
+	)
+}
+
 type RoomRead = Pick<
 	ReasonRead,
 	'free_lanes' | 'occupied_count' | 'lane_limit' | 'usage_reset_ms' | 'is_memory_held' | 'gauges'
@@ -152,7 +162,7 @@ function planned_layout(
 	})
 
 	return run_board_layout.layout_of(
-		with_closed(plan, state.closed),
+		{ ...with_closed(plan, state.closed), is_backlog_live: is_backlog_live(local) },
 		statuses,
 		reason_of,
 		earlier_here(local),
@@ -168,7 +178,10 @@ function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardL
 	const statuses = run_board_status.settle_closed(statuses_for(state, local), read)
 	const known = closed_under(state.known, state.closed)
 
-	return run_board_layout.local_layout_of(statuses, earlier_here(local), known)
+	return run_board_layout.local_layout_of(statuses, earlier_here(local), {
+		...known,
+		is_backlog_live: is_backlog_live(local),
+	})
 }
 
 // What one redraw draws with.

@@ -11,8 +11,8 @@ import {
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
-import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
+import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_kind, type BoardPriority } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -28,6 +28,7 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // tracks is drawn under its epic; a `blocked_by` edge is a DAG, so it stays a waiting-on note at the end of the row.
 
 interface BoardPlan {
+	is_backlog_live?: boolean | undefined
 	waves: WavePlan
 	// Which opted-in epic tracks which child (`Plan.tracked`).
 	tracked: ReadonlyMap<number, number>
@@ -100,6 +101,7 @@ interface BoardLayout {
 
 // What an active row is named and classified by — each issue's title and labels.
 interface RowRead {
+	is_backlog_live?: boolean | undefined
 	titles: ReadonlyMap<number, string>
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
 }
@@ -141,12 +143,6 @@ function is_blocked(child: EpicChild, overlay: Overlay): boolean {
 	return child.blocked_by.some((edge) => is_waiting_on(edge, overlay))
 }
 
-// A stalled row's right end names the action that resumes it (`run-stalled.ts`), with no event to
-// name its cause.
-function stalled_reason(number: number): RowReason {
-	return { tail: run_stalled.row_text(number) }
-}
-
 // Why a waiting row waits, or what resumes a stalled one.
 function plan_reason(
 	child: EpicChild,
@@ -154,7 +150,9 @@ function plan_reason(
 	overlay: Drawn,
 	waits: ReadonlyArray<string>,
 ): RowReason | undefined {
-	if (state === 'stopped') return stalled_reason(child.number)
+	if (state === 'stopped') {
+		return run_board_ending_reason.stalled_reason(child.number, overlay.plan.is_backlog_live)
+	}
 
 	return state === 'waiting' ? overlay.reason_of?.(child, waits) : undefined
 }
@@ -210,27 +208,6 @@ function active_order(left: BoardRow, right: BoardRow): number {
 	return compared(rank_of(left), rank_of(right)) || compared(key_of(left), key_of(right))
 }
 
-// The states a row its labels say stalled can be drawn in: 🛑, and 💤 where its last park event was
-// bare — `run:merge`'s park of a child already labelled (`on_parked`) after the ship-stop cap's.
-const STALLED_STATES: ReadonlySet<ItemState> = new Set(['stopped', 'parked'])
-
-// A row its labels say stalled, which no ending event explains.
-function is_stalled(status: ItemStatus, labels: ReadonlyArray<string> = []): boolean {
-	return STALLED_STATES.has(status.state) && has_label_name(labels, RUN_STALLED_LABEL)
-}
-
-// The reason a parked or withdrawn row draws where ⏳ draws why it waits — its ending event's own —
-// and a stalled row the action that resumes it.
-function ending_reason(
-	number: number,
-	status: ItemStatus,
-	labels: ReadonlyArray<string> | undefined,
-): Pick<BoardRow, 'reason'> {
-	if (status.reason !== undefined) return { reason: { tail: status.reason } }
-
-	return is_stalled(status, labels) ? { reason: stalled_reason(number) } : {}
-}
-
 // A park waiting on a person's decision (joshuafolkken/kit#4099) — the one answer the 🙋 decision
 // section and the findings section read a park reason by.
 function is_decision(reason: string | undefined): boolean {
@@ -248,7 +225,7 @@ function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRo
 	const labels = read.labels.get(number)
 
 	return {
-		...(!is_asked && ending_reason(number, status, labels)),
+		...(!is_asked && run_board_ending_reason.row_reason(number, status, read)),
 		...solo_flag(labels),
 		number,
 		title: read.titles.get(number),
@@ -349,7 +326,11 @@ function layout_of(
 ): BoardLayout {
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
-	const read = { titles: plan.context.titles, labels: plan.labels }
+	const read = {
+		titles: plan.context.titles,
+		labels: plan.labels,
+		is_backlog_live: plan.is_backlog_live,
+	}
 
 	return {
 		active: active_rows(statuses, read),

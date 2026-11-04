@@ -59,7 +59,7 @@ interface ItemStatus {
 	track?: ReadonlyArray<Phase> | undefined
 	// When a running child entered the phase its track ends on — the event that moved it there.
 	phase_ms?: number | undefined
-	// Why the park or withdraw that ended the child ended it, where its event gives a reason.
+	// The raw reason the ending event gave; the layout chooses the current stalled resume action.
 	reason?: string | undefined
 	// The command that paused a paused lane, read off its lane state record (`run-board-lane-state.ts`).
 	paused_by?: string | undefined
