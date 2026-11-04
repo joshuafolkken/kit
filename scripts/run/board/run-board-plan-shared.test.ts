@@ -30,6 +30,7 @@ const PLAN: BoardPlan = {
 	labels: new Map([[2, [AUTO_OK]]]),
 	declared: new Map([[2, new Set(['scripts/a.ts'])]]),
 	withheld: new Set([3]),
+	human_merge_prs: new Map([[3, 4]]),
 }
 
 function event(pos: number): RunEvent {

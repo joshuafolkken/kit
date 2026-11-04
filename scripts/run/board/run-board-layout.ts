@@ -7,12 +7,14 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	has_label_name,
 	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	RUN_SOLO_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
+import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_kind, type BoardPriority } from './run-board-kind'
 import type { ItemState, ItemStatus } from './run-board-status'
 
@@ -28,6 +30,7 @@ import type { ItemState, ItemStatus } from './run-board-status'
 // tracks is drawn under its epic; a `blocked_by` edge is a DAG, so it stays a waiting-on note at the end of the row.
 
 interface BoardPlan {
+	human_merge_prs?: ReadonlyMap<number, number> | undefined
 	waves: WavePlan
 	// Which opted-in epic tracks which child (`Plan.tracked`).
 	tracked: ReadonlyMap<number, number>
@@ -290,6 +293,7 @@ function is_untouched(child: EpicChild, overlay: Overlay): boolean {
 // A plan row waits, unless it waits on a person's decision — the one wait the board marks — or the run
 // stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as a decision.
 function plan_state(child: EpicChild): ItemState {
+	if (has_label_name(child.labels, NEEDS_HUMAN_MERGE_LABEL)) return 'waiting'
 	if (has_label_name(child.labels, NEEDS_DECISION_LABEL)) return 'human'
 
 	return has_label_name(child.labels, RUN_STALLED_LABEL) ? 'stopped' : 'waiting'
@@ -342,11 +346,13 @@ function waiting_children(overlay: Overlay): Array<EpicChild> {
 }
 
 function layout_of(
-	plan: BoardPlan,
-	statuses: ReadonlyMap<number, ItemStatus>,
+	input_plan: BoardPlan,
+	input_statuses: ReadonlyMap<number, ItemStatus>,
 	reason_of?: ReasonOf,
 	earlier: EarlierLanes = run_board_earlier.NO_EARLIER,
 ): BoardLayout {
+	const current = run_board_human_merge.overlay_of(input_plan, input_statuses)
+	const { plan, statuses } = current
 	const overlay = { plan, statuses, reason_of }
 	const queue = plan.waves.waves.flat().filter((child) => is_untouched(child, overlay))
 	const read = { titles: plan.context.titles, labels: plan.labels }
@@ -356,7 +362,9 @@ function layout_of(
 		queued: queued_entries(queue, overlay),
 		people: unreached_rows(overlay, true),
 		unreached: unreached_rows(overlay, false),
-		earlier: run_board_earlier.rows_of(earlier, statuses, read),
+		earlier: run_board_earlier
+			.rows_of(earlier, statuses, read)
+			.filter((row) => !current.waiting_numbers.has(row.number)),
 	}
 }
 

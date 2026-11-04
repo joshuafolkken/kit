@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`run board human merge rows > renders the waiting row and legend in chat 1`] = `
+[
+  "── 🔗 waiting 1 ──────────────────────────────────",
+  "    🔏 PR 6225     6221       Workflow update",
+  "🔏 human merge",
+]
+`;
+
+exports[`run board human merge rows > renders the waiting row and legend in screen 1`] = `
+[
+  "── 🔗 waiting 1 ──────────────────────────────────",
+  "    🔏 PR 6225     6221       Workflow update",
+  "🔏 human merge",
+]
+`;

@@ -69,6 +69,7 @@ const WORDS = {
 	solo_running: 'solo running',
 	// A blocker this run will not finish, which a person has to move (joshuafolkken/kit#4292).
 	on_human: 'needs a person',
+	human_merge: 'human merge',
 	// A lane held back by the machine-wide core budget, and why.
 	held_check: 'held',
 	memory: 'waits for memory',
@@ -261,6 +262,7 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 // every row icon, and 🪫 the account's Claude usage limit until it resets (#4796). The rest are the
 // board's own, shared rather than copied.
 const WAIT_ICONS = {
+	human_merge: '🔏',
 	usage_limit: '🪫',
 	path: '📂',
 	named: '📋',
@@ -278,6 +280,7 @@ const WAIT_ICONS = {
 // The legend's word for each icon a waiting row can lead with — a lane's stage among them. 📝, the
 // planning a row waits on, is the plan phase's icon, which the legend names already.
 const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
+	[WAIT_ICONS.human_merge, 'human_merge'],
 	[LANE_STAGE_ICONS.opening, 'opening'],
 	[LANE_STAGE_ICONS.installing, 'installing'],
 	[LANE_STAGE_ICONS.dispatching, 'dispatching'],
