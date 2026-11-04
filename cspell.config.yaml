@@ -307,6 +307,7 @@ words:
   - mnemecha
   - waneccha
   - ENOENT
+  - EACCES
   # The errno a `--stop` gets when it may not signal the supervisor it just unrecorded
   - EPERM
   - ELIFECYCLE
