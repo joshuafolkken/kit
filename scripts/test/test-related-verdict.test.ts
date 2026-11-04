@@ -16,12 +16,16 @@ const SOURCE = 'source.ts'
 const TREE = { files: { [SOURCE]: 'digest' }, base: 'base' }
 const OTHER = 'other.ts'
 const FAILED = 1
+const TEST = 'source.test.ts'
+const BLOBS = { [TEST]: 'test-digest' }
 const fresh = vi.fn(async () => 0)
 
 beforeEach(() => {
 	vi.spyOn(tree_verdict, 'record_path').mockImplementation((name) => path.join(SCRATCH, name))
 	vi.spyOn(scoped_green, 'read_before').mockResolvedValue(TREE)
 	vi.spyOn(review_stamps.test_related_stamp, 'write').mockReturnValue('unused')
+	vi.spyOn(review_stamps.test_related_stamp, 'read').mockReturnValue(undefined)
+	vi.spyOn(review_stamps.test_related_stamp, 'describes_inputs').mockReturnValue(true)
 	vi.spyOn(gate_tree, 'read_gate_tree').mockResolvedValue(TREE)
 	vi.spyOn(test_unit_guard, 'is_running').mockReturnValue(true)
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
@@ -67,6 +71,33 @@ describe('test_related_verdict.run', () => {
 		vi.stubEnv('TZ', 'Asia/Tokyo')
 		await test_related_verdict.run([], fresh)
 		expect(fresh).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('test_related_verdict.run — individual stamp greens', () => {
+	it.each([
+		{ tree: TREE, inputs_match: true, expected: BLOBS },
+		{ tree: { ...TREE, files: { [SOURCE]: 'moved' } }, inputs_match: true, expected: undefined },
+		{ tree: { ...TREE, base: 'moved' }, inputs_match: true, expected: undefined },
+		{ tree: TREE, inputs_match: false, expected: undefined },
+	])('preserves individual greens only for a matching stamp: %j', async (sample) => {
+		await test_related_verdict.run([], fresh)
+		vi.mocked(review_stamps.test_related_stamp.read).mockReturnValue({
+			...sample.tree,
+			taken_at: 'now',
+			blobs: BLOBS,
+		})
+		vi.mocked(review_stamps.test_related_stamp.describes_inputs).mockReturnValue(
+			sample.inputs_match,
+		)
+		await test_related_verdict.run([], fresh)
+		expect(fresh).toHaveBeenCalledTimes(1)
+		expect(review_stamps.test_related_stamp.write).toHaveBeenCalledWith(
+			TREE.files,
+			undefined,
+			TREE.base,
+			sample.expected,
+		)
 	})
 })
 

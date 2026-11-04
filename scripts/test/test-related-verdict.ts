@@ -34,6 +34,21 @@ async function fresh_verdict(
 	return { exit_code, is_reused: false }
 }
 
+function preserved_blobs(before: GateTree | undefined): Record<string, string> | undefined {
+	if (before === undefined) return undefined
+	const stamp = review_stamps.test_related_stamp.read()
+
+	if (
+		stamp === undefined ||
+		!scoped_green.is_unmoved(before, { files: stamp.files, base: stamp.base }) ||
+		!review_stamps.test_related_stamp.describes_inputs(stamp)
+	) {
+		return undefined
+	}
+
+	return stamp.blobs
+}
+
 async function checked(
 	given: ReadonlyArray<string>,
 	fresh: (before: GateTree | undefined) => Promise<number>,
@@ -44,9 +59,12 @@ async function checked(
 
 	if (kept?.exit_code === 0) {
 		if (given.length === 0) {
+			const blobs = preserved_blobs(before)
+
 			await scoped_green.record_if_green(review_stamps.test_related_stamp, {
 				before,
 				exit_code: kept.exit_code,
+				...(blobs !== undefined && { blobs }),
 			})
 		}
 
