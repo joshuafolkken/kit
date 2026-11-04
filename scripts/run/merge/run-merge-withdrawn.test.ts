@@ -65,7 +65,20 @@ describe('run_merge_withdrawn.collect', () => {
 // joshuafolkken/kit#4926: a child that gave its lane back noted it from inside the lane, which
 // `run:merge` closes, named as the yield.
 describe('run_merge_withdrawn.collect_yield', () => {
-	it('closes the still-open lane of a child that yielded, named as the yield', async () => {
+	it('names the holder and the re-queue point (ac-bfd33e73)', async () => {
+		events_mock.mockResolvedValue([
+			{ ...WITHDRAW_EVENT, kind: 'note', text: `#${CHILD} yielded its lane: overlaps #6207` },
+		])
+
+		expect(await run_merge_withdrawn.collect_yield(CHILD)).toStrictEqual(COLLECTED)
+		expect(withdraw_lane_mock).toHaveBeenCalledWith(
+			LANE,
+			'yielded to #6207, which held one of its planned files; re-queues after #6207 merges',
+			'yield',
+		)
+	})
+
+	it('keeps the original reason when no holder can be read (ac-7f57b406) (ac-793430d0)', async () => {
 		expect(await run_merge_withdrawn.collect_yield(CHILD)).toStrictEqual(COLLECTED)
 		expect(withdraw_lane_mock).toHaveBeenCalledWith(LANE, lane_yield.YIELD_REASON, 'yield')
 	})

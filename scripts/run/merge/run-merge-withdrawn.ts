@@ -42,9 +42,10 @@ async function collect(child: string): Promise<Collected> {
 async function collect_yield(child: string): Promise<Collected> {
 	const lane = await lane_registry.find_open_lane(child)
 
-	return lane === undefined
-		? NOTHING_LEFT
-		: await lane_withdraw_closed.withdraw_lane(lane, lane_yield.YIELD_REASON, 'yield')
+	if (lane === undefined) return NOTHING_LEFT
+	const reason = lane_yield.withdraw_reason(await run_event_stream_emit.current_events(), child)
+
+	return await lane_withdraw_closed.withdraw_lane(lane, reason, 'yield')
 }
 
 const run_merge_withdrawn = { UNMERGED_REASON, collect, collect_yield }
