@@ -17,6 +17,7 @@
 // `env git commit` and `(git push -f)` are silently not a git command, and
 // `/usr/bin/time -p pnpm exec eslint .` is not an `eslint` run (joshuafolkken/kit#4356).
 const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/u
+const WORD_QUOTING = /["'\\]/gu
 const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'pnpm',
 	'npx',
@@ -46,6 +47,8 @@ const SUBSHELL_OPEN = '('
 // The git global options that consume a **separate** following token as their value, so the parser
 // skips two words rather than one. `--opt=value` carries its value inline and is skipped as one word by
 // the ordinary flag branch below.
+const CONFIG_ENV = '--config-env'
+const ATTACHED_CONFIG = /^(?:-c|--config-env=)(.+)$/u
 const VALUE_TAKING_GLOBALS: ReadonlySet<string> = new Set([
 	'-C',
 	'-c',
@@ -54,7 +57,7 @@ const VALUE_TAKING_GLOBALS: ReadonlySet<string> = new Set([
 	'--namespace',
 	'--exec-path',
 	'--super-prefix',
-	'--config-env',
+	CONFIG_ENV,
 ])
 
 const FLAG_PREFIX = '-'
@@ -86,7 +89,9 @@ function program_name(word: string): string {
 
 function is_wrapper_token(word: string): boolean {
 	return (
-		word === SUBSHELL_OPEN || ENV_ASSIGNMENT.test(word) || WRAPPER_WORDS.has(program_name(word))
+		word === SUBSHELL_OPEN ||
+		ENV_ASSIGNMENT.test(word.replaceAll(WORD_QUOTING, '')) ||
+		WRAPPER_WORDS.has(program_name(word))
 	)
 }
 
@@ -185,10 +190,27 @@ function parse(segment: string): GitCall | undefined {
 	return { subcommand: words[subcommand_index], args: words.slice(subcommand_index + NEXT) }
 }
 
-function global_arguments_of(segment: string): Array<string> {
-	const words = arguments_of(segment, GIT_COMMAND) ?? []
+function config_value(flag: string, next: string | undefined): string | undefined {
+	if (flag === '-c' || flag === CONFIG_ENV) return next
 
-	return words.slice(0, after_globals(words))
+	return ATTACHED_CONFIG.exec(flag)?.[1]
+}
+
+function config_arguments_of(segment: string): Array<string> {
+	const words = arguments_of(segment, GIT_COMMAND) ?? []
+	const values: Array<string> = []
+	const end = after_globals(words)
+	let index = 0
+
+	while (index < end) {
+		const flag = words[index] ?? ''
+		const value = config_value(flag, words[index + NEXT])
+
+		if (value !== undefined) values.push(value)
+		index += global_step(flag)
+	}
+
+	return values
 }
 
 // A single-dash cluster of letters (`-uf`, `-D`), never a `--long` flag. The callers ask whether such a
@@ -210,7 +232,7 @@ function short_cluster_has(token: string, letters: string): boolean {
 
 const git_argv = {
 	arguments_of,
-	global_arguments_of,
+	config_arguments_of,
 	parse,
 	program_of,
 	short_cluster_has,

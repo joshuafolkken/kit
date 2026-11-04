@@ -16,17 +16,32 @@ const PUSH_VALUE_FLAGS: ReadonlySet<string> = new Set([
 	'--push-option',
 ])
 const QUOTING = /["'\\]/gu
-const PUSH_CONFIG = /^(?:-c|--config-env=)?(?:remote\.|url\.|core\.(?:sshCommand|gitProxy))/iu
+const PUSH_CONFIG = /^(?:remote\.|url\.|core\.(?:sshCommand|gitProxy))/iu
+const CONFIG_ENVIRONMENT = /^GIT_CONFIG(?:_[A-Z0-9_]+)?=/u
 
 function has_push_config(line: string): boolean {
 	return git_argv
-		.global_arguments_of(line)
+		.config_arguments_of(line)
 		.some((word) => PUSH_CONFIG.test(word.replaceAll(QUOTING, '')))
 }
 
-function has_push_override(line: string, args: ReadonlyArray<string>): boolean {
+function has_config_environment(segment: string, call: ProgramCall): boolean {
+	const prefix = git_argv.words_of(segment).slice(0, -(call.args.length + 1))
+
+	return prefix.some((word) => CONFIG_ENVIRONMENT.test(word.replaceAll(QUOTING, '')))
+}
+
+function has_push_override(
+	segment: string,
+	call: ProgramCall,
+	args: ReadonlyArray<string>,
+): boolean {
+	const line = [call.name, ...call.args].join(' ')
+
 	return (
-		has_push_config(line) || args.some((word) => PUSH_VALUE_FLAGS.has(word.split('=', 1)[0] ?? ''))
+		has_config_environment(segment, call) ||
+		has_push_config(line) ||
+		args.some((word) => PUSH_VALUE_FLAGS.has(word.split('=', 1)[0] ?? ''))
 	)
 }
 
@@ -46,26 +61,28 @@ function is_gh_write(call: ProgramCall): boolean {
 
 // A missing remote may resolve to a configured foreign push target. Only an explicit origin
 // is accepted, and flags that replace a destination or remote executable are refused.
-function is_foreign_push(call: ProgramCall): boolean {
+function is_foreign_push(segment: string, call: ProgramCall): boolean {
 	const line = [call.name, ...call.args].join(' ')
 	const parsed = git_argv.parse(line)
 
 	if (parsed?.subcommand !== PUSH) return false
-	if (has_push_override(line, parsed.args)) return true
+	if (has_push_override(segment, call, parsed.args)) return true
 
 	const remote = parsed.args.find((word) => !word.startsWith(FLAG_PREFIX))
 
 	return remote?.replaceAll(QUOTING, '') !== ORIGIN
 }
 
-function is_restricted(_segment: string, call: ProgramCall): boolean {
+function is_restricted(segment: string, call: ProgramCall): boolean {
 	const plain = {
 		name: call.name,
 		args: call.args.map((word) => interpreter_options.syntax_word(word)),
 	}
 
 	return (
-		interpreter_options.is_inline_execution(plain) || is_gh_write(plain) || is_foreign_push(plain)
+		interpreter_options.is_inline_execution(plain) ||
+		is_gh_write(plain) ||
+		is_foreign_push(segment, plain)
 	)
 }
 
