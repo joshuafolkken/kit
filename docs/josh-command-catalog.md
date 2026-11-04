@@ -38,6 +38,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh test:red` · `josh trd` | — | developer | git, processes | Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/stopped/test-only |
 | `josh test:related` · `josh tr` | `[files...]` | developer | processes | Run only the unit tests related to the changed files (full suite on fallback) |
 | `josh test:unit` · `josh tu` | `[filters...]` | developer | processes | Run unit tests with Vitest (without Vitest: a basic project runs its own test script, others skip; fails when Vitest has no tests) |
+| `josh usage:tee` | — | automation | files | Record account-wide Claude statusLine rate limits without printing output |
 
 ## Project
 
