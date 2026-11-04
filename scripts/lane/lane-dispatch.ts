@@ -114,12 +114,12 @@ function child_invocation(issue: string): string {
  * the bare `child_invocation`. Given the plain `fullrun #<N>`, a relaunched child would read the
  * workflow-commands entry documents every resume before it could learn it was a resume at all — the
  * "do not re-read" exception lives inside the very skill it would have to open. This preamble tells
- * it up front, so it goes straight to `run:cut --resume` and the stage that answers.
+ * it up front, so it goes straight to `run:entry` and the stage that answers.
  *
  * **It ends with `child_invocation` on purpose, not as decoration.** The parent's liveness poll is
  * `lane_child_invocation.process_pattern` (read by `run:liveness` — see `log_sentence`), so a relaunched process
  * whose command line did not end with `fullrun #<N>` would be booked stopped while it ran. The trailing
- * invocation keeps that poll matching and is also the ordinary run a `fresh` verdict falls back to.
+ * invocation keeps that poll matching and identifies the run the composite entry continues on `fresh`.
  */
 function resume_invocation(issue: string): string {
 	return lane_child_invocation.resume_invocation(issue)
