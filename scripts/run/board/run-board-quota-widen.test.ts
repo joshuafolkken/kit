@@ -50,7 +50,7 @@ function head_of(lane: number): QuotaReading {
 	}
 }
 
-// `dropped` lanes are listed but left out of each page, as `claude_files` leaves out a Codex child's log.
+// A source that filters each page can return short pages without exhausting its wider results.
 function ports_of(
 	limits: Array<number>,
 	dropped: ReadonlyArray<number> = [],
