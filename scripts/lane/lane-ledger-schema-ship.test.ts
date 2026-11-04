@@ -28,6 +28,12 @@ describe('lane_ledger_schema_ship — the lines josh ship writes, read through t
 		expect(lane_ledger_schema.entry_schema.parse(LAP)).toEqual(LAP)
 	})
 
+	it('keeps a scoped test replay when reading the ledger', () => {
+		const reused = { ...LAP, step: 'test:related', is_reused: true }
+
+		expect(lane_ledger_schema.entry_schema.parse(reused)).toEqual(reused)
+	})
+
 	it('refuses a ship lap with no step', () => {
 		const missing = { ...LAP, step: undefined }
 

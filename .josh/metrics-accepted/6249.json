@@ -1,0 +1,7 @@
+{
+	"reason": "Reuse existing tree verdicts for unchanged related-test runs and record scoped replay telemetry (#6249)",
+	"date": "2026-11-04",
+	"growth": {
+		"scripts.code_lines": 87
+	}
+}

@@ -18,9 +18,22 @@ const UNMOVED_MS = 900
 const { NOT_MEASURED } = lane_stage_stats
 const { WHOLE_GATE_LABEL } = lane_check_stats
 const UNIT = 'test:unit'
+const RELATED = 'test:related'
 const NO_MAP = 'no-map'
 const WHOLE_SUITE = 'whole-suite-file'
 const LEGACY_GATE = { kind: 'gate', at: AT, elapsed_ms: 1, is_passed: true } satisfies LedgerEntry
+
+function related_lap(step: string, is_reused: boolean): LedgerEntry {
+	return {
+		kind: 'ship-lap',
+		at: AT,
+		issue: 6249,
+		stage: 'sync',
+		step,
+		elapsed_ms: CHECK_MS,
+		is_reused,
+	}
+}
 
 function gate(checks: ReadonlyArray<GateCheckRecord>): LedgerEntry {
 	return { ...LEGACY_GATE, checks: [...checks] }
@@ -42,6 +55,18 @@ function row_of(entries: ReadonlyArray<LedgerEntry>, label: string): Array<strin
 		.find(([first]) => first === label)
 		?.slice(1)
 }
+
+describe('lane_check_stats.table — scoped test replays', () => {
+	it('counts scoped test replays, including child processes, without timing reuse or unrelated laps', () => {
+		const entries = [
+			related_lap(RELATED, false),
+			related_lap('josh git › test:related', true),
+			related_lap('scoped pair', true),
+		]
+
+		expect(row_of(entries, RELATED)).toEqual(['30.0', '30.0', '2', '1', '0', '0'])
+	})
+})
 
 describe('lane_check_stats.table — the recorded checks', () => {
 	it('reduces a check to its median, its maximum, its runs and its reuses, in seconds', () => {

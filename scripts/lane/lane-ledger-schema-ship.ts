@@ -57,6 +57,7 @@ const ship_lap_schema = z.object({
 	runs: z.number().optional(),
 	rerun: z.string().optional(),
 	reused_tree: z.string().optional(),
+	is_reused: z.boolean().optional(),
 	named: z.number().optional(),
 	unsplit: z.string().optional(),
 })
