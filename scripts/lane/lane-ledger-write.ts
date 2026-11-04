@@ -210,6 +210,13 @@ async function record_push_miss(miss: PushMissRecord, path?: string): Promise<vo
 	await record({ kind: KIND.PUSH_MISS, at: now_iso(), ...miss }, path)
 }
 
+async function record_early_push(
+	push: Omit<Extract<LedgerEntry, { kind: 'early-push' }>, 'kind' | 'at'>,
+	path?: string,
+): Promise<void> {
+	await record({ kind: KIND.EARLY_PUSH, at: now_iso(), ...push }, path)
+}
+
 async function record_ship_lap(lap: ShipLapRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.SHIP_LAP, at: now_iso(), ...lap }, path)
 }
@@ -246,6 +253,7 @@ const lane_ledger_write = {
 	record_overlap,
 	record_offerable,
 	record_push_miss,
+	record_early_push,
 	record_round_one,
 	record_round_two,
 	record_ship_lap,

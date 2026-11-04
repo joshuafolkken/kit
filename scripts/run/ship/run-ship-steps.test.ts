@@ -5,6 +5,7 @@ import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_early_push } from './run-ship-early-push'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_review_steps } from './run-ship-review-steps'
@@ -47,6 +48,7 @@ const remove_draft_spy = vi.spyOn(run_ship_body_draft, 'remove')
 const remove_record_spy = vi.spyOn(run_investigation_record, 'remove')
 
 beforeEach(() => {
+	vi.spyOn(run_ship_early_push, 'push').mockResolvedValue()
 	catch_up_spy.mockReset().mockResolvedValue(undefined)
 	remove_draft_spy.mockReset().mockResolvedValue(undefined)
 	remove_record_spy.mockReset().mockResolvedValue(undefined)
@@ -134,6 +136,17 @@ describe('run_ship_steps — preflight and review stages delegate', () => {
 })
 
 describe('run_ship_steps — the gate stage', () => {
+	it('pushes immediately on green for a reviewed ship and never on red', async () => {
+		const args = { ...ARGS, is_review: true }
+
+		await step_for(STAGE.GATE).run(args, FRESH)
+		expect(run_ship_early_push.push).toHaveBeenCalledExactlyOnceWith(args)
+		vi.mocked(run_ship_early_push.push).mockClear()
+		scoped_gate_spy.mockResolvedValue(FAILED)
+		await step_for(STAGE.GATE).run(args, FRESH)
+		expect(run_ship_early_push.push).not.toHaveBeenCalled()
+	})
+
 	it('delegates to the scoped gate and returns its result', async () => {
 		scoped_gate_spy.mockResolvedValue(FAILED)
 

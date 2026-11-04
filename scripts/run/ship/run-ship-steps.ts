@@ -3,6 +3,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_early_push } from './run-ship-early-push'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
@@ -56,9 +57,11 @@ const PREFLIGHT_STEP: Step = {
 // launched the gate itself, this stage ends in seconds without running a check, and those seconds
 // would pull the `gate` row `lane:stats` reads for `JOSH_LANE_LIMIT` toward zero. The record is asked
 // for before the stage runs — afterwards every green gate has one.
-async function gate_stage(): Promise<StepResult> {
+async function gate_stage(args: ShipArguments): Promise<StepResult> {
 	const is_skipped = await run_ship_scoped.is_gate_green()
 	const result = await run_ship_scoped.scoped_gate()
+
+	if (args.is_review && result.code === SUCCESS_EXIT_CODE) await run_ship_early_push.push(args)
 
 	return { ...result, is_skipped }
 }
@@ -107,7 +110,7 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.GATE,
 		header: run_ship.GATE_HEADER,
-		run: async () => await gate_stage(),
+		run: async (args) => await gate_stage(args),
 	},
 	{
 		stage: STAGE.COMMIT,
@@ -162,8 +165,9 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 
 // `--review` puts the supervised round-1 review in front of the gate: it launches the gate itself, so
 // the gate stage that follows reuses that tree's green record unless the round changed the tree. It
-// also joins round 2 beside the gate, before the commit opens the PR — a no-op when round 1
-// left no fix delta. Sync and round 1 finish first, so neither can move the review's checkout.
+// also joins round 2 beside the gate. The green gate pushes the committed tree and opens its PR
+// while round 2 finishes; the commit stage sends only subsequent changes. Sync and round 1 finish
+// first, so neither can move the review's checkout.
 const REVIEW_STEP: Step = {
 	stage: STAGE.REVIEW,
 	header: run_ship.REVIEW_HEADER,

@@ -6,6 +6,15 @@ import { lane_ledger_kind } from './lane-ledger-kind'
 
 const { KIND } = lane_ledger_kind
 
+// Every early-push decision, including a skip before a push process could start.
+const early_push_schema = z.object({
+	kind: z.literal(KIND.EARLY_PUSH),
+	at: z.string(),
+	issue: z.number().optional(),
+	source: z.enum(['review', 'ship']),
+	result: z.string(),
+})
+
 // A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
 // retrospective's stop reason — and `cause` why (`run-ship-stop-cause.ts`), absent on a stop recorded
 // before it had one. `preconditions` names the kinds a preflight stop found unmet (`run-ship-preflight.ts`),
@@ -75,6 +84,7 @@ const size_schema = z.object({
 })
 
 const lane_ledger_schema_ship = {
+	early_push_schema,
 	ship_lap_schema,
 	size_schema,
 	stop_schema,
