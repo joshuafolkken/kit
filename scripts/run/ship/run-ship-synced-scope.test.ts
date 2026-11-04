@@ -25,6 +25,7 @@ const SHARED_TEST = 'scripts/shared.test.ts'
 const RUN_RECORD = '.josh/metrics-accepted/4985.json'
 const WHOLE_SUITE = [...whole_suite_files.WHOLE_SUITE_FILES][0] ?? ''
 const WHOLE_SUITE_CODE = 'scripts/lib/read-file.ts'
+const COMPONENT = 'src/lib/Card.svelte'
 const MAP: ReadMap = {
 	version: 1,
 	commit: 'old-base',
@@ -111,9 +112,46 @@ describe('run_ship_synced_scope.settle — where the merge meets the branch', ()
 	})
 
 	it('runs the pair when the import graph could not split a synced module', async () => {
-		split.mockResolvedValue({ left: [], shared: [], meeting: [] })
+		const { FAILURE } = test_related_synced
+
+		split.mockResolvedValue({ left: [], shared: [], meeting: [], failure: FAILURE.NO_GRAPH })
 
 		expect(await settle(TREE, PAIR)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6185: a failed split named every synced module, 2536 of them in one ship.
+describe('run_ship_synced_scope.read_sync — a merge the import graph could not split', () => {
+	const { FAILURE } = test_related_synced
+
+	it.each([FAILURE.NO_GRAPH, FAILURE.UNRESOLVED, FAILURE.OWN_UNREAD, FAILURE.THREW])(
+		'names nothing and says why when %s',
+		async (failure) => {
+			split.mockResolvedValue({ left: [], shared: [SHARED_TEST], meeting: [OWN], failure })
+
+			const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+			expect(reading?.overlap).toBeUndefined()
+			expect(reading?.unsplit).toContain(failure)
+			expect(await settle(TREE, PAIR)).toBeUndefined()
+			expect(record).not.toHaveBeenCalled()
+		},
+	)
+
+	it('still settles a failed split over a merge that brought in no code', async () => {
+		read_parts.mockResolvedValue(synced_parts([SYNCED_DOC]))
+		split.mockResolvedValue({ left: [], shared: [], meeting: [], failure: FAILURE.NOTHING_VOUCHED })
+
+		expect(await settle(TREE, [LINT])).toBeDefined()
+	})
+
+	it('still names the code a split that succeeded left unsplit', async () => {
+		read_parts.mockResolvedValue(synced_parts([SYNCED_CODE, COMPONENT]))
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, [LINT])
+
+		expect(reading?.overlap).toStrictEqual([COMPONENT])
+		expect(reading?.unsplit).toBeUndefined()
 	})
 })
 
