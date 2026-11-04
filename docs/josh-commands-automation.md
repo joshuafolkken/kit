@@ -295,6 +295,20 @@ Run by a lane filing an overrun investigation, for the reach count its `## ãƒ™ãƒ
 
 - A path is read from the repository root (where `pnpm josh` runs) or as an absolute path; one that names no file is refused rather than printed as `0`.
 
+### `josh usage:tee`
+
+<!-- usage: usage:tee -->
+
+Record account-wide Claude statusLine rate limits without printing output.
+
+```bash
+pnpm josh usage:tee   # Claude statusLine JSON on stdin; stdout stays empty
+```
+
+<!-- /usage -->
+
+Stores `{five_hour, seven_day, at}` in `~/.claude/josh/usage.json`; `CLAUDE_CONFIG_DIR` overrides `~/.claude`. An absent window is stored as `null`; absent `rate_limits` or invalid input leaves the file unchanged.
+
 ## Project
 
 Commands for setting up and maintaining a project.
