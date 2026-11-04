@@ -1241,12 +1241,11 @@ The `implement read` table under it splits `read` by lane medians (`lane-impleme
 (`tool`), the turns before them (`thinking`), the distinct files `Read` opened (`files read`), and how many of those an
 investigator's report cited by `path:line` (`investigator-cited`).
 
-The `stage turns` table under it counts each period-dispatched lane's transcript calls by the ledger stage their start falls
-in (`lane-turn-stats.ts`): `implement` from the dispatch to the first ship stage (open while none followed), each stage from its start to its end,
-the shortest interval holding a call (`ci-wait` inside `followup`), `between stages` for a call in none.
-
-Each `stage turns` row prints the median calls per lane and the lanes read; a lane with no transcript call is left out
-and counted on `no transcript`.
+The `stage turns` table (`lane-turn-stats.ts`) groups period-dispatched lanes' calls by ledger interval:
+`implement` until the first ship stage (open until then), the shortest stage holding a call, or `between stages`.
+Rows show median calls and measured lanes; lanes without calls appear under `no transcript`, outside the calls median.
+`stops per lane (median)` counts in-period stops by `reason` (`conflict` as `sync`) over all dispatched lanes,
+including zero-stop and transcript-missing lanes; no dispatched lanes means `not measured`.
 
 Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts, per check that settled last in `followup`'s CI wait,
 its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
