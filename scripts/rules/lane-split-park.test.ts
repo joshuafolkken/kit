@@ -5,6 +5,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { egress_guard } from './egress-guard'
 import { lane_split_park } from './lane-split-park'
 
 // joshuafolkken/kit#3296: the lane child for #3255 promoted its Issue to an epic mid-run, then applied
@@ -131,13 +132,13 @@ describe('delivered_rules.delivery — a lane child that promoted its own issue'
 })
 
 describe('delivered_rules.delivery — a person working in a lane', () => {
-	it('says nothing without the dispatch mark', () => {
+	it('leaves a raw write without the dispatch mark to egress', () => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
 
 		const payload = payload_of('person', EPIC_LABEL_COMMAND, PROMOTE_LINE)
 
-		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(egress_guard.EGRESS_REASON)
 	})
 })
 

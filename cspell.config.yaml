@@ -101,6 +101,13 @@ words:
   - pkief
   - usernamehw
   - errorlens
+  - errexit
+  - autoselection
+  - rcfile
+  - rfixture
+  - Wonce
+  - Iexample
+  - rrexml
   # Python virtual-environment directory names excluded from project file discovery.
   - venv
   # Standard shell command used to create a temporary publication directory.

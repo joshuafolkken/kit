@@ -175,9 +175,7 @@ describe('egress_guard.is_egress — leaves local checks and plain mentions alon
 		'echo "fetch the curl docs"',
 		'set -euo pipefail',
 		'export FOO=bar',
-		'node -e "console.log(process.version)"',
 		'node scripts/fetch-thing.ts',
-		'python -c "print(1)"',
 		'rsync -a dist/ build/',
 		'grep -rn "curl" scripts',
 	])(LEAVES, (command) => {
