@@ -3,8 +3,14 @@ import type { Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { IN_PROGRESS_LABEL, NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
+} from '#scripts/issue/issue-labels'
+import { issue_read } from '#scripts/issue/issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_plan, type PlanPorts } from './run-board-plan'
 
@@ -161,6 +167,29 @@ describe('run_board_plan.read_plan human merge pull requests', () => {
 		const plan = await run_board_plan.read_plan({ issues: only ? [SINGLE] : [], only }, read)
 
 		expect(plan?.human_merge_prs).toEqual(new Map([[SINGLE, EPIC]]))
+	})
+})
+
+describe('run_board_plan.read_plan decision questions', () => {
+	it('carries the trusted question from the issue comments into the live plan', async () => {
+		const labelled = { ...row(SINGLE), labels: [{ name: NEEDS_DECISION_LABEL }] }
+		const read = {
+			...ports(),
+			fetch_open: vi.fn(async () => ({ rows: [labelled], is_capped: false })),
+		}
+
+		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
+		vi.spyOn(issue_read, 'parse_comments').mockResolvedValue([
+			{ body: '## Choose an account', author: 'owner', created_at: '', is_trusted: true },
+		])
+		const plan = await run_board_plan.read_plan({ issues: [SINGLE], only: true }, read)
+
+		expect(plan?.decision_questions).toEqual(new Map([[SINGLE, 'Choose an account']]))
+		expect(git_gh_issue_read.issue_list_comments).toHaveBeenCalledWith(
+			String(SINGLE),
+			undefined,
+			REPO,
+		)
 	})
 })
 

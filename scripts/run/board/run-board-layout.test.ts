@@ -248,9 +248,9 @@ describe('run_board_layout.layout_of decision parks', () => {
 	const statuses = new Map<number, ItemStatus>([[1, { state: 'parked', started_ms: 100, reason }]])
 	const [row] = run_board_layout.layout_of(plan_of([]), statuses).active
 
-	it('draws a decision park as a human row with no reason', () => {
+	it('draws a decision park as a human row with the question', () => {
 		expect(row?.state).toBe('human')
-		expect(row?.reason).toBeUndefined()
+		expect(row?.reason).toStrictEqual({ tail: '→ decide: pick one' })
 		expect(row?.status?.state).toBe('parked')
 	})
 })
