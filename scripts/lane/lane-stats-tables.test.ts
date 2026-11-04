@@ -12,6 +12,7 @@ const FIRST_HEADER_CELLS = [
 	'ship step',
 	'followup critical path',
 	'implement sub-stage',
+	'implement read',
 	'stop',
 	'gap',
 	'cuts',

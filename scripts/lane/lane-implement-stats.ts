@@ -108,18 +108,41 @@ function active_ms(call: ToolCall, reach: Reach, paused: ReadonlyArray<PausedSpa
 	return span - lane_paused_spans.overlap_ms(paused, end - span, end)
 }
 
-// Each sub-stage's summed span over one lane's implement calls, oldest first.
-function lane_totals(calls: ReadonlyArray<ToolCall>, paused: ReadonlyArray<PausedSpan>): Totals {
-	const totals = new Map<SubStage, number>(SUB_STAGES.map((stage) => [stage, 0]))
+// One implement call with the sub-stage its span went to and that span less its paused overlap.
+interface StagedCall {
+	call: ToolCall
+	stage: SubStage
+	active_ms: number
+}
+
+// One lane's implement calls, oldest first, each put to its sub-stage.
+function staged(
+	calls: ReadonlyArray<ToolCall>,
+	paused: ReadonlyArray<PausedSpan>,
+): Array<StagedCall> {
+	const result: Array<StagedCall> = []
 	let phase: Phase = { edited: false, reviewing: false }
 	let reach = NO_REACH
 
 	for (const call of calls) {
 		phase = next_phase(call, phase)
-		const stage = sub_stage_of(call, phase)
-
-		totals.set(stage, (totals.get(stage) ?? 0) + active_ms(call, reach, paused))
+		result.push({
+			call,
+			stage: sub_stage_of(call, phase),
+			active_ms: active_ms(call, reach, paused),
+		})
 		reach = next_reach(call, reach)
+	}
+
+	return result
+}
+
+// Each sub-stage's summed span over one lane's implement calls, oldest first.
+function lane_totals(calls: ReadonlyArray<ToolCall>, paused: ReadonlyArray<PausedSpan>): Totals {
+	const totals = new Map<SubStage, number>(SUB_STAGES.map((stage) => [stage, 0]))
+
+	for (const entry of staged(calls, paused)) {
+		totals.set(entry.stage, (totals.get(entry.stage) ?? 0) + entry.active_ms)
 	}
 
 	return totals
@@ -227,7 +250,14 @@ function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow, paused: Paus
 	].join('\n')
 }
 
-const lane_implement_stats = { EDIT_TOOLS, SUB_STAGES, lane_totals_in, table }
+const lane_implement_stats = {
+	EDIT_TOOLS,
+	SUB_STAGES,
+	implement_lanes,
+	lane_totals_in,
+	staged,
+	table,
+}
 
-export type { SubStage }
+export type { StagedCall, SubStage }
 export { lane_implement_stats }
