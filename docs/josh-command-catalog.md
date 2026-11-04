@@ -170,6 +170,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:scout` | `<title> [--body <summary> \| --body-file <path>]` | automation | network | Before filing: say whether an issue like this exists and which epic it belongs to |
 | `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行"` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |
+| `josh issue:tick` | `<issue> <ac-id>...` | automation | network | Tick selected acceptance checkboxes by their plan identifiers |
 | `josh lane:adopt` · `josh lad` | `<issue> \| --all` | developer | files, git, processes, network | Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched |
 | `josh lane:await` | `<issue> [<issue>...] [--owner <pid>]` | automation | files, processes | Block until any of the named in-flight lane children completes; prints which one finished |
 | `josh lane:breakdown` · `josh lbd` | `<issue>` | maintainer | none | Print a merged lane's net time by stage, longest first, the implementation split by its tool calls |
