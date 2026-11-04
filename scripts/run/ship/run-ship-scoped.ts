@@ -68,20 +68,40 @@ async function bare_pair(scripts: ReadonlyArray<string>): Promise<JoshResult> {
 	return { ...result, out: outs.filter((out) => out !== '').join('\n') }
 }
 
+// A merge the import graph could not split names nothing (joshuafolkken/kit#6185).
+async function nameable_files(
+	scripts: ReadonlyArray<string>,
+	tree: GateTree,
+	sync: SyncReading | undefined,
+): Promise<ReadonlyArray<string> | undefined> {
+	const checks = run_ship_synced_scope.checks_of(scripts)
+
+	if (sync === undefined) return await run_ship_narrowed.moved_since_green(checks, tree)
+	if (sync.overlap === undefined) return undefined
+
+	return await run_ship_narrowed.nameable(checks, sync.overlap)
+}
+
 // The files the pair can be named over, with why, or `undefined`.
 async function named_files(
 	tree: GateTree,
 	scripts: ReadonlyArray<string>,
 	sync: SyncReading | undefined,
 ): Promise<{ files: ReadonlyArray<string>; why: string } | undefined> {
-	const checks = run_ship_synced_scope.checks_of(scripts)
-	const files =
-		sync === undefined
-			? await run_ship_narrowed.moved_since_green(checks, tree)
-			: await run_ship_narrowed.nameable(checks, sync.overlap)
+	const files = await nameable_files(scripts, tree, sync)
 	const why = sync === undefined ? MOVED_SINCE_GREEN : MERGE_MEETS_BRANCH
 
 	return files === undefined ? undefined : { files, why }
+}
+
+// The pair over the branch's own scope, after the line saying why a merge named nothing.
+async function unnamed_pair(
+	scripts: ReadonlyArray<string>,
+	sync: SyncReading | undefined,
+): Promise<JoshResult> {
+	if (sync?.unsplit !== undefined) printed(sync.unsplit)
+
+	return await bare_pair(scripts)
 }
 
 // A tree that moved while the checks ran — a reviewer's edit beside the gate — was not the one they
@@ -97,7 +117,7 @@ async function narrowed_or_bare(
 ): Promise<JoshResult> {
 	const named = await named_files(tree, scripts, sync)
 
-	if (named === undefined) return await bare_pair(scripts)
+	if (named === undefined) return await unnamed_pair(scripts, sync)
 
 	printed(run_ship_narrowed.describe(named.files, named.why))
 
