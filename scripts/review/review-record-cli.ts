@@ -2,6 +2,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_comment_carry } from './review-comment-carry'
+import { review_final_record } from './review-final-record'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
 import { review_finding_text } from './review-finding-text'
 import { review_fix_round, type DescribedFinding, type RecordedRound } from './review-fix-round'
@@ -356,6 +357,7 @@ async function record_prepared(
 
 	if (code !== 0) return code
 
+	if (!parsed.interaction) review_final_record.record(request.issue, request.findings, root)
 	review_fix_round.record_reasons(request.issue, request.findings)
 	if (request.round !== undefined) review_fix_round.save(request.round, root)
 
