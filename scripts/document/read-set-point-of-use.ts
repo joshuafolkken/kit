@@ -56,13 +56,15 @@ const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 // parent additionally reads `fullrun.md` and `split-assessment.md` inside a dispatched child, while
 // `fullrun`, `halfrun` and `kickoff` read them at their own entries.
 const DEFERRED_DECISIONS: ReadonlySet<string> = new Set(['delegation.md', 'issue-scout.md'])
+const SPLIT_ASSESSMENT = 'split-assessment.md'
 
 const POINT_OF_USE_BY_ENTRY: ReadonlyMap<string, ReadonlySet<string>> = new Map([
 	['kickoff', DEFERRED_DECISIONS],
 	['fullrun', DEFERRED_DECISIONS],
 	['halfrun', DEFERRED_DECISIONS],
 	['prrun', DEFERRED_DECISIONS],
-	['backlogrun', new Set([...DEFERRED_DECISIONS, 'fullrun.md', 'split-assessment.md'])],
+	['backlogrun', new Set([...DEFERRED_DECISIONS, 'fullrun.md', SPLIT_ASSESSMENT])],
+	['lane-child', new Set([SPLIT_ASSESSMENT])],
 ])
 
 const NO_PER_ENTRY_FILES: ReadonlySet<string> = new Set()

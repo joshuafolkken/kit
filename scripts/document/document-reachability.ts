@@ -22,6 +22,7 @@
 // the whole corpus take it as an argument, and their only callers are tests, which own the fixture.
 
 import { entry_read_set } from './entry-read-set'
+import { lane_child_read_set } from './lane-child-read-set'
 
 // The always-resident rule document. It is not an entry read — every request carries it — so it is
 // named here rather than derived from a trigger table, and the entry-total budget adds it to every
@@ -44,9 +45,9 @@ function names_of(set: ReturnType<typeof entry_read_set.read_set>): Array<string
 }
 
 function entry_read_names(root: string): Set<string> {
-	const names = entry_read_set
-		.entries(root)
-		.flatMap((entry) => names_of(entry_read_set.read_set(root, entry)))
+	const names = [...entry_read_set.entries(root), lane_child_read_set.LANE_CHILD].flatMap((entry) =>
+		names_of(entry_read_set.read_set(root, entry)),
+	)
 
 	return new Set(names)
 }

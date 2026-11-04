@@ -17,6 +17,8 @@ interface LaneSet {
 // names the rules a lane does need by `CLAUDE.md` heading or bold label, and each `include` line is
 // expanded from the launch checkout's own `CLAUDE.md` here, so the rule text keeps one source (#3929).
 const LANE_DOCUMENT = 'prompts/collaboration-workflow/lane-instructions.md'
+const WORKFLOW_ENTRY = 'fullrun-lane.md'
+const WORKFLOW_GUIDE = `A headless fullrun lane child runs pnpm josh doc:read ${WORKFLOW_ENTRY} instead of workflow-commands/SKILL.md, fullrun.md or entry-sequence.md. A resumed child follows its resume prompt first. Review sessions do not start a fullrun.`
 const RULES_FILE = 'CLAUDE.md'
 // `AGENTS.md` only points at `CLAUDE.md`, and Claude Code loads it once `CLAUDE.md` is excluded.
 const POINTER_FILE = 'AGENTS.md'
@@ -42,7 +44,7 @@ function compose(lane_markdown: string, rules: string): string | undefined {
 
 	if (expanded.includes(undefined)) return undefined
 
-	return expanded.join('\n')
+	return [WORKFLOW_GUIDE, ...expanded].join('\n')
 }
 
 // **Where the rules are: the checkout's `CLAUDE.md`, else the package copy it imports.** kit and a
@@ -133,6 +135,7 @@ function resident_line(cwd: string = process.cwd()): string {
 }
 
 const lane_instructions = {
+	WORKFLOW_ENTRY,
 	PROMPT_FILE_FLAG,
 	SETTINGS_FLAG,
 	compose,
