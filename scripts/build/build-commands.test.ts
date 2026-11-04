@@ -6,6 +6,7 @@ import { josh_in_process } from '#scripts/josh/josh-in-process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { build_commands, bundled_scripts } from './build-commands'
 import { COMMANDS_TEST_PREFIX } from './distribution-scratch-fixture'
+import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 
 const BUILD_TIMEOUT = 60_000
@@ -43,6 +44,9 @@ function run_node(
 }
 
 describe('build_commands — the pre-built doc:section', () => {
+	it('records command sources for the shared freshness check', () => {
+		expect(hook_bundle_stamp.is_fresh(out_directory, PACKAGE_DIR)).toBe(true)
+	})
 	it('bundles doc:section as the first command that skips the tsx child', () => {
 		expect(bundled_scripts()).toContain(DOC_SECTION_SCRIPT)
 	})

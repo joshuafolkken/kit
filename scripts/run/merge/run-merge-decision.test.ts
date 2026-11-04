@@ -46,7 +46,7 @@ describe('run_merge_decision — inline questions', () => {
 	it('keeps a stop guard without confirmation mechanical (ac-21828827)', () => {
 		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(`${STOP_GUARD}\n${transcript(NORMAL)}`)
 
-		expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
+		expect(run_merge_decision.cause(OUTPUT)).toStrictEqual(run_stalled.session_unfinished(NORMAL))
 	})
 })
 
@@ -60,17 +60,14 @@ describe('run_merge_decision — the latest final reply', () => {
 		)
 	})
 
-	it.each([
-		undefined,
-		'',
-		transcript(NORMAL),
-		transcript(`${NORMAL} See https://ci.example/build?job=42 for the failure log.`),
-		`${transcript(MESSAGES[0] ?? '')}${HEADER}${transcript(NORMAL)}`,
-	])('keeps an ordinary unfinished session mechanical (ac-f9e5a4ce): %s', (text) => {
-		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(text)
+	it.each([undefined, ''])(
+		'keeps an ordinary unfinished session mechanical (ac-f9e5a4ce): %s',
+		(text) => {
+			vi.spyOn(run_ending, 'read_transcript').mockReturnValue(text)
 
-		expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
-	})
+			expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
+		},
+	)
 
 	it('ignores tool text and earlier questions once the agent has answered', () => {
 		const command = JSON.stringify({
@@ -82,8 +79,23 @@ describe('run_merge_decision — the latest final reply', () => {
 			`${transcript('Proceed?')}\n${transcript(NORMAL)}\n${command}`,
 		)
 
-		expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
+		expect(run_merge_decision.cause(OUTPUT)).toStrictEqual(run_stalled.session_unfinished(NORMAL))
 	})
+})
+
+describe('run_merge_decision — mechanical final replies', () => {
+	it.each([NORMAL, `${NORMAL} See https://ci.example/build?job=42 for the failure log.`])(
+		'keeps a mechanical message after an earlier launch question: %s',
+		(message) => {
+			vi.spyOn(run_ending, 'read_transcript').mockReturnValue(
+				`${transcript(MESSAGES[0] ?? '')}${HEADER}${transcript(message)}`,
+			)
+
+			expect(run_merge_decision.cause(OUTPUT)).toStrictEqual(
+				run_stalled.session_unfinished(message),
+			)
+		},
+	)
 })
 
 describe('run_merge_decision — confirmation evidence', () => {
@@ -115,10 +127,19 @@ describe('run_merge_decision — confirmation evidence', () => {
 			type: ITEM_COMPLETED,
 			item: { type: 'command_execution', command: NOTIFY, exit_code: 1 },
 		}),
-		`📱 stop:guard sent the confirmation notify (#6268).${HEADER}${transcript(NORMAL)}`,
 	])('ignores documentation, failed sends and prior launches: %s', (text) => {
 		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(text)
 
 		expect(run_merge_decision.cause(OUTPUT)).toBe(run_stalled.SESSION_UNFINISHED)
+	})
+})
+
+describe('run_merge_decision — prior launch confirmation', () => {
+	it('keeps the latest ordinary message after a prior launch confirmation', () => {
+		vi.spyOn(run_ending, 'read_transcript').mockReturnValue(
+			`📱 stop:guard sent the confirmation notify (#6268).${HEADER}${transcript(NORMAL)}`,
+		)
+
+		expect(run_merge_decision.cause(OUTPUT)).toStrictEqual({ short: NORMAL, why: NORMAL })
 	})
 })

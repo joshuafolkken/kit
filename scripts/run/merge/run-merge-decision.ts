@@ -41,7 +41,7 @@ function judged(transcript: string): StallCause {
 	const message = agent_event.read(latest).last_message ?? ''
 	const is_confirmed = latest.split('\n').some((line) => confirms(line))
 
-	if (!is_confirmed && !asks(message)) return run_stalled.SESSION_UNFINISHED
+	if (!is_confirmed && !asks(message)) return run_stalled.session_unfinished(message)
 
 	return {
 		short: NEEDS_DECISION_LABEL,
