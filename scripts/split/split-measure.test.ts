@@ -12,6 +12,11 @@ vi.mock('#scripts/git/git-command', () => ({
 }))
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved_through_merge: vi.fn() } }))
+vi.mock('./split-relocations', () => ({
+	split_relocations: {
+		without_relocations: vi.fn(async (_root: string, _base: string, numstat: string) => numstat),
+	},
+}))
 
 const { change_base } = await import('#scripts/git/change-base')
 const { git_command } = await import('#scripts/git/git-command')
@@ -38,6 +43,21 @@ beforeEach(() => {
 
 afterEach(async () => {
 	await rm(fixture.root, { recursive: true, force: true })
+})
+
+describe('read_branch excludes quoted tests', () => {
+	it('excludes an untracked C-quoted test file over the line guide', async () => {
+		const file = 'quote"name.test.ts'
+
+		await writeFile(path.join(fixture.root, file), lines_of(201))
+		vi.mocked(git_command.untracked_names).mockResolvedValue(JSON.stringify(file))
+
+		expect(await split_measure.read_branch()).toStrictEqual({
+			files: 0,
+			lines: 0,
+			verdict: 'single',
+		})
+	})
 })
 
 describe('read_branch', () => {

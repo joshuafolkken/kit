@@ -121,10 +121,11 @@ describe('lane_dispatch.child_invocation — what the child is asked to do', () 
 // workflow-commands entry documents to learn it is a resume. This pins that instruction — its resume
 // command, and that it still ends with `child_invocation` so the parent's liveness poll keeps matching.
 describe('lane_dispatch.resume_invocation — what a relaunched child is asked to do', () => {
-	it('tells the child to resume first and points it at the resume guide, not the entry docs', () => {
+	it('opens a resumed child with one entry command (ac-648deb2e)', () => {
 		const prompt = lane_dispatch.resume_invocation(ISSUE)
 
-		expect(prompt).toContain(`pnpm josh run:cut --resume ${ISSUE}`)
+		expect(prompt).toContain(`pnpm josh run:entry ${ISSUE}`)
+		expect(prompt).not.toContain('run:cut --resume')
 		expect(prompt).toContain('pre-gate-cut.md')
 		expect(prompt).toContain('do not re-read the workflow-commands entry documents')
 	})

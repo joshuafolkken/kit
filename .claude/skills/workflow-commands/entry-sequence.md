@@ -4,15 +4,13 @@
 
 ## The ordered entry sequence
 
-**One call folds the mechanical steps**: `pnpm josh run:entry <N> --to
-<command>` claims the tree, reads the budget, bundles the reads and decides the pre-implementation
-step — steps 1, 3, 4 and 5 below in one round trip. Its `stage #<N>` line says where the run starts
-(`start: reached` redoes nothing — stop), and its `entry #<N> — hold: … · cost: … · verdict: …` line
-carries the three facts the run branches on; a `busy` / `unknown` hold or an `over` budget
-short-circuits with a non-zero exit. The numbered steps are the detail behind each fact.
+**Call `pnpm josh run:entry <N> --to <command>` once, fresh or resumed.** It checks the carried cut
+before the hold: a resume returns its instructions; `fresh` continues steps 1, 3, 4 and 5 below.
+Never call `run:cut --resume` separately. Its `stage` line names the start (`reached` stops);
+its `entry` line gives hold, cost and verdict. `busy` / `unknown` hold or `over` budget exits non-zero.
 
-1. **Claim the working tree — first, before anything else.** `#N`: `pnpm josh run:entry <N> --to
-   <command>` (no `--to` is `fullrun`), which calls `run:hold` as its first step. `new`: bare `pnpm
+1. **Claim the working tree after the resume check.** `#N`: `pnpm josh run:entry <N> --to
+   <command>` (no `--to` is `fullrun`), which calls `run:hold` on `fresh`. `new`: bare `pnpm
    josh run:hold`, ahead of the title and the filing. `hold` continues; `busy` / `unknown` stop with a
    `confirmation` Telegram carrying stderr (`run:entry` sends it). `working-tree-hold.md` is the single
    source; a cross-repository target resolves its checkout from `pnpm josh doctor` first
