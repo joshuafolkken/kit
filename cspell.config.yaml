@@ -2,6 +2,7 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  - pushurl
   # perl's `-Mstrict`, a module flag `workflow-edit.ts` must not read as in-place (#6050).
   - Mstrict
   # One of the network programs `egress-guard.ts` refuses (#5999).

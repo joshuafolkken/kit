@@ -47,6 +47,8 @@ describe('gh_api read vs write', () => {
 			"gh api repos/o/r/rulesets -f name=x -f 'note=a -X GET'",
 		],
 		['the last method winning', 'gh api repos/o/r/rulesets -X GET -X POST'],
+		['a flag-shaped jq value before a field', 'gh api user -q -X -f name=x'],
+		['a flag-shaped jq value before a method', 'gh api user -q --method -X PATCH'],
 	])('writes: %s', (_name, command) => {
 		expect(gh_api.is_write(command)).toBe(true)
 		expect(gh_api.is_read(command)).toBe(false)

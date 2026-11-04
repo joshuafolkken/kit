@@ -54,6 +54,7 @@ const VALUE_TAKING_GLOBALS: ReadonlySet<string> = new Set([
 	'--namespace',
 	'--exec-path',
 	'--super-prefix',
+	'--config-env',
 ])
 
 const FLAG_PREFIX = '-'
@@ -130,8 +131,8 @@ function global_step(flag: string): number {
 }
 
 // Skip git's own global options, so `git -C <path> -c user.name=x push` reaches `push`.
-function after_globals(words: ReadonlyArray<string>, start: number): number {
-	let index = start
+function after_globals(words: ReadonlyArray<string>): number {
+	let index = 0
 
 	while (index < words.length) {
 		const flag = words[index] ?? ''
@@ -179,9 +180,15 @@ function parse(segment: string): GitCall | undefined {
 
 	if (words === undefined) return undefined
 
-	const subcommand_index = after_globals(words, 0)
+	const subcommand_index = after_globals(words)
 
 	return { subcommand: words[subcommand_index], args: words.slice(subcommand_index + NEXT) }
+}
+
+function global_arguments_of(segment: string): Array<string> {
+	const words = arguments_of(segment, GIT_COMMAND) ?? []
+
+	return words.slice(0, after_globals(words))
 }
 
 // A single-dash cluster of letters (`-uf`, `-D`), never a `--long` flag. The callers ask whether such a
@@ -201,7 +208,14 @@ function short_cluster_has(token: string, letters: string): boolean {
 	return false
 }
 
-const git_argv = { arguments_of, parse, program_of, short_cluster_has, words_of }
+const git_argv = {
+	arguments_of,
+	global_arguments_of,
+	parse,
+	program_of,
+	short_cluster_has,
+	words_of,
+}
 
 export { git_argv }
 export type { ProgramCall }

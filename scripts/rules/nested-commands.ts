@@ -1,4 +1,5 @@
 import { git_argv } from './git-argv'
+import { interpreter_options } from './interpreter-options'
 import { shell_segments } from './shell-segments'
 
 // Every command a `Bash` call runs, the nested ones included — the cut `protected-files.ts` and
@@ -8,9 +9,8 @@ import { shell_segments } from './shell-segments'
 // cut apart, since `commands_of` cuts at every newline.
 
 // Programs that run their quoted argument as a script.
-const SHELLS: ReadonlySet<string> = new Set(['bash', 'eval', 'sh', 'zsh'])
+const { SHELLS } = interpreter_options
 const EVAL = 'eval'
-const SCRIPT_FLAG_LETTER = 'c'
 // The body of an innermost `$(…)` / `<(…)` / `>(…)`, or of a backtick substitution.
 const SUBSTITUTION = /[$<>]\((?<paren>[^()]*)\)|`(?<backtick>[^`]*)`/gu
 const OUTER_QUOTES = /^["']|["']$/gu
@@ -26,7 +26,7 @@ function is_shell(segment: string): boolean {
 function quoted_script_of(args: ReadonlyArray<string>, name: string): string {
 	if (name === EVAL) return args.join(' ')
 
-	const flag_index = args.findIndex((word) => git_argv.short_cluster_has(word, SCRIPT_FLAG_LETTER))
+	const flag_index = interpreter_options.shell_script_index({ name, args: [...args] })
 
 	return flag_index === -1 ? '' : (args[flag_index + NEXT] ?? '')
 }
@@ -37,12 +37,6 @@ function script_of(segment: string): string {
 	if (call === undefined) return ''
 
 	return quoted_script_of(call.args, call.name).replaceAll(OUTER_QUOTES, '')
-}
-
-// A shell's quoted script holds commands of its own, cut again without regard to quotes
-// (`bash -c "true; cat .env"`).
-function script_commands_of(segment: string): Array<string> {
-	return is_shell(segment) ? shell_segments.commands_of(segment) : []
 }
 
 // The bodies a segment runs, each read as a command line of its own: a shell's unquoted script
@@ -65,7 +59,7 @@ function commands_of(command: string): Array<string> {
 	while (pending.length > 0) {
 		const segments = pending.flatMap((line) => shell_segments.quote_aware_commands_of(line))
 
-		found.push(...segments, ...segments.flatMap((segment) => script_commands_of(segment)))
+		found.push(...segments)
 		pending = segments.flatMap((segment) => bodies_of(segment))
 	}
 
