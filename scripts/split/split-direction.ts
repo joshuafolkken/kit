@@ -1,6 +1,6 @@
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -29,6 +29,7 @@ const COMMAND_SEPARATOR = ':'
 interface SplitFiling {
 	route: string | undefined
 	found_during: string | undefined
+	labels?: ReadonlyArray<string>
 }
 
 interface Reference {
@@ -107,7 +108,7 @@ function format_refusal(kept: string, found: ReadonlyArray<Reference>): string {
 
 	return [
 		`✖ ${session_cite.issue(kept)}'s expected result or acceptance criteria name what this split takes off: ${named}. The kept Issue depends on the split-off part, so it cannot merge first.`,
-		`File the part as a prerequisite instead (\`--route tier-a\`), then run \`pnpm josh run:split ${kept} --prerequisite <P>\` — \`prerequisite.md\`; nothing was filed.`,
+		`File the part as a prerequisite instead (\`--route split --label route:tier-a\`), then run \`pnpm josh run:split ${kept} --prerequisite <P>\` — \`prerequisite.md\`; nothing was filed.`,
 	].join('\n')
 }
 
@@ -118,10 +119,16 @@ function kept_issue({ route, found_during }: SplitFiling): string | undefined {
 	return issue_number_shape.is_issue_number(found_during) ? found_during : undefined
 }
 
+function is_prerequisite({ labels = [] }: SplitFiling): boolean {
+	return labels.includes(TIER_A_ROUTE_LABEL)
+}
+
 // The refusal for a split child filed from `found_during`, or `undefined` when it may split off
 // independently. An unreadable kept body refuses nothing: the check is advice on the split's direction,
 // not a gate on reaching GitHub.
 async function refusal_of(filing: SplitFiling, child_body: string): Promise<string | undefined> {
+	// A split prerequisite explicitly keeps the opposite dependency (joshuafolkken/kit#6300).
+	if (is_prerequisite(filing)) return undefined
 	const found_during = kept_issue(filing)
 	if (found_during === undefined) return undefined
 	const kept_body = await git_gh_command.issue_get_body(found_during)

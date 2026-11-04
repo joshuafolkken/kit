@@ -78,7 +78,7 @@ describe('issue_file_cli.record — a split child', () => {
 		expect(record_child).toHaveBeenCalledExactlyOnceWith({
 			route: SPLIT_ROUTE_LABEL,
 			found_during: FINDER,
-			child: '#3438',
+			child: URL,
 		})
 	})
 })

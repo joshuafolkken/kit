@@ -25,6 +25,7 @@ import { run_step } from '#scripts/run/run-step'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_children, type EntryRequest, type Resume } from './run-entry-children'
+import { run_entry_dispatch } from './run-entry-dispatch'
 import { run_entry_lane_plan } from './run-entry-lane-plan'
 import { run_entry_spill } from './run-entry-spill'
 import { run_entry_stop, type StopNotice } from './run-entry-stop'
@@ -381,6 +382,8 @@ async function claim_run(request: EntryRequest, state: StageState): Promise<numb
 
 		return await stop_run({ parts, command, reason: HOLD_REASON, should_release: false })
 	}
+
+	await run_entry_dispatch.record_missing(Number(issue_number))
 
 	const cost = await check_cost()
 	// The entry synchronizes the tree with main before reading the issue (a lane child's ship does it).

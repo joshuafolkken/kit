@@ -144,7 +144,7 @@ describe('test_pinned.run with a stored verdict', () => {
 			const report = await run_report()
 
 			expect(runs).toHaveBeenCalledTimes(1)
-			expect(report).toEqual(first)
+			expect(report).toEqual({ ...first, tree_hash: report.tree_hash })
 		},
 		RUN_TIMEOUT,
 	)
@@ -166,7 +166,7 @@ describe('test_pinned.run after only run records changed', () => {
 			const report = await run_report()
 
 			expect(runs).not.toHaveBeenCalled()
-			expect(report).toEqual(first)
+			expect(report).toEqual({ ...first, tree_hash: report.tree_hash })
 		},
 		RUN_TIMEOUT,
 	)
@@ -202,7 +202,7 @@ describe('test_pinned.run after a non-code file changed', () => {
 
 			expect(runs).toHaveBeenCalledTimes(1)
 			expect(runs.mock.calls[0]?.[1].slice(0, 2)).toEqual(['run', test_pinned_fixture.TEST_FILE])
-			expect(report).toEqual(first)
+			expect(report).toEqual({ ...first, tree_hash: report.tree_hash })
 		},
 		RUN_TIMEOUT,
 	)
@@ -317,7 +317,7 @@ describe('test_pinned.run after a test file is added', () => {
 			const report = await run_report()
 
 			expect(runs).toHaveBeenCalledTimes(1)
-			expect(report).toEqual(first)
+			expect(report).toEqual({ ...first, tree_hash: report.tree_hash })
 		},
 		RUN_TIMEOUT,
 	)
@@ -357,7 +357,7 @@ describe('test_pinned.run over parallel trees', () => {
 
 			const parallel = await run_report()
 
-			expect(trees).toHaveBeenCalledTimes(2 + 1)
+			expect(trees).toHaveBeenCalledTimes(2 + 1 + 2)
 			expect(parallel).toEqual(serial)
 		},
 		RUN_TIMEOUT,

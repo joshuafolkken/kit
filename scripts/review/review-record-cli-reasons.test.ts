@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
+import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { review_prior_findings } from './review-prior-findings'
 import { review_record_cli } from './review-record-cli'
@@ -91,6 +92,24 @@ async function record(name: string, positionals: ReadonlyArray<string>): Promise
 }
 
 describe('review_record_cli.run with a reason', () => {
+	it.each(['passing', 'blocking'])(
+		'saves a ship %s finding description (ac-e202c7b5)',
+		async (route) => {
+			rmSync(LOG, { force: true })
+			const prefix = route === 'passing' ? run_ship_review.FIXED_PREFIX : ''
+			const verdict = run_ship_review.read_verdict(`${prefix}${EPERM_SPEC} — ${EPERM_REASON}`)
+
+			expect(verdict.kind).not.toBe(run_ship_review.VERDICT.INVALID)
+			if (verdict.kind === run_ship_review.VERDICT.INVALID) return
+
+			const outcome = run_ship_review.round_one_outcome(verdict)
+			const specs = run_ship_review.recorded_specs(verdict, outcome)
+
+			await record(`ship-${route}`, specs)
+			expect(readFileSync(LOG, 'utf8')).toContain('is_live_pid reads EPERM as dead.')
+		},
+	)
+
 	it('carries the location and reason into the next stop fix and the next review prompt', async () => {
 		await record('with-reason', [`${EPERM_SPEC} — ${EPERM_REASON}`])
 

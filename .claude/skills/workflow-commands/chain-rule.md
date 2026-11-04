@@ -28,7 +28,7 @@ Review results and successful pushes are never turn boundaries.
      `review:round2 --record <N>` and runs a due round 2 as `reviewer-verification`.
    - Round 2 is final. Fix a branch-1 finding, run its scoped check, push it, then run the gate. Dispose
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
-   Outside step 0, round-1 fixes run one scoped check and the gate before `git -y`.
+   After the last pre-commit review fix: `pnpm josh test:related --touched` once.
    Record an attested round's findings with `pnpm josh review:record --from-slot
    --issue <N>` (dispositions: its usage). **A round 2 that
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").
@@ -86,7 +86,7 @@ These are the gate → review → PR → merge facts other documents cite; this 
 - **One related-check command answers once per tree** — while implementing re-run one check per edit
   (`lint:related` / `cspell:dot` / `test:related --touched`), one full-reach `test:related` once the
   implementation is done (`docs/josh-commands.md` → "`josh test:related`"), then `pnpm josh check:related` once
-  before `run:review`, a review round's fixes once after the last (in a lane, none after `run:review`); `check:related` is those three plus `check`. In kit `lint:related` reports a metrics total past the
+  before `run:review`; ship's scoped pair runs full reach after review fixes; `check:related` is those three plus `check`. In kit `lint:related` reports a metrics total past the
   merge-base; accept it with its reason before `run:review`, whose open stops on it (the ship's pre-detach check is the backstop).
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against
