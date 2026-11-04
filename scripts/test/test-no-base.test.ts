@@ -46,6 +46,37 @@ describe('test_no_base.touching', () => {
 	})
 })
 
+// joshuafolkken/kit#6186: the import decides, not a string the text happens to hold.
+describe('test_no_base.imports_base', () => {
+	const IMPORTS = Object.fromEntries([['#scripts/*', './scripts/*.ts']])
+	const FILE = 'scripts/gate/fixture.ts'
+
+	it('keeps a file that imports a base-resolution module, by alias or relative path', () => {
+		const aliased = "import { change_base } from '#scripts/git/change-base'\n"
+		const relative = "import { git_diff_reads } from '../git/git-diff-reads'\n"
+
+		expect(test_no_base.imports_base(aliased, FILE, IMPORTS)).toBe(true)
+		expect(test_no_base.imports_base(relative, FILE, IMPORTS)).toBe(true)
+	})
+
+	it.each([
+		[
+			'only names the default branch as a string',
+			'const BRANCH = \'main\'\nconst OTHER = "main"\n',
+		],
+		[
+			'calls a wrapper, which hands it paths already resolved',
+			"import { changed_paths } from '#scripts/git/changed-paths'\n",
+		],
+		[
+			'imports a type alone, which resolves nothing at run time',
+			"import type { ChangeBase } from '#scripts/git/change-base'\n",
+		],
+	])('leaves out a file that %s', (_case, source) => {
+		expect(test_no_base.imports_base(source, FILE, IMPORTS)).toBe(false)
+	})
+})
+
 describe('test_no_base.run_if_touched', () => {
 	it('runs the related tests of the touching files in the no-base checkout, then removes it', async () => {
 		const exit_code = await test_no_base.run_if_touched(ROOT, [BASE_FILE, OTHER_FILE], ['--silent'])
