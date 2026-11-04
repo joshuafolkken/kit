@@ -4,6 +4,7 @@ import { agent_provider } from '#scripts/agent/agent-provider'
 import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import { run_cut_adoption } from '#scripts/run/cut/run-cut-adoption'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { describe, expect, it } from 'vitest'
 import { josh_harness, type JoshEnvironment } from './josh-harness'
@@ -78,12 +79,22 @@ async function seed(
 	return { cut, hold, handoff }
 }
 
+async function release_and_resume(opened: JoshEnvironment, target: string): Promise<void> {
+	expect(await command(opened, ['--resume', ISSUE], 'other-session')).toBe('handed-off')
+	const read = run_cut.read_cut(target)
+	if (read.kind !== 'carried') throw new Error('missing adopted cut')
+
+	run_cut_adoption.release(target, read.cut, ISSUE)
+
+	expect(await command(opened, ['--resume', ISSUE])).toBe('resume')
+}
+
 async function exercise(opened: JoshEnvironment): Promise<void> {
 	const saved = await seed(opened)
 
 	try {
 		expect(await command(opened, ['--resume', ISSUE])).toBe('resume')
-		expect(await command(opened, ['--resume', ISSUE], 'other-session')).toBe('handed-off')
+		await release_and_resume(opened, saved.cut)
 		expect(await command(opened, ['--impl', ISSUE, '--handoff', saved.handoff])).toBe('cut')
 		const read = run_cut.read_cut(saved.cut)
 

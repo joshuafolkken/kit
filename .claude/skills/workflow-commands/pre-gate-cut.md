@@ -69,8 +69,9 @@ pnpm josh run:cut --resume <N>
   fresh hold claim and the split assessment, re-read the plan, then **continue implementation** — do
   **not** go straight to the gate. A round 1 the resume prints is continued, not rerun
   (`scripts/run/cut/run-cut-review.ts`).
-- `handed-off` (0) — a successor already adopted this cut. **End the turn quietly and do nothing**;
-  no Telegram owed.
+- `handed-off` (0) — a successor adopted this cut and has not been released. **End the turn quietly
+  and do nothing**; no Telegram owed. After `run:merge` stops and releases that worker to wait or
+  park, the next resume verifies and adopts the saved cut again.
 - `stale` (1) — the record does not match the tree (branch, clean tree, expired, or unknown hand-off).
   **A resume failure**: send a `confirmation` Telegram and stop; never gate the wrong tree.
 - `busy` (1) — another process owns the resume. Send a `confirmation` Telegram and stop.
@@ -95,8 +96,9 @@ or re-normalize the title; the plan and decisions are read back from the issue.
 - **Adoption records its session**; only that session may replace its adopted pre-gate record with an
   implementation cut. An unknown adopter stays protected (OpenAI keeps its supervisor owner separately).
 - **The cut is exclusive** — a second cut on the same tree is `busy`.
-- **The resume is unique** — a spent record answers `handed-off`, and the take-over is an exclusive
-  create. One lane crosses the pre-gate boundary exactly once.
+- **The resume is unique until release** — a spent record answers `handed-off`, and the take-over is
+  an exclusive create. After stopping the worker, `run:merge` makes its adopted cut resumable again
+  for a later run, preserving the branch, timestamp and handoff.
 
 ## The implementation-phase cut — a lane child cuts before the gate too
 
