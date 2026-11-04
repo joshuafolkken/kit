@@ -1,6 +1,7 @@
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
+import { test_related_verdict } from '#scripts/test/test-related-verdict'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_brief_cli } from './review-brief-cli'
 import { review_tree } from './review-tree'
@@ -54,6 +55,13 @@ afterEach(() => {
 })
 
 describe('josh review:brief without a scoped green record', () => {
+	it('allows only later rounds to try the separate touched record', async () => {
+		await review_brief_cli.run(['--round', '2'])
+		expect(mocked_refusal).toHaveBeenNthCalledWith(2, CHANGED_TREE, RESOLVED_COMMIT, {
+			test: test_related_verdict.touched_target(),
+		})
+	})
+
 	it('exits non-zero rather than composing a brief', async () => {
 		await expect(review_brief_cli.run(NO_ARGUMENTS)).resolves.toBe(REFUSED_EXIT_CODE)
 	})
