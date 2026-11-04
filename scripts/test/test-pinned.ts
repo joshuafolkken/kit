@@ -6,6 +6,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
 import { test_pinned_cache, type LoadedCache, type Reached } from './test-pinned-cache'
 import { test_pinned_cache_logic, type Known, type Recheck } from './test-pinned-cache-logic'
+import { test_pinned_carry } from './test-pinned-carry'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_functions } from './test-pinned-functions'
 import type { PinnedOrigin } from './test-pinned-ledger'
@@ -85,15 +86,6 @@ async function read_hunks(base: string, files: ReadonlyArray<string>): Promise<A
 	)
 }
 
-// The key of each hunk, read off the working file its lines sit in now.
-async function keys_of(hunks: ReadonlyArray<Hunk>): Promise<Array<string>> {
-	const contents = await Promise.all(hunks.map(async (hunk) => await readFile(hunk.file, 'utf8')))
-
-	return test_pinned_cache_logic.distinct(
-		hunks.map((hunk, index) => test_pinned_cache_logic.hunk_key(hunk, contents[index] ?? '')),
-	)
-}
-
 // The verdict the cache already holds; one left to recheck holds none yet.
 function held_of(known: Known): RedProbe | undefined {
 	return test_pinned_cache_logic.is_recheck(known) ? undefined : known
@@ -152,7 +144,7 @@ async function verdicts_on(paths: ReadonlyArray<string>, probing: ProbeRun): Pro
 	const verdicts = probing.known.map((entry) => held_of(entry))
 	const reached = reached_of(verdicts)
 	const probes = by_reach(probes_of(probing.hunks, probing.known), probing.counts)
-	const writer = test_pinned_cache.writer(probing.cache, probing.keys)
+	const writer = test_pinned_cache.writer({ ...probing.cache, hunks: probing.hunks }, probing.keys)
 	const options = check_options(reached.length, probing.options)
 
 	await writer.record(reached)
@@ -202,7 +194,7 @@ async function checked_outcome(
 	options: RunOptions,
 ): Promise<HunkOutcome> {
 	const { hunks, cache } = read
-	const keys = await keys_of(hunks)
+	const keys = test_pinned_carry.keys(cache, hunks)
 	const known = await test_pinned_cache.known(
 		cache,
 		keys,
@@ -221,16 +213,15 @@ async function checked_outcome(
 	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts), staged }
 }
 
-// A hunk over the test-file cap is neither read from the cache nor probed, in either mode, so both
-// report it alike; the fresh run's ledger row counts it.
+// A hunk over the test-file cap is never probed; both modes report it alike, and the fresh run's
+// ledger row counts it.
 async function outcome_on(
-	base: string,
+	cache: LoadedCache,
 	paths: ReadonlyArray<string>,
 	changed: ReadonlyArray<Hunk>,
 	options: RunOptions,
 ): Promise<HunkOutcome> {
 	if (changed.length === 0) return NO_OUTCOME
-	const cache = await test_pinned_cache.load(base, changed)
 	const counts = await counts_of(changed, cache.reach)
 	const { checked, unchecked } = test_pinned_logic.capped(changed, counts)
 	const capped_options = { ...options, over_cap: unchecked.length }
@@ -300,8 +291,10 @@ async function report_on(
 		changed.filter((file) => test_pinned_logic.is_target(file)),
 	)
 	const probes = await read_probes(base, targets)
-	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, has_runner ? max_hunks : 0)
-	const outcome = await outcome_on(base, paths, checked, { ...options, rewired: probes.rewired })
+	const cache = await test_pinned_cache.load(base, probes.hunks)
+	const { checked, unchecked } = await test_pinned_carry.select(cache, has_runner ? max_hunks : 0)
+	if (!options.is_cached_only) test_pinned_carry.record(cache, unchecked)
+	const outcome = await outcome_on(cache, paths, checked, { ...options, rewired: probes.rewired })
 
 	return { ...outcome, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
 }
