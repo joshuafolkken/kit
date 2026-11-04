@@ -50,6 +50,7 @@ const issue_fields_schema = z.looseObject({
 })
 
 const comment_schema = z.looseObject({
+	html_url: z.string().optional(),
 	user: z.looseObject({ login: z.string() }).optional(),
 	created_at: z.string().optional(),
 	body: z.string().optional(),
@@ -66,6 +67,7 @@ interface IssueFields {
 }
 
 interface IssueComment {
+	html_url?: string | undefined
 	author: string
 	created_at: string
 	body: string
@@ -113,6 +115,7 @@ async function to_comment(
 	const login = raw.user?.login
 
 	return {
+		html_url: raw.html_url,
 		author: login ?? UNKNOWN_AUTHOR,
 		created_at: raw.created_at ?? UNKNOWN_TIME,
 		body: raw.body ?? '',

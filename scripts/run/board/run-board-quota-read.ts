@@ -164,17 +164,21 @@ function codex_heads(text: string): Array<QuotaReading> {
 		.filter((reading) => reading !== undefined)
 }
 
-function json_ms(line: string): number | undefined {
+function json_stamp(line: string): string | undefined {
 	if (!line.includes(TIMESTAMP_MARK)) return undefined
 
-	return time_instant.parse_instant(json_value.parse_with(line, TIMED_LINE)?.timestamp)
+	return json_value.parse_with(line, TIMED_LINE)?.timestamp
 }
 
 // The time a line carries: the launcher's header's, or a JSON line's own `timestamp`.
-function line_ms(line: string): number | undefined {
+function line_stamp(line: string): string | undefined {
 	const stamp = LAUNCH_HEADER.exec(line)?.groups?.['stamp']
 
-	return stamp === undefined ? json_ms(line) : time_instant.parse_instant(stamp)
+	return stamp ?? json_stamp(line)
+}
+
+function line_ms(line: string): number | undefined {
+	return time_instant.parse_instant(line_stamp(line))
 }
 
 // The nearest time among `lines` before `index`; the header heads the log, so it is reached last.
@@ -398,6 +402,7 @@ const run_board_quota_read = {
 	codex_heads,
 	codex_reading,
 	read_head,
+	line_stamp,
 	read_tail,
 	reading_in,
 }
