@@ -1,0 +1,7 @@
+{
+	"reason": "Import-based no-base targeting replaces the string match; the test-side reader adds a few lines (#6186)",
+	"date": "2026-11-04",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}
