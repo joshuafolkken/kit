@@ -19,7 +19,7 @@ run_cut_cli_fixture.install()
 
 const FAILURE_EXIT_CODE = 1
 const OVER_MINUTES = 31
-const NOTE = 'got the split notice and has neither a recorded reason nor a split child'
+const NOTE = 'got the split notice and has no split child'
 
 // joshuafolkken/kit#6026: an implementation past its stage budget with a green part checked ships that
 // part and spills the rest, rather than being cut and resumed into it.

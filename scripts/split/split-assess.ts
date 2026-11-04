@@ -178,10 +178,9 @@ function notice_bar(declared: DeclaredSize | undefined): NoticeBar {
 // pins the document to both.
 const NOTICE_SECTION = 'Over the guide before the gate'
 const QUESTION_SECTION = 'The question'
-// The line that records why an Issue stays one — read the same in a filed body (`size_estimate`) and
-// in the Issue comment that answers the notice (`split_resolution`).
+// The filing's reason line (`size_estimate`); it does not answer a later split notice.
 const REASON_PREFIX = '- 分割しない理由:'
-const NOTICE_ACTION = `record why it stays one Issue in an Issue comment line \`${REASON_PREFIX} <理由>\`, or carve the rest out with \`pnpm josh issue:file --route split\` — split-assessment.md → "${NOTICE_SECTION}"`
+const NOTICE_ACTION = `stop implementation, keep only the green part and file the rest with \`pnpm josh issue:file --route split --found-during <N>\`, then ship the green part — split-assessment.md → "${NOTICE_SECTION}"`
 
 // The pre-gate notice `josh main:merge` prints for a diff past `notice_bar` on either axis — strictly
 // greater than, as the guide is — and a diff at or under it prints nothing.

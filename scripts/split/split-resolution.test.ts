@@ -9,8 +9,7 @@ import { split_resolution } from './split-resolution'
 
 const { REASON_PREFIX } = split_assess
 
-// joshuafolkken/kit#4695: a lane the split notice reached is refused before the gate until it either
-// filed a split child or recorded, in a trusted Issue comment, why it stays one Issue.
+// joshuafolkken/kit#6212: only a filed split child answers the notice, never a reason comment.
 
 const ISSUE = 4695
 const OTHER_ISSUE = 4696
@@ -48,12 +47,12 @@ beforeEach(() => {
 })
 
 describe('split_resolution.refusal for a noticed issue with no answer', () => {
-	it('names the counts, the reason line, the split route and the command to rerun', async () => {
+	it('names the counts, the stop, the split route and the command to rerun', async () => {
 		const note = await split_resolution.refusal(ISSUE, [NOTICE])
 
 		expect(note).toContain('11 file(s), 550 line(s)')
-		expect(note).toContain(REASON_PREFIX)
-		expect(note).toContain('pnpm josh issue:file --route split')
+		expect(note).toContain('stop implementation, keep only the green part')
+		expect(note).toContain(`pnpm josh issue:file --route split --found-during ${String(ISSUE)}`)
 		expect(note).toContain(`pnpm josh run:cut ${String(ISSUE)}`)
 	})
 
@@ -69,10 +68,11 @@ describe('split_resolution.refusal for a noticed issue with no answer', () => {
 		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toBeDefined()
 	})
 
-	it('refuses, saying so, when the comments cannot be read', async () => {
+	it('refuses without reading unavailable comments', async () => {
 		list_comments.mockResolvedValue(undefined)
 
-		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toContain('could not be read')
+		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toContain('has no split child')
+		expect(list_comments).not.toHaveBeenCalled()
 	})
 })
 
@@ -88,10 +88,12 @@ describe('split_resolution.refusal for an answered or unnoticed issue', () => {
 		expect(await split_resolution.refusal(ISSUE, [NOTICE, SPLIT_CHILD])).toBeUndefined()
 	})
 
-	it('passes an issue with a trusted comment carrying the reason line', async () => {
+	it('refuses a trusted reason comment without a split child (ac-cb274576)', async () => {
 		list_comments.mockResolvedValue(comments_json(`Stays one Issue.\n${REASON}`))
 
-		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toBeUndefined()
+		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toBeDefined()
+		expect(list_comments).not.toHaveBeenCalled()
+		expect(is_trusted).not.toHaveBeenCalled()
 	})
 })
 
