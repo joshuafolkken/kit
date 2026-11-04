@@ -7,6 +7,7 @@ import { lane_cut_stats } from './lane-cut-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_implement_rate } from './lane-implement-rate'
+import { lane_implement_read } from './lane-implement-read'
 import { lane_implement_stats } from './lane-implement-stats'
 import type { lane_ledger } from './lane-ledger'
 import { lane_paused_spans } from './lane-paused-spans'
@@ -39,6 +40,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_ship_lap_stats.table(entries, window),
 		lane_ci_path_stats.table(entries, window),
 		lane_implement_stats.table(calls, window, lane_paused_spans.by_lane(entries)),
+		lane_implement_read.table(calls, window, lane_paused_spans.by_lane(entries)),
 		lane_stop_stats.table(entries, window, events),
 		lane_gap_stats.table(entries, window, events),
 		lane_cut_stats.table(entries, window, events),

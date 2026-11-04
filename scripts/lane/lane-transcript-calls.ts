@@ -20,7 +20,8 @@ import { z } from 'zod'
 // the agent dispatched (joshuafolkken/kit#5297). **A review's pass and level are kept too** — the
 // interaction review by its brief's path or block, the round-2 verification pass by its prompt's words
 // (`run-ship-review.ts`), and the level when the prompt opens with it — so `josh lane:breakdown` tells
-// the reviews apart (joshuafolkken/kit#5539); the prompt itself is not kept.
+// the reviews apart (joshuafolkken/kit#5539); the prompt itself is not kept. **A call's `file_path` is
+// kept**, so the implement's read can count the files it read (joshuafolkken/kit#6188).
 
 interface Subagent {
 	type: string
@@ -39,6 +40,7 @@ interface ToolCall {
 	command: string | undefined
 	subagent: Subagent | undefined
 	output: string
+	file_path?: string | undefined
 }
 
 interface ToolUse {
@@ -47,6 +49,7 @@ interface ToolUse {
 	background: boolean
 	command: string | undefined
 	subagent: Subagent | undefined
+	file_path: string | undefined
 }
 
 interface ToolResult {
@@ -68,12 +71,14 @@ interface RawInput {
 	subagent_type?: unknown
 	model?: unknown
 	prompt?: unknown
+	file_path?: unknown
 }
 
 interface CallInput {
 	background: boolean
 	command: string | undefined
 	subagent: Subagent
+	file_path: string | undefined
 }
 
 const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Task'])
@@ -125,6 +130,7 @@ function to_input(input: RawInput | null | undefined): CallInput {
 		background: input?.run_in_background === true,
 		command: string_or_undefined(input?.command),
 		subagent: subagent_of(input),
+		file_path: string_or_undefined(input?.file_path),
 	}
 }
 
@@ -140,6 +146,7 @@ const INPUT_SCHEMA = z
 		subagent_type: z.unknown(),
 		model: z.unknown(),
 		prompt: z.unknown(),
+		file_path: z.unknown(),
 	})
 	.partial()
 
@@ -219,6 +226,7 @@ function to_call(source: CallSource, use: ToolUse, result: ToolResult | undefine
 		command: use.command,
 		subagent: use.subagent,
 		output: result?.output ?? '',
+		file_path: use.file_path,
 	}
 }
 
