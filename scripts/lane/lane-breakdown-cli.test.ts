@@ -29,9 +29,22 @@ const ISSUE = 4970
 const FAILURE = 1
 const START = Date.parse('2026-10-26T05:43:00.000Z')
 const MINUTE_MS = 60_000
+const FOLLOWUP_CI = 'followup CI'
+const SHIP_STAGE = 'ship-stage'
 
 function at(minute: number): string {
 	return new Date(START + minute * MINUTE_MS).toISOString()
+}
+
+function followup_lap(ended: number, minutes: number, step: string): LedgerEntry {
+	return {
+		kind: 'ship-lap',
+		at: at(ended),
+		issue: ISSUE,
+		stage: 'followup',
+		step,
+		elapsed_ms: minutes * MINUTE_MS,
+	}
 }
 
 beforeEach(() => {
@@ -58,6 +71,7 @@ describe('lane_breakdown_cli.run', () => {
 				'- implement 51.0 min, over budget +39 min (editing & thinking 51.0 min)',
 				'- start to plan 10.0 min, over budget +7 min',
 				'- waits taken out (park, outage, usage limit, yield, host sleep) 0.0 min, of which yield wait 0.0 min, of which host sleep 0.0 min',
+				'- Largest time sinks (stages and laps overlap): implement 51.0 min; start to plan 10.0 min',
 			].join('\n'),
 		)
 	})
@@ -74,6 +88,45 @@ describe('lane_breakdown_cli.run', () => {
 		await expect(lane_breakdown_cli.run([])).resolves.toBe(FAILURE)
 		await expect(lane_breakdown_cli.run(['x'])).resolves.toBe(FAILURE)
 		expect(console.error).toHaveBeenCalledWith(lane_breakdown_cli.USAGE)
+	})
+})
+
+// joshuafolkken/kit#6303: reuse the sinks classification, with overlapping laps summed by name.
+describe('lane_breakdown_cli.run time sinks', () => {
+	it('prints the largest three sinks descending after aggregating repeated lap names', async () => {
+		mocks.all_events.mockResolvedValue([
+			{ pos: 1, at: at(10), kind: 'plan', text: `#${String(ISSUE)} plan` },
+			{ pos: 2, at: at(31), kind: SHIP_STAGE, text: `#${String(ISSUE)} followup start` },
+		])
+		mocks.read_entries.mockReturnValue([
+			{ kind: 'dispatch', at: at(0), issue: ISSUE },
+			followup_lap(51, 20, FOLLOWUP_CI),
+			followup_lap(56, 5, `${FOLLOWUP_CI} (reused)`),
+			{ kind: 'merge', at: at(61), issue: ISSUE },
+		])
+
+		await lane_breakdown_cli.run([String(ISSUE)])
+
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining(
+				'\n- Largest time sinks (stages and laps overlap): ship followup 30.0 min; followup CI 25.0 min; implement 21.0 min',
+			),
+		)
+		expect(String(vi.mocked(console.info).mock.calls[0]?.[0]).split('\n').at(-1)).not.toContain(
+			'start to plan',
+		)
+	})
+
+	it('prints a single available sink without padding', async () => {
+		mocks.all_events.mockResolvedValue([])
+
+		await lane_breakdown_cli.run([String(ISSUE)])
+
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringMatching(
+				/\n- Largest time sinks \(stages and laps overlap\): start to plan 61\.0 min$/u,
+			),
+		)
 	})
 })
 
@@ -101,12 +154,11 @@ describe('lane_breakdown_cli.run on a lane that cut', () => {
 describe('lane_breakdown_cli.run on a lane whose ship pre-detach probed', () => {
 	it("prints the test:pinned row written inside the stage on that stage's line", async () => {
 		const lane = `#${String(ISSUE)}`
-		const ship_stage = 'ship-stage'
 
 		mocks.all_events.mockResolvedValue([
 			{ pos: 1, at: at(10), kind: 'plan', text: `${lane} plan` },
-			{ pos: 2, at: at(50), kind: ship_stage, text: `${lane} pre-detach start` },
-			{ pos: 3, at: at(55), kind: ship_stage, text: `${lane} pre-detach done` },
+			{ pos: 2, at: at(50), kind: SHIP_STAGE, text: `${lane} pre-detach start` },
+			{ pos: 3, at: at(55), kind: SHIP_STAGE, text: `${lane} pre-detach done` },
 		])
 		mocks.read_entries.mockReturnValue([
 			{ kind: 'dispatch', at: at(0), issue: ISSUE },
