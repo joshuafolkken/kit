@@ -30,6 +30,7 @@ import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round } from './review-round'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_round_one_skip } from './review-round-one-skip'
+import { review_size } from './review-size'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 import { review_untouched_readers, type ReadersRead } from './review-untouched-readers'
@@ -205,6 +206,7 @@ function record_briefed(tree: Record<string, string>, base?: string): void {
 }
 
 interface ComposeRequest {
+	level: ReviewLevel
 	is_full_change?: boolean | undefined
 	round: number
 	paths: ReadonlyArray<string>
@@ -267,7 +269,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 
 	return review_brief.compose({
 		is_full_change: request.is_full_change,
-		level: review_level.level_for(paths),
+		level: request.level,
 		profile,
 		round,
 		tree,
@@ -312,28 +314,18 @@ function report_error(message: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-// Why a change was reduced, or which path forced the default — moved here verbatim from the old
-// `review:level` command so `--level-only` says why rather than only what.
-function format_reason(paths: ReadonlyArray<string>, level: ReviewLevel): string {
-	if (level === review_level.REDUCED_LEVEL) {
-		return 'every changed path is inert, documentation, a prompt or a test'
-	}
-
-	const deciding = review_level.deciding_paths(paths)
-
-	if (deciding.length === 0) return 'no changed paths; the default level stands'
-
-	return `changed paths that execute or instruct: ${path_decision.format_path_list(deciding)}`
-}
-
 // The level alone, over `path_decision` — the same reading `review:round2` shares — so `--staged`,
 // `--json` and the usage handling are the ones the old command had, not a second copy.
 async function run_level(argv: ReadonlyArray<string>): Promise<number> {
 	return await path_decision.run_path_decision(argv, {
 		usage: USAGE,
 		key: LEVEL_KEY,
-		decide: (paths) => review_level.level_for(paths),
-		explain: format_reason,
+		decide: async (paths, is_staged) => {
+			const lines = await review_size.read(paths, is_staged)
+
+			return review_level.level_for(paths, lines)
+		},
+		explain: review_level.format_reason,
 	})
 }
 
@@ -362,8 +354,9 @@ async function read_change(): Promise<ChangeReading> {
 	const { base, commit } = await read_bases()
 	const paths = await changed_paths.read_changed_paths(false)
 	const tree = await review_tree.read_changed_tree(paths)
+	const lines = await review_size.read(paths)
 
-	return { base, commit, paths, tree, level: review_level.level_for(paths) }
+	return { base, commit, paths, tree, level: review_level.level_for(paths, lines) }
 }
 
 async function record_review(
@@ -475,7 +468,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 const review_brief_cli = {
 	attested_tree,
 	FIRST_ROUND,
-	format_reason,
+	format_reason: review_level.format_reason,
 	KEPT_NOTE_PREFIX,
 	parse_round: review_round.parse_round,
 	record_review,

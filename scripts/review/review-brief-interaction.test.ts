@@ -21,6 +21,7 @@ import { review_interaction } from './review-interaction'
 import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round } from './review-round'
 import { review_round_one_skip } from './review-round-one-skip'
+import { review_size } from './review-size'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -113,6 +114,7 @@ function printed(): string {
 }
 
 beforeEach(() => {
+	vi.spyOn(review_size, 'read').mockResolvedValue(undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	stub_review()
@@ -134,7 +136,7 @@ describe('review:brief automatic final round', () => {
 		await expect(review_brief_cli.run([])).resolves.toBe(0)
 		expect(printed()).toContain(review_round.FINAL_LINE)
 		expect(printed()).toContain(WHOLE_CHANGE)
-		expect(resolve).toHaveBeenCalledWith(review_brief.SECOND_ROUND)
+		expect(resolve.mock.calls[0]?.[0]).toBe(review_brief.SECOND_ROUND)
 		expect(lane_ledger_write.record_round_one).toHaveBeenCalledWith({
 			issue: 6243,
 			verdict: 'skipped',
@@ -148,11 +150,25 @@ describe('review:brief automatic final round', () => {
 		const resolve = vi.spyOn(agent_role_profile, 'resolve_review')
 
 		await expect(review_brief_cli.run(['--round', '1'])).resolves.toBe(0)
-		expect(resolve).toHaveBeenCalledWith(1)
+		expect(resolve.mock.calls[0]?.[0]).toBe(1)
 		expect(review_round_one_skip.eligible_issue).not.toHaveBeenCalled()
 		vi.mocked(scoped_green.refusal_for).mockReturnValue('not checked')
 		await expect(review_brief_cli.run([])).resolves.toBe(1)
 		expect(lane_ledger_write.record_round_one).not.toHaveBeenCalled()
+	})
+})
+
+describe('review:brief tiny executable diff', () => {
+	it('prints low and the reduced profile for 20 lines (ac-267e5f8b)', async () => {
+		stub_change([OTHER_FILE])
+		vi.mocked(review_size.read).mockResolvedValue(20)
+		const resolve = vi.spyOn(agent_role_profile, 'resolve_review')
+
+		await review_brief_cli.run(['--round', '1'])
+
+		expect(resolve.mock.calls[0]?.[2]).toBe(true)
+		expect(printed()).toContain('low')
+		expect(printed()).toContain('sonnet')
 	})
 })
 

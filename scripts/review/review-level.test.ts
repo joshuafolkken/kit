@@ -6,6 +6,17 @@ const EDITOR_SETTING = '.editorconfig'
 const RULES_DOCUMENT = 'CLAUDE.md'
 
 describe('review_level.level_for', () => {
+	it.each([0, 1, 20])('reduces executable changes of %i lines (ac-df3ca1fc)', (lines) => {
+		expect(review_level.level_for([CODE], lines)).toBe(review_level.REDUCED_LEVEL)
+	})
+
+	it.each([21, 100, -1, NaN, Infinity, undefined])(
+		'keeps medium for large or unknown executable sizes: %s (ac-edf028a4)',
+		(lines) => {
+			expect(review_level.level_for([CODE], lines)).toBe(review_level.DEFAULT_LEVEL)
+		},
+	)
+
 	it('reduces the level when every changed path is inert', () => {
 		expect(review_level.level_for([EDITOR_SETTING, '.gitignore'])).toBe(review_level.REDUCED_LEVEL)
 	})
