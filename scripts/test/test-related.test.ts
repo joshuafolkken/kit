@@ -34,6 +34,7 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
+vi.mock('#scripts/gate/tree-verdict')
 // No green record, so every case reads the whole branch change; the since-green narrowing is
 // `test-related.since-green.test.ts`.
 vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
