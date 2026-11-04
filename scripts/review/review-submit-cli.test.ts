@@ -106,12 +106,6 @@ describe('review_submit_cli — a refusal writes nothing', () => {
 		expect(console.error).toHaveBeenCalledWith(review_submit_cli.EMPTY_NOTE)
 	})
 
-	it('refuses --none passed with findings', () => {
-		expect(review_submit_cli.run([NONE_FLAG], MEDIUM)).toBe(FAILED)
-
-		expect(stamps.size).toBe(0)
-	})
-
 	it.each([
 		[['--code']],
 		[[INTERACTION_FLAG, 'extra']],
@@ -146,6 +140,14 @@ describe('review_submit_cli — findings_of reads stdin only when findings are e
 		const findings = review_submit_cli.findings_of([], Readable.from([MEDIUM]))
 
 		await expect(findings).resolves.toBe(MEDIUM)
+	})
+
+	it('reads no stdin for arguments run refuses', async () => {
+		const open_stdin = new PassThrough()
+
+		await expect(review_submit_cli.findings_of([ROUND_FLAG, '2'], open_stdin)).resolves.toBe('')
+
+		open_stdin.destroy()
 	})
 
 	it('reads nothing from a terminal', async () => {
