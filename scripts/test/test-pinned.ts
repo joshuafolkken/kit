@@ -213,6 +213,15 @@ async function checked_outcome(
 	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts), staged }
 }
 
+async function hinted_hunks(outcome: HunkOutcome, reach: Reach): Promise<HunkOutcome['unpinned']> {
+	return await Promise.all(
+		outcome.unpinned.map(async (hunk) => ({
+			...hunk,
+			related_tests: await reach.related(hunk.file),
+		})),
+	)
+}
+
 // A hunk over the test-file cap is never probed; both modes report it alike, and the fresh run's
 // ledger row counts it.
 async function outcome_on(
@@ -227,7 +236,9 @@ async function outcome_on(
 	const capped_options = { ...options, over_cap: unchecked.length }
 	const outcome = await checked_outcome(paths, { hunks: checked, counts, cache }, capped_options)
 
-	return { ...outcome, ...over_cap_of(unchecked) }
+	const unpinned = await hinted_hunks(outcome, cache.reach)
+
+	return { ...outcome, unpinned, ...over_cap_of(unchecked) }
 }
 
 // A target the base's tree does not hold is added — committed on the branch or still untracked.

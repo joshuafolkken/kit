@@ -27,11 +27,19 @@ afterEach(async () => {
 	if (fixture.current !== undefined) await git_fixture_workspace.close_workspace(fixture.current)
 })
 
+async function build_with_graph(): Promise<void> {
+	await build_change_branch()
+	await write(
+		'tsconfig.json',
+		'{ "compilerOptions": { "allowJs": true, "moduleResolution": "bundler", "module": "esnext" } }\n',
+	)
+}
+
 describe('test_pinned.run', () => {
 	it(
 		'lists the #4102-shaped hunk no test pins and not the pinned one, leaving the checkout untouched',
 		async () => {
-			await build_change_branch()
+			await build_with_graph()
 			const before = await snapshot()
 
 			const report = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
@@ -40,6 +48,10 @@ describe('test_pinned.run', () => {
 				expect.objectContaining({ file: DRIVER_FILE, new_start: 6 }),
 			])
 			expect(report.unpinned[0]?.is_green).toBe(true)
+			expect(report.unpinned[0]?.related_tests).toEqual([test_pinned_fixture.TEST_FILE])
+			const cached = await test_pinned.cached(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+			expect(cached.unpinned).toEqual(report.unpinned)
 			expect(report.unchecked).toEqual([])
 			expect(await snapshot()).toBe(before)
 		},

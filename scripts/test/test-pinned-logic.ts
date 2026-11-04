@@ -60,6 +60,7 @@ interface HunkSplit {
 // vitest passed with no related test to run.
 interface UnpinnedHunk extends Hunk {
 	is_green: boolean
+	related_tests?: ReadonlyArray<string> | undefined
 }
 
 interface HunkOutcome {
@@ -275,8 +276,24 @@ function unchecked_reason(report: PinnedReport): string {
 	return report.has_runner ? `over the ${String(report.max_hunks)}-hunk cap` : NO_RUNNER_REASON
 }
 
+function hint(hunk: UnpinnedHunk): string {
+	const tests = hunk.related_tests
+
+	if (tests === undefined) {
+		return 'related tests unavailable; add or strengthen a regression test that fails when this change is reverted'
+	}
+
+	if (tests.length === 0) {
+		return 'no related tests; add a related regression test that fails when this change is reverted'
+	}
+
+	return `related tests: ${tests.join(', ')}; strengthen a regression assertion that fails when this change is reverted`
+}
+
 function unpinned_lines(report: PinnedReport): Array<string> {
-	return report.unpinned.map((hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}`)
+	return report.unpinned.map(
+		(hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}; ${hint(hunk)}`,
+	)
 }
 
 function place_of(hunk: Hunk, why: string): UncheckedPlace {

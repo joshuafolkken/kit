@@ -29,7 +29,8 @@ const FILE = 'a.ts'
 const MANUAL = 'manual'
 const PRE_DETACH = 'pre-detach'
 const HUNK = { file: FILE, new_start: 4, new_count: 1, old_lines: [], is_green: true }
-const GREEN_LINE = 'unpinned a.ts:4 — reverting it left every related test green\n'
+const GREEN_LINE =
+	'unpinned a.ts:4 — reverting it left every related test green; related tests unavailable; add or strengthen a regression test that fails when this change is reverted\n'
 const output: { stdout: Array<string>; stderr: Array<string> } = { stdout: [], stderr: [] }
 
 function capture(sink: Array<string>): (chunk: string | Uint8Array) => boolean {
