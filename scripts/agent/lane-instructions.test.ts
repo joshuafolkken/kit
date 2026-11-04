@@ -48,6 +48,17 @@ function checkout_with(rules: string): string {
 	return directory
 }
 
+describe('lane workflow entry', () => {
+	it('routes fresh fullrun children to the dedicated entry and preserves resume and review scope', () => {
+		const composed = lane_instructions.composed_in(REPO_ROOT, REPO_ROOT) ?? ''
+
+		expect(composed).toContain(lane_instructions.WORKFLOW_ENTRY)
+		expect(composed).toContain('instead of workflow-commands/SKILL.md')
+		expect(composed).toContain('A resumed child follows its resume prompt first')
+		expect(composed).toContain('Review sessions do not start a fullrun')
+	})
+})
+
 describe('lane instruction composition', () => {
 	it('expands each include from CLAUDE.md and drops the rules it does not name', () => {
 		const composed = lane_instructions.compose(LANE, RULES) ?? ''
@@ -121,6 +132,12 @@ describe('lane instruction launch flags', () => {
 		expect(excludes_of(lane_instructions.flags(cwd))).toEqual({
 			claudeMdExcludes: [package_copy, path.join(cwd, AGENTS_FILE)],
 		})
+		const prompt_file = value_after(
+			lane_instructions.flags(cwd),
+			lane_instructions.PROMPT_FILE_FLAG,
+		)
+
+		expect(readFileSync(prompt_file, 'utf8')).toContain('pnpm josh doc:read fullrun-lane.md')
 	})
 
 	it('passes nothing, leaving CLAUDE.md loaded, when the set cannot be composed', () => {
