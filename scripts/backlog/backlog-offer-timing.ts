@@ -22,7 +22,7 @@ function due_ms(deadline: number | undefined, offered_ms: number, interval_ms: n
 }
 
 function deadline_of(state: DriveState): number | undefined {
-	if (state.not_before_ms === undefined) return undefined
+	if (state.is_stopping || state.not_before_ms === undefined) return undefined
 
 	return Math.min(state.not_before_ms, state.idle_until_ms ?? Infinity)
 }

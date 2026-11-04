@@ -7,7 +7,7 @@ import { backlog_drive_fixture } from './backlog-drive-fixture'
 // joshuafolkken/kit#3691: one interval between two asks for work, running or idle, and a collected
 // child is asked about without waiting it out.
 
-const { CONFIG, FIRST_CHILD, POLL_MS, harness, state } = backlog_drive_fixture
+const { CONFIG, FIRST_CHILD, SECOND_CHILD, POLL_MS, harness, state } = backlog_drive_fixture
 const WATCHED_INTERVALS = 10
 const FINISH_AFTER_POLLS = 2
 const WINDOW_POLLS = 3
@@ -49,6 +49,27 @@ describe('backlog_drive.run_loop — idle expiry', () => {
 
 		expect(ports.now().getTime() - start_ms).toBe(CONFIG.offer_ms)
 		expect(offered_elapsed_ms).toStrictEqual([0, CONFIG.offer_ms])
+	})
+})
+
+describe('backlog_drive.run_loop — a stopped dated wait', () => {
+	it('keeps the normal drain interval after a merge stops a dated wait', async () => {
+		const { ports } = harness({})
+		const stopping = backlog_drive.merge_stopped(FIRST_CHILD, {
+			...state([SECOND_CHILD]),
+			not_before_ms: ports.now().getTime() - 1,
+		})
+		const config = { ...CONFIG, window_ms: POLL_MS * WINDOW_POLLS }
+
+		const end = await backlog_drive.run_loop(stopping, config, {
+			...ports,
+			sleep: async (milliseconds) => {
+				expect(milliseconds).toBe(POLL_MS)
+				await ports.sleep(milliseconds)
+			},
+		})
+
+		expect(end.reason).toBe('window')
 	})
 })
 
