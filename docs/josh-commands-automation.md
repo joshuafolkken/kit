@@ -917,6 +917,18 @@ pnpm josh latest:guard   # refuses inside a lane
 
 It fronts the `josh latest` chain.
 
+### `josh split:recover`
+
+<!-- usage: split:recover -->
+
+Recover split-child evidence after verifying an existing child URL, split route and parent.
+
+```bash
+pnpm josh split:recover 6212 https://github.com/joshuafolkken/kit/issues/6326
+```
+
+<!-- /usage -->
+
 ### `josh command:derive`
 
 <!-- usage: command:derive -->
