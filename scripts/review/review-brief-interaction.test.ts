@@ -18,6 +18,7 @@ import { review_diff_write } from './review-diff-write'
 import { review_fix_round, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
 import { review_reviewed_tree } from './review-reviewed-tree'
+import { review_round } from './review-round'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -118,6 +119,25 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+})
+
+describe('review:brief --full-change', () => {
+	it('mints a full-change final brief and records its own tree without replacing round one', async () => {
+		stub_change([OTHER_FILE])
+		const resolve = vi.spyOn(agent_role_profile, 'resolve_review')
+
+		await expect(review_brief_cli.run(['--full-change'])).resolves.toBe(0)
+		expect(printed()).toContain(review_round.FINAL_LINE)
+		expect(printed()).toContain(WHOLE_CHANGE)
+		expect(resolve).toHaveBeenCalledWith(review_brief.SECOND_ROUND)
+		expect(review_stamps.round_one_stamp.write).not.toHaveBeenCalled()
+		expect(review_stamps.briefed_stamp.write).toHaveBeenCalledWith(
+			{ [OTHER_FILE]: 'digest' },
+			undefined,
+			COMMIT,
+			expect.any(Object),
+		)
+	})
 })
 
 describe('review:brief --interaction', () => {

@@ -27,6 +27,7 @@ import { review_fix_round, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
 import { review_level, type ReviewLevel } from './review-level'
 import { review_reviewed_tree } from './review-reviewed-tree'
+import { review_round } from './review-round'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
@@ -42,7 +43,7 @@ import { review_untouched_readers, type ReadersRead } from './review-untouched-r
 // on round 2 — which files the first round's fixes touched.
 
 const USAGE =
-	'Usage: josh review:brief [--round <1|2>] | --interaction | --level-only [--staged] [--json]'
+	'Usage: josh review:brief [--round <1|2> | --full-change] | --interaction | --level-only [--staged] [--json]'
 
 // The rubric's absolute path, resolved against the kit package rather than the review checkout root.
 // The rubric ships inside the package, so a consumer that keeps no
@@ -54,7 +55,6 @@ const RUBRIC_PATH = path.join(
 	find_package_directory(MODULE_DIRECTORY),
 	review_brief.RUBRIC_RELATIVE_PATH,
 )
-const ROUND_FLAG = '--round'
 // `review:level` folded in here: it was a second command deciding the same
 // thing `review:brief` already prints on its first line, so it is now a mode of this one. `--level-only`
 // answers the level alone — for a pre-commit review run outside any workflow — and, unlike the full
@@ -66,26 +66,6 @@ const INTERACTION_FLAG = '--interaction'
 const LEVEL_KEY = 'level'
 const FIRST_ROUND = 1
 const FAILURE_EXIT_CODE = 1
-// The flag and its value; anything else is a usage error rather than a round.
-const ROUND_ARGUMENT_COUNT = 2
-const VALID_ROUNDS: ReadonlySet<number> = new Set([FIRST_ROUND, review_brief.SECOND_ROUND])
-
-// `Number` rather than a parse: `--round 2x` must be a usage error, and a parse would read it as 2.
-// A missing value gives `NaN`, which no valid round equals.
-function parse_round_value(raw: string | undefined): number | undefined {
-	const round = Number(raw)
-
-	return VALID_ROUNDS.has(round) ? round : undefined
-}
-
-// `undefined` on anything unrecognized rather than a default: a misspelled flag that silently
-// reviewed the whole diff would hand round 2 the scope the command exists to narrow.
-function parse_round(argv: ReadonlyArray<string>): number | undefined {
-	if (argv.length === 0) return FIRST_ROUND
-	if (argv.length !== ROUND_ARGUMENT_COUNT || argv[0] !== ROUND_FLAG) return undefined
-
-	return parse_round_value(argv[1])
-}
 
 // **Printed on stderr, because stdout is the `/code-review` invocation and nothing else.** A kept
 // record is not an error, but it is the one thing a second round-1 invocation has to be told: the
@@ -211,11 +191,9 @@ async function open_contract(slot: ReviewSlot): Promise<{
 	return { checkout, nonce, resumed_from, fix_round }
 }
 
-// Retaken on every round-1 brief, after the pointer it pairs with. Swallowed:
+// Retaken on every code brief, after the pointer it pairs with. Swallowed:
 // a record that failed to write predates the next pointer, so the resume widens rather than narrows.
-function record_briefed(round: number, tree: Record<string, string>, base?: string): void {
-	if (round !== FIRST_ROUND) return
-
+function record_briefed(tree: Record<string, string>, base?: string): void {
 	try {
 		const blobs = review_round_one_blobs.capture(Object.keys(tree))
 
@@ -226,6 +204,7 @@ function record_briefed(round: number, tree: Record<string, string>, base?: stri
 }
 
 interface ComposeRequest {
+	is_full_change?: boolean | undefined
 	round: number
 	paths: ReadonlyArray<string>
 	tree: Record<string, string>
@@ -286,6 +265,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 	}
 
 	return review_brief.compose({
+		is_full_change: request.is_full_change,
 		level: review_level.level_for(paths),
 		profile,
 		round,
@@ -392,7 +372,7 @@ async function record_review(
 	const is_snapshot_written = record_round_one(round, tree, commit)
 
 	if (is_snapshot_written) await review_code_tree.record(Object.keys(tree), commit)
-	record_briefed(round, tree, commit)
+	record_briefed(tree, commit)
 }
 
 // An interaction brief records nothing: the round-one and briefed stamps describe `/code-review`'s
@@ -401,7 +381,10 @@ async function run_review(
 	round: number,
 	reading: ChangeReading,
 	emit: Emit,
-	interaction?: ReadonlyArray<string>,
+	{
+		interaction,
+		is_full_change,
+	}: { interaction?: ReadonlyArray<string>; is_full_change?: boolean } = {},
 ): Promise<number> {
 	const { base, commit, paths, tree } = reading
 	const refusal = refusal_for_round(reading, round)
@@ -413,7 +396,7 @@ async function run_review(
 	agent_role_profile.warn_of_default()
 	const { profile } = resolved
 
-	emit(await compose_brief({ round, paths, tree, base, profile, interaction }))
+	emit(await compose_brief({ round, paths, tree, base, profile, interaction, is_full_change }))
 	if (interaction === undefined) await record_review(round, tree, commit)
 
 	return 0
@@ -439,7 +422,7 @@ async function run_interaction(emit: Emit): Promise<number> {
 
 	if (stale !== undefined) return report_error(stale)
 
-	return await run_review(FIRST_ROUND, reading, emit, targets)
+	return await run_review(FIRST_ROUND, reading, emit, { interaction: targets })
 }
 
 // The scoped-green refusal a brief on this tree would print, read without composing one — so
@@ -459,11 +442,13 @@ const REVIEWER_REFUSAL =
 async function run_brief(argv: ReadonlyArray<string>, emit: Emit): Promise<number> {
 	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction(emit)
 
-	const round = parse_round(argv)
+	const round = review_round.parse_round(argv)
 
 	if (round === undefined) return report_error(USAGE)
 
-	return await run_review(round, await read_change(), emit)
+	return await run_review(round, await read_change(), emit, {
+		is_full_change: argv.includes(review_round.FULL_CHANGE_FLAG),
+	})
 }
 
 // `emit` takes the brief: `josh run:review` writes it to a file, because its two briefs together exceed
@@ -484,7 +469,7 @@ const review_brief_cli = {
 	FIRST_ROUND,
 	format_reason,
 	KEPT_NOTE_PREFIX,
-	parse_round,
+	parse_round: review_round.parse_round,
 	record_review,
 	record_round_one,
 	report_error,

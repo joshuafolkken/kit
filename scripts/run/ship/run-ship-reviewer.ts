@@ -8,6 +8,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
+import { review_round } from '#scripts/review/review-round'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_brokered_review } from './run-ship-brokered-review'
 import { run_ship_review, type PromptOf } from './run-ship-review'
@@ -231,6 +232,9 @@ async function launch_reviewers(
 	issue: string,
 	round: Round,
 ): Promise<JoshResult> {
+	const code = briefs.find(({ slot }) => slot === CODE)
+	const effective_round = review_round.from_brief(code?.brief ?? '', round)
+
 	for (const { brief, slot } of briefs) {
 		const target = paths(slot)
 
@@ -239,9 +243,9 @@ async function launch_reviewers(
 	}
 
 	return await run_sessions(
-		prompt_of,
+		effective_round === ROUND_TWO ? run_ship_review.verification_prompt : prompt_of,
 		issue,
-		round,
+		effective_round,
 		briefs.map(({ slot }) => slot),
 	)
 }
