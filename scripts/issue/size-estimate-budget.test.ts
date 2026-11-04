@@ -20,15 +20,15 @@ function estimate(files: number, lines: number): string {
 	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト除く）`
 }
 
-const OVER_GUIDE = body_with(estimate(5, 120))
-const OVER_GUIDE_EXCUSED = body_with(estimate(5, 120), REASON)
-const UNDER_GUIDE = body_with(estimate(4, 100))
+const OVER_GUIDE = body_with(estimate(2, 70))
+const OVER_GUIDE_EXCUSED = body_with(estimate(2, 70), REASON)
+const UNDER_GUIDE = body_with(estimate(1, 50))
 
 describe('size_estimate.guide_problem — the projected implement time', () => {
 	it('refuses a reasoned estimate over the guide projecting past the budget', () => {
 		const problem = size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, SLOW) ?? ''
 
-		for (const part of ['24 implement minute(s)', '12-minute', '10.0 implement min', '4 lane(s)']) {
+		for (const part of ['14 implement minute(s)', '12-minute', '10.0 implement min', '4 lane(s)']) {
 			expect(problem).toContain(part)
 		}
 	})
@@ -38,7 +38,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	})
 
 	it('keeps the guide refusal for an unreasoned estimate within the budget', () => {
-		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined, FAST)
+		const problem = size_estimate.guide_problem(body_with(estimate(7, 120)), undefined, FAST)
 
 		expect(problem).toContain('exceeds the guide')
 		expect(problem).not.toContain('implement budget')
@@ -52,7 +52,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 		expect(size_estimate.guide_problem(OVER_GUIDE, SPLIT_ROUTE, SLOW)).toBeUndefined()
 	})
 
-	it('passes an estimate under the guide whatever it projects', () => {
+	it('passes an estimate under the measured guide within the budget', () => {
 		expect(size_estimate.guide_problem(UNDER_GUIDE, undefined, SLOW)).toBeUndefined()
 	})
 
@@ -67,8 +67,8 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 describe('size_estimate.over_budget', () => {
 	it('answers the estimate of a reasoned body projecting past the budget', () => {
 		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, SLOW)).toEqual({
-			files: 5,
-			lines: 120,
+			files: 2,
+			lines: 70,
 			verdict: 'split',
 		})
 	})

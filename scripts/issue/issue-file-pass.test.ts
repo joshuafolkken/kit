@@ -140,10 +140,23 @@ describe('issue_file_pass.labels_in_one_pass — the implement rate', () => {
 		vi.mocked(lane_net_read.implement_rate).mockResolvedValue({ median: 10, lanes: 4 })
 		const body = CLEAR_BODY.replace(
 			CLEAR_ESTIMATE,
-			'- 規模見積もり: 約 5 ファイル / 120 行（テスト除く）\n- 分割しない理由: 一体で入れる',
+			'- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）\n- 分割しない理由: 一体で入れる',
 		)
 
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(body))).toBeUndefined()
 		expect(printed()).toContain('implement budget')
+	})
+
+	it.each([
+		{ lines: 30, passes: true },
+		{ lines: 50, passes: false },
+	])('judges $lines declared lines at the measured rate', async ({ lines, passes }) => {
+		vi.mocked(lane_net_read.implement_rate).mockResolvedValue({ median: 17.7, lanes: 316 })
+		const estimate = `- 規模見積もり: 約 1 ファイル / ${String(lines)} 行（テスト除く）`
+		const body = CLEAR_BODY.replace(CLEAR_ESTIMATE, () => estimate)
+
+		const labels = await issue_file_pass.labels_in_one_pass(filing_of(body))
+
+		expect(labels !== undefined).toBe(passes)
 	})
 })
