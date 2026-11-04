@@ -2,6 +2,6 @@
 	"reason": "Add optional clean join shipping and preserve implementation timing for combined ship calls; regression tests cover valid modes and quoted false positives for #6385",
 	"date": "2026-11-04",
 	"growth": {
-		"scripts.code_lines": 45
+		"scripts.code_lines": 46
 	}
 }

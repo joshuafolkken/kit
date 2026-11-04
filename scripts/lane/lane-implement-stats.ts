@@ -1,5 +1,3 @@
-import { shell_segments } from '#scripts/rules/shell-segments'
-import { time_shell } from '#scripts/time-runtime/time-shell'
 import { lane_implement_subagents, type ImplementLane } from './lane-implement-subagents'
 import { lane_paused_spans, type PausedSpan, type PausedSpans } from './lane-paused-spans'
 import { lane_stage_stats } from './lane-stage-stats'
@@ -39,9 +37,9 @@ const CHECK_COMMANDS: ReadonlySet<string> = new Set([
 ])
 const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['review:brief', 'run:review'])
 const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
-const CHAIN_COMMANDS: ReadonlySet<string> = new Set(['run:chain'])
 const JOIN_FLAG = /\s--join(?:\s|$)/u
 const SHIP_FLAG = /\s--ship(?:\s|=|$)/u
+const CHAIN_REACHED_SHIP = /^run:chain \d+ — (?:ran (?:[^\s]+ → )*ship$|stopped at ship \()/mu
 const FIRST_LINT_ROW = `lane first ${LINT_RELATED}`
 // `backgrounded` counts a subagent row's untimed calls (`lane-implement-subagents.ts`); a sub-stage has none.
 const COLUMNS = [
@@ -155,18 +153,17 @@ function lane_totals(calls: ReadonlyArray<ToolCall>, paused: ReadonlyArray<Pause
 
 function chain_ships(segment: string): boolean {
 	return (
-		shell_segments.is_josh_command(segment, CHAIN_COMMANDS) &&
+		lane_transcript_stats.josh_commands(segment).includes('run:chain') &&
 		JOIN_FLAG.test(segment) &&
 		SHIP_FLAG.test(segment)
 	)
 }
 
 function starts_ship(call: ToolCall): boolean {
-	const spoken = time_shell.unquoted(call.command ?? '')
-
 	return (
 		runs_any(call, SHIP_COMMANDS) ||
-		shell_segments.commands_of(spoken).some((segment) => chain_ships(segment))
+		(CHAIN_REACHED_SHIP.test(call.output) &&
+			lane_transcript_stats.command_segments(call.command).some((segment) => chain_ships(segment)))
 	)
 }
 
