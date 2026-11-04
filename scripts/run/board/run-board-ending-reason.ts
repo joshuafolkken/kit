@@ -77,10 +77,25 @@ function is_stalled(status: ItemStatus, labels: ReadonlyArray<string> = []): boo
 	return STALLED_STATES.has(status.state) && has_label_name(labels, RUN_STALLED_LABEL)
 }
 
+// Finished rows name why no action remains; merge rows keep their existing tail.
+function tail_of(status: ItemStatus): string | undefined {
+	if (status.state === 'done') {
+		return `nothing to do · done: ${status.reason ?? 'closed without a PR to merge'}`
+	}
+
+	if (status.state === 'withdrawn') {
+		return `nothing to do · withdrawn: ${status.reason ?? 'run withdrawn'}`
+	}
+
+	return status.reason
+}
+
 // Raw event reasons remain cacheable; only drawing selects an action from the current live state.
 function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
-	if (status.reason !== undefined) {
-		const tail = park_row_reason(number, status.reason, read.is_backlog_live === true)
+	const reason = tail_of(status)
+
+	if (reason !== undefined) {
+		const tail = park_row_reason(number, reason, read.is_backlog_live === true)
 
 		return { reason: { tail } }
 	}
