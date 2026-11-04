@@ -38,7 +38,16 @@ const HANDOFF_OUTPUTS = [
 	}),
 	`${CLAUDE_CALL}\n${CLAUDE_RESULT}`,
 ]
+const QUOTED_ENTRY_COMMANDS = [
+	`printf '%s\\n' 'quoted; ${ENTRY_COMMAND}; quoted\n${HANDED_OFF}'`,
+	`cat <<'EOF'\n${ENTRY_COMMAND}\n${HANDED_OFF}\nEOF`,
+]
 const HANDOFF_NEGATIVES = [
+	...QUOTED_ENTRY_COMMANDS.flatMap((command) =>
+		HANDOFF_OUTPUTS.map((output) =>
+			output.replace(JSON.stringify(ENTRY_COMMAND), () => JSON.stringify(command)),
+		),
+	),
 	transcript(HANDED_OFF),
 	CLAUDE_RESULT,
 	`${CLAUDE_CALL}\n${CLAUDE_RESULT.replace('"type":"tool_result"', '"type":"tool_result","is_error":true')}`,

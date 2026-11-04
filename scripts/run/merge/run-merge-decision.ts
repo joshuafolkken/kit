@@ -5,17 +5,17 @@ import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-la
 import { json_value } from '#scripts/lib/json-value'
 import { transcript_record, type TranscriptBlock } from '#scripts/lib/transcript-record'
 import { lane_park } from '#scripts/rules/lane-park'
-import { shell_segments } from '#scripts/rules/shell-segments'
 import { stop_decision } from '#scripts/rules/stop-decision'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { z } from 'zod'
 import { run_merge, type ParkReason } from './run-merge'
 
 const HOOK_CONFIRMATION = '📱 stop:guard sent the confirmation notify ('
-const ENTRY_COMMANDS: ReadonlySet<string> = new Set(['run:entry'])
 const INPUT_SCHEMA = z.object({ command: z.string() })
 const AWAITING_CONFIRMATION =
 	/(?:確認|回答|返答|承認)(?:[をの]?待っています|待ちです|後に(?:続行|再開)します)/u
@@ -44,9 +44,9 @@ function asks(message: string): boolean {
 }
 
 function is_entry(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, ENTRY_COMMANDS))
+	return time_josh_names
+		.josh_commands_of(time_shell.unquoted(command).replaceAll('\n', ';'))
+		.includes('josh run:entry')
 }
 
 function entry_ids(latest: string): ReadonlySet<string> {
