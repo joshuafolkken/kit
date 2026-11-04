@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { run_ship_args } from '#scripts/run/ship/run-ship-args'
 import { run_chain, type ChainStage } from './run-chain'
 import { run_chain_join } from './run-chain-join'
 
@@ -14,12 +15,13 @@ import { run_chain_join } from './run-chain-join'
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh run:chain <N> [--from <stage>] [--unpinned-ok "<reason>"] | <N> --join [--fixing] [--from <stage>]'
+	'Usage: josh run:chain <N> [--from <stage>] [--unpinned-ok "<reason>"] | <N> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]'
 const OPTIONS = {
 	from: { type: 'string' },
 	'unpinned-ok': { type: 'string' },
 	join: { type: 'boolean' },
 	fixing: { type: 'boolean' },
+	ship: { type: 'string' },
 } as const
 
 interface ChainValues {
@@ -27,6 +29,7 @@ interface ChainValues {
 	unpinned_ok: string | undefined
 	is_join: boolean
 	is_fixing: boolean
+	ship: string | undefined
 }
 
 interface ChainArguments {
@@ -44,7 +47,7 @@ function opening_stages(unpinned_ok: ReadonlyArray<string>): ReadonlyArray<Chain
 }
 
 function stages_of(issue: string, values: ChainValues): ReadonlyArray<ChainStage> {
-	if (values.is_join) return run_chain_join.join_stages(issue, values.is_fixing)
+	if (values.is_join) return run_chain_join.join_stages(issue, values.is_fixing, values.ship)
 	const reason = values.unpinned_ok
 
 	return opening_stages(reason === undefined ? [] : ['--unpinned-ok', reason])
@@ -52,14 +55,23 @@ function stages_of(issue: string, values: ChainValues): ReadonlyArray<ChainStage
 
 // `--fixing` belongs to the join and `--unpinned-ok` to the opening half, so each refuses the other list.
 function is_mixed(values: ChainValues): boolean {
-	return values.is_join ? values.unpinned_ok !== undefined : values.is_fixing
+	if (values.is_join) return values.unpinned_ok !== undefined
+
+	return values.is_fixing || values.ship !== undefined
+}
+
+function ship_matches(issue: string, title: string | undefined): boolean {
+	if (title === undefined) return true
+	const command = run_ship_args.parse([title])
+
+	return command?.kind === 'ship' && command.args.number === issue
 }
 
 function arguments_from(
 	issue: string | undefined,
 	values: ChainValues,
 ): ChainArguments | undefined {
-	if (issue === undefined || is_mixed(values)) return undefined
+	if (issue === undefined || is_mixed(values) || !ship_matches(issue, values.ship)) return undefined
 
 	return {
 		issue,
@@ -79,6 +91,7 @@ function parse(argv: ReadonlyArray<string>): ChainArguments | undefined {
 		unpinned_ok: values['unpinned-ok'],
 		is_join: values.join === true,
 		is_fixing: values.fixing === true,
+		ship: values.ship,
 	})
 }
 

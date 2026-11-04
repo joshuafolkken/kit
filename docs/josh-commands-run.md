@@ -1003,14 +1003,15 @@ The watcher is fresh when `run:progress` has pinged its life record within three
 
 <!-- usage: run:chain -->
 
-Run main:merge (not in a lane child), review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action.
+Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action.
 
 ```bash
-pnpm josh run:chain <N>                             # after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review
-pnpm josh run:chain <N> --from check:related        # resume at the stage a stop named, once the run settled it
-pnpm josh run:chain <N> --unpinned-ok "only logs"   # forwarded to run:review as given
-pnpm josh run:chain <N> --join                      # once the review returns: join the gate, attest the round, record a round with no findings — a finding stops for its fix and disposition
-pnpm josh run:chain <N> --join --fixing             # the same, when round 1 has fixes to make
+pnpm josh run:chain <N>                                # after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review
+pnpm josh run:chain <N> --from check:related           # resume at the stage a stop named, once the run settled it
+pnpm josh run:chain <N> --unpinned-ok "only logs"      # forwarded to run:review as given
+pnpm josh run:chain <N> --join                         # join the gate, attest and record; every finding holds for disposition
+pnpm josh run:chain <N> --join --fixing                # the same, when round 1 has fixes to make
+pnpm josh run:chain <N> --join --ship "<title> #<N>"   # ship a clean round; title must match the issue. Record interaction review first.
 ```
 
 <!-- /usage -->
@@ -1177,7 +1178,7 @@ pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes"   # th
 
 Dependencies are re-installed against the lock the popped stash brought in. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
 
-Launches reserve 270 MB in the shared core budget and wait for free memory without a timeout bypass. The child retains the claim. `run:board` shows its lane and wait reason; `lane:stats` lists completed waits as `lane:launch` under held-by.
+Launches reserve 810 MB for the parent and two subagents, waiting for free memory without a timeout bypass. The child retains the claim. `run:board` shows the wait; `lane:stats` lists it as `lane:launch` under held-by.
 
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
