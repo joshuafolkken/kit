@@ -17,6 +17,8 @@ import { review_submit_args, type Submission } from './review-submit-args'
 //
 // **A clean review is said with `--none`, never with empty stdin**: a reviewer that forgot the pipe,
 // or ran on a terminal, sends nothing, and reading that as clean would lose every finding it had.
+// `--none` reads no stdin at all (joshuafolkken/kit#6204): an agent's shell leaves stdin open without
+// end, and waiting for that end hung a clean submission.
 //
 // **`--review <file>` lints the reviewer's markdown review in the same call** (joshuafolkken/kit#5627):
 // a grammar refusal and the rubric's format violations come back together, and nothing is written
@@ -27,7 +29,6 @@ const NONE_FLAG = '--none'
 const USAGE =
 	'Usage: josh review:submit [--interaction] [--review <absolute-path> [--round <1|2>]] < findings | josh review:submit [--interaction] [--review <absolute-path> [--round <1|2>]] --none'
 const EMPTY_NOTE = `nothing written — no findings on stdin; a review with none passes ${NONE_FLAG}`
-const NONE_WITH_FINDINGS_NOTE = `nothing written — ${NONE_FLAG} was passed with findings on stdin`
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
@@ -60,13 +61,11 @@ function grammar_refusal(findings: string): string | undefined {
 		: undefined
 }
 
-// The refusal for stdin that does not match the flags, or for a line outside the grammar.
+// The refusal for empty stdin without `--none`, or for a line outside the grammar.
 function refusal_of(submission: Submission, findings: string): string | undefined {
-	const is_empty = findings.trim() === ''
+	if (submission.is_none) return undefined
 
-	if (submission.is_none) return is_empty ? undefined : NONE_WITH_FINDINGS_NOTE
-
-	return is_empty ? EMPTY_NOTE : grammar_refusal(findings)
+	return findings.trim() === '' ? EMPTY_NOTE : grammar_refusal(findings)
 }
 
 function refusals_of(submission: Submission, findings: string): ReadonlyArray<string> {
@@ -102,14 +101,27 @@ function run(argv: ReadonlyArray<string>, findings: string): number {
 	return SUCCESS_EXIT_CODE
 }
 
-async function main(): Promise<void> {
-	const findings = process.stdin.isTTY ? '' : await text(process.stdin)
+// Stdin is read only when it can carry findings `run` would write: not under `--none`, not on a
+// terminal, and not for arguments `run` refuses before reading them.
+async function findings_of(
+	argv: ReadonlyArray<string>,
+	input: NodeJS.ReadableStream & { isTTY?: boolean },
+): Promise<string> {
+	const submission = review_submit_args.submission_of(argv)
 
-	process.exitCode = run(process.argv.slice(ARGV_OFFSET), findings)
+	if (submission === undefined || submission.is_none || input.isTTY === true) return ''
+
+	return await text(input)
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+async function main(): Promise<number> {
+	const argv = process.argv.slice(ARGV_OFFSET)
 
-const review_submit_cli = { EMPTY_NOTE, USAGE, run }
+	return run(argv, await findings_of(argv, process.stdin))
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await main()
+
+const review_submit_cli = { EMPTY_NOTE, USAGE, findings_of, run }
 
 export { review_submit_cli }
