@@ -182,15 +182,15 @@ function is_inline_execution(call: ProgramCall): boolean {
 function is_gh_write(call: ProgramCall): boolean {
 	if (call.name !== 'gh') return false
 
-	const segment = [call.name, ...call.args].join(' ')
+	const line = [call.name, ...call.args].join(' ')
 
 	if (pr_merge.is_graphql_call(call.name, call.args)) {
-		return pr_merge.is_pr_merge(segment) || third_party_write.writes_third_party(segment)
+		return [pr_merge.is_pr_merge, third_party_write.writes_third_party].some((test) => test(line))
 	}
 
-	if (gh_api.is_gh_api(segment)) return gh_api.is_write(segment)
+	if (gh_api.is_gh_api(line)) return gh_api.is_write(line)
 
-	return gh_repo_selector.is_write_call(call.args)
+	return !/^gh (?:--help|--version|-h)$/u.test(line) && gh_repo_selector.is_write_call(call.args)
 }
 
 // A missing remote may resolve to a configured foreign push target. Only an explicit origin

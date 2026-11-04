@@ -72,6 +72,9 @@ describe('shell permissions — refuses direct writes and foreign push destinati
 
 describe('shell permissions — preserves ordinary reads and josh routes', () => {
 	it.each([
+		'gh --help',
+		'gh -h',
+		'gh --version',
 		'gh api user',
 		'gh api -X GET repos/o/r/issues -f state=open',
 		'gh api user "-X" "GET" "-f" "note=a -X POST"',
