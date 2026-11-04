@@ -8,8 +8,10 @@ import {
 } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { split_assess } from './split-assess'
+import { split_early_notice } from './split-early-notice'
+import { split_measure } from './split-measure'
 
-// A split notice stops implementation until the lane files a split child, recorded in the ledger
+// A split child answers a notice, or a fresh measurement falls under its bar. The child is recorded
 // as the filing lands (joshuafolkken/kit#6212). A reason comment cannot answer the notice.
 
 const NOTICE_SECTION = `split-assessment.md → "${split_assess.NOTICE_SECTION}"`
@@ -54,8 +56,20 @@ async function refusal(
 // The refusal against this repository's lane ledger; outside a repository there is none to read.
 async function ledger_refusal(issue: number): Promise<string | undefined> {
 	const ledger = await lane_ledger.target()
+	const note =
+		ledger === undefined ? undefined : await refusal(issue, lane_ledger.read_entries(ledger))
 
-	return ledger === undefined ? undefined : await refusal(issue, lane_ledger.read_entries(ledger))
+	if (note === undefined) return undefined
+
+	try {
+		const measurement = await split_measure.read_branch()
+
+		return split_assess.notice(measurement, await split_early_notice.declared()) === undefined
+			? undefined
+			: note
+	} catch {
+		return note
+	}
 }
 
 interface Filing {
