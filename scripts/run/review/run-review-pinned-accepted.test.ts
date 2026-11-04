@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
@@ -14,6 +14,8 @@ const SITE = 'scripts/a.ts 0123456789abcdef'
 const OTHER_SITE = 'scripts/b.ts 89abcdef01234567'
 const BRANCH = '4775-lane'
 const OTHER_BRANCH = 'other-branch'
+const GIT_FAILURE = new Error('git failed')
+const NEWER_REASON = 'a newer reason'
 
 const scratch = { directory: '' }
 
@@ -136,8 +138,60 @@ describe('run_review_pinned_accepted.recorded_reason', () => {
 
 	it('returns none when the branch could not be read', async () => {
 		await accept([SITE])
-		vi.mocked(git_command.branch).mockRejectedValue(new Error('git failed'))
+		vi.mocked(git_command.branch).mockRejectedValue(GIT_FAILURE)
 
 		expect(await run_review_pinned_accepted.recorded_reason()).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6207: the reason `run:review` was opened with reaches the ship's carry though
+// `--join` judged nothing on the tree a round-1 fix moved.
+describe('run_review_pinned_accepted.keep_reason', () => {
+	it('records the reason with no place for a branch that recorded none', async () => {
+		await run_review_pinned_accepted.keep_reason(REASON)
+
+		const target = path.join(scratch.directory, run_review_pinned_accepted.RECORD_NAME)
+		const recorded: unknown = JSON.parse(readFileSync(target, 'utf8'))
+
+		expect(recorded).toStrictEqual({ branch: BRANCH, reason: REASON, unpinned: [] })
+		expect(await run_review_pinned_accepted.recorded_reason()).toBe(REASON)
+	})
+
+	it('keeps the places this branch already accepted under the new reason', async () => {
+		await accept([SITE])
+		await run_review_pinned_accepted.keep_reason(NEWER_REASON)
+
+		const verdict = await later([SITE])
+
+		expect(verdict.text).toContain(NEWER_REASON)
+		expect(verdict.kind).toBe('accepted')
+	})
+
+	it('accepts no place a later run with no reason lists', async () => {
+		await run_review_pinned_accepted.keep_reason(REASON)
+
+		const verdict = await later([SITE])
+
+		expect(verdict.kind).toBe('stop')
+	})
+
+	it("drops another branch's places", async () => {
+		await accept([SITE])
+		vi.mocked(git_command.branch).mockResolvedValue(OTHER_BRANCH)
+		await run_review_pinned_accepted.keep_reason(REASON)
+
+		const verdict = await later([SITE])
+
+		expect(verdict.kind).toBe('stop')
+	})
+
+	it('records nothing, and throws nothing, when the branch could not be read', async () => {
+		vi.mocked(git_command.branch).mockRejectedValue(GIT_FAILURE)
+
+		await expect(run_review_pinned_accepted.keep_reason(REASON)).resolves.toBeUndefined()
+
+		const target = path.join(scratch.directory, run_review_pinned_accepted.RECORD_NAME)
+
+		expect(existsSync(target)).toBe(false)
 	})
 })
