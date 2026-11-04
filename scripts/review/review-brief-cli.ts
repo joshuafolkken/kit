@@ -141,12 +141,9 @@ function record_round_one(
 			return false
 		}
 
-		review_stamps.round_one_stamp.write(
-			tree,
-			target,
-			base,
-			review_round_one_blobs.capture(Object.keys(tree)),
-		)
+		const blobs = review_round_one_blobs.capture(Object.keys(tree))
+
+		review_stamps.round_one_stamp.write(tree, target, base, blobs)
 
 		return true
 	} catch {
@@ -220,12 +217,9 @@ function record_briefed(round: number, tree: Record<string, string>, base?: stri
 	if (round !== FIRST_ROUND) return
 
 	try {
-		review_stamps.briefed_stamp.write(
-			tree,
-			undefined,
-			base,
-			review_round_one_blobs.capture(Object.keys(tree)),
-		)
+		const blobs = review_round_one_blobs.capture(Object.keys(tree))
+
+		review_stamps.briefed_stamp.write(tree, undefined, base, blobs)
 	} catch {
 		/* no record widens the resume rather than narrowing it */
 	}
