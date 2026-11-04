@@ -102,14 +102,25 @@ function run(argv: ReadonlyArray<string>, findings: string): number {
 	return SUCCESS_EXIT_CODE
 }
 
-async function main(): Promise<void> {
-	const findings = process.stdin.isTTY ? '' : await text(process.stdin)
+// `--none` never reads stdin (joshuafolkken/kit#6204): an agent's shell leaves it open without
+// end, and waiting for that end hangs a clean submission.
+async function findings_of(
+	argv: ReadonlyArray<string>,
+	input: NodeJS.ReadableStream & { isTTY?: boolean },
+): Promise<string> {
+	if (input.isTTY === true || review_submit_args.submission_of(argv)?.is_none === true) return ''
 
-	process.exitCode = run(process.argv.slice(ARGV_OFFSET), findings)
+	return await text(input)
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+async function main(): Promise<number> {
+	const argv = process.argv.slice(ARGV_OFFSET)
 
-const review_submit_cli = { EMPTY_NOTE, USAGE, run }
+	return run(argv, await findings_of(argv, process.stdin))
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await main()
+
+const review_submit_cli = { EMPTY_NOTE, USAGE, findings_of, run }
 
 export { review_submit_cli }
