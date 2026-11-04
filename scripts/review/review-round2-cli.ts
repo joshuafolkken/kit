@@ -7,6 +7,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { path_decision } from '#scripts/josh/path-decision'
 import { review_code_tree } from './review-code-tree'
+import { review_level } from './review-level'
 import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_round_one_closure } from './review-round-one-closure'
@@ -145,6 +146,7 @@ async function decide_here(options: Options): Promise<RoundTwoAnswer> {
 	const tree = await review_tree.read_changed_tree()
 
 	return review_round2.decide({
+		level: review_level.level_for(Object.keys(tree)),
 		base,
 		carried_delta: carried_reader(base, tree),
 		comment_only: await read_comment_only(base),

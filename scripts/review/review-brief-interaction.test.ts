@@ -165,7 +165,7 @@ describe('review:brief --full-change', () => {
 		await expect(review_brief_cli.run(['--full-change'])).resolves.toBe(0)
 		expect(printed()).toContain(review_round.FINAL_LINE)
 		expect(printed()).toContain(WHOLE_CHANGE)
-		expect(resolve).toHaveBeenCalledWith(review_brief.SECOND_ROUND)
+		expect(resolve).toHaveBeenCalledWith(review_brief.SECOND_ROUND, process.env, false)
 		expect(record).toHaveBeenCalledWith(review_brief.SECOND_ROUND)
 		expect(review_stamps.round_one_stamp.write).not.toHaveBeenCalled()
 		expect(review_stamps.briefed_stamp.write).toHaveBeenCalledWith(
