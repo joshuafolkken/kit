@@ -15,7 +15,7 @@ vi.mock(import('./followup-human-merge'), async (import_original) => ({
 
 vi.mock('node:util', async (import_original) => ({
 	...(await import_original<Record<string, unknown>>()),
-	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
+	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: ['6221'] }),
 }))
 
 const print_section_mock = vi.hoisted(() => vi.fn())
@@ -194,7 +194,7 @@ it('carries the checked head into the final workflow merge guard', async () => {
 
 	expect(before_merge_at_import).toBeTypeOf('function')
 	await before_merge_at_import?.(head)
-	expect(followup_human_merge.assert_allowed).toHaveBeenLastCalledWith('main', undefined, head)
+	expect(followup_human_merge.assert_allowed).toHaveBeenLastCalledWith('main', '6221', head)
 })
 
 // joshuafolkken/kit#5645. The import ran `main` with no `--help`, so it opened on its governing section.
