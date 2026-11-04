@@ -121,12 +121,32 @@ function check_overlap(
 	return [...meeting, ...read]
 }
 
+// What a merge-only staleness reads: the stale checks, what the merge brought in, and where it meets
+// this branch's change — the files the pair is narrowed to (`run-ship-narrowed.ts`) when any. An
+// `overlap` of `undefined` is a merge the import graph could not split, `unsplit` the line saying why:
+// the pair runs as before rather than naming every synced module (joshuafolkken/kit#6185).
+interface SyncReading {
+	checks: ReadonlyArray<SyncedCheck>
+	synced: ReadonlyArray<string>
+	overlap: ReadonlyArray<string> | undefined
+	unsplit?: string
+}
+
+type Overlap = Pick<SyncReading, 'overlap' | 'unsplit'>
+
+function unsplit_line(failure: string): string {
+	return (
+		'scoped pair: the import graph could not split the merge with the default branch ' +
+		`(${failure}), so the pair runs as before.`
+	)
+}
+
 // The synced files and tests where the merge and this branch's change meet.
 async function overlap_of(
 	checks: ReadonlyArray<SyncedCheck>,
 	synced: ReadonlyArray<string>,
 	branch: ReadonlyArray<string>,
-): Promise<ReadonlyArray<string>> {
+): Promise<Overlap> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const map = test_read_map.read_map(root)
 	const split = await test_related_synced.split(root, synced, branch, map)
@@ -137,15 +157,13 @@ async function overlap_of(
 			related_scope.is_relatable(file) && !branch.includes(file) && !split.left.includes(file),
 	)
 
-	return [...both, ...split.shared, ...unsplit, ...check_overlap(checks, synced, split, map)]
-}
+	if (split.failure !== undefined && unsplit.length > 0) {
+		return { overlap: undefined, unsplit: unsplit_line(split.failure) }
+	}
 
-// What a merge-only staleness reads: the stale checks, what the merge brought in, and where it meets
-// this branch's change — the files the pair is narrowed to (`run-ship-narrowed.ts`) when any.
-interface SyncReading {
-	checks: ReadonlyArray<SyncedCheck>
-	synced: ReadonlyArray<string>
-	overlap: ReadonlyArray<string>
+	return {
+		overlap: [...both, ...split.shared, ...unsplit, ...check_overlap(checks, synced, split, map)],
+	}
 }
 
 function checks_of(scripts: ReadonlyArray<string>): ReadonlyArray<SyncedCheck> {
@@ -163,7 +181,7 @@ async function read_sync(
 
 	if (synced === undefined || branch === undefined) return undefined
 
-	return { checks, synced, overlap: await overlap_of(checks, synced, branch) }
+	return { checks, synced, ...(await overlap_of(checks, synced, branch)) }
 }
 
 function reason(checks: ReadonlyArray<SyncedCheck>, synced: ReadonlyArray<string>): string {
@@ -177,7 +195,7 @@ function reason(checks: ReadonlyArray<SyncedCheck>, synced: ReadonlyArray<string
 // The line a settled pair prints, after re-recording each stale check green on this tree so the gate
 // and the brief read it as checked — or `undefined` where the merge meets the branch.
 function settle(reading: SyncReading, tree: GateTree): string | undefined {
-	if (reading.overlap.length > 0) return undefined
+	if (reading.overlap === undefined || reading.overlap.length > 0) return undefined
 
 	run_ship_narrowed.record(reading.checks, tree)
 
