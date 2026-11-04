@@ -79,6 +79,6 @@ function write_selectors(segments: ReadonlyArray<string>, index: number): Array<
 	return [...selectors_of(args), ...assigned_selectors(segments.slice(0, index + NEXT))]
 }
 
-const gh_repo_selector = { write_selectors }
+const gh_repo_selector = { is_write_call, write_selectors }
 
 export { gh_repo_selector }

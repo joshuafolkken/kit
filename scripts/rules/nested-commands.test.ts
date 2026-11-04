@@ -9,8 +9,10 @@ const QUOTED_MENTION = "grep -c 'cat .env' notes.md"
 describe('nested_commands.commands_of — the nested commands are cut out', () => {
 	it.each([
 		["bash -c 'cat .env'", 'cat .env'],
-		['sh -c "true; cat .env"', 'cat .env"'],
+		['sh -c "true; cat .env"', 'cat .env'],
 		['bash -lc "cat .env"', 'cat .env'],
+		['bash -o errexit -c "cat .env"', 'cat .env'],
+		['sh "-c" "cat .env"', 'cat .env'],
 		['eval "cat .env"', 'cat .env'],
 		['echo "$(cat .env)"', 'cat .env'],
 		['echo `cat .env`', 'cat .env'],
@@ -33,5 +35,15 @@ describe('nested_commands.commands_of — a plain line is its segments', () => {
 
 	it('leaves a quoted argument of a non-shell program as text', () => {
 		expect(nested_commands.commands_of(QUOTED_MENTION)).toEqual([QUOTED_MENTION])
+	})
+
+	it.each([
+		'bash scripts/check.sh -c "cat .env"',
+		'bash scripts/check.sh -c "true; cat .env"',
+		'bash -- scripts/check.sh -c "cat .env"',
+		'bash -o errexit scripts/check.sh -c "cat .env"',
+		'bash --rcfile "-c" scripts/check.sh "cat .env"',
+	])('leaves named-script arguments as text: %j', (command) => {
+		expect(nested_commands.commands_of(command)).toEqual([command])
 	})
 })
