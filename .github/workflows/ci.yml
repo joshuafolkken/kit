@@ -413,6 +413,8 @@ jobs:
         env:
           JOSH_METRICS_BASE: HEAD^1
           STATIC_GROUP: ${{ matrix.group }}
+          # Typed lint retains the full project; an eight-GiB heap leaves room on its 16 GB runner.
+          NODE_OPTIONS: ${{ matrix.group == 'lint' && '--max-old-space-size=8192' || '' }}
 
       # joshuafolkken/kit#4449: a main push that reuses this run skips the job above, so it saves no
       # ESLint cache, and a later pull request restored an entry several merges old. Since
@@ -547,6 +549,8 @@ jobs:
         if: steps.eslint-cache.outputs.cache-hit != 'true'
         continue-on-error: true
         run: pnpm josh lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
