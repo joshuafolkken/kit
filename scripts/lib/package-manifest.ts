@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import type { z } from 'zod'
+import { z } from 'zod'
+import { ancestor_directories } from './ancestor-directories'
 import { json_value } from './json-value'
 import { file_reader } from './read-file'
 
@@ -8,6 +9,13 @@ import { file_reader } from './read-file'
 // file name and written their own read-then-parse; they now ask here, and choose only how a manifest
 // that cannot be read answers.
 const PACKAGE_JSON = 'package.json'
+const REVIEW_GATE_SCHEMA = z.enum(['ci', 'local'])
+const josh_schemas = {
+	progress_interval_minutes: z.object({
+		josh: z.object({ progress_interval_minutes: z.number().positive() }).optional(),
+	}),
+	review_gate: z.object({ josh: z.object({ review_gate: REVIEW_GATE_SCHEMA }).optional() }),
+}
 
 function manifest_path(directory: string): string {
 	return path.join(directory, PACKAGE_JSON)
@@ -30,6 +38,27 @@ function read_manifest_if_valid<T>(directory: string, schema: z.ZodType<T>): T |
 	return json_value.parse_with(text, schema)
 }
 
-const package_manifest = { manifest_path, read_manifest, read_manifest_if_valid }
+function read_nearest_value<T, Value>(
+	start: string,
+	schema: z.ZodType<T>,
+	select: (manifest: T) => Value | undefined,
+): Value | undefined {
+	const value_schema = schema.transform(select)
 
-export { PACKAGE_JSON, package_manifest }
+	for (const directory of ancestor_directories.list(start)) {
+		const value = read_manifest_if_valid(directory, value_schema)
+		if (value !== undefined) return value
+	}
+
+	return undefined
+}
+
+const package_manifest = {
+	josh_schemas,
+	manifest_path,
+	read_manifest,
+	read_manifest_if_valid,
+	read_nearest_value,
+}
+
+export { PACKAGE_JSON, REVIEW_GATE_SCHEMA, package_manifest }
