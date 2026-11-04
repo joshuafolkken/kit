@@ -5,7 +5,7 @@ import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { implementation_cut } from './implementation-cut'
 import { investigator_foreground } from './investigator-foreground'
@@ -22,6 +22,14 @@ const GENERAL_PURPOSE = 'general-purpose'
 const FOREGROUND_FIELD = '`run_in_background: false`'
 const ROW_REASON = investigator_foreground.ROW.reason
 const { REISSUE_WINDOW_MS } = implementation_cut
+
+beforeEach(() => {
+	vi.stubEnv('CLAUDE_CODE_ENTRYPOINT', '')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 
 function agent_call(
 	input: Record<string, unknown>,
