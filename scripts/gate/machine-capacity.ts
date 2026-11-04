@@ -291,20 +291,24 @@ function moved_over(from: number | undefined, to: number | undefined, limit: num
 	return (swapped_between(from, to) ?? 0) > limit
 }
 
+function is_swapping(before: MemoryReading | undefined, after: MemoryReading): boolean {
+	return moved_over(before?.swapped_mb, after.swapped_mb, SWAP_PRESSURE_MB)
+}
+
 function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
 	return (
 		(after.pressure_level ?? 0) >= PRESSURE_HOLD ||
-		moved_over(before.swapped_mb, after.swapped_mb, SWAP_PRESSURE_MB) ||
+		is_swapping(before, after) ||
 		moved_over(before.compressed_mb, after.compressed_mb, COMPRESSION_PRESSURE_MB)
 	)
 }
 
-// Only critical kernel pressure implies no free memory; swap and compressor traffic alone do not
-// prove a shortfall (joshuafolkken/kit#3943, #4313). Free memory is compared with the claim's declared
-// need. Traffic marks pressure and holds a shortfall past solo/wait-cap exceptions
-// (`core_admission.is_swap_held`, joshuafolkken/kit#4451).
-function pressured_available(after: MemoryReading): number | undefined {
+// Sustained swap traffic holds new heavy claims even with memory to spare (#6229).
+// The zero budget stops running lanes' checks as well as new lanes; compressor traffic alone
+// still compares free memory with the claim's need (#4313).
+function pressured_available(after: MemoryReading, before?: MemoryReading): number | undefined {
 	if (after.available_mb === undefined) return undefined
+	if (is_swapping(before, after)) return 0
 
 	return (after.pressure_level ?? 0) >= PRESSURE_HOLD ? 0 : after.available_mb
 }
@@ -322,7 +326,7 @@ async function read_machine(
 	return {
 		busy_cores,
 		run_queue: is_host ? loadavg()[0] : undefined,
-		available_mb: pressured_available(memory_after),
+		available_mb: pressured_available(memory_after, memory_before),
 		memory_pressured: is_pressured(memory_before, memory_after),
 	}
 }
