@@ -79,7 +79,7 @@ function latest_decision(): LatestDecision {
 		return { scope: LANE_SKIP_SCOPE, reason: LANE_SKIP_REASON }
 	}
 
-	return latest_scope_cli.decide()
+	return latest_scope_cli.scope_decision()
 }
 
 // Whether a dispatched lane child's tree holds uncommitted work. A lane child that popped
