@@ -4,7 +4,16 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { afterAll, afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import {
+	afterAll,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+	type MockInstance,
+} from 'vitest'
 import { measure_rerun_cli } from './measure-rerun-cli'
 
 vi.mock('#scripts/observations/observation-ledger-home', async (original) => {
@@ -37,9 +46,24 @@ const TWO_BASELINES = [HEADING, '', '- `sleep 999` → 1', ECHO_LINE, ''].join('
 const TIMEOUT_MESSAGE = 'spawnSync /bin/sh ETIMEDOUT'
 const mocked_exec_sync = vi.mocked(execSync)
 const mocked_issue_view = vi.mocked(git_gh_issue_read.issue_view_json)
+const api_state = { graphql_response: '', permission_role: 'read' }
 
 function issue_json(body: string, author_association: string, login = 'author'): string {
-	return JSON.stringify({ body, author_association, user: { login } })
+	api_state.graphql_response = JSON.stringify({
+		data: {
+			node: {
+				body,
+				authorAssociation: author_association,
+				author: { login },
+				// eslint-disable-next-line unicorn/no-null -- GraphQL explicitly returns null for an unedited issue
+				editor: null,
+				// eslint-disable-next-line unicorn/no-null -- GraphQL explicitly returns null for an unedited issue
+				lastEditedAt: null,
+			},
+		},
+	})
+
+	return JSON.stringify({ node_id: 'issue-node' })
 }
 
 // An issue by `login`, a `MEMBER` / `COLLABORATOR` whose permission lookup answers `role_name`.
@@ -50,8 +74,16 @@ function use_asked_author(
 	role_name: string,
 ): void {
 	mocked_issue_view.mockResolvedValue(issue_json(body, association, login))
-	api_mock.mockResolvedValue(JSON.stringify({ permission: role_name, role_name }))
+	api_state.permission_role = role_name
 }
+
+beforeEach(() => {
+	api_mock.mockImplementation(async ({ path: api_path }: { path: string }) =>
+		api_path === 'graphql'
+			? api_state.graphql_response
+			: JSON.stringify({ permission: api_state.permission_role }),
+	)
+})
 
 function silence_console(): MockInstance<typeof console.info> {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -145,7 +177,8 @@ describe('measure_rerun_cli.run — write access', () => {
 		mocked_issue_view.mockResolvedValue(issue_json(BODY, 'OWNER'))
 
 		expect(await measure_rerun_cli.run(ISSUE, NOW)).toBe(0)
-		expect(api_mock).not.toHaveBeenCalled()
+		expect(api_mock).toHaveBeenCalledTimes(1)
+		expect(api_mock).toHaveBeenCalledWith(expect.objectContaining({ path: 'graphql' }))
 	})
 })
 
