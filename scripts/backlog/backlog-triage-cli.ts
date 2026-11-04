@@ -10,6 +10,8 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_park } from '#scripts/run/park/run-park'
+import { backlog_triage_decision } from './backlog-triage-decision'
+import { backlog_triage_pass } from './backlog-triage-pass'
 import { backlog_triage_unblock } from './backlog-triage-unblock'
 
 // `josh backlog:triage --apply <N> [--lane | --solo] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear]` —
@@ -33,7 +35,7 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh backlog:triage --apply <N> [--lane | --solo] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear]'
+	'Usage: josh backlog:triage --pass [--exclude <N>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <N> [--lane | --solo] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear]'
 
 const OPTIONS = {
 	apply: { type: 'string' },
@@ -209,6 +211,9 @@ async function run(
 	argv: ReadonlyArray<string>,
 	directory: string = process.cwd(),
 ): Promise<number> {
+	if (argv[0] === '--pass') return await backlog_triage_pass.run(argv.slice(1))
+	if (argv[0] === '--decide') return backlog_triage_decision.run(argv.slice(1))
+
 	const request = parse_request(argv)
 
 	if (request !== undefined) return await triage(request, directory)
