@@ -1,15 +1,33 @@
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { scoped_green } from '#scripts/gate/scoped-green'
-import { tree_verdict } from '#scripts/gate/tree-verdict'
+import { tree_verdict, type TreeVerdict } from '#scripts/gate/tree-verdict'
 import { verification_tail } from '#scripts/gate/verification-tail'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
+import { test_related_touched } from './test-related-touched'
 import { test_unit_guard } from './test-unit-guard'
 
 interface RelatedVerdict {
 	exit_code: number
 	is_reused: boolean
+}
+
+function touched_target(): string {
+	return tree_verdict.record_path('test-related-touched-review')
+}
+
+async function record_touched(
+	given: ReadonlyArray<string>,
+	before: GateTree | undefined,
+	exit_code: number,
+): Promise<void> {
+	if (given.length !== 1 || given[0] !== test_related_touched.TOUCHED_FLAG) return
+	await scoped_green.record_if_green(review_stamps.test_related_stamp, {
+		before,
+		exit_code,
+		target: touched_target(),
+	})
 }
 
 // Arguments belong to the identity too: an explicitly narrowed green never answers a bare run.
@@ -49,6 +67,27 @@ function preserved_blobs(before: GateTree | undefined): Record<string, string> |
 	return stamp.blobs
 }
 
+async function reused_verdict(
+	given: ReadonlyArray<string>,
+	before: GateTree | undefined,
+	target: string,
+	kept: TreeVerdict,
+): Promise<RelatedVerdict> {
+	if (given.length === 0) {
+		const blobs = preserved_blobs(before)
+
+		await scoped_green.record_if_green(review_stamps.test_related_stamp, {
+			before,
+			exit_code: 0,
+			...(blobs !== undefined && { blobs }),
+		})
+	}
+
+	await record_touched(given, before, 0)
+
+	return { exit_code: tree_verdict.replay(kept, target), is_reused: true }
+}
+
 async function checked(
 	given: ReadonlyArray<string>,
 	fresh: (before: GateTree | undefined) => Promise<number>,
@@ -57,21 +96,13 @@ async function checked(
 	const target = target_of(given)
 	const kept = tree_verdict.read(before, target)
 
-	if (kept?.exit_code === 0) {
-		if (given.length === 0) {
-			const blobs = preserved_blobs(before)
+	if (kept?.exit_code === 0) return await reused_verdict(given, before, target, kept)
 
-			await scoped_green.record_if_green(review_stamps.test_related_stamp, {
-				before,
-				exit_code: kept.exit_code,
-				...(blobs !== undefined && { blobs }),
-			})
-		}
+	const result = await fresh_verdict(before, target, fresh)
 
-		return { exit_code: tree_verdict.replay(kept, target), is_reused: true }
-	}
+	await record_touched(given, before, result.exit_code)
 
-	return await fresh_verdict(before, target, fresh)
+	return result
 }
 
 async function run(
@@ -91,6 +122,6 @@ async function run(
 	return outcome.exit_code
 }
 
-const test_related_verdict = { run }
+const test_related_verdict = { run, touched_target }
 
 export { test_related_verdict }

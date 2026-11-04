@@ -15,6 +15,7 @@ import { path_decision } from '#scripts/josh/path-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { test_related_verdict } from '#scripts/test/test-related-verdict'
 import { removed_tests_check } from './removed-tests-check'
 import { review_attest, type ReviewSlot } from './review-attest'
 import { review_brief } from './review-brief'
@@ -362,6 +363,15 @@ interface ChangeReading {
 
 type Emit = (text: string) => void
 
+function refusal_for_round(reading: ChangeReading, round: number): string | undefined {
+	const { tree, commit } = reading
+	const refusal = scoped_green.refusal_for(tree, commit)
+
+	if (refusal === undefined || round === FIRST_ROUND) return refusal
+
+	return scoped_green.refusal_for(tree, commit, { test: test_related_verdict.touched_target() })
+}
+
 // One reading, used by every half below. Read twice, the level could describe a different change from
 // the digests printed beside it — and it would cost four git spawns to do so.
 async function read_change(): Promise<ChangeReading> {
@@ -392,7 +402,7 @@ async function run_review(
 	interaction?: ReadonlyArray<string>,
 ): Promise<number> {
 	const { base, commit, paths, tree } = reading
-	const refusal = scoped_green.refusal_for(tree, commit)
+	const refusal = refusal_for_round(reading, round)
 
 	if (refusal !== undefined) return report_error(refusal)
 	const resolved = agent_role_profile.resolve_review(round)
