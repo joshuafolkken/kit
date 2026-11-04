@@ -1,3 +1,4 @@
+import { review_round } from '#scripts/review/review-round'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -49,6 +50,7 @@ const broker_serving = vi.spyOn(lane_session_broker, 'is_serving')
 
 const OK = 0
 const FAILED = 1
+const FINAL_ROUND = 2
 const ISSUE = '2427'
 const OPEN = 'run:review --code-only'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
@@ -94,6 +96,29 @@ beforeEach(() => {
 	broker_request.mockReset().mockResolvedValue({ is_success: false, reason: UNSERVED })
 	broker_serving.mockReset().mockReturnValue(false)
 	interaction_status.mockReset().mockResolvedValue(undefined)
+})
+
+describe('run_ship_review_steps.review_stage — full-change final brief', () => {
+	it('requests the round in a full-change final brief rather than the caller round', async () => {
+		reviewer_on(OPENAI_REVIEWER_PROFILE)
+		broker_request.mockResolvedValue({ is_success: true })
+		josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => ({
+			code: OK,
+			out: argv.join(' ') === OPEN ? `medium\n${review_round.FINAL_LINE}` : '',
+		}))
+
+		expect(await stage_code()).toBe(OK)
+		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, {
+			kind: 'review',
+			round: '2',
+		})
+		expect(review_in_mock).toHaveBeenCalledWith(
+			expect.stringContaining('Do not edit any file.'),
+			FINAL_ROUND,
+			expect.any(String),
+		)
+		expect(launch).not.toHaveBeenCalled()
+	})
 })
 
 describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
