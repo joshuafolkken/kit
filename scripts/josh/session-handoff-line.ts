@@ -1,3 +1,4 @@
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import { consultation_handoff } from '#scripts/rules/consultation-handoff'
 import { run_handoff_args } from '#scripts/run/handoff/run-handoff-args'
@@ -71,6 +72,8 @@ function line_of(payload: PromptPayload): string {
 }
 
 function handoff_line(raw_payload: string): string {
+	if (lane_child_marker.is_child_of(process.cwd())) return ''
+
 	const payload = json_value.parse_with(raw_payload, payload_schema)
 
 	return payload === undefined ? '' : line_of(payload)

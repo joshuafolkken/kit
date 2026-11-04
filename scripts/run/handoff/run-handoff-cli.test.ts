@@ -19,6 +19,7 @@ const FINAL = JSON.stringify({ type: 'result', result: `Filed ${ISSUE_URL}` })
 const CLAUDE_SESSION = { CLAUDE_CODE_SESSION_ID: 'session', HOME: '/home' }
 const PID = 42
 const BRIEF_TEXT = 'Agreed brief'
+const LANE_DIRECTORY = '/home/dev/.kit-lanes/12'
 
 writeFileSync(BRIEF_FILE, BRIEF_TEXT)
 
@@ -175,6 +176,36 @@ describe('run_handoff_cli.run backlogrun', () => {
 
 		expect(backlogrun).toHaveBeenCalledWith(['--agent', 'codex'])
 	})
+})
+
+describe('run_handoff_cli.run lane boundary', () => {
+	it.each(['kickoff', 'fullrun', 'halfrun', 'prrun', 'backlogrun'])(
+		'refuses %s in a lane child before starting any worker',
+		async (keyword) => {
+			const { ports, lines, requests, backlogrun } = fake({
+				cwd: LANE_DIRECTORY,
+				environment: { ...CLAUDE_SESSION, JOSH_LANE_CHILD: '12' },
+			})
+
+			expect(await run_handoff_cli.run([keyword, '12', BRIEF_FLAG, BRIEF_FILE], ports)).toBe(1)
+			expect(lines).toEqual([expect.stringContaining('continue the workflow in this session')])
+			expect(requests).toEqual([])
+			expect(backlogrun).not.toHaveBeenCalled()
+		},
+	)
+
+	it.each([undefined, '99'])(
+		'starts a consultation run with unrelated lane mark %s',
+		async (mark) => {
+			const { ports, requests } = fake({
+				cwd: LANE_DIRECTORY,
+				environment: { ...CLAUDE_SESSION, JOSH_LANE_CHILD: mark },
+			})
+
+			expect(await run_handoff_cli.run(['fullrun', '12', BRIEF_FLAG, BRIEF_FILE], ports)).toBe(0)
+			expect(requests).toHaveLength(1)
+		},
+	)
 })
 
 describe('run_handoff_cli.run refusals', () => {

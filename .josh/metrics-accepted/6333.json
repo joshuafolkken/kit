@@ -1,0 +1,8 @@
+{
+	"reason": "Reject lane-child handoff at the CLI and suppress its prompt guidance using the existing marker; +12 code lines and +1 on-demand byte implement the required boundary without new state or duplicated detection.",
+	"date": "2026-11-04",
+	"growth": {
+		"scripts.code_lines": 12,
+		"ai_cost.on_demand_bytes": 1
+	}
+}
