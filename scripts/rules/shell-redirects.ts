@@ -1,8 +1,8 @@
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { nested_commands } from './nested-commands'
 
-// The files a shell segment's redirects name — the one reading `protected-files.ts` (a secret read or
-// written) and `workflow-edit.ts` (a workflow written) share, so neither row carries its own copy.
+// The files a shell segment's redirects name, used by `protected-files.ts` to detect secrets read or
+// written.
 //
 // Each `<` of a redirect operator is spaced out to the read mark and each `>` (the clobber `>|` whole)
 // to the write mark, so the word after the last mark of `<`, `>`, `>>`, `2>` or `&>` is the file it
@@ -19,7 +19,6 @@ const REDIRECT = />\||[<>]/gu
 const WHITESPACE = /\s+/u
 const NEXT = 1
 const ANY_MARK: ReadonlySet<string> = new Set([READ_MARK, WRITE_MARK])
-const WRITE_ONLY: ReadonlySet<string> = new Set([WRITE_MARK])
 const { SHELLS } = nested_commands
 
 function redirect_marks_of(segment: string, program: string | undefined): string {
@@ -41,28 +40,15 @@ function marked_words(segment: string, program: string | undefined): Array<strin
 	return spaced.split(WHITESPACE).filter((word) => word !== '')
 }
 
-function targets_after(
-	segment: string,
-	program: string | undefined,
-	marks: ReadonlySet<string>,
-): Array<string> {
+// Every file the segment's redirects read or write.
+function targets_of(segment: string, program: string | undefined): Array<string> {
 	const words = marked_words(segment, program)
 
 	return words
-		.map((word, index) => (marks.has(word) ? words[index + NEXT] : undefined))
+		.map((word, index) => (ANY_MARK.has(word) ? words[index + NEXT] : undefined))
 		.filter((target): target is string => target !== undefined && !ANY_MARK.has(target))
 }
 
-// Every file the segment's redirects read or write.
-function targets_of(segment: string, program: string | undefined): Array<string> {
-	return targets_after(segment, program, ANY_MARK)
-}
-
-// The files the segment's redirects write (`>`, `>>`, `>|`, `2>`, `&>`), never one they read.
-function written_of(segment: string, program: string | undefined): Array<string> {
-	return targets_after(segment, program, WRITE_ONLY)
-}
-
-const shell_redirects = { targets_of, written_of }
+const shell_redirects = { targets_of }
 
 export { shell_redirects }
