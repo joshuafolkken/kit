@@ -13,9 +13,11 @@ import { backlog_drive_args } from './backlog-drive-args'
 import { backlog_drive_cli } from './backlog-drive-cli'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_drive_retry } from './backlog-drive-retry'
 
 const ACTIVE = '2026-09-24T00:00:00.000Z'
 const WINDOW_MINUTES = 9
+const RETRY_ERROR = 'retry failed'
 
 it.each([false, true])(
 	'clears pending admission on driver exit, throwing=%s',
@@ -152,6 +154,7 @@ function arrange_merge(out: string, code = 0): MockInstance<typeof josh_command.
 	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
+	vi.spyOn(backlog_drive_retry, 'after_merge').mockResolvedValue()
 
 	return vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code, out })
 }
@@ -161,6 +164,7 @@ describe('backlog_drive_cli.merge', () => {
 		const run = arrange_merge(`progress\n${run_merge_driver.print(MERGED)}`)
 
 		await expect(backlog_drive_cli.merge('2500', '4242')).resolves.toStrictEqual(MERGED)
+		expect(backlog_drive_retry.after_merge).toHaveBeenCalledWith(2500)
 		expect(run).toHaveBeenCalledWith(
 			['run:merge', '2500', '--owner', '4242', '--driver'],
 			expect.any(Boolean),
@@ -177,6 +181,16 @@ describe('backlog_drive_cli.merge', () => {
 			is_offer: true,
 			outcome: 'unresolved',
 		})
+		expect(backlog_drive_retry.after_merge).not.toHaveBeenCalled()
+		vi.restoreAllMocks()
+	})
+
+	it('propagates dependent retry failure after collecting the merge (ac-e6cfefaf)', async () => {
+		arrange_merge(run_merge_driver.print(MERGED))
+		vi.mocked(backlog_drive_retry.after_merge).mockRejectedValue(new Error(RETRY_ERROR))
+
+		await expect(backlog_drive_cli.merge('2500', '4242')).rejects.toThrow(RETRY_ERROR)
+		expect(backlog_drive_named.mark_done).toHaveBeenCalled()
 		vi.restoreAllMocks()
 	})
 })

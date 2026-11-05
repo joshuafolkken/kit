@@ -27,6 +27,10 @@ action. `pnpm josh run:merge` enforces the computable half: an unfinished child 
 blocked-by is released to **wait** — no `needs-decision` label, no failure counted — and the backlog
 offer hands it back once its blockers merge.
 
+After collecting a merged cause, the driver retries this run's parked native blocked-by dependents
+through `run:add --retry` once all blockers close. It preserves the retry command's human-decision,
+active-lane and terminal-state protections; incomplete dependency reads and failed retries are errors.
+
 **A wait for the next published release is a dependency too** — never `needs-decision`. Record it
 with `pnpm josh issue:release <M> --wait` (`<M>` blocked by the release Issue, filed when none is
 open), then `pnpm josh run:pause <M> --for <the release Issue>` as for a prerequisite below; `fullrun` /
