@@ -73,6 +73,10 @@ runs:
         SAFE_CHAIN_INSTALLER_VERSION: 1.5.26
         SAFE_CHAIN_INSTALLER_SHA256: 9e4af7107f06d9c0d758cb08fb36804c2af88e24972f3a9d3f8c2bd0ca002adf
       run: |
+        export CURL_HOME
+        CURL_HOME=$(mktemp -d "$RUNNER_TEMP/safe-chain-curl.XXXXXX")
+        trap 'rm -r "$CURL_HOME"' EXIT
+        printf '%s\n' 'retry = 3' 'retry-delay = 2' 'retry-max-time = 60' > "$CURL_HOME/.curlrc"
         installer="$RUNNER_TEMP/install-safe-chain.sh"
         curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
         echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
