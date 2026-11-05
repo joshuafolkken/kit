@@ -20,6 +20,15 @@ const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = [
 ]
 
 const COMMAND_MAP: Record<string, CommandEntry> = {
+	completion: {
+		script: 'scripts/josh/josh-completion.ts',
+		description: 'Print command names and aliases for shell completion',
+		category: 'Development',
+		reference: ['--names', 'automation', ['none']],
+		is_bundled: true,
+		is_read_only: true,
+		usage: { examples: [{ arguments: '--names' }] },
+	},
 	...DEV_COMMANDS,
 	...PROJECT_COMMANDS,
 	...WORKFLOW_COMMANDS,
