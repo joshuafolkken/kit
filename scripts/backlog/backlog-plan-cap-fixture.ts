@@ -9,7 +9,7 @@ const LIMIT = 4
 const COUNT = 7
 const FIRST = 901
 const ISSUES = Array.from({ length: COUNT }, (_, index) => FIRST + index)
-const ORDERED = ISSUES.toReversed()
+const ORDERED = ISSUES
 const WORD_CASES: ReadonlyArray<readonly [string, string, string]> = [
 	[
 		'ja',

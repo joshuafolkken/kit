@@ -23,7 +23,7 @@ import {
 // (joshuafolkken/kit#5506)), then the minutes a week its declared speed-up saves
 // (`expected_effect_lint.weekly_minutes`, on the same minute scale; `0` when undeclared, so a measured
 // time-saver runs ahead of an unmeasured feature (joshuafolkken/kit#5302)). Below those, the caller's
-// own order stands — the sort is stable, so recency and the defect-rate adjustment survive as the last key.
+// own order stands — the sort is stable, so oldest-first ties and the defect-rate adjustment survive.
 //
 // **`run:solo` alone is not a key.** It means "runs alone", not "runs first": tidying that only touches
 // the verification path carries it too, and a low-priority one is not owed a place ahead of the queue.

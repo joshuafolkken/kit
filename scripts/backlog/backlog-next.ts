@@ -31,7 +31,7 @@ import { backlog_wait_cause } from './backlog-wait-cause'
 //
 // Neither half alone can give the answer. `epic:next` has the dependency graph and the execution
 // wave, but its input is **one epic's task list**. `auto-ok:next` sees the whole backlog, but it
-// orders by the display's newest-first ranking and reads no dependency at all.
+// orders by the display's ranking, oldest first on ties, and reads no dependency at all.
 //
 // This command is the route that asks the backlog itself what may start, and it is glue rather than a third implementation: the epic half runs
 // through `epic:next`'s own read → classify → report pipeline unchanged, the standalone half through
