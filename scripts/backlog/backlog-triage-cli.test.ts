@@ -38,6 +38,9 @@ const BLOCKED_BY_FLAG = '--blocked-by'
 const BLOCKED_ARGV = ['--apply', ISSUE, BLOCKED_BY_FLAG, BLOCKER, '--reason', REASON]
 const UNBLOCK_FLAG = '--unblock'
 const UNBLOCK_ARGV = ['--apply', ISSUE, UNBLOCK_FLAG, BLOCKER, '--reason', REASON]
+const VERIFICATION_FLAG = '--verification'
+const EVERY_RUN_FLAG = '--every-run'
+const SOLO_ANSWERS = ['--defect', 'yes', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes']
 
 vi.spyOn(console, 'info').mockImplementation(() => undefined)
 vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -74,6 +77,18 @@ beforeEach(() => {
 })
 
 describe('josh backlog:triage — the arguments', () => {
+	it.each(['no', 'unknown', 'invalid', ''])(
+		'refuses solo evidence %s before writing (ac-237df449)',
+		async (answer) => {
+			const answers =
+				answer === '' ? [] : ['--defect', answer, VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes']
+			const args = ['--apply', ISSUE, '--solo', ...answers, '--reason', REASON]
+
+			expect(await backlog_triage_cli.run(args, DIRECTORY)).toBe(FAILURE_EXIT_CODE)
+			expect(order).toStrictEqual([])
+		},
+	)
+
 	it.each([
 		['no issue', ['--lane', '--reason', REASON]],
 		['no run label and no blocker', ['--apply', ISSUE, '--reason', REASON]],
@@ -117,7 +132,7 @@ describe('josh backlog:triage --decide', () => {
 	})
 
 	it('routes the three-condition decision without writing a verdict', async () => {
-		const args = ['--decide', '--defect', 'yes', '--verification', 'yes', '--every-run', 'no']
+		const args = ['--decide', '--defect', 'yes', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'no']
 
 		expect(await backlog_triage_cli.run(args, DIRECTORY)).toBe(SUCCESS_EXIT_CODE)
 		expect(console.info).toHaveBeenCalledWith(RUN_LANE_LABEL)
@@ -144,11 +159,16 @@ describe('josh backlog:triage --apply', () => {
 	})
 
 	it('applies run:solo for --solo', async () => {
-		await backlog_triage_cli.run(['--apply', ISSUE, '--solo', '--reason', REASON], DIRECTORY)
+		await backlog_triage_cli.run(
+			['--apply', ISSUE, '--solo', ...SOLO_ANSWERS, '--reason', REASON],
+			DIRECTORY,
+		)
 
 		expect(apply_label).toHaveBeenCalledWith(ISSUE, RUN_SOLO_LABEL)
 	})
+})
 
+describe('josh backlog:triage --apply failures', () => {
 	it('stops before the comment when the park cannot be cleared', async () => {
 		clear_label.mockResolvedValueOnce(false)
 
@@ -183,9 +203,9 @@ describe('josh backlog:triage --blocked-by', () => {
 	})
 
 	it('records the relation before the comment and the run label when both are given', async () => {
-		expect(await backlog_triage_cli.run([...BLOCKED_ARGV, '--solo'], DIRECTORY)).toBe(
-			SUCCESS_EXIT_CODE,
-		)
+		expect(
+			await backlog_triage_cli.run([...BLOCKED_ARGV, '--solo', ...SOLO_ANSWERS], DIRECTORY),
+		).toBe(SUCCESS_EXIT_CODE)
 		expect(order).toStrictEqual([`blocked-by ${BLOCKER}`, 'comment', `label ${RUN_SOLO_LABEL}`])
 	})
 

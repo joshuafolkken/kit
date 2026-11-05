@@ -1,3 +1,4 @@
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#5629: `run:entry <N> --adopt` — a `new` run's entry once its Issue is filed. Kept
@@ -54,7 +55,7 @@ const FRESH = { code: OK, out: 'fresh' }
 const HELD = { code: OK, out: 'hold' }
 const UNDER = { code: OK, out: 'under' }
 const ADOPT_CALL = ['run:hold', '--adopt', ISSUE]
-const RELEASE_CALL = ['run:release', ISSUE]
+const RELEASE_CALL = ['--release', ISSUE]
 const TRUSTED_READS = { content: { kind: 'ok', block: '', trust: { is_body_trusted: true } } }
 
 function calls(): ReadonlyArray<ReadonlyArray<string>> {
@@ -65,6 +66,7 @@ beforeEach(() => {
 	josh_run_mock.mockReset()
 	gather_mock.mockReset().mockResolvedValue(TRUSTED_READS)
 	confirm_mock.mockReset().mockResolvedValue(true)
+	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(OK)
 	mark_mock.mockReset().mockResolvedValue(true)
 	sync_mock.mockReset().mockResolvedValue(undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -111,7 +113,7 @@ describe('run_entry_cli.run --adopt — the tree sync before the reads', () => {
 		sync_mock.mockResolvedValue({ report: '(sync failed)', notice: { reason: 'sync' } })
 
 		expect(await run_entry_cli.run([ISSUE, '--adopt'])).not.toBe(OK)
-		expect(calls().at(-1)).toStrictEqual(RELEASE_CALL)
+		expect(run_hold_cli.run).toHaveBeenCalledExactlyOnceWith(RELEASE_CALL)
 		expect(confirm_mock).toHaveBeenCalledTimes(1)
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(mark_mock).not.toHaveBeenCalled()
@@ -139,7 +141,7 @@ describe('run_entry_cli.run --adopt — the stops before the reads', () => {
 			.mockResolvedValueOnce({ code: OK, out: '' })
 
 		expect(await run_entry_cli.run([ISSUE, '--adopt'])).not.toBe(OK)
-		expect(calls().at(-1)).toStrictEqual(RELEASE_CALL)
+		expect(run_hold_cli.run).toHaveBeenCalledExactlyOnceWith(RELEASE_CALL)
 		expect(gather_mock).not.toHaveBeenCalled()
 	})
 })
