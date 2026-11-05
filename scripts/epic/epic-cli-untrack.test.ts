@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { epic_cli_untrack } from './epic-cli-untrack'
+import { epic_cli_untrack } from './epic-cli'
 
 describe('epic child untrack arguments', () => {
 	it('recognizes only the untrack form', () => {
