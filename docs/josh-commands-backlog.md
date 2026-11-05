@@ -958,6 +958,8 @@ The supervisor claims the record for the session it wakes; the session acts and 
 
 A pass launches every free lane it seats side by side, not one after another. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
 
+Merged causes use guarded `run:add --retry` for parked dependents.
+
 A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are in [Labels and run states](./labels-and-run-states.md).

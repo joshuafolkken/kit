@@ -30,6 +30,17 @@ describe('explicit mechanical retry', () => {
 	})
 })
 
+it('preserves remaining dependencies when explicitly retrying (ac-505a5dfa)', async () => {
+	const ports = {
+		...ports_for([RUN_STALLED_LABEL]),
+		read_issue: async () => ({ is_open: true, blockers: [6400] }),
+	}
+
+	expect(await run_add.add_all([ISSUE], true, ports, CONTEXT)).toMatchObject([
+		{ kind: 'queued', blockers: [6400] },
+	])
+})
+
 describe('retry protection', () => {
 	it.each(['needs-decision', 'needs-human-review', 'already-done', 'in-progress'])(
 		'protects %s',
