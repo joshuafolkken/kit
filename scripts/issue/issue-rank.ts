@@ -21,7 +21,8 @@ import {
 // so causes of one lane are told apart (joshuafolkken/kit#4861); `0` when neither is declared, so an
 // undeclared issue follows every declared one of its priority), then how many other open issues wait
 // on it, transitively (`count_dependents`: a chain's head runs ahead of an independent issue
-// (joshuafolkken/kit#5506)), then the minutes a week its declared speed-up saves
+// (joshuafolkken/kit#5506)), then declared size-estimate lines, smallest first (undeclared last),
+// then the minutes a week its declared speed-up saves
 // (`expected_effect_lint.weekly_minutes`, on the same minute scale; `0` when undeclared, so a measured
 // time-saver runs ahead of an unmeasured feature (joshuafolkken/kit#5302)). Below those, the caller's
 // own order stands — the sort is stable, so oldest-first ties and the defect-rate adjustment survive.
@@ -37,6 +38,7 @@ interface RankRow {
 	lost_minutes: number
 	gain_minutes: number
 	dependents: number
+	estimated_lines?: number | undefined
 }
 
 // One open issue as its key and the keys of the issues it is blocked by. The caller names the key
@@ -66,8 +68,7 @@ function is_verification_defect(labels: ReadonlyArray<string>): boolean {
 	return has_label_name(labels, BUG_LABEL) && has_label_name(labels, RUN_SOLO_LABEL)
 }
 
-// Negated so that the larger value sorts first under an ascending comparison; `is_last` alone is not,
-// so a declared row sorts last.
+// Descending keys are negated for the ascending comparison; `is_last` and estimated lines are not.
 function keys_of(row: RankRow): ReadonlyArray<number> {
 	return [
 		flag(row.is_last),
@@ -77,6 +78,7 @@ function keys_of(row: RankRow): ReadonlyArray<number> {
 		-flag(is_verification_defect(row.labels)),
 		-row.lost_minutes,
 		-row.dependents,
+		row.estimated_lines ?? Number.MAX_SAFE_INTEGER,
 		-row.gain_minutes,
 	]
 }

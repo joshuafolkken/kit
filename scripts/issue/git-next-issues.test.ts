@@ -17,6 +17,7 @@ const OVER_LIMIT_COUNT = 8
 const CREATED_EARLIER = '2026-08-01T00:00:00Z'
 const CREATED_LATER = '2026-08-02T00:00:00Z'
 const CREATED_LATEST = '2026-08-03T00:00:00Z'
+const WEEKLY_EFFECT = '## 期待効果\n\n- 効く率: 週 23 回のうち 5 回\n- 1 回あたりの得: 約 250 秒\n'
 const EXCLUDED_LABEL_SPELLINGS: ReadonlyArray<string> = [
 	'epic',
 	'Epic',
@@ -114,12 +115,27 @@ describe('git_next_issues.prioritize - ranking keys', () => {
 	})
 })
 
+describe('git_next_issues.order - estimated size', () => {
+	it('orders smaller estimates before weekly gain and missing estimates', () => {
+		const background = '## 背景\n\n- 規模見積もり: 約 1 ファイル / '
+		const large = {
+			...issue(1, CREATED_EARLIER),
+			body: `${background}60 行（テスト除く）\n\n${WEEKLY_EFFECT}`,
+		}
+		const small = { ...issue(2, CREATED_LATER), body: `${background}10 行（テスト除く）` }
+		const missing = issue(3, CREATED_EARLIER)
+
+		expect(git_next_issues.order([missing, large, small]).map((entry) => entry.number)).toEqual([
+			2, 1, 3,
+		])
+	})
+})
+
 // joshuafolkken/kit#5302: the 2026-10-28 queue — one measured time-saver behind newer undeclared
 // issues of its priority — puts the time-saver first.
 describe('git_next_issues.prioritize - expected effect', () => {
 	it('puts the issue that declares an expected effect ahead of older undeclared ones', () => {
-		const effect = '## 期待効果\n\n- 効く率: 週 23 回のうち 5 回\n- 1 回あたりの得: 約 250 秒\n'
-		const saver = { ...issue(1, CREATED_LATEST), body: effect }
+		const saver = { ...issue(1, CREATED_LATEST), body: WEEKLY_EFFECT }
 		const issues = [saver, issue(2, CREATED_EARLIER), issue(3, CREATED_LATER)]
 
 		expect(prioritized_numbers(issues)).toEqual([1, 2, 3])

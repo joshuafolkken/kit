@@ -198,7 +198,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			ignores: ['**/*.svelte.ts'],
 			languageOptions: {
 				parser: checkout_rooted_parser.create(tsconfig_root_dir),
-				parserOptions: { project: './tsconfig.json' },
+				parserOptions: { project: false, projectService: true },
 			},
 		},
 		{
@@ -221,6 +221,13 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 		{
 			files: FILE_PATTERNS.tests,
 			rules: {
+				...ts.configs.disableTypeChecked.rules,
+				// Missing awaits can make tests finish before their assertions; void callbacks can
+				// silently discard rejected promises. Keep both checks with real project types.
+				'@typescript-eslint/no-floating-promises':
+					typescript_rules['@typescript-eslint/no-floating-promises'],
+				'@typescript-eslint/no-misused-promises':
+					typescript_rules['@typescript-eslint/no-misused-promises'],
 				'@typescript-eslint/no-magic-numbers': 'off',
 				...code_quality_test_rules,
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],

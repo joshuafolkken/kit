@@ -30,6 +30,8 @@ const SEVENTH = 807
 const HOLDER = 950
 const OFFER_CAP = 5
 const EPIC_CHILD = 901
+const SMALL_ESTIMATE = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
+const LARGE_ESTIMATE = '## 背景\n\n- 規模見積もり: 約 2 ファイル / 60 行（テスト除く）'
 
 const streams = console_streams()
 const { stdout } = streams
@@ -110,6 +112,60 @@ describe('backlog:next ranking keys', () => {
 	it('offers the older issue first when all ranking keys are equal', async () => {
 		backlog_fixture.stub_backlog({
 			opted_in: [auto_ok_fixture.issue(SIXTH, CREATED_LATER, [AUTO_OK_LABEL]), row(SEVENTH, [])],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()).toStrictEqual([SEVENTH, SIXTH])
+	})
+})
+
+describe('backlog:next estimated size ranking keys', () => {
+	it('offers smaller standalone estimates first (ac-3e8c1770)', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [
+				{ ...row(SIXTH, []), body: LARGE_ESTIMATE },
+				{ ...row(SEVENTH, []), body: SMALL_ESTIMATE },
+			],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()).toStrictEqual([SEVENTH, SIXTH])
+	})
+
+	it('offers smaller epic child estimates first (ac-ede537a2)', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [opted_in_epic()],
+			epics: [{ number: EPIC_NUMBER, children: [SIXTH, SEVENTH] }],
+			children: [
+				{ number: SIXTH, body: LARGE_ESTIMATE },
+				{ number: SEVENTH, body: SMALL_ESTIMATE },
+			],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()).toStrictEqual([SEVENTH, SIXTH])
+	})
+})
+
+describe('backlog:next estimated size precedence', () => {
+	it('keeps more dependents ahead of smaller estimates (ac-745dc1d2)', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [opted_in_epic()],
+			epics: [{ number: EPIC_NUMBER, children: [SIXTH, SEVENTH, EPIC_CHILD] }],
+			children: [
+				{ number: SIXTH, body: LARGE_ESTIMATE },
+				{ number: SEVENTH, body: SMALL_ESTIMATE },
+				{ number: EPIC_CHILD, blocked_by: [SIXTH] },
+			],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()).toStrictEqual([SIXTH, SEVENTH])
+	})
+
+	it('offers declared estimates before missing estimates (ac-d38a52b0)', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [row(SIXTH, []), { ...row(SEVENTH, []), body: LARGE_ESTIMATE }],
 		})
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
