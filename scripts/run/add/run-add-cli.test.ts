@@ -190,7 +190,12 @@ describe('GitHub retry labels', () => {
 		run_carry.begin_carry(target(), RETRY_INVOCATION, run_carry.NO_OWNER, new Date())
 		vi.spyOn(git_gh_command, 'issue_get_state_and_relations_classified').mockResolvedValue({
 			kind: 'read',
-			json: JSON.stringify({ number: 5413, state: 'OPEN', labels: [{ name: label }] }),
+			json: JSON.stringify({
+				number: 5413,
+				state: 'OPEN',
+				labels: [{ name: label }],
+				blockedBy: { nodes: [], totalCount: 0 },
+			}),
 		})
 		vi.spyOn(git_gh_command, 'issue_add_label').mockResolvedValue(true)
 		const clear = vi.spyOn(git_gh_command, 'issue_clear_label').mockResolvedValue(true)
@@ -198,6 +203,23 @@ describe('GitHub retry labels', () => {
 		expect(await run_add_cli.run(RETRY_ARGS)).toBe(exit)
 		expect(clear).toHaveBeenCalledTimes(exit === 0 ? 1 : 0)
 	})
+})
+
+describe('complete retry dependencies', () => {
+	it.each([undefined, { nodes: [], totalCount: 1 }, { nodes: [] }])(
+		'refuses incomplete native relations %j (ac-e6cfefaf)',
+		async (blocked_by) => {
+			completed_retry()
+			vi.spyOn(git_gh_command, 'issue_get_state_and_relations_classified').mockResolvedValue({
+				kind: 'read',
+				json: JSON.stringify({ number: 5413, state: 'OPEN', blockedBy: blocked_by }),
+			})
+			const clear = vi.spyOn(git_gh_command, 'issue_clear_label')
+
+			expect(await run_add_cli.run(RETRY_ARGS)).toBe(1)
+			expect(clear).not.toHaveBeenCalled()
+		},
+	)
 })
 
 describe('retry in a pool run', () => {

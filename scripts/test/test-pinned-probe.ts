@@ -40,6 +40,7 @@ interface Probe {
 	index: number
 	recheck?: Recheck | undefined
 	reach?: number | undefined
+	spawned?: ReadonlyArray<string> | undefined
 }
 
 type OnVerdict = (index: number, verdict: RedProbe) => Promise<void>
@@ -53,7 +54,7 @@ async function direct_of(root: string, file: string): Promise<Array<string>> {
 // What a fresh probe of the hunk runs in the tree at `root` (`test-pinned-stage.ts`). A file every
 // test imports stays the special case of joshuafolkken/kit#5122: its direct importers alone, never
 // escalated, since its reach is the whole suite — and `vitest related` handed it runs the whole suite.
-async function plan_of(root: string, probe: Probe): Promise<StagePlan> {
+async function import_plan(root: string, probe: Probe): Promise<StagePlan> {
 	const { file } = probe.hunk
 
 	if (direct_importers.every_test_imports_of([file]).length > 0) {
@@ -63,6 +64,17 @@ async function plan_of(root: string, probe: Probe): Promise<StagePlan> {
 	if (probe.reach === undefined) return { reach: [file] }
 
 	return test_pinned_stage.plan_over(file, await direct_of(root, file), probe.reach)
+}
+
+async function plan_of(root: string, probe: Probe): Promise<StagePlan> {
+	const plan = await import_plan(root, probe)
+	const spawned = probe.spawned ?? []
+
+	return {
+		...plan,
+		direct: plan.direct?.concat(spawned),
+		reach: [...new Set([...plan.reach, ...spawned])],
+	}
 }
 
 // The tests `files` reach in the tree at `root`, the heavy files reached only indirectly left out
