@@ -33,6 +33,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					note: 'rewrite the body to match the recorded blocked-by, and record any order the body declared',
 				},
 				{ arguments: '--decide 893 894 --decision-file .josh/tmp/why.md' },
+				{ arguments: '--untrack 893 894', note: 'remove a child row and its connected orders' },
 			],
 			flags: [
 				{
@@ -80,6 +81,11 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--remove <E> <M> <N> [<N2> …]'],
 					description:
 						'delete a declared order from the body and the relations; each consecutive pair is one link.',
+				},
+				{
+					names: ['--untrack <E> <N...>'],
+					description:
+						'remove child rows and connected orders without reconnecting survivors; relation failures preserve the body for retry; absent rows are safe to repeat.',
 				},
 			],
 		},

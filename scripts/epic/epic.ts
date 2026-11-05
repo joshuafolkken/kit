@@ -5,13 +5,14 @@
  */
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { epic_add, type AddChildrenInput } from './epic-add'
-import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
+import { epic_cli, epic_cli_untrack, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
 import { epic_decide } from './epic-decide'
 import { epic_notify } from './epic-notify'
 import { epic_reconcile } from './epic-reconcile'
 import { epic_remove } from './epic-remove'
 import { epic_run } from './epic-run'
 import { epic_split_reach } from './epic-split-reach'
+import { epic_untrack } from './epic-untrack'
 
 const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
@@ -20,6 +21,7 @@ const USAGE = [
 	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>] [--decision-file <path|->]',
 	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
+	'       josh epic --untrack <E> <N1> <N2> ...',
 	'       josh epic --reconcile <E>',
 	'       josh epic --decide <E> <N1> <N2> ... --decision-file <path|->',
 ].join('\n')
@@ -216,6 +218,20 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 	return creation.kind === 'refused' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
+async function run_untrack(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = epic_cli_untrack.parse_arguments(argv)
+
+	if (parsed === undefined) {
+		console.error(
+			`✖ An epic number and at least one distinct child issue number are required.\n${USAGE}`,
+		)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await epic_untrack.untrack(parsed.epic_number, parsed.children)
+}
+
 type EpicForm = readonly [
 	(argv: ReadonlyArray<string>) => boolean,
 	(argv: ReadonlyArray<string>) => Promise<number>,
@@ -224,6 +240,7 @@ type EpicForm = readonly [
 // Checked in this order. `--add` comes before `--promote`: both name an existing issue first, and only
 // the flag distinguishes "insert into this epic" from "turn this issue into one".
 const FLAGGED_FORMS: ReadonlyArray<EpicForm> = [
+	[epic_cli_untrack.is_untrack, run_untrack],
 	[epic_cli.is_reconciliation, run_reconciliation],
 	[epic_cli.is_removal, run_removal],
 	[epic_cli.is_decision_entry, run_decision],
