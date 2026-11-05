@@ -12,14 +12,14 @@ import { run_board_tick } from './run-board-tick'
 
 const { harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
-const { WORKER_URL, worker_gatherer } = run_board_gather_thread
+const { WORKER_URL, worker_gatherer, worker_options } = run_board_gather_thread
 // The worker starts tsx and takes a first round of real reads before the first frame.
 const FIRST_ROUND_MS = 60_000
 const workers: Array<Worker> = []
 
-// The test runner loads TypeScript its own way; the worker is handed tsx, as `josh` hands it.
+// A dist-launched parent carries no loader in its command line.
 function spawn(): Worker {
-	const worker = new Worker(WORKER_URL, { execArgv: ['--import', 'tsx'] })
+	const worker = new Worker(WORKER_URL, worker_options([]))
 
 	workers.push(worker)
 
