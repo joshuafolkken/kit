@@ -19,6 +19,7 @@ import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
 import { lane_value_cell, type CellAddress, type CellFilter } from './lane-value-cell'
+import { lane_why_period } from './lane-why-period'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement; `josh lane:value` and
 // `josh lane:net` print one measurement each.
@@ -46,6 +47,7 @@ const USAGE = [
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
 	'       josh lane:stats --period <days> --sinks [<minutes>]',
 	'       josh lane:stats --period <days> --over <minutes>',
+	'       josh lane:stats --period <days> --why <minutes>',
 	'       josh lane:stats --period <days> --pairs',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
 	`       josh lane:value ${CELL_METRIC} --table <title> [--row <label>] [--where <header>=<text>] --column <header> [--item <label>] [--zero] --since <instant>`,
@@ -133,6 +135,7 @@ type LedgerTable = typeof lane_sinks.table
 
 // The `--over` or `--sinks` table with its threshold, `undefined` for the period's row and tables.
 function table_choice(request: StatsRequest): { table: LedgerTable; minutes: number } | undefined {
+	if (request.why !== undefined) return { table: lane_why_period.table, minutes: request.why }
 	if (request.over !== undefined) return { table: lane_over.table, minutes: request.over }
 
 	return request.sinks === undefined

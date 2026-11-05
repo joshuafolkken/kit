@@ -9,6 +9,7 @@ const STATS_OPTIONS = {
 	limit: { type: 'string' },
 	sinks: { type: 'boolean' },
 	over: { type: 'string' },
+	why: { type: 'string' },
 	pairs: { type: 'boolean' },
 } as const
 
@@ -16,6 +17,7 @@ interface StatsFlags {
 	limit?: string | undefined
 	sinks?: boolean | undefined
 	over?: string | undefined
+	why?: string | undefined
 	pairs?: boolean | undefined
 }
 
@@ -26,6 +28,7 @@ interface StatsRequest {
 	sinks: number | undefined
 	// The `--over` threshold in minutes, `undefined` without the flag.
 	over: number | undefined
+	why: number | undefined
 	// `--pairs`: the scoped pair table (`lane-pairs.ts`).
 	is_pairs: boolean
 }
@@ -65,34 +68,46 @@ function sink_choice(
 	return positionals.length === 0 ? { minutes: undefined } : undefined
 }
 
-// `--over` reads a positive threshold and labels no lane limit nor sink, so either beside it is refused.
-function over_choice(values: StatsFlags): { minutes: number | undefined } | undefined {
-	if (values.over === undefined) return { minutes: undefined }
+// A missing threshold selects no table; an invalid one refuses the request.
+function threshold_choice(text: string | undefined): { minutes: number | undefined } | undefined {
+	if (text === undefined) return { minutes: undefined }
 
-	const minutes = positive(values.over)
-	const is_alone = values.sinks !== true && values.limit === undefined
+	const minutes = positive(text)
 
-	return minutes === undefined || !is_alone ? undefined : { minutes }
+	return minutes === undefined ? undefined : { minutes }
 }
 
-// `--pairs` labels no lane limit and reads no threshold, so any of them beside it is refused.
-function is_pairs_alone(values: StatsFlags): boolean {
-	if (values.pairs !== true) return true
+// Each alternate table is exclusive and carries no lane-limit label.
+function is_one_table(values: StatsFlags): boolean {
+	const selected = [
+		values.sinks === true,
+		values.over !== undefined,
+		values.why !== undefined,
+		values.pairs === true,
+	].filter(Boolean).length
 
-	return values.limit === undefined && values.sinks !== true && values.over === undefined
+	return selected <= 1 && (selected === 0 || values.limit === undefined)
 }
 
 // The one table the flags choose, `undefined` for a refused combination.
 function table_flags(
 	values: StatsFlags,
 	positionals: ReadonlyArray<string>,
-): Pick<StatsRequest, 'sinks' | 'over' | 'is_pairs'> | undefined {
+): Pick<StatsRequest, 'sinks' | 'over' | 'why' | 'is_pairs'> | undefined {
 	const choice = sink_choice(values, positionals)
-	const over = over_choice(values)
+	const over = threshold_choice(values.over)
+	const why = threshold_choice(values.why)
 
-	if (choice === undefined || over === undefined || !is_pairs_alone(values)) return undefined
+	if (choice === undefined || over === undefined || why === undefined || !is_one_table(values)) {
+		return undefined
+	}
 
-	return { sinks: choice.minutes, over: over.minutes, is_pairs: values.pairs === true }
+	return {
+		sinks: choice.minutes,
+		over: over.minutes,
+		why: why.minutes,
+		is_pairs: values.pairs === true,
+	}
 }
 
 function stats_request(rest: ReadonlyArray<string>): StatsRequest | undefined {

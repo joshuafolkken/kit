@@ -1196,12 +1196,13 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print lane throughput, gate duration and machine load over a period, the per-stage durations, the wait after each ship stop reason, and each gate check's duration, reuse count and core claim against the cores it used; with --sinks the stage totals, or with --over the ledger chains, of the lanes over a net-minute threshold; with --pairs the scoped pair runs.
+Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
 
 ```bash
 pnpm josh lane:stats --period 7             # a 7-day period's stage medians and maxima
 pnpm josh lane:stats --period 1 --sinks     # stage totals of the lanes over 30 net min
 pnpm josh lane:stats --period 1 --over 40   # ledger chains of lanes over 40 net min
+pnpm josh lane:stats --period 1 --why 40    # cause groups of lanes over 40 net min
 pnpm josh lane:stats --period 7 --pairs     # a 7-day period's scoped pair runs
 ```
 
@@ -1219,6 +1220,8 @@ lanes recorded.
 `--over <minutes>` prints one row per merged lane of the period over that many net minutes, the longest first: its
 net and waited minutes, the ledger chain behind them, its longest stage and the open Issues that stage matches as
 `--sinks` matches a row (`lane-over.ts`).
+
+Groups overlap; each sums net lane time. Implement attribution is unverified; Issues match names.
 
 The chain names `split-notice ×N`, `split-filed <child>`, `round 1 blocking`, `unplanned-notice ×N`, each yield's
 holder and redispatch gap (`dispatched before holder end` when the lane came back first, `gap open` while either is

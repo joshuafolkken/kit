@@ -7,14 +7,19 @@ several. Every command applies it identically.
 
 **The default is not to split.** Two questions have to answer yes **together**:
 
-1. **Does the request contain two or more deliverables that could each be merged separately?**
-2. **Does the whole of it exceed what one verification gate can confirm in one pass?** The guide is
-   **more than 8 changed files or more than 200 changed lines** (test files excluded) — either one is
-   over. Docs, snapshots and command listings the change has to follow count as files.
+1. **Two or more separately-mergeable deliverables (separability)?**
+2. Either size axis over the guide? (test files excluded) Count docs, snapshots and command listings.
 
-A change that must land in one commit is one deliverable, **separability alone splits nothing**, up to
-**the cap, 1.5 times the guide**: past it, or past the projected implement budget, no reason keeps it one Issue.
-The numbers are read against the whole request's estimate, a declared one doubled. `lane:plan` answers `split` past
+Use the same trailing 3-day period as the implement budget and median
+implement minutes per 100 actual changed lines:
+line guide = implement budget ÷ measured minutes per 100 lines × 100;
+file guide = line guide × (fallback file guide / fallback line guide).
+Without a measured rate, fall back to
+**more than 8 changed files or more than 200 changed lines**.
+
+One-commit deliverables stay single up to **the cap, 1.5 times the guide**; over cap or projected
+implement budget, always split. Double declared estimates.
+`lane:plan` answers `split` past
 twice the declared files (files or hunks) or the line guide.
 
 ## The same two questions decide the filing-time fold
