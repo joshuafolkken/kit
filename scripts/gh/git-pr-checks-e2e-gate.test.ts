@@ -188,9 +188,7 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 		mergeStateStatus: 'CLEAN',
 		reviewDecision: 'APPROVED',
 		statusCheckRollup: [
-			// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 			{ __typename: 'CheckRun', name: E2E_CHECK, status: 'COMPLETED', conclusion: 'SKIPPED' },
-			// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 			{ __typename: 'CheckRun', name: SONAR_QUBE, status: 'COMPLETED', conclusion: 'SUCCESS' },
 		],
 	})
