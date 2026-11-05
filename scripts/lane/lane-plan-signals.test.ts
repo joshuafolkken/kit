@@ -48,6 +48,37 @@ describe('lane_plan_signals.hunk_files', () => {
 	})
 })
 
+describe('lane_plan_signals measured rate', () => {
+	it('measures implementation and declaration growth from the same ledger window (ac-881063cd)', () => {
+		const entries: Array<LedgerEntry> = [
+			{ kind: 'dispatch', at: RECENT, issue: 1 },
+			{
+				kind: 'stage',
+				at: '2026-10-31T10:30:00.000Z',
+				issue: 1,
+				stage: 'preflight',
+				elapsed_ms: 0,
+			},
+			...sized(1, 50, 100),
+			{ kind: 'dispatch', at: '2026-10-27T10:00:00.000Z', issue: 2 },
+			{
+				kind: 'stage',
+				at: '2026-10-27T11:00:00.000Z',
+				issue: 2,
+				stage: 'preflight',
+				elapsed_ms: 0,
+			},
+			...sized(2, 10, 100).map((entry) => ({ ...entry, at: '2026-10-27T11:30:00.000Z' })),
+		]
+		const tree = { hunk_files: [], committed_files: [] }
+
+		expect(lane_plan_signals.signals_from(ISSUE, tree, entries, NOW)).toMatchObject({
+			lines_ratio: 2,
+			implement_rate: { median: 30, lanes: 1 },
+		})
+	})
+})
+
 describe('lane_plan_signals.signals_from', () => {
 	it('reads the period lines ratio and no split child off a ledger of merged sizes', () => {
 		const entries = [...sized(1, 100, 150), ...sized(2, 100, 250)]
@@ -58,6 +89,7 @@ describe('lane_plan_signals.signals_from', () => {
 			hunk_files: ['a.ts'],
 			committed_files: ['b.ts'],
 			lines_ratio: 2,
+			implement_rate: undefined,
 			split_filed: false,
 		})
 	})
@@ -71,6 +103,7 @@ describe('lane_plan_signals.signals_from', () => {
 			hunk_files: [],
 			committed_files: [],
 			lines_ratio: undefined,
+			implement_rate: undefined,
 			split_filed: true,
 		})
 	})

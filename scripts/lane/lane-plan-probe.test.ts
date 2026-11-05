@@ -25,7 +25,13 @@ const LANE_PLAN = { issue: LANE, paths: [PLANNED], planned_at: '2026-11-02T00:00
 
 const EXTRA_FILE = 'scripts/lane/extra.ts'
 const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
-const QUIET = { hunk_files: [], committed_files: [], lines_ratio: undefined, split_filed: false }
+const QUIET = {
+	hunk_files: [],
+	committed_files: [],
+	lines_ratio: undefined,
+	implement_rate: undefined,
+	split_filed: false,
+}
 
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
 

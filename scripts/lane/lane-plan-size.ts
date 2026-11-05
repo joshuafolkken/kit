@@ -4,7 +4,9 @@ import { size_estimate } from '#scripts/issue/size-estimate'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { split_assess } from '#scripts/split/split-assess'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
+import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
+import { lane_stage_budget } from './lane-stage-budget'
 
 // The size bar `josh lane:plan` holds a plan to (joshuafolkken/kit#5533): a plan whose files outgrow
 // twice the size estimate its Issue declares is refused, not recorded, and the lane splits the rest
@@ -44,6 +46,7 @@ interface PlanSignals {
 	hunk_files: ReadonlyArray<string>
 	committed_files: ReadonlyArray<string>
 	lines_ratio: number | undefined
+	implement_rate: ImplementRate | undefined
 	split_filed: boolean
 }
 
@@ -137,9 +140,14 @@ function hunks_over(declared: number, hunks: number): MeasureOver | undefined {
 	return hunks > limit ? { reason: 'hunks', declared, limit, measured: hunks } : undefined
 }
 
-function lines_over(declared: number, lines_ratio: number | undefined): MeasureOver | undefined {
-	const measured = Math.round(declared * (lines_ratio ?? split_assess.DECLARED_GROWTH_FACTOR))
-	const limit = split_assess.LINE_GUIDE
+function lines_over(declared: number, signals: PlanSignals): MeasureOver | undefined {
+	const measured = Math.round(
+		declared * (signals.lines_ratio ?? split_assess.DECLARED_GROWTH_FACTOR),
+	)
+	const limit = split_assess.guide_for(
+		lane_stage_budget.BUDGET_MINUTES.implement,
+		signals.implement_rate,
+	).lines
 
 	return measured > limit ? { reason: 'lines', declared, limit, measured } : undefined
 }
@@ -151,9 +159,7 @@ function measure_over(
 	recorded: LanePlan | undefined,
 ): MeasureOver | undefined {
 	if (signals.split_filed) return undefined
-	const lines = lane_plan.is_sized(recorded)
-		? undefined
-		: lines_over(declared.lines, signals.lines_ratio)
+	const lines = lane_plan.is_sized(recorded) ? undefined : lines_over(declared.lines, signals)
 
 	return hunks_over(declared.files, unplanned_hunks(signals, plan, recorded)) ?? lines
 }
