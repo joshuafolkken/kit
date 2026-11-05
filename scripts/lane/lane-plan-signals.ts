@@ -2,6 +2,7 @@ import { change_base } from '#scripts/git/change-base'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
+import { lane_implement_rate } from './lane-implement-rate'
 import { lane_implement_rate_read } from './lane-implement-rate-read'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import type { PlanSignals } from './lane-plan-size'
@@ -80,6 +81,7 @@ function signals_from(
 	return {
 		...tree,
 		lines_ratio: lane_size_stats.lines_ratio(entries, window),
+		implement_rate: lane_implement_rate.rate(entries, window),
 		split_filed: split_resolution.split_issues(entries).has(issue),
 	}
 }
