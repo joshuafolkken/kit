@@ -1,4 +1,5 @@
 import { repo_party } from '#scripts/discovery/repo-party'
+import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
@@ -22,8 +23,10 @@ import { issue_file_deferral } from './issue-file-deferral'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_file_pass, type Filing } from './issue-file-pass'
+import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
 import type { ScoutOutcome } from './issue-scout-cli'
+import { session_cite } from './session-cite'
 
 // `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok]
@@ -34,7 +37,8 @@ import type { ScoutOutcome } from './issue-scout-cli'
 // follow-up owes, the `## Origin` check for another repository, the `auto-ok` decision with the run
 // label it owes, the start condition read as a pull request, the WIP cap count and the duplicate
 // scout; then the missing workflow labels created, the create call carrying every label, a blocking
-// interrupt's finder recorded as blocked by it, the release link on `--release`, and `epic:bundle`.
+// interrupt's finder recorded as blocked by it, declared parks recorded through the shared epic
+// recorder, the release link on `--release`, and `epic:bundle`.
 // `--check` stops before the labels and the create call, so nothing is written to GitHub.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
@@ -139,6 +143,33 @@ async function emit_filed(
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
 }
 
+// The create has succeeded; report a recorder failure without inviting another filing.
+async function record_park(issue: string, prerequisite: string): Promise<void> {
+	try {
+		const result = await epic_blocked_by.record({ issue, prerequisite })
+
+		console.info(
+			`caused park ${session_cite.issue(issue)} blocked by ${session_cite.issue(prerequisite)}: ${result}`,
+		)
+	} catch (error) {
+		console.error(
+			`⚠ ${session_cite.issue(prerequisite)} is already filed; caused park ${session_cite.issue(issue)} dependency could not be recorded: ${error_text.message_of(error)}`,
+		)
+	}
+}
+
+async function record_parks(url: string, filing: Filing): Promise<void> {
+	if (!issue_file.is_same_repository(filing.target, filing.current)) return
+	const blocker = issue_number_of(url)
+
+	if (!Number.isSafeInteger(blocker) || blocker <= 0) return
+
+	for (const issue of issue_priority.parked_issues(filing.body)) {
+		// eslint-disable-next-line no-await-in-loop -- each record may rewrite the same epic declaration
+		await record_park(issue, String(blocker))
+	}
+}
+
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain(
@@ -162,6 +193,7 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 		blocker: issue_number_of(url),
 		is_here: issue_file.is_same_repository(filing.target, filing.current),
 	})
+	await record_parks(url, filing)
 }
 
 async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<string | undefined> {
