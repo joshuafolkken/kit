@@ -43,6 +43,12 @@ pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --route tier-a
 If the size check requires a split, use `--route split --label route:tier-a` instead.
 Then run `pnpm josh run:split <M> --prerequisite <N>` to record that the kept Issue waits for it.
 
+For a cause that stopped a run, declare `- 原因の park: #<M>` under `## 背景` before filing;
+repeat the single-number line for each local stopped Issue. `issue:file` records each stopped Issue
+as blocked by the cause through the same shared epic recorder the confirmed-duplicate path uses,
+settling the epic declaration too. A warning leaves the cause filed: repair the dependency, never
+file the cause again. The set-aside and release through `run:pause` below are still required.
+
 Every *file the prerequisite* step below means that filing, and it always happens **first** — the
 later steps name its number. **Its duplicate scan is read exactly as it is for a `new` entry**
 (`issue-scout.md`).
