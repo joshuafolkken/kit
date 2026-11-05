@@ -65,4 +65,4 @@ function comment_with_answers(body: string, flags: RunLabelFlags): string {
 
 const issue_run_verdict = { RUN_LABEL_OPTIONS, run_label_of, apply_labels, comment_with_answers }
 
-export { issue_run_verdict }
+export { issue_run_verdict, type RunLabelFlags }
