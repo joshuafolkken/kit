@@ -1,11 +1,9 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { lane_implement_rate, type ImplementRate } from './lane-implement-rate'
-import { lane_ledger } from './lane-ledger'
+import { lane_implement_rate_read } from './lane-implement-rate-read'
+import type { lane_ledger } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
-import { lane_plan_signals } from './lane-plan-signals'
 import type { MeasureContext } from './lane-sampler'
-import { lane_stats } from './lane-stats'
 
 // The ledger and the event stream the lane measurements read, and the one lane's net minutes read from
 // them — `josh lane:net` and the causing-lane line `josh issue:file --found-during` prints
@@ -13,13 +11,7 @@ import { lane_stats } from './lane-stats'
 
 type ReadContext = Pick<MeasureContext, 'ledger_path' | 'events_path'>
 
-async function read_ledger(
-	context: ReadContext,
-): Promise<ReturnType<typeof lane_ledger.read_entries>> {
-	const path = context.ledger_path ?? (await lane_ledger.target())
-
-	return path === undefined ? [] : lane_ledger.read_entries(path)
-}
+const { implement_rate, read_ledger } = lane_implement_rate_read
 
 // The run's event stream, read for the parks that end a stop's wait.
 async function read_events(context: ReadContext): Promise<ReadonlyArray<RunEvent>> {
@@ -44,17 +36,6 @@ async function net_minutes_of(
 	const events = await read_events(context)
 
 	return lane_net_time.net_minutes(await read_ledger(context), events, issue)
-}
-
-// The recent implement rate — the window `lane:plan`'s lines ratio reads — that `issue:file` projects a
-// declared size by (joshuafolkken/kit#6025); `undefined` when no merged lane in it measured one.
-async function implement_rate(
-	context: ReadContext = {},
-	now_ms: number = Date.now(),
-): Promise<ImplementRate | undefined> {
-	const window = lane_stats.window_of(lane_plan_signals.RATIO_PERIOD_DAYS, now_ms)
-
-	return lane_implement_rate.rate(await read_ledger(context), window)
 }
 
 const lane_net_read = {
