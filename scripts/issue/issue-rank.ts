@@ -14,7 +14,8 @@ import {
 // undeclared one, so a wide-reach upgrade queues behind the rest of its pool (joshuafolkken/kit#5310);
 // declared ones rank among themselves by the keys below.
 //
-// Then, in order: `priority:critical`, then `priority:high`, then a defect on the verification path (`bug` with `run:solo`, or
+// Then, in order: `priority:critical`, then `priority:high`, then resumable work (an owned
+// stash), then a defect on the verification path (`bug` with `run:solo`, or
 // `route:interrupt`), then the minutes its cause lost (`issue_priority.lost_minutes`: the body's
 // cause-loss lines summed over its recurrences (joshuafolkken/kit#4928), else its causing-lane line,
 // so causes of one lane are told apart (joshuafolkken/kit#4861); `0` when neither is declared, so an
@@ -30,6 +31,7 @@ import {
 // Only a defect on that path is, because `backlogrun-lanes.md` holds a batch until it has merged.
 
 interface RankRow {
+	is_resumable?: boolean | undefined
 	is_last: boolean
 	labels: ReadonlyArray<string>
 	lost_minutes: number
@@ -71,6 +73,7 @@ function keys_of(row: RankRow): ReadonlyArray<number> {
 		flag(row.is_last),
 		-flag(is_critical(row.labels)),
 		-flag(is_priority(row.labels)),
+		-flag(row.is_resumable === true),
 		-flag(is_verification_defect(row.labels)),
 		-row.lost_minutes,
 		-row.dependents,
