@@ -1,4 +1,5 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { size_estimate } from '#scripts/issue/size-estimate'
 import { describe, expect, it } from 'vitest'
 import type { LanePlan } from './lane-plan'
 import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-size'
@@ -17,6 +18,7 @@ const QUIET: PlanSignals = {
 	hunk_files: [],
 	committed_files: [],
 	lines_ratio: undefined,
+	implement_rate: undefined,
 	split_filed: false,
 }
 
@@ -105,6 +107,47 @@ describe('lane_plan_size.oversize', () => {
 		const over = oversize_of([added, ...files(8)], issue_with(DECLARED_BODY), files(8))
 
 		expect(over).toMatchObject({ kept: files(8), split_off: [added] })
+	})
+})
+
+describe('lane_plan_size measured guide', () => {
+	it.each([
+		[12, 50, false],
+		[12, 51, true],
+		[7, 85, false],
+		[7, 86, true],
+		[undefined, 100, false],
+		[undefined, 101, true],
+	])(
+		'matches the backlog line boundary at rate %s and %s lines (ac-881063cd)',
+		(median, lines, split) => {
+			const implement_rate = median === undefined ? undefined : { median, lanes: 1 }
+			const issues = declared(1, lines)
+			const body = issues[0]?.body ?? ''
+
+			const over = signalled(issues, { implement_rate })
+
+			expect(over).toEqual(split ? expect.objectContaining({ reason: 'lines' }) : undefined)
+			expect(size_estimate.over_guide(body, undefined, implement_rate) !== undefined).toBe(split)
+		},
+	)
+
+	it('keeps the measured declaration correction and split and replan exemptions', () => {
+		const signals = { implement_rate: { median: 12, lanes: 1 }, lines_ratio: 1.5 }
+		const issues = declared(1, 70)
+
+		expect(signalled(issues, signals)).toMatchObject({ reason: 'lines', measured: 105, limit: 100 })
+		expect(signalled(issues, { ...signals, split_filed: true })).toBeUndefined()
+		expect(replanned(issues, signals)).toBeUndefined()
+		expect(replanned(issues, signals, false)).toMatchObject({ reason: 'lines' })
+		const recorded = { ...plan_of(files(1)), sized: true }
+
+		const over = lane_plan_size.oversize(plan_of(files(1)), issues, recorded, {
+			...QUIET,
+			...signals,
+		})
+
+		expect(over).toBeUndefined()
 	})
 })
 

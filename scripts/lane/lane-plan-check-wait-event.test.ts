@@ -24,7 +24,13 @@ const LATER = 5171
 const HELD = 'scripts/test/vitest-failure-summary.ts'
 const WAIT_AHEAD_MS = 600_000
 const LISTING_LIMIT = 100
-const QUIET = { hunk_files: [], committed_files: [], lines_ratio: undefined, split_filed: false }
+const QUIET = {
+	hunk_files: [],
+	committed_files: [],
+	lines_ratio: undefined,
+	implement_rate: undefined,
+	split_filed: false,
+}
 const directory = path.join(ROOT, 'lane')
 
 function running(number: number): OpenIssueData {

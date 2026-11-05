@@ -133,6 +133,7 @@ describe('lane_plan_wait.deadline', () => {
 				hunk_files: [],
 				committed_files: committed,
 				lines_ratio: undefined,
+				implement_rate: undefined,
 				split_filed: false,
 			})
 
