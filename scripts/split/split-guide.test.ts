@@ -47,12 +47,20 @@ describe('a shared derived guide', () => {
 		const raw = '51\t0\tscripts/a.ts\n500\t0\tscripts/a.test.ts'
 		const measured = split_assess.assess(raw, SMALL_GUIDE)
 
-		expect(measured).toEqual({ files: 1, lines: 51, verdict: 'split' })
+		expect(measured).toEqual({ files: 1, lines: 51, verdict: 'split', guide: SMALL_GUIDE })
 		expect(split_assess.assess(raw).verdict).toBe('single')
 		expect(split_assess.reason(measured, SMALL_GUIDE)).toContain(SMALL_GUIDE_TEXT)
 		expect(split_assess.reason(measured, SMALL_GUIDE)).toContain('over the guide')
 		expect(split_assess.notice(measured, undefined, SMALL_GUIDE)).toContain(SMALL_GUIDE_TEXT)
-		expect(split_assess.notice(measured)).toBeUndefined()
+	})
+
+	it('defaults to the attached guide while explicit arguments take precedence (ac-9e07d12c)', () => {
+		const measured = split_assess.assess('51\t0\tscripts/a.ts', SMALL_GUIDE)
+
+		expect(split_assess.reason(measured)).toContain(SMALL_GUIDE_TEXT)
+		expect(split_assess.notice(measured)).toContain(SMALL_GUIDE_TEXT)
+		expect(split_assess.notice(measured, undefined, GUIDE)).toBeUndefined()
+		expect(split_assess.reason(measured, GUIDE)).not.toContain(SMALL_GUIDE_TEXT)
 	})
 })
 

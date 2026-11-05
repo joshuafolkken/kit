@@ -5,6 +5,8 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { git_path_quoting } from '#scripts/git/git-path-quoting'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { lane_implement_rate_read } from '#scripts/lane/lane-implement-rate-read'
+import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
 import { split_assess } from './split-assess'
 import { split_relocations } from './split-relocations'
 
@@ -75,8 +77,12 @@ async function read_branch(): Promise<ReturnType<typeof split_assess.assess>> {
 	const numstat = `${tracked}${NEWLINE}${await untracked_numstat(root, files)}`
 
 	const adjusted = await split_relocations.without_relocations(root, base, numstat, files)
+	const guide = split_assess.guide_for(
+		lane_stage_budget.BUDGET_MINUTES.implement,
+		await lane_implement_rate_read.implement_rate(),
+	)
 
-	return split_assess.assess(adjusted)
+	return split_assess.assess(adjusted, guide)
 }
 
 const split_measure = { line_count, read_branch }

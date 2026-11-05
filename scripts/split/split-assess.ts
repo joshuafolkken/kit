@@ -28,6 +28,7 @@ interface SizeMeasurement {
 	files: number
 	lines: number
 	verdict: SplitVerdict
+	guide?: SplitGuide
 }
 
 // A size as an Issue declares it, or as a bar a measurement is compared with.
@@ -135,15 +136,20 @@ function is_over_cap(files: number, lines: number, guide: SplitGuide = DEFAULT_G
 	return files > guide.cap.files || lines > guide.cap.lines
 }
 
-function measure(changes: ReadonlyArray<FileChange>, guide: SplitGuide): SizeMeasurement {
+function measure(changes: ReadonlyArray<FileChange>, guide?: SplitGuide): SizeMeasurement {
 	const runtime = changes.filter((change) => is_deliverable(change))
 	const lines = runtime.reduce((total, change) => total + change.changed_lines, 0)
 
-	return { files: runtime.length, lines, verdict: verdict_for(runtime.length, lines, guide) }
+	return {
+		files: runtime.length,
+		lines,
+		verdict: verdict_for(runtime.length, lines, guide),
+		...(guide !== undefined && { guide }),
+	}
 }
 
 // The size measurement of a raw `git diff --numstat`, the one call the CLI makes.
-function assess(raw: string, guide: SplitGuide = DEFAULT_GUIDE): SizeMeasurement {
+function assess(raw: string, guide?: SplitGuide): SizeMeasurement {
 	return measure(parse_numstat(raw), guide)
 }
 
@@ -162,7 +168,10 @@ function guide_text(guide: SplitGuide): string {
 
 // The sentence printed on stderr: what was counted, against which guide, and what the verdict does
 // and does not mean.
-function reason(measurement: SizeMeasurement, guide: SplitGuide = DEFAULT_GUIDE): string {
+function reason(
+	measurement: SizeMeasurement,
+	guide: SplitGuide = measurement.guide ?? DEFAULT_GUIDE,
+): string {
 	const tail = measurement.verdict === SPLIT_VERDICT ? SPLIT_TAIL : SINGLE_TAIL
 
 	return `${counted(measurement)} (${guide_text(guide)}) — ${tail}`
@@ -218,7 +227,7 @@ const NOTICE_ACTION = `stop implementation, keep only the green part and file th
 function notice(
 	measurement: SizeMeasurement,
 	declared?: DeclaredSize,
-	guide: SplitGuide = DEFAULT_GUIDE,
+	guide: SplitGuide = measurement.guide ?? DEFAULT_GUIDE,
 ): string | undefined {
 	const bar = notice_bar(declared, guide)
 

@@ -12,6 +12,9 @@ vi.mock('#scripts/git/git-command', () => ({
 }))
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved_through_merge: vi.fn() } }))
+vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
+	lane_implement_rate_read: { implement_rate: vi.fn() },
+}))
 vi.mock('./split-relocations', () => ({
 	split_relocations: {
 		without_relocations: vi.fn(async (_root: string, _base: string, numstat: string) => numstat),
@@ -23,10 +26,14 @@ const { git_command } = await import('#scripts/git/git-command')
 const { git_spawn } = await import('#scripts/git/git-spawn')
 const { split_measure } = await import('./split-measure')
 const { split_assess } = await import('./split-assess')
+const { lane_implement_rate_read } = await import('#scripts/lane/lane-implement-rate-read')
 
 const NEW_FILE_COUNT = 11
 const NEW_FILE_LINES = 50
 const TREE_BASE = 'tree-base-commit'
+const LEGACY_GUIDE = split_assess.guide_for(12)
+const SMALL_DIFF = '51\t0\tscripts/a.ts'
+const SMALL_GUIDE_TEXT = 'guide 2 files / 50 lines'
 
 const fixture = { root: '' }
 
@@ -40,6 +47,7 @@ beforeEach(() => {
 	vi.mocked(git_command.diff_numstat_since).mockResolvedValue('')
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
 	vi.mocked(change_base.resolved_through_merge).mockResolvedValue(TREE_BASE)
+	vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue(undefined)
 })
 
 afterEach(async () => {
@@ -57,7 +65,29 @@ describe('read_branch excludes quoted tests', () => {
 			files: 0,
 			lines: 0,
 			verdict: 'single',
+			guide: LEGACY_GUIDE,
 		})
+	})
+})
+
+describe('read_branch measured guide', () => {
+	it('carries the measured budget guide into verdict, reason and notices (ac-9e07d12c)', async () => {
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(SMALL_DIFF)
+		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
+		const measured = await split_measure.read_branch()
+
+		expect(measured.verdict).toBe('split')
+		expect(measured.guide).toEqual({ files: 2, lines: 50, cap: { files: 3, lines: 75 } })
+		expect(split_assess.reason(measured)).toContain(SMALL_GUIDE_TEXT)
+		expect(split_assess.notice(measured)).toContain(SMALL_GUIDE_TEXT)
+	})
+
+	it('keeps the same diff single when no implement rate is measured (ac-9e07d12c)', async () => {
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(SMALL_DIFF)
+		const unmeasured = await split_measure.read_branch()
+
+		expect(unmeasured.verdict).toBe('single')
+		expect(split_assess.notice(unmeasured)).toBeUndefined()
 	})
 })
 
@@ -79,6 +109,7 @@ describe('read_branch', () => {
 			files: NEW_FILE_COUNT,
 			lines: NEW_FILE_COUNT * NEW_FILE_LINES,
 			verdict: 'split',
+			guide: LEGACY_GUIDE,
 		})
 	})
 
@@ -89,6 +120,7 @@ describe('read_branch', () => {
 			files: 1,
 			lines: 5,
 			verdict: 'single',
+			guide: LEGACY_GUIDE,
 		})
 	})
 })
@@ -105,7 +137,7 @@ describe('read_branch excludes run records', () => {
 		)
 		const measurement = await split_measure.read_branch()
 
-		expect(measurement).toEqual({ files: 1, lines: 1, verdict: 'single' })
+		expect(measurement).toEqual({ files: 1, lines: 1, verdict: 'single', guide: LEGACY_GUIDE })
 		expect(split_assess.notice(measurement, { files: 1, lines: 10 })).toBeUndefined()
 	})
 })
@@ -136,6 +168,7 @@ describe('read_branch with an unreadable untracked entry', () => {
 			files: 2,
 			lines: 0,
 			verdict: 'single',
+			guide: LEGACY_GUIDE,
 		})
 	})
 })
