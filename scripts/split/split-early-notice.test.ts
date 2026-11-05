@@ -19,6 +19,9 @@ vi.mock('#scripts/git/git-command', () => ({
 vi.mock('#scripts/git/change-base', () => ({
 	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
+vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
+	lane_implement_rate_read: { implement_rate: vi.fn() },
+}))
 
 vi.mock('./split-relocations', () => ({
 	split_relocations: {
@@ -32,6 +35,7 @@ const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 const { split_assess } = await import('./split-assess')
 const { split_early_notice } = await import('./split-early-notice')
 const { split_measure } = await import('./split-measure')
+const { lane_implement_rate_read } = await import('#scripts/lane/lane-implement-rate-read')
 
 const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice')
 // The Issue body read; no declared size by default, so the guide is the bar.
@@ -68,6 +72,7 @@ beforeEach(() => {
 	vi.mocked(git_command.diff_numstat_since).mockResolvedValue(OVER_GUIDE_NUMSTAT)
 	record_split_notice.mockResolvedValue()
 	read_declared.mockResolvedValue(undefined)
+	vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue(undefined)
 })
 
 afterEach(async () => {
@@ -85,6 +90,14 @@ afterAll(async () => {
 })
 
 describe('split_early_notice.surface over the guide', () => {
+	it('uses the measured guide below the legacy bar (ac-9e07d12c)', async () => {
+		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(numstat_of(3))
+		await split_early_notice.surface()
+
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('guide 2 files / 50 lines'))
+	})
+
 	it('shows the same notice main:merge prints', async () => {
 		await split_early_notice.surface()
 

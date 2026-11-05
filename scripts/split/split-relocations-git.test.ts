@@ -20,6 +20,7 @@ const SPECIAL_FILES = [
 ]
 const STAGE_ALL = ['add', '--all']
 const NO_VERIFY = '--no-verify'
+const LEGACY_GUIDE = { files: 8, lines: 200, cap: { files: 12, lines: 300 } }
 const fixture: FixtureWorkspace = {
 	workspace: '',
 	previous_cwd: '',
@@ -58,6 +59,7 @@ describe('exact relocation measurement with real git', () => {
 			files: 0,
 			lines: 0,
 			verdict: 'single',
+			guide: LEGACY_GUIDE,
 		})
 		expect(await git(fixture.workspace, ['ls-files', '--stage'])).toBe(index)
 	})
@@ -71,6 +73,7 @@ describe('exact relocation measurement with real git', () => {
 			files: 0,
 			lines: 0,
 			verdict: 'single',
+			guide: LEGACY_GUIDE,
 		})
 	})
 
@@ -81,6 +84,7 @@ describe('exact relocation measurement with real git', () => {
 			files: 2,
 			lines: ORIGINAL_LINES * 2 + EXTRA_LINES,
 			verdict: 'split',
+			guide: LEGACY_GUIDE,
 		})
 	})
 })
@@ -93,6 +97,7 @@ describe('relocation boundaries with real git', () => {
 			files: 0,
 			lines: 0,
 			verdict: 'single',
+			guide: LEGACY_GUIDE,
 		})
 	})
 
@@ -104,6 +109,7 @@ describe('relocation boundaries with real git', () => {
 			files: 1,
 			lines: ORIGINAL_LINES,
 			verdict: 'single',
+			guide: LEGACY_GUIDE,
 		})
 	})
 
@@ -114,6 +120,7 @@ describe('relocation boundaries with real git', () => {
 			files: 2,
 			lines: ORIGINAL_LINES + EXTRA_LINES,
 			verdict: 'split',
+			guide: LEGACY_GUIDE,
 		})
 	})
 
