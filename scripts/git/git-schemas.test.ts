@@ -42,14 +42,12 @@ describe('package_name_schema', () => {
 
 describe('rollup_item_schema', () => {
 	it('parses StatusContext item', () => {
-		// eslint-disable-next-line @typescript-eslint/naming-convention -- __typename is a GraphQL field name
 		const result = rollup_item_schema.safeParse({ __typename: STATUS_CONTEXT, state: 'SUCCESS' })
 
 		expect(result.success).toBe(true)
 
 		if (!result.success) return
 
-		// eslint-disable-next-line @typescript-eslint/dot-notation -- bracket notation prevents naming-convention violation on __typename
 		expect(result.data['__typename']).toBe(STATUS_CONTEXT)
 		expect(result.data.state).toBe('SUCCESS')
 	})
