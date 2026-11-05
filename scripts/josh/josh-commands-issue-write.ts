@@ -186,6 +186,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					description: 'an extra label (for example `epic`). Repeatable.',
 				},
 				{
+					names: ['--defect / --verification / --every-run <yes|no|unknown>'],
+					description:
+						'`--label run:solo` requires all three `yes`: a verification defect affecting unrelated PRs every run. Missing, invalid, `no` or `unknown` answers file nothing; success comments the three answers on the issue.',
+				},
+				{
 					names: [REPO],
 					description: 'the target repository. Defaults to this repository.',
 				},

@@ -148,6 +148,7 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--batch <dir|file>` — file each `*.md` in `<dir>` by name, or each `%%%`-separated part of `<file>`, other flags applied to each; every scout report prints once before the first filing. Title: front matter `title:`, else the first line; front matter `distinct: <N,…>` is its `--distinct`. A refused filing stays unfiled, the rest are filed, the summary names each; any refusal exits 1.
 - `--route <tier-a|split|interrupt|review-cap>` — the `route:` label naming the filing route. Omit it for a filing with no route.
 - `--label <name>` — an extra label (for example `epic`). Repeatable.
+- `--defect / --verification / --every-run <yes|no|unknown>` — `--label run:solo` requires all three `yes`: a verification defect affecting unrelated PRs every run. Missing, invalid, `no` or `unknown` answers file nothing; success comments the three answers on the issue.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--found-during <N>` — the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 2); step 7 never holds it as a candidate here. #N gets a deferral comment.
@@ -163,7 +164,7 @@ The `direct-filing` guard refuses `gh api …/issues` and `gh issue create`, poi
 
 **Steps (run in this order):**
 
-Steps 1 and 2 each end the filing on a refusal. Steps 3–7 run as one pass: each prints its refusal and the pass goes on, so one call prints every problem, the duplicate candidates of a body the lint refused included. Any refusal in the pass files nothing.
+Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates when lint fails. Refusals file nothing.
 
 1. Refuse unless the target is first-party: a third-party target (Tier C), and one whose owner cannot be read (`unknown`). The `third-party-write` guard stays silent on `unknown`; this command files only to a tracker known to be ours.
 2. In a run's session, refuse an origin's eleventh run filing (origin: `--found-during <N>`, else the lane or branch issue; none: the run invocation). Then, on a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
