@@ -26,6 +26,8 @@ const PERMISSIONS_KEY = 'permissions'
 const WITHDRAWN_KIT_PERMISSIONS: ReadonlySet<unknown> = new Set([
 	'Bash(git commit -a*)',
 	'Bash(git commit --all*)',
+	'Edit(./.github/workflows/**)',
+	'Write(./.github/workflows/**)',
 ])
 
 function as_array(value: unknown): Array<unknown> {

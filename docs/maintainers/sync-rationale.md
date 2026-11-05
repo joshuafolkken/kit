@@ -258,20 +258,18 @@ mean denying `git` and its read-only inspection with it. The deny stops the habi
 `CLAUDE.md` stays the authority, and a command being let through is not permission. An explicit
 staging request is blocked for the agent too — deliberately; the user runs it in their own terminal.
 
-## The workflow edit deny
+## Human review before merging workflow changes
 
-`Edit(./.github/workflows/**)` and `Write(./.github/workflows/**)` are denied (joshuafolkken/kit#6067).
+Agents may edit `.github/workflows/**` and open a pull request (joshuafolkken/kit#6223).
 A `pull_request` run executes the branch's own workflow files, so a rewritten workflow can turn a
 required check green.
 
-The lane child's refusal, Bash included, belongs to `pretool-guard` (joshuafolkken/kit#6050). These
-entries cover the Edit and Write tools whether or not that hook runs, and do not cover Bash.
+`followup` therefore refuses to merge a pull request that changes a workflow,
+even when CI is green. A person reads the diff on GitHub and merges it; this merge-side check
+addresses the concern in joshuafolkken/kit#6067.
 
-The deny reaches every session, and that is accepted. Settings cannot tell a lane child from an
-interactive session, and `.claude/settings.local.json` cannot lift a deny: a deny wins at any scope.
-
-A workflow change is made by the person in their editor. `josh init` and `josh sync` write workflows
-from node scripts, not with the file tools, so they are unaffected. Reading a workflow stays open.
+The former file-tool denies and lane-child write guard are removed. `josh sync` also removes the
+retired deny entries from existing consumer settings, so the next sync opens workflow editing there.
 
 ## The Bash output cap
 
