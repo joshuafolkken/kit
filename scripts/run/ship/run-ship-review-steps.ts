@@ -4,6 +4,7 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
+import { review_round } from '#scripts/review/review-round'
 import { review_round_reuse, type ReuseAnswer } from '#scripts/review/review-round-reuse'
 import { review_round2 } from '#scripts/review/review-round2'
 import { review_stop_log } from '#scripts/review/review-stop-log'
@@ -179,16 +180,27 @@ async function is_fix_verified(slots: ReadonlyArray<ReviewSlot>): Promise<boolea
 	return checked.code === SUCCESS_EXIT_CODE
 }
 
+function outcome_for_round(round: Round, verdict: ScoredVerdict): RoundOutcome {
+	return round === ROUND_TWO
+		? run_ship_review.round_two_outcome(verdict)
+		: run_ship_review.round_one_outcome(verdict)
+}
+
 async function round_one_record(
 	issue: string,
 	slot: ReviewSlot,
 	is_verified: boolean,
 ): Promise<StepResult> {
+	const round =
+		slot === CODE
+			? review_round.from_brief(stamp_file.read_stamp_text(paths(slot).brief) ?? '')
+			: ROUND_ONE
+
 	return await record_and_route(
 		issue,
-		ROUND_ONE,
+		round,
 		(verdict) =>
-			is_verified ? run_ship_review.round_one_outcome(verdict) : run_ship_review.UNVERIFIED_OUTCOME,
+			is_verified ? outcome_for_round(round, verdict) : run_ship_review.UNVERIFIED_OUTCOME,
 		slot,
 	)
 }
@@ -226,7 +238,13 @@ function skipped(out: string): StepResult {
 // round whose `review:record` failed is not counted either: the relaunch re-runs it, and that run is
 // the one that ended.
 async function record_outcome(issue: string, verdict: string, cause?: string): Promise<void> {
-	if (verdict === run_ship_review.VERDICT.INVALID || cause === CAUSE.CHECK) return
+	if (
+		verdict === run_ship_review.VERDICT.INVALID ||
+		cause === CAUSE.CHECK ||
+		review_round.from_brief(stamp_file.read_stamp_text(paths(CODE).brief) ?? '') === ROUND_TWO
+	) {
+		return
+	}
 
 	await lane_ledger_write.record_round_one({ issue: Number(issue), verdict })
 }

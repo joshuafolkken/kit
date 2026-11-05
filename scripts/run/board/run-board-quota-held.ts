@@ -6,7 +6,8 @@ import {
 	type QuotaReading,
 	type Quotas,
 } from './run-board-quota-read'
-import { run_board_quota_spent, type QuotaSpan } from './run-board-quota-spent'
+import { run_board_quota_spent, type QuotaEnd, type QuotaSpan } from './run-board-quota-spent'
+import { run_board_quota_status } from './run-board-quota-status'
 
 // The usage-limit gauges' readings as the board holds them (joshuafolkken/kit#5395): a redraw draws
 // the held readings and reads no file; once a minute one read runs in the background
@@ -27,6 +28,7 @@ interface QuotaSource {
 	reading_of: (text: string) => QuotaReading | undefined
 	heads_of: (text: string) => Array<QuotaReading>
 	is_done: (tail: string) => boolean
+	lane_of?: (head: string) => string | undefined
 }
 
 interface QuotaPorts {
@@ -34,6 +36,7 @@ interface QuotaPorts {
 	read_tail: (file: string, bytes: number) => Promise<string>
 	read_head: (file: string, bytes: number) => Promise<string>
 	now: () => number
+	read_status?: () => Promise<QuotaReading | undefined>
 }
 
 // A file a provider was last read off, what its tail read and, once done, the readings it holds.
@@ -41,6 +44,7 @@ interface QuotaMark {
 	file: QuotaFile
 	reading: QuotaReading | undefined
 	span: QuotaSpan
+	lane: string | undefined
 }
 
 type QuotaMarks = Map<QuotaProvider, ReadonlyArray<QuotaMark>>
@@ -83,11 +87,16 @@ async function file_mark(
 
 	const { reading, is_done } = await tail_of(file, source, ports)
 
-	if (!is_done) return { file, reading, span: [] }
+	if (!is_done) return { file, reading, span: [], lane: undefined }
 
 	const head = await ports.read_head(file.path, run_board_quota_read.TAIL_BYTES)
 
-	return { file, reading, span: run_board_quota_spent.span_of(source.heads_of(head), reading) }
+	return {
+		file,
+		reading,
+		span: run_board_quota_spent.span_of(source.heads_of(head), reading),
+		lane: source.lane_of?.(head),
+	}
 }
 
 function is_told(mark: QuotaMark): boolean {
@@ -111,10 +120,10 @@ async function sampled(
 }
 
 // The time a done file's last reading was taken.
-function end_of(mark: QuotaMark): Array<number> {
+function end_of(mark: QuotaMark): Array<QuotaEnd> {
 	const end_ms = mark.span.at(-1)?.taken_ms
 
-	return end_ms === undefined ? [] : [end_ms]
+	return end_ms === undefined ? [] : [{ end_ms, lane: mark.lane }]
 }
 
 // The oldest time the sample's done files were read at, where any was timed.
@@ -135,7 +144,7 @@ async function marks_back(
 	if (file === undefined) return []
 
 	const mark = await mark_of(file)
-	const is_before = end_of(mark).some((end_ms) => end_ms < since)
+	const is_before = end_of(mark).some((end) => end.end_ms < since)
 
 	return [mark, ...(is_before ? [] : await marks_back(rest, mark_of, since))]
 }
@@ -167,16 +176,13 @@ async function read_back(
 // The newest file's reading that holds windows, with each window's spend per task where told.
 function reading_with(
 	marks: ReadonlyArray<QuotaMark>,
-	ends: ReadonlyArray<number>,
+	ends: ReadonlyArray<QuotaEnd>,
 ): QuotaReading | undefined {
 	const reading = marks.find((mark) => (mark.reading?.windows.length ?? 0) > 0)?.reading
 
 	if (reading === undefined) return undefined
 
-	const per_task = run_board_quota_spent.per_task_of(
-		marks.map((mark) => mark.span),
-		ends,
-	)
+	const per_task = run_board_quota_spent.per_lane_of(marks, ends)
 
 	return Object.keys(per_task).length === 0 ? reading : { ...reading, per_task }
 }
@@ -246,7 +252,9 @@ async function quotas_of(ports: QuotaPorts, marks: QuotaMarks): Promise<Quotas> 
 		PROVIDERS.map(async (provider) => await reading_of(provider, ports, marks)),
 	)
 
-	return { claude, codex }
+	const status = await ports.read_status?.()
+
+	return { claude: run_board_quota_status.newest(claude, status), codex }
 }
 
 function quota_reader(ports: QuotaPorts): () => Promise<Quotas> {
@@ -260,7 +268,7 @@ function quota_reader(ports: QuotaPorts): () => Promise<Quotas> {
 	})
 }
 
-// The production reader: the run-state directory's newest lane logs and Codex's newest rollout files.
+// The production reader: Claude's status record, lane/handoff logs and Codex's newest rollout files.
 function live_quota_reader(): () => Promise<Quotas> {
 	const { claude_files, claude_heads, claude_reading, codex_files, codex_heads, codex_reading } =
 		run_board_quota_read
@@ -278,10 +286,12 @@ function live_quota_reader(): () => Promise<Quotas> {
 				reading_of: codex_reading,
 				heads_of: codex_heads,
 				is_done: run_board_quota_spent.codex_done,
+				lane_of: run_board_quota_read.codex_lane,
 			},
 		},
 		read_tail: run_board_quota_read.read_tail,
 		read_head: run_board_quota_read.read_head,
+		read_status: run_board_quota_status.read,
 		now: Date.now,
 	})
 }

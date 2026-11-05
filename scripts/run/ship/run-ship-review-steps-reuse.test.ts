@@ -1,3 +1,4 @@
+import { review_round } from '#scripts/review/review-round'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -69,6 +70,8 @@ const RECORD = `review:record --issue ${ISSUE}`
 const REVIEWED = [OPEN, 'run:review --join', 'review:attest --check', RECORD]
 const HIGH = 'bug-risks:high:a.ts:4'
 const UNSETTLED = 'unsettled'
+const MEDIUM = 'bug-risks:medium:a.ts:7'
+const LOW = 'tests:low:a.ts'
 
 type JoshRun = (argv: ReadonlyArray<string>) => Promise<{ code: number; out: string }>
 
@@ -104,6 +107,37 @@ beforeEach(() => {
 	stopped_on_mock.mockReset().mockReturnValue(false)
 	mark_stopped_mock.mockClear()
 	stamps.read_stamp_text.mockReset().mockReturnValue('')
+})
+
+function final_brief(findings: string): void {
+	record_check_mock.mockResolvedValue({ status: 'missing' })
+	stamps.read_stamp_text.mockImplementation((path: string) =>
+		path.includes('review-brief-') ? review_round.FINAL_LINE : findings,
+	)
+}
+
+describe('initial full-change final review', () => {
+	it.each([
+		['', `${RECORD} --comment`],
+		[LOW, `${RECORD} --comment ${LOW}`],
+	])('records a passing final round on the issue: %s', async (findings, recorded) => {
+		final_brief(findings)
+		expect(await run_ship_review_steps.review_stage(ISSUE)).toHaveProperty('code', OK)
+		expect(commands()).toContain(recorded)
+		expect(record_round_one_mock).not.toHaveBeenCalled()
+	})
+	it.each([
+		[HIGH, HIGH],
+		[MEDIUM, MEDIUM],
+		[`fixed ${MEDIUM}`, MEDIUM],
+	])('applies final-round disposition: %s', async (finding, recorded) => {
+		final_brief(finding)
+		expect(await run_ship_review_steps.review_stage(ISSUE)).toMatchObject({
+			cause: 'finding',
+			code: FAILED,
+		})
+		expect(commands()).toContain(`${RECORD} ${recorded}`)
+	})
 })
 
 describe('run_ship_review_steps.review_stage — a recorded round 1', () => {

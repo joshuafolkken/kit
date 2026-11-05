@@ -1,5 +1,6 @@
 import type { IssueState } from '#scripts/issue/issue-state'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { describe, expect, it } from 'vitest'
 import { run_merge } from './run-merge'
 
@@ -285,6 +286,21 @@ describe('park_comment', () => {
 		})
 
 		expect(comment).toContain('not recorded')
+	})
+})
+
+describe('stale hand-off park comment', () => {
+	it('requires record repair before retry (ac-438a3cb5)', () => {
+		const comment = run_merge.park_comment({
+			child: '1',
+			cause: run_stalled.STALE_HANDOFF.why,
+			carry: undefined,
+			output: undefined,
+		})
+
+		expect(comment).toContain(`- Why: ${run_stalled.STALE_HANDOFF.why}`)
+		expect(comment).toContain('repair the stale hand-off cut record with `pnpm josh run:cut --end`')
+		expect(comment).toContain('(retry alone does not clear it), then use')
 	})
 })
 

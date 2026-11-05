@@ -4,8 +4,8 @@ The **pre-gate cut**: a dispatched lane child ends its process the moment implem
 **fresh** process resumes the same lane from the gate onward, without the implementation's accumulated
 context.
 
-`run:cut` takes the boundary, `run:cut --resume` is the fresh
-process's entry check. A second boundary — the implementation-phase cut, _during_ implementation — is
+`run:cut` takes the boundary; `run:entry` checks it internally with `run:cut --resume` for the fresh
+process. A second boundary — the implementation-phase cut, _during_ implementation — is
 below; it states only what differs.
 
 ## Where the boundary is
@@ -27,25 +27,14 @@ answers `not-a-lane` outside a lane, so it is safe to issue unconditionally.
 ## Taking the cut
 
 `chain-rule.md` step 1 issues it before `pnpm josh run:chain <N>`, the scoped pair and the gate —
-**unconditionally** — first tick in #N's body the criteria this tree meets (`gh issue edit <N> --body-file .josh/tmp/body.md`),
+**unconditionally** — first tick in #N's body the criteria this tree meets (`pnpm josh issue:tick <N> <ac-id>...`, using the plan's criterion IDs),
 the green part `budget-over` reads:
 
 ```bash
 pnpm josh run:cut <N>
 ```
 
-- `cut` (0) — record written and handed to the lane's launch owner (OpenAI supervisor starts the
-  successor after this process exits; Anthropic relaunches directly). **End the turn immediately.**
-- `under-threshold` (0) — the newest request's billed input is under the `pnpm josh cost --cut` threshold; **continue to the gate.**
-- `not-a-lane` (0) — not a dispatched child. **Continue to the gate.**
-- `unready` (1) — the tree is clean or on the default branch. Continue to the gate.
-- `busy` (1) — a cut is already in flight for this tree. Do not relaunch.
-- `failed` (1) — no live OpenAI supervisor, or the Anthropic relaunch could not start. Continue.
-- `unknown` (1) — the git directory could not be read. Continue to the gate.
-- `split-unresolved` (1) — `split-assessment.md` → "Over the guide before the gate".
-- `budget-over` (0) — implement past its stage budget with a criterion checked; nothing was cut. Run
-  what it prints, then continue to the gate on this tree.
-
+**Follow the printed `next:` line.** The verdict stays on stdout; its next action is on stderr.
 **`cut` is the only verdict that ends the turn.**
 
 ### The gate refuses until the cut has been taken
@@ -56,13 +45,14 @@ row: `prompts/collaboration-workflow/rule-delivery.md`.
 
 ## Resuming — the fresh process's entry check
 
-A fresh `fullrun #<N>` runs this **at its entry, before `run:hold` and the session-boundary check**:
+`fullrun #<N>` enters once. It checks the carried cut internally
+**before `run:hold` and the session-boundary check**; never call `run:cut --resume` separately:
 
 ```bash
-pnpm josh run:cut --resume <N>
+pnpm josh run:entry <N>
 ```
 
-- `fresh` (0) — an ordinary run; normal entry.
+- `fresh` (0) — normal entry completes; follow its stage and entry report.
 - `resume` (0) — a verified pre-gate cut. **Skip the title, the plan, the fresh hold claim and the
   implementation**; re-read the issue body and comments, then go straight to `pnpm josh gate`.
 - `resume-impl` (0) — the cut was taken **during** implementation. Skip the title, the plan, the

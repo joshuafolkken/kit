@@ -20,6 +20,12 @@ vi.mock('#scripts/git/change-base', () => ({
 	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
 
+vi.mock('./split-relocations', () => ({
+	split_relocations: {
+		without_relocations: vi.fn(async (_root: string, _base: string, numstat: string) => numstat),
+	},
+}))
+
 const { git_command } = await import('#scripts/git/git-command')
 const { issue_declared_size } = await import('#scripts/issue/issue-declared-size')
 const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')

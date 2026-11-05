@@ -8,10 +8,11 @@ import { json_value } from '#scripts/lib/json-value'
 import { time_instant } from '#scripts/time-runtime/time-instant'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
+import { run_board_quota_lane } from './run-board-quota-lane'
 
 // The usage-limit windows Claude Code and Codex last reported, read off files they already write — no
-// API is asked (joshuafolkken/kit#5395). Claude's come from a lane child's stream-json log, the last
-// `rate_limit_event`; Codex's from its newest rollout, the last `rate_limits`. Each is read off the
+// API is asked (joshuafolkken/kit#5395). Claude's log readings come from lane and handoff stream-json
+// logs, the last `rate_limit_event`; Codex's from its newest rollout, the last `rate_limits`. Each is read off the
 // newest file's tail, widened until it holds such a line or reaches its limit, and a file that is
 // missing, unreadable or holds no such line reads as none.
 
@@ -261,7 +262,9 @@ function newest(files: ReadonlyArray<QuotaFile>, limit: number): Array<QuotaFile
 }
 
 function is_lane_log(name: string): boolean {
-	return name.startsWith(durable_state.PREFIX.LANE_DISPATCH) && name.endsWith(LOG_SUFFIX)
+	const prefixes = [durable_state.PREFIX.LANE_DISPATCH, durable_state.PREFIX.HANDOFF_LOG]
+
+	return prefixes.some((prefix) => name.startsWith(prefix)) && name.endsWith(LOG_SUFFIX)
 }
 
 // The provider a log's last launch header names; `undefined` where it names none.
@@ -407,6 +410,7 @@ const run_board_quota_read = {
 	claude_reading,
 	codex_files,
 	codex_heads,
+	codex_lane: run_board_quota_lane.codex_lane,
 	codex_reading,
 	read_head,
 	line_stamp,

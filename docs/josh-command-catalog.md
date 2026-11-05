@@ -170,6 +170,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:scout` | `<title> [--body <summary> \| --body-file <path>]` | automation | network | Before filing: say whether an issue like this exists and which epic it belongs to |
 | `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行"` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |
+| `josh issue:tick` | `<issue> <ac-id>...` | automation | network | Tick selected acceptance checkboxes by their plan identifiers |
 | `josh lane:adopt` · `josh lad` | `<issue> \| --all` | developer | files, git, processes, network | Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched |
 | `josh lane:await` | `<issue> [<issue>...] [--owner <pid>]` | automation | files, processes | Block until any of the named in-flight lane children completes; prints which one finished |
 | `josh lane:breakdown` · `josh lbd` | `<issue>` | maintainer | none | Print a merged lane's net time by stage, longest first, the implementation split by its tool calls |
@@ -204,7 +205,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh report:template` | `summary\|done\|child [<path>...]` | automation | files | Print the work summary, completion report or lane child's summary skeleton in the session language: summary \| done \| child |
 | `josh retrospective` · `josh rtr` · **kit only** | — | maintainer | none | Aggregate a finished run's cost, review findings, observation ledger and events into one digest |
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |
-| `josh review:brief` | `[--round <1\|2>] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
+| `josh review:brief` | `[--round <1\|2> \| --full-change] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
 | `josh review:round2` | `[--record <N>] [--json]` | automation | network | Say whether the second /code-review round is due, or may be skipped entirely |
 | `josh review:selfcheck` | `[--interaction-answered]` | automation | files, processes | Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command |
 | `josh review:submit` | `[--interaction] [--review <absolute-path> [--round <1\|2>]] < findings \| … --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call |
@@ -213,7 +214,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
 | `josh run:board` | `[--once \| --chat \| --every <minutes>]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
 | `josh run:carry` | `<operation> [arguments...]` | automation | files | Carry one invocation’s budget across its own session cuts |
-| `josh run:chain` | `<issue> [--from <stage>] [--unpinned-ok "<reason>"] \| <issue> --join [--fixing] [--from <stage>]` | automation | processes, files, git, network | Run main:merge (not in a lane child), review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action |
+| `josh run:chain` | `<issue> [--from <stage>] [--unpinned-ok "<reason>"] \| <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]` | automation | processes, files, git, network | Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action |
 | `josh run:cut` | `[--resume] <issue> [--impl] [--handoff <path>]` | automation | files | Cut a lane child before the gate and resume a fresh process |
 | `josh run:ending` | `<issue> --output <path> [--repo <owner/repo>]` | automation | network | Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable) |
 | `josh run:entry` | `<issue> [--to <command>] [--adopt]` | automation | git, network, files | Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step |

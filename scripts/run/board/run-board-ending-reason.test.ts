@@ -42,6 +42,14 @@ describe('run_board_ending_reason.reason_of', () => {
 })
 
 describe('run_board_ending_reason.park_row_reason', () => {
+	it('bounds a long recorded cause without changing the stored event reason', () => {
+		const cause = 'Long cause. '.repeat(20)
+		const reason = `run:stalled: ${cause}`
+
+		expect(run_board_ending_reason.park_row_reason(13, reason, true)).toBe(
+			`→ resume: pnpm josh run:add 13 --retry (${cause.slice(0, 119)}…)`,
+		)
+	})
 	it.each([
 		[true, 'pnpm josh run:add 13 --retry'],
 		[false, 'fullrun #13'],

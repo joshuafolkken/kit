@@ -100,10 +100,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:chain': {
 		script: 'scripts/run/review/run-chain-cli.ts',
 		description:
-			'Run main:merge (not in a lane child), review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action',
+			'Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action',
 		category: 'AI tools',
 		reference: [
-			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] | <issue> --join [--fixing] [--from <stage>]',
+			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] | <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -123,11 +123,15 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '<N> --join',
-					note: 'once the review returns: join the gate, attest the round, record a round with no findings — a finding stops for its fix and disposition',
+					note: 'join the gate, attest and record; every finding holds for disposition',
 				},
 				{
 					arguments: '<N> --join --fixing',
 					note: 'the same, when round 1 has fixes to make',
+				},
+				{
+					arguments: '<N> --join --ship "<title> #<N>"',
+					note: 'ship a clean round; title must match the issue. Record interaction review first.',
 				},
 			],
 		},

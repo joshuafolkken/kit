@@ -11,6 +11,15 @@ const EVIDENCE_REFERENCE = `<issue> ${EVIDENCE_FILE}`
 // spreads this in at the same place, so the map keeps its order.
 
 const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
+	'issue:tick': {
+		script: 'scripts/issue/issue-tick-cli.ts',
+		description: 'Tick selected acceptance checkboxes by their plan identifiers',
+		category: 'AI tools',
+		reference: ['<issue> <ac-id>...', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '6233 ac-a1f32a2f ac-8647b0dd' }],
+		},
+	},
 	'issue:comment': {
 		script: 'scripts/issue/issue-comment-main.ts',
 		description: 'Post one comment to an issue from a file, so no shell expands the body',

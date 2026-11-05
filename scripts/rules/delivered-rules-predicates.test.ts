@@ -34,6 +34,8 @@ describe('shell_script_of', () => {
 		['bash -lc "cd x && vitest run"', 'cd x && vitest run'],
 		["FOO=1 /bin/sh -c 'tsc --noEmit'", 'tsc --noEmit'],
 		["eval 'tsc -p .'", 'tsc -p .'],
+		["sh -c 'cat previous-run.log' '&& pnpm josh run:entry 6339'", 'cat previous-run.log'],
+		['sh -c \'printf "%s" "quoted; text"\'', 'printf "%s" "quoted; text"'],
 	])('reads %j as %j', (command, script) => {
 		expect(bash_triggers.shell_script_of(command)).toBe(script)
 	})

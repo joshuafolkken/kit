@@ -11,6 +11,7 @@ import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_lane_handover } from '#scripts/review/review-lane-handover'
+import { review_round } from '#scripts/review/review-round'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
@@ -140,9 +141,12 @@ function save_brief(slot: ReviewSlot, text: string): void {
 
 	stamp_file.write_text_stamp(brief, `${text}\n`)
 	stamp_file.remove_stamp(findings)
-	process.stdout.write(
-		`${slot} brief: ${brief}\n${slot} prompt: ${run_ship_review.round_one_opening(brief)}\n`,
-	)
+	const opening =
+		review_round.from_brief(text) === '2'
+			? run_ship_review.final_opening(brief)
+			: run_ship_review.round_one_opening(brief)
+
+	process.stdout.write(`${slot} brief: ${brief}\n${slot} prompt: ${opening}\n`)
 }
 
 async function write_brief(slot: ReviewSlot): Promise<number> {

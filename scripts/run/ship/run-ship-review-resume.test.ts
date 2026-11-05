@@ -52,6 +52,7 @@ vi.mock('./run-ship-reviewer', () => ({
 		SUCCESS_EXIT_CODE: 0,
 		attest_phase: phases.attest,
 		current_verdict: () => ({ kind: 'clean', specs: [], report: [] }),
+		paths: () => ({ brief: '/nonexistent/ship-review-resume-brief' }),
 		josh: phases.josh,
 		note: vi.fn(),
 		reviewed: () => [phases.provider],

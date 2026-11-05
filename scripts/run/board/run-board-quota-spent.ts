@@ -3,9 +3,10 @@ import { z } from 'zod'
 import type { QuotaReading, QuotaWindow } from './run-board-quota-read'
 
 // How much of each usage window one task spends (joshuafolkken/kit#5508). A lane child works one
-// issue, so each done file is one task; a file still being written has done only part of it, so it
-// tells nothing. The windows are shared by every session, so the sample's rise is measured once
-// across its done files and divided by them (joshuafolkken/kit#5770): a file whose readings did not
+// issue, so each done lane is one task; Codex rollouts in the same lane share one task. Files without
+// lanes each count as one task; a file still being written tells nothing. The windows are shared
+// by every session, so the sample's rise is measured once across its done lanes and divided by
+// them (joshuafolkken/kit#5770): a file whose readings did not
 // rise is still a task done (joshuafolkken/kit#5618), and a window that reset is measured inside the
 // newest file's last reset.
 
@@ -35,6 +36,41 @@ function codex_done(tail: string): boolean {
 type Spent = Readonly<Record<number, number>>
 // A done file's readings, its head's oldest first and its tail's last; a file not done holds none.
 type QuotaSpan = ReadonlyArray<QuotaReading>
+
+interface QuotaTask {
+	span: QuotaSpan
+	lane: string | undefined
+}
+
+interface QuotaEnd {
+	end_ms: number
+	lane: string | undefined
+}
+
+// Marks arrive newest first: prepend older spans so a lane's newest reading stays last.
+function lane_spans(tasks: ReadonlyArray<QuotaTask>): Array<QuotaSpan> {
+	const lanes = new Map<string | QuotaTask, QuotaSpan>()
+
+	for (const task of tasks) {
+		const key = task.lane ?? task
+
+		lanes.set(key, [...task.span, ...(lanes.get(key) ?? [])])
+	}
+
+	return [...lanes.values()]
+}
+
+function lane_ends(ends: ReadonlyArray<QuotaEnd>): Array<number> {
+	const lanes = new Map<string | QuotaEnd, number>()
+
+	for (const end of ends) {
+		const key = end.lane ?? end
+
+		lanes.set(key, Math.max(end.end_ms, lanes.get(key) ?? end.end_ms))
+	}
+
+	return [...lanes.values()]
+}
 
 function is_same_window(start: QuotaWindow, end: QuotaWindow): boolean {
 	const drift = Math.abs(end.resets_ms - start.resets_ms)
@@ -71,7 +107,7 @@ function by_use(left: Told, right: Told): number {
 	return left.used_percent - right.used_percent || (left.taken_ms ?? 0) - (right.taken_ms ?? 0)
 }
 
-// The tasks the rise from `low` to `high` was spent by: the done files whose last reading lies after
+// The tasks the rise from `low` to `high` was spent by: the done lanes whose last reading lies after
 // `low` and by `high` (joshuafolkken/kit#5826), so a resumed lane's head read hours back does not
 // share the lanes done since among the sample alone; the sample's own count where untimed or none.
 function tasks_in(low: Told, high: Told, ends: ReadonlyArray<number>, sampled: number): number {
@@ -116,7 +152,11 @@ function per_task_of(spans: ReadonlyArray<QuotaSpan>, ends: ReadonlyArray<number
 	return Object.fromEntries([...lengths].flatMap((minutes) => rise_per_task(spans, minutes, ends)))
 }
 
-const run_board_quota_spent = { claude_done, codex_done, per_task_of, span_of }
+function per_lane_of(tasks: ReadonlyArray<QuotaTask>, ends: ReadonlyArray<QuotaEnd>): Spent {
+	return per_task_of(lane_spans(tasks), lane_ends(ends))
+}
+
+const run_board_quota_spent = { claude_done, codex_done, per_lane_of, per_task_of, span_of }
 
 export { run_board_quota_spent }
-export type { QuotaSpan, Spent }
+export type { QuotaEnd, QuotaSpan, Spent }

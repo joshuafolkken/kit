@@ -319,8 +319,22 @@ function resolve(
 
 // The reviewer for one review round: round 1 as `resolve(REVIEWER)` does, any later round the
 // verification pass's own profile.
-function resolve_review(round: number, environment: AgentEnvironment = process.env): ProfileResult {
-	return resolve_stage(REVIEWER, environment, { round })
+function reduced_review(result: ProfileResult, environment: AgentEnvironment): ProfileResult {
+	if (result.kind === 'rejected') return result
+	const { profile } = result
+	if (profile.provider !== 'anthropic' || trimmed(environment['JOSH_REVIEWER_MODEL'])) return result
+
+	return { kind: 'profile', profile: { ...profile, model: SONNET_MODEL } }
+}
+
+function resolve_review(
+	round: number,
+	environment: AgentEnvironment = process.env,
+	is_reduced = false,
+): ProfileResult {
+	const result = resolve_stage(REVIEWER, environment, { round })
+
+	return is_reduced && round === FIRST_REVIEW_ROUND ? reduced_review(result, environment) : result
 }
 
 // The model a consultation main line hands its investigation to. Its key moves the Claude model alone,
