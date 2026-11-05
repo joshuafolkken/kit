@@ -1,7 +1,11 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
-import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import {
+	has_label_name,
+	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
+} from '#scripts/issue/issue-labels'
 import { backlog_auto_triage } from './backlog-auto-triage'
 import type { PoolContext } from './backlog-gate-scope'
 import { backlog_next } from './backlog-next'
@@ -15,7 +19,10 @@ interface TriageSnapshot {
 
 function parked_of(plan: TriageSnapshot): ReadonlyArray<EpicChild> {
 	return plan.result.blocked_on_people.filter(
-		(child) => child.repo === plan.repo && has_label_name(child.labels, NEEDS_DECISION_LABEL),
+		(child) =>
+			child.repo === plan.repo &&
+			(has_label_name(child.labels, NEEDS_DECISION_LABEL) ||
+				has_label_name(child.labels, RUN_STALLED_LABEL)),
 	)
 }
 
@@ -28,6 +35,9 @@ async function next_action(plan: TriageSnapshot): Promise<string> {
 
 	console.error(
 		'Answer existing decisions from the body and comments; keep questions needing a person or measurement parked. Use backlog:triage --decide for the three solo conditions, then --apply with the reason and any --blocked-by / --clear. Repeat --pass, excluding decisions left parked in this pass.',
+	)
+	console.error(
+		'For Tier A answers, use epic --decide to record the decision and clear needs-decision; for recovered failures, use run:add --retry. Record dependencies with backlog:triage --apply --blocked-by; leave questions needing a person or measurement parked and exclude them from this pass.',
 	)
 
 	return `pnpm josh issue:read ${numbers.join(' ')}`

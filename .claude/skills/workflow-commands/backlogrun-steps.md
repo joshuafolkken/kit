@@ -91,13 +91,17 @@ from, printed in the session language. Relay all four sections as printed, with 
 ### Resolve what the plan can resolve
 
 **Run `pnpm josh backlog:triage --pass`** after the first offer and follow its one stdout command.
-It settles mechanical lane candidates and batches the remaining judgments and `needs-decision`
-issues into one body-and-comments read. After recording answers, repeat it with `--exclude <N>`
+It settles mechanical lane candidates and batches the remaining judgments, `needs-decision` and
+`run:stalled` issues into one body-and-comments read, once per local issue. Foreign-repository and
+excluded children are not read. After recording answers, repeat it with `--exclude <N>`
 for decisions left parked in this pass; when none remain it prints `pnpm josh backlog:plan --waves`.
 The reader supplies semantic evidence; the command cannot infer a person's answer or prove a main failure:
 
-- **An answer already in the issue** — record it as a comment and **remove the label** with `pnpm josh run:park <N> --clear` (Tier A).
+- **An answer already in the issue** — record a Tier A answer in the epic and child with
+  `pnpm josh epic --decide <E> <N...> --decision-file .josh/tmp/decision.md`, which clears `needs-decision`.
   **Never measure in order to decide**: a question needing a benchmark or a run stays labelled.
+- **A recovered mechanical failure** — retry with `pnpm josh run:add <N> --retry`, which clears
+  `run:stalled` and the previous attempt; unresolved failures stay parked and excluded from this pass.
 - **A person's judgement** — apply `needs-decision` (`backlogrun-park.md` → "Only a person's judgement
   carries `needs-decision`").
 - **Order and isolate** — a native `blocked-by` where one must land first (`--blocked-by <M>`);
