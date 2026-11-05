@@ -408,5 +408,6 @@ export {
 	RECONCILE_FLAG,
 }
 export { REMOVE_FLAG } from './epic-cli-remove'
+export { epic_cli_untrack } from './epic-cli-untrack'
 export type { AddArguments, CreateArguments, CrossRepoAddTarget, PromoteArguments }
 export type { RemoveArguments } from './epic-cli-remove'
