@@ -203,9 +203,7 @@ function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'paus
 	return {
 		hold: holds.hold,
 		idle: backlog_drive_idle.notify,
-		paused: async () => {
-			await backlog_drive_paused.notify()
-		},
+		paused: backlog_drive_paused.notify,
 	}
 }
 
