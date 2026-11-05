@@ -1,0 +1,1 @@
+- rf:performance | low | scripts/lane/lane-why-cli.ts:28 | 2026-11-03 | #6124

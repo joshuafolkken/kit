@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | tools/josh/josh-ready.ts:13 | 2026-11-04 | #6239 | false-positive

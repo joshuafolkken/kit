@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/lane/lane-implement-stats.ts:169 | 2026-11-04 | #6385
+- rf:bug-risks | medium | scripts/lane/lane-implement-stats.ts:158 | 2026-11-04 | #6385

@@ -1,4 +1,5 @@
 import { git_path_quoting } from '#scripts/git/git-path-quoting'
+import { run_record_path } from '#scripts/josh/run-record-path'
 import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 
@@ -10,7 +11,7 @@ import { test_declared_logic } from '#scripts/test/test-declared-logic'
 // separately-mergeable deliverables — stays a judgement, so this answers the size question alone and
 // never claims to have decided the split.
 //
-// **The counting excludes test files, single-sourced from `test_declared_logic.is_test_file`.** The
+// Counting excludes run records via `run_record_path` and test files via `test_declared_logic.is_test_file`. The
 // "test files excluded" clause in the guide and the `*.test.ts` / `*.e2e.ts` spelling are one fact;
 // a second copy here would let the two drift.
 
@@ -112,10 +113,10 @@ function parse_numstat(raw: string): Array<FileChange> {
 		.filter((change): change is FileChange => change !== undefined)
 }
 
-function non_test_changes(changes: ReadonlyArray<FileChange>): Array<FileChange> {
-	return changes.filter(
-		(change) => !test_declared_logic.is_test_file(git_path_quoting.unquote(change.path)),
-	)
+function is_deliverable(change: FileChange): boolean {
+	const file = git_path_quoting.unquote(change.path)
+
+	return !test_declared_logic.is_test_file(file) && !run_record_path.is_run_record(file)
 }
 
 // `split` when **either** guide is exceeded — the AND form never fired, even on the lanes cut twice
@@ -135,7 +136,7 @@ function is_over_cap(files: number, lines: number, guide: SplitGuide = DEFAULT_G
 }
 
 function measure(changes: ReadonlyArray<FileChange>, guide: SplitGuide): SizeMeasurement {
-	const runtime = non_test_changes(changes)
+	const runtime = changes.filter((change) => is_deliverable(change))
 	const lines = runtime.reduce((total, change) => total + change.changed_lines, 0)
 
 	return { files: runtime.length, lines, verdict: verdict_for(runtime.length, lines, guide) }
