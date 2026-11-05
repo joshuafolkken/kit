@@ -25,6 +25,7 @@ import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-ga
 import { backlog_next_size } from './backlog-next-size'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank } from './backlog-rank'
+import { backlog_resumable } from './backlog-resumable'
 import { backlog_wait_cause } from './backlog-wait-cause'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next.
@@ -308,7 +309,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		context.repo,
 	)
 
-	return backlog_rank.rank_result(ordered, context.repo)
+	return backlog_rank.rank_result(await backlog_resumable.read(ordered, context.repo), context.repo)
 }
 
 // Whether the `error` verdict is really a transport failure wearing the graph's clothes.

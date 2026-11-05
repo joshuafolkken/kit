@@ -115,7 +115,34 @@ describe('backlog:next ranking keys', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(offered()).toStrictEqual([SEVENTH, SIXTH])
 	})
+})
 
+describe('backlog:next resumable ranking keys', () => {
+	it('offers stashed work before fresh work', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [row(SIXTH, []), row(SEVENTH, [])],
+			stashed: [SEVENTH],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()).toStrictEqual([SEVENTH, SIXTH])
+	})
+
+	it.each([PRIORITY_CRITICAL_LABEL, PRIORITY_HIGH_LABEL])(
+		'keeps %s ahead of resumable work',
+		async (priority) => {
+			backlog_fixture.stub_backlog({
+				opted_in: [row(SIXTH, []), row(SEVENTH, [priority])],
+				stashed: [SIXTH],
+			})
+
+			expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+			expect(offered()[0]).toBe(SEVENTH)
+		},
+	)
+})
+
+describe('backlog:next priority ranking keys', () => {
 	it('offers priority:high first, then a verification-path defect, then oldest-first ties', async () => {
 		stub(
 			new Map([
