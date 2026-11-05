@@ -199,6 +199,26 @@ describe('issue:lint measurement declaration (joshuafolkken/kit#4621)', () => {
 	})
 })
 
+describe('issue:lint decision rule (joshuafolkken/kit#6501)', () => {
+	const RULE = '- 判定規則: 検出範囲を保てるなら A、そうでなければ B（#6403）'
+
+	it('rejects human judgement when a decision rule cites a measurement Issue', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await lint_body(declaring(`- 人の判断: 要（方針の判断）\n${RULE}`))).toBe(1)
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('- 人の判断: 不要'))
+	})
+
+	it.each([`- 人の判断: 不要\n${RULE}`, '- 人の判断: 要（方針の判断）'])(
+		'accepts a consistent declaration: %s',
+		async (line) => {
+			vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+			expect(await lint_body(declaring(line))).toBe(0)
+		},
+	)
+})
+
 const AGGREGATION_BODY = `${VALID_BODY.replace('1 ファイル', '6 ファイル')}- 種別: 非不具合\n${REQUIRED_SECTIONS}\n- [ ] 形を集計し Issue にコメントで記録する\n`
 
 describe('issue:lint aggregation split (joshuafolkken/kit#5190)', () => {

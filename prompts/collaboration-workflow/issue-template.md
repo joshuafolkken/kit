@@ -1,13 +1,14 @@
 ## Step 1: Issue 作成テンプレ
 
-タイトルは簡潔で明瞭な英語にする（「出力の言語（`JOSH_SESSION_LANG`）」の例外）。日本語や改善できるタイトルは実装開始前に `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --title "<title>"` で計画と一緒に書き換える。本文は次のテンプレートの節をすべて含める:
+タイトルは簡潔な英語。実装前に `pnpm josh issue:plan <N> --body-file .josh/tmp/plan.md --title "<title>"` で計画と一緒に改善する。本文は次の節をすべて含める:
 
 ````md
 ## 背景
 
 <不具合なら `- 種別: 不具合`、そうでなければ `- 種別: 非不具合` を宣言する>
 <不具合なら `- 原因: #<PR>`、追えなければ `- 原因: 不明（<理由>）` を宣言する>
-<人の判断が要らなければ `- 人の判断: 不要`、要るなら `- 人の判断: 要（<方針の判断 / 外部アカウント / 目視確認>）` を宣言する>
+<`- 人の判断: 不要` または `- 人の判断: 要（<方針の判断 / 外部アカウント / 目視確認>）`>
+<計測で選ぶなら `- 判定規則: <条件> なら <A>、そうでなければ <B>（#<計測 Issue>）`。`人の判断: 不要` とする>
 <レーンを延ばした原因なら `- 原因のレーン: <分> 分（#<N>）` を宣言する。分は `pnpm josh lane:net <N>`>
 <そのうちこの Issue の原因で縮められる分は `- 原因の損失: <分> 分` で宣言する。再発のたびに 1 行足す>
 <セキュリティの指摘なら `- セキュリティ: <迂回される gate・ガード・権限>` を宣言する>
@@ -69,7 +70,7 @@
 
 ### `## 背景` 直下の宣言と分類ラベル
 
-起票は `pnpm josh issue:file "<title>" --body-file .josh/tmp/issue.md` で行い（置き場は `shell-body.md`）、本文の検査（`pnpm josh issue:lint <path>` と同じ）と下表のラベル付与はコマンドが行う。**宣言は起票者が選ぶ。** `- 人の判断:` の行は必須で、`issue:file` が検査し `auto-ok` の判定に使う（`scripts/issue/issue-auto-ok.ts`、`docs/how-to/run-backlog.md`）。`不要` を宣言する起票には `--label run:lane`（kit 自身の検証が `main` で毎回決まって誤った答えを出す不具合なら `run:solo`。時々出る誤判定は `run:lane` と `priority:critical`）も付ける — 無ければ `issue:file` が拒否する。
+起票は `pnpm josh issue:file "<title>" --body-file .josh/tmp/issue.md`（置き場は `shell-body.md`）。本文検査は `pnpm josh issue:lint <path>` と共通で、下表のラベルも付与する。宣言は起票者が選ぶ。`- 人の判断:` は必須で `auto-ok` 判定に使う（`scripts/issue/issue-auto-ok.ts`）。`不要` には `--label run:lane` も必須（kit 自身の検証が `main` で毎回誤判定する不具合なら `run:solo`。時々なら `run:lane` と `priority:critical`）。
 
 | 宣言                                                     | 付くラベル                             | 選ぶ基準                                                                                                  |
 | -------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -82,6 +83,7 @@
 | `- 強制: <hook・lint・gate>` / `- 強制: 計測のみ`        | なし                                   | 振る舞い変更のみ。検査は `scripts/issue/enforcement-lint.ts`                                              |
 | `- 計測: <コマンド名と数字>`                             | なし                                   | 振る舞い変更のみ。検査は `scripts/issue/enforcement-lint.ts`                                              |
 | `- 人の判断: 不要`                                       | `auto-ok`（除外ラベルが無ければ）      | 方針の判断・外部アカウント・目視確認のどれも要らない                                                      |
+| `- 判定規則: <条件分岐>（#<計測 Issue>）`                | なし                                   | `人の判断: 要` との併記を拒否。適用は `operating-rules.md` → "decision-autonomy"                          |
 | `- 実施可能条件: #<PR> のマージ後 <K> マージ`            | `not-before`（待つ間）                 | 追跡計測。元の PR のマージ後に lane ledger が K 件（既定 10、上限 30）のマージを記録するまで着手しない    |
 | `- 実施可能日: <UTC>`                                    | `not-before`（待つ間）                 | 外部の期限など暦そのものに意味がある待ち（`YYYY-MM-DDTHH:MMZ`）。追跡計測には使わない（`measurement.md`） |
 | ``- 計測宣言: `<command>` <= <数値>``                    | なし（閉じたら `measured`）            | 追跡計測の既定。比較は `<=` `<` `>=` `>`                                                                  |
