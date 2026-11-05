@@ -125,7 +125,7 @@ Run `pnpm josh command:derive` to regenerate.
 
 | Command | Arguments | Audience | Side effects | Description |
 | --- | --- | --- | --- | --- |
-| `josh auto-ok:judge` | `[--apply <n> (--lane \| --solo) \| --decline <n> --reason <text>]` | automation | network | List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline) |
+| `josh auto-ok:judge` | `[--apply <n> (--lane \| --solo --defect yes --verification yes --every-run yes) \| --decline <n> --reason <text>]` | automation | network | List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline) |
 | `josh auto-ok:next` | `[--exclude <n>[,<n>...]] [--label <name>]` | automation | network | Print the next opted-in issue an unattended run may pick up outside an epic |
 | `josh backlog:budget` | `[options]` | automation | none | Say whether a backlogrun may start more work, keep watching, or finish |
 | `josh backlog:drive` | `[--owner <pid>] [options]` | automation | network | Drive backlogrun through offer, launch and merge; restore this run’s lanes and report when complete |
