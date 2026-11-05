@@ -92,6 +92,12 @@ describe('josh auto-ok:judge --apply / --decline', () => {
 })
 
 describe('josh auto-ok:judge — usage', () => {
+	it('shows the three affirmative answers required for solo (ac-facb5348)', async () => {
+		await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER)])
+
+		expect(stderr()).toContain(`--solo ${SOLO_ANSWERS.join(' ')}`)
+	})
+
 	it.each(['no', 'unknown', 'invalid', ''])(
 		'refuses solo evidence %s before writing (ac-237df449)',
 		async (answer) => {

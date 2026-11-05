@@ -32,6 +32,7 @@ const DIRECTORY = '/lane/5636'
 const REASON = 'no gate path is named'
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
+const ARGV_OFFSET = 2
 const LANE_ARGV = ['--apply', ISSUE, '--lane', '--reason', REASON]
 const CLEAR_ARGV = [...LANE_ARGV, '--clear']
 const BLOCKED_BY_FLAG = '--blocked-by'
@@ -73,6 +74,34 @@ beforeEach(() => {
 	})
 	remove_blocked_by.mockImplementation(async (request) => {
 		order.push(`unblock ${request.prerequisite}`)
+	})
+})
+
+describe('josh backlog:triage — atomic solo refusal', () => {
+	it.each([
+		[BLOCKED_BY_FLAG, ''],
+		[BLOCKED_BY_FLAG, 'no'],
+		[BLOCKED_BY_FLAG, 'unknown'],
+		[BLOCKED_BY_FLAG, 'invalid'],
+		[UNBLOCK_FLAG, ''],
+		[UNBLOCK_FLAG, 'no'],
+		[UNBLOCK_FLAG, 'unknown'],
+		[UNBLOCK_FLAG, 'invalid'],
+	])(
+		'refuses invalid solo evidence with %s and clear before every side effect (ac-614b1740)',
+		async (relation, answer) => {
+			const answers = answer === '' ? [] : ['--defect', answer, ...SOLO_ANSWERS.slice(ARGV_OFFSET)]
+			const args = [...BLOCKED_ARGV.slice(0, ARGV_OFFSET), relation, BLOCKER, '--solo', '--clear']
+
+			expect(
+				await backlog_triage_cli.run([...args, ...answers, '--reason', REASON], DIRECTORY),
+			).toBe(FAILURE_EXIT_CODE)
+			expect(order).toStrictEqual([])
+		},
+	)
+
+	it('shows the three affirmative answers required for solo (ac-facb5348)', () => {
+		expect(backlog_triage_cli.USAGE).toContain(`--solo ${SOLO_ANSWERS.join(' ')}`)
 	})
 })
 
