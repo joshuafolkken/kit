@@ -23,6 +23,7 @@ import { issue_file_deferral } from './issue-file-deferral'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_file_pass, type Filing } from './issue-file-pass'
+import { has_label_name, RUN_SOLO_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
 import type { ScoutOutcome } from './issue-scout-cli'
@@ -45,7 +46,7 @@ import { session_cite } from './session-cite'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]'
+	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--defect yes|no|unknown] [--verification yes|no|unknown] [--every-run yes|no|unknown] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]'
 const CHECK_CLEAR_MESSAGE = 'check: every filing step passed — nothing filed (`--check`).'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
@@ -196,11 +197,31 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 	await record_parks(url, filing)
 }
 
+// Once created, a comment failure warns rather than inviting a duplicate filing.
+async function record_solo(
+	url: string,
+	filing: Filing,
+	labels: ReadonlyArray<string>,
+): Promise<void> {
+	if (!has_label_name(labels, RUN_SOLO_LABEL)) return
+	const { answers = {} } = filing.args
+	const body = `run:solo\n\n- defect: ${String(answers.defect)}\n- verification: ${String(answers.verification)}\n- every-run: ${String(answers['every-run'])}`
+
+	try {
+		await git_gh_command.issue_comment(String(issue_number_of(url)), body, filing.target)
+	} catch (error) {
+		console.error(
+			`⚠ ${url} is already filed; could not record solo answers: ${error_text.message_of(error)}`,
+		)
+	}
+}
+
 async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<string | undefined> {
 	const url = await create(filing, labels)
 
 	if (url === undefined) return undefined
 	console.info(url)
+	await record_solo(url, filing, labels)
 	await record(url, filing, labels)
 	await link_release(url, filing)
 	await place(url, filing.target)
