@@ -98,7 +98,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 describe('run_review_cli.run — a lane child after its recorded round 1', () => {

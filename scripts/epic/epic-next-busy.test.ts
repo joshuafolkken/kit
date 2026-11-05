@@ -112,7 +112,6 @@ function listing(numbers: ReadonlyArray<number>): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
 	stdout_lines.length = 0
 	stderr_lines.length = 0

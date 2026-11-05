@@ -1,5 +1,5 @@
 import { execaSync } from 'execa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { build_upgrade_command, shell_upgrade_command } from './upgrade-shell-command'
 import { create_version_command_config } from './version-command-config'
 import { version_commands } from './version-commands'
@@ -40,10 +40,6 @@ function config_with(
 		...overrides,
 	})
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 const SPAWN_OPTIONS = {
 	stdio: 'inherit',

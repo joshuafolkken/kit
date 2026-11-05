@@ -67,7 +67,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	rmSync(scratch.directory, { recursive: true, force: true })
 })
 

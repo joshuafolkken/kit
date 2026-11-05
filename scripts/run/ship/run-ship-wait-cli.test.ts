@@ -38,7 +38,6 @@ const { VERDICT } = run_ship_wait_cli
 const SHORT_CHUNK_MS = 20
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	take_mock.mockReturnValue(undefined)
 	result_mock.mockReturnValue({ result: 'running' })
 	done_mock.mockReturnValue(new Set())

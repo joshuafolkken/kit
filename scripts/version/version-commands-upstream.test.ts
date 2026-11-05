@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
 	CHAINED_CONFIG,
 	CHAINED_CONFIG_WITH_EFFECTIVE,
@@ -26,10 +26,6 @@ vi.mock('./version-targets', () => ({
 }))
 
 const { arrange_chain_versions, config_with_context_hooks } = version_chain_fixture
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('version_commands.read_upstream_reports', () => {
 	it('reads the project and latest versions for each configured upstream', () => {

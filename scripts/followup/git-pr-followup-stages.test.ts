@@ -157,7 +157,6 @@ const MERGED_RUN_STAGES: ReadonlyArray<string> = [
 ]
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	answer_every_call()
 })

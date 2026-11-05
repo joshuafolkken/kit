@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { execa, execaSync } from 'execa'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 
 vi.mock('execa', () => ({
@@ -49,10 +49,6 @@ const GLOBAL_AGENT_KEY = 'GLOBAL_AGENT_HTTP_PROXY'
 
 // Each case declares exactly the proxy it is about; every other spelling starts blank because the
 // unit projects blank them (`unit-projects.ts`), whatever wrapper launched the suite.
-beforeEach(() => {
-	vi.clearAllMocks()
-})
-
 afterEach(() => {
 	vi.unstubAllEnvs()
 })

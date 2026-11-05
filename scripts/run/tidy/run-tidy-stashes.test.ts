@@ -57,7 +57,6 @@ async function is_merged(issue: string): Promise<boolean> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	rmSync(path.join(scratch, OBSERVATION_LEDGER_DIRECTORY), { force: true, recursive: true })
 	mkdirSync(path.dirname(LEDGER), { recursive: true })
 	writeFileSync(OTHER_ISSUE_LEDGER, `${EXISTING_LINE}\n`)

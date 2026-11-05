@@ -1,5 +1,5 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { lane_registry } from './lane-registry'
 import { openai_lane_supervisor_cli } from './openai-lane-supervisor-cli'
 
@@ -11,8 +11,6 @@ beforeEach(() => {
 	find_lane.mockResolvedValue(undefined)
 	error.mockImplementation(() => undefined)
 })
-
-afterEach(() => vi.clearAllMocks())
 
 it.each([[], [ISSUE]])('logs missing arguments for %j', async (...args) => {
 	expect(await openai_lane_supervisor_cli.run(args)).toBe(1)

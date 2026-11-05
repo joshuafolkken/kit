@@ -54,7 +54,6 @@ function stub_ok(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(info_mock)
 	vi.spyOn(console, 'error').mockImplementation(error_mock)
 	stub_ok()

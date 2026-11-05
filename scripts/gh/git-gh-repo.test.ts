@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_repo } from './git-gh-repo'
 
@@ -11,10 +11,6 @@ vi.mock('./git-gh-exec', () => ({
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 const REPO = 'joshuafolkken/kit'
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 // joshuafolkken/kit#1023: `gh repo view --json nameWithOwner` goes through GraphQL, which a cloud
 // session is refused (403). The same fact is repository-scoped REST, which is allowed.

@@ -48,7 +48,6 @@ function stub_state(state: Record<string, unknown>): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	read_merged.mockResolvedValue(false)
 	vi.mocked(git_gh_pr_snapshot.pr_get_review_decision).mockResolvedValue('')
 })

@@ -59,7 +59,6 @@ function own_ancestry(): ReadonlySet<number> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	lanes_in_flight.mockResolvedValue(true)
 	repository_directory.mockResolvedValue('/repo/.git')
 	read_carry.mockReturnValue(DRIVING)

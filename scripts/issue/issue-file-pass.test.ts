@@ -1,6 +1,6 @@
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
 import { issue_file_pass, type Filing } from './issue-file-pass'
@@ -60,10 +60,6 @@ beforeEach(() => {
 	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
 	vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue(NO_DUPLICATES)
 	vi.spyOn(lane_net_read, 'implement_rate').mockResolvedValue(undefined)
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 afterAll(() => {

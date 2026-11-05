@@ -149,7 +149,6 @@ function setup_run_mocks(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	setup_gh_mocks()
 	setup_run_mocks()

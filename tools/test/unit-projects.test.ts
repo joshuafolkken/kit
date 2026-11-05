@@ -90,6 +90,17 @@ describe('the two projects partition the suite without gaps or overlap', () => {
 // Both `globalSetup` entries and `coverage` are read once at the root, so the projects must carry the
 // per-run env and timeout themselves or a project would silently run with vitest's defaults.
 describe('each project carries the per-run environment and timeout', () => {
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('preserves file-level spies in %s', (name) => {
+		expect(project(name).restoreMocks).toBe(false)
+	})
+
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])(
+		'clears mock history before each test in %s',
+		(name) => {
+			expect(project(name).clearMocks).toBe(true)
+		},
+	)
+
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('gives %s the session env and timeout', (name) => {
 		expect(project(name).env['CLAUDE_CODE_SESSION_ID']).toBe('vitest-session')
 		expect(project(name).testTimeout).toBeGreaterThan(0)

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#3773: the issue watch ends with the run it watched, so a merged run clears it
 // beside the review records. A separate suite from `git-followup-finish.test.ts`, which is at its
@@ -19,10 +19,6 @@ vi.mock('#scripts/review/review-attest', () => ({
 }))
 
 const { git_followup_finish } = await import('./git-followup-finish')
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('clear_review_records — the issue watch', () => {
 	it('clears the watch on a merged run', async () => {

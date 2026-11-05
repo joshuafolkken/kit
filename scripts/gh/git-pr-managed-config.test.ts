@@ -4,7 +4,7 @@ import {
 	DISTRIBUTED_SKILL_FILE,
 	DISTRIBUTED_SYNC_ARTIFACT,
 } from '#scripts/managed-marker/managed-config-fixture'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { git_pr_managed_config } from './git-pr-managed-config'
 
 // `./git-command` rather than `./changed-paths`: this reads the **tracked** branch diff and lets the
@@ -33,10 +33,6 @@ async function run_report(): Promise<Array<string>> {
 function joined(lines: ReadonlyArray<string>): string {
 	return lines.join(DIFF_LINE_SEPARATOR)
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('handle_managed_config_changes — a diff that distributes nothing', () => {
 	it('reports nothing at all, so the completion report gains no section', async () => {

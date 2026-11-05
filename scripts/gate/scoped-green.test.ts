@@ -66,7 +66,6 @@ function plant_both(digest: string = DIGEST, base: string = BASE): ScopedSources
 const BEFORE = { files: tree_of(), base: BASE }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mkdirSync(DIRECTORY, { recursive: true })
 	mocked_tree.mockResolvedValue({ files: tree_of(), base: BASE })
 })

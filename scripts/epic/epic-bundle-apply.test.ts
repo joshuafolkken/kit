@@ -51,7 +51,6 @@ const BLOCKED_MEMBER = issue(CANDIDATE_NUMBER, {
 })
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	mocked_add.mockResolvedValue(SUCCESS_EXIT_CODE)
 	mocked_create.mockResolvedValue(NEW_EPIC_NUMBER)

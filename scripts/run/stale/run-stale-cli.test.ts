@@ -58,7 +58,6 @@ async function live_ports(): Promise<StalePorts> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocks.repo_name.mockResolvedValue(REPO)
 	mocks.list_lanes.mockResolvedValue([])
 	mocks.read_hold.mockReturnValue({ kind: 'free' })

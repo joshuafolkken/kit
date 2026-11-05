@@ -81,7 +81,6 @@ function reset_ship(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	run_cut.end_cut(target)
 	stamp_file.remove_stamp(openai_lane_supervisor.marker_path(lane_directory))
 	stamp_file.remove_stamp(openai_lane_supervisor.state_path(lane_directory))

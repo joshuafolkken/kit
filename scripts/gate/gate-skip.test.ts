@@ -106,7 +106,6 @@ function check_count(): number {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	clear_records()
 	repository.tree = CHANGED_TREE
 	repository.base = BASE

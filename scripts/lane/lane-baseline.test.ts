@@ -56,7 +56,6 @@ function launched_prompt(): string {
 afterEach(() => vi.unstubAllEnvs())
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.target.mockResolvedValue('/state/lane-ledger.jsonl')
 	mocks.all_events.mockResolvedValue([])

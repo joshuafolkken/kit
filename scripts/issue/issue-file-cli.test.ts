@@ -113,7 +113,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	Reflect.deleteProperty(process.env, 'GH_REPO')
 })
 

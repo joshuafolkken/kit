@@ -44,7 +44,6 @@ function listing(lane_body = ''): Awaited<ReturnType<typeof auto_ok_cli.fetch_op
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	fetch_opted_in.mockResolvedValue(listing())
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
 		mkdtempSync(path.join(ROOT, 'repository-')),

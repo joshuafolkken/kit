@@ -66,7 +66,6 @@ function mock_unfinished(outcome: UnfinishedOutcome): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	spawn_options.length = 0
 })
 

@@ -47,7 +47,6 @@ const CLOSED_LINKED = child_json({ state: 'CLOSED', blocked_by: 1 })
 const NO_COMMENTS = '[]'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_close.mockResolvedValue(true)
 	// The default is an epic nobody has announced yet, which is what every case below except the
 	// re-run ones is about.

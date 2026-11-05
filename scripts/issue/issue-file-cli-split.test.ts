@@ -6,7 +6,7 @@ import { UNORDERED_DEPENDENCIES } from '#scripts/epic/epic-parse'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
@@ -60,10 +60,6 @@ beforeEach(() => {
 	vi.spyOn(git_gh_command, 'issue_get_labels_and_body').mockResolvedValue(
 		JSON.stringify({ number: Number(KEPT), labels: [], body: KEPT_BODY }),
 	)
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 afterAll(() => {

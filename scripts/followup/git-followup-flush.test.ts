@@ -32,7 +32,6 @@ const LIVE_CLAIM = `${LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? ''}.4242${MIGRATION_
 const mocked_status = vi.mocked(git_command.status)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	mocked_status.mockResolvedValue([OTHER_CHANGE, DIRTY_LEDGER].join('\n'))
 	vi.mocked(observation_ledger_prepare.prepare).mockResolvedValue([])

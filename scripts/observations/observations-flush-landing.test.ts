@@ -112,7 +112,6 @@ function first_call_order(command: (...args: Array<never>) => unknown): number {
 
 describe('observations_flush — auto-merge', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -139,7 +138,6 @@ describe('observations_flush — auto-merge', () => {
 
 describe('observations_flush — an auto-merge that does not land', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -183,7 +181,6 @@ describe('observations_flush — an auto-merge that does not land', () => {
 
 describe('observations_flush — an earlier flush pull request still open', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -221,7 +218,6 @@ describe('observations_flush — an earlier flush pull request still open', () =
 // fast-forward, so it is discarded first and a deferring flush never carries.
 describe('observations_flush — the comment-round carry beside an open flush', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -248,7 +244,6 @@ describe('observations_flush — the comment-round carry beside an open flush', 
 
 describe('observations_flush — the merge progress of an earlier auto-merge flush', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 

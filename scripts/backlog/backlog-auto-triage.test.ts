@@ -2,7 +2,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { BUG_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_auto_triage } from './backlog-auto-triage'
 
 // The mechanical triage (joshuafolkken/kit#5517): an untriaged candidate that is not a `bug` naming a
@@ -36,10 +36,6 @@ beforeEach(() => {
 	apply_label.mockResolvedValue({ is_applied: true })
 	try_comment.mockResolvedValue(true)
 	read_labels.mockResolvedValue([])
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 describe('backlog_auto_triage.lane_reason', () => {

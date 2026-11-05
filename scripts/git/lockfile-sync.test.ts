@@ -38,7 +38,6 @@ async function installed(content: string): Promise<void> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	checkout.directory = mkdtempSync(path.join(tmpdir(), 'lockfile-sync-'))
 	install.mockResolvedValue({ is_installed: true, output: INSTALL_OUTPUT })
 })

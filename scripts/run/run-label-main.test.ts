@@ -20,7 +20,6 @@ const ISSUE = '6255'
 const LABEL = 'in-progress'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.mocked(run_hold.worktree_directory).mockResolvedValue('tree')
 	vi.mocked(run_hold.read_hold).mockReturnValue({

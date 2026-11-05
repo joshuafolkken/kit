@@ -23,7 +23,6 @@ const ROCKET = '🚀'
 const PERSISTED_TEXT = `${LOADING} ${DONE}`
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	spinner_spy.start.mockReturnValue(spinner_spy)
 })
 

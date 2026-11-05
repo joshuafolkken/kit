@@ -85,7 +85,6 @@ async function answer_for(children: ReadonlyArray<EpicChild>): Promise<number> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	stdout_lines.length = 0
 	stderr_lines.length = 0
 	issue_list.mockResolvedValue(listing_outcome('[]'))

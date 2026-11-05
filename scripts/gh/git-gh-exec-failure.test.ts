@@ -51,7 +51,6 @@ const BAD_GATEWAY = 'gh: Server Error (HTTP 502)'
 const POSTED = '{"id":1}'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stderr, 'write').mockReturnValue(true)
 })
 

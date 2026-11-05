@@ -49,7 +49,6 @@ function lookup_calls(): number {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	forget_pr_numbers()
 })
 

@@ -61,7 +61,6 @@ const current_events = vi.spyOn(run_event_stream_emit, 'current_events')
 const unpushed = vi.spyOn(git_command, 'commit_count_unpushed')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	list_lanes.mockResolvedValue([
 		lane(WITHDRAWN),
 		lane(MERGED),

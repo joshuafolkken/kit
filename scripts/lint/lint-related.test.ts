@@ -112,7 +112,6 @@ function green_checks_after_lint(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	mocked_root.mockResolvedValue(REPOSITORY_ROOT)
 	mocked_changed.mockResolvedValue([CHANGED_SOURCE])

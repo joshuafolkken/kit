@@ -48,7 +48,6 @@ const info = vi.spyOn(console, 'info')
 const error = vi.spyOn(console, 'error')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	info.mockImplementation(vi.fn())
 	error.mockImplementation(vi.fn())
 	emit.mockResolvedValue(undefined)

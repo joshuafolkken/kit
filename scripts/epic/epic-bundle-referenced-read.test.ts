@@ -1,5 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { epic_bundle_referenced } from './epic-bundle-referenced'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
@@ -21,10 +21,6 @@ function plan_json(number: number): string {
 		labels: [],
 	})
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 // joshuafolkken/kit#957: this is the seam the fix lives on. `collect_referenced` is exercised with
 // hand-built results and the classification is exercised at the gh layer, so without a test here a

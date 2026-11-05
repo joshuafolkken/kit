@@ -94,7 +94,6 @@ function launched_lanes(): ReadonlyArray<string | undefined> {
 afterEach(() => vi.unstubAllEnvs())
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.all_events.mockResolvedValue([])
 	mocks.read_entries.mockReturnValue(lane(70))

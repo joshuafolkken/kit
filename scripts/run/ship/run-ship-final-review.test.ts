@@ -20,7 +20,6 @@ const review = vi.fn(async () => PASS)
 const stamp = file_map_stamp.create(`josh-ship-final-review-${ISSUE}-`, PROJECT_ROOT)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(gate_tree.read_gate_tree).mockResolvedValue(TREE)
 	vi.mocked(review_round_reuse.is_stale_here).mockResolvedValue(false)
 	review.mockResolvedValue(PASS)

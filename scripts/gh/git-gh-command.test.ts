@@ -44,7 +44,6 @@ const HEAD_BRANCH = 'feature-branch'
 const REPO_NAME = 'joshuafolkken/kit'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_get_default_branch.mockResolvedValue(DEFAULT_BRANCH)
 	mocked_git.branch.mockResolvedValue(HEAD_BRANCH)
 })

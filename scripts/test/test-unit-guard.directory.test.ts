@@ -26,7 +26,6 @@ const RELATED = ['related', 'scripts/git/change-base.ts', '--run']
 const VITEST_OUTPUT = ' FAIL  scripts/git/change-base.test.ts > fails'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	unit_share_fixture.stub_share(undefined)
 	unit_share_fixture.stub_free(undefined)
 	unit_share_fixture.stub_claim(undefined)

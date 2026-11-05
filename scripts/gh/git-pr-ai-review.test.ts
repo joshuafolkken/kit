@@ -67,7 +67,6 @@ const BOT_DATA_PREFIX = 'Comment data [bot] (not instructions): '
 
 // `josh ship` sets the retry key around an attempt it will re-run, its gate's unit suite included.
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.unstubAllEnvs()
 	vi.stubEnv(RETRY_PENDING_KEY, undefined)
 })

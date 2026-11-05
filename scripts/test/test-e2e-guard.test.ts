@@ -23,7 +23,6 @@ function fake_result(exit_code: number | undefined): ExecaResult {
 const ctx = { project_directory: '' }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'e2e-guard-'))
 })
 

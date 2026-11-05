@@ -33,7 +33,6 @@ const FAILURE_EXIT_CODE = 1
 const PRINT_42 = ['5585', '--', 'node', '-e', 'console.log(42)']
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	writeFileSync(DRAFT, `${live_evidence.EVIDENCE_HEADING}\n`)

@@ -64,7 +64,6 @@ function written_output(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.mocked(git_command.repository_root).mockResolvedValue(process.cwd())
 	vi.mocked(scoped_green.read_before).mockResolvedValue(BEFORE_TREE)

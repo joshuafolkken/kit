@@ -1,5 +1,5 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold, type RunHold } from './run-hold'
 import { run_hold_member } from './run-hold-member'
 
@@ -23,10 +23,6 @@ beforeEach(() => {
 	marked_issue.mockReturnValue(undefined)
 	worktree_directory.mockResolvedValue('.git')
 	held({ ...HOLD, ...OWN })
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 describe('run_hold_member.is_run_member', () => {
