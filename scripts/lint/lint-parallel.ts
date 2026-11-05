@@ -15,6 +15,7 @@ import {
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 import { eslint_daemon, type DaemonState } from './eslint-daemon'
+import { eslint_heap } from './eslint-heap'
 import { lint_gate_scope } from './lint-gate-scope'
 import { lint_timing } from './lint-timing'
 
@@ -69,7 +70,7 @@ interface LintPair {
 async function run_eslint_process(eslint: EslintRun): Promise<EslintResult> {
 	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args)
 
-	return await buffered_process.run_buffered_process(eslint.args)
+	return await eslint_heap.run_cold(eslint.args)
 }
 
 // The run sits inside the lane's cache sharing, between dropping the entries whose imports changed

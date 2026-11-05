@@ -12,6 +12,7 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const { resolve_package_bin } = await import('#scripts/build/local-bin')
 const mocked_resolve = vi.mocked(resolve_package_bin)
 const { eslint_daemon } = await import('./eslint-daemon')
+const { ESLINT_HEAP_MIB } = await import('./eslint-heap')
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 
@@ -20,6 +21,7 @@ const PNPM_ESLINT = ['exec', 'eslint', '--quiet', 'src/a.ts']
 const ESLINT_DIRECTORY = 'node_modules/eslint'
 const DAEMON = 'token 4321 77 hash'
 const REPORT = 'report'
+const ESLINT_HEAP = `--max-old-space-size=${String(ESLINT_HEAP_MIB)}`
 
 const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-state-'))
 
@@ -53,8 +55,17 @@ function spawned(): ReadonlyArray<unknown> {
 	return mocked_execa.mock.calls.map((call) => call[1])
 }
 
+function spawned_environment(): unknown {
+	const options: unknown = mocked_execa.mock.lastCall?.at(-1)
+
+	return typeof options === 'object' && options !== null && 'env' in options
+		? options.env
+		: undefined
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.stubEnv('NODE_OPTIONS', '')
 	mkdirSync(project_root, { recursive: true })
 	vi.spyOn(process, 'cwd').mockReturnValue(project_root)
 	mocked_resolve.mockReturnValue(CLI)
@@ -63,6 +74,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 	rmSync(project_root, { recursive: true, force: true })
 })
 
@@ -104,5 +116,28 @@ describe('eslint_daemon.run_or_cold daemon state', () => {
 			exit_code: 0,
 			daemon: 'daemon unreachable, cold process',
 		})
+	})
+})
+
+// joshuafolkken/kit#6331: the daemon, and the cold process it falls back to, lint under ESLint's heap.
+describe('eslint_daemon.run_or_cold heap', () => {
+	it('hands the daemon forwarder the eslint heap', async () => {
+		installed()
+
+		await eslint_daemon.run_or_cold(PNPM_ESLINT)
+
+		expect(spawned_environment()).toMatchObject({
+			NODE_OPTIONS: ESLINT_HEAP,
+			ESLINT_D_MISS: 'fail',
+		})
+	})
+
+	it('hands the cold fallback the eslint heap', async () => {
+		installed()
+		mocked_resolve.mockReturnValue(undefined)
+
+		await eslint_daemon.run_or_cold(PNPM_ESLINT)
+
+		expect(spawned_environment()).toMatchObject({ NODE_OPTIONS: ESLINT_HEAP })
 	})
 })

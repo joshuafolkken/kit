@@ -7,9 +7,10 @@ import { resolve_package_bin } from '#scripts/build/local-bin'
 import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { atomic_write } from '#scripts/lib/atomic-write'
-import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
+import type { BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { execa } from 'execa'
 import { eslint_daemon_sources } from './eslint-daemon-sources'
+import { eslint_heap } from './eslint-heap'
 
 // One warm eslint per checkout, reached by every eslint run that is not the gate's whole tree: the
 // `PostToolUse` edit hook, `josh lint:related` and the pre-commit hook (joshuafolkken/kit#4358).
@@ -251,7 +252,7 @@ async function spawn_daemon(
 		reject: false,
 		all: true,
 		cwd: options.project_root,
-		env: { ...buffered_process.child_environment(), ESLINT_D_MISS: 'fail' },
+		env: { ...eslint_heap.environment(), ESLINT_D_MISS: 'fail' },
 		extendEnv: false,
 		...(options.timeout_ms !== undefined && { timeout: options.timeout_ms }),
 	})
@@ -306,7 +307,7 @@ async function run_or_cold(pnpm_arguments: ReadonlyArray<string>): Promise<WarmR
 	const outcome = await run(pnpm_arguments, { project_root: process.cwd() })
 
 	if (outcome === undefined) {
-		const cold = await buffered_process.run_buffered_process(pnpm_arguments)
+		const cold = await eslint_heap.run_cold(pnpm_arguments)
 
 		return { ...cold, daemon: DAEMON_STATE.COLD_FALLBACK }
 	}
