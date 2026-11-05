@@ -12,7 +12,7 @@ import { file_reader } from '#scripts/lib/read-file'
 // split, while the criteria it kept still needed the relay: review round 1 blocked, and the file came
 // back. Before a `josh issue:file --route split --found-during <N>` lands, the
 // kept Issue's expected result and criteria are read for the names of the files the child declares —
-// each file's module name and the `josh` commands it registers or names (joshuafolkken/kit#5992:
+// each file's module name and the `josh` commands it registers or its source names (joshuafolkken/kit#5992:
 // #5953's criteria named `run:cut`, which the relay passes on, and never its module); a hit refuses
 // the independent split and points at `run:split --prerequisite`.
 
@@ -25,6 +25,7 @@ const EXTENSION = /\.[^.]*$/u
 const WORD = /\s+/u
 const COMMAND_WORD = /[\w:-]+/gu
 const COMMAND_SEPARATOR = ':'
+const MARKDOWN = /\.mdx?$/iu
 
 interface SplitFiling {
 	route: string | undefined
@@ -75,11 +76,12 @@ function kept_names(body: string): ReadonlySet<string> {
 	return new Set([...stems, ...spans.flatMap((span) => commands_of(span))])
 }
 
-// The commands that run `path`, and the commands its source names — an absent file names none.
+// Registered commands still count; documentation mentions do not implement commands (#6417).
 function commands_for(path: string): Array<string> {
 	const registered = Object.entries(COMMAND_MAP)
 		.filter(([, entry]) => entry.script === path)
 		.map(([command]) => command)
+	if (MARKDOWN.test(path)) return registered
 	const source = file_reader.read_if_readable(path) ?? ''
 	const named = [...source.matchAll(COMMAND_WORD)].map((match) => match[0])
 
