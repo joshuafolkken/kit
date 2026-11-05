@@ -8,6 +8,7 @@ import { split_assess_cli } from './split-assess-cli'
 const NO_DELETE = '0'
 const A_TS = 'scripts/a.ts'
 const TAB_PATH = 'scripts/a\tb.ts'
+const OBSERVATION_RECORD = '.josh/observations/6391.md'
 
 // A numstat row: added, deleted, path.
 function row(added: string, deleted: string, path: string): string {
@@ -69,6 +70,25 @@ describe('measure excludes test files from both counts', () => {
 		const measurement = split_assess.assess(raw)
 
 		expect(measurement).toMatchObject({ files: 1, lines: 40 })
+	})
+})
+
+describe('measure excludes run records', () => {
+	it.each(['.josh/metrics-accepted/6391.json', OBSERVATION_RECORD])(
+		'excludes both counts for %s, including quoted paths',
+		(file) => {
+			const raw = [add_row(500, file), add_row(500, JSON.stringify(file))].join('\n')
+
+			expect(split_assess.assess(raw)).toEqual({ files: 0, lines: 0, verdict: 'single' })
+		},
+	)
+
+	it('still warns when deliverables exceed the declared file boundary', () => {
+		const raw = [runtime_numstat(3, 1), add_row(500, OBSERVATION_RECORD)].join('\n')
+		const measurement = split_assess.assess(raw)
+
+		expect(measurement).toMatchObject({ files: 3, lines: 3 })
+		expect(split_assess.notice(measurement, { files: 1, lines: 10 })).toBeDefined()
 	})
 })
 
