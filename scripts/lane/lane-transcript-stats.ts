@@ -67,10 +67,13 @@ function segment_command(segment: string): string {
 	return named.slice(time_shell.JOSH_PREFIX.length)
 }
 
+function command_segments(command = ''): Array<string> {
+	return time_shell.unquoted(command).split(SEPARATOR_PATTERN)
+}
+
 // Every josh command a shell `command` runs, in order.
 function josh_commands(command = ''): Array<string> {
-	const spoken = time_shell.unquoted(command)
-	const named = spoken.split(SEPARATOR_PATTERN).map((segment) => segment_command(segment))
+	const named = command_segments(command).map((segment) => segment_command(segment))
 
 	return named.filter((name) => name !== '')
 }
@@ -189,6 +192,7 @@ function read_calls(directories: ReadonlyArray<string>, window: StatsWindow): Ar
 }
 
 const lane_transcript_stats = {
+	command_segments,
 	durations,
 	in_period,
 	josh_commands,

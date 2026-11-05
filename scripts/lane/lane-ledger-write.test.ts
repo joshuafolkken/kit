@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger } from './lane-ledger'
@@ -228,6 +229,32 @@ describe('lane_ledger_write.record_test_related', () => {
 
 // joshuafolkken/kit#4695: the split notice a lane got, and the split child it filed, read back.
 describe('lane_ledger_write — the split notice and the split child', () => {
+	it('rejects an append the ownership check refuses', async () => {
+		const check = vi.spyOn(stamp_file, 'is_own_regular_file').mockReturnValueOnce(false)
+
+		await expect(
+			lane_ledger_write.record_split_filed(
+				{ issue: 4695, child: '#4700' },
+				ledger('refused-split'),
+			),
+		).rejects.toThrow('owned regular file')
+		check.mockRestore()
+	})
+
+	it('rejects a split-child append failure instead of dropping the evidence', async () => {
+		const destination = path.join(scratch, 'missing-split-directory', 'split.jsonl')
+
+		await expect(
+			lane_ledger_write.record_split_filed({ issue: 4695, child: '#4700' }, destination),
+		).rejects.toThrow()
+	})
+
+	it('rejects a split-child record when no ledger can be resolved', async () => {
+		await expect(
+			lane_ledger_write.record_split_filed({ issue: 4695, child: '#4700' }),
+		).rejects.toThrow('Could not resolve')
+	})
+
 	it('records the notice with its counts and the child with the lane it was filed from', async () => {
 		const target = ledger('split')
 

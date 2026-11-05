@@ -8,6 +8,7 @@ import { split_assess_cli } from './split-assess-cli'
 const NO_DELETE = '0'
 const A_TS = 'scripts/a.ts'
 const TAB_PATH = 'scripts/a\tb.ts'
+const OBSERVATION_RECORD = '.josh/observations/6391.md'
 
 // A numstat row: added, deleted, path.
 function row(added: string, deleted: string, path: string): string {
@@ -51,6 +52,15 @@ describe('parse_numstat', () => {
 })
 
 describe('measure excludes test files from both counts', () => {
+	it.each(['quote"name.test.ts', 'tab\tname.e2e.ts', 'line\nname.test.ts'])(
+		'excludes a C-quoted test path: %j',
+		(file) => {
+			const raw = add_row(201, JSON.stringify(file))
+
+			expect(split_assess.assess(raw)).toStrictEqual({ files: 0, lines: 0, verdict: 'single' })
+		},
+	)
+
 	it('drops *.test.ts and *.e2e.ts from files and lines', () => {
 		const raw = [
 			add_row(40, A_TS),
@@ -60,6 +70,25 @@ describe('measure excludes test files from both counts', () => {
 		const measurement = split_assess.assess(raw)
 
 		expect(measurement).toMatchObject({ files: 1, lines: 40 })
+	})
+})
+
+describe('measure excludes run records', () => {
+	it.each(['.josh/metrics-accepted/6391.json', OBSERVATION_RECORD])(
+		'excludes both counts for %s, including quoted paths',
+		(file) => {
+			const raw = [add_row(500, file), add_row(500, JSON.stringify(file))].join('\n')
+
+			expect(split_assess.assess(raw)).toEqual({ files: 0, lines: 0, verdict: 'single' })
+		},
+	)
+
+	it('still warns when deliverables exceed the declared file boundary', () => {
+		const raw = [runtime_numstat(3, 1), add_row(500, OBSERVATION_RECORD)].join('\n')
+		const measurement = split_assess.assess(raw)
+
+		expect(measurement).toMatchObject({ files: 3, lines: 3 })
+		expect(split_assess.notice(measurement, { files: 1, lines: 10 })).toBeDefined()
 	})
 })
 
@@ -123,14 +152,14 @@ describe('reason', () => {
 
 // joshuafolkken/kit#4302: the pre-gate notice fires past the guide when the Issue declares no size.
 describe('notice', () => {
-	it('names the measurement and the two actions when both guides are exceeded', () => {
+	it('names the measurement and stops implementation until the rest is split', () => {
 		const notice = split_assess.notice({ files: 12, lines: 500, verdict: 'split' })
 
 		expect(notice).toContain('12 changed file(s), 500 changed line(s)')
-		expect(notice).toContain(
-			`record why it stays one Issue in an Issue comment line \`${split_assess.REASON_PREFIX}`,
-		)
-		expect(notice).toContain('pnpm josh issue:file --route split')
+		expect(notice).toContain('stop implementation, keep only the green part')
+		expect(notice).not.toContain(split_assess.REASON_PREFIX)
+		expect(notice).toContain('pnpm josh issue:file --route split --found-during <N>')
+		expect(notice).toContain('then ship the green part')
 		expect(notice).toContain('Over the guide before the gate')
 	})
 

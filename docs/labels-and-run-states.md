@@ -1,6 +1,6 @@
 # Labels and run states
 
-The labels you put on an Issue to steer the agent, the labels a run puts on it for you, and the states a run reads off an Issue to decide where it starts. The procedures behind them are in the [`workflow-commands` skill](../.claude/skills/workflow-commands/SKILL.md); this page is for the person running the agent.
+Issue labels and entry states. Procedures: [`workflow-commands`](../.claude/skills/workflow-commands/SKILL.md).
 
 ## Labels you apply
 
@@ -53,7 +53,7 @@ Procedure: [`.claude/skills/workflow-commands/issue-comments.md`](../.claude/ski
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 🔏         | An OPEN Issue carrying `needs-human-merge`: its workflow PR awaits a person's merge. The waiting row names the PR number; the terminal and chat board use the same icon. |
 
-A run reads one of these states off the Issue to decide where it starts, so nothing already done is redone. Which keyword starts where from each state is the table in [Run Issues with the workflow keywords](./how-to/run-issues.md#going-up-the-ladder-a-stage-at-a-time).
+A run starts from the Issue's state. Keyword entry points: [Run Issues](./how-to/run-issues.md#going-up-the-ladder-a-stage-at-a-time).
 
 | State             | What it means                                                                    |
 | ----------------- | -------------------------------------------------------------------------------- |
@@ -64,3 +64,7 @@ A run reads one of these states off the Issue to decide where it starts, so noth
 | `merged`          | The Issue is closed; the work is in the default branch.                          |
 
 How each state is read is in [`josh run:entry`](./josh-commands-run.md#josh-runentry).
+
+A cut's `handed-off` verdict stops a second resume. After stopping and releasing the adopter to
+wait or park, `run:merge` makes the cut resumable again, with the usual tree verification.
+A failed stop leaves the adoption protected.

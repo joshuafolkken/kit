@@ -416,8 +416,10 @@ describe('review_brief_cli.format_reason', () => {
 	const CODE = 'scripts/x.ts'
 	const INERT = '.editorconfig'
 
-	it('says a reduced change is inert', () => {
-		expect(review_brief_cli.format_reason([INERT], review_level.REDUCED_LEVEL)).toContain('inert')
+	it('says a reduced change is inert, documentation, prompts or tests', () => {
+		expect(review_brief_cli.format_reason([INERT], review_level.REDUCED_LEVEL)).toContain(
+			'documentation',
+		)
 	})
 
 	it('names the path that forced the default level', () => {

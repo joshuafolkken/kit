@@ -1,3 +1,4 @@
+import { review_round } from '#scripts/review/review-round'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -36,11 +37,14 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 const { run_ship_reviewer } = await import('./run-ship-reviewer')
 const { run_ship_stop_cause } = await import('./run-ship-stop-cause')
 const { core_priority } = await import('#scripts/gate/core-priority')
+const { agent_argv } = await import('#scripts/agent/agent-argv')
 
 const OK = 0
 const FAILED = 1
 const ISSUE = '4276'
-const OPEN = ['review:brief', '--interaction']
+const FINAL_ROUND = 2
+const REVIEW_BRIEF_COMMAND = 'review:brief'
+const OPEN = [REVIEW_BRIEF_COMMAND, '--interaction']
 const { CAUSE } = run_ship_stop_cause
 const { PRIORITY_ENVIRONMENT } = core_priority
 
@@ -94,6 +98,30 @@ describe('run_ship_reviewer.reviewed', () => {
 		expect(await review?.()).toHaveProperty('code', OK)
 		expect(josh_run_mock).toHaveBeenCalledWith(OPEN, true, undefined, PRIORITY_ENVIRONMENT)
 		expect(write_text_stamp).toHaveBeenCalledWith(expect.any(String), 'the brief')
+	})
+})
+
+describe('run_ship_reviewer.reviewed with a full-change final brief', () => {
+	it('uses the final profile and read-only prompt for a direct launch', async () => {
+		const profile = vi.spyOn(agent_argv, 'review_in')
+		const brief = `medium\n${review_round.FINAL_LINE}`
+		const [open, review] = run_ship_reviewer.reviewed(
+			[REVIEW_BRIEF_COMMAND, review_round.FULL_CHANGE_FLAG],
+			prompt_of,
+			ISSUE,
+			run_ship_reviewer.ROUND_ONE,
+		)
+
+		josh_run_mock.mockResolvedValue({ code: OK, out: brief })
+		await open?.()
+		await review?.()
+		expect(profile).toHaveBeenCalledWith(
+			expect.stringMatching(/read the scope the brief names.*Do not edit any file/u),
+			FINAL_ROUND,
+			expect.any(String),
+		)
+		expect(launch).toHaveBeenCalledOnce()
+		profile.mockRestore()
 	})
 })
 

@@ -154,7 +154,7 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 		title: filing.args.title,
 		current: filing.current,
 	})
-	await split_resolution.record_child({ route: filing.args.route, found_during, child: reference })
+	await split_resolution.record_child({ route: filing.args.route, found_during, child: url })
 	await issue_file_interrupt.block_finder({
 		route: filing.args.route,
 		is_blocking_finder: filing.args.is_blocking_finder,

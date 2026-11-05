@@ -23,7 +23,7 @@ pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it fi
 - `--fullrun` — marks the record as `fullrun #N`'s.
 - `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
 - `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
-- `--human-review-stop` — marks a `halfrun` stop and a `human-review` lane (still in use), sends the `confirmation` naming it; the parent continues in free lanes. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.
+- `--human-review-stop` — marks a `halfrun` stop and a `human-review` lane, retaining its tree and hold. Sends `confirmation`; its worker's exit frees the execution place. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.
 - `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.
 
 <!-- /usage -->
@@ -977,7 +977,7 @@ pnpm josh run:handoff backlogrun <E> --only                         # josh backl
 
 <!-- /usage -->
 
-For a session on a consultation model (Fable / Astra): the child runs on its provider at the role profile's model (`kickoff` scheduler, else worker). Background a `kickoff`; it can outlast the Bash timeout.
+Consultation main (Fable / Astra): uses its provider's role profile (`kickoff` scheduler, else worker). Background `kickoff`. Lane children cannot use `run:handoff`: exit 1 before launch; continue in the current session.
 
 **Output / exit codes:** exits 0 once the child starts (`kickoff`: once it exits 0); `backlogrun` exits with `josh backlogrun`'s code. A bad argument, an unreadable brief, an unresolvable profile, no git repository, a failed start, or a tree hold that blocks the child's `run:entry` claim exits 1.
 
@@ -1003,14 +1003,15 @@ The watcher is fresh when `run:progress` has pinged its life record within three
 
 <!-- usage: run:chain -->
 
-Run main:merge (not in a lane child), review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action.
+Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action.
 
 ```bash
-pnpm josh run:chain <N>                             # after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review
-pnpm josh run:chain <N> --from check:related        # resume at the stage a stop named, once the run settled it
-pnpm josh run:chain <N> --unpinned-ok "only logs"   # forwarded to run:review as given
-pnpm josh run:chain <N> --join                      # once the review returns: join the gate, attest the round, record a round with no findings — a finding stops for its fix and disposition
-pnpm josh run:chain <N> --join --fixing             # the same, when round 1 has fixes to make
+pnpm josh run:chain <N>                                # after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review
+pnpm josh run:chain <N> --from check:related           # resume at the stage a stop named, once the run settled it
+pnpm josh run:chain <N> --unpinned-ok "only logs"      # forwarded to run:review as given
+pnpm josh run:chain <N> --join                         # join the gate, attest and record; every finding holds for disposition
+pnpm josh run:chain <N> --join --fixing                # the same, when round 1 has fixes to make
+pnpm josh run:chain <N> --join --ship "<title> #<N>"   # ship a clean round; title must match the issue. Record interaction review first.
 ```
 
 <!-- /usage -->
@@ -1177,7 +1178,7 @@ pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes"   # th
 
 Dependencies are re-installed against the lock the popped stash brought in. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
 
-Launches reserve 270 MB in the shared core budget and wait for free memory without a timeout bypass. The child retains the claim. `run:board` shows its lane and wait reason; `lane:stats` lists completed waits as `lane:launch` under held-by.
+Launches reserve 810 MB for the parent and two subagents, waiting for free memory without a timeout bypass. The child retains the claim. `run:board` shows the wait; `lane:stats` lists it as `lane:launch` under held-by.
 
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
@@ -1240,12 +1241,11 @@ The `implement read` table under it splits `read` by lane medians (`lane-impleme
 (`tool`), the turns before them (`thinking`), the distinct files `Read` opened (`files read`), and how many of those an
 investigator's report cited by `path:line` (`investigator-cited`).
 
-The `stage turns` table under it counts each period-dispatched lane's transcript calls by the ledger stage their start falls
-in (`lane-turn-stats.ts`): `implement` from the dispatch to the first ship stage (open while none followed), each stage from its start to its end,
-the shortest interval holding a call (`ci-wait` inside `followup`), `between stages` for a call in none.
-
-Each `stage turns` row prints the median calls per lane and the lanes read; a lane with no transcript call is left out
-and counted on `no transcript`.
+The `stage turns` table (`lane-turn-stats.ts`) groups period-dispatched lanes' calls by ledger interval:
+`implement` until the first ship stage (open until then), the shortest stage holding a call, or `between stages`.
+Rows show median calls and measured lanes; lanes without calls appear under `no transcript`, outside the calls median.
+`stops per lane (median)` counts in-period stops by `reason` (`conflict` as `sync`) over all dispatched lanes,
+including zero-stop and transcript-missing lanes; no dispatched lanes means `not measured`.
 
 Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts, per check that settled last in `followup`'s CI wait,
 its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is

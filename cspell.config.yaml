@@ -2,6 +2,11 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # Codex session files grouped into one lane task (#6376).
+  - rollouts
+  # Claude's update opt-out and an unsupported CPU used by bootstrap tests (#6295).
+  - AUTOUPDATER
+  - riscv
   - pushurl
   # perl's `-Mstrict`, a module flag `workflow-edit.ts` must not read as in-place (#6050).
   - Mstrict
@@ -304,6 +309,7 @@ words:
   - mnemecha
   - waneccha
   - ENOENT
+  - EACCES
   # The errno a `--stop` gets when it may not signal the supervisor it just unrecorded
   - EPERM
   - ELIFECYCLE

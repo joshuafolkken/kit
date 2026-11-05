@@ -16,8 +16,8 @@ point reached it — `fullrun` or `backlogrun` — and the label may be applied 
 - **Mark the stop: `pnpm josh run:hold <N> --human-review-stop`, then stop this child.** It keeps
   the hold, marks it as `halfrun`'s stop, and sends the `confirmation` Telegram with the resume command
   and the lane directory — never compose one. It answers `e2e-owed` until `test:e2e` answered green on
-  this tree. Inside a `backlogrun`, the stopped lane stays counted in use and the parent continues
-  launching children in the remaining free lanes (`backlogrun-park.md`). Never park or release it.
+  this tree. Inside a `backlogrun`, the stopped lane holds no execution place once its worker exits;
+  the parent continues launching children in the free lanes (`backlogrun-park.md`). Never park or release it.
 - **Resuming is `halfrun`'s stop exactly**: a person looks at the working tree and, if it is right,
   carries on from the commit themselves. The stop report carries the resume command too.
 

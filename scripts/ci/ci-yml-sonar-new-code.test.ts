@@ -74,6 +74,15 @@ describe('sonar-qube.yml dependency install', () => {
 	})
 })
 
+describe('sonar-qube.yml analysis safeguards', () => {
+	it('keeps full history and the quality gate wait (ac-9839ceec)', () => {
+		const checkout = sonar_steps().find((step) => step.uses?.startsWith('actions/checkout@'))
+
+		expect(checkout?.with?.['fetch-depth']).toBe(0)
+		expect(step_named(SCAN_STEP_NAME)?.with?.['args']).toContain('-Dsonar.qualitygate.wait=true')
+	})
+})
+
 describe('sonar-qube.yml project version', () => {
 	it('passes the version step output to the scan', () => {
 		expect(step_named(SCAN_STEP_NAME)?.with?.['args']).toContain(

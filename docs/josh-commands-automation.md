@@ -295,6 +295,20 @@ Run by a lane filing an overrun investigation, for the reach count its `## ベ�
 
 - A path is read from the repository root (where `pnpm josh` runs) or as an absolute path; one that names no file is refused rather than printed as `0`.
 
+### `josh usage:tee`
+
+<!-- usage: usage:tee -->
+
+Record account-wide Claude statusLine rate limits without printing output.
+
+```bash
+pnpm josh usage:tee   # Claude statusLine JSON on stdin; stdout stays empty
+```
+
+<!-- /usage -->
+
+Stores `{five_hour, seven_day, at}` in `~/.claude/josh/usage.json`; `CLAUDE_CONFIG_DIR` overrides `~/.claude`. An absent window is stored as `null`; absent `rate_limits` or invalid input leaves the file unchanged.
+
 ## Project
 
 Commands for setting up and maintaining a project.
@@ -481,6 +495,20 @@ The opposite direction — one consumer catching itself up from its own checkout
 ## Workflow
 
 AI-assisted git and notification helpers used in the day-to-day development loop.
+
+### `josh issue:tick`
+
+<!-- usage: issue:tick -->
+
+Tick selected acceptance checkboxes by their plan identifiers.
+
+```bash
+pnpm josh issue:tick 6233 ac-a1f32a2f ac-8647b0dd
+```
+
+<!-- /usage -->
+
+Use the `ac-…` identifiers printed in the plan's acceptance map. Unknown identifiers refuse the whole update. Repeating a checked criterion is a no-op. Other sections, formatting and line endings are preserved.
 
 ### `josh pr:classification`
 
@@ -916,6 +944,18 @@ pnpm josh latest:guard   # refuses inside a lane
 <!-- /usage -->
 
 It fronts the `josh latest` chain.
+
+### `josh split:recover`
+
+<!-- usage: split:recover -->
+
+Recover split-child evidence after verifying an existing child URL, split route and parent.
+
+```bash
+pnpm josh split:recover 6212 https://github.com/joshuafolkken/kit/issues/6326
+```
+
+<!-- /usage -->
 
 ### `josh command:derive`
 

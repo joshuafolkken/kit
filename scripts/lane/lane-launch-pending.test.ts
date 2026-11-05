@@ -11,7 +11,7 @@ import { lane_launch_pending } from './lane-launch-pending'
 const { claim } = core_budget
 const CONTEXT: LaunchContext = { issue: '17', stash: undefined }
 const LAUNCHED: LaunchOutcome = { kind: 'launched', pid: String(process.pid) }
-const MEMORY_MB = 270
+const MEMORY_MB = 810
 const probe = { directory: '', available: 0 }
 
 beforeEach(() => {

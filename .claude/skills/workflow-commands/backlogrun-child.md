@@ -51,12 +51,18 @@ unit, run the child in the parent's context and still ask the hand-off at every 
 
 **Only what GitHub does not, in at most 25 lines; the brief states the bound.**
 
-- **Kept**: the cause / fix / result lines `pnpm josh report:template child` prints; every verification not closed the ordinary way, named as such;
+- **Kept**: the cause / fix / result lines from `run:tail`'s `child summary template`; every verification not closed the ordinary way, named as such;
   observations that could bite later — **a child's only route for one** (`observation-filing.md` → "A
   delegated child does not take this route"); decisions not yet logged; what was left undone, on whose
   authority.
 - **Cut**: the changed-file list, per-round review detail, restated rules.
 - Before the final message → `pnpm josh report:lint --child-summary < summary.md`.
+
+Fill the `<…>` narrative fields from `pnpm josh run:tail <N>`, keeping its cited targets.
+`report:template child` supplies a standalone skeleton.
+
+The `notify-message template` section supplies the three lines for `followup --notify-message`
+(or `--notify-message-file`) when preparing a notification.
 
 ## Audit before the first child
 

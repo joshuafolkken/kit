@@ -1,6 +1,8 @@
 import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { agent_provider } from '#scripts/agent/agent-provider'
 import { own_session } from '#scripts/cost-runtime/own-session'
+import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import type { RunCut } from './run-cut'
 
 // A session id survives separate CLI calls; the CLI's own pid does not.
@@ -41,6 +43,25 @@ function can_replace(previous: RunCut, next: RunCut): boolean {
 	)
 }
 
-const run_cut_adoption = { can_replace, session }
+// Called only after the lane's workers have stopped. Keep the saved resume point, but let the
+// next worker adopt it again; a waiting or parked worker no longer owns the handoff.
+function release(target: string, cut: RunCut, issue: string): void {
+	if (
+		cut.is_handed_off !== false ||
+		cut.invocation !== lane_child_invocation.child_invocation(issue) ||
+		cut.issue !== issue
+	) {
+		return
+	}
+
+	stamp_file.replace_stamp(target, {
+		...cut,
+		is_handed_off: true,
+		adopted_session: undefined,
+		is_merge_relaunched: undefined,
+	})
+}
+
+const run_cut_adoption = { can_replace, release, session }
 
 export { run_cut_adoption }

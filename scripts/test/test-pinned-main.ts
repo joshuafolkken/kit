@@ -1,11 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { poll } from '#scripts/lib/poll'
-import { review_tree } from '#scripts/review/review-tree'
 import { test_pinned } from './test-pinned'
 import { test_pinned_ledger, type PinnedOrigin } from './test-pinned-ledger'
-import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
+import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from './test-pinned-record'
 
 // The `josh test:pinned` entry: read `--max`, run, print one line per unpinned hunk and per unchecked
@@ -36,9 +34,6 @@ const PARSE_ARGS_OPTIONS = {
 } as const
 
 const HELP_FLAGS: ReadonlySet<string> = new Set(['--help', '-h'])
-// A tree still moving after this many checks is answered as not checked rather than waited on.
-const MAX_CHECKS = 3
-const MOVING_NOTE = `the tree kept moving across ${String(MAX_CHECKS)} checks`
 
 interface PinnedOptions {
 	max_hunks: number
@@ -82,42 +77,13 @@ function print_usage(argv: ReadonlyArray<string>): number {
 	return argv.some((argument) => HELP_FLAGS.has(argument)) ? CLEAN_EXIT : FAILED_EXIT
 }
 
-async function tree_digest(): Promise<string> {
-	return JSON.stringify(await review_tree.read_changed_tree())
-}
-
-// The recorded check runs beside a review that may fix in place, and it reads the tree at more than
-// one moment; a check the tree moved under is run again, so its answer is about one tree.
-async function settled_run(options: PinnedOptions): Promise<PinnedReport> {
-	const settled = await poll.poll_for(
-		async () => {
-			const before = await tree_digest()
-			const report = await test_pinned.run(
-				options.max_hunks,
-				options.is_first_unpinned,
-				options.origin,
-			)
-
-			return (await tree_digest()) === before ? report : undefined
-		},
-		{
-			attempts: MAX_CHECKS,
-			interval_ms: 0,
-			sleeper: async () => {
-				await Promise.resolve()
-			},
-		},
-	)
-	if (settled !== undefined) return settled
-
-	throw new Error(MOVING_NOTE)
-}
-
 // `--record` leaves an answer however the run ends — a check that could not run included — so the
 // join waiting on it never waits on a check that died.
 async function recorded_run(options: PinnedOptions, token: string): Promise<PinnedSummary> {
 	try {
-		const summary = test_pinned_record.summary_of(await settled_run(options))
+		const summary = test_pinned_record.summary_of(
+			await test_pinned.run(options.max_hunks, options.is_first_unpinned, options.origin),
+		)
 
 		test_pinned_record.write(token, summary)
 
