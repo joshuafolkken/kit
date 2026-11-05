@@ -175,15 +175,19 @@ describe('merge_claude_settings — permissions', () => {
 	})
 })
 
-describe('merge_claude_settings — the workflow edit deny', () => {
+describe('merge_claude_settings — retired workflow edit denies', () => {
 	it.each(['Edit(./.github/workflows/**)', 'Write(./.github/workflows/**)'])(
-		'restores %s the project removed',
+		'removes %s from existing settings without restoring it on another sync',
 		(workflow_deny) => {
-			const merged = merged_with((settings) => {
-				settings.permissions[DENY] = [OWN_DENY]
+			const existing = existing_with((settings) => {
+				settings.permissions[DENY] = [workflow_deny, OWN_DENY]
 			})
+			const once = merge_claude_settings(existing, DISTRIBUTED)
 
-			expect(merged.permissions[DENY]).toContain(workflow_deny)
+			expect(parse(DISTRIBUTED).permissions[DENY]).not.toContain(workflow_deny)
+			expect(parse(once).permissions[DENY]).not.toContain(workflow_deny)
+			expect(parse(once).permissions[DENY]).toContain(OWN_DENY)
+			expect(merge_claude_settings(once, DISTRIBUTED)).toBe(once)
 		},
 	)
 })
