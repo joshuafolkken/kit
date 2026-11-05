@@ -4,7 +4,11 @@ import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
-import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import {
+	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
+	RUN_STALLED_LABEL,
+} from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -144,7 +148,7 @@ async function offer_labelled(
 // joshuafolkken/kit#4102: a mechanical park (`run:stalled`) is booked the same as a decision park.
 // joshuafolkken/kit#4746: and only it — the named issues after it were never started, so an `--only`
 // run that booked them done ended over issues still queued for a lane.
-test.each([NEEDS_DECISION_LABEL, RUN_STALLED_LABEL])(
+test.each([NEEDS_DECISION_LABEL, RUN_STALLED_LABEL, NEEDS_HUMAN_MERGE_LABEL])(
 	'never dispatches a named issue parked with %s, and books it done alone',
 	async (label) => {
 		const { offer, done } = await offer_labelled([label])
