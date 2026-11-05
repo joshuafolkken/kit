@@ -88,6 +88,17 @@ describe('command entry usage', () => {
 })
 
 describe('command help', () => {
+	it('includes all solo evidence in the triage synopsis and example (ac-71557ea7)', () => {
+		const help = command_usage.format_command_help('backlog:triage') ?? ''
+
+		expect(help.split('\n', 1)[0]).toContain(
+			'[--lane | --solo --defect yes --verification yes --every-run yes]',
+		)
+		expect(help).toContain(
+			'pnpm josh backlog:triage --apply 913 --solo --defect yes --verification yes --every-run yes --reason "<why>" --clear',
+		)
+	})
+
 	it('resolves an alias and prints the synopsis, description and usage', () => {
 		const help = command_usage.format_command_help('ga') ?? ''
 		const { gate } = COMMAND_MAP
