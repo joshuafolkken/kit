@@ -1,0 +1,1 @@
+- rf:tests | medium | scripts/test/test-pinned-native.test.ts:19 | 2026-11-05 | #6433 | fixed

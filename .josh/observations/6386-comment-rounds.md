@@ -1,0 +1,2 @@
+- k:followup-unrelated-test-rerun | d1 | 2026-11-04 | scripts/review/review-brief-interaction.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/review/review-brief-interaction.test.ts > review:brief automatic final round > automatically briefs the whole change with the final profile when round one can be skipped; isolated scripts/review/review-brief-interaction.test.ts > review:brief automatic final round > keeps an explicit round one and records no skip when the scoped gate refuses
+- rf:none | none | - | 2026-11-05 | #6386
