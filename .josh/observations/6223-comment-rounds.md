@@ -1,0 +1,1 @@
+- rf:comments | low | docs/maintainers/rule-delivery-rationale.md:412 | 2026-11-05 | #6223 | deferred:#6423
