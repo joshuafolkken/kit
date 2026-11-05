@@ -227,7 +227,7 @@ describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
 		expect(create_body()).toMatchObject({ labels: ['run:solo', 'bug', 'auto-ok'] })
 		const comment = exec_gh_api.mock.calls[1]?.[0].body
 
-		expect(comment).toMatch(/defect: yes.*verification: yes.*every-run: yes/u)
+		expect(comment).toContain('solo-run answers: defect yes · verification yes · every-run yes')
 	})
 
 	it('files without a run label when auto-ok is not applied, as before', async () => {

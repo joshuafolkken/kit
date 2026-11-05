@@ -15,6 +15,7 @@ import {
 } from './git-gh-pr-read'
 import { git_gh_pr_rest } from './git-gh-pr-rest'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
+import { gh_retry } from './git-gh-retry'
 
 // The pull-request writes, through REST.
 //
@@ -249,21 +250,31 @@ async function has_merge_landed(
 // **A failed merge request is not proof the merge did not happen**, so the pull request's own state
 // settles it: merged, and this returns as if the request had succeeded, which is what lets
 // `followup` carry on to the notification and the epic close, and what makes re-running it recover
-// instead of failing on the 405. Not merged, and the original failure is rethrown unchanged.
+// instead of failing on the 405. Not merged, and the original failure reaches the bounded retry.
 //
 // **The question is "is this pull request merged", not "did my request merge it"**, and that is
 // deliberate: the state the recovery has to act on is whether the branch is in, and a merge someone
 // made by hand between the failure and the read leaves `followup` with exactly the same work to
 // finish. REST offers nothing that would tell the two apart without keeping the merge commit's SHA
 // across a request that never answered.
-async function pr_merge(branch_name: string, head_sha: string): Promise<void> {
-	const pr_number = await require_pr_number(branch_name)
-
+async function merge_with_confirmation(
+	branch_name: string,
+	pr_number: number,
+	head_sha: string,
+): Promise<void> {
 	try {
 		await put_merge(pr_number, head_sha)
 	} catch (error) {
 		if (!(await has_merge_landed(branch_name, pr_number, error))) throw error
 	}
+}
+
+async function pr_merge(branch_name: string, head_sha: string): Promise<void> {
+	const pr_number = await require_pr_number(branch_name)
+
+	await gh_retry.with_retry(async () => {
+		await merge_with_confirmation(branch_name, pr_number, head_sha)
+	})
 }
 
 const git_gh_pr = {

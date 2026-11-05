@@ -91,3 +91,22 @@ describe('issue_run_verdict.apply_labels', () => {
 		expect(apply_label).toHaveBeenCalledTimes(1)
 	})
 })
+
+describe('issue_run_verdict.comment_with_answers', () => {
+	it('formats the supplied answers once (ac-ab6606a5)', () => {
+		expect(
+			issue_run_verdict.comment_with_answers('reason', {
+				solo: true,
+				defect: YES,
+				verification: NO,
+				'every-run': UNKNOWN,
+			}),
+		).toBe('reason\n\nsolo-run answers: defect yes · verification no · every-run unknown')
+	})
+
+	it('keeps comments without solo unchanged even when answers are supplied', () => {
+		expect(issue_run_verdict.comment_with_answers('reason', { lane: true, defect: YES })).toBe(
+			'reason',
+		)
+	})
+})
