@@ -302,6 +302,7 @@ async function run_command(
 }
 
 const josh_logic = {
+	all_command_names,
 	format_help,
 	format_unknown_command,
 	run_command,
