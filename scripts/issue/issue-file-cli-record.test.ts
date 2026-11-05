@@ -6,6 +6,7 @@ import { git_command } from '#scripts/git/git-command'
 import { issue_file_deferral } from '#scripts/issue/issue-file-deferral'
 import { issue_file_interrupt } from '#scripts/issue/issue-file-interrupt'
 import { INTERRUPT_ROUTE_LABEL, SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -30,8 +31,10 @@ const record_child = vi.spyOn(split_resolution, 'record_child')
 const block_finder = vi.spyOn(issue_file_interrupt, 'block_finder')
 const note_finder = vi.spyOn(issue_file_deferral, 'note_finder')
 const record_dependency = vi.spyOn(epic_blocked_by, 'record')
+const read_state = vi.spyOn(issue_state_cli, 'read_issue')
 const PARK_BODY = '## 背景\n\n- 原因の park: #4703\n- 原因の park: #4704\n'
 const RECORD_ERROR = 'epic listing unread'
+const STALLED = 'run:stalled'
 
 function filing_to(target: string): Filing {
 	const args = {
@@ -61,6 +64,10 @@ beforeEach(() => {
 	block_finder.mockResolvedValue()
 	note_finder.mockResolvedValue()
 	record_dependency.mockResolvedValue('recorded')
+	read_state.mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: [STALLED], is_human_review: false },
+	})
 	vi.stubEnv(lane_child_marker.KEY, undefined)
 	vi.stubEnv(lane_child_marker.OVERRUN_KEY, undefined)
 })
@@ -93,9 +100,50 @@ describe('issue_file_cli.record — caused parks', () => {
 		await issue_file_cli.record(URL, { ...filing_to(HERE), body: PARK_BODY }, [])
 
 		expect(record_dependency.mock.calls).toStrictEqual([
-			[{ issue: '4703', prerequisite: '3438' }],
-			[{ issue: '4704', prerequisite: '3438' }],
+			[{ issue: '4703', prerequisite: '3438', is_relation_only: true }],
+			[{ issue: '4704', prerequisite: '3438', is_relation_only: true }],
 		])
+	})
+})
+
+describe('issue_file_cli.record — current park state', () => {
+	it.each([
+		{ state: 'OPEN', labels: [] },
+		{ state: 'CLOSED', labels: [STALLED] },
+	])('skips a source that is no longer parked: %j', async (state) => {
+		read_state.mockResolvedValue({ kind: 'state', state: { ...state, is_human_review: false } })
+
+		await issue_file_cli.record(URL, { ...filing_to(HERE), body: PARK_BODY }, [])
+
+		expect(record_dependency).not.toHaveBeenCalled()
+	})
+
+	it.each(['needs-decision', STALLED])('records an open source carrying %s', async (label) => {
+		read_state.mockResolvedValue({
+			kind: 'state',
+			state: { state: 'OPEN', labels: [label], is_human_review: false },
+		})
+
+		await issue_file_cli.record(URL, { ...filing_to(HERE), body: PARK_BODY }, [])
+
+		expect(record_dependency).toHaveBeenCalledTimes(2)
+	})
+})
+
+describe('issue_file_cli.record — park failures and scope', () => {
+	it('warns on an unreadable source and still records the next parked source', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		read_state.mockResolvedValueOnce({ kind: 'unreadable', reason: 'malformed' })
+		await issue_file_cli.record(URL, { ...filing_to(HERE), body: PARK_BODY }, [])
+
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('could not read park state'))
+		expect(record_dependency).toHaveBeenCalledExactlyOnceWith({
+			issue: '4704',
+			prerequisite: '3438',
+			is_relation_only: true,
+		})
+		report.mockRestore()
 	})
 
 	it('reports a failed record without rejecting the filing or skipping the next park', async () => {
