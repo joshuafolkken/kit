@@ -2,6 +2,6 @@
 	"reason": "Report ESLint child peak RSS through a shipped JavaScript preload resolved from the package root; preserve existing heap settings.",
 	"date": "2026-11-05",
 	"growth": {
-		"scripts.code_lines": 20
+		"scripts.code_lines": 43
 	}
 }

@@ -54,11 +54,8 @@ afterEach(() => {
 
 describe('ESLint peak memory', () => {
 	it('writes the operating system peak RSS as MiB', () => {
-		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-
-		eslint_memory.report_peak_memory()
-
-		expect(write).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(MEMORY_LINE))
+		expect(eslint_memory.peak_mib('1048576 maximum resident set size', 'darwin')).toBe(1)
+		expect(eslint_memory.peak_mib('JOSH_ESLINT_RSS=1024', 'linux')).toBe(1)
 	})
 
 	it('loads the shipped preload from an installed bundled command with spaces in its path', async () => {
@@ -80,6 +77,19 @@ describe('ESLint peak memory', () => {
 		const result = await eslint_heap.run_cold(['exec', 'eslint', '--invalid-memory-test-option'])
 
 		expect(result.exit_code).not.toBe(0)
+		expect([...result.output.matchAll(MEMORY_LINE)]).toHaveLength(1)
+	})
+
+	it('reports peak memory after a real ESLint heap abort', async () => {
+		vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=16')
+		onTestFinished(() => {
+			vi.unstubAllEnvs()
+		})
+
+		const result = await eslint_heap.run_cold(['exec', 'eslint', MEMORY_SOURCE, '--no-cache'])
+
+		expect(result.exit_code).not.toBe(0)
+		expect(result.output).toContain('heap out of memory')
 		expect([...result.output.matchAll(MEMORY_LINE)]).toHaveLength(1)
 	})
 })
