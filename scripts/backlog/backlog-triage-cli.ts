@@ -48,6 +48,7 @@ const OPTIONS = {
 
 interface TriageRequest {
 	issue: string
+	answers: Values
 	run_label: string | undefined
 	blocker: string | undefined
 	unblock: string | undefined
@@ -95,7 +96,15 @@ function verdict_request(issue: string, values: Values, reason: string): TriageR
 
 	return is_verdict_invalid(run_label, values)
 		? undefined
-		: { issue, run_label, blocker, unblock, reason, is_clearing: values.clear === true }
+		: {
+				issue,
+				answers: values,
+				run_label,
+				blocker,
+				unblock,
+				reason,
+				is_clearing: values.clear === true,
+			}
 }
 
 function labelled_request(issue: string, values: Values): TriageRequest | undefined {
@@ -147,7 +156,10 @@ async function comment(request: TriageRequest): Promise<boolean> {
 	try {
 		await git_gh_command.issue_comment(
 			request.issue,
-			`triaged by backlogrun: ${verdict_of(request, issue_cite.plain)}\n\n${request.reason}`,
+			issue_run_verdict.comment_with_answers(
+				`triaged by backlogrun: ${verdict_of(request, issue_cite.plain)}\n\n${request.reason}`,
+				request.answers,
+			),
 		)
 
 		return true

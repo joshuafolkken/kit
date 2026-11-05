@@ -73,12 +73,26 @@ describe('josh auto-ok:judge — the listing', () => {
 })
 
 describe('josh auto-ok:judge --apply / --decline', () => {
-	it('names the solo label when --solo is given', async () => {
+	it('records all solo answers with the solo label (ac-30e91803)', async () => {
 		read_issue.mockResolvedValueOnce(labels_and_body([]))
 
 		await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER), '--solo', ...SOLO_ANSWERS])
 
 		expect(apply_label.mock.calls[0]?.[1]).toBe(RUN_SOLO_LABEL)
+		expect(post_comment.mock.calls[0]?.[1]).toContain(
+			'solo-run answers: defect yes · verification yes · every-run yes',
+		)
+	})
+
+	it('preserves the lane judgement comment (ac-ca28edeb)', async () => {
+		read_issue.mockResolvedValueOnce(labels_and_body([]))
+
+		await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER), '--lane'])
+
+		expect(post_comment.mock.calls[0]?.[1]).toContain(
+			"judged by backlogrun: no exclusion holds and no person's judgement is needed (run:lane)",
+		)
+		expect(post_comment.mock.calls[0]?.[1]).not.toContain('solo-run answers:')
 	})
 
 	it('passes the --reason text through to the judgement comment', async () => {
