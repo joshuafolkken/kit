@@ -762,7 +762,8 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. Ranks `priority:critical`, then `priority:high`, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then issues other open issues wait on (all keys: **Ranking** below), then newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
+Read-only. Ranks `priority:critical`, `priority:high`, verification-path defects (`bug` with `run:solo`, or `route:interrupt`), then blockers (all keys: **Ranking** below).
+Ties use creation time ascending, then number ascending. Skips `epic`, `in-progress`, `needs-decision` and candidates whose `blockedBy` is open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
 or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` (or `#<issue> を閉じる PR のマージ後 <K> マージ`) is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read` — `the pull request closing #<issue>` in place of `#<PR>` for the issue form.
 
 `josh start` creates the `auto-ok` label, and `josh sync` adds it to a repository that lacks it. stdout is the issue number, `none`, or empty with exit 1 if the listing could not be read; explanations to stderr.
@@ -817,7 +818,7 @@ Read-only, except for the mechanical triage of the triage gate below. stdout is 
 
 Any other untriaged candidate is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
 
-**Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
+**Defect priority**: defects always go to the front of the runnable numbers among ranking ties. New mechanisms go to the back only while the defect rate is above its baseline.
 
 **Ranking**: a body declaring `- 実施順: 最後` goes last; otherwise `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of open issues waiting on it down a chain (transitively), then the declared weekly gain (`## 期待効果`); standalone numbers are cut to five.
 
