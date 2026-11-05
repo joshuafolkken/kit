@@ -594,6 +594,7 @@ pnpm josh epic --add 893 894 --after 890                                     # #
 pnpm josh epic --add 893 894 --decision-file .josh/tmp/why.md                # …and record why, in one call
 pnpm josh epic --reconcile 2184                                              # rewrite the body to match the recorded blocked-by, and record any order the body declared
 pnpm josh epic --decide 893 894 --decision-file .josh/tmp/why.md
+pnpm josh epic --untrack 893 894                                             # remove a child row and its connected orders
 ```
 
 **Options:**
@@ -608,6 +609,7 @@ pnpm josh epic --decide 893 894 --decision-file .josh/tmp/why.md
 - `--order-before <M>` / `--order-after <M>` — with `--add`: move the task-list row only; write no `blocked-by` relation.
 - `--decision-file <path|->` — with `--add`: record why the child was placed, written under `.josh/tmp/` (`-` reads stdin).
 - `--remove <E> <M> <N> [<N2> …]` — delete a declared order from the body and the relations; each consecutive pair is one link.
+- `--untrack <E> <N...>` — remove child rows and connected orders without reconnecting survivors; relation failures preserve the body for retry; absent rows are safe to repeat.
 
 <!-- /usage -->
 
