@@ -113,6 +113,32 @@ describe('split_direction.refusal_of', () => {
 })
 
 describe('split_direction.refusal_of — the commands of a split-off file', () => {
+	it('admits documentation cleanup whose command mentions are not implementations (ac-5ab59a34, ac-63269a29)', async () => {
+		stub_kept(kept_body('`pnpm josh rule:list` が規則を一覧表示する'))
+		const child = '`docs/maintainers/rule-delivery-rationale.md` の説明を整理する。'
+
+		expect(await split_direction.refusal_of(SPLIT_FILING, child)).toBeUndefined()
+	})
+
+	it.each(['docs/guide.md', 'docs/guide.mdx', 'docs/GUIDE.MD'])(
+		'ignores command mentions without reading Markdown content: %s',
+		(path: string) => {
+			const read = vi.spyOn(file_reader, 'read_if_readable').mockReturnValue('pnpm josh rule:list')
+
+			expect(split_direction.references(kept_body('`rule:list`'), `\`${path}\``)).toEqual([])
+			expect(read).not.toHaveBeenCalled()
+		},
+	)
+
+	it('retains a dependency on an explicitly named document', () => {
+		const path = 'docs/maintainers/rule-delivery-rationale.md'
+		const body = kept_body(`\`${path}\` の説明を更新する`)
+
+		expect(split_direction.references(body, `\`${path}\``)).toEqual([
+			{ path, name: 'rule-delivery-rationale' },
+		])
+	})
+
 	it('refuses when the kept criteria name only the command a split-off file registers', async () => {
 		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(undefined)
 		stub_kept(kept_body('`run:entry` が節を中継する'))
