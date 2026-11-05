@@ -871,7 +871,7 @@ Run a parent triage pass, decide solo/lane from three conditions, or apply one i
 pnpm josh backlog:triage --pass
 pnpm josh backlog:triage --decide --defect yes --verification yes --every-run no
 pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
-pnpm josh backlog:triage --apply 913 --solo --reason "<why>" --clear
+pnpm josh backlog:triage --apply 913 --solo --defect yes --verification yes --every-run yes --reason "<why>" --clear
 pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"
 pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
 ```
