@@ -68,6 +68,8 @@ interface LocalRead {
 	// How many lanes hold a place under the limit (`backlog-occupied.ts`), counted beside a row that
 	// waits for a free lane.
 	occupied_count?: number | undefined
+	// The same snapshot's occupied identities, so row selection can use the heading's exact lanes.
+	occupied_lanes?: ReadonlyArray<string> | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
 	// The reset a Claude usage limit holds the running run's launches until (`run-merge-usage-limit.ts`);
@@ -197,7 +199,12 @@ async function unfinished_here(repository: string): Promise<Pick<LocalRead, 'clo
 
 type LaneRoomRead = Pick<
 	LocalRead,
-	'free_lanes' | 'lane_limit' | 'occupied_count' | 'earlier_occupied' | 'idle_lanes'
+	| 'free_lanes'
+	| 'lane_limit'
+	| 'occupied_count'
+	| 'occupied_lanes'
+	| 'earlier_occupied'
+	| 'idle_lanes'
 >
 
 // The lanes against the limit, read once so the free count, the lanes it counts, the earlier run's
@@ -215,6 +222,7 @@ async function lane_room_of(
 		free_lanes: count?.free,
 		lane_limit: count?.limit,
 		occupied_count: occupied.length,
+		occupied_lanes: occupied,
 		earlier_occupied: run_board_lane_state.earlier_occupied(occupied, sorted),
 		idle_lanes: room.idle,
 	}
