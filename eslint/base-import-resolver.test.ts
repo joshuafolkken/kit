@@ -46,6 +46,8 @@ const RELATIVE_ENTRY = 'a.ts'
 const ALIAS_ENTRY = 'lib/c.ts'
 const ACYCLIC_ENTRY = 'lib/e.ts'
 const PATHS_ENTRY = 'lib/g.ts'
+const DEEP_ENTRY = 'deep-a.ts'
+const DEEP_ENTRY_SOURCE = "import { b } from './deep-b'\n\nexport const a = b\n"
 const RELATIVE_ENTRY_SOURCE = "import { b } from './b'\n\nexport const a = b\n"
 const ALIAS_ENTRY_SOURCE = "import { d } from '#lib/d'\n\nexport const c = d\n"
 const ACYCLIC_ENTRY_SOURCE = "import { f } from '#lib/f'\n\nexport const e = f\n"
@@ -66,6 +68,10 @@ const FIXTURE_FILES: Record<string, string> = {
 	'lib/h.ts': "import { g } from '$lib/g'\n\nexport const h = g\n",
 	[JAVASCRIPT_ENTRY]: JAVASCRIPT_ENTRY_SOURCE,
 	'k.js': 'export const k = 1\n',
+	[DEEP_ENTRY]: DEEP_ENTRY_SOURCE,
+	'deep-b.ts': "import { c } from './deep-c'\n\nexport const b = c\n",
+	'deep-c.ts': "import { d } from './deep-d'\n\nexport const c = d\n",
+	'deep-d.ts': "import { a } from './deep-a'\n\nexport const d = a\n",
 }
 
 function write_fixture(root: string): void {
@@ -140,6 +146,18 @@ describe('create_base_config — the import resolver follows TypeScript (issue #
 
 	it('stays quiet on an alias import that closes no cycle', async () => {
 		await expect(cycle_messages(ACYCLIC_ENTRY, ACYCLIC_ENTRY_SOURCE)).resolves.toEqual([])
+	})
+
+	it('keeps internal cycle detection beyond direct imports (ac-f1d67bc1)', async () => {
+		await expect(cycle_messages(DEEP_ENTRY, DEEP_ENTRY_SOURCE)).resolves.toHaveLength(1)
+	})
+
+	it('skips external traversal without limiting cycle depth (ac-ecf45c29)', async () => {
+		const config = await rule_config(RELATIVE_ENTRY)
+
+		expect(config).toHaveProperty(['rules', NO_CYCLE_RULE, 0], RULE_SEVERITY_ERROR)
+		expect(config).toHaveProperty(['rules', NO_CYCLE_RULE, 1, 'ignoreExternal'], true)
+		expect(config).not.toHaveProperty(['rules', NO_CYCLE_RULE, 1, 'maxDepth'])
 	})
 
 	// The compiler does not check a hand-authored module, so the lint is the only thing between a

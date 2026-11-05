@@ -26,8 +26,8 @@ export const import_rules = {
 	// 名前付きエクスポートを優先
 	'import/prefer-default-export': 'off',
 	'import/no-default-export': 'error',
-	// 循環依存を禁止
-	'import/no-cycle': 'error',
+	// Skip dependencies outside the project without limiting internal cycle depth (#6405).
+	'import/no-cycle': ['error', { ignoreExternal: true }],
 	// CommonJSを禁止
 	'import/no-commonjs': 'error',
 	// AMD形式を禁止
@@ -78,8 +78,4 @@ export const import_rules = {
 	'import/newline-after-import': 'error',
 	// グループ化されていないインポートを禁止
 	'import/no-unassigned-import': ['error', { allow: ['**/*.css', '**/*.scss'] }],
-
-	// // 循環参照チェックは重いため、ローカル開発時は off、CIでのみ実行などを検討
-	// // どうしても有効にしたい場合は maxDepth を指定して制限する
-	// 'import/no-cycle': 'off',
 }
