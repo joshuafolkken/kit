@@ -17,8 +17,6 @@
 			"Read(~/.codex/auth.json)",
 			"Read(~/.netrc)",
 			"Read(~/.ssh/**)",
-			"Edit(./.github/workflows/**)",
-			"Write(./.github/workflows/**)",
 			"Bash(git push --force*)",
 			"Bash(git push -f*)",
 			"Bash(git push *--force*)",
