@@ -5,7 +5,6 @@ import {
 	FAILURE_EXIT_CODE,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
-import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_report } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
@@ -18,8 +17,11 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_named } from './backlog-named'
-import { backlog_plan, type PlanContext } from './backlog-plan'
+import { backlog_plan } from './backlog-plan'
+import { backlog_plan_cap_fixture as cap_fixture } from './backlog-plan-cap-fixture'
 import { backlog_plan_cli } from './backlog-plan-cli'
+import { backlog_plan_waiting_fixture } from './backlog-plan-waiting-fixture'
+import { backlog_plan_words } from './backlog-plan-words'
 import { backlog_scope } from './backlog-scope'
 
 // joshuafolkken/kit#1652: the plan a person reads before a `backlogrun` starts. Four sections, one
@@ -27,6 +29,7 @@ import { backlog_scope } from './backlog-scope'
 // and what the backlog will not run at all.
 
 const { issue, console_streams } = auto_ok_fixture
+const { epic_child, plan_context } = backlog_plan_waiting_fixture
 
 const READY_CHILD = 901
 const BLOCKED_CHILD = 902
@@ -43,20 +46,6 @@ const { stdout, stderr } = streams
 
 function open_row(number: number, labels: ReadonlyArray<string> = []): OpenIssueData {
 	return issue(number, CREATED_LATER, labels)
-}
-
-function plan_context(open_numbers: ReadonlyArray<number>): PlanContext {
-	return { repo: backlog_fixture.REPO, titles: new Map(), open_numbers: new Set(open_numbers) }
-}
-
-function epic_child(blockers: ReadonlyArray<number>, labels: ReadonlyArray<string>): EpicChild {
-	return {
-		number: BLOCKED_CHILD,
-		repo: backlog_fixture.REPO,
-		state: 'OPEN',
-		labels: [...labels],
-		blocked_by: blockers.map((number) => ({ repo: backlog_fixture.REPO, number })),
-	}
 }
 
 // The one listing the plan reads beyond the pool: it carries the titles and the set the out-of-scope
@@ -115,17 +104,31 @@ beforeEach(() => {
 })
 
 describe('the four sections a person reads before the run starts', () => {
+	it.each(cap_fixture.WORD_CASES)('caps seven issues in %s', async (lang, heading, note) => {
+		vi.stubEnv('JOSH_SESSION_LANG', lang)
+		cap_fixture.stub()
+		await backlog_plan_cli.run([])
+		const words = backlog_plan_words.words_for(lang)
+		const [ready, waiting] = stdout().split(words.waiting_heading)
+
+		for (const number of cap_fixture.ORDERED.slice(cap_fixture.LIMIT)) {
+			expect(ready).not.toContain(backlog_fixture.cite(number))
+			expect(waiting).toContain(backlog_fixture.cite(number))
+		}
+
+		expect(ready).toContain(heading)
+		expect(waiting).toContain(note)
+	})
+
 	it('prints all four headings from one ask', async () => {
 		stub_backlog()
 
 		await backlog_plan_cli.run([])
 
-		const plan = stdout()
-
-		expect(plan).toContain(backlog_plan.READY_HEADING)
-		expect(plan).toContain(backlog_plan.WAITING_HEADING)
-		expect(plan).toContain(backlog_plan.HUMAN_HEADING)
-		expect(plan).toContain(backlog_plan.SCOPE_HEADING)
+		expect(stdout()).toContain(backlog_plan.READY_HEADING)
+		expect(stdout()).toContain(backlog_plan.WAITING_HEADING)
+		expect(stdout()).toContain(backlog_plan.HUMAN_HEADING)
+		expect(stdout()).toContain(backlog_plan.SCOPE_HEADING)
 	})
 
 	it('names a ready child with its title so the plan reads without opening GitHub', async () => {
@@ -193,8 +196,7 @@ describe('the named issues a backlogrun runs before the pool', () => {
 
 		await backlog_plan_cli.run([`#${String(BLOCKED_CHILD)}`, `#${String(READY_CHILD)}`])
 
-		const plan = stdout()
-		const named = plan.split(backlog_plan.READY_HEADING)[0] ?? ''
+		const named = stdout().split(backlog_plan.READY_HEADING)[0] ?? ''
 
 		expect(named).toContain(backlog_plan.NAMED_HEADING)
 		expect(named.indexOf(`#${String(BLOCKED_CHILD)}`)).toBeLessThan(
@@ -232,10 +234,8 @@ describe('the --only plan', () => {
 
 		await backlog_plan_cli.run([`#${String(READY_CHILD)}`, '--only'])
 
-		const plan = stdout()
-
-		expect(plan).toContain(backlog_plan.ONLY_NAMED_HEADING)
-		expect(plan).not.toContain(backlog_plan.READY_HEADING)
+		expect(stdout()).toContain(backlog_plan.ONLY_NAMED_HEADING)
+		expect(stdout()).not.toContain(backlog_plan.READY_HEADING)
 	})
 
 	it('refuses --only with no named issues before anything starts', async () => {
