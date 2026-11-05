@@ -108,6 +108,8 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'effect:audit': {
 		script: 'scripts/issue/effect-audit-cli.ts',
+		is_read_only: true,
+		write_flags: ['--draft'],
 		description:
 			'List closed run-time-shortening issues with their expected effect, follow-up measurement and result',
 		category: 'AI tools',

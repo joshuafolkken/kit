@@ -38,6 +38,21 @@ describe('josh read-only invocations', () => {
 	})
 })
 
+describe('effect audit write flags', () => {
+	const COMMAND = 'effect:audit'
+
+	it.each([[], ['--days', '7'], ['--days=7']])('passes listing %j (ac-7ed0eac7)', (...args) => {
+		expect(josh_read_only.refusal([COMMAND, ...args])).toBeUndefined()
+	})
+
+	it.each([['--draft', '6476'], ['--draft=6476'], ['--days', '7', '--draft', '6476']])(
+		'refuses draft %j (ac-7ed0eac7)',
+		(...args) => {
+			expect(josh_read_only.refusal([COMMAND, ...args])).toContain('declared write flag')
+		},
+	)
+})
+
 describe('josh help requests', () => {
 	it.each([undefined, 'help', '--help', '-h', '--all'])('reads %s as a help request', (command) => {
 		expect(josh_read_only.is_help_request(command)).toBe(true)
