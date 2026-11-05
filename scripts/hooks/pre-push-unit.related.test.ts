@@ -44,7 +44,7 @@ vi.mock('#scripts/test/test-related', () => ({ test_related: { run_related_tests
 const { pre_push_unit } = await import('./pre-push-unit')
 
 const BASE = 'a1b2c3d4'
-const CHANGED_PATH = 'scripts/rules/workflow-edit.ts'
+const CHANGED_PATH = 'scripts/rules/protected-files.ts'
 const CHANGED_TREE: Record<string, string> = { [CHANGED_PATH]: 'digest-one' }
 const MOVED_TREE: Record<string, string> = { [CHANGED_PATH]: 'digest-two' }
 const RELATED_LINE = 'running the related unit tests'
