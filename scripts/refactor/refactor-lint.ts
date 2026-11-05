@@ -2,6 +2,7 @@ import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { json_value } from '#scripts/lib/json-value'
 import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { eslint_heap } from '#scripts/lint/eslint-heap'
 import { execa, type Options, type Result } from 'execa'
 import { z } from 'zod'
 
@@ -222,6 +223,8 @@ async function run_eslint_json(
 
 	const result = await execa(bin ?? PNPM, command_arguments, {
 		cwd: root,
+		env: eslint_heap.environment(),
+		extendEnv: false,
 		reject: false,
 		stdout: 'pipe',
 		stderr: 'pipe',

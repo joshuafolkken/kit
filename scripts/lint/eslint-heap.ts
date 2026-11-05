@@ -5,9 +5,10 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 
 // joshuafolkken/kit#6331: whole-tree typed lint holds the root TypeScript program and every
 // module's import/export metadata, and ran out of V8's default heap — in CI and locally
-// alike. `josh lint`'s ESLint takes its heap from here: the cold `pnpm exec eslint` and the
-// eslint_d forwarder, whose launcher hands its environment on to the daemon. CI sets nothing of
-// its own; its `josh gate` / `josh lint` arrive here too.
+// alike. ESLint takes its heap from here in `josh lint`, `josh format` and the refactor scan:
+// the cold `pnpm exec eslint`, direct launches and the eslint_d forwarder, whose launcher hands
+// its environment on to the daemon. CI sets nothing of its own; its `josh gate` / `josh lint`
+// arrive here too.
 const ESLINT_HEAP_MIB = 8192
 
 // Node reads the flag with `-` or `_` between words (`node --help`), and either spelling set by the

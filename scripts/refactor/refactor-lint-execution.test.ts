@@ -1,5 +1,6 @@
 import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { eslint_heap } from '#scripts/lint/eslint-heap'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { refactor_lint } from './refactor-lint'
 
 const { execute } = vi.hoisted(() => ({ execute: vi.fn() }))
@@ -13,6 +14,31 @@ const SPAWN_ERROR = 'spawn eslint ENOENT'
 
 beforeEach(() => {
 	vi.resetAllMocks()
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
+})
+
+describe('refactor lint heap', () => {
+	it.each([undefined, '--trace-warnings', '--max-old-space-size=4096'])(
+		'passes the shared heap to ESLint with options %s (ac-c8c6f65c)',
+		async (options) => {
+			vi.stubEnv('NODE_OPTIONS', options)
+			const environment = { NODE_OPTIONS: eslint_heap.with_heap(options) }
+
+			vi.spyOn(eslint_heap, 'environment').mockReturnValue(environment)
+			execute.mockResolvedValue({ stdout: '[]', stderr: '', failed: false, exitCode: 0 })
+
+			await refactor_lint.scan_categories(FILES, ROOT)
+			expect(execute).toHaveBeenCalledWith(
+				expect.any(String),
+				expect.any(Array),
+				expect.objectContaining({ env: environment, extendEnv: false }),
+			)
+		},
+	)
 })
 
 describe('refactor lint execution', () => {
