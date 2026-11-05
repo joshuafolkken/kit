@@ -1,31 +1,13 @@
-// Which `/code-review` level a change is reviewed at, decided from the changed paths alone.
-//
-// **The decision takes no judgement.** "This one is small" is a judgement made under cost pressure,
-// and cost pressure resolves it toward "small" exactly when a defect is most likely to be shipped —
-// the same reason the cross-package interrupt removed its own "does this block?" evaluation. So the
-// input is the list of changed paths and nothing else.
+// Mechanical scope and size classification; an unknown executable size keeps the default.
+import { path_decision } from '#scripts/josh/path-decision'
 
 type ReviewLevel = 'low' | 'medium'
 
 const DEFAULT_LEVEL: ReviewLevel = 'medium'
 const REDUCED_LEVEL: ReviewLevel = 'low'
+const TINY_CHANGE_LINES = 20
 
-// Paths that neither execute, nor instruct, nor ship. A defect in one of these cannot change what
-// any program does, cannot change what an agent does, and cannot reach a consumer — the three ways
-// a defect in this repository escapes. Everything else, including every markdown file not named
-// here, is reviewed at the default level.
-//
-// **Being distributed is disqualifying on its own**, which is why `.vscode/**`, `.gitattributes`
-// and `.prettierignore` are *not* here despite looking inert: `package.json`'s `files` ships all
-// three, and `josh init` / `josh sync` write them into every consumer project. Keeping them out is
-// the same criterion that keeps documentation out, applied consistently.
-//
-// **Documentation is deliberately absent from this list**, which is the opposite of what the
-// "Non-runtime updates" testing exception does with it, and the difference is not an oversight.
-// That exception is about whether an automated test could have caught the defect; this is about
-// whether a human reading the diff is the only thing that can. Documentation-only diffs carry real
-// defects — dangling pointers into removed sections, and citations naming the wrong file, in
-// artifacts distributed to every consumer — that no test covers, because prose is what they are.
+// Inert remains separate from reduced review: round 2 uses it to identify non-executing fixes.
 const INERT_PATHS: ReadonlyArray<string> = [
 	'.editorconfig',
 	'.gitignore',
@@ -33,8 +15,6 @@ const INERT_PATHS: ReadonlyArray<string> = [
 	'LICENSE',
 ]
 
-// No directory is inert today. The constant stays because the check reads it, and because the next
-// candidate will arrive as a directory — but an empty list is the honest answer right now.
 const INERT_PREFIXES: ReadonlyArray<string> = []
 const INERT_SUFFIXES: ReadonlyArray<string> = ['.code-workspace']
 
@@ -48,24 +28,44 @@ function is_inert(path: string): boolean {
 	)
 }
 
-// The reduced level applies only when **every** changed path is inert. One executable or
-// instruction file in the diff and the whole change is reviewed at the default level: a review
-// reads the change, not a subset of it, so a per-file level would mean reviewing part of a diff.
-//
-// An empty diff also takes the default. There is nothing to review, so the level does not matter —
-// and answering `low` to "no files changed" would let a caller that failed to read the diff receive
-// a reduced level as though it had.
-function level_for(paths: ReadonlyArray<string>): ReviewLevel {
+function is_reduced_path(relative: string): boolean {
+	return (
+		is_inert(relative) ||
+		relative.endsWith('.md') ||
+		['docs/', 'prompts/', 'tests/'].some((prefix) => relative.startsWith(prefix)) ||
+		/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(relative)
+	)
+}
+
+function is_tiny(changed_lines: number | undefined): boolean {
+	return changed_lines !== undefined && changed_lines >= 0 && changed_lines <= TINY_CHANGE_LINES
+}
+
+function level_for(paths: ReadonlyArray<string>, changed_lines?: number): ReviewLevel {
 	const changed = paths.map((path) => path.trim()).filter((path) => path !== '')
 
 	if (changed.length === 0) return DEFAULT_LEVEL
 
-	return changed.every((path) => is_inert(path)) ? REDUCED_LEVEL : DEFAULT_LEVEL
+	if (changed.every((relative) => is_reduced_path(relative))) return REDUCED_LEVEL
+
+	return is_tiny(changed_lines) ? REDUCED_LEVEL : DEFAULT_LEVEL
 }
 
 // The paths that forced the default level, so the answer can say why rather than only what.
 function deciding_paths(paths: ReadonlyArray<string>): Array<string> {
-	return paths.map((path) => path.trim()).filter((path) => path !== '' && !is_inert(path))
+	return paths.map((path) => path.trim()).filter((path) => path !== '' && !is_reduced_path(path))
+}
+
+function format_reason(paths: ReadonlyArray<string>, level: ReviewLevel): string {
+	if (level === REDUCED_LEVEL) {
+		return 'every changed path is inert, documentation, a prompt or a test; or the entire diff is at most 20 added/deleted lines'
+	}
+
+	const deciding = deciding_paths(paths)
+
+	if (deciding.length === 0) return 'no changed paths; the default level stands'
+
+	return `changed paths that execute or instruct: ${path_decision.format_path_list(deciding)}`
 }
 
 const review_level = {
@@ -77,6 +77,7 @@ const review_level = {
 	is_inert,
 	level_for,
 	deciding_paths,
+	format_reason,
 }
 
 export type { ReviewLevel }

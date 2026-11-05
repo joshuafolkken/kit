@@ -22,6 +22,7 @@ const FIXTURE_MARK = '-fixture'
 // `related` names the tests reaching a file, which `test-pinned-cache-logic.ts` turns into a basis.
 interface Reach {
 	related: (file: string) => Promise<Array<string> | undefined>
+	spawned: (file: string) => Promise<Array<string> | undefined>
 	failed: (tests: ReadonlyArray<string>) => Promise<string | undefined>
 }
 
@@ -113,11 +114,11 @@ async function probed_files(files: ReadonlyArray<string>): Promise<Array<string>
 	return files.filter((file) => !is_fixture(file) || is_asset(view, file))
 }
 
-// The test files whose runtime imports reach `file` — the graph vitest walks (joshuafolkken/kit#5368).
+// The tests whose runtime imports or spawned entries reach `file` (joshuafolkken/kit#5368, #6433).
 function related_of(view: GraphView, file: string): Array<string> {
 	const reached = view.graph.runtime_importers([path.resolve(file)], view.universe)
 
-	return [...reached]
+	return [...new Set([...reached, ...view.spawn.related(path.resolve(file))])]
 		.map((reader) => path.relative(process.cwd(), reader))
 		.filter((reader) => test_declared_logic.is_test_file(reader))
 }
@@ -178,7 +179,14 @@ function create(inputs: ReachInputs): Reach {
 		return read === undefined ? undefined : failed_of(read, tests, inputs)
 	}
 
-	return { related, failed }
+	async function spawned(file: string): Promise<Array<string> | undefined> {
+		held.view ??= view_of()
+		const read = await held.view
+
+		return read?.spawn.related(path.resolve(file)).map((test) => path.relative(process.cwd(), test))
+	}
+
+	return { related, failed, spawned }
 }
 
 const test_pinned_reach = {

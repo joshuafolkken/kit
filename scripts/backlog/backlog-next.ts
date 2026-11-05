@@ -25,13 +25,14 @@ import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-ga
 import { backlog_next_size } from './backlog-next-size'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank } from './backlog-rank'
+import { backlog_resumable } from './backlog-resumable'
 import { backlog_wait_cause } from './backlog-wait-cause'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next.
 //
 // Neither half alone can give the answer. `epic:next` has the dependency graph and the execution
 // wave, but its input is **one epic's task list**. `auto-ok:next` sees the whole backlog, but it
-// orders by the display's newest-first ranking and reads no dependency at all.
+// orders by the display's ranking, oldest first on ties, and reads no dependency at all.
 //
 // This command is the route that asks the backlog itself what may start, and it is glue rather than a third implementation: the epic half runs
 // through `epic:next`'s own read → classify → report pipeline unchanged, the standalone half through
@@ -309,7 +310,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		context.repo,
 	)
 
-	return backlog_rank.rank_result(ordered, context.repo)
+	return backlog_rank.rank_result(await backlog_resumable.read(ordered, context.repo), context.repo)
 }
 
 // Whether the `error` verdict is really a transport failure wearing the graph's clothes.

@@ -13,10 +13,10 @@ import { backlog_plan_cli } from './backlog-plan-cli'
 
 const { console_streams } = auto_ok_fixture
 
-// One timestamp, so the rank is the number order, highest first; the yielded one ranks last.
-const RANKED_FIRST = 807
+// One timestamp, so the rank is the number order, lowest first; the yielded one ranks last.
+const RANKED_FIRST = 805
 const RANKED_SECOND = 806
-const YIELDED = 805
+const YIELDED = 807
 
 const streams = console_streams()
 const { stdout } = streams

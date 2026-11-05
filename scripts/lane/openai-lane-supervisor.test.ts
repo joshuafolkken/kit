@@ -22,7 +22,7 @@ const repository = path.join(scratch, 'repository.git')
 const lane_directory = path.join(scratch, 'lane')
 const target = run_cut.cut_path(repository)
 const profile = agent_role_profile.OPENAI_PROFILES.worker
-const RESUME_PROMPT = 'run:cut --resume 2084'
+const RESUME_PROMPT = 'run:entry 2084'
 const SHIP_SUCCESS = 'ship-success'
 const EPHEMERAL_FLAG = '--ephemeral'
 

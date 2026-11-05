@@ -3,9 +3,11 @@ import { core_wait } from '#scripts/gate/core-wait'
 import type { LaunchContext, LaunchOutcome } from './lane-launch-cli'
 import { lane_paths } from './lane-paths'
 
-// Admission uses the per-process RSS median so an aggregate does not overcharge each new lane
-// (joshuafolkken/kit#5409).
-const LANE_MEMORY_MB = 270
+// Reserve the per-process RSS median for the parent and its reviewer / investigator children
+// before any of them starts (joshuafolkken/kit#5409, #6229).
+const PROCESS_MEMORY_MB = 270
+const CHILD_PROCESSES = 2
+const LANE_MEMORY_MB = PROCESS_MEMORY_MB * (1 + CHILD_PROCESSES)
 
 function checkout_of(issue: string): string {
 	const cwd = process.cwd()

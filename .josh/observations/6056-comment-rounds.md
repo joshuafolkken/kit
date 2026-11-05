@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/issue/issue-lint-cli.ts:79 | 2026-11-03 | #6056
+- rf:security | low | scripts/run/handoff/run-handoff-cli.ts:212 | 2026-11-03 | #6056
+- rf:tests | low | scripts/issue/issue-file-batch-entries.test.ts:27 | 2026-11-03 | #6056

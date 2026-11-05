@@ -137,6 +137,25 @@ describe('run_board_quota_held updated and missing event time', () => {
 describe('run_board_quota_held live status source', () => {
 	afterEach(() => vi.restoreAllMocks())
 
+	it('connects a completed production rollout to the lane parser', async () => {
+		const head = JSON.stringify({ type: 'session_meta', payload: { cwd: '/work/.kit-lanes/6375' } })
+
+		vi.spyOn(run_board_quota_read, 'claude_files').mockResolvedValue([])
+		vi.spyOn(run_board_quota_read, 'codex_files').mockResolvedValue([
+			{ path: CODEX_FILE, mtime_ms: 0 },
+		])
+		vi.spyOn(run_board_quota_read, 'read_tail').mockResolvedValue(
+			`${codex_event(TAKEN)}\n{"payload":{"type":"task_complete"}}`,
+		)
+		vi.spyOn(run_board_quota_read, 'read_head').mockResolvedValue(head)
+		vi.spyOn(run_board_quota_status, 'read').mockResolvedValue(undefined)
+		const lane = vi.spyOn(run_board_quota_read, 'codex_lane')
+
+		await run_board_quota_held.live_quota_reader()()
+
+		expect(lane).toHaveBeenCalledWith(head)
+	})
+
 	it('connects the shared status record to the production reader', async () => {
 		const status = reading_at(WINDOW.used_percent)
 
@@ -257,6 +276,24 @@ describe('run_board_quota_held.quota_reader — a newest file holding no reading
 		const quotas = await quota_reader(ports)()
 
 		expect(quotas.claude).toBeUndefined()
+	})
+})
+
+describe('run_board_quota_held.quota_reader — lane metadata', () => {
+	it('reads done heads for lane metadata and shares the spend per lane', async () => {
+		const { files, ports } = fixture_of()
+		const lane_of = vi.fn(() => '6375')
+
+		ports.sources.codex.lane_of = lane_of
+		files.codex = ['a_log', 'b_log', RUNNING_FILE].map((file, index) => ({
+			path: file,
+			mtime_ms: 50 - index,
+		}))
+
+		const { codex } = await quota_reader(ports)()
+
+		expect(lane_of.mock.calls).toEqual([['a_log'], ['b_log']])
+		expect(codex?.per_task).toEqual({ [WINDOW.minutes]: 16 })
 	})
 })
 

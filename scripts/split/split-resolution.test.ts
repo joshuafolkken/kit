@@ -5,6 +5,8 @@ import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { split_assess } from './split-assess'
+import { split_early_notice } from './split-early-notice'
+import { split_measure } from './split-measure'
 import { split_resolution } from './split-resolution'
 
 const { REASON_PREFIX } = split_assess
@@ -16,6 +18,8 @@ const OTHER_ISSUE = 4696
 const AT = '2026-10-23T00:00:00.000Z'
 const OWNER = 'OWNER'
 const REASON = `${REASON_PREFIX} the rest shares one schema change`
+const LEDGER_PATH = '/ledger.jsonl'
+const NO_CHILD = 'has no split child'
 
 const NOTICE: LedgerEntry = {
 	kind: lane_ledger.KIND.SPLIT_NOTICE,
@@ -34,6 +38,8 @@ const SPLIT_CHILD: LedgerEntry = {
 const list_comments = vi.spyOn(git_gh_issue_read, 'issue_list_comments')
 const is_trusted = vi.spyOn(gh_author_association, 'is_trusted')
 const record_split_filed = vi.spyOn(lane_ledger_write, 'record_split_filed')
+const read_branch = vi.spyOn(split_measure, 'read_branch')
+const declared = vi.spyOn(split_early_notice, 'declared')
 
 function comments_json(body: string, association = OWNER): string {
 	return JSON.stringify([{ user: { login: 'someone' }, body, author_association: association }])
@@ -44,6 +50,8 @@ beforeEach(() => {
 	is_trusted.mockImplementation(async (author) => author.association === OWNER)
 	list_comments.mockResolvedValue('[]')
 	record_split_filed.mockResolvedValue()
+	read_branch.mockResolvedValue({ files: 11, lines: 550, verdict: 'split' })
+	declared.mockResolvedValue(undefined)
 })
 
 describe('split_resolution.refusal for a noticed issue with no answer', () => {
@@ -71,7 +79,7 @@ describe('split_resolution.refusal for a noticed issue with no answer', () => {
 	it('refuses without reading unavailable comments', async () => {
 		list_comments.mockResolvedValue(undefined)
 
-		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toContain('has no split child')
+		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toContain(NO_CHILD)
 		expect(list_comments).not.toHaveBeenCalled()
 	})
 })
@@ -98,8 +106,33 @@ describe('split_resolution.refusal for an answered or unnoticed issue', () => {
 })
 
 describe('split_resolution.ledger_refusal', () => {
+	it('passes a stale notice when the current diff is below the bar (ac-92ff3c54)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+		read_branch.mockResolvedValueOnce({ files: 4, lines: 164, verdict: 'single' })
+
+		expect(await split_resolution.ledger_refusal(ISSUE)).toBeUndefined()
+	})
+
+	it('keeps the notice when measurement fails (ac-993a6e83)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+		read_branch.mockRejectedValueOnce(new Error('unmeasurable'))
+
+		expect(await split_resolution.ledger_refusal(ISSUE)).toContain(NO_CHILD)
+	})
+
+	it('keeps the declaration bar for a smaller current diff (ac-993a6e83)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+		read_branch.mockResolvedValueOnce({ files: 3, lines: 150, verdict: 'single' })
+		declared.mockResolvedValueOnce({ files: 2, lines: 50 })
+
+		expect(await split_resolution.ledger_refusal(ISSUE)).toContain(NO_CHILD)
+	})
+
 	it('reads the repository ledger', async () => {
-		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce('/ledger.jsonl')
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
 		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
 
 		expect(await split_resolution.ledger_refusal(ISSUE)).toBeDefined()

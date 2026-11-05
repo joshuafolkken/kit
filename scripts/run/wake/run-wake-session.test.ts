@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
@@ -12,6 +13,7 @@ import { run_wake_session, type LaunchResult } from './run-wake-session'
 const INVOCATION = 'backlogrun --max 5 --idle 30'
 const SCRIPT = '/somewhere/run-wake-cli.ts'
 const LOOPBACK_PROXY = 'http://localhost:52554'
+const PLAIN_NODE_FLAG = '--disable-warning=ExperimentalWarning'
 
 // Nothing here is exploitable as the code stands — `spawn` is given an argument vector and never a
 // shell — but "it cannot be exploited the way this is written today" is an argument rather than a
@@ -69,6 +71,27 @@ describe('run_wake_session.supervisor_argv — the detached self', () => {
 
 		expect(argv.command).toBe(process.execPath)
 		expect(argv.args.slice(0, process.execArgv.length)).toStrictEqual(process.execArgv)
+	})
+
+	// joshuafolkken/kit#6401: the dist launcher runs under plain node, so the parent has no loader flag.
+	it('adds the tsx loader when the parent runner carries none', () => {
+		const inherited = process.execArgv
+
+		process.execArgv = [PLAIN_NODE_FLAG]
+
+		try {
+			const argv = run_wake_session.supervisor_argv(SCRIPT)
+
+			expect(argv.args).toStrictEqual([
+				PLAIN_NODE_FLAG,
+				ts_entry_loader.IMPORT_FLAG,
+				ts_entry_loader.loader_url(),
+				SCRIPT,
+				run_wake_session.LOOP_FLAG,
+			])
+		} finally {
+			process.execArgv = inherited
+		}
 	})
 
 	it('runs the loop body and names the script it was given', () => {

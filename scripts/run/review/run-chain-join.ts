@@ -1,3 +1,4 @@
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 import { review_record_slot } from '#scripts/review/review-record-slot'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
@@ -55,14 +56,30 @@ async function findings_hold(): Promise<HoldStop | undefined> {
 	return slot_stop()
 }
 
-// `mode` is the join's flags as typed, so every rerun a stop prints keeps `--fixing`.
-function join_stages(issue: string, is_fixing: boolean): ReadonlyArray<ChainStage> {
-	const mode = [JOIN, ...(is_fixing ? [FIXING] : [])]
+function ship_stage(title: string, mode: ReadonlyArray<string>): ChainStage {
+	return {
+		name: 'ship',
+		argv: ['ship', '--detach', '--review', title],
+		next: (target) => `settle what \`ship\` refused, ${run_chain.rerun(target, 'ship', mode)}`,
+	}
+}
+
+function join_mode(is_fixing: boolean, title: string | undefined): ReadonlyArray<string> {
+	return [
+		JOIN,
+		...(is_fixing ? [FIXING] : []),
+		...(title === undefined ? [] : ['--ship', shell_quote.word(title)]),
+	]
+}
+
+// Printed resumptions preserve the selected mode and quote the title as one shell word.
+function join_stages(issue: string, is_fixing: boolean, title?: string): ReadonlyArray<ChainStage> {
+	const mode = join_mode(is_fixing, title)
 
 	return [
 		{
 			name: RUN_REVIEW,
-			argv: [RUN_REVIEW, ...mode],
+			argv: [RUN_REVIEW, JOIN, ...(is_fixing ? [FIXING] : [])],
 			next: (target) =>
 				`settle what \`${RUN_REVIEW} ${JOIN}\` reported (\`chain-rule.md\` → "Run the review-to-merge chain", step 2), ${run_chain.rerun(target, undefined, mode)}`,
 		},
@@ -79,6 +96,7 @@ function join_stages(issue: string, is_fixing: boolean): ReadonlyArray<ChainStag
 			next: (target) =>
 				`settle what \`${RECORD}\` refused, ${run_chain.rerun(target, RECORD, mode)}`,
 		},
+		...(title === undefined ? [] : [ship_stage(title, mode)]),
 	]
 }
 

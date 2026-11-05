@@ -7,6 +7,7 @@ import { review_diff_parts, type DiffParts } from './review-diff-parts'
 import { review_fix_hunks } from './review-fix-hunks'
 import { review_fix_round, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
+import { review_round } from './review-round'
 import { review_untouched_readers, type ReadersRead } from './review-untouched-readers'
 
 // The text `josh review:brief` prints — the `/code-review` invocation, composed from what the run
@@ -372,6 +373,7 @@ interface BriefStamps {
 }
 
 interface BriefInput {
+	is_full_change?: boolean | undefined
 	level: string
 	profile?: AgentProfile
 	round: number
@@ -405,8 +407,6 @@ interface BriefInput {
 	readers?: ReadersRead | undefined
 }
 
-const SECOND_ROUND = 2
-
 function round_one_target(input: BriefInput): string {
 	const { root } = input.checkout
 	const previous = input.fix_round
@@ -433,7 +433,8 @@ function round_one_target(input: BriefInput): string {
 }
 
 function target_block(input: BriefInput): string {
-	if (input.round < SECOND_ROUND) return round_one_target(input)
+	if (input.is_full_change) return whole_change_target(input.checkout.root, input.base)
+	if (input.round < review_round.SECOND_ROUND) return round_one_target(input)
 
 	const { root } = input.checkout
 	const block = round_two_block(input.stamps.round_one, input.tree, root, input.base)
@@ -479,6 +480,7 @@ function compose(input: BriefInput): string {
 		input.level,
 		'',
 		`Agent profile: ${agent_profile_schema.describe(profile)}`,
+		...(input.is_full_change ? [review_round.FINAL_LINE] : []),
 		'',
 		rubric_line(input.rubric_path),
 		'',
@@ -516,7 +518,7 @@ const review_brief = {
 	ROUND_TWO_QUESTION,
 	round_two_block,
 	round_two_scope,
-	SECOND_ROUND,
+	SECOND_ROUND: review_round.SECOND_ROUND,
 	TEST_COMMAND_LINE,
 	whole_change_target,
 }

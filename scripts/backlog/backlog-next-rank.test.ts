@@ -1,6 +1,7 @@
 import {
 	auto_ok_fixture,
 	CREATED_EARLIER,
+	CREATED_LATER,
 	EPIC_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
@@ -22,10 +23,10 @@ import { backlog_next } from './backlog-next'
 
 const { console_streams, opted_in_epic } = auto_ok_fixture
 
-// One timestamp, so the recency order is the number order, highest first.
-const ROWS = [807, 806, 805, 804, 803, 802, 801]
-const SIXTH = 802
-const SEVENTH = 801
+// One timestamp, so oldest-first ties use the number order, lowest first.
+const ROWS = [801, 802, 803, 804, 805, 806, 807]
+const SIXTH = 806
+const SEVENTH = 807
 const HOLDER = 950
 const OFFER_CAP = 5
 const EPIC_CHILD = 901
@@ -106,7 +107,43 @@ describe('backlog:next with a run:solo issue past the cap', () => {
 })
 
 describe('backlog:next ranking keys', () => {
-	it('offers priority:high first, then a verification-path defect, then the recency order', async () => {
+	it('offers the older issue first when all ranking keys are equal', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [auto_ok_fixture.issue(SIXTH, CREATED_LATER, [AUTO_OK_LABEL]), row(SEVENTH, [])],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()).toStrictEqual([SEVENTH, SIXTH])
+	})
+})
+
+describe('backlog:next resumable ranking keys', () => {
+	it('offers stashed work before fresh work', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [row(SIXTH, []), row(SEVENTH, [])],
+			stashed: [SEVENTH],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()).toStrictEqual([SEVENTH, SIXTH])
+	})
+
+	it.each([PRIORITY_CRITICAL_LABEL, PRIORITY_HIGH_LABEL])(
+		'keeps %s ahead of resumable work',
+		async (priority) => {
+			backlog_fixture.stub_backlog({
+				opted_in: [row(SIXTH, []), row(SEVENTH, [priority])],
+				stashed: [SIXTH],
+			})
+
+			expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+			expect(offered()[0]).toBe(SEVENTH)
+		},
+	)
+})
+
+describe('backlog:next priority ranking keys', () => {
+	it('offers priority:high first, then a verification-path defect, then oldest-first ties', async () => {
 		stub(
 			new Map([
 				[SIXTH, [BUG_LABEL, RUN_SOLO_LABEL]],

@@ -23,6 +23,8 @@ Review results and successful pushes are never turn boundaries.
 3. A round for which `review:attest --check` answers `missing` or `mismatch` is discarded uncounted; rerun
    against the brief's checkout. A review error receives a `confirmation` Telegram and stops.
 4. Route the attested verdict mechanically:
+   - Full-change final brief: apply round 2's disposition; record with `--comment`.
+     Interaction stays independent.
    - Clean or Low-only round 1: no second round. Fix, file, or drop each Low with a one-line reason.
    - High/Medium round 1: fix and record it (below), then `ship --review` (step 5) asks
      `review:round2 --record <N>` and runs a due round 2 as `reviewer-verification`.
@@ -49,9 +51,10 @@ Recommendations are informational; severity decides. A CodeRabbit rate-limit war
 0. **A lane child** (no `main:merge`: ship's sync merges main, stopping `conflict`): the self-check (`prompts/review.md` → "Before round 1 —
    the implementer's self-check"; 1: `--join`'s `test:pinned`, 2/4/10: `review:selfcheck`), `pnpm josh run:chain <N>` (a metrics notice → its verdict line) —
    the ship body draft's rows a green `test:related` left pending filled in beside the gate (`report-format.md` → "PR
-   本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --from-slot --interaction --issue <N>` — not backgrounded — a turn end kills it — then `pnpm josh run:chain <N> --join` (step 2), the
+   本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --from-slot --interaction --issue <N>` before the join that ships — not backgrounded — a turn end kills it — then `pnpm josh run:chain <N> --join --ship "<title> #<N>"` (step 2; clean records and ships with `--detach --review`; every finding holds before recording or shipping), the
    round's fixes, no `check:related` after them unless a brief follows (one before `--join` is refused, `round-one-check-related`), on a held finding `pnpm josh review:record --from-slot --issue <N>` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; a `lane:plan` widened after round 1 → the ship, whose `--review` reads the widened files (`review-lane-handover.ts`); on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
-   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it; `timeout` 600000). On `launched` it runs
+   only after that hold is settled; use plain `--join` then this ship when additional ship options are needed
+   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it; `timeout` 600000 for either shipping call). On either shipping path, `launched` runs
    `cost --cut` and, on `under`, one `ship:wait <N>` chunk; follow it
    (`docs/josh-commands-run.md` → "`josh ship:wait`"); on `busy`, **end the turn**. No `pnpm josh gate`,
    `check:related`, `check` or `metrics` before it or a re-detach, by hand: ship reuses the scoped

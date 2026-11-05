@@ -25,7 +25,7 @@ interface DecisionOptions {
 interface DecisionCommand<Answer extends string> {
 	usage: string
 	key: string
-	decide: (paths: ReadonlyArray<string>) => Answer
+	decide: (paths: ReadonlyArray<string>, is_staged: boolean) => Answer | Promise<Answer>
 	explain: (paths: ReadonlyArray<string>, answer: Answer) => string
 }
 
@@ -82,7 +82,7 @@ async function run_path_decision<Answer extends string>(
 	}
 
 	const paths = await changed_paths.read_changed_paths(options.is_staged)
-	const answer = command.decide(paths)
+	const answer = await command.decide(paths, options.is_staged)
 
 	print_decision(command.key, answer, command.explain(paths, answer), options.is_json)
 

@@ -8,7 +8,7 @@ Only these load `.env` themselves, and only when it exists:
 - **Run state** — `josh run:entry`, `josh run:hold`, `josh run:release`, `josh run:pause`, `josh run:split`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:merge`, and `josh run:park`, `josh issue:already-done` and `josh issue:measured`, which release the hold.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:pause`, `josh lane:resume`, `josh lane:plan`, `josh lane:adopt`, `josh lane:sample`, `josh lane:stats`, `josh lane:value`, `josh lane:net`, `josh lane:breakdown`, `josh lane:why`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:if-required`, `josh run:prime` (which runs it), `josh latest:update`, `josh port`, `josh session:lang`.
-- **Reports** — `josh report:template`, `josh report:lint`, `josh backlog:plan` and `josh run:report`, whose labels follow `JOSH_SESSION_LANG`; `run:report --handoff` also sends its report to Telegram.
+- **Reports** — `josh report:template`, `josh report:lint`, `josh backlog:plan`, `josh run:tail` and `josh run:report`, whose labels follow `JOSH_SESSION_LANG`; `run:report --handoff` also sends its report to Telegram.
 - **Hooks** — `josh pretool:guard` (the rule, batch, investigation and duplicate-read guards in one process) and `josh stop:guard`; and `josh codex:hook-adapter`.
 - `playwright.config.ts`.
 
@@ -190,6 +190,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_SHIP_RETRY_PENDING`   | `josh ship`                    | `josh ship` will run this stage again on an infrastructure stop, so the AI review gate sends no confirmation for an unreadable listing.  |
 | `JOSH_SHIP_LAP_SCOPE`       | `josh ship`                    | The lap scope a child process times its steps under, so `lane:breakdown` names the `josh git` step or hook that spent a stage's minutes. |
 | `JOSH_INIT_HANDED_OFF`      | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                      |
+| `JOSH_ESLINT_MEMORY_CHILD`  | the ESLint memory preload      | `1` marks the ESLint child whose peak RSS is measured, so the preload does not launch another observer.                                  |
 | `JOSH_WORKFLOW`             | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                    |
 | `JOSH_UNIT_RUN_MARKED`      | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.                                                                         |
 | `JOSH_UNIT_GUARD_LOG`       | the unit suite's network guard | Where the guard logs blocked calls.                                                                                                      |

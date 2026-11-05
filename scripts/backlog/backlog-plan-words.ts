@@ -31,13 +31,12 @@ const ENGLISH_PLAN_WORDS: PlanWords = {
 	named_heading: 'Named issues — run in order first, one at a time, then the backlog:',
 	only_named_heading:
 		'Named issues — run in order, one at a time, then stop (`--only`; the opted-in backlog is not run):',
-	ready_heading:
-		'Ready now — each takes a free lane in its repository, so these may run in parallel:',
+	ready_heading: 'Ready now — the first wave; these may run in parallel:',
 	waiting_heading: 'Waiting — each names what it is waiting on:',
 	human_heading: 'Waiting on a person — resolve these before the run starts:',
 	scope_heading: 'Out of scope — open, but the backlog will not run these:',
 	in_progress_note: 'a run already has it',
-	past_offer_note: 'ready, but past the offer this ask could make',
+	past_offer_note: 'waiting for a later wave (lane limit or selection gates)',
 	waiting_on: 'waiting on',
 }
 
@@ -47,12 +46,12 @@ const JAPANESE_PLAN_WORDS: PlanWords = {
 	named_heading: '指名した Issue — 指名順に 1 件ずつ先に流し、その後バックログへ:',
 	only_named_heading:
 		'指名した Issue — 指名順に 1 件ずつ流して止まる（`--only`。opt-in 済みのバックログは流さない）:',
-	ready_heading: '今すぐ着手可 — それぞれリポジトリの空きレーンを使うので並行に流せる:',
+	ready_heading: '今すぐ着手可 — 最初の組。並行に流せる:',
 	waiting_heading: '待ち — 各行が待っている相手を示す:',
 	human_heading: '人の対応待ち — ランの開始前に解消する:',
 	scope_heading: '対象外 — open だがバックログは流さない:',
 	in_progress_note: '既に別のランが担当中',
-	past_offer_note: '着手可だが、今回の提示数を超えた',
+	past_offer_note: '後続の組を待つ（レーン上限または選択条件による）',
 	waiting_on: '待ち:',
 }
 

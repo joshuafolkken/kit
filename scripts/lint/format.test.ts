@@ -4,6 +4,7 @@ import path from 'node:path'
 import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
+import { eslint_heap } from './eslint-heap'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 
@@ -59,6 +60,33 @@ beforeEach(() => {
 afterEach(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
+})
+
+describe('josh format heap', () => {
+	it.each([undefined, '--trace-warnings', '--max_old_space_size=4096'])(
+		'passes the shared heap only to ESLint with options %s (ac-c8c6f65c)',
+		async (options) => {
+			vi.stubEnv('NODE_OPTIONS', options)
+			const environment = { NODE_OPTIONS: eslint_heap.with_heap(options) }
+
+			vi.spyOn(eslint_heap, 'environment').mockReturnValue(environment)
+			const root = write_project({ josh: { profile: 'full' } })
+
+			await format.run_format(root)
+			expect(mocked_execa).toHaveBeenNthCalledWith(1, 'pnpm', expect.any(Array), {
+				cwd: root,
+				stdio: 'inherit',
+				reject: false,
+			})
+			expect(mocked_execa).toHaveBeenNthCalledWith(
+				2,
+				'pnpm',
+				expect.any(Array),
+				expect.objectContaining({ env: environment, extendEnv: false }),
+			)
+		},
+	)
 })
 
 describe('josh format', () => {

@@ -13,12 +13,17 @@ const JOIN = '--join'
 const FROM = '--from'
 const RUN_REVIEW = 'run:review'
 const ATTEST = 'review:attest'
-const RECORD_ARGV = ['review:record', '--from-slot', '--issue', ISSUE]
+const RECORD = 'review:record'
+const RECORD_ARGV = [RECORD, '--from-slot', '--issue', ISSUE]
 const JOIN_LINE = [[RUN_REVIEW, JOIN], [ATTEST, '--check'], RECORD_ARGV]
 const STOP_EXIT = 2
 const LOW_FINDING = 'bug-risks:low:scripts/a.ts — a nit'
 const MEDIUM_FINDING = 'fixed bug-risks:medium:scripts/b.ts — fixed in place'
 const SHIP_REVIEW = 'then ship with `--review`'
+const SHIP = 'ship'
+const TITLE = 'Extend clean join #5735'
+const SHIPPING = [ISSUE, JOIN, '--ship', TITLE]
+const SHIP_LINE = [...JOIN_LINE, [SHIP, '--detach', '--review', TITLE]]
 
 const error_lines: Array<string> = []
 
@@ -136,5 +141,60 @@ describe('run_chain_cli.run --join — findings held for the record', () => {
 
 		expect(errors()).toContain('2 finding(s)')
 		expect(errors()).toContain(SHIP_REVIEW)
+	})
+})
+
+describe('run_chain_cli.run --join --ship', () => {
+	it('ships only after the clean record succeeds (ac-b6f5ca5d)', async () => {
+		await expect(run_chain_cli.run(SHIPPING)).resolves.toBe(0)
+
+		expect(ran()).toStrictEqual(SHIP_LINE)
+	})
+
+	it.each([LOW_FINDING, MEDIUM_FINDING, 'bug-risks:high:scripts/c.ts — a bug'])(
+		'holds every finding before recording or shipping: %s (ac-9572a35f)',
+		async (finding) => {
+			slot_holds(finding)
+
+			await expect(run_chain_cli.run(SHIPPING)).resolves.toBe(1)
+
+			expect(ran()).toStrictEqual(JOIN_LINE.slice(0, 2))
+			expect(errors()).toContain('next: fix')
+		},
+	)
+
+	it.each([RUN_REVIEW, ATTEST, RECORD, SHIP])(
+		'stops at a failed %s and retains the shipping mode (ac-92775e31)',
+		async (stage) => {
+			stop_at(stage)
+
+			await expect(run_chain_cli.run([...SHIPPING, '--fixing'])).resolves.toBe(1)
+
+			const stop_index = SHIP_LINE.findIndex(([name]) => name === stage)
+
+			expect(ran()).toHaveLength(stop_index + 1)
+			expect(ran().at(-1)?.[0]).toBe(stage)
+			expect(errors()).toContain(`--join --fixing --ship '${TITLE}'`)
+		},
+	)
+})
+
+describe('run_chain_cli.run --join --ship — resume', () => {
+	it.each([ATTEST, RECORD, SHIP])('resumes at %s with the ship stage', async (stage) => {
+		await expect(run_chain_cli.run([...SHIPPING, FROM, stage])).resolves.toBe(0)
+
+		const start = SHIP_LINE.findIndex(([name]) => name === stage)
+
+		expect(ran()).toStrictEqual(SHIP_LINE.slice(start))
+	})
+
+	it('quotes shell metacharacters in the resume title', async () => {
+		stop_at(SHIP)
+		const title = "Don't expand $(touch /tmp/no) `cmd` #5735"
+
+		await run_chain_cli.run([ISSUE, JOIN, '--ship', title])
+
+		expect(ran().at(-1)).toStrictEqual([SHIP, '--detach', '--review', title])
+		expect(errors()).toContain("--ship 'Don'\\''t expand $(touch /tmp/no) `cmd` #5735' --from ship")
 	})
 })
