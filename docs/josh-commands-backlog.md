@@ -822,7 +822,7 @@ Any other untriaged candidate is held alone, named on stderr. The triaged candid
 
 **Defect priority**: defects always go to the front of the runnable numbers among ranking ties. New mechanisms go to the back only while the defect rate is above its baseline.
 
-**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, resumable work (owned stash), verification-path defect, lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
+**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, resumable work (owned stash, pause comment or linked open PR), verification-path defect, lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
 Lost minutes sum `- 原因の損失:` lines, falling back to `- 原因のレーン:`.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.

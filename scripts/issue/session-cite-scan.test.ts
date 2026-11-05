@@ -124,6 +124,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/park/run-stalled.ts', 2],
 	// The `run:pause` stash name, its idempotence marker, and the pause comment on the paused Issue.
 	['run/pause/run-pause.ts', 2],
+	['run/pause/run-pause-comment.ts', 1],
 	// The `run:split` stash name, its idempotence marker, the split comment and the park comment.
 	['run/split/run-split.ts', 3],
 	// The `run:split --prerequisite` park comment on the paused Issue.

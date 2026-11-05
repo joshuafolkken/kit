@@ -1,12 +1,9 @@
-import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
-import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { stash_push_cli } from '#scripts/git/stash/stash-push-cli'
-import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
-import { z } from 'zod'
+import { run_pause_comment } from './run-pause-comment'
 import { run_set_aside_commit } from './run-set-aside-commit'
 
 // Setting a run aside — the work committed on the run's lane branch (`run-set-aside-commit.ts`) or,
@@ -20,7 +17,6 @@ import { run_set_aside_commit } from './run-set-aside-commit'
 
 const SUCCESS_EXIT_CODE = 0
 const ALREADY = 'already'
-const comment_schema = z.object({ body: z.string().nullish() })
 
 interface AsideRequest {
 	issue: string
@@ -88,19 +84,8 @@ async function work_line(request: AsideRequest): Promise<string> {
 	return (await is_stashed(request)) ? stashed_line(request) : NOTHING_SET_ASIDE
 }
 
-async function has_comment(request: AsideRequest): Promise<boolean> {
-	const json = await git_gh_issue_read.issue_list_comments(request.issue)
-	const rows = json === undefined ? undefined : parse_json_array_or_undefined(json, comment_schema)
-
-	if (rows === undefined) {
-		throw new Error(`the comments on ${session_cite.issue(request.issue)} could not be read`)
-	}
-
-	return rows.some((row) => row.body?.includes(request.marker) === true)
-}
-
 async function comment(request: AsideRequest): Promise<string> {
-	if (await has_comment(request)) return ALREADY
+	if (await run_pause_comment.has_comment(request)) return ALREADY
 
 	const body = [request.headline, await work_line(request), request.marker].join('\n')
 

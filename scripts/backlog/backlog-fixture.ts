@@ -12,6 +12,7 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import {
 	BUG_LABEL,
 	NOT_BEFORE_LABEL,
@@ -21,6 +22,7 @@ import {
 import { lane_await } from '#scripts/lane/lane-await'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
+import { run_pause_comment } from '#scripts/run/pause/run-pause-comment'
 import { vi } from 'vitest'
 
 // One description of a backlog, stubbed across every read `josh backlog:next` makes.
@@ -62,6 +64,8 @@ interface EpicInput {
 
 interface BacklogInput {
 	stashed?: ReadonlyArray<number>
+	paused?: ReadonlyArray<number>
+	open_pr?: ReadonlyArray<number>
 	// The rows the `auto-ok` listing answers with — an epic root among them is what opts its children in.
 	opted_in?: ReadonlyArray<OpenIssueData>
 	// The open epics, whatever their labels: this is the listing that says which issues an epic tracks.
@@ -252,6 +256,12 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 }
 
 function stub_resumable(input: BacklogInput): void {
+	vi.spyOn(run_pause_comment, 'is_paused').mockImplementation(async (issue) =>
+		(input.paused ?? []).includes(Number(issue)),
+	)
+	vi.spyOn(issue_closing_pr, 'has_open_pr').mockImplementation(async (issue) =>
+		(input.open_pr ?? []).includes(Number(issue)),
+	)
 	vi.spyOn(git_stash, 'list').mockResolvedValue(
 		(input.stashed ?? []).map((number) => ({
 			selector: 'stash@{0}',

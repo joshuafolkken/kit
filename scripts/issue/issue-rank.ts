@@ -15,7 +15,7 @@ import {
 // declared ones rank among themselves by the keys below.
 //
 // Then, in order: `priority:critical`, then `priority:high`, then resumable work (an owned
-// stash), then a defect on the verification path (`bug` with `run:solo`, or
+// stash, a pause comment or a linked open PR), then a defect on the verification path (`bug` with `run:solo`, or
 // `route:interrupt`), then the minutes its cause lost (`issue_priority.lost_minutes`: the body's
 // cause-loss lines summed over its recurrences (joshuafolkken/kit#4928), else its causing-lane line,
 // so causes of one lane are told apart (joshuafolkken/kit#4861); `0` when neither is declared, so an
