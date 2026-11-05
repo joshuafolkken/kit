@@ -25,7 +25,7 @@ function graph_of(strings: Record<string, ReadonlyArray<string>>): ImportGraph {
 		closure_hash: () => '',
 		imports: () => [],
 		importers: () => new Set(),
-		runtime_importers: () => new Set(),
+		runtime_importers: (files) => new Set(files),
 		strings: (file) => strings[path.basename(file)] ?? [],
 	}
 }
@@ -50,5 +50,29 @@ describe('test_pinned_spawn.started', () => {
 
 	it('names no test file, and nothing where no string names a file', () => {
 		expect(started_in({ [TEST]: [OTHER_TEST, 'driver'] })).toEqual([])
+	})
+})
+
+describe('test_pinned_spawn.related', () => {
+	it('selects directly named native entries without following asset strings in helpers', () => {
+		const universe = [TEST, HELPER, CLI, COMMAND, UNNAMED, OTHER_TEST].map((name) => at(name))
+		const graph = graph_of({ [TEST]: [CLI], [HELPER]: [COMMAND] })
+		const spawn = test_pinned_spawn.create(graph, universe)
+
+		expect(spawn.related(at(CLI))).toEqual([at(TEST)])
+		expect(spawn.related(at(COMMAND))).toEqual([])
+		expect(spawn.related(at(UNNAMED))).toEqual([])
+	})
+
+	it('finds the test when the started entry imports the changed module', () => {
+		const graph = graph_of({ [TEST]: [CLI] })
+
+		graph.runtime_importers = () => new Set([at(HELPER), at(CLI)])
+		const spawn = test_pinned_spawn.create(
+			graph,
+			[TEST, CLI, HELPER].map((name) => at(name)),
+		)
+
+		expect(spawn.related(at(HELPER))).toEqual([at(TEST)])
 	})
 })

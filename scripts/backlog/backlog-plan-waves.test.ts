@@ -85,6 +85,20 @@ describe('josh backlog:plan --waves — the width of a wave', () => {
 })
 
 describe('josh backlog:plan --waves — the first wave', () => {
+	it('places resumable work in an earlier wave than fresh work', async () => {
+		const rows = [open_row(FIRST, [AUTO_OK_LABEL]), open_row(SOLO, [AUTO_OK_LABEL])]
+
+		backlog_fixture.stub_backlog({ opted_in: rows, stashed: [SOLO] })
+		vi.spyOn(git_gh_command, 'issue_list_recent').mockResolvedValue(listing_of(rows))
+		vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: 1 })
+
+		expect(await backlog_plan_cli.run(['--waves'])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toContain(`Wave 1  ${backlog_fixture.cite(SOLO)}\n`)
+		expect(stdout()).toContain(`Wave 2  ${backlog_fixture.cite(FIRST)}\n`)
+	})
+})
+
+describe('josh backlog:plan --waves — ready order', () => {
 	it('matches oldest-first ties in the ready section and the first wave', async () => {
 		const rows = [
 			issue(FIRST, CREATED_LATER, [AUTO_OK_LABEL]),

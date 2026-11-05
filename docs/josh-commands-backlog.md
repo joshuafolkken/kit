@@ -180,7 +180,8 @@ Steps 1 and 2 each end the filing on a refusal. Steps 3–7 run as one pass: eac
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. File nothing until every candidate is named in `--distinct`; a duplicate is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the search and the epic decision run there.
    - An open issue with the same normalized `- 計測宣言:` refuses the filing whatever `--distinct` names, printing its number; join it with `pnpm josh issue:comment <N>`. Another command or bound, a closed issue and `- 計測宣言なし:` pass.
 8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created warns, and the filing goes on.
-9. File with all labels in one request, plus the `priority:critical` / `priority:high` the declaration names; print the URL. A `--route interrupt --blocks-finder` filing in this repository then records its finder (step 2's origin) as blocked by the filed issue; a write that fails prints `⚠` with the `gh api` call to re-run, and the exit code stays 0; one that records nothing prints why.
+9. Create with all labels and print the URL. A local `--route interrupt --blocks-finder` filing records its finder as blocked by it; failures warn with the retry command, skipped records say why.
+   Local `原因の park: #<N>` lines record stops through the shared epic recorder. Foreign filings skip them. Failures warn and continue; repair dependencies without refiling. Post-create failures leave exit 0.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
 
@@ -762,7 +763,7 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. Ranks `priority:critical`, `priority:high`, verification-path defects (`bug` with `run:solo`, or `route:interrupt`), then blockers (all keys: **Ranking** below).
+Read-only. Uses **Ranking** below: priority, resumable work, verification-path defects, then blockers.
 Ties use creation time ascending, then number ascending. Skips `epic`, `in-progress`, `needs-decision` and candidates whose `blockedBy` is open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
 or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` (or `#<issue> を閉じる PR のマージ後 <K> マージ`) is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read` — `the pull request closing #<issue>` in place of `#<PR>` for the issue form.
 
@@ -820,7 +821,8 @@ Any other untriaged candidate is held alone, named on stderr. The triaged candid
 
 **Defect priority**: defects always go to the front of the runnable numbers among ranking ties. New mechanisms go to the back only while the defect rate is above its baseline.
 
-**Ranking**: a body declaring `- 実施順: 最後` goes last; otherwise `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of open issues waiting on it down a chain (transitively), then the declared weekly gain (`## 期待効果`); standalone numbers are cut to five.
+**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, resumable work (owned stash), verification-path defect, lost minutes, transitive dependents, then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
+Lost minutes sum `- 原因の損失:` lines, falling back to `- 原因のレーン:`.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
 
@@ -956,7 +958,9 @@ An open carry record supplies the start time, merged count and named issues. The
 
 The supervisor claims the record for the session it wakes; the session acts and ends its turn; its `Stop` hook writes the cut that hands the loop back.
 
-A pass launches every free lane it seats side by side, not one after another. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
+A pass launches every free lane it seats side by side. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
+
+Merged causes use guarded `run:add --retry` for parked dependents.
 
 A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
 

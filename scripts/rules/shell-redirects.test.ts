@@ -21,12 +21,15 @@ describe('shell_redirects.targets_of', () => {
 	})
 })
 
-describe('shell_redirects.written_of', () => {
-	it('keeps the written files and drops the read ones', () => {
-		expect(shell_redirects.written_of('sort < in.txt > out.txt', 'sort')).toEqual(['out.txt'])
+describe('shell_redirects.targets_of combined redirects', () => {
+	it('keeps both the read and written files (ac-6ec7da1e)', () => {
+		expect(shell_redirects.targets_of('sort < in.txt > out.txt', 'sort')).toEqual([
+			'in.txt',
+			'out.txt',
+		])
 	})
 
 	it('reads `&>` as a write', () => {
-		expect(shell_redirects.written_of('make &> log.txt', 'make')).toEqual(['log.txt'])
+		expect(shell_redirects.targets_of('make &> log.txt', 'make')).toEqual(['log.txt'])
 	})
 })
