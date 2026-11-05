@@ -890,6 +890,15 @@ pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
 The parent follows `--pass`'s stdout command; diagnostics go to stderr. Apply prints
 `triage #N — <label> · blocked by #M`; without `--clear`, the park stays.
 
+The pass reads local `needs-decision`, `run:stalled` and remaining judgments once per issue.
+Foreign-repository and excluded children are not read. With none left it prints `backlog:plan --waves`.
+
+For Tier A answers, `pnpm josh epic --decide <E> <N...> --decision-file .josh/tmp/decision.md`
+records the answer in the epic and child and clears `needs-decision`. For recovered mechanical
+failures, `pnpm josh run:add <N> --retry` clears `run:stalled` and retries the previous attempt.
+Record prerequisites with `--apply <N> --blocked-by <M> --reason <text>`; questions needing a person
+or measurement stay parked and excluded from this pass. Recovery guidance prints only when a read is due.
+
 ### `josh backlog:budget`
 
 <!-- usage: backlog:budget -->

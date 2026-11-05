@@ -1,11 +1,12 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
-import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_auto_triage } from './backlog-auto-triage'
 import type { PoolContext } from './backlog-gate-scope'
 import { backlog_next } from './backlog-next'
+import { backlog_pool } from './backlog-pool'
 import { backlog_triage_pass } from './backlog-triage-pass'
 
 vi.mock('./backlog-next', () => ({ backlog_next: { context_of: vi.fn(), resolve: vi.fn() } }))
@@ -14,9 +15,10 @@ vi.mock('./backlog-auto-triage', () => ({ backlog_auto_triage: { untriaged_of: v
 const REPO = 'owner/repo'
 const PARKED = 901
 const UNTRIAGED = 902
+const STALLED = 903
 const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-vi.spyOn(console, 'error').mockImplementation(() => undefined)
+const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 const classify = vi.mocked(backlog_next.resolve)
 const read_context = vi.mocked(backlog_next.context_of)
 const settle = vi.mocked(backlog_auto_triage.untriaged_of)
@@ -52,6 +54,7 @@ describe('the parent triage pass', () => {
 		expect(await backlog_triage_pass.run([])).toBe(0)
 		expect(settle).toHaveBeenCalledWith(result(), REPO)
 		expect(info).toHaveBeenCalledExactlyOnceWith('pnpm josh backlog:plan --waves')
+		expect(error).not.toHaveBeenCalled()
 	})
 
 	it('batches local decisions and remaining judgments into one body-and-comments read', async () => {
@@ -72,6 +75,60 @@ describe('the parent triage pass', () => {
 
 		expect(read_context).toHaveBeenCalledWith(expect.objectContaining({ kind: 'read' }), [PARKED])
 	})
+})
+
+describe('stalled child triage', () => {
+	it('reads stalled and decision children once across overlapping judgments (ac-a0bf964f)', async () => {
+		const snapshot = result()
+
+		snapshot.blocked_on_people = [
+			child(STALLED, [RUN_STALLED_LABEL]),
+			child(PARKED, [NEEDS_DECISION_LABEL, RUN_STALLED_LABEL]),
+		]
+		classify.mockResolvedValue(snapshot)
+		settle.mockResolvedValue({ result: snapshot, untriaged: [child(STALLED), child(PARKED)] })
+		await backlog_triage_pass.run([])
+
+		expect(info).toHaveBeenCalledExactlyOnceWith(
+			`pnpm josh issue:read ${String(STALLED)} ${String(PARKED)}`,
+		)
+	})
+
+	it('omits foreign and excluded parked children (ac-67cb7a1d)', async () => {
+		const snapshot = context()
+		const human = [child(STALLED, [RUN_STALLED_LABEL]), child(PARKED, [NEEDS_DECISION_LABEL])]
+
+		snapshot.exclude = [STALLED]
+		human.push({ ...child(STALLED, [RUN_STALLED_LABEL]), repo: 'owner/other' })
+		read_context.mockResolvedValue(snapshot)
+		classify.mockImplementation(async (pool) => ({
+			...result(),
+			blocked_on_people: backlog_pool.drop_excluded(
+				{ runnable: [], time: [], human },
+				pool.exclude,
+				pool.repo,
+			).human,
+		}))
+		await backlog_triage_pass.run(['--exclude', String(STALLED)])
+
+		expect(read_context).toHaveBeenCalledWith(expect.objectContaining({ kind: 'read' }), [STALLED])
+		expect(info).toHaveBeenCalledExactlyOnceWith(`pnpm josh issue:read ${String(PARKED)}`)
+	})
+})
+
+describe('triage recovery guidance', () => {
+	it.each(['epic --decide', 'run:add --retry', '--blocked-by', 'person or measurement parked'])(
+		'prints the %s recovery route for stalled children (ac-51b36095)',
+		async (route) => {
+			classify.mockResolvedValue({
+				...result(),
+				blocked_on_people: [child(STALLED, [RUN_STALLED_LABEL])],
+			})
+			await backlog_triage_pass.run([])
+
+			expect(error).toHaveBeenCalledWith(expect.stringContaining(route))
+		},
+	)
 })
 
 describe('triage pass refusals', () => {
