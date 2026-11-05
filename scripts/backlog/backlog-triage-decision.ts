@@ -44,6 +44,6 @@ function run(argv: ReadonlyArray<string>): number {
 	return 0
 }
 
-const backlog_triage_decision = { run }
+const backlog_triage_decision = { OPTIONS, decide, is_answer, run }
 
 export { backlog_triage_decision }
