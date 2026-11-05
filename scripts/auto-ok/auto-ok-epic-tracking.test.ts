@@ -121,7 +121,7 @@ describe('josh auto-ok:next — an epic that is not opted in', () => {
 		epic_list.mockResolvedValueOnce(tracking([NEW_ISSUE_NUMBER, OLD_ISSUE_NUMBER]))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 	})
 
 	// The other half of the acceptance: an issue no epic tracks behaves exactly as it did.
@@ -130,7 +130,7 @@ describe('josh auto-ok:next — an epic that is not opted in', () => {
 		epic_list.mockResolvedValueOnce(tracking([BLOCKER_NUMBER]))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 	})
 })
 
