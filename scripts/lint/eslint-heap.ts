@@ -1,3 +1,6 @@
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { find_package_directory } from '#scripts/josh/package-directory'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
 // joshuafolkken/kit#6331: whole-tree typed lint holds the root TypeScript program and every
@@ -11,6 +14,12 @@ const ESLINT_HEAP_MIB = 8192
 // person wins: their limit is a deliberate choice, this one only a floor for the default.
 const HEAP_FLAG = /--max[-_]old[-_]space[-_]size\b/u
 const NODE_OPTIONS = 'NODE_OPTIONS'
+const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
+const MEMORY_PATH = path.join(
+	find_package_directory(MODULE_DIRECTORY),
+	'scripts/lint/eslint-memory.js',
+)
+const MEMORY_IMPORT = `--import=${pathToFileURL(MEMORY_PATH).href}`
 
 function with_heap(given_options: string | undefined): string {
 	const current = given_options?.trim() ?? ''
@@ -29,8 +38,10 @@ function environment(): NodeJS.ProcessEnv {
 
 // `pnpm exec eslint` as a buffered child under this heap.
 async function run_cold(pnpm_arguments: ReadonlyArray<string>): Promise<BufferedProcessResult> {
+	const child = environment()
+
 	return await buffered_process.run_buffered_process(pnpm_arguments, {
-		environment: environment(),
+		environment: { ...child, [NODE_OPTIONS]: `${child[NODE_OPTIONS] ?? ''} ${MEMORY_IMPORT}` },
 	})
 }
 
