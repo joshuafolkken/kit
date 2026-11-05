@@ -10,16 +10,13 @@ import { describe, expect, it } from 'vitest'
 // disabled on the line, as in ci-yml-fixture — rather than reached through an index signature,
 // which would turn a misspelled key into `undefined` and make an assertion pass without testing.
 interface DependabotGroup {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Dependabot config key
 	'update-types'?: ReadonlyArray<string>
 	patterns?: ReadonlyArray<string>
 }
 
 interface DependabotUpdate {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Dependabot config key
 	'package-ecosystem'?: string
 	schedule?: { interval?: string }
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Dependabot config key
 	'open-pull-requests-limit'?: number
 	groups?: Record<string, DependabotGroup>
 }
