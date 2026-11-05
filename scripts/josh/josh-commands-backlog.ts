@@ -72,7 +72,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 			"Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict",
 		category: 'AI tools',
 		reference: [
-			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear]',
+			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear]',
 			'automation',
 			['files', 'network'],
 		],
@@ -81,7 +81,10 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '--pass' },
 				{ arguments: '--decide --defect yes --verification yes --every-run no' },
 				{ arguments: '--apply 912 --lane --reason "<why>"' },
-				{ arguments: '--apply 913 --solo --reason "<why>" --clear' },
+				{
+					arguments:
+						'--apply 913 --solo --defect yes --verification yes --every-run yes --reason "<why>" --clear',
+				},
 				{
 					arguments: '--apply 914 --blocked-by 912 --reason "<why>"',
 				},
