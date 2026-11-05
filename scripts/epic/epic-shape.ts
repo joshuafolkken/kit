@@ -1,4 +1,4 @@
-import { EPIC_LABEL } from '#scripts/issue/issue-labels'
+import { EPIC_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { epic_parse } from './epic-parse'
 import { to_issue_reference } from './epic-reference'
 
@@ -46,7 +46,7 @@ function promote_remedy(epic_number: number): string {
 // in the native relations alone (`epic_graph.child_links`), which these edits never read or drop — and
 // the rewrite leaves a row it does not recognize exactly where it stood.
 function find_epic_shape_error(subject: EpicShapeSubject): string | undefined {
-	if (subject.labels.includes(EPIC_LABEL)) return undefined
+	if (has_label_name(subject.labels, EPIC_LABEL)) return undefined
 
 	return `${to_issue_reference(subject.epic_number)} does not carry the \`${EPIC_LABEL}\` label, so it is not an epic. ${promote_remedy(subject.epic_number)}`
 }
