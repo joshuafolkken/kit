@@ -105,13 +105,14 @@ const NOT_BEFORE_LABEL = 'not-before'
 
 // The labels that park an open issue: a run never starts or restarts it, and only a person lifts
 // them — `needs-decision` waits for an answer, `run:stalled` for a mechanical cause to be fixed, and
-// `already-done` for the close. The run that applied any of them committed nothing, so the checkout
-// is clean. Held once because the merge, the board, the pool, the classification and the liveness
+// `already-done` for the close, and `needs-human-merge` for a person to merge its ready PR. Each
+// leaves a clean checkout. Held once because the merge, the board, the pool, the classification and the liveness
 // read all ask "is this child parked", and a copy that missed a label would answer differently.
 const PARKED_LABELS: ReadonlySet<string> = new Set([
 	NEEDS_DECISION_LABEL,
 	RUN_STALLED_LABEL,
 	ALREADY_DONE_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 ])
 
 // The labels that mean an open issue must not be handed to a run as it stands: an `epic`
