@@ -85,6 +85,8 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/release/github-release-cli.ts',
 	'scripts/release/publish-tag.ts',
 	'scripts/release/publish-tag-cli.ts',
+	// #6514 stages the child removal plan; remove this entry when #6517 adds its consumer command.
+	'scripts/epic/epic-untrack-plan.ts',
 	// #6299 stages the shared reader without callers; remove this entry when #6243 or #6048 uses it.
 	'scripts/review/review-gate-mode.ts',
 ])
