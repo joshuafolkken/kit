@@ -37,6 +37,7 @@ const CHANGED_ARGUMENTS = ['--changed']
 const PRETTIER_PASS = 'All matched files use Prettier code style!'
 const TIMING_LINE = /^lint timing — prettier \d+\.\d s · eslint \d+\.\d s\n$/u
 const ESLINT_HEAP = `--max-old-space-size=${String(ESLINT_HEAP_MIB)}`
+const COLD_OPTIONS = `${ESLINT_HEAP} --import=${new URL('eslint-memory.js', import.meta.url).href}`
 
 // The lint check reads only `all` and `exitCode` of execa's large result interface.
 function fake_result(exit_code: number, all = ''): ExecaResult {
@@ -135,7 +136,7 @@ describe('CI whole-tree resource settings', () => {
 			expect.any(String),
 			expect.any(Array),
 			expect.objectContaining<Record<string, unknown>>({
-				env: expect.objectContaining({ NODE_OPTIONS: ESLINT_HEAP }),
+				env: expect.objectContaining({ NODE_OPTIONS: COLD_OPTIONS }),
 			}),
 		)
 	})

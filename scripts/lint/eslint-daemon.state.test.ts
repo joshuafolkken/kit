@@ -22,6 +22,7 @@ const ESLINT_DIRECTORY = 'node_modules/eslint'
 const DAEMON = 'token 4321 77 hash'
 const REPORT = 'report'
 const ESLINT_HEAP = `--max-old-space-size=${String(ESLINT_HEAP_MIB)}`
+const COLD_OPTIONS = `${ESLINT_HEAP} --import=${new URL('eslint-memory.js', import.meta.url).href}`
 
 const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-state-'))
 
@@ -138,6 +139,8 @@ describe('eslint_daemon.run_or_cold heap', () => {
 
 		await eslint_daemon.run_or_cold(PNPM_ESLINT)
 
-		expect(spawned_environment()).toMatchObject({ NODE_OPTIONS: ESLINT_HEAP })
+		expect(spawned_environment()).toMatchObject({
+			NODE_OPTIONS: COLD_OPTIONS,
+		})
 	})
 })

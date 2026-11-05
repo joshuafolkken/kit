@@ -22,6 +22,7 @@ const { change_base } = await import('#scripts/git/change-base')
 const { git_command } = await import('#scripts/git/git-command')
 const { git_spawn } = await import('#scripts/git/git-spawn')
 const { split_measure } = await import('./split-measure')
+const { split_assess } = await import('./split-assess')
 
 const NEW_FILE_COUNT = 11
 const NEW_FILE_LINES = 50
@@ -89,6 +90,23 @@ describe('read_branch', () => {
 			lines: 5,
 			verdict: 'single',
 		})
+	})
+})
+
+describe('read_branch excludes run records', () => {
+	it('keeps one deliverable under its declared boundary with tracked and untracked records', async () => {
+		const record = '.josh/observations/6391.md'
+
+		await mkdir(path.join(fixture.root, '.josh/observations'), { recursive: true })
+		await writeFile(path.join(fixture.root, record), lines_of(NEW_FILE_LINES))
+		vi.mocked(git_command.untracked_names).mockResolvedValue(record)
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(
+			'1\t0\tscripts/a.ts\n50\t0\tscripts/a.test.ts\n50\t0\t.josh/metrics-accepted/6391.json',
+		)
+		const measurement = await split_measure.read_branch()
+
+		expect(measurement).toEqual({ files: 1, lines: 1, verdict: 'single' })
+		expect(split_assess.notice(measurement, { files: 1, lines: 10 })).toBeUndefined()
 	})
 })
 
