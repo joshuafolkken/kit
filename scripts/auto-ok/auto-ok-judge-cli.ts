@@ -19,7 +19,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const NONE_TOKEN = 'none'
 const USAGE =
-	'Usage: josh auto-ok:judge [--apply <N> (--lane | --solo) | --decline <N> --reason <text>]'
+	'Usage: josh auto-ok:judge [--apply <N> (--lane | --solo --defect yes --verification yes --every-run yes) | --decline <N> --reason <text>]'
 
 const OPTIONS = {
 	apply: { type: 'string' },
