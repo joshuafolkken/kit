@@ -1,3 +1,4 @@
+import { pnpm_installer } from '#scripts/lib/pnpm-installer'
 import { describe, expect, it } from 'vitest'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 
@@ -69,6 +70,15 @@ describe('patch_deploy_vps_pnpm — version check insertion', () => {
 })
 
 describe('patch_deploy_vps_pnpm — existing guards', () => {
+	it('migrates the fallback even when the version check is already current', () => {
+		const guarded = OLD_WORKFLOW_SCRIPT.replace(OLD_IF_CHECK, () => NEW_IF_CHECK)
+		const result = init_logic_deploy_vps.patch_deploy_vps_pnpm(guarded)
+
+		expect(result).toContain(` || ${pnpm_installer.command()}`)
+		expect(result).not.toContain('https://get.pnpm.io/install.sh')
+		expect(init_logic_deploy_vps.patch_deploy_vps_pnpm(result)).toBe(result)
+	})
+
 	it('upgrades the old pnpm 11 guard without duplicating its version line', () => {
 		const old_guard = OLD_WORKFLOW_SCRIPT.replace(
 			OLD_IF_CHECK,

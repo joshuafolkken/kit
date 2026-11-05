@@ -2,12 +2,18 @@ import { describe, expect, it } from 'vitest'
 import type { QuotaReading } from './run-board-quota-read'
 import { run_board_quota_spent } from './run-board-quota-spent'
 
-const { claude_done, codex_done, per_task_of, span_of } = run_board_quota_spent
+const { claude_done, codex_done, per_lane_of, per_task_of, span_of } = run_board_quota_spent
 const FIVE_HOURS = 300
 const SEVEN_DAYS = 10_080
 const RESET_MS = 1_800_000_000_000
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
+const HOURS = [5, 4, 3, 2, 1]
+
+interface Task {
+	span: ReadonlyArray<QuotaReading>
+	lane: string | undefined
+}
 
 function reading(five_hour: number, seven_day: number, shift_ms = 0): QuotaReading {
 	return {
@@ -25,6 +31,11 @@ function week(used: number, hour: number): QuotaReading {
 		windows: [{ minutes: SEVEN_DAYS, used_percent: used, resets_ms: RESET_MS }],
 		taken_ms: hour * HOUR_MS,
 	}
+}
+
+// Five done files in newest-first order, each observing the same shared rise.
+function rollouts(lane: string | undefined): Array<Task> {
+	return HOURS.map((hour) => ({ span: [week(0, 0), week(10, hour)], lane }))
 }
 
 // One done file's span: a head reading and a tail reading of the same meters.
@@ -127,5 +138,45 @@ describe('run_board_quota_spent.per_task_of over the lanes done in its rise', ()
 
 		expect(per_task_of(spans, ends)).toEqual({ [SEVEN_DAYS]: 3 / 2 })
 		expect(per_task_of(spans)).toEqual({ [SEVEN_DAYS]: 3 / 2 })
+	})
+})
+
+describe('run_board_quota_spent.per_lane_of', () => {
+	it('counts five completed rollouts of one lane as one task', () => {
+		const tasks = rollouts('6376')
+		const ends = HOURS.map((hour) => ({ end_ms: hour * HOUR_MS, lane: '6376' }))
+
+		expect(per_lane_of(tasks, ends)).toEqual({ [SEVEN_DAYS]: 10 })
+		expect(per_lane_of(tasks, [])).toEqual({ [SEVEN_DAYS]: 10 })
+	})
+
+	it('counts rollouts without lanes individually, including an untimed sample', () => {
+		const tasks = rollouts(undefined)
+		const ends = HOURS.map((hour) => ({ end_ms: hour * HOUR_MS, lane: undefined }))
+
+		expect(per_lane_of(tasks, ends)).toEqual({ [SEVEN_DAYS]: 2 })
+		expect(per_lane_of(tasks, [])).toEqual({ [SEVEN_DAYS]: 2 })
+	})
+
+	it('uses the latest done rollout of each lane across all files read back', () => {
+		const tasks = [{ span: [week(0, 0), week(10, 10)], lane: 'sample' }]
+		const ends = [
+			{ end_ms: 20 * HOUR_MS, lane: 'later' },
+			{ end_ms: HOUR_MS, lane: 'later' },
+			{ end_ms: 5 * HOUR_MS, lane: 'finished' },
+			{ end_ms: 6 * HOUR_MS, lane: 'finished' },
+		]
+
+		expect(per_lane_of(tasks, ends)).toEqual({ [SEVEN_DAYS]: 10 })
+	})
+
+	it('keeps the newest rollout reset when joining spans for the same lane', () => {
+		const reset = FIVE_HOURS * MINUTE_MS
+		const tasks = [
+			{ span: [reading(0, 0, reset), reading(10, 10, reset)], lane: '6376' },
+			{ span: [reading(80, 0), reading(90, 0)], lane: '6376' },
+		]
+
+		expect(per_lane_of(tasks, [])).toEqual({ [FIVE_HOURS]: 10, [SEVEN_DAYS]: 10 })
 	})
 })

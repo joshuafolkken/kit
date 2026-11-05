@@ -79,4 +79,19 @@ describe('observation_ledger_home.read', () => {
 
 		expect(await observation_ledger_home.read(root)).toBeUndefined()
 	})
+
+	it('rejects an unreadable directory in strict mode', async () => {
+		const root = mkdtempSync(path.join(scratch, 'strict-directory-'))
+
+		await expect(observation_ledger_home.read(root, true)).rejects.toThrow()
+	})
+
+	it('rejects an unreadable ledger file in strict mode instead of treating it as empty history', async () => {
+		const root = mkdtempSync(path.join(scratch, 'strict-file-'))
+		const directory = path.join(root, OBSERVATION_LEDGER_DIRECTORY)
+
+		mkdirSync(path.join(directory, '1.md'), { recursive: true })
+		await expect(observation_ledger_home.read(root, true)).rejects.toThrow()
+		expect(await observation_ledger_home.read(root)).toBe('')
+	})
 })

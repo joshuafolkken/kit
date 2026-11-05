@@ -1,6 +1,7 @@
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
+import type { StallCause } from '#scripts/run/park/run-stalled'
+import { run_merge_decision } from './run-merge-decision'
 import { run_merge_ship } from './run-merge-ship'
 
 // Why a child the per-child re-dispatch cap stopped is parked (joshuafolkken/kit#4765). The cap turns a
@@ -35,21 +36,25 @@ function note_of(events: Events, child: string, limit: number): string {
 	return `it reached the re-dispatch cap (${String(limit)}) after ${String(count)} re-dispatches; the last failed relaunch: ${failure}.`
 }
 
-// What a failed child is parked for: the caller's cause, else its ended ship's, else the unfinished
-// session — led by the cap's line where the cap stopped its re-dispatch. A caller's cause parked the
+// What an unfinished child is parked for: the caller's cause, else a question, its ended ship's stop,
+// or the unfinished session — led by the cap's line where the cap stopped its re-dispatch. A caller's cause parked the
 // child on its own path, so the cap's line stays off it.
 function park_cause(
 	child: string,
 	cause: StallCause | undefined,
 	note: string | undefined,
+	output?: string,
 ): StallCause {
 	if (cause !== undefined) return cause
 
-	const judged = run_merge_ship.cause(child) ?? run_stalled.SESSION_UNFINISHED
+	const judged = run_merge_decision.cause(output)
+	const stopped = run_merge_decision.is_decision(judged.short)
+		? judged
+		: (run_merge_ship.cause(child) ?? judged)
 
-	if (note === undefined) return judged
+	if (note === undefined) return stopped
 
-	return { short: judged.short, why: `${note} ${judged.why}` }
+	return { short: stopped.short, why: `${note} ${stopped.why}` }
 }
 
 const run_merge_cap = { note_of, outages, park_cause }

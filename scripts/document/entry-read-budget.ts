@@ -60,7 +60,7 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'backlogrun', bytes: 69_632 },
 	// joshuafolkken/kit#5953 charged pre-gate-cut.md at the two sections run:cut prints, not whole;
 	// joshuafolkken/kit#5958 dropped the seam's pointer to the cut, lowering it by a block.
-	{ entry: LANE_CHILD, bytes: 36_864 },
+	{ entry: LANE_CHILD, bytes: 24_576 },
 ]
 
 function byte_size(root: string, relative_path: string): number {

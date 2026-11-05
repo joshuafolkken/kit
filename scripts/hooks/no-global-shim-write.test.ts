@@ -25,8 +25,7 @@ const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = [...SHARED_PATH_MARKERS,
 // directory is unavoidable there — and reaching for `process.env.HOME` instead would be exactly the
 // "equivalent reconstruction" the marker above exists to catch (joshuafolkken/kit#962).
 //
-// **The exemption is paid for, not granted.** The principle this guard protects is that no kit
-// script *writes* to a shared, user-level location; an exempted file is therefore held to a
+// **The exemption is paid for, not granted.** Home resolution stays read-only; an exempted file is held to a
 // stricter rule than the ban it escapes — it must contain no write call at all, which the second
 // test below enforces. Adding a name here without that property defeats the guard.
 //
@@ -41,6 +40,8 @@ const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
 	path.join('cost-runtime', 'cost-transcript.ts'),
 	path.join('run', 'run-liveness.ts'),
 	path.join('agent', 'codex-home-source.ts'),
+	// `usage:tee` explicitly records account-wide statusLine data (#6316), outside lifecycle hooks.
+	path.join('usage', 'usage-state-path.ts'),
 	// `secret-paths` names the home directory's credential files so the protected-file guard can refuse
 	// a read of one; it only compares paths (joshuafolkken/kit#6003).
 	path.join('rules', 'secret-paths.ts'),

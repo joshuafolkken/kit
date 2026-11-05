@@ -51,6 +51,17 @@ describe('a stored lane profile across a cut', () => {
 
 // joshuafolkken/kit#3926: a verification round builds under its own reviewer profile.
 describe('a review round', () => {
+	it.each(['low', 'medium'])('launches the model selected for a %s first round', (level) => {
+		check.mockReturnValue({ kind: 'ready' })
+		const built = agent_argv.review_in(`${level} — review the brief`, 1, LANE, {
+			JOSH_AGENT_PROVIDER: 'anthropic',
+		})
+		const model = level === 'low' ? SONNET : DEFAULT_PROFILES.reviewer.model
+
+		expect(built).toMatchObject({ kind: 'argv', profile: { model } })
+		expect(built.kind === 'argv' && built.argv.args).toContain(model)
+	})
+
 	it.each([1, 2])('keeps the trusted local policy for OpenAI review round %s', (round) => {
 		check.mockReturnValue({ kind: 'ready' })
 		const built = agent_argv.review_in(INVOCATION, round, LANE, { JOSH_AGENT_PROVIDER: 'openai' })

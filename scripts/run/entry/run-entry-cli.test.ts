@@ -1,13 +1,13 @@
 import { session_cite } from '#scripts/issue/session-cite'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 const gather_mock = vi.hoisted(() => vi.fn())
 const to_parts_mock = vi.hoisted(() => vi.fn())
-const fit_mock = vi.hoisted(() =>
-	vi.fn<(parts: unknown, compose: (r: string) => string) => string>(),
-)
+type Fit = (parts: unknown, compose: (r: string) => string) => string
+const fit_mock = vi.hoisted(() => vi.fn<Fit>())
 const adopt_mock = vi.hoisted(() => vi.fn())
 const is_pending_mock = vi.hoisted(() => vi.fn())
 const prrun_adopt_mock = vi.hoisted(() => vi.fn())
@@ -69,7 +69,6 @@ const PREP_BODY = '=== issue ===\nbody'
 const ISSUE = '2372'
 const CITED = session_cite.issue(ISSUE)
 const PRRUN_TOKEN = 'prrun-merge'
-const RELEASE_CALL = ['run:release', ISSUE]
 
 const info_lines: Array<string> = []
 
@@ -97,6 +96,7 @@ function calls(): ReadonlyArray<ReadonlyArray<string>> {
 }
 
 function reset_resume_mocks(): void {
+	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(OK)
 	adopt_mock.mockReset().mockResolvedValue(false)
 	is_pending_mock.mockReset().mockResolvedValue(false)
 	prrun_adopt_mock.mockReset().mockResolvedValue(false)
@@ -123,7 +123,7 @@ beforeEach(() => {
 })
 
 describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and step into one report', () => {
-	it('claims the tree, reads the budget, gathers the reads and prints one composite', async () => {
+	it('opens a fresh run with one entry call (ac-b726d0b0)', async () => {
 		josh_run_mock
 			.mockResolvedValueOnce(FRESH)
 			.mockResolvedValueOnce(HELD)
@@ -179,7 +179,7 @@ describe('run_entry_cli.run — a halfrun stop is resumed rather than claimed (j
 		expect(await run_entry_cli.run([ISSUE])).not.toBe(OK)
 		expect(adopt_mock).not.toHaveBeenCalled()
 		expect(info_lines[1]).toContain('cost: over')
-		expect(calls()).not.toContainEqual(RELEASE_CALL)
+		expect(run_hold_cli.run).not.toHaveBeenCalled()
 	})
 })
 
@@ -248,7 +248,7 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(info_lines[1]).toContain('cost: over · verdict: -')
 		expect(mark_mock).not.toHaveBeenCalled()
-		expect(calls().at(-1)).toStrictEqual(RELEASE_CALL)
+		expect(run_hold_cli.run).toHaveBeenCalledExactlyOnceWith(['--release', ISSUE])
 		expect(info_lines.at(-1)).toBe(lane_park.COMMAND_NOTIFY_MARKER)
 	})
 })
@@ -257,10 +257,12 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 // refused the fresh session `busy` by its own run's hold and the resume was never asked.
 describe('run_entry_cli.run — a carried cut is resumed before the hold is claimed', () => {
 	it.each([
+		['resume', OK],
 		['resume-impl', OK],
 		['over', 1],
-	])('answers %j with its exit code and claims nothing', async (token, exit) => {
+	])('answers %j from one entry call and claims nothing (ac-b726d0b0)', async (token, exit) => {
 		josh_run_mock.mockResolvedValueOnce({ code: exit, out: token })
+		is_child_mock.mockReturnValue(true)
 
 		const code = await run_entry_cli.run([ISSUE])
 

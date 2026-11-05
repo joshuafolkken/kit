@@ -6,6 +6,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
 import { test_pinned_cache, type LoadedCache, type Reached } from './test-pinned-cache'
 import { test_pinned_cache_logic, type Known, type Recheck } from './test-pinned-cache-logic'
+import { test_pinned_carry } from './test-pinned-carry'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_functions } from './test-pinned-functions'
 import type { PinnedOrigin } from './test-pinned-ledger'
@@ -18,6 +19,7 @@ import {
 import { test_pinned_moves } from './test-pinned-moves'
 import { test_pinned_probe, type CheckOptions, type Probe } from './test-pinned-probe'
 import { test_pinned_reach, type Reach } from './test-pinned-reach'
+import { test_pinned_snapshot } from './test-pinned-snapshot'
 import type { Staged } from './test-pinned-stage'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
@@ -26,9 +28,8 @@ import type { RedProbe } from './test-red-logic'
 // the merge-base's lines, one at a time, run that file's related tests, and list the hunks no test went
 // red on, so reviews can identify changes whose behavior the tests do not pin.
 //
-// **The reverts happen in a detached worktree at HEAD, never the caller's checkout** (`base-tree.ts`).
-// The changed files are copied in from the working tree first, so what is reverted is the change as it
-// stands, committed or not, and each hunk's file is restored before the next one runs.
+// The entire read runs inside an immutable snapshot (`test-pinned-snapshot.ts`). Each probe gets a
+// detached tree at that snapshot's HEAD, and each hunk's file is restored before the next one runs.
 
 const HEAD = 'HEAD'
 
@@ -43,6 +44,7 @@ interface ProbeRead extends StubRead {
 }
 
 interface RunOptions {
+	cache_file?: string
 	max_hunks: number
 	is_cached_only: boolean
 	is_first_unpinned?: boolean
@@ -82,15 +84,6 @@ async function read_hunks(base: string, files: ReadonlyArray<string>): Promise<A
 
 	return test_pinned_logic.parse_hunks(
 		await git_spawn.read([...diff_args, ...prefix_args, ...files]),
-	)
-}
-
-// The key of each hunk, read off the working file its lines sit in now.
-async function keys_of(hunks: ReadonlyArray<Hunk>): Promise<Array<string>> {
-	const contents = await Promise.all(hunks.map(async (hunk) => await readFile(hunk.file, 'utf8')))
-
-	return test_pinned_cache_logic.distinct(
-		hunks.map((hunk, index) => test_pinned_cache_logic.hunk_key(hunk, contents[index] ?? '')),
 	)
 }
 
@@ -145,14 +138,25 @@ function check_options(held: number, options: RunOptions): CheckOptions {
 	}
 }
 
+async function with_spawned(probes: ReadonlyArray<Probe>, reach: Reach): Promise<Array<Probe>> {
+	const files = [...new Set(probes.map((probe) => probe.hunk.file))]
+	const spawned = await Promise.all(files.map(async (file) => await reach.spawned(file)))
+	const by_file = new Map(files.map((file, index) => [file, spawned[index]]))
+
+	return probes.map((probe) => ({ ...probe, spawned: by_file.get(probe.hunk.file) }))
+}
+
 // Each hunk's verdict: the cached one where it still holds, else a fresh run's, in the hunks' order.
 // The held ones are written first and each fresh one as it is reached (`test_pinned_cache.writer`).
 // Under `is_first_unpinned` a hunk the run stopped before keeps no verdict.
 async function verdicts_on(paths: ReadonlyArray<string>, probing: ProbeRun): Promise<Verdicts> {
 	const verdicts = probing.known.map((entry) => held_of(entry))
 	const reached = reached_of(verdicts)
-	const probes = by_reach(probes_of(probing.hunks, probing.known), probing.counts)
-	const writer = test_pinned_cache.writer(probing.cache, probing.keys)
+	const probes = await with_spawned(
+		by_reach(probes_of(probing.hunks, probing.known), probing.counts),
+		probing.cache.reach,
+	)
+	const writer = test_pinned_cache.writer({ ...probing.cache, hunks: probing.hunks }, probing.keys)
 	const options = check_options(reached.length, probing.options)
 
 	await writer.record(reached)
@@ -202,7 +206,7 @@ async function checked_outcome(
 	options: RunOptions,
 ): Promise<HunkOutcome> {
 	const { hunks, cache } = read
-	const keys = await keys_of(hunks)
+	const keys = test_pinned_carry.keys(cache, hunks)
 	const known = await test_pinned_cache.known(
 		cache,
 		keys,
@@ -221,22 +225,32 @@ async function checked_outcome(
 	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts), staged }
 }
 
-// A hunk over the test-file cap is neither read from the cache nor probed, in either mode, so both
-// report it alike; the fresh run's ledger row counts it.
+async function hinted_hunks(outcome: HunkOutcome, reach: Reach): Promise<HunkOutcome['unpinned']> {
+	return await Promise.all(
+		outcome.unpinned.map(async (hunk) => ({
+			...hunk,
+			related_tests: await reach.related(hunk.file),
+		})),
+	)
+}
+
+// A hunk over the test-file cap is never probed; both modes report it alike, and the fresh run's
+// ledger row counts it.
 async function outcome_on(
-	base: string,
+	cache: LoadedCache,
 	paths: ReadonlyArray<string>,
 	changed: ReadonlyArray<Hunk>,
 	options: RunOptions,
 ): Promise<HunkOutcome> {
 	if (changed.length === 0) return NO_OUTCOME
-	const cache = await test_pinned_cache.load(base, changed)
 	const counts = await counts_of(changed, cache.reach)
 	const { checked, unchecked } = test_pinned_logic.capped(changed, counts)
 	const capped_options = { ...options, over_cap: unchecked.length }
 	const outcome = await checked_outcome(paths, { hunks: checked, counts, cache }, capped_options)
 
-	return { ...outcome, ...over_cap_of(unchecked) }
+	const unpinned = await hinted_hunks(outcome, cache.reach)
+
+	return { ...outcome, unpinned, ...over_cap_of(unchecked) }
 }
 
 // A target the base's tree does not hold is added — committed on the branch or still untracked.
@@ -300,8 +314,10 @@ async function report_on(
 		changed.filter((file) => test_pinned_logic.is_target(file)),
 	)
 	const probes = await read_probes(base, targets)
-	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, has_runner ? max_hunks : 0)
-	const outcome = await outcome_on(base, paths, checked, { ...options, rewired: probes.rewired })
+	const cache = await test_pinned_cache.load(base, probes.hunks, options.cache_file)
+	const { checked, unchecked } = await test_pinned_carry.select(cache, has_runner ? max_hunks : 0)
+	if (!options.is_cached_only) test_pinned_carry.record(cache, unchecked)
+	const outcome = await outcome_on(cache, paths, checked, { ...options, rewired: probes.rewired })
 
 	return { ...outcome, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
 }
@@ -311,7 +327,13 @@ async function report(options: RunOptions): Promise<PinnedReport> {
 	const has_runner = test_red.has_runner()
 	if (base === undefined) return { ...NO_REPORT, max_hunks: options.max_hunks, has_runner }
 
-	return await report_on(base, options, has_runner)
+	const root = process.cwd()
+	const result = await test_pinned_snapshot.with_snapshot(async (snapshot) => ({
+		...(await report_on(base, { ...options, cache_file: snapshot.cache_file }, has_runner)),
+		tree_hash: snapshot.tree_hash,
+	}))
+
+	return { ...result, is_stale: test_pinned_snapshot.current_hash(root) !== result.tree_hash }
 }
 
 // No merge-base (not a repository, no default branch) checks nothing, as `josh test:red` does. The cap

@@ -25,7 +25,10 @@ describe('an unknown answer says why', () => {
 		const code = await run_cut_cli.run([ISSUE])
 
 		expect([code, verdict()]).toStrictEqual([FAILURE_EXIT_CODE, UNKNOWN_VERDICT])
-		expect(explanations()).toStrictEqual([run_cut.unknown_message()])
+		expect(explanations()).toStrictEqual([
+			run_cut.unknown_message(),
+			`next: pnpm josh run:chain ${ISSUE}`,
+		])
 	})
 
 	it('reports the failure itself when acting on the record throws', async () => {
@@ -34,6 +37,9 @@ describe('an unknown answer says why', () => {
 		const code = await run_cut_cli.run([ISSUE])
 
 		expect([code, verdict()]).toStrictEqual([FAILURE_EXIT_CODE, UNKNOWN_VERDICT])
-		expect(explanations()).toStrictEqual([`run:cut failed and established nothing: ${REASON}`])
+		expect(explanations()).toStrictEqual([
+			`run:cut failed and established nothing: ${REASON}`,
+			`next: pnpm josh run:chain ${ISSUE}`,
+		])
 	})
 })

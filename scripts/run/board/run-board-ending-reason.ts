@@ -3,12 +3,14 @@ import { lane_withdraw } from '#scripts/lane/lane-withdraw'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import type { BoardRow, RowRead, RowReason } from './run-board-layout'
+import { run_board_render_title } from './run-board-render-title'
 import type { ItemStatus } from './run-board-status'
 
 // Why a child's park or withdraw ended it, in the ending event's own words — the reason its board row
 // draws and its park note carries.
 
 const KIND = run_event_stream.EVENT_KIND
+const CAUSE_LIMIT = 120
 // `#<N> parked`, `#<N> parked (<reason>)` and `#<N> waiting on #<M>` lose their leading number, so a
 // waiting park does not name its issue twice.
 const PARK_PREFIX = /^#\d+ (?:parked\s*)?/u
@@ -38,7 +40,13 @@ function withdraw_reason(event: RunEvent): string {
 function park_row_reason(issue: number, reason: string, is_backlog_live: boolean): string {
 	const cause = run_stalled.cause_of(reason)
 
-	return cause === undefined ? reason : run_stalled.row_text(issue, cause, is_backlog_live)
+	return cause === undefined
+		? reason
+		: run_stalled.row_text(
+				issue,
+				run_board_render_title.title_of(cause, CAUSE_LIMIT),
+				is_backlog_live,
+			)
 }
 
 // The reason an ending event gives, `undefined` for an event that is neither a park nor a withdraw or
@@ -77,10 +85,25 @@ function is_stalled(status: ItemStatus, labels: ReadonlyArray<string> = []): boo
 	return STALLED_STATES.has(status.state) && has_label_name(labels, RUN_STALLED_LABEL)
 }
 
+// Finished rows name why no action remains; merge rows keep their existing tail.
+function tail_of(status: ItemStatus): string | undefined {
+	if (status.state === 'done') {
+		return `nothing to do · done: ${status.reason ?? 'closed without a PR to merge'}`
+	}
+
+	if (status.state === 'withdrawn') {
+		return `nothing to do · withdrawn: ${status.reason ?? 'run withdrawn'}`
+	}
+
+	return status.reason
+}
+
 // Raw event reasons remain cacheable; only drawing selects an action from the current live state.
 function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
-	if (status.reason !== undefined) {
-		const tail = park_row_reason(number, status.reason, read.is_backlog_live === true)
+	const reason = tail_of(status)
+
+	if (reason !== undefined) {
+		const tail = park_row_reason(number, reason, read.is_backlog_live === true)
 
 		return { reason: { tail } }
 	}

@@ -1,3 +1,7 @@
+import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
+import { backlog_fixture } from '#scripts/backlog/backlog-fixture'
+import { backlog_next } from '#scripts/backlog/backlog-next'
+import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { git_command } from '#scripts/git/git-command'
 import { issue_file_deferral } from '#scripts/issue/issue-file-deferral'
 import { issue_file_interrupt } from '#scripts/issue/issue-file-interrupt'
@@ -25,6 +29,9 @@ const is_run_member = vi.spyOn(run_hold_member, 'is_run_member')
 const record_child = vi.spyOn(split_resolution, 'record_child')
 const block_finder = vi.spyOn(issue_file_interrupt, 'block_finder')
 const note_finder = vi.spyOn(issue_file_deferral, 'note_finder')
+const record_dependency = vi.spyOn(epic_blocked_by, 'record')
+const PARK_BODY = '## 背景\n\n- 原因の park: #4703\n- 原因の park: #4704\n'
+const RECORD_ERROR = 'epic listing unread'
 
 function filing_to(target: string): Filing {
 	const args = {
@@ -53,8 +60,70 @@ beforeEach(() => {
 	record_child.mockResolvedValue()
 	block_finder.mockResolvedValue()
 	note_finder.mockResolvedValue()
+	record_dependency.mockResolvedValue('recorded')
 	vi.stubEnv(lane_child_marker.KEY, undefined)
 	vi.stubEnv(lane_child_marker.OVERRUN_KEY, undefined)
+})
+
+describe('issue_file_cli.record — caused park dispatch', () => {
+	it('withholds a stopped issue once the filed cause is recorded as its open blocker', async () => {
+		const blockers: Array<{ number: number }> = []
+		const output = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		record_dependency.mockImplementation(async (request) => {
+			blockers.push({ number: Number(request.prerequisite) })
+
+			return 'recorded'
+		})
+
+		await issue_file_cli.record(URL, { ...filing_to(HERE), body: PARK_BODY }, [])
+		backlog_fixture.stub_backlog({
+			opted_in: [auto_ok_fixture.blocked_issue(4703, CREATED_EARLIER, blockers)],
+		})
+		output.mockClear()
+
+		expect(await backlog_next.run([])).toBe(0)
+		expect(output).toHaveBeenCalledWith(backlog_next.VERDICT_TOKENS.wait)
+		output.mockRestore()
+	})
+})
+
+describe('issue_file_cli.record — caused parks', () => {
+	it('records every parked issue through the shared epic recorder', async () => {
+		await issue_file_cli.record(URL, { ...filing_to(HERE), body: PARK_BODY }, [])
+
+		expect(record_dependency.mock.calls).toStrictEqual([
+			[{ issue: '4703', prerequisite: '3438' }],
+			[{ issue: '4704', prerequisite: '3438' }],
+		])
+	})
+
+	it('reports a failed record without rejecting the filing or skipping the next park', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		record_dependency.mockRejectedValueOnce(new Error(RECORD_ERROR))
+
+		await expect(
+			issue_file_cli.record(URL, { ...filing_to(HERE), body: PARK_BODY }, []),
+		).resolves.toBeUndefined()
+
+		expect(record_dependency).toHaveBeenCalledTimes(2)
+		expect(report).toHaveBeenCalledWith(expect.stringContaining(RECORD_ERROR))
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('already filed'))
+		report.mockRestore()
+	})
+
+	it.each([HERE, THERE])('writes no dependency for an undeclared park in %s', async (target) => {
+		await issue_file_cli.record(URL, filing_to(target), [])
+
+		expect(record_dependency).not.toHaveBeenCalled()
+	})
+
+	it('does not resolve local park numbers in a different repository', async () => {
+		await issue_file_cli.record(URL, { ...filing_to(THERE), body: PARK_BODY }, [])
+
+		expect(record_dependency).not.toHaveBeenCalled()
+	})
 })
 
 afterEach(() => {
@@ -78,7 +147,7 @@ describe('issue_file_cli.record — a split child', () => {
 		expect(record_child).toHaveBeenCalledExactlyOnceWith({
 			route: SPLIT_ROUTE_LABEL,
 			found_during: FINDER,
-			child: '#3438',
+			child: URL,
 		})
 	})
 })

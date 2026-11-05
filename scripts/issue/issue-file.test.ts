@@ -20,10 +20,14 @@ const FOUND_DURING_FLAG = '--found-during'
 const EPIC = 'epic'
 const TIER_A = 'route:tier-a'
 const FILED = [TITLE, BODY_FLAG, BODY_FILE]
+const DEFECT_FLAG = '--defect'
+const VERIFICATION_FLAG = '--verification'
+const EVERY_RUN_FLAG = '--every-run'
 const REFUSES = 'refuses %s'
 
 function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 	return {
+		answers: { defect: undefined, verification: undefined, 'every-run': undefined },
 		title: TITLE,
 		body_file: BODY_FILE,
 		route: undefined,
@@ -72,6 +76,36 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		['an unknown flag', [...FILED, '--nope']],
 	])(REFUSES, (_label, argv) => {
 		expect(issue_file.parse(argv)).toBeUndefined()
+	})
+})
+
+describe('issue_file.parse — solo evidence', () => {
+	it('reads the three solo answers', () => {
+		const parsed = issue_file.parse([
+			...FILED,
+			DEFECT_FLAG,
+			'yes',
+			VERIFICATION_FLAG,
+			'yes',
+			EVERY_RUN_FLAG,
+			'yes',
+		])
+
+		expect(parsed?.answers).toStrictEqual({
+			defect: 'yes',
+			verification: 'yes',
+			'every-run': 'yes',
+		})
+	})
+	it.each([
+		[],
+		[DEFECT_FLAG, 'yes', VERIFICATION_FLAG, 'yes'],
+		[DEFECT_FLAG, 'no', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes'],
+		[DEFECT_FLAG, 'yes', VERIFICATION_FLAG, 'unknown', EVERY_RUN_FLAG, 'yes'],
+		[DEFECT_FLAG, 'yes', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'no'],
+		[DEFECT_FLAG, 'invalid', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes'],
+	])('refuses %j', (...answers) => {
+		expect(issue_file.parse([...FILED, '--label', 'run:solo', ...answers])).toBeUndefined()
 	})
 })
 

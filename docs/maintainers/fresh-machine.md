@@ -20,7 +20,7 @@ which a normal user (`dev`) runs the Linux route of
 [setup/prerequisites.md](../setup/prerequisites.md) and nothing else:
 
 ```bash
-curl -fsSL https://get.pnpm.io/install.sh | sh -
+(installer=$(mktemp) && trap 'rm -f "$installer"' EXIT && curl --proto '=https' -fsSL https://raw.githubusercontent.com/pnpm/get.pnpm.io/7c26e549143daf5cf072a38c428170ad8eccaf2d/install.sh -o "$installer" && (echo "53d3ad6ef67d49d6951f3326bd3180e5c504c8f695bcdf73bb61ec7a4d4c9407  $installer" | (if command -v sha256sum >/dev/null 2>&1; then sha256sum -c -; else shasum -a 256 -c -; fi)) && PNPM_VERSION=12.6.0 sh "$installer")
 # a new terminal
 pnpm runtime set node 22 -g
 node --version

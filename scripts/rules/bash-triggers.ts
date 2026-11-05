@@ -2,6 +2,7 @@ import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { git_argv } from './git-argv'
+import { interpreter_options } from './interpreter-options'
 import { shell_segments } from './shell-segments'
 
 // The trigger helpers the enumeration in `delivered-rules.ts` is built from, held here so a rule
@@ -57,7 +58,6 @@ function spoken_line(command: string): string {
 }
 
 const LEADING_SHELL_SCRIPT_RUNNER = new RegExp(`^${SHELL_SCRIPT_RUNNER.source}`, 'u')
-const QUOTE_MARK = /["']/gu
 
 // The quoted script a segment's shell runs, as a line of its own: `sh -c 'pnpm exec eslint .'` reads
 // as `pnpm exec eslint .`, so a caller cutting it into commands reads the programs the script
@@ -65,15 +65,14 @@ const QUOTE_MARK = /["']/gu
 // `undefined` when the segment runs no shell script.
 function shell_script_of(segment: string): string | undefined {
 	const call = git_argv.program_of(segment)
-
 	if (call === undefined) return undefined
-
 	const spoken = [call.name, ...call.args].join(' ')
-	const runner = LEADING_SHELL_SCRIPT_RUNNER.exec(spoken)
+	if (!LEADING_SHELL_SCRIPT_RUNNER.test(spoken)) return undefined
 
-	if (runner === null) return undefined
+	const index = interpreter_options.shell_script_index(call)
+	const script = call.name === 'eval' ? call.args.join(' ') : (call.args[index + 1] ?? '')
 
-	return spoken.slice(runner[0].length).replaceAll(QUOTE_MARK, '').trim()
+	return script.replace(/^(["'])([\s\S]*)\1$/u, '$2')
 }
 
 function is_direct_filing(command: string): boolean {

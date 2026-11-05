@@ -47,6 +47,11 @@ interface Criterion {
 	text: string
 }
 
+interface CriterionLine {
+	text: string
+	index: number
+}
+
 interface Deferral {
 	id: string
 	issue: string
@@ -77,19 +82,26 @@ function criterion_id(text: string): string {
 	return `${ID_PREFIX}${digest.slice(0, ID_HEX_LENGTH)}`
 }
 
-function joins(last: string | undefined, line: string): boolean {
+function joins(last: string, line: string): boolean {
 	const is_continuation = line.trim() !== '' && !BLOCK_START_PATTERN.test(line)
 
-	return is_continuation && last !== undefined && CRITERION_PATTERN.test(last)
+	return is_continuation && CRITERION_PATTERN.test(last)
+}
+
+function append_line(items: Array<CriterionLine>, line: string, index: number): void {
+	const last = items.at(-1)
+
+	if (last !== undefined && joins(last.text, line)) last.text += ` ${line.trim()}`
+	else items.push({ text: line, index })
 }
 
 // A criterion wrapped onto continuation lines is one criterion, hashed whole — rewording any of its
 // lines changes its identifier. A blank line or a nested item ends it.
-function unwrapped(lines: ReadonlyArray<string>): ReadonlyArray<string> {
-	const items: Array<string> = []
+function unwrapped(lines: ReadonlyArray<string>): ReadonlyArray<CriterionLine> {
+	const items: Array<CriterionLine> = []
 
-	for (const line of lines) {
-		items.push(joins(items.at(-1), line) ? `${items.pop() ?? ''} ${line.trim()}` : line)
+	for (const [index, line] of lines.entries()) {
+		append_line(items, line, index)
 	}
 
 	return items
@@ -99,11 +111,52 @@ function criteria_of(issue_body: string | undefined): ReadonlyArray<Criterion> {
 	// A list item inside a code fence is an example the Issue quotes, not a criterion. An indented line
 	// outside one is a wrapped criterion's continuation, so it is kept.
 	const lines = markdown_section.fence_free_lines(epic_audit_logic.acceptance_section(issue_body))
-	const texts = unwrapped(lines).map((line) => CRITERION_PATTERN.exec(line)?.groups?.['text'])
+	const texts = unwrapped(lines).map((line) => CRITERION_PATTERN.exec(line.text)?.groups?.['text'])
 
 	return texts
 		.filter((text): text is string => text !== undefined)
 		.map((text) => ({ id: criterion_id(text), text: text.trim() }))
+}
+
+function selected_line(line: CriterionLine, ids: ReadonlySet<string>): boolean {
+	const text = CRITERION_PATTERN.exec(line.text)?.groups?.['text']
+
+	return text !== undefined && ids.has(criterion_id(text))
+}
+
+function tick_line(line: string): string {
+	const checkbox = /^(?<prefix>(?:[-*+]|\d+\.)\s+)\[[ xX]\]/u
+
+	if (!checkbox.test(line)) throw new Error('Selected acceptance criterion has no checkbox')
+
+	return line.replace(/^(?<prefix>(?:[-*+]|\d+\.)\s+)\[ \]/u, '$<prefix>[x]')
+}
+
+function tick_section(section: string, ids: ReadonlySet<string>): string {
+	const visible = markdown_section.fence_free_lines(section)
+	const selected = new Set(
+		unwrapped(visible)
+			.filter((line) => selected_line(line, ids))
+			.map((line) => line.index),
+	)
+
+	return section
+		.split('\n')
+		.map((line, index) => (selected.has(index) ? tick_line(line) : line))
+		.join('\n')
+}
+
+// IDs come from the plan's acceptance map. Resolve every ID before editing, so a stale plan cannot
+// partially tick an Issue. Only checkbox markers in the canonical acceptance section are changed.
+function tick(body: string, ids: ReadonlyArray<string>): string {
+	const criteria = criteria_of(body)
+	const unknown = ids.filter((id) => criteria.every((criterion) => criterion.id !== id))
+
+	if (unknown.length > 0) throw new Error(`Unknown acceptance criteria: ${unknown.join(', ')}`)
+
+	return markdown_section.map_section(body, epic_audit_logic.is_acceptance_heading, (section) =>
+		tick_section(section, new Set(ids)),
+	)
 }
 
 // A deferral row with no issue or no reason is no row at all, so its criterion reads as unmapped.
@@ -224,6 +277,7 @@ const acceptance_map = {
 	rows_of,
 	skeleton,
 	with_test_rows,
+	tick,
 }
 
 export type { Criterion, Deferral, MapComparison }

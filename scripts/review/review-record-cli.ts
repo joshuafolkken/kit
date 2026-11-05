@@ -1,10 +1,11 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import type { StopFinding } from '#scripts/run/ship/run-ship-review'
 import { review_comment_carry } from './review-comment-carry'
+import { review_final_record } from './review-final-record'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
 import { review_finding_text } from './review-finding-text'
+import { review_fix_round, type DescribedFinding, type RecordedRound } from './review-fix-round'
 import { review_interaction } from './review-interaction'
 import { review_lane_handover } from './review-lane-handover'
 import { review_record, type RecordVerdict } from './review-record'
@@ -12,7 +13,6 @@ import { review_record_code_round } from './review-record-code-round'
 import { review_record_comment } from './review-record-comment'
 import { review_record_interaction } from './review-record-interaction'
 import type { ReuseAnswer } from './review-round-reuse'
-import { review_stop_log } from './review-stop-log'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
 // `/code-review` round's findings. It appends a `- rb:` round boundary and a `- rf:` line per finding to
@@ -48,7 +48,6 @@ const DISPOSITION_HINT =
 	'  <disposition>: optional — fixed | false-positive | filed:#<M> | deferred:#<M>; josh review:round2 skips only when every High/Medium is fixed or false-positive'
 const REASON_HINT =
 	'  <reason>: optional, one sentence on what was wrong, kept for the lane’s next review and fix — pass each finding with its reason as one single-quoted argument'
-const RECORD_STAGE = 'review:record'
 const CHECK_USAGE = 'Usage: josh review:record --check [--interaction] --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
 const REUSED_LINE =
@@ -91,6 +90,7 @@ const OPTIONS = {
 interface Request {
 	issue: number
 	findings: ReadonlyArray<Finding>
+	round?: RecordedRound | undefined
 }
 
 interface Parsed {
@@ -140,14 +140,14 @@ function parse_positional(positional: string): Positional | undefined {
 }
 
 function parse_findings(positionals: ReadonlyArray<string>): ReadonlyArray<Finding> | undefined {
-	const findings: Array<Finding> = []
+	const findings: Array<DescribedFinding> = []
 
 	for (const positional of positionals) {
 		const parsed = parse_positional(positional)
 
 		if (parsed === undefined) return undefined
 
-		findings.push(parsed.finding)
+		findings.push({ ...parsed.finding, description: parsed.description })
 	}
 
 	return findings
@@ -329,7 +329,10 @@ async function write_round(
 ): Promise<number> {
 	const kind = kind_of(parsed)
 	const date = observation_ledger_home.ledger_date(now)
-	const lines = build_lines(request, date, kind)
+	const lines = [
+		...build_lines(request, date, kind),
+		...review_fix_round.lines(request.round, root),
+	]
 	const { issue, findings } = request
 
 	if (parsed.comment) return await review_record_comment.post(issue, lines)
@@ -338,43 +341,27 @@ async function write_round(
 		return await review_record_comment.post_after_push({ issue, lines, root, findings })
 	}
 
-	return await append_round({
-		issue: request.issue,
-		lines,
-		root,
-		kind,
-		findings: request.findings,
-		date,
-	})
+	return await append_round({ issue, lines, root, kind, findings, date })
 }
 
-// The stop-log finding a positional carries, or `undefined` for one written without a reason.
-function reason_of(positional: string): StopFinding | undefined {
-	const parsed = parse_positional(positional)
+async function record_prepared(
+	parsed: Parsed,
+	request: Request,
+	now: Date,
+	root: string,
+): Promise<number> {
+	request.round = parsed.interaction
+		? undefined
+		: review_fix_round.prepare(request.issue, request.findings, root)
+	const code = await write_round(parsed, request, now, root)
 
-	if (parsed === undefined || parsed.description.length === 0) return undefined
+	if (code !== 0) return code
 
-	const { finding, description } = parsed
+	if (!parsed.interaction) review_final_record.record(request.issue, request.findings, root)
+	review_fix_round.record_reasons(request.issue, request.findings)
+	if (request.round !== undefined) review_fix_round.save(request.round, root)
 
-	return {
-		kind: `${finding.category}:${finding.severity}`,
-		location: finding.file,
-		sentence: review_finding_text.first_sentence(description),
-	}
-}
-
-function is_reason(finding: StopFinding | undefined): finding is StopFinding {
-	return finding !== undefined
-}
-
-// Recorded only once the round itself is, so the stop log never holds a round the ledger refused.
-function record_reasons(issue: number, positionals: ReadonlyArray<string>): void {
-	review_stop_log.record({
-		issue,
-		stage: RECORD_STAGE,
-		findings: positionals.map((positional) => reason_of(positional)).filter(is_reason),
-		is_fixed: true,
-	})
+	return code
 }
 
 async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {
@@ -386,11 +373,7 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 		return FAILURE_EXIT_CODE
 	}
 
-	const code = await write_round(parsed, request, now, root)
-
-	if (code === 0) record_reasons(request.issue, parsed.positionals)
-
-	return code
+	return await record_prepared(parsed, request, now, root)
 }
 
 // **The default is the work tree the command runs in, a lane's inside a lane**.

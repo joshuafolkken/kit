@@ -7,11 +7,13 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { path_decision } from '#scripts/josh/path-decision'
 import { review_code_tree } from './review-code-tree'
+import { review_level } from './review-level'
 import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_round_one_closure } from './review-round-one-closure'
 import { review_round2, type RoundTwoAnswer } from './review-round2'
 import { review_round2_skip_comment } from './review-round2-skip-comment'
+import { review_size } from './review-size'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -143,8 +145,11 @@ async function decide_here(options: Options): Promise<RoundTwoAnswer> {
 	// `josh review:level` and `josh review:brief` all decide from. Passing our own reading would be a
 	// second definition, which is the drift that module exists to prevent.
 	const tree = await review_tree.read_changed_tree()
+	const paths = Object.keys(tree)
+	const lines = await review_size.read(paths)
 
 	return review_round2.decide({
+		level: review_level.level_for(paths, lines),
 		base,
 		carried_delta: carried_reader(base, tree),
 		comment_only: await read_comment_only(base),

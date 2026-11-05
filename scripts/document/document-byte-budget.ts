@@ -75,7 +75,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	// `command:derive`'s usage section (joshuafolkken/kit#4970) crossed the 45056 block.
 	// `ui:shot`'s usage section (joshuafolkken/kit#5633) crossed the 49152 block.
-	{ path: 'docs/josh-commands-automation.md', bytes: 53_248 },
+	// `usage:tee`'s usage section (joshuafolkken/kit#6316) crossed the 53248 block.
+	{ path: 'docs/josh-commands-automation.md', bytes: 57_344 },
 	// The carried `--unpinned-ok` record (joshuafolkken/kit#4775) crossed the 73728 block.
 	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
 	// `lane:plan --probe` and the entry probe (joshuafolkken/kit#5211) crossed the 81920 block.
@@ -89,8 +90,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'docs/josh-commands-run.md', bytes: 110_592 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
-	// (joshuafolkken/kit#5547) crossed the 65536 block.
-	{ path: 'docs/josh-commands-backlog.md', bytes: 73_728 },
+	// (joshuafolkken/kit#5547) crossed the 65536 block; solo evidence in `backlog:triage`
+	// (joshuafolkken/kit#6463) crossed the 73728 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 77_824 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub

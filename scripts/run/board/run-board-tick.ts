@@ -68,16 +68,6 @@ function closed_under(known: Known, closed: ReadonlyMap<number, ClosedIssue>): K
 	}
 }
 
-// The plan with a closed child's title and labels under the listing's own.
-function with_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>): BoardPlan {
-	const { titles, labels } = closed_under(
-		{ titles: plan.context.titles, labels: plan.labels },
-		closed,
-	)
-
-	return { ...plan, context: { ...plan.context, titles }, labels }
-}
-
 // The titles the findings name a parked issue by — the rows' own; the snapshot's before the plan is
 // read.
 function titles_of(state: BoardState): Titles {
@@ -100,6 +90,22 @@ function is_backlog_live(local: LocalRead): boolean {
 		!activity_here(local).is_stopped &&
 		(roots.supervisor !== undefined || roots.parent !== undefined)
 	)
+}
+
+// The plan with closed titles underneath the listing and this tick's local worker snapshot.
+function plan_here(plan: BoardPlan, state: BoardState, local: LocalRead): BoardPlan {
+	const { titles, labels } = closed_under(
+		{ titles: plan.context.titles, labels: plan.labels },
+		state.closed,
+	)
+
+	return {
+		...plan,
+		context: { ...plan.context, titles },
+		labels,
+		is_backlog_live: is_backlog_live(local),
+		occupied_lanes: local.occupied_lanes,
+	}
 }
 
 type RoomRead = Pick<
@@ -146,10 +152,11 @@ function earlier_here(local: LocalRead): EarlierLanes {
 // The plan laid under its statuses, each waiting row saying why it waits.
 function planned_layout(
 	state: BoardState,
-	plan: BoardPlan,
+	input_plan: BoardPlan,
 	local: LocalRead,
 	now_ms: number,
 ): BoardLayout {
+	const plan = plan_here(input_plan, state, local)
 	const statuses = planned_statuses(state, plan, local)
 	const reason_of = run_board_reason.reader({
 		plan,
@@ -161,12 +168,7 @@ function planned_layout(
 		now_ms,
 	})
 
-	return run_board_layout.layout_of(
-		{ ...with_closed(plan, state.closed), is_backlog_live: is_backlog_live(local) },
-		statuses,
-		reason_of,
-		earlier_here(local),
-	)
+	return run_board_layout.layout_of(plan, statuses, reason_of, earlier_here(local))
 }
 
 // The statuses scoped to the run's plan, a running child GitHub read closed settled.

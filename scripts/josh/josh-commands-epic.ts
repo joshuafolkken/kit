@@ -159,7 +159,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 			'List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline)',
 		category: 'AI tools',
 		reference: [
-			'[--apply <n> (--lane | --solo) | --decline <n> --reason <text>]',
+			'[--apply <n> (--lane | --solo --defect yes --verification yes --every-run yes) | --decline <n> --reason <text>]',
 			'automation',
 			['network'],
 		],

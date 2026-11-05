@@ -3,8 +3,10 @@ import path from 'node:path'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { git_path_quoting } from '#scripts/git/git-path-quoting'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { split_assess } from './split-assess'
+import { split_relocations } from './split-relocations'
 
 // The branch's size measurement — the one reading every `split_assess` caller takes.
 //
@@ -15,6 +17,7 @@ import { split_assess } from './split-assess'
 // `git diff --numstat` counts it. An entry with no readable content — a dangling symlink, a nested
 // repository's directory — still counts as a file, of zero lines, so one such entry cannot reject
 // the whole measurement.
+// Exact relocations are removed after combining both halves (joshuafolkken/kit#6360).
 //
 // joshuafolkken/kit#4696: **the tracked half is measured from the tree's base, through a merge in
 // progress** (`change_base.resolved_through_merge`). A merge of the default branch stopped on a
@@ -49,33 +52,31 @@ async function read_content(file_path: string): Promise<Buffer> {
 async function untracked_row(root: string, file: string): Promise<string> {
 	const lines = line_count(await read_content(path.join(root, file)))
 
-	return `${String(lines)}\t0\t${file}`
+	return `${String(lines)}\t0\t${git_path_quoting.quote(file)}`
 }
 
-async function untracked_numstat(): Promise<string> {
-	const files = changed_paths.to_paths(await git_command.untracked_names())
-
-	if (files.length === 0) return ''
-
-	const toplevel = await git_spawn.read(['rev-parse', '--show-toplevel'])
-	const root = toplevel.trim()
+async function untracked_numstat(root: string, files: ReadonlyArray<string>): Promise<string> {
 	const rows = await Promise.all(files.map(async (file) => await untracked_row(root, file)))
 
 	return rows.join(NEWLINE)
 }
 
-async function tracked_numstat(): Promise<string> {
+async function read_branch(): Promise<ReturnType<typeof split_assess.assess>> {
 	const base = await change_base.resolved_through_merge()
 
 	if (base === undefined) throw new Error(UNRESOLVED_BASE)
 
-	return await git_command.diff_numstat_since(base)
-}
+	const tracked = await git_command.diff_numstat_since(base)
+	const files = changed_paths
+		.to_paths(await git_command.untracked_names())
+		.map((file) => git_path_quoting.unquote(file))
+	const toplevel = await git_spawn.read(['rev-parse', '--show-toplevel'])
+	const root = toplevel.trim()
+	const numstat = `${tracked}${NEWLINE}${await untracked_numstat(root, files)}`
 
-async function read_branch(): Promise<ReturnType<typeof split_assess.assess>> {
-	const tracked = await tracked_numstat()
+	const adjusted = await split_relocations.without_relocations(root, base, numstat, files)
 
-	return split_assess.assess(`${tracked}${NEWLINE}${await untracked_numstat()}`)
+	return split_assess.assess(adjusted)
 }
 
 const split_measure = { line_count, read_branch }

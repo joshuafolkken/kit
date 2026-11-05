@@ -1,3 +1,4 @@
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { agent_diagnostics } from './agent-diagnostics'
 import {
 	agent_role_profile,
@@ -135,7 +136,13 @@ function review_in(
 	cwd: string,
 	environment: AgentEnvironment = process.env,
 ): AgentArgvResult {
-	return profiled_in(invocation, agent_role_profile.resolve_review(round, environment), cwd)
+	const is_reduced = review_prompt_level.level_of(invocation) === 'low'
+
+	return profiled_in(
+		invocation,
+		agent_role_profile.resolve_review(round, environment, is_reduced),
+		cwd,
+	)
 }
 
 const agent_argv = {

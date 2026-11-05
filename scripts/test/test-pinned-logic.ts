@@ -60,6 +60,7 @@ interface HunkSplit {
 // vitest passed with no related test to run.
 interface UnpinnedHunk extends Hunk {
 	is_green: boolean
+	related_tests?: ReadonlyArray<string> | undefined
 }
 
 interface HunkOutcome {
@@ -80,6 +81,8 @@ interface HunkOutcome {
 }
 
 interface PinnedReport extends HunkOutcome {
+	tree_hash?: string
+	is_stale?: boolean
 	unchecked: ReadonlyArray<Hunk>
 	// Added files whose functions could not be read, so none of them was probed.
 	unparsed: ReadonlyArray<string>
@@ -97,6 +100,8 @@ interface UncheckedPlace {
 // A report as printed (joshuafolkken/kit#5188): `text` is its lines above the counts line, each ending in
 // a newline; `counts` is absent for a check that could not run, and `log` where no full list was kept.
 interface ReportParts {
+	tree_hash?: string
+	is_stale?: boolean
 	text: string
 	counts?: string | undefined
 	log?: KeptLog | undefined
@@ -275,8 +280,24 @@ function unchecked_reason(report: PinnedReport): string {
 	return report.has_runner ? `over the ${String(report.max_hunks)}-hunk cap` : NO_RUNNER_REASON
 }
 
+function hint(hunk: UnpinnedHunk): string {
+	const tests = hunk.related_tests
+
+	if (tests === undefined) {
+		return 'related tests unavailable; add or strengthen a regression test that fails when this change is reverted'
+	}
+
+	if (tests.length === 0) {
+		return 'no related tests; add a related regression test that fails when this change is reverted'
+	}
+
+	return `related tests: ${tests.join(', ')}; strengthen a regression assertion that fails when this change is reverted`
+}
+
 function unpinned_lines(report: PinnedReport): Array<string> {
-	return report.unpinned.map((hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}`)
+	return report.unpinned.map(
+		(hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}; ${hint(hunk)}`,
+	)
 }
 
 function place_of(hunk: Hunk, why: string): UncheckedPlace {
@@ -328,7 +349,14 @@ function counts_line(report: PinnedReport): string {
 function report_parts(report: PinnedReport): ReportParts {
 	const lines = [...unpinned_lines(report), ...folded_unchecked(report)]
 
-	return { text: lines.map((line) => `${line}${LINE_BREAK}`).join(''), counts: counts_line(report) }
+	return {
+		text: lines.map((line) => `${line}${LINE_BREAK}`).join(''),
+		counts: counts_line(report),
+		...(report.tree_hash !== undefined && {
+			tree_hash: report.tree_hash,
+			is_stale: report.is_stale,
+		}),
+	}
 }
 
 // What `josh test:pinned`, `josh run:review` and the ship's pre-detach print, in the verification-tail
@@ -336,7 +364,9 @@ function report_parts(report: PinnedReport): ReportParts {
 // newline), then where the full list went, and the counts line last. Without a counts line — a check
 // that could not run — the text and the note alone.
 function report_text(parts: ReportParts, note = ''): string {
-	const failures = `${parts.text}${note}`
+	const stale = parts.is_stale === true ? ' · stale' : ''
+	const snapshot = parts.tree_hash === undefined ? '' : `snapshot ${parts.tree_hash}${stale}\n`
+	const failures = `${snapshot}${parts.text}${note}`
 	if (parts.counts === undefined) return failures
 
 	return verification_tail.format_tail({ failures, log: parts.log, verdict: parts.counts })

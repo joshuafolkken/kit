@@ -3,6 +3,7 @@ import { josh_read_only } from '#scripts/josh/josh-read-only'
 import { git_argv, type ProgramCall } from '#scripts/rules/git-argv'
 import { shell_segments } from '#scripts/rules/shell-segments'
 import { time_shell } from '#scripts/time-runtime/time-shell'
+import { implementation_shell_read } from './implementation-shell-read'
 import { step_zero_notice } from './step-zero-notice'
 
 // This is a pre-execution check of visible writes, not a shell sandbox. An interpreter body or
@@ -21,6 +22,8 @@ const READ_PROGRAMS: ReadonlySet<string> = new Set([
 	'false',
 	'wc',
 	'diff',
+	'cut',
+	'tr',
 	// Writes nothing itself; a write beside it is refused, as its target is no longer read off the root.
 	'cd',
 ])
@@ -157,7 +160,7 @@ const ARGUMENT_READS: ReadonlyMap<string, (segment: string, args: Array<string>)
 	])
 
 function is_read_or_operation(segment: string, name: string, args: Array<string>): boolean {
-	if (READ_PROGRAMS.has(name)) return true
+	if (READ_PROGRAMS.has(name) || implementation_shell_read.is_read(segment, name)) return true
 
 	return ARGUMENT_READS.get(name)?.(segment, args) ?? is_operation(name, args)
 }
@@ -209,6 +212,8 @@ function command_refusal(segment: string, root: string): Refusal {
 }
 
 function segment_refusal(segment: string, root: string): Refusal {
+	if (implementation_shell_read.wrapper_writes(segment)) return 'a time output file'
+
 	const target = redirected_paths(segment).find((path) => unsafe_path(path, root))
 
 	return target === undefined ? command_refusal(segment, root) : `redirect to \`${target}\``

@@ -148,6 +148,7 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--batch <dir|file>` — file each `*.md` in `<dir>` by name, or each `%%%`-separated part of `<file>`, other flags applied to each; every scout report prints once before the first filing. Title: front matter `title:`, else the first line; front matter `distinct: <N,…>` is its `--distinct`. A refused filing stays unfiled, the rest are filed, the summary names each; any refusal exits 1.
 - `--route <tier-a|split|interrupt|review-cap>` — the `route:` label naming the filing route. Omit it for a filing with no route.
 - `--label <name>` — an extra label (for example `epic`). Repeatable.
+- `--defect / --verification / --every-run <yes|no|unknown>` — `--label run:solo` requires all three `yes`: a verification defect affecting unrelated PRs every run. Missing, invalid, `no` or `unknown` answers file nothing; success comments the three answers on the issue.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--found-during <N>` — the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 2); step 7 never holds it as a candidate here. #N gets a deferral comment.
@@ -163,7 +164,7 @@ The `direct-filing` guard refuses `gh api …/issues` and `gh issue create`, poi
 
 **Steps (run in this order):**
 
-Steps 1 and 2 each end the filing on a refusal. Steps 3–7 run as one pass: each prints its refusal and the pass goes on, so one call prints every problem, the duplicate candidates of a body the lint refused included. Any refusal in the pass files nothing.
+Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates when lint fails. Refusals file nothing.
 
 1. Refuse unless the target is first-party: a third-party target (Tier C), and one whose owner cannot be read (`unknown`). The `third-party-write` guard stays silent on `unknown`; this command files only to a tracker known to be ours.
 2. In a run's session, refuse an origin's eleventh run filing (origin: `--found-during <N>`, else the lane or branch issue; none: the run invocation). Then, on a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
@@ -180,7 +181,8 @@ Steps 1 and 2 each end the filing on a refusal. Steps 3–7 run as one pass: eac
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. File nothing until every candidate is named in `--distinct`; a duplicate is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the search and the epic decision run there.
    - An open issue with the same normalized `- 計測宣言:` refuses the filing whatever `--distinct` names, printing its number; join it with `pnpm josh issue:comment <N>`. Another command or bound, a closed issue and `- 計測宣言なし:` pass.
 8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created warns, and the filing goes on.
-9. File with all labels in one request, plus the `priority:critical` / `priority:high` the declaration names; print the URL. A `--route interrupt --blocks-finder` filing in this repository then records its finder (step 2's origin) as blocked by the filed issue; a write that fails prints `⚠` with the `gh api` call to re-run, and the exit code stays 0; one that records nothing prints why.
+9. Create with all labels and print the URL. A local `--route interrupt --blocks-finder` filing records its finder as blocked by it; failures warn with the retry command, skipped records say why.
+   Local `原因の park: #<N>` lines record stops through the shared epic recorder. Foreign filings skip them. Failures warn and continue; repair dependencies without refiling. Post-create failures leave exit 0.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
 
@@ -195,16 +197,17 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:f
 Assess whether a complete draft can join an unstarted issue.
 
 ```bash
-pnpm josh issue:fold-existing --fingerprint 5848             # print the comment thread's fingerprint, before reading the issue, for the assessment's `comment_fingerprint`.
+pnpm josh issue:fold-existing --fingerprint 5848                            # read the comment fingerprint before assessment.
 pnpm josh issue:fold-existing assessment.json --json
-pnpm josh issue:fold-existing assessment.json --apply 5848   # write the fold to the issue once its body and comments still read as assessed, apply its priority floor, and verify the re-read.
+pnpm josh issue:fold-existing assessment.json --apply 5848                  # apply and verify the assessed fold and priority floor.
+pnpm josh issue:fold-existing assessment.json --apply 5848 --blocked 5849   # record a confirmed duplicate dependency and reconcile its epic.
 ```
 
 <!-- /usage -->
 
-Run it after the issue and the draft are read. It returns `duplicate` / `fold` / `separate` / `inspect`; only `--apply <N>` updates the issue, and only on `fold`. The JSON carries the facts (`content`, `is_open`, `size_verdict`, `existing_body`, `draft_body`, …). `separate` returns to the ordinary filing path.
+Read the issue and draft first. `--apply <N>` writes on `fold`; with `--blocked <M>` on `duplicate`, it records `<M>` blocked by `<N>` and reconciles its epic. Failure exits 1. Display writes nothing; `separate` returns to the ordinary filing path.
 
-`content`, `has_complete_read`, `existing_body`, `comment_fingerprint`, `draft_body` and `verification` are required; an assessment without one exits 1. Any other unknown fact is omitted and answers `inspect`.
+`content`, `has_complete_read`, `existing_body`, `comment_fingerprint`, `draft_body` and `verification` are required; an assessment without one exits 1. Omit other unknown facts: `inspect`.
 
 The JSON also carries `comment_fingerprint`, as `--fingerprint <N>` prints it before the issue is read; `--apply` writes nothing when a comment was added, edited or deleted since.
 
@@ -660,7 +663,7 @@ Several leading epic arguments merge into one candidate pool per repository. `ru
 
 **Priority and duplicates:** the order the epics were named, then each epic's task-list order (its declared chain still decides what is runnable). A child two epics track enters once, under the epic named earlier. Reordering with `josh epic --add … --order-before` / `--order-after` leaves declarations and `blocked-by` relations as they were.
 
-**Lanes:** an `in-progress` issue occupies a lane, not the repository. Free lanes are `JOSH_LANE_LIMIT` (default 8) minus that repository's `in-progress` listing; at zero the answer is `wait`, holders on standard error. A parked child releases its lane; a `needs-human-review` stop keeps it. Launches also wait for their memory claim in the shared core budget.
+**Lanes:** free places are `JOSH_LANE_LIMIT` (default 8) minus `backlog_occupied`'s count; at zero, `wait` names holders on stderr. Lanes without a worker, paused or merge-waiting hold no place. Human-review stops retain their tree and hold. Launches also wait for shared-core memory.
 
 **Nested epics:** a child that is itself an epic is never offered and waits on a person. The test is the child's `epic` label, not how its row is written: a cross-repository `owner/repo#N` row that is not an epic stays runnable. A parent epic over an epic never auto-closes; `epic:audit` reports the row.
 
@@ -761,7 +764,8 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. Ranks `priority:critical`, then `priority:high`, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then issues other open issues wait on (all keys: **Ranking** below), then newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
+Read-only. Uses **Ranking** below: priority, resumable work, verification-path defects, then blockers.
+Ties use creation time ascending, then number ascending. Skips `epic`, `in-progress`, `needs-decision` and candidates whose `blockedBy` is open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
 or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` (or `#<issue> を閉じる PR のマージ後 <K> マージ`) is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read` — `the pull request closing #<issue>` in place of `#<PR>` for the issue form.
 
 `josh start` creates the `auto-ok` label, and `josh sync` adds it to a repository that lacks it. stdout is the issue number, `none`, or empty with exit 1 if the listing could not be read; explanations to stderr.
@@ -816,9 +820,10 @@ Read-only, except for the mechanical triage of the triage gate below. stdout is 
 
 Any other untriaged candidate is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
 
-**Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
+**Defect priority**: defects always go to the front of the runnable numbers among ranking ties. New mechanisms go to the back only while the defect rate is above its baseline.
 
-**Ranking**: a body declaring `- 実施順: 最後` goes last; otherwise `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of open issues waiting on it down a chain (transitively), then the declared weekly gain (`## 期待効果`); standalone numbers are cut to five.
+**Ranking**: `- 実施順: 最後` goes last; otherwise `priority:critical`, `priority:high`, resumable work (owned stash), verification-path defect, lost minutes, transitive dependents, estimated lines (smallest first, undeclared last), then weekly gain (`## 期待効果`). Standalone numbers are cut to five.
+Lost minutes sum `- 原因の損失:` lines, falling back to `- 原因のレーン:`.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
 
@@ -860,27 +865,30 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog
 
 <!-- usage: backlog:triage -->
 
-Apply backlogrun's triage verdict to one issue: clear the park, comment the reason, apply the run label.
+Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict.
 
 ```bash
+pnpm josh backlog:triage --pass
+pnpm josh backlog:triage --decide --defect yes --verification yes --every-run no
 pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
-pnpm josh backlog:triage --apply 913 --solo --reason "<why>" --clear     # its question answered
-pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"   # the blocker lands first
-pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"      # a dependency a person dropped
+pnpm josh backlog:triage --apply 913 --solo --defect yes --verification yes --every-run yes --reason "<why>" --clear
+pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"
+pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
 ```
 
 **Options:**
 
-- `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label — the flags and the label write are `auto-ok:judge --apply`'s.
-- `--clear` — first takes the park off, as `run:park <N> --clear` does — only once the issue already answers its `needs-decision` question.
+- `--pass [--exclude <N>]` — settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Failed or incomplete reads exit 1.
+- `--decide --defect <answer> --verification <answer> --every-run <answer>` — yes/no/unknown evidence: three yes → run:solo; any no → run:lane; otherwise judge. Read-only.
+- `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label (`auto-ok:judge --apply`).
+- `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
 - `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
 
 <!-- /usage -->
 
-The triage step of `backlogrun-steps.md` → "Resolve what the plan can resolve", in one call.
-Without `--clear` a `needs-decision` issue keeps its park, so a question left for a person is never offered once labelled.
-The comment lands before the label, as `auto-ok:judge`'s does. Prints `triage #N — <label> · blocked by #M` (whichever were given); a failed write exits 1 naming it.
+The parent follows `--pass`'s stdout command; diagnostics go to stderr. Apply prints
+`triage #N — <label> · blocked by #M`; without `--clear`, the park stays.
 
 ### `josh backlog:budget`
 
@@ -951,7 +959,9 @@ An open carry record supplies the start time, merged count and named issues. The
 
 The supervisor claims the record for the session it wakes; the session acts and ends its turn; its `Stop` hook writes the cut that hands the loop back.
 
-A pass launches every free lane it seats side by side, not one after another. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
+A pass launches every free lane it seats side by side. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
+
+Merged causes use guarded `run:add --retry` for parked dependents.
 
 A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
 
@@ -972,6 +982,7 @@ Print the whole /code-review invocation: level, what the gate already proved, ta
 ```bash
 pnpm josh review:brief                       # round 1
 pnpm josh review:brief --round 2             # verification pass, scoped to the fix delta
+pnpm josh review:brief --full-change         # final round 2 over the whole change
 pnpm josh review:brief --interaction         # the interaction review of a run-tooling change
 pnpm josh review:brief --level-only          # the level alone (pre-commit review)
 pnpm josh review:brief --level-only --json   # level and reason, machine-readable
@@ -979,13 +990,14 @@ pnpm josh review:brief --level-only --json   # level and reason, machine-readabl
 
 **Options:**
 
+- `--full-change` — final round 2 over the whole change (no `--round` or `--interaction`).
 - `--round 2` — target is round 1's fixes and nothing else (widened back to the whole change when the record's change base no longer matches).
 - `--level-only` — print the level alone (level to stdout, reason to stderr); bypasses the scoped-green refusal.
 - `--staged` / `--json` — the staged diff; machine-readable level and reason.
 
 <!-- /usage -->
 
-Pass the output to `/code-review`; the level is on line one. It refuses to compose a brief when the scoped checks have never been green on this tree; run `pnpm josh lint:related && pnpm josh test:related`, then reissue. Pass the `reviewer` profile it prints (model and effort) explicitly to the review subagent.
+Pass output to `/code-review` with its reviewer model and effort; line one is the level. If scoped checks are not green on this tree, run `pnpm josh lint:related && pnpm josh test:related` and reissue.
 
 #### The review level
 

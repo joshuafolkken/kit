@@ -36,15 +36,14 @@ const LANE_LOG = '/logs/josh-lane-dispatch-3432.log'
 // Three lanes allowed and one open: two more may open.
 const FREE_LANES = 2
 
-afterEach(() => {
-	vi.restoreAllMocks()
-})
+afterEach(() => vi.restoreAllMocks())
 
 // The one lane against the limit, as `lane:limit` counts it — this run's, no earlier run's among them.
 const LANE_ROOM = {
 	free_lanes: FREE_LANES,
 	lane_limit: run_board_read_fixture.LANE_LIMIT,
 	occupied_count: 1,
+	occupied_lanes: ['3432'],
 	earlier_occupied: [],
 }
 // An ended run with no record to resume from and no wake stamp: no session and no process named.

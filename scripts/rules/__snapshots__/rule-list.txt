@@ -82,7 +82,7 @@
   - not automated: which model fits the unit is the author's call
 - **Investigator dispatched in the foreground** (`investigator-foreground`, `.claude/skills/workflow-commands/delegation.md` → "The pre-implementation reading — what goes to a unit, and from which file")
   - fires: `pnpm josh pretool:guard` — an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence
-  - silent: another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session
+  - silent: another agent type, `run_in_background: false` set, VS Code identified by `CLAUDE_CODE_ENTRYPOINT=claude-vscode`, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session
   - not automated: which reads go beside the dispatch is the author’s call
 - **Lane child reviewer dispatched in the foreground** (`reviewer-foreground`, `.claude/skills/workflow-commands/chain-rule.md` → "A lane child")
   - fires: `pnpm josh pretool:guard` — a dispatched lane child’s `Agent` / `Task` call of the `reviewer` or `reviewer-verification` type without `run_in_background: false` — rewritten with it, every occurrence
@@ -98,7 +98,7 @@
   - not automated: which reading is narrow enough to keep is the author’s call
 - **Consultation main line hands a run to run:handoff** (`consultation-handoff`, `docs/josh-commands-run.md` → "josh run:handoff")
   - fires: `pnpm josh pretool:guard` — `pnpm josh run:entry` / `run:hold` on Fable or Codex Astra. Every occurrence
-  - silent: a main line on any other model, an unnamed model, a delegated unit, or filing and operating (`issue:file`, `issue:plan`, `epic`)
+  - silent: a lane child, a main line on any other model, an unnamed model, a delegated unit, or filing and operating (`issue:file`, `issue:plan`, `epic`)
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry` / `run:handoff-lanes`. Every occurrence
@@ -167,10 +167,6 @@
 - **Network egress or credential print** (`egress`, `SECURITY.md` → "Secrets")
   - fires: `pnpm josh pretool:guard` — network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential or environment prints — in each shell segment and nested command. Every occurrence
   - silent: ordinary reads, `gh` reads against github.com, `git fetch`, `git push origin`, named scripts and `pnpm josh` routes. A plain `curl` / `wget` is still refused by the deny list; the hook allows local or GitHub destinations with known flags
-  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
-- **Lane child changing a workflow** (`workflow-edit`, `SECURITY.md`)
-  - fires: `pnpm josh pretool:guard` — a dispatched lane child changing `.github/workflows/**` — an `Edit` / `Write` of it, or a `Bash` write to it (a `>` redirect, `tee`, `cp` / `install` / `ln` to it, `dd of=`, `mv` / `rm` / `unlink` / `shred` / `touch` / `truncate` / `patch`, an in-place `sed` / `perl`, `git checkout` / `restore` / `rm` / `mv`), or a `cd` / `pushd` into `.github`, inside `bash -c`, `$()` or a heredoc too. Every occurrence
-  - silent: not a lane child, or a read (`Read`, `cat`, `grep`, a `<` redirect)
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
   - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence

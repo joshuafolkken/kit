@@ -72,6 +72,30 @@ describe('issue_closing_pr.read_closing_number', () => {
 	})
 })
 
+describe('issue_closing_pr.read_closing_number_result', () => {
+	it('distinguishes a missing reference from a failed lookup', async () => {
+		exec_gh_api.mockResolvedValueOnce('').mockRejectedValueOnce(new Error('gh failed'))
+
+		await expect(issue_closing_pr.read_closing_number_result(Number(ISSUE))).resolves.toEqual({
+			kind: 'read',
+			number: undefined,
+		})
+		await expect(issue_closing_pr.read_closing_number_result(Number(ISSUE))).resolves.toEqual({
+			kind: 'unreadable',
+		})
+	})
+
+	it('reports an unavailable repository and preserves legacy failure behavior', async () => {
+		repo_get_name_with_owner.mockResolvedValue(undefined)
+		exec_gh_api.mockResolvedValue(line(CLOSING_URL, `closes #${ISSUE}`))
+
+		await expect(issue_closing_pr.read_closing_number_result(Number(ISSUE))).resolves.toEqual({
+			kind: 'unreadable',
+		})
+		await expect(issue_closing_pr.read_closing_number(Number(ISSUE))).resolves.toBeUndefined()
+	})
+})
+
 // A reopened issue still carries its earlier attempt's merged reference; only a later one closes it.
 describe('issue_closing_pr.read_closing_pr — a reopened issue', () => {
 	const REOPENED = JSON.stringify({ reopened: true })

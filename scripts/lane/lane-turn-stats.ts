@@ -1,4 +1,5 @@
-import type { LedgerEntry, StageEntry } from './lane-ledger'
+import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
+import { lane_ledger, type LedgerEntry, type StageEntry, type StopEntry } from './lane-ledger'
 import { lane_paused_spans } from './lane-paused-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -16,12 +17,18 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 // counted `between stages`.
 //
 // **The lanes are the period's dispatched issues.** One with no transcript call in the period is left
-// out of every median and counted on the `no transcript` row, never read as a lane of zero calls.
+// out of the calls median and counted on the `no transcript` row, never read as a lane of zero calls.
+// Stops use all dispatched lanes, with zero-stop lanes included (joshuafolkken/kit#6213).
 
 const BETWEEN = 'between stages'
 const NO_TRANSCRIPT = 'no transcript'
 const NO_VALUE = '-'
-const COLUMNS = ['stage turns', 'calls per lane (median)', 'lanes'] as const
+const COLUMNS = [
+	'stage turns',
+	'calls per lane (median)',
+	'stops per lane (median)',
+	'lanes',
+] as const
 const ROWS = [...lane_stage_stats.STAGES, BETWEEN] as const
 
 interface Interval {
@@ -36,9 +43,10 @@ interface IssueStage {
 	stage: string
 }
 
-// Each measured lane's calls, as the stage of each call.
+// Per-lane call and stop stages; only the calls cohort requires a transcript.
 interface Lanes {
 	measured: ReadonlyArray<ReadonlyArray<string>>
+	stops: ReadonlyArray<ReadonlyArray<string>>
 	without: number
 }
 
@@ -99,6 +107,16 @@ function issue_stages(
 		.map(({ issue, at_ms }) => ({ issue, stage: stage_of(at_ms, issue, intervals) }))
 }
 
+// Stops use every dispatched lane, including those without a transcript or without stops.
+function lane_stops(entries: ReadonlyArray<LedgerEntry>, issue: number): Array<string> {
+	return entries
+		.filter((entry): entry is StopEntry => entry.kind === lane_ledger.KIND.STOP)
+		.filter((stop) => stop.issue === issue)
+		.map((stop) =>
+			stop.reason === run_ship_stage.CONFLICT ? run_ship_stage.STAGE.SYNC : stop.reason,
+		)
+}
+
 function lanes_of(entries: ReadonlyArray<LedgerEntry>, calls: ReadonlyArray<ToolCall>): Lanes {
 	const stages = issue_stages(calls, intervals_of(entries))
 	const dispatches = entries.filter((entry) => lane_stage_stats.is_dispatch(entry))
@@ -107,16 +125,23 @@ function lanes_of(entries: ReadonlyArray<LedgerEntry>, calls: ReadonlyArray<Tool
 		.map((issue) => stages.filter((call) => call.issue === issue).map(({ stage }) => stage))
 		.filter((lane) => lane.length > 0)
 
-	return { measured, without: dispatched.size - measured.length }
+	const stops = [...dispatched].map((issue) => lane_stops(entries, issue))
+
+	return { measured, stops, without: dispatched.size - measured.length }
+}
+
+function median_count(stage: string, lanes: ReadonlyArray<ReadonlyArray<string>>): string {
+	const counts = lanes.map((lane) => lane.filter((name) => name === stage).length)
+	const median = lane_stats.median(counts)
+
+	return median === undefined ? lane_stage_stats.NOT_MEASURED : String(median)
 }
 
 function stage_row(stage: string, lanes: Lanes): string {
-	const counts = lanes.measured.map((lane) => lane.filter((name) => name === stage).length)
-	const median = lane_stats.median(counts)
-
 	return lane_stats.to_row([
 		stage,
-		median === undefined ? lane_stage_stats.NOT_MEASURED : String(median),
+		median_count(stage, lanes.measured),
+		median_count(stage, lanes.stops),
 		String(lanes.measured.length),
 	])
 }
@@ -137,7 +162,7 @@ function table(
 		lane_stats.to_row(COLUMNS),
 		lane_stats.to_row(COLUMNS.map(() => '---')),
 		...ROWS.map((stage) => stage_row(stage, lanes)),
-		lane_stats.to_row([NO_TRANSCRIPT, NO_VALUE, String(lanes.without)]),
+		lane_stats.to_row([NO_TRANSCRIPT, NO_VALUE, NO_VALUE, String(lanes.without)]),
 	].join('\n')
 }
 

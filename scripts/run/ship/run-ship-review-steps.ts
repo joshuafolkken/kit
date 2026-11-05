@@ -4,12 +4,14 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
+import { review_round } from '#scripts/review/review-round'
 import { review_round_reuse, type ReuseAnswer } from '#scripts/review/review-round-reuse'
 import { review_round2 } from '#scripts/review/review-round2'
 import { review_stop_log } from '#scripts/review/review-stop-log'
 import { run_review } from '#scripts/run/review/run-review'
 import { run_ship_final_review } from './run-ship-final-review'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
+import { run_ship_review_checkpoint } from './run-ship-review-checkpoint'
 import { run_ship_review_reason } from './run-ship-review-reason'
 import { run_ship_reviewer, type Round } from './run-ship-reviewer'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -178,16 +180,27 @@ async function is_fix_verified(slots: ReadonlyArray<ReviewSlot>): Promise<boolea
 	return checked.code === SUCCESS_EXIT_CODE
 }
 
+function outcome_for_round(round: Round, verdict: ScoredVerdict): RoundOutcome {
+	return round === ROUND_TWO
+		? run_ship_review.round_two_outcome(verdict)
+		: run_ship_review.round_one_outcome(verdict)
+}
+
 async function round_one_record(
 	issue: string,
 	slot: ReviewSlot,
 	is_verified: boolean,
 ): Promise<StepResult> {
+	const round =
+		slot === CODE
+			? review_round.from_brief(stamp_file.read_stamp_text(paths(slot).brief) ?? '')
+			: ROUND_ONE
+
 	return await record_and_route(
 		issue,
-		ROUND_ONE,
+		round,
 		(verdict) =>
-			is_verified ? run_ship_review.round_one_outcome(verdict) : run_ship_review.UNVERIFIED_OUTCOME,
+			is_verified ? outcome_for_round(round, verdict) : run_ship_review.UNVERIFIED_OUTCOME,
 		slot,
 	)
 }
@@ -225,7 +238,13 @@ function skipped(out: string): StepResult {
 // round whose `review:record` failed is not counted either: the relaunch re-runs it, and that run is
 // the one that ended.
 async function record_outcome(issue: string, verdict: string, cause?: string): Promise<void> {
-	if (verdict === run_ship_review.VERDICT.INVALID || cause === CAUSE.CHECK) return
+	if (
+		verdict === run_ship_review.VERDICT.INVALID ||
+		cause === CAUSE.CHECK ||
+		review_round.from_brief(stamp_file.read_stamp_text(paths(CODE).brief) ?? '') === ROUND_TWO
+	) {
+		return
+	}
 
 	await lane_ledger_write.record_round_one({ issue: Number(issue), verdict })
 }
@@ -294,13 +313,19 @@ async function round_one_stage(
 	// A stale record narrows nothing: the next round reads the whole change under the new specification.
 	if (is_stale) review_reviewed_tree.discard()
 	const opens = round_one_opens(slots, unpinned_ok)
-	const ran = await run_phases([
-		tagged_phase(CAUSE.CHECK, scoped_pair),
-		...reviewed_together(opens, run_ship_review.reviewer_prompt, issue, ROUND_ONE),
-		tagged_phase(CAUSE.CHECK, async () => await join_gate(slots)),
-		attest_phase,
-		async () => await code_round_one_record(issue, slots),
-	])
+	const provider = reviewed_together(opens, run_ship_review.reviewer_prompt, issue, ROUND_ONE)
+	const ran = await run_ship_review_checkpoint.run(
+		issue,
+		`one-${slots.join('-')}`,
+		[
+			['scoped', tagged_phase(CAUSE.CHECK, scoped_pair)],
+			['provider', async () => await run_phases(provider)],
+			['gate', tagged_phase(CAUSE.CHECK, async () => await join_gate(slots))],
+			['attest', attest_phase],
+			['record', async () => await code_round_one_record(issue, slots)],
+		],
+		is_stale,
+	)
 
 	return { ...ran, reason: run_ship_review_reason.ran(reused) }
 }
@@ -311,12 +336,19 @@ async function round_one_stage(
 async function interaction_stage(issue: string): Promise<StepResult> {
 	const opens = [{ open: INTERACTION_BRIEF, slot: INTERACTION }]
 
-	return await run_phases([
-		tagged_phase(CAUSE.CHECK, scoped_pair),
-		...reviewed_together(opens, run_ship_review.reviewer_prompt, issue, ROUND_ONE),
-		attest_phase,
-		async () => await record_slots(issue, [INTERACTION]),
-	])
+	const provider = reviewed_together(opens, run_ship_review.reviewer_prompt, issue, ROUND_ONE)
+
+	return await run_ship_review_checkpoint.run(
+		issue,
+		'interaction',
+		[
+			['scoped', tagged_phase(CAUSE.CHECK, scoped_pair)],
+			['provider', async () => await run_phases(provider)],
+			['attest', attest_phase],
+			['record', async () => await record_slots(issue, [INTERACTION])],
+		],
+		await review_round_reuse.is_stale_here(),
+	)
 }
 
 async function due_slots(issue: string): Promise<ReadonlyArray<ReviewSlot>> {
@@ -372,6 +404,25 @@ async function review_stage(
 // **The decision is read as JSON and recorded in the lane ledger before it is acted on**, so
 // `josh lane:stats` can count the period's round-2 runs and skips by their reason code
 // (joshuafolkken/kit#4064). Output it cannot parse stops the ship rather than guessing a verdict.
+async function reviewed_round_two(issue: string): Promise<StepResult> {
+	const provider = reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt, issue, ROUND_TWO)
+
+	return await run_ship_review_checkpoint.run(
+		issue,
+		'two',
+		[
+			['scoped', tagged_phase(CAUSE.CHECK, scoped_pair)],
+			['provider', async () => await run_phases(provider)],
+			['attest', attest_phase],
+			[
+				'record',
+				async () => await record_and_route(issue, ROUND_TWO, run_ship_review.round_two_outcome),
+			],
+		],
+		await review_round_reuse.is_stale_here(),
+	)
+}
+
 async function execute_round_two_stage(issue: string): Promise<StepResult> {
 	const decision = await josh(round_two_decision(issue))
 
@@ -394,12 +445,7 @@ async function execute_round_two_stage(issue: string): Promise<StepResult> {
 		return skipped(`${answer.verdict}\n${ROUND_TWO_SKIPPED_NOTE}`)
 	}
 
-	return await run_phases([
-		tagged_phase(CAUSE.CHECK, scoped_pair),
-		...reviewed(ROUND_TWO_BRIEF, run_ship_review.verification_prompt, issue, ROUND_TWO),
-		attest_phase,
-		async () => await record_and_route(issue, ROUND_TWO, run_ship_review.round_two_outcome),
-	])
+	return await reviewed_round_two(issue)
 }
 
 async function round_two_stage(issue: string): Promise<StepResult> {

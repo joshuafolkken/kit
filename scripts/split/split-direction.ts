@@ -1,6 +1,9 @@
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
+import { epic_parse } from '#scripts/epic/epic-parse'
+import { epic_shape } from '#scripts/epic/epic-shape'
+import { epic_validate } from '#scripts/epic/epic-validate'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -12,7 +15,7 @@ import { file_reader } from '#scripts/lib/read-file'
 // split, while the criteria it kept still needed the relay: review round 1 blocked, and the file came
 // back. Before a `josh issue:file --route split --found-during <N>` lands, the
 // kept Issue's expected result and criteria are read for the names of the files the child declares —
-// each file's module name and the `josh` commands it registers or names (joshuafolkken/kit#5992:
+// each file's module name and the `josh` commands it registers or its source names (joshuafolkken/kit#5992:
 // #5953's criteria named `run:cut`, which the relay passes on, and never its module); a hit refuses
 // the independent split and points at `run:split --prerequisite`.
 
@@ -25,10 +28,12 @@ const EXTENSION = /\.[^.]*$/u
 const WORD = /\s+/u
 const COMMAND_WORD = /[\w:-]+/gu
 const COMMAND_SEPARATOR = ':'
+const MARKDOWN = /\.mdx?$/iu
 
 interface SplitFiling {
 	route: string | undefined
 	found_during: string | undefined
+	labels?: ReadonlyArray<string>
 }
 
 interface Reference {
@@ -74,11 +79,12 @@ function kept_names(body: string): ReadonlySet<string> {
 	return new Set([...stems, ...spans.flatMap((span) => commands_of(span))])
 }
 
-// The commands that run `path`, and the commands its source names — an absent file names none.
+// Registered commands still count; documentation mentions do not implement commands (#6417).
 function commands_for(path: string): Array<string> {
 	const registered = Object.entries(COMMAND_MAP)
 		.filter(([, entry]) => entry.script === path)
 		.map(([command]) => command)
+	if (MARKDOWN.test(path)) return registered
 	const source = file_reader.read_if_readable(path) ?? ''
 	const named = [...source.matchAll(COMMAND_WORD)].map((match) => match[0])
 
@@ -107,7 +113,7 @@ function format_refusal(kept: string, found: ReadonlyArray<Reference>): string {
 
 	return [
 		`✖ ${session_cite.issue(kept)}'s expected result or acceptance criteria name what this split takes off: ${named}. The kept Issue depends on the split-off part, so it cannot merge first.`,
-		`File the part as a prerequisite instead (\`--route tier-a\`), then run \`pnpm josh run:split ${kept} --prerequisite <P>\` — \`prerequisite.md\`; nothing was filed.`,
+		`File the part as a prerequisite instead (\`--route split --label route:tier-a\`), then run \`pnpm josh run:split ${kept} --prerequisite <P>\` — \`prerequisite.md\`; nothing was filed.`,
 	].join('\n')
 }
 
@@ -118,13 +124,31 @@ function kept_issue({ route, found_during }: SplitFiling): string | undefined {
 	return issue_number_shape.is_issue_number(found_during) ? found_during : undefined
 }
 
+function is_prerequisite({ labels = [] }: SplitFiling): boolean {
+	return labels.includes(TIER_A_ROUTE_LABEL)
+}
+
+// A promoted epic keeps the aggregate criteria of its children, not a deliverable that merges first.
+// Reuse the same label/body contract that permits adding a child to that container.
+async function kept_deliverable_body(issue: string): Promise<string | undefined> {
+	const raw = await git_gh_command.issue_get_labels_and_body(issue)
+	const subject = epic_validate.parse_epic_subject(raw)
+	if (subject === undefined) return undefined
+	const tracked = epic_parse.parse_task_list_issue_numbers(subject.body)
+	const shape = { epic_number: subject.number, labels: subject.labels, body: subject.body }
+
+	return epic_shape.find_subject_error(shape, tracked) === undefined ? undefined : subject.body
+}
+
 // The refusal for a split child filed from `found_during`, or `undefined` when it may split off
 // independently. An unreadable kept body refuses nothing: the check is advice on the split's direction,
 // not a gate on reaching GitHub.
 async function refusal_of(filing: SplitFiling, child_body: string): Promise<string | undefined> {
+	// A split prerequisite explicitly keeps the opposite dependency (joshuafolkken/kit#6300).
+	if (is_prerequisite(filing)) return undefined
 	const found_during = kept_issue(filing)
 	if (found_during === undefined) return undefined
-	const kept_body = await git_gh_command.issue_get_body(found_during)
+	const kept_body = await kept_deliverable_body(found_during)
 	const found = kept_body === undefined ? [] : references(kept_body, child_body)
 
 	return found.length === 0 ? undefined : format_refusal(found_during, found)

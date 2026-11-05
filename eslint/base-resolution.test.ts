@@ -78,19 +78,17 @@ describe('create_base_config — tests block (issue #867)', () => {
 describe('create_base_config — naming-convention by file kind', () => {
 	const naming_rule = '@typescript-eslint/naming-convention'
 
-	it.each(['scripts/josh/josh-commands-ai.ts', 'scripts/ci/ci-yml-fixture.ts'])(
-		'resolves the rule to off for %s',
-		async (file_path) => {
-			await expect(resolve_severity(file_path, naming_rule)).resolves.toBe(OFF)
-		},
-	)
+	it.each([
+		'scripts/josh/josh-commands-ai.ts',
+		'scripts/ci/ci-yml-fixture.ts',
+		'scripts/josh/josh-commands-ai.test.ts',
+	])('resolves the rule to off for %s', async (file_path) => {
+		await expect(resolve_severity(file_path, naming_rule)).resolves.toBe(OFF)
+	})
 
-	it.each([SOURCE_FILE, 'scripts/josh/josh-commands-ai.test.ts'])(
-		'keeps the rule at error for %s',
-		async (file_path) => {
-			await expect(resolve_severity(file_path, naming_rule)).resolves.toBe(ERROR)
-		},
-	)
+	it('keeps the rule at error for production source', async () => {
+		await expect(resolve_severity(SOURCE_FILE, naming_rule)).resolves.toBe(ERROR)
+	})
 })
 
 // joshuafolkken/kit#1112: asserted through the linter's own ignore resolution rather than by

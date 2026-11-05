@@ -28,12 +28,6 @@ export const import_rules = {
 	'import/no-default-export': 'error',
 	// 循環依存を禁止
 	'import/no-cycle': 'error',
-	// 未使用のインポートを禁止
-	// ESLint 10 で FileEnumerator API が削除されたため no-op だが、将来の代替実装に備えて残す
-	'import/no-unused-modules': [
-		'error',
-		{ unusedExports: true, suppressMissingFileEnumeratorAPIWarning: true },
-	],
 	// CommonJSを禁止
 	'import/no-commonjs': 'error',
 	// AMD形式を禁止
@@ -88,7 +82,4 @@ export const import_rules = {
 	// // 循環参照チェックは重いため、ローカル開発時は off、CIでのみ実行などを検討
 	// // どうしても有効にしたい場合は maxDepth を指定して制限する
 	// 'import/no-cycle': 'off',
-
-	// // 未使用モジュールチェックも非常に重い
-	// 'import/no-unused-modules': 'off',
 }

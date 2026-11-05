@@ -1,3 +1,4 @@
+import { lane_instructions } from '#scripts/agent/lane-instructions'
 import { read_repo_file, skill_documents } from '#scripts/document/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 import { read_skill_file, SKILL_ENTRY_FILE } from './skill-fixture'
@@ -48,9 +49,10 @@ function supporting_documents(): Map<string, string> {
 }
 
 describe(`${WORKFLOW_SKILL} — every shipped document is reachable`, () => {
-	it('reaches every markdown file it ships from the entry file', () => {
+	it('reaches every markdown file it ships from the interactive and lane entries', () => {
 		const documents = supporting_documents()
-		const reached = reached_documents(read_skill_file(WORKFLOW_SKILL), documents)
+		const entry = [read_skill_file(WORKFLOW_SKILL), lane_instructions.WORKFLOW_ENTRY].join('\n')
+		const reached = reached_documents(entry, documents)
 
 		expect([...reached].toSorted(by_text)).toEqual([...documents.keys()].toSorted(by_text))
 	})

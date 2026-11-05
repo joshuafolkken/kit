@@ -92,6 +92,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['epic/epic-parse.ts', 1],
 	['issue/issue-file-cli.ts', 1],
 	['lane/lane-adopt-cli.ts', 1],
+	['lane/lane-breakdown-estimate.ts', 1],
 	['lane/lane-child-invocation.ts', 7],
 	['lane/lane-dispatch.ts', 2],
 	['lane/lane-pause-cli.ts', 2],
@@ -117,6 +118,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The halfrun / prrun stop confirmation: copy-out commands.
 	['run/hold/run-stop-notify.ts', 1],
 	['run/merge/run-merge-cli.ts', 6],
+	['run/merge/run-merge-decision.ts', 1],
 	['run/merge/run-merge-human-review.ts', 1],
 	// The `run:stalled` park event, and the resume command a park comment and a board row name.
 	['run/park/run-stalled.ts', 2],

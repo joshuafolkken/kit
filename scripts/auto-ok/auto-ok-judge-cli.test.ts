@@ -30,6 +30,9 @@ const apply_label = vi.mocked(git_gh_command.issue_apply_label)
 const post_comment = vi.mocked(git_gh_command.issue_comment)
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const { row, labels_and_body } = auto_ok_judge_fixture
+const VERIFICATION_FLAG = '--verification'
+const EVERY_RUN_FLAG = '--every-run'
+const SOLO_ANSWERS = ['--defect', 'yes', VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes']
 
 const streams = auto_ok_fixture.console_streams()
 const { stdout, stderr } = streams
@@ -73,7 +76,7 @@ describe('josh auto-ok:judge --apply / --decline', () => {
 	it('names the solo label when --solo is given', async () => {
 		read_issue.mockResolvedValueOnce(labels_and_body([]))
 
-		await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER), '--solo'])
+		await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER), '--solo', ...SOLO_ANSWERS])
 
 		expect(apply_label.mock.calls[0]?.[1]).toBe(RUN_SOLO_LABEL)
 	})
@@ -89,6 +92,26 @@ describe('josh auto-ok:judge --apply / --decline', () => {
 })
 
 describe('josh auto-ok:judge — usage', () => {
+	it('shows the three affirmative answers required for solo (ac-facb5348)', async () => {
+		await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER)])
+
+		expect(stderr()).toContain(`--solo ${SOLO_ANSWERS.join(' ')}`)
+	})
+
+	it.each(['no', 'unknown', 'invalid', ''])(
+		'refuses solo evidence %s before writing (ac-237df449)',
+		async (answer) => {
+			const answers =
+				answer === '' ? [] : ['--defect', answer, VERIFICATION_FLAG, 'yes', EVERY_RUN_FLAG, 'yes']
+
+			expect(
+				await auto_ok_judge_cli.run(['--apply', String(OWED_NUMBER), '--solo', ...answers]),
+			).toBe(FAILURE_EXIT_CODE)
+			expect(post_comment).not.toHaveBeenCalled()
+			expect(apply_label).not.toHaveBeenCalled()
+		},
+	)
+
 	it.each([
 		[['--apply', String(OWED_NUMBER)]],
 		[['--apply', String(OWED_NUMBER), '--lane', '--solo']],

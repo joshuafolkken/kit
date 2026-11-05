@@ -96,6 +96,7 @@ describe('Codex event normalization', () => {
 			provider: 'openai',
 			launch: 'started',
 			progress: CHECKING_GATE,
+			last_message: CHECKING_GATE,
 			result: 'failed',
 			reason: BUDGET_EXCEEDED,
 			usage: undefined,

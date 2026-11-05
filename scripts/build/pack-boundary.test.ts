@@ -58,14 +58,15 @@ const PATH_LAUNCHED_ENTRIES = [
 	'scripts/gh/fix-gh-packages.ts',
 	'scripts/lane/lane-session-reread-main.ts',
 	'scripts/lane/openai-lane-supervisor-entry.ts',
+	'scripts/lint/eslint-memory.js',
 	'scripts/lint/eslint-warm-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',
 	'scripts/run/run-label-main.ts',
 ]
 
 // Shipped although no consumer entry reaches them: kit's own build and release entries, which run
-// from kit's checkout (`pnpm build`, CI workflows). Every other unreachable module is kit-internal
-// and belongs in `tools/`, so a kit-only file placed under `scripts/` fails the reachability test.
+// from kit's checkout (`pnpm build`, CI workflows), and the explicitly staged shared reader below.
+// Every other unreachable module is kit-internal and belongs in `tools/`.
 const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-bin.ts',
 	'scripts/build/build-claude-md.ts',
@@ -85,6 +86,8 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/release/github-release-cli.ts',
 	'scripts/release/publish-tag.ts',
 	'scripts/release/publish-tag-cli.ts',
+	// #6299 stages the shared reader without callers; remove this entry when #6243 or #6048 uses it.
+	'scripts/review/review-gate-mode.ts',
 ])
 
 interface PackedEntry {

@@ -27,6 +27,10 @@ action. `pnpm josh run:merge` enforces the computable half: an unfinished child 
 blocked-by is released to **wait** — no `needs-decision` label, no failure counted — and the backlog
 offer hands it back once its blockers merge.
 
+After collecting a merged cause, the driver retries this run's parked native blocked-by dependents
+through `run:add --retry` once all blockers close. It preserves the retry command's human-decision,
+active-lane and terminal-state protections; incomplete dependency reads and failed retries are errors.
+
 **A wait for the next published release is a dependency too** — never `needs-decision`. Record it
 with `pnpm josh issue:release <M> --wait` (`<M>` blocked by the release Issue, filed when none is
 open), then `pnpm josh run:pause <M> --for <the release Issue>` as for a prerequisite below; `fullrun` /
@@ -40,9 +44,14 @@ so the observation row carries no `route:` label (`observation-filing.md`):
 pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --route tier-a
 ```
 
-The command lints the body against `prompts/collaboration-workflow/issue-template.md`, applies the
-classification labels it declares, and runs the duplicate scan and `epic:bundle` itself
-(`docs/josh-commands-backlog.md` → `josh issue:file`).
+If the size check requires a split, use `--route split --label route:tier-a` instead.
+Then run `pnpm josh run:split <M> --prerequisite <N>` to record that the kept Issue waits for it.
+
+For a cause that stopped a run, declare `- 原因の park: #<M>` under `## 背景` before filing;
+repeat the single-number line for each local stopped Issue. `issue:file` records each stopped Issue
+as blocked by the cause through the same shared epic recorder the confirmed-duplicate path uses,
+settling the epic declaration too. A warning leaves the cause filed: repair the dependency, never
+file the cause again. The set-aside and release through `run:pause` below are still required.
 
 Every *file the prerequisite* step below means that filing, and it always happens **first** — the
 later steps name its number. **Its duplicate scan is read exactly as it is for a `new` entry**

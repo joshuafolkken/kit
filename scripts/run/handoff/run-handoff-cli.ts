@@ -7,6 +7,7 @@ import {
 } from '#scripts/agent/agent-provider'
 import { cli_body } from '#scripts/josh/cli-body'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import {
 	detached_launch,
@@ -228,7 +229,7 @@ async function handed(
 		: await launched(result.started, ports)
 }
 
-async function run(argv: ReadonlyArray<string>, ports: HandoffPorts = LIVE_PORTS): Promise<number> {
+async function dispatch(argv: ReadonlyArray<string>, ports: HandoffPorts): Promise<number> {
 	const parsed = run_handoff_args.parse(argv)
 
 	if (parsed.kind === 'refused') return refuse(`${parsed.note}\n${USAGE}`, ports)
@@ -242,6 +243,17 @@ async function run(argv: ReadonlyArray<string>, ports: HandoffPorts = LIVE_PORTS
 	}
 
 	return await handed(parsed, selected.provider, ports)
+}
+
+async function run(argv: ReadonlyArray<string>, ports: HandoffPorts = LIVE_PORTS): Promise<number> {
+	if (lane_child_marker.is_child_of(ports.cwd, ports.environment)) {
+		return refuse(
+			'lane children cannot use run:handoff; continue the workflow in this session',
+			ports,
+		)
+	}
+
+	return await dispatch(argv, ports)
 }
 
 const run_handoff_cli = { run }

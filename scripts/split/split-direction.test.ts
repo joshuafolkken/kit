@@ -1,5 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { file_reader } from '#scripts/lib/read-file'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { split_direction } from './split-direction'
@@ -47,15 +47,26 @@ function kept_body(criteria: string): string {
 }
 
 function stub_kept(body: string | undefined): ReturnType<typeof vi.fn> {
-	const read = vi.fn<typeof git_gh_command.issue_get_body>().mockResolvedValue(body)
+	const raw = body === undefined ? undefined : JSON.stringify({ number: Number(KEPT), body })
+	const read = vi.fn<typeof git_gh_command.issue_get_labels_and_body>().mockResolvedValue(raw)
 
-	vi.spyOn(git_gh_command, 'issue_get_body').mockImplementation(read)
+	vi.spyOn(git_gh_command, 'issue_get_labels_and_body').mockImplementation(read)
 
 	return read
 }
 
 afterEach(() => {
 	vi.restoreAllMocks()
+})
+
+describe('split_direction.refusal_of — a split prerequisite', () => {
+	it('admits an explicitly declared split prerequisite (ac-a6f82ac3)', async () => {
+		const read = stub_kept(kept_body(MODULE_SPAN))
+		const filing = { ...SPLIT_FILING, labels: [TIER_A_ROUTE_LABEL] }
+
+		expect(await split_direction.refusal_of(filing, CHILD_BODY)).toBeUndefined()
+		expect(read).not.toHaveBeenCalled()
+	})
 })
 
 describe('split_direction.refusal_of', () => {
@@ -103,6 +114,32 @@ describe('split_direction.refusal_of', () => {
 })
 
 describe('split_direction.refusal_of — the commands of a split-off file', () => {
+	it('admits documentation cleanup whose command mentions are not implementations (ac-5ab59a34, ac-63269a29)', async () => {
+		stub_kept(kept_body('`pnpm josh rule:list` が規則を一覧表示する'))
+		const child = '`docs/maintainers/rule-delivery-rationale.md` の説明を整理する。'
+
+		expect(await split_direction.refusal_of(SPLIT_FILING, child)).toBeUndefined()
+	})
+
+	it.each(['docs/guide.md', 'docs/guide.mdx', 'docs/GUIDE.MD'])(
+		'ignores command mentions without reading Markdown content: %s',
+		(path: string) => {
+			const read = vi.spyOn(file_reader, 'read_if_readable').mockReturnValue('pnpm josh rule:list')
+
+			expect(split_direction.references(kept_body('`rule:list`'), `\`${path}\``)).toEqual([])
+			expect(read).not.toHaveBeenCalled()
+		},
+	)
+
+	it('retains a dependency on an explicitly named document', () => {
+		const path = 'docs/maintainers/rule-delivery-rationale.md'
+		const body = kept_body(`\`${path}\` の説明を更新する`)
+
+		expect(split_direction.references(body, `\`${path}\``)).toEqual([
+			{ path, name: 'rule-delivery-rationale' },
+		])
+	})
+
 	it('refuses when the kept criteria name only the command a split-off file registers', async () => {
 		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(undefined)
 		stub_kept(kept_body('`run:entry` が節を中継する'))

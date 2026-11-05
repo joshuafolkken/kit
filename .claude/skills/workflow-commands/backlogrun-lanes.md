@@ -11,7 +11,10 @@ dependency that crosses a repository are `docs/josh-commands-backlog.md` → "`j
 
 **One kind of child takes no lane beside anything: a defect in kit's own verification that makes
 unrelated PRs answer wrongly on `main` today.** It runs alone, and the batch resumes only once it has
-merged. **Decide it from three conditions that must all hold, never from how serious it looks** — is
+merged. **Ask `pnpm josh backlog:triage --decide --defect <answer> --verification <answer> --every-run <answer>`**
+with `yes`, `no` or `unknown` for each condition below, never from how serious it looks. The command
+prints `run:solo`, `run:lane`, or `judge` when evidence is missing; `judge` keeps the issue untriaged.
+The reader answers the semantic questions; the command computes their conjunction — is
 it a defect (not an improvement, refactor, removal or feature)? Is it in kit's own verification gate
 (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge
 checks — not a consumer repository's CI or template? Does it, on `main` now, make unrelated PRs
@@ -23,6 +26,16 @@ trustworthy.**
 
 `backlog:next` labels `run:lane` itself where the first two conditions fail
 (`docs/josh-commands-backlog.md` → "`josh backlog:next`").
+
+To apply `run:solo`, pass all three affirmative answers:
+
+```bash
+pnpm josh backlog:triage --apply <N> --solo --defect yes --verification yes --every-run yes --reason <text>
+pnpm josh auto-ok:judge --apply <N> --solo --defect yes --verification yes --every-run yes
+```
+
+Missing, negative, unknown or invalid answers refuse the entire request before any writes,
+including relation changes and park clearing. `--lane` requires no answers.
 
 **A wrong answer that only comes some of the time — a flaky test, a timeout under load — is not a solo
 run.** It carries `run:lane` and `priority:critical`, so it leads the next offer while the other lanes

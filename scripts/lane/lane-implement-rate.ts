@@ -59,7 +59,16 @@ function minutes_for(lines: number, measured: ImplementRate): number {
 	return (lines * measured.median) / LINES_PER_RATE
 }
 
-const lane_implement_rate = { minutes_for, rate, table }
+// Invert the same rate unit for a budget; missing or invalid rates cannot size a change.
+function lines_for(minutes: number, measured: ImplementRate | undefined): number | undefined {
+	if (measured === undefined || !Number.isFinite(measured.median) || measured.median <= 0) {
+		return undefined
+	}
+
+	return (minutes * LINES_PER_RATE) / measured.median
+}
+
+const lane_implement_rate = { lines_for, minutes_for, rate, table }
 
 export type { ImplementRate }
 export { lane_implement_rate }

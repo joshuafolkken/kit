@@ -1,5 +1,6 @@
 import { agent_consultation_model } from '#scripts/agent/agent-consultation-model'
 import type { GuardRun } from '#scripts/josh/hook-decision'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { bash_triggers } from './bash-triggers'
 import type { DeliveredRule } from './delivered-rules'
 import { main_model_reader } from './main-model'
@@ -48,6 +49,8 @@ function is_consultation_main(
 
 // A delegated unit enters no run.
 function is_not_consultation_main(tail: string, _call: unknown, run: GuardRun): boolean {
+	if (lane_child_marker.is_child_of(process.cwd())) return true
+
 	return run.is_unit === true || !is_consultation_main(tail, run.model)
 }
 
@@ -63,7 +66,7 @@ const ROW: DeliveredRule = {
 		topic: HANDOFF_DOC,
 		fires: '`pnpm josh run:entry` / `run:hold` on Fable or Codex Astra. Every occurrence',
 		quiet:
-			'a main line on any other model, an unnamed model, a delegated unit, or filing and operating (`issue:file`, `issue:plan`, `epic`)',
+			'a lane child, a main line on any other model, an unnamed model, a delegated unit, or filing and operating (`issue:file`, `issue:plan`, `epic`)',
 	},
 }
 

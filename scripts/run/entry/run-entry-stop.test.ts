@@ -1,5 +1,6 @@
 import { lane_park } from '#scripts/rules/lane-park'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_entry_stop, type StopNotice, type StopPorts } from './run-entry-stop'
 
 const ISSUE = '3099'
@@ -50,6 +51,10 @@ beforeEach(() => {
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
 	})
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
 })
 
 describe('run_entry_stop.stop — the stop carries its own chores', () => {
@@ -108,6 +113,16 @@ describe('run_entry_stop.stop — a stop that left something behind', () => {
 })
 
 describe('run_entry_stop.stop — what it withholds', () => {
+	it('releases internally when the entry stops a dispatched lane child', async () => {
+		const release = vi.spyOn(run_hold_cli, 'run').mockResolvedValue(0)
+
+		vi.spyOn(lane_park, 'is_parking_child').mockReturnValue(true)
+		await run_entry_stop.stop(notice(true))
+
+		expect(release).toHaveBeenCalledExactlyOnceWith(['--release', ISSUE])
+		expect(info_lines).toStrictEqual([run_entry_stop.RELEASED_NOTE])
+	})
+
 	// A failed release must leave the agent still asked to release, so the released note is withheld.
 	it('prints the release failure note when the release does not succeed', async () => {
 		await run_entry_stop.stop(notice(true), ports({ is_sent: true, is_released: false }))
