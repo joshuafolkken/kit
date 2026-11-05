@@ -62,6 +62,11 @@ function over_of(stage: Stage): OverStage | undefined {
 		: { stage, budget }
 }
 
+// Shared by the single-lane explanation and the period-wide triage.
+function over_stages(breakdown: Breakdown): Array<OverStage> {
+	return breakdown.stages.map((stage) => over_of(stage)).filter((row) => row !== undefined)
+}
+
 function is_stop(entry: LedgerEntry, issue: number): entry is StopRow {
 	return entry.kind === lane_ledger.KIND.STOP && entry.issue === issue
 }
@@ -107,9 +112,7 @@ function row_of({ stage, budget }: OverStage, records: WhyRecords): string {
 
 // The table of the stages over budget, longest first; `undefined` when none ran over.
 function table(records: WhyRecords): string | undefined {
-	const over = records.breakdown.stages
-		.map((stage) => over_of(stage))
-		.filter((row) => row !== undefined)
+	const over = over_stages(records.breakdown)
 
 	if (over.length === 0) return undefined
 
@@ -120,7 +123,7 @@ function table(records: WhyRecords): string | undefined {
 	].join('\n')
 }
 
-const lane_why = { projected_of, table }
+const lane_why = { over_stages, projected_of, table }
 
 export { lane_why }
 export type { WhyRecords }

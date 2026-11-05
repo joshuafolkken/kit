@@ -495,10 +495,10 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			"Print lane throughput, gate duration and machine load over a period, the per-stage durations, the wait after each ship stop reason, and each gate check's duration, reuse count and core claim against the cores it used; with --sinks the stage totals, or with --over the ledger chains, of the lanes over a net-minute threshold; with --pairs the scoped pair runs",
+			'Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs',
 		category: 'AI tools',
 		reference: [
-			'--period <days> [--limit <lane-limit> | --sinks [<minutes>] | --over <minutes> | --pairs]',
+			'--period <days> [--limit <lane-limit> | --sinks [<minutes>] | --over <minutes> | --why <minutes> | --pairs]',
 			'maintainer',
 			['none'],
 		],
@@ -508,6 +508,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '--period 7', note: "a 7-day period's stage medians and maxima" },
 				{ arguments: '--period 1 --sinks', note: 'stage totals of the lanes over 30 net min' },
 				{ arguments: '--period 1 --over 40', note: 'ledger chains of lanes over 40 net min' },
+				{ arguments: '--period 1 --why 40', note: 'cause groups of lanes over 40 net min' },
 				{ arguments: '--period 7 --pairs', note: "a 7-day period's scoped pair runs" },
 			],
 		},
