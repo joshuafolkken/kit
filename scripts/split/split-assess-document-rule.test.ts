@@ -7,6 +7,7 @@ import { split_assess } from './split-assess'
 // command" is pinned so the pointer cannot be dropped, and the oracle entry stays registered.
 
 const SPLIT_ASSESSMENT = '.claude/skills/workflow-commands/split-assessment.md'
+const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'
 const COMMAND = 'split:assess'
 
 describe('split-assessment.md points to the split:assess command', () => {
@@ -61,11 +62,32 @@ describe('split:assess is a registered decision oracle', () => {
 })
 
 describe('the issue template uses the shared split guide', () => {
+	it('references the measured derivation, fallback and cap (ac-f05d82e6)', () => {
+		const template = read_repo_file(ISSUE_TEMPLATE)
+
+		expect(template).toContain('実測からの導出・未測定時の fallback・cap は')
+		expect(template).toContain(`split-assessment.md\` → "${split_assess.QUESTION_SECTION}"`)
+	})
+
 	it('counts follow-up files and points either axis at the question', () => {
-		const template = read_repo_file('prompts/collaboration-workflow/issue-template.md')
+		const template = read_repo_file(ISSUE_TEMPLATE)
 
 		expect(template).toContain('文書・スナップショット・コマンド一覧の追従も数える')
 		expect(template).toContain('ファイル数または行数が分割の目安')
 		expect(template).toContain(`split-assessment.md\` → "${split_assess.QUESTION_SECTION}"`)
+	})
+})
+
+describe('the split question explains the measured guide', () => {
+	it('derives both axes from the budget with an unmeasured fallback and cap (ac-a00be54f)', () => {
+		const document = read_repo_file(SPLIT_ASSESSMENT)
+
+		expect(document).toContain('same trailing 3-day period as the implement budget')
+		expect(document).toContain('implement minutes per 100 actual changed lines')
+		expect(document).toContain('implement budget ÷ measured minutes per 100 lines × 100')
+		expect(document).toContain('line guide × (fallback file guide / fallback line guide)')
+		expect(document).toContain('Without a measured rate, fall back to')
+		expect(document).toContain('more than 8 changed files or more than 200 changed lines')
+		expect(document).toContain('the cap, 1.5 times the guide')
 	})
 })
