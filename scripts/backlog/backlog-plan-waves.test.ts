@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
 import { backlog_plan } from './backlog-plan'
+import { backlog_plan_cap_fixture } from './backlog-plan-cap-fixture'
 import { backlog_plan_cli } from './backlog-plan-cli'
 import { backlog_waves } from './backlog-waves'
 
@@ -78,6 +79,26 @@ describe('josh backlog:plan --waves — the width of a wave', () => {
 		await backlog_plan_cli.run(['--waves'])
 
 		expect(stdout()).toContain(`${backlog_waves.UNCAPPED_WIDTH}\n`)
+	})
+})
+
+describe('josh backlog:plan --waves — the first wave', () => {
+	it('matches the first wave in the ready section for seven issues and four lanes', async () => {
+		backlog_plan_cap_fixture.stub()
+		await backlog_plan_cli.run([])
+		const ready = stdout().split(backlog_plan.WAITING_HEADING)[0] ?? ''
+
+		streams.reset()
+		await backlog_plan_cli.run(['--waves'])
+		const first_wave =
+			stdout()
+				.split('\n')
+				.find((line) => line.startsWith('Wave 1 ')) ?? ''
+		const wave_numbers = backlog_plan_cap_fixture.numbers_in(first_wave)
+		const { LIMIT, ORDERED } = backlog_plan_cap_fixture
+
+		expect(wave_numbers).toEqual(ORDERED.slice(0, LIMIT))
+		expect(backlog_plan_cap_fixture.numbers_in(ready)).toEqual(wave_numbers)
 	})
 })
 

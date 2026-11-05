@@ -3,9 +3,11 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_report } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
+import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_plan, type PlanContext } from './backlog-plan'
+import { backlog_plan_cap_fixture } from './backlog-plan-cap-fixture'
 import { backlog_plan_cli } from './backlog-plan-cli'
 import { backlog_plan_words } from './backlog-plan-words'
 
@@ -48,6 +50,32 @@ describe('backlog_plan_words — the table per session language', () => {
 
 		expect(backlog_plan_words.session_words()).toBe(EN)
 	})
+})
+
+describe('backlog_plan_cli.run — unreadable lane limit', () => {
+	it.each([
+		['ja', 'レーン上限内'],
+		['en', 'within the lane limit'],
+	])(
+		'does not promise a lane bound when the limit is unreadable in %s',
+		async (lang, guarantee) => {
+			vi.restoreAllMocks()
+			vi.stubEnv('JOSH_SESSION_LANG', lang)
+			backlog_plan_cap_fixture.stub()
+			vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'problem', problem: 'bad' })
+			const streams = auto_ok_fixture.console_streams()
+
+			vi.spyOn(console, 'info').mockImplementation(streams.info)
+			await backlog_plan_cli.run([])
+			const ready =
+				streams.stdout().split(backlog_plan_words.words_for(lang).waiting_heading)[0] ?? ''
+
+			expect(backlog_plan_cap_fixture.numbers_in(ready)).toHaveLength(
+				backlog_plan_cap_fixture.ORDERED.length,
+			)
+			expect(ready).not.toContain(guarantee)
+		},
+	)
 })
 
 describe('backlog_plan_cli.run — in the session language', () => {
