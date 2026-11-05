@@ -10,6 +10,7 @@ import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_invocation } from '#scripts/run/run-invocation'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { run_wake_caffeinate } from './run-wake-caffeinate'
 
 // How the supervisor starts things: the next agent session, and — at `--start` — its own detached
@@ -141,9 +142,9 @@ function wake_argv(
 }
 
 // Re-invoking this very script under the same runner, which is what makes the supervisor outlive the
-// session that started it. `execArgv` is carried across rather than dropped, because the loader flags
-// are what let the runner execute a TypeScript entry point at all — without them the detached process
-// starts and immediately fails on the syntax.
+// session that started it. `execArgv` is carried across, and the tsx loader is added when it is missing
+// (`ts-entry-loader.ts`, joshuafolkken/kit#6401) — the dist launcher leaves none, and without one the
+// detached process fails on the entry's extensionless imports.
 //
 // **The interval is forwarded rather than dropped.** `--start --interval 15` accepts the flag, so a
 // supervisor that then polled at the default would be silently ignoring what it was told.
@@ -152,7 +153,7 @@ function supervisor_argv(script_path: string, interval?: string): LaunchArgv {
 
 	return {
 		command: process.execPath,
-		args: [...process.execArgv, script_path, LOOP_FLAG, ...chosen],
+		args: [...ts_entry_loader.loader_argv(process.execArgv), script_path, LOOP_FLAG, ...chosen],
 	}
 }
 

@@ -206,6 +206,17 @@ describe('color environment', () => {
 		expect(spawn_options[0]?.env).not.toHaveProperty('FORCE_COLOR')
 		expect(spawn_options[0]?.extendEnv).toBe(false)
 	})
+
+	it('hands the child a caller-supplied environment in place of its own', async () => {
+		const environment = { NODE_OPTIONS: '--max-old-space-size=1' }
+
+		mock_execa()
+
+		await buffered_process.run_buffered_process(['josh', 'lint'], { environment })
+
+		expect(spawn_options[0]?.env).toBe(environment)
+		expect(spawn_options[0]?.extendEnv).toBe(false)
+	})
 })
 
 // The parameter is narrowed to the one field the function reads, so these carry the exit code and

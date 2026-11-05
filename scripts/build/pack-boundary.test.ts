@@ -57,6 +57,7 @@ const PATH_LAUNCHED_ENTRIES = [
 	'scripts/gh/fix-gh-packages.ts',
 	'scripts/lane/lane-session-reread-main.ts',
 	'scripts/lane/openai-lane-supervisor-entry.ts',
+	'scripts/lint/eslint-memory.js',
 	'scripts/lint/eslint-warm-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',
 	'scripts/run/run-label-main.ts',

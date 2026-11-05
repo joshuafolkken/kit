@@ -16,6 +16,7 @@ const WINDOW = lane_stats.window_of(1, NOW)
 const BASE_MS = NOW - 100 * MS_PER_MINUTE
 const TABLE = 'stage turns'
 const CALLS = 'calls per lane (median)'
+const STOPS = 'stops per lane (median)'
 const LANES = 'lanes'
 const NO_TRANSCRIPT = 'no transcript'
 const BETWEEN = 'between stages'
@@ -30,6 +31,10 @@ function at(minute: number): string {
 
 function dispatch(issue: number): LedgerEntry {
 	return { kind: lane_ledger.KIND.DISPATCH, at: at(0), issue }
+}
+
+function stop(issue: number, reason: string, minute = 1): LedgerEntry {
+	return { kind: lane_ledger.KIND.STOP, at: at(minute), issue, reason }
 }
 
 // A stage of `issue` from minute `from` to minute `to`.
@@ -101,9 +106,54 @@ describe('lane_turn_stats.table', () => {
 	it('prints not measured when no lane has a transcript', () => {
 		const table = lane_turn_stats.table(ENTRIES, [], WINDOW)
 
-		expect(table).toContain(`| ${STAGE.PREFLIGHT} | ${lane_stage_stats.NOT_MEASURED} | 0 |`)
+		expect(table).toContain(`| ${STAGE.PREFLIGHT} | ${lane_stage_stats.NOT_MEASURED} | 0 | 0 |`)
 		expect(
 			lane_value_cell.value([table], { table: TABLE, column: LANES, row: NO_TRANSCRIPT }),
 		).toBe(3)
+	})
+})
+
+const STOP_ENTRIES: ReadonlyArray<LedgerEntry> = [
+	dispatch(LANE_A),
+	dispatch(LANE_B),
+	stop(LANE_A, STAGE.PREFLIGHT),
+	stop(LANE_A, STAGE.PREFLIGHT),
+	stop(LANE_B, STAGE.PREFLIGHT),
+	stop(LANE_A, STAGE.SYNC),
+	stop(LANE_A, run_ship_stage.CONFLICT),
+	stop(LANE_B, STAGE.REVIEW),
+]
+
+describe('lane_turn_stats.table stop counts', () => {
+	it('reads stage stop medians over two dispatched lanes as numeric cells', () => {
+		const table = lane_turn_stats.table(STOP_ENTRIES, [], WINDOW)
+		const address = { table: TABLE, column: STOPS }
+
+		expect(lane_value_cell.value([table], { ...address, row: STAGE.PREFLIGHT })).toBe(1.5)
+		expect(lane_value_cell.value([table], { ...address, row: STAGE.SYNC })).toBe(1)
+		expect(lane_value_cell.value([table], { ...address, row: STAGE.REVIEW })).toBe(0.5)
+		expect(lane_value_cell.value([table], { ...address, row: STAGE.GATE })).toBe(0)
+	})
+
+	it('includes zero-stop lanes without transcripts and excludes other lanes and periods', () => {
+		const entries = [
+			dispatch(LANE_A),
+			dispatch(LANE_B),
+			stop(LANE_A, STAGE.REVIEW),
+			stop(LANE_A, STAGE.REVIEW),
+			stop(LANE_A, STAGE.REVIEW, -2000),
+			stop(LANE_C, STAGE.REVIEW),
+		]
+		const table = lane_turn_stats.table(entries, [call(LANE_A, 1)], WINDOW)
+
+		const address = { table: TABLE, column: STOPS, row: STAGE.REVIEW }
+
+		expect(lane_value_cell.value([table], address)).toBe(1)
+	})
+
+	it('prints not measured for stops when no lane was dispatched in the period', () => {
+		const table = lane_turn_stats.table([stop(LANE_A, STAGE.REVIEW)], [], WINDOW)
+
+		expect(table).toContain(`| ${STAGE.REVIEW} | not measured | not measured | 0 |`)
 	})
 })

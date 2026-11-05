@@ -66,7 +66,7 @@ merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本�
 
 ## Review level (decided by `pnpm josh review:brief --level-only`, never by judgement)
 
-Use the level `pnpm josh review:brief --level-only [--staged] [--json]` prints: `low` gets 1 round, `medium` up to 2; a documentation diff stays `medium`.
+Use the level `pnpm josh review:brief --level-only [--staged] [--json]` prints: `low` gets 1 round with Sonnet (Anthropic default), `medium` up to 2. Documentation, prompts and tests only get `low`; executable changes also get `low` at 20 added/deleted lines or fewer, including tests. Larger executable diffs, binary files and unreadable sizes stay `medium`. Model overrides still apply.
 
 ---
 
@@ -83,6 +83,11 @@ by the three-way disposition below, and record the pass with
 
 Two rounds is the ceiling, not the schedule; whether round 2 is due is `pnpm josh review:round2`'s
 answer (below). The interaction review is not one of the two.
+
+A bare `review:brief` starts at full-change final round 2 when both declared size axes fit, no
+High/Medium exists in the issue's history, and the gate is local; it records `round1: skipped-in-size`.
+Missing or unreadable inputs keep round 1; explicit round flags win. Final disposition and the
+independent interaction review still apply.
 
 ### A merge-conflict resolution review is not one of the two
 

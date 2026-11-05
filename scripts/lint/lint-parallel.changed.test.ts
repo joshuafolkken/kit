@@ -1,7 +1,9 @@
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ESLINT_HEAP_MIB } from './eslint-heap'
 import { lint_parallel } from './lint-parallel'
 
 // joshuafolkken/kit#4085: `josh lint --changed` is the gate's lint. Narrowed, it must still hand the
@@ -34,6 +36,8 @@ const FAILED = 1
 const CHANGED_ARGUMENTS = ['--changed']
 const PRETTIER_PASS = 'All matched files use Prettier code style!'
 const TIMING_LINE = /^lint timing — prettier \d+\.\d s · eslint \d+\.\d s\n$/u
+const ESLINT_HEAP = `--max-old-space-size=${String(ESLINT_HEAP_MIB)}`
+const COLD_OPTIONS = `${ESLINT_HEAP} --import=${new URL('eslint-memory.js', import.meta.url).href}`
 
 // The lint check reads only `all` and `exitCode` of execa's large result interface.
 function fake_result(exit_code: number, all = ''): ExecaResult {
@@ -112,6 +116,29 @@ describe('lint_parallel.run_lint_command --changed', () => {
 		await lint_parallel.run_lint_command([])
 
 		for (const argv of linter_arguments()) expect(argv).toContain(WHOLE_TREE)
+	})
+})
+
+describe('CI whole-tree resource settings', () => {
+	it('preserves CI whole-tree violations and gives eslint its heap (ac-2027cb4a)', async () => {
+		vi.stubEnv('CI', 'true')
+		vi.stubEnv('NODE_OPTIONS', '')
+		mock_exit_codes(0, FAILED)
+
+		await expect(lint_parallel.run_lint_command(CHANGED_ARGUMENTS)).resolves.toBe(FAILED)
+		expect(mocked_execa.mock.calls.at(-1)?.[1]).toEqual([
+			'exec',
+			'eslint',
+			WHOLE_TREE,
+			...ESLINT_CACHE_FLAGS,
+		])
+		expect(mocked_execa).toHaveBeenLastCalledWith(
+			expect.any(String),
+			expect.any(Array),
+			expect.objectContaining<Record<string, unknown>>({
+				env: expect.objectContaining({ NODE_OPTIONS: COLD_OPTIONS }),
+			}),
+		)
 	})
 })
 

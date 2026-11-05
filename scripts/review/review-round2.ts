@@ -3,7 +3,7 @@ import { path_decision } from '#scripts/josh/path-decision'
 import { json_value } from '#scripts/lib/json-value'
 import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { z } from 'zod'
-import { review_level } from './review-level'
+import { review_level, type ReviewLevel } from './review-level'
 
 // Whether the second review round runs at all.
 //
@@ -17,10 +17,8 @@ import { review_level } from './review-level'
 // `prompts/`, `josh metrics` approvals, and source files whose only change is in comments
 // (`review-code-tree.ts`).
 //
-// **Arm B is wider than the review level's inert set, on purpose** (joshuafolkken/kit#3787). Round 1
-// still reviews a documentation or prompt change in full, and the fix to its findings is still made;
-// what goes unread is only that fix. `.claude/**`, `CLAUDE.md`, tests and configuration stay outside:
-// a test fix can weaken the verification it belongs to, and nothing reads that but the review.
+// A low-level change gets one round once its findings close and its snapshot/base can be verified.
+// Medium changes retain the delta rules below, including tests and configuration outside arm B.
 
 type RoundTwoVerdict = 'required' | 'skip'
 
@@ -37,6 +35,7 @@ const CODE = {
 	NO_SNAPSHOT: 'no-snapshot',
 	BASE_MOVED: 'base-moved',
 	LIVE: 'live',
+	LOW: 'low',
 } as const
 
 type RoundTwoCode = (typeof CODE)[keyof typeof CODE]
@@ -68,6 +67,7 @@ const BASE_MOVED_REASON =
 	"the change base moved since round 1 was recorded and round 1's tree could not be carried onto the new one — no recorded round-1 blobs, or the carry conflicts — so the fix delta cannot be named and the round runs"
 
 interface RoundTwoInput {
+	level?: ReviewLevel
 	// **The commit the tree above is a diff against**. This decision reads the
 	// same digest comparison the brief's round-2 target does, so it inherits the same failure: taken
 	// against two different bases, the two maps do not cover the same set of paths, and an empty or
@@ -152,7 +152,16 @@ function verdict_for_delta(
 	delta: ReadonlyArray<string>,
 	taken_at: string,
 	comment_only: ReadonlyArray<string> = [],
+	level?: ReviewLevel,
 ): RoundTwoAnswer {
+	if (level === review_level.REDUCED_LEVEL) {
+		return {
+			verdict: SKIPPED_VERDICT,
+			code: CODE.LOW,
+			reason: `low review level has one round: ${delta.join(', ')}`,
+		}
+	}
+
 	if (delta.length === 0) {
 		return { verdict: SKIPPED_VERDICT, code: CODE.EMPTY, reason: empty_reason(taken_at) }
 	}
@@ -194,7 +203,10 @@ function decide(input: RoundTwoInput): RoundTwoDecision {
 
 	if (delta === undefined) return required(CODE.BASE_MOVED, BASE_MOVED_REASON)
 
-	return { ...verdict_for_delta(delta, input.snapshot.taken_at, input.comment_only), delta }
+	return {
+		...verdict_for_delta(delta, input.snapshot.taken_at, input.comment_only, input.level),
+		delta,
+	}
 }
 
 function to_json(answer: RoundTwoAnswer): string {
