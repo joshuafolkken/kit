@@ -57,6 +57,12 @@ async function apply_labels(
 	return undefined
 }
 
-const issue_run_verdict = { RUN_LABEL_OPTIONS, run_label_of, apply_labels }
+function comment_with_answers(body: string, flags: RunLabelFlags): string {
+	if (flags.solo !== true) return body
 
-export { issue_run_verdict }
+	return `${body}\n\nsolo-run answers: defect ${String(flags.defect)} · verification ${String(flags.verification)} · every-run ${String(flags['every-run'])}`
+}
+
+const issue_run_verdict = { RUN_LABEL_OPTIONS, run_label_of, apply_labels, comment_with_answers }
+
+export { issue_run_verdict, type RunLabelFlags }

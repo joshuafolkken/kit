@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { josh_in_process } from '#scripts/josh/josh-in-process'
+import { josh_logic } from '#scripts/josh/josh-logic'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { build_commands, bundled_scripts } from './build-commands'
 import { COMMANDS_TEST_PREFIX } from './distribution-scratch-fixture'
@@ -62,6 +63,13 @@ describe('build_commands — the pre-built doc:section', () => {
 const BUNDLED_ENTRIES = Object.entries(COMMAND_MAP).filter(([, entry]) => entry.is_bundled === true)
 
 describe('every is_bundled command can be bundled safely', () => {
+	it('prints completion names under plain node without a TypeScript loader', () => {
+		const result = run_node(bundle_of('scripts/josh/josh-completion.ts'), ['--names'])
+
+		expect(result.status).toBe(0)
+		expect(result.stdout).toBe(`${josh_logic.all_command_names().join('\n')}\n`)
+	})
+
 	// A single-file bundle gives every module the entry's `import.meta.url`, so a second main guard in
 	// the closure would run its own main beside the command's.
 	it.each(bundled_scripts())('%s carries no other main guard in its import closure', (script) => {

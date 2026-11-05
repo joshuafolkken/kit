@@ -185,15 +185,23 @@ describe('josh backlog:triage --apply', () => {
 	it('leaves the park alone without --clear', async () => {
 		expect(await backlog_triage_cli.run(LANE_ARGV, DIRECTORY)).toBe(SUCCESS_EXIT_CODE)
 		expect(order).toStrictEqual(['comment', `label ${RUN_LANE_LABEL}`])
+		expect(post_comment).toHaveBeenCalledWith(
+			ISSUE,
+			`triaged by backlogrun: \`${RUN_LANE_LABEL}\`\n\n${REASON}`,
+		)
 	})
 
-	it('applies run:solo for --solo', async () => {
+	it('records all solo answers with run:solo (ac-30e91803, ac-ca28edeb)', async () => {
 		await backlog_triage_cli.run(
 			['--apply', ISSUE, '--solo', ...SOLO_ANSWERS, '--reason', REASON],
 			DIRECTORY,
 		)
 
 		expect(apply_label).toHaveBeenCalledWith(ISSUE, RUN_SOLO_LABEL)
+		expect(post_comment).toHaveBeenCalledWith(
+			ISSUE,
+			`triaged by backlogrun: \`${RUN_SOLO_LABEL}\`\n\n${REASON}\n\nsolo-run answers: defect yes · verification yes · every-run yes`,
+		)
 	})
 })
 

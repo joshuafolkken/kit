@@ -23,6 +23,7 @@ import { ci_yml_fixture } from './ci-yml-fixture'
 // the empty string, and pass the `not.toContain` half while asserting nothing at all.
 const RUNTIME_LINT_JOB = 'static-checks'
 const TEMPLATE_LINT_JOB = 'checks'
+const WARM_LINT_JOB = 'warm-eslint-lineage'
 const CACHE_STEP_ID = 'eslint-cache'
 const KEY_INPUT = 'key'
 const RESTORE_KEYS_INPUT = 'restore-keys'
@@ -73,6 +74,7 @@ describe('setup-node composite action', () => {
 
 describe.each([
 	[ci_yml_fixture.RUNTIME_CI_YML, RUNTIME_LINT_JOB],
+	[ci_yml_fixture.RUNTIME_CI_YML, WARM_LINT_JOB],
 	[ci_yml_fixture.TEMPLATE_CI_YML, TEMPLATE_LINT_JOB],
 ])('eslint cache key (%s)', (relative_path, job_name) => {
 	// The lookup above returns the empty string for a job or step that is not there, which would let
@@ -83,6 +85,15 @@ describe.each([
 
 	it('keys the cache on the config sources the fingerprint reads', () => {
 		expect(eslint_cache_key(relative_path, job_name)).toContain(CONFIG_SOURCE_GLOB)
+	})
+
+	it('keeps the config lineage in every restore-key while allowing another lockfile', () => {
+		const keys = eslint_cache_keys(relative_path, job_name)
+
+		for (const key of keys) expect(key).toContain(CONFIG_SOURCE_GLOB)
+		expect(keys.at(-1)).toBe(
+			`\${{ runner.os }}-eslint-cache-${NODE_VERSION_EXPRESSION}-\${{ ${CONFIG_SOURCE_GLOB} }}-`,
+		)
 	})
 
 	it('does not key it on the tests beside them, which no cache entry depends on', () => {

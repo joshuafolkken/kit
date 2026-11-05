@@ -6,6 +6,7 @@ import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
 import { issue_priority } from './issue-priority'
 import { issue_rank, type DependencyRow } from './issue-rank'
 import { session_cite } from './session-cite'
+import { size_estimate } from './size-estimate'
 
 // The next-issues display printed when a workflow completes: up to five open issues in
 // priority order, so the user picks the next run from the completion output instead of opening the
@@ -70,6 +71,7 @@ function order(
 		lost_minutes: issue_priority.lost_minutes(issue.body),
 		gain_minutes: expected_effect_lint.weekly_minutes(issue.body),
 		dependents: dependents.get(String(issue.number)) ?? 0,
+		estimated_lines: size_estimate.declared_size(issue.body ?? '')?.lines,
 	}))
 }
 

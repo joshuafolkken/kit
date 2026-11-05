@@ -32,13 +32,13 @@ type Values = NonNullable<ReturnType<typeof cli_flags.values_of<typeof OPTIONS>>
 
 type JudgeRequest =
 	| { kind: 'list' }
-	| { kind: 'apply'; issue: string; run_label: string }
+	| { kind: 'apply'; issue: string; run_label: string; answers: Values }
 	| { kind: 'decline'; issue: string; reason: string }
 
 function apply_request(issue: string, values: Values): JudgeRequest | undefined {
 	const run_label = issue_run_verdict.run_label_of(values)
 
-	return run_label === undefined ? undefined : { kind: 'apply', issue, run_label }
+	return run_label === undefined ? undefined : { kind: 'apply', issue, run_label, answers: values }
 }
 
 function decline_request(issue: string, values: Values): JudgeRequest | undefined {
@@ -91,7 +91,7 @@ async function dispatch(request: JudgeRequest): Promise<number> {
 	if (request.kind === 'list') return await list()
 	if (request.kind === 'decline') return await decline(request.issue, request.reason)
 
-	return await apply(request.issue, request.run_label)
+	return await apply(request.issue, request.run_label, request.answers)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
