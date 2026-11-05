@@ -104,6 +104,18 @@ describe('split_resolution.refusal for an answered or unnoticed issue', () => {
 	})
 })
 
+describe('split_resolution.ledger_refusal measured guide', () => {
+	it('keeps a notice above the attached measured guide (ac-9e07d12c)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+		const guide = split_assess.guide_for(12, { median: 24, lanes: 1 })
+
+		read_branch.mockResolvedValueOnce(split_assess.assess('51\t0\tscripts/a.ts', guide))
+
+		expect(await split_resolution.ledger_refusal(ISSUE)).toContain(NO_CHILD)
+	})
+})
+
 describe('split_resolution.ledger_refusal', () => {
 	it('passes a stale notice when the current diff is below the bar (ac-92ff3c54)', async () => {
 		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)

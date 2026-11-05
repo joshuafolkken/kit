@@ -23,6 +23,9 @@ vi.mock('./git-command', () => ({
 vi.mock('./change-base', () => ({
 	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
+vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
+	lane_implement_rate_read: { implement_rate: vi.fn() },
+}))
 
 // The guard's one git read — the paths the default branch would bring in.
 vi.mock('./git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
@@ -38,6 +41,7 @@ const { main_merge_regenerate } = await import('./main-merge-regenerate')
 const { git_spawn } = await import('./git-spawn')
 const { split_early_notice } = await import('#scripts/split/split-early-notice')
 const { lane_install } = await import('#scripts/lane/lane-install')
+const { lane_implement_rate_read } = await import('#scripts/lane/lane-implement-rate-read')
 
 // The notice's ledger record; its marker and ledger writes are `split-early-notice.test.ts`'s.
 const record_notice = vi.spyOn(split_early_notice, 'record').mockResolvedValue()
@@ -93,6 +97,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	vi.mocked(git_command.diff_numstat_since).mockResolvedValue('')
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
+	vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue(undefined)
 })
 
 describe('merging the default branch into the current branch', () => {
@@ -300,6 +305,16 @@ function over_guide_numstat(): string {
 		(_unused, index) => `${String(LINES_PER_FILE)}\t0\tscripts/thing-${String(index)}.ts`,
 	).join('\n')
 }
+
+describe('the measured split notice before the gate', () => {
+	it('uses the measured guide below the legacy bar (ac-9e07d12c)', async () => {
+		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(`51\t0\t${CHANGED_FILE}`)
+
+		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('guide 2 files / 50 lines'))
+	})
+})
 
 describe('the split notice before the gate', () => {
 	it('warns when the diff clearly exceeds the split guide', async () => {
