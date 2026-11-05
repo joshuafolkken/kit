@@ -1,8 +1,10 @@
 #!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
+import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 import { issue_fold_apply, type ApplyResult } from './issue-fold-apply'
 import { issue_fold_existing } from './issue-fold-existing'
@@ -12,8 +14,9 @@ const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 const JSON_FLAG = '--json'
 const APPLY_FLAG = '--apply'
+const BLOCKED_FLAG = '--blocked'
 const FINGERPRINT_FLAG = '--fingerprint'
-const USAGE = `Usage: josh issue:fold-existing <assessment.json> [${JSON_FLAG} | ${APPLY_FLAG} <issue-number>] | ${FINGERPRINT_FLAG} <issue-number>`
+const USAGE = `Usage: josh issue:fold-existing <assessment.json> [${JSON_FLAG} | ${APPLY_FLAG} <issue-number> [${BLOCKED_FLAG} <stopped-issue>]] | ${FINGERPRINT_FLAG} <issue-number>`
 
 const APPLY_REPORTS: Readonly<Record<ApplyResult, string>> = {
 	applied: 'folded — the body was written, its priority floor applied and the re-read carries it.',
@@ -25,10 +28,20 @@ const APPLY_REPORTS: Readonly<Record<ApplyResult, string>> = {
 	unverified: 'was written, but the re-read does not carry the fold — the fold is not complete.',
 }
 
-type Mode = { kind: 'print'; should_json: boolean } | { kind: 'apply'; issue_number: string }
+type Mode =
+	| { kind: 'print'; should_json: boolean }
+	| { kind: 'apply'; issue_number: string }
+	| { kind: 'duplicate'; issue_number: string; blocked: string }
 
 const NO_OPTION = ''
 const FLAG_VALUE_ARITY = 2
+const DUPLICATE_ARITY = 4
+const duplicate_options_schema = z.tuple([
+	z.literal(APPLY_FLAG),
+	z.string().regex(issue_number_shape.ISSUE_NUMBER_PATTERN),
+	z.literal(BLOCKED_FLAG),
+	z.string().regex(issue_number_shape.ISSUE_NUMBER_PATTERN),
+])
 const PRINT_MODES: ReadonlyMap<string, Mode> = new Map([
 	[NO_OPTION, { kind: 'print', should_json: false }],
 	[JSON_FLAG, { kind: 'print', should_json: true }],
@@ -111,6 +124,41 @@ async function read_assessment(path: string): Promise<Assessment | undefined> {
 	}
 }
 
+async function record_duplicate(mode: Extract<Mode, { kind: 'duplicate' }>): Promise<number> {
+	try {
+		console.info(
+			await epic_blocked_by.record({ issue: mode.blocked, prerequisite: mode.issue_number }),
+		)
+
+		return SUCCESS_EXIT_CODE
+	} catch (error) {
+		console.error(`Duplicate dependency could not be recorded: ${error_text.message_of(error)}`)
+
+		return FAILURE_EXIT_CODE
+	}
+}
+
+async function apply_duplicate(
+	input: Assessment,
+	mode: Extract<Mode, { kind: 'duplicate' }>,
+): Promise<number> {
+	if (issue_fold_existing.decide(input) !== 'duplicate') {
+		console.error('Fold: not a confirmed duplicate — nothing written.')
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const refusal = await issue_fold_apply.check_unchanged({
+		...input,
+		issue_number: mode.issue_number,
+	})
+
+	if (refusal === undefined) return await record_duplicate(mode)
+	console.error(APPLY_REPORTS[refusal])
+
+	return FAILURE_EXIT_CODE
+}
+
 async function assess(path: string, mode: Mode): Promise<number> {
 	const input = await read_assessment(path)
 
@@ -120,6 +168,7 @@ async function assess(path: string, mode: Mode): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
+	if (mode.kind === 'duplicate') return await apply_duplicate(input, mode)
 	if (mode.kind === 'apply') return await apply_fold(input, mode.issue_number)
 
 	return print_assessment(input, mode.should_json)
@@ -133,8 +182,18 @@ function parse_apply([option, value]: ReadonlyArray<string>): Mode | undefined {
 		: undefined
 }
 
+function parse_duplicate(options: ReadonlyArray<string>): Mode | undefined {
+	const parsed = duplicate_options_schema.safeParse(options)
+
+	if (!parsed.success) return undefined
+	const [, issue_number, , blocked] = parsed.data
+
+	return { kind: 'duplicate', issue_number, blocked }
+}
+
 // No option and `--json` print; `--apply <N>` writes.
 function parse_mode(options: ReadonlyArray<string>): Mode | undefined {
+	if (options.length === DUPLICATE_ARITY) return parse_duplicate(options)
 	if (options.length === FLAG_VALUE_ARITY) return parse_apply(options)
 
 	return options.length <= 1 ? PRINT_MODES.get(options.join(NO_OPTION)) : undefined

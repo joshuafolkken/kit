@@ -195,16 +195,17 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:f
 Assess whether a complete draft can join an unstarted issue.
 
 ```bash
-pnpm josh issue:fold-existing --fingerprint 5848             # print the comment thread's fingerprint, before reading the issue, for the assessment's `comment_fingerprint`.
+pnpm josh issue:fold-existing --fingerprint 5848                            # read the comment fingerprint before assessment.
 pnpm josh issue:fold-existing assessment.json --json
-pnpm josh issue:fold-existing assessment.json --apply 5848   # write the fold to the issue once its body and comments still read as assessed, apply its priority floor, and verify the re-read.
+pnpm josh issue:fold-existing assessment.json --apply 5848                  # apply and verify the assessed fold and priority floor.
+pnpm josh issue:fold-existing assessment.json --apply 5848 --blocked 5849   # record a confirmed duplicate dependency and reconcile its epic.
 ```
 
 <!-- /usage -->
 
-Run it after the issue and the draft are read. It returns `duplicate` / `fold` / `separate` / `inspect`; only `--apply <N>` updates the issue, and only on `fold`. The JSON carries the facts (`content`, `is_open`, `size_verdict`, `existing_body`, `draft_body`, …). `separate` returns to the ordinary filing path.
+Read the issue and draft first. `--apply <N>` writes on `fold`; with `--blocked <M>` on `duplicate`, it records `<M>` blocked by `<N>` and reconciles its epic. Failure exits 1. Display writes nothing; `separate` returns to the ordinary filing path.
 
-`content`, `has_complete_read`, `existing_body`, `comment_fingerprint`, `draft_body` and `verification` are required; an assessment without one exits 1. Any other unknown fact is omitted and answers `inspect`.
+`content`, `has_complete_read`, `existing_body`, `comment_fingerprint`, `draft_body` and `verification` are required; an assessment without one exits 1. Omit other unknown facts: `inspect`.
 
 The JSON also carries `comment_fingerprint`, as `--fingerprint <N>` prints it before the issue is read; `--apply` writes nothing when a comment was added, edited or deleted since.
 
