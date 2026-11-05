@@ -8,6 +8,18 @@ A `<!-- usage: … -->` span is generated — its summary line from the command'
 
 These replace the corresponding `package.json` scripts; consumers need not add them.
 
+### `josh completion`
+
+<!-- usage: completion -->
+
+Print command names and aliases for shell completion.
+
+```bash
+pnpm josh completion --names
+```
+
+<!-- /usage -->
+
 ### `josh refactor:scan`
 
 <!-- usage: refactor:scan -->

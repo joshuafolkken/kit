@@ -61,7 +61,6 @@ function marker(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	vi.mocked(git_command.branch).mockResolvedValue(ISSUE_BRANCH)
 	vi.mocked(git_command.git_directories).mockResolvedValue([GIT_DIRECTORY])

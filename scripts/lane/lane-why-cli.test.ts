@@ -62,7 +62,6 @@ function lane(merge_minute: number): ReadonlyArray<LedgerEntry> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockReturnValue(undefined)
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
 	mocks.read_records.mockResolvedValue({

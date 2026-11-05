@@ -108,7 +108,6 @@ function with_split_and_map(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	with_split_and_map()
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)

@@ -35,7 +35,7 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh backlog:triage --pass [--exclude <N>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <N> [--lane | --solo] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear]'
+	'Usage: josh backlog:triage --pass [--exclude <N>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <N> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear]'
 
 const OPTIONS = {
 	apply: { type: 'string' },
@@ -48,6 +48,7 @@ const OPTIONS = {
 
 interface TriageRequest {
 	issue: string
+	answers: Values
 	run_label: string | undefined
 	blocker: string | undefined
 	unblock: string | undefined
@@ -78,6 +79,14 @@ function is_flags_valid(issue: string, values: Values): boolean {
 	return is_relation_valid(issue, values) && !(values.lane === true && values.solo === true)
 }
 
+function has_relation(values: Values): boolean {
+	return values['blocked-by'] !== undefined || values.unblock !== undefined
+}
+
+function is_verdict_invalid(run_label: string | undefined, values: Values): boolean {
+	return run_label === undefined && (values.solo === true || !has_relation(values))
+}
+
 // The verdict needs a run label, a relation change, or both.
 function verdict_request(issue: string, values: Values, reason: string): TriageRequest | undefined {
 	if (!is_flags_valid(issue, values)) return undefined
@@ -85,9 +94,17 @@ function verdict_request(issue: string, values: Values, reason: string): TriageR
 	const run_label = issue_run_verdict.run_label_of(values)
 	const { 'blocked-by': blocker, unblock } = values
 
-	return run_label === undefined && blocker === undefined && unblock === undefined
+	return is_verdict_invalid(run_label, values)
 		? undefined
-		: { issue, run_label, blocker, unblock, reason, is_clearing: values.clear === true }
+		: {
+				issue,
+				answers: values,
+				run_label,
+				blocker,
+				unblock,
+				reason,
+				is_clearing: values.clear === true,
+			}
 }
 
 function labelled_request(issue: string, values: Values): TriageRequest | undefined {
@@ -139,7 +156,10 @@ async function comment(request: TriageRequest): Promise<boolean> {
 	try {
 		await git_gh_command.issue_comment(
 			request.issue,
-			`triaged by backlogrun: ${verdict_of(request, issue_cite.plain)}\n\n${request.reason}`,
+			issue_run_verdict.comment_with_answers(
+				`triaged by backlogrun: ${verdict_of(request, issue_cite.plain)}\n\n${request.reason}`,
+				request.answers,
+			),
 		)
 
 		return true

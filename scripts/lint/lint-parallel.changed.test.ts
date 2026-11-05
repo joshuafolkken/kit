@@ -57,7 +57,6 @@ function linter_arguments(): ReadonlyArray<ReadonlyArray<string>> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.stubEnv('CI', '')
 	vi.mocked(git_command.repository_root).mockResolvedValue(ROOT)

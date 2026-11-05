@@ -1,5 +1,5 @@
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_deferral } from './issue-file-deferral'
 
 // joshuafolkken/kit#4821: a filing that names `--found-during <N>` leaves its deferral on #N, so the
@@ -23,10 +23,6 @@ function deferral_of(
 beforeEach(() => {
 	try_comment.mockResolvedValue(true)
 	error.mockImplementation(() => undefined)
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 describe('issue_file_deferral.note_finder', () => {

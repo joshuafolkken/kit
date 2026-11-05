@@ -52,7 +52,6 @@ describe('resolve_local_bin', () => {
 describe('find_local_bin_upwards', () => {
 	beforeEach(() => {
 		set_platform('darwin')
-		vi.clearAllMocks()
 	})
 
 	it('finds the shim in the directory it starts from', () => {

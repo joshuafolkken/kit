@@ -2,6 +2,8 @@ import { change_base } from '#scripts/git/change-base'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
+import { lane_implement_rate } from './lane-implement-rate'
+import { lane_implement_rate_read } from './lane-implement-rate-read'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import type { PlanSignals } from './lane-plan-size'
 import { lane_size_stats } from './lane-size-stats'
@@ -16,7 +18,7 @@ import { lane_stats } from './lane-stats'
 // `lane:stats` prints, and whether this lane already filed a split child. A diff or ledger it cannot
 // read counts as nothing, so an unmeasured axis never refuses.
 
-const RATIO_PERIOD_DAYS = 3
+const RATIO_PERIOD_DAYS = lane_implement_rate_read.PERIOD_DAYS
 const DIFF_ARGUMENTS = [
 	'diff',
 	'-U0',
@@ -79,6 +81,7 @@ function signals_from(
 	return {
 		...tree,
 		lines_ratio: lane_size_stats.lines_ratio(entries, window),
+		implement_rate: lane_implement_rate.rate(entries, window),
 		split_filed: split_resolution.split_issues(entries).has(issue),
 	}
 }
@@ -89,6 +92,6 @@ async function signals_of(issue: number): Promise<PlanSignals> {
 	return signals_from(issue, tree, entries, Date.now())
 }
 
-const lane_plan_signals = { RATIO_PERIOD_DAYS, hunk_files, signals_from, signals_of }
+const lane_plan_signals = { hunk_files, signals_from, signals_of }
 
 export { lane_plan_signals }

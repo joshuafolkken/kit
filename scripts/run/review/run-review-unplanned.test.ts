@@ -52,7 +52,6 @@ function found(file: string): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	info.mockImplementation(vi.fn())
 	fetch_opted_in.mockResolvedValue(listing())
 	vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(undefined)

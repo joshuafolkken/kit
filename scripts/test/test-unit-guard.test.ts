@@ -80,7 +80,6 @@ const ctx = { project_directory: '' }
 const { stub_claim, stub_free, stub_share } = unit_share_fixture
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	stub_share(undefined)
 	stub_free(undefined)
 	stub_claim(undefined)

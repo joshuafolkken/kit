@@ -125,7 +125,6 @@ function suite_run_count(): number {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	rmSync(STAMP_PATH, { force: true })
 	repository.tree = CHANGED_TREE
 	repository.base = BASE

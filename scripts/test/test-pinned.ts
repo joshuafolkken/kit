@@ -138,13 +138,24 @@ function check_options(held: number, options: RunOptions): CheckOptions {
 	}
 }
 
+async function with_spawned(probes: ReadonlyArray<Probe>, reach: Reach): Promise<Array<Probe>> {
+	const files = [...new Set(probes.map((probe) => probe.hunk.file))]
+	const spawned = await Promise.all(files.map(async (file) => await reach.spawned(file)))
+	const by_file = new Map(files.map((file, index) => [file, spawned[index]]))
+
+	return probes.map((probe) => ({ ...probe, spawned: by_file.get(probe.hunk.file) }))
+}
+
 // Each hunk's verdict: the cached one where it still holds, else a fresh run's, in the hunks' order.
 // The held ones are written first and each fresh one as it is reached (`test_pinned_cache.writer`).
 // Under `is_first_unpinned` a hunk the run stopped before keeps no verdict.
 async function verdicts_on(paths: ReadonlyArray<string>, probing: ProbeRun): Promise<Verdicts> {
 	const verdicts = probing.known.map((entry) => held_of(entry))
 	const reached = reached_of(verdicts)
-	const probes = by_reach(probes_of(probing.hunks, probing.known), probing.counts)
+	const probes = await with_spawned(
+		by_reach(probes_of(probing.hunks, probing.known), probing.counts),
+		probing.cache.reach,
+	)
 	const writer = test_pinned_cache.writer({ ...probing.cache, hunks: probing.hunks }, probing.keys)
 	const options = check_options(reached.length, probing.options)
 

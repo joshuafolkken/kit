@@ -1,4 +1,5 @@
 import type { parseArgs } from 'node:util'
+import { backlog_triage_decision } from '#scripts/backlog/backlog-triage-decision'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
@@ -14,6 +15,7 @@ import {
 } from './issue-labels'
 import { issue_not_before_label } from './issue-not-before-label'
 import { issue_priority } from './issue-priority'
+import { issue_run_verdict } from './issue-run-verdict'
 import { markdown_section } from './markdown-section'
 
 // The decisions behind `josh issue:file`, kept apart from the command that
@@ -30,6 +32,7 @@ const LEADING_NON_WORD = /^[^\w]+/u
 const DIGIT = /\d/u
 
 interface FileArguments {
+	answers?: Parameters<typeof issue_run_verdict.run_label_of>[0]
 	title: string
 	body_file: string
 	route: string | undefined
@@ -55,6 +58,7 @@ interface FileArguments {
 }
 
 const OPTIONS = {
+	...backlog_triage_decision.OPTIONS,
 	'body-file': { type: 'string' },
 	route: { type: 'string' },
 	label: { type: 'string', multiple: true },
@@ -139,6 +143,11 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 	return {
 		title,
 		body_file,
+		answers: {
+			defect: values.defect,
+			verification: values.verification,
+			'every-run': values['every-run'],
+		},
 		...labelled,
 		labels: values.label ?? [],
 		repo: values.repo,
@@ -153,8 +162,13 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 // An unknown flag is `undefined` rather than a throw, so the answer is the usage line, not a stack trace.
 function parse(argv: ReadonlyArray<string>): FileArguments | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
+	const args = parsed === undefined ? undefined : arguments_of(parsed.values, parsed.positionals[0])
 
-	return parsed === undefined ? undefined : arguments_of(parsed.values, parsed.positionals[0])
+	if (args === undefined || !has_label_name(args.labels, RUN_SOLO_LABEL)) return args
+
+	return issue_run_verdict.run_label_of({ ...args.answers, solo: true }) === RUN_SOLO_LABEL
+		? args
+		: undefined
 }
 
 // A classification label is the body's to declare, so an extra `--label` naming one the body does not

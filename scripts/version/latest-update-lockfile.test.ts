@@ -49,7 +49,6 @@ function read_tree_file(path: string): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	tree.package_json = PACKAGE_JSON
 	tree.workspace_yaml = WORKSPACE_WITH_OVERRIDE
 	tree.lockfile = make_lockfile(OVERRIDE_RANGE)

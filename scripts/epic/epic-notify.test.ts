@@ -16,7 +16,6 @@ const NOTICE = { epic_number: 900, children: [901, 902], title: 'Epic: split the
 const RUN_LINE = 'Next: backlogrun #900 --only'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 	vi.mocked(git_gh_repo.repo_get_name_with_owner).mockResolvedValue(SLUG)
 	vi.mocked(telegram_test.send_values).mockResolvedValue(undefined)

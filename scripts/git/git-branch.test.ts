@@ -40,7 +40,6 @@ const ISSUE_99_BRANCH = '99-other-feature'
 const NO_PREFIX_BRANCH = 'feature-no-number'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_get_default_branch.mockResolvedValue('main')
 })
 

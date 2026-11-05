@@ -30,7 +30,6 @@ writeFileSync(
 writeFileSync(path.join(DIRECTORY, IMPORTABLE), 'export const epic_schema = {}\n')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	error.mockImplementation(vi.fn())
 })
 

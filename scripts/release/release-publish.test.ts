@@ -81,10 +81,6 @@ function arrange_publish(): void {
 	arrange_merge()
 }
 
-beforeEach(() => {
-	vi.clearAllMocks()
-})
-
 afterEach(() => {
 	vi.restoreAllMocks()
 })

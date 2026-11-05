@@ -1,4 +1,7 @@
 import { backlog_overlap } from '#scripts/backlog/backlog-overlap'
+import { epic_parse } from '#scripts/epic/epic-parse'
+import { epic_shape } from '#scripts/epic/epic-shape'
+import { epic_validate } from '#scripts/epic/epic-validate'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
@@ -125,6 +128,18 @@ function is_prerequisite({ labels = [] }: SplitFiling): boolean {
 	return labels.includes(TIER_A_ROUTE_LABEL)
 }
 
+// A promoted epic keeps the aggregate criteria of its children, not a deliverable that merges first.
+// Reuse the same label/body contract that permits adding a child to that container.
+async function kept_deliverable_body(issue: string): Promise<string | undefined> {
+	const raw = await git_gh_command.issue_get_labels_and_body(issue)
+	const subject = epic_validate.parse_epic_subject(raw)
+	if (subject === undefined) return undefined
+	const tracked = epic_parse.parse_task_list_issue_numbers(subject.body)
+	const shape = { epic_number: subject.number, labels: subject.labels, body: subject.body }
+
+	return epic_shape.find_subject_error(shape, tracked) === undefined ? undefined : subject.body
+}
+
 // The refusal for a split child filed from `found_during`, or `undefined` when it may split off
 // independently. An unreadable kept body refuses nothing: the check is advice on the split's direction,
 // not a gate on reaching GitHub.
@@ -133,7 +148,7 @@ async function refusal_of(filing: SplitFiling, child_body: string): Promise<stri
 	if (is_prerequisite(filing)) return undefined
 	const found_during = kept_issue(filing)
 	if (found_during === undefined) return undefined
-	const kept_body = await git_gh_command.issue_get_body(found_during)
+	const kept_body = await kept_deliverable_body(found_during)
 	const found = kept_body === undefined ? [] : references(kept_body, child_body)
 
 	return found.length === 0 ? undefined : format_refusal(found_during, found)

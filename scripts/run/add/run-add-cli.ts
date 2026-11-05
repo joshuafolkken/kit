@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
-import { epic_issue } from '#scripts/epic/epic-issue'
+import { epic_issue, type EpicIssue } from '#scripts/epic/epic-issue'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_spent } from '#scripts/lane/lane-spent'
@@ -12,6 +12,7 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { run_add, type AddContext, type AddOutcome, type AddPorts, type IssueView } from './run-add'
+import { run_add_issue } from './run-add-issue'
 
 // `josh run:add <issue...> [--no-priority]` — the wiring around `run-add.ts`.
 // It refuses unless a `backlogrun` holds the carry record here: an issue labelled with no run to take
@@ -123,11 +124,7 @@ async function announce(issues: ReadonlyArray<number>, is_retry: boolean): Promi
 
 // The blockers still open. A blocker whose state did not come back counts as open, so an issue is
 // never reported free to run on a read that did not say so.
-function view_of(json: string): IssueView | undefined {
-	const issue = epic_issue.parse_epic_issue(json)
-
-	if (issue === undefined) return undefined
-
+function view_of(issue: EpicIssue): IssueView {
 	const blockers = (issue.blockedBy?.nodes ?? [])
 		.filter((blocker) => epic_issue.normalize_state(blocker.state ?? '') !== epic_issue.CLOSED)
 		.map((blocker) => blocker.number)
@@ -140,9 +137,9 @@ function view_of(json: string): IssueView | undefined {
 }
 
 async function read_issue(issue: number): Promise<IssueView | undefined> {
-	const read = await git_gh_command.issue_get_state_and_relations_classified(String(issue))
+	const read = await run_add_issue.read(issue)
 
-	return read.kind === 'read' ? view_of(read.json) : undefined
+	return read === undefined ? undefined : view_of(read)
 }
 
 async function apply_label(issue: number, label: string): Promise<boolean> {

@@ -31,7 +31,6 @@ function withdrawn(is_noted: boolean): WithdrawOutcome {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	error.mockImplementation(vi.fn())
 })
 

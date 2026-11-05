@@ -40,7 +40,6 @@ async function fake_git(arguments_: Array<string>): Promise<string> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	list_comments.mockResolvedValue('[]')
 	parse_comments.mockResolvedValue([])
 	git_read.mockImplementation(fake_git)

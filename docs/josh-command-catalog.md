@@ -12,6 +12,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh check` · `josh c` | `[arguments...]` | developer | processes | Type-check with tsc (skips a basic project with no TypeScript to check) |
 | `josh check:related` · `josh cr` | — | developer | processes | Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes |
 | `josh codex:hook-adapter` | `<pretool\|posttool>` | automation | none | Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin) |
+| `josh completion` | `--names` | automation | none | Print command names and aliases for shell completion |
 | `josh cspell:dot` · `josh sd` | — | developer | processes | Run spell check including dotfiles |
 | `josh e2e:retry-check` | — | automation | none | Report whether the preview server crashed during a failed E2E attempt (CI) |
 | `josh exports:unused` · `josh eu` | — | developer | none | Report exported namespace members nothing reads (kit only; a consumer project skips it) |
@@ -125,14 +126,14 @@ Run `pnpm josh command:derive` to regenerate.
 
 | Command | Arguments | Audience | Side effects | Description |
 | --- | --- | --- | --- | --- |
-| `josh auto-ok:judge` | `[--apply <n> (--lane \| --solo) \| --decline <n> --reason <text>]` | automation | network | List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline) |
+| `josh auto-ok:judge` | `[--apply <n> (--lane \| --solo --defect yes --verification yes --every-run yes) \| --decline <n> --reason <text>]` | automation | network | List the open issues backlogrun owes an auto-ok judgement, or record one (--apply / --decline) |
 | `josh auto-ok:next` | `[--exclude <n>[,<n>...]] [--label <name>]` | automation | network | Print the next opted-in issue an unattended run may pick up outside an epic |
 | `josh backlog:budget` | `[options]` | automation | none | Say whether a backlogrun may start more work, keep watching, or finish |
 | `josh backlog:drive` | `[--owner <pid>] [options]` | automation | network | Drive backlogrun through offer, launch and merge; restore this run’s lanes and report when complete |
 | `josh backlog:next` | `[--exclude <n>[,<n>...]] [--repo <owner/repo>]` | automation | network | Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics |
 | `josh backlog:offer` | `[options]` | automation | files, git, network, processes | Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start |
 | `josh backlog:plan` | `[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]` | automation | network | Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope |
-| `josh backlog:triage` | `--pass [--exclude <n>] \| --decide --defect yes\|no\|unknown --verification yes\|no\|unknown --every-run yes\|no\|unknown \| --apply <n> [--lane \| --solo] [--blocked-by <m> \| --unblock <m>] --reason <text> [--clear]` | automation | files, network | Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict |
+| `josh backlog:triage` | `--pass [--exclude <n>] \| --decide --defect yes\|no\|unknown --verification yes\|no\|unknown --every-run yes\|no\|unknown \| --apply <n> [--lane \| --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> \| --unblock <m>] --reason <text> [--clear]` | automation | files, network | Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict |
 | `josh backlogrun` · `josh blr` | `[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude\|codex] \| --stop \| --restart` | developer | files, network, processes | Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it; --restart replaces its processes and keeps its record |
 | `josh cases` | `<path...>` | automation | files | Read changed paths and print the boundaries crossed and their mandatory abnormal cases: network \| process \| fs \| time \| state \| env \| none |
 | `josh clone:scan` | — | automation | files | Count code duplication across files and first-party repositories, printing each clone as file:line pairs |
@@ -158,9 +159,9 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:already-done` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold |
 | `josh issue:cite` | `<issue...> [--repo <owner/repo>]` | automation | network | Print the paste-ready number-link citation line for each issue, in one call |
 | `josh issue:comment` | `<issue> --body <text> \| --body-file <path>` | automation | network | Post one comment to an issue from a file, so no shell expands the body |
-| `josh issue:file` | `<title> --body-file <path> \| --batch <dir\|file> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]` | automation | network | File an Issue: filing cap, fold, one pass naming each refusal (lint, Origin, auto-ok, start condition, WIP cap, scout), labels, epic:bundle |
+| `josh issue:file` | `<title> --body-file <path> \| --batch <dir\|file> [--route <route>] [--label <name>] [--defect yes\|no\|unknown] [--verification yes\|no\|unknown] [--every-run yes\|no\|unknown] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]` | automation | network | File an Issue: filing cap, fold, one pass naming each refusal (lint, Origin, auto-ok, start condition, WIP cap, scout), labels, epic:bundle |
 | `josh issue:fold` | `<title>... [--not-separable] [--json]` | automation | none | Before a second filing: say whether findings from this session fold into one issue |
-| `josh issue:fold-existing` | `<assessment.json> [--json \| --apply <N>] \| --fingerprint <N>` | automation | network | Assess whether a complete draft can join an unstarted issue |
+| `josh issue:fold-existing` | `<assessment.json> [--json \| --apply <N> [--blocked <M>]] \| --fingerprint <N>` | automation | network | Assess whether a complete draft can join an unstarted issue |
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
 | `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
 | `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |

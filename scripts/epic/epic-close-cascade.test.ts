@@ -63,7 +63,6 @@ function linear_chain(depth: number): Array<{ number: number; children: Array<nu
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_close.mockResolvedValue(true)
 	mocked_comments.mockResolvedValue('[]')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)

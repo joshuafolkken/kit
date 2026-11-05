@@ -154,7 +154,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			'File an Issue: filing cap, fold, one pass naming each refusal (lint, Origin, auto-ok, start condition, WIP cap, scout), labels, epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> | --batch <dir|file> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]',
+			'<title> --body-file <path> | --batch <dir|file> [--route <route>] [--label <name>] [--defect yes|no|unknown] [--verification yes|no|unknown] [--every-run yes|no|unknown] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]',
 			'automation',
 			['network'],
 		],
@@ -184,6 +184,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--label <name>'],
 					description: 'an extra label (for example `epic`). Repeatable.',
+				},
+				{
+					names: ['--defect / --verification / --every-run <yes|no|unknown>'],
+					description:
+						'`--label run:solo` requires all three `yes`: a verification defect affecting unrelated PRs every run. Missing, invalid, `no` or `unknown` answers file nothing; success comments the three answers on the issue.',
 				},
 				{
 					names: [REPO],

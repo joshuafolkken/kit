@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
 import { git_gh_issue_read, NOT_FOUND_STATUS } from './git-gh-issue-read'
@@ -24,10 +24,6 @@ vi.mock('./git-gh-exec', () => ({
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const mocked_status = vi.mocked(git_gh_exec.exec_gh_api_status)
 const READ_NUMBER = String(ISSUE_NUMBER)
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 // joshuafolkken/kit#1690: one read makes two requests, and only the first resolves the number. The
 // relations endpoint is reached after the issue itself came back, so its own 404 — the endpoint

@@ -9,6 +9,7 @@ import {
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { execa } from 'execa'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
+import { eslint_heap } from './eslint-heap'
 
 const COMMAND_NAME = 'format'
 const ARGV_OFFSET = 2
@@ -16,8 +17,18 @@ const FAIL_EXIT_CODE = 1
 const PRETTIER_WRITE_ARGS = ['exec', 'prettier', '--write', '.', ...PRETTIER_CACHE_FLAGS] as const
 const ESLINT_FIX_ARGS = ['exec', 'eslint', '.', '--fix', ...ESLINT_CACHE_FLAGS] as const
 
-async function run_step(args: ReadonlyArray<string>, directory: string): Promise<number> {
-	const result = await execa('pnpm', args, { cwd: directory, stdio: 'inherit', reject: false })
+async function run_step(
+	check: string,
+	args: ReadonlyArray<string>,
+	directory: string,
+): Promise<number> {
+	const environment = check === 'eslint' ? { env: eslint_heap.environment(), extendEnv: false } : {}
+	const result = await execa('pnpm', args, {
+		cwd: directory,
+		stdio: 'inherit',
+		reject: false,
+		...environment,
+	})
 
 	return result.exitCode ?? FAIL_EXIT_CODE
 }
@@ -31,7 +42,7 @@ async function run_unless_skipped(
 	args: ReadonlyArray<string>,
 	directory: string,
 ): Promise<number> {
-	if (reason === undefined) return await run_step(args, directory)
+	if (reason === undefined) return await run_step(check, args, directory)
 	console.info(project_checks.skip_notice(check, reason))
 
 	return 0

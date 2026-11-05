@@ -17,10 +17,55 @@ const ISSUE = '2761'
 const CLOSING_URL = 'https://github.com/joshuafolkken/kit/pull/2768'
 const MENTION_BODY = 'follows #2761'
 const MENTION_URL = 'https://github.com/joshuafolkken/kit/pull/2770'
+const READ_ERROR = 'could not be read'
 
 function line(url: string, body: string, repo: string = REPO): string {
 	return JSON.stringify({ url, repo, body })
 }
+
+describe('issue_closing_pr.has_open_pr after reopen', () => {
+	it('keeps an open PR linked before the issue was reopened', async () => {
+		exec_gh_api.mockResolvedValue(
+			[
+				JSON.stringify({ url: MENTION_URL, repo: REPO, body: MENTION_BODY, state: 'open' }),
+				JSON.stringify({ reopened: true }),
+			].join('\n'),
+		)
+		expect(await issue_closing_pr.has_open_pr(ISSUE)).toBe(true)
+	})
+})
+
+describe('issue_closing_pr.has_open_pr', () => {
+	it('refuses malformed timeline rows', async () => {
+		exec_gh_api.mockResolvedValue('invalid')
+		await expect(issue_closing_pr.has_open_pr(ISSUE)).rejects.toThrow(READ_ERROR)
+	})
+
+	it('finds a linked open PR without requiring a closing keyword', async () => {
+		exec_gh_api.mockResolvedValue(
+			JSON.stringify({ url: MENTION_URL, repo: REPO, body: MENTION_BODY, state: 'open' }),
+		)
+		expect(await issue_closing_pr.has_open_pr(ISSUE)).toBe(true)
+		expect(await issue_closing_pr.read_closing_pr(ISSUE)).toBeUndefined()
+	})
+
+	it.each(['closed', 'merged'])('ignores a %s PR', async (state) => {
+		exec_gh_api.mockResolvedValue(JSON.stringify({ url: CLOSING_URL, repo: REPO, body: '', state }))
+		expect(await issue_closing_pr.has_open_pr(ISSUE)).toBe(false)
+	})
+
+	it('ignores a foreign open PR and distinguishes absence from failure', async () => {
+		exec_gh_api
+			.mockResolvedValueOnce(
+				JSON.stringify({ url: OTHER_URL, repo: OTHER_REPO, body: '', state: 'open' }),
+			)
+			.mockResolvedValueOnce('')
+			.mockRejectedValueOnce(new Error('gh failed'))
+		expect(await issue_closing_pr.has_open_pr(ISSUE)).toBe(false)
+		expect(await issue_closing_pr.has_open_pr(ISSUE)).toBe(false)
+		await expect(issue_closing_pr.has_open_pr(ISSUE)).rejects.toThrow(READ_ERROR)
+	})
+})
 
 beforeEach(() => {
 	exec_gh_api.mockReset()

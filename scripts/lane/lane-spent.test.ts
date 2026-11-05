@@ -67,7 +67,6 @@ async function reason_with(overrides: Partial<SpentProbes>): Promise<string | un
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(lane_registry.list_lanes).mockResolvedValue([LANE, OTHER])
 	live.process_trace_default.mockReturnValue('none')
 	live.issue_view_json.mockResolvedValue('{"state":"CLOSED"}')

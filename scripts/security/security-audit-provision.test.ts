@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { execaSync } from 'execa'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { security_audit_logic } from './security-audit-logic'
 import { security_audit_provision } from './security-audit-provision'
 import type { ScannerAsset } from './security-audit-provision-logic'
@@ -130,10 +130,6 @@ async function fail_then_succeed(target_path: string): Promise<void> {
 	stub_response(true, PAYLOAD)
 	await security_audit_provision.attempt(target_path, asset, TEST_TIMEOUT_MS)
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 afterEach(() => {
 	vi.unstubAllGlobals()

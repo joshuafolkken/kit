@@ -77,7 +77,7 @@ async function run_gate(argv: ReadonlyArray<string>): Promise<number> {
 
 beforeEach(() => {
 	RECORDS.clear()
-	vi.clearAllMocks()
+
 	every_step_passes()
 })
 

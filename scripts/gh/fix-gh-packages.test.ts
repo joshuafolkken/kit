@@ -1,6 +1,6 @@
 import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { execaSync } from 'execa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fix_gh_packages } from './fix-gh-packages'
 import { gh_cli_token } from './gh-cli-token'
 
@@ -41,10 +41,6 @@ function fake_stdout(stdout: string): ExecaSyncResult {
 
 	return result as unknown as ExecaSyncResult
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('get_gh_cli_token', () => {
 	it('returns the trimmed token from gh auth token', () => {

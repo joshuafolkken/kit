@@ -1,5 +1,6 @@
 import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { run_pause_comment } from './run-pause-comment'
 import { run_set_aside, type AsideRequest, type Step, type StepReport } from './run-set-aside'
 
 // `josh run:pause <M> --for <N>` — set a run aside while its prerequisite `#N` lands first
@@ -26,7 +27,7 @@ function aside_of(request: PauseRequest): AsideRequest {
 	return {
 		issue: request.issue,
 		stash_message: `run:pause: ${issue} waits on ${prerequisite}`,
-		marker: `<!-- josh:run-pause ${issue} for ${prerequisite} -->`,
+		marker: `${run_pause_comment.marker_of(request.issue)}${prerequisite} -->`,
 		headline: `Paused: ${prerequisite} has to land first.`,
 	}
 }

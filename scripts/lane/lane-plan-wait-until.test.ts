@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { LanePlan } from './lane-plan'
 import { lane_plan_wait } from './lane-plan-wait'
 import { lane_plan_wait_until } from './lane-plan-wait-until'
@@ -15,10 +15,6 @@ function plan_of(waits_until?: string): LanePlan {
 
 	return waits_until === undefined ? plan : { ...plan, waits_until }
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('lane_plan_wait_until.until', () => {
 	it('keeps a recorded deadline still ahead, asking for no new one', async () => {

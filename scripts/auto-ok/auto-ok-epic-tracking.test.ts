@@ -67,7 +67,6 @@ function capped_epic_listing(): ReturnType<typeof listing_outcome> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	issue_list.mockResolvedValue(listing_outcome(undefined))
 	epic_list.mockResolvedValue(listing_outcome(epic_listing([])))
 	streams.reset()
@@ -121,7 +120,7 @@ describe('josh auto-ok:next — an epic that is not opted in', () => {
 		epic_list.mockResolvedValueOnce(tracking([NEW_ISSUE_NUMBER, OLD_ISSUE_NUMBER]))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 	})
 
 	// The other half of the acceptance: an issue no epic tracks behaves exactly as it did.
@@ -130,7 +129,7 @@ describe('josh auto-ok:next — an epic that is not opted in', () => {
 		epic_list.mockResolvedValueOnce(tracking([BLOCKER_NUMBER]))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 	})
 })
 

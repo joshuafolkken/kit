@@ -10,7 +10,7 @@ import {
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 } from '#scripts/issue/issue-labels'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { epic_busy } from './epic-busy'
 
 // joshuafolkken/kit#925: the question is asked of the repository rather than of the epic, which is
@@ -41,10 +41,6 @@ const NOT_IDLE = 'not "nothing is running"'
 function holder(): ReturnType<typeof issue> {
 	return issue(HOLDER_NUMBER, CREATED_EARLIER, [IN_PROGRESS_LABEL])
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('epic_busy.read_repository', () => {
 	it('asks the named repository for its in-progress issues', async () => {

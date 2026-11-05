@@ -29,7 +29,6 @@ async function run(): Promise<number> {
 // The claim runs its body without touching the machine-wide ledger, and no parent claim covers it;
 // the live-run count is pinned so the share cannot move between the run and the assertion.
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(unit_worker_share, 'live_run_count').mockReturnValue(0)
 	vi.spyOn(core_budget, 'is_covered').mockReturnValue(false)
 	vi.spyOn(core_budget, 'with_command_reservation').mockImplementation(

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { VersionCommandConfig } from './version-command-config'
 import { version_commands } from './version-commands'
 
@@ -23,10 +23,6 @@ function config_with_endpoint(versions_endpoint: string): VersionCommandConfig {
 		upstreams: [],
 	}
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('version_commands.read_snapshot endpoint guard', () => {
 	it('raises the descriptive endpoint error when the endpoint is empty', () => {

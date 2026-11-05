@@ -48,7 +48,6 @@ async function decide(children: ReadonlyArray<number> = [CHILD]): Promise<number
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	mocked_read.mockResolvedValue(epic_json(EPIC_BODY))

@@ -34,7 +34,6 @@ const PLAN = `## 計画\n\n- \`${EDITED}\` を追加する\n`
 const PATHLESS_PLAN = `## 計画\n\n- 入口で実行する\n\n${plan_consumers_section.HEADING}\n\n- なし\n`
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	read_plan_mock.mockResolvedValue(PLAN)
 })
 

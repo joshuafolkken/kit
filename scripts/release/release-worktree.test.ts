@@ -49,7 +49,6 @@ const ADD_REFUSAL = 'already exists'
 const AHEAD = 2
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(git_command.get_default_branch).mockResolvedValue(DEFAULT_BRANCH)
 	vi.mocked(git_worktree.worktree_add).mockResolvedValue('')
 	vi.mocked(git_worktree.worktree_remove).mockResolvedValue('')

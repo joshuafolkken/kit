@@ -44,7 +44,7 @@ const deadline = vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(undefine
 const hold = vi.spyOn(lane_plan_wait, 'hold')
 const WAIT_AHEAD_MS = 600_000
 const WAIT = 'wait'
-const QUIET = { hunk_files: [], committed_files: [], lines_ratio: undefined, split_filed: false }
+const QUIET = lane_plan_signals.signals_from(LATER, { hunk_files: [], committed_files: [] }, [], 0)
 const PROBED = 'scripts/lane/probed.ts'
 const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
 
@@ -69,7 +69,6 @@ function holding(later_body: string): Awaited<ReturnType<typeof auto_ok_cli.fetc
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	budgets.mockResolvedValue([])
 	signals_of.mockResolvedValue(QUIET)
 	record_split_notice.mockResolvedValue(undefined)

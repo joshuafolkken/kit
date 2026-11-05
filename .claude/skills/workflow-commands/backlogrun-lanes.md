@@ -27,6 +27,16 @@ trustworthy.**
 `backlog:next` labels `run:lane` itself where the first two conditions fail
 (`docs/josh-commands-backlog.md` → "`josh backlog:next`").
 
+To apply `run:solo`, pass all three affirmative answers:
+
+```bash
+pnpm josh backlog:triage --apply <N> --solo --defect yes --verification yes --every-run yes --reason <text>
+pnpm josh auto-ok:judge --apply <N> --solo --defect yes --verification yes --every-run yes
+```
+
+Missing, negative, unknown or invalid answers refuse the entire request before any writes,
+including relation changes and park clearing. `--lane` requires no answers.
+
 **A wrong answer that only comes some of the time — a flaky test, a timeout under load — is not a solo
 run.** It carries `run:lane` and `priority:critical`, so it leads the next offer while the other lanes
 keep running: a flake costs another lane one rerun, less than every lane stopped until it merges.

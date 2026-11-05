@@ -1,6 +1,6 @@
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import {
 	git_gh_issue_list,
@@ -110,10 +110,6 @@ function full_page_of(page: number, is_filtered_out: boolean): string {
 function parse_listing(json: string | undefined): Array<OpenIssueData> | undefined {
 	return json === undefined ? undefined : parse_json_array_or_undefined(json, open_issue_schema)
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('issue_list — the request', () => {
 	it('reads the REST listing rather than gh issue list', async () => {

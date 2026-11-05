@@ -62,7 +62,6 @@ const FAKE_ISSUE_INFO = {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(git_gh_command.pr_exists).mockResolvedValue(false)
 	vi.mocked(animation_helpers.execute_with_animation).mockImplementation(
 		async (_label: string, action: () => Promise<unknown>) => await action(),

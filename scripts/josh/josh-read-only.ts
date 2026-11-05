@@ -26,6 +26,8 @@ function entry_of(name: string): CommandEntry | undefined {
 
 // An invocation of an entry declared read-only whole, or carrying a flag its entry declares read-only.
 function is_read_only_call(entry: CommandEntry, rest: ReadonlyArray<string>): boolean {
+	const write_flags = entry.write_flags ?? []
+	if (rest.some((argument) => write_flags.includes(argument.split('=', 1)[0] ?? ''))) return false
 	if (entry.is_read_only === true) return true
 
 	const flags = entry.read_only_flags ?? []
@@ -41,7 +43,7 @@ function refusal(args: ReadonlyArray<string>): string | undefined {
 	const entry = entry_of(command)
 	if (entry !== undefined && is_read_only_call(entry, rest)) return undefined
 
-	return `\`josh ${command}\` is not read-only: it is no help request, its entry is not declared read-only and it carries no read-only flag its entry declares; read its usage with \`pnpm josh help ${command}\``
+	return `\`josh ${command}\` is not read-only: it carries a declared write flag, or its entry is not declared read-only and it carries no read-only flag its entry declares; read its usage with \`pnpm josh help ${command}\``
 }
 
 const josh_read_only = { ALL_FLAG, entry_of, is_help_request, refusal }

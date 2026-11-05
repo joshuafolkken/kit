@@ -1,6 +1,7 @@
 import { expected_effect_lint } from '#scripts/issue/expected-effect-lint'
 import { issue_priority } from '#scripts/issue/issue-priority'
 import { issue_rank } from '#scripts/issue/issue-rank'
+import { size_estimate } from '#scripts/issue/size-estimate'
 import { epic_graph, type EpicChild } from './epic-graph'
 
 // `issue-rank.ts`'s keys over graph children, for both offer paths that hand
@@ -30,11 +31,13 @@ function rank(
 	const dependents = dependents_of(pool)
 
 	return issue_rank.rank(children, (child) => ({
+		is_resumable: child.is_resumable,
 		is_last: issue_priority.is_last(child.body),
 		labels: child.labels,
 		lost_minutes: issue_priority.lost_minutes(child.body),
 		gain_minutes: expected_effect_lint.weekly_minutes(child.body),
 		dependents: dependents.get(epic_graph.key_of(child)) ?? 0,
+		estimated_lines: size_estimate.declared_size(child.body ?? '')?.lines,
 	}))
 }
 

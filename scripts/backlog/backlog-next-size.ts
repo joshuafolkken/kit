@@ -40,7 +40,8 @@ function warning_of(
 	route: string | undefined,
 	rate: ImplementRate | undefined,
 ): Warning | undefined {
-	const guide = size_estimate.over_guide(body, route) ?? size_estimate.split_over_guide(body, route)
+	const guide =
+		size_estimate.over_guide(body, route, rate) ?? size_estimate.split_over_guide(body, route, rate)
 
 	if (guide !== undefined) return { estimate: guide, remedy: remedy_of(route) }
 	const budget = size_estimate.over_budget(body, route, rate)
@@ -56,7 +57,7 @@ function note_of(issue: OpenIssueData, context: PoolContext): string | undefined
 	if (warning === undefined) return undefined
 	const cited = session_cite.issue(issue.number, undefined, context.repo)
 
-	return `${cited} ${size_estimate.exceeded(warning.estimate)} ${warning.remedy} — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${cited} ${size_estimate.exceeded(warning.estimate, context.implement_rate)} ${warning.remedy} — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // One stderr line per offered number over the guide; the stdout tokens stay bare numbers.
@@ -79,19 +80,22 @@ interface CapRow {
 	labels: ReadonlyArray<string>
 }
 
-function capped_of(row: Pick<CapRow, 'body' | 'labels'>): SizeMeasurement | undefined {
-	return size_estimate.over_cap(row.body ?? '', size_estimate.route_of(row.labels))
+function capped_of(
+	row: Pick<CapRow, 'body' | 'labels'>,
+	rate?: ImplementRate,
+): SizeMeasurement | undefined {
+	return size_estimate.over_cap(row.body ?? '', size_estimate.route_of(row.labels), rate)
 }
 
 // The withheld note: the counts against the cap and what a person does about it.
-function warn_capped(row: CapRow): void {
-	const estimate = capped_of(row)
+function warn_capped(row: CapRow, rate?: ImplementRate): void {
+	const estimate = capped_of(row, rate)
 
 	if (estimate === undefined) return
 	const cited = session_cite.issue(row.number, undefined, row.repo)
 
 	console.error(
-		`${cited} not offered: ${size_estimate.capped(estimate)} — split it; split-assessment.md → "${split_assess.QUESTION_SECTION}"`,
+		`${cited} not offered: ${size_estimate.capped(estimate, rate)} — split it; split-assessment.md → "${split_assess.QUESTION_SECTION}"`,
 	)
 }
 
@@ -106,15 +110,22 @@ function warn_over_cap(context: PoolContext): void {
 	})
 	const rows = backlog_pool.to_children(issues, context.repo)
 
-	for (const row of rows) if (considered.has(epic_graph.key_of(row))) warn_capped(row)
+	for (const row of rows) {
+		if (considered.has(epic_graph.key_of(row))) warn_capped(row, context.implement_rate)
+	}
 }
 
 // The keys of the open epic children over the cap, each reported on stderr — held for a person the
 // way an untrusted author's child is.
-function held_children(children: ReadonlyArray<EpicChild>): ReadonlySet<string> {
-	const held = children.filter((child) => child.state === 'OPEN' && capped_of(child) !== undefined)
+function held_children(
+	children: ReadonlyArray<EpicChild>,
+	rate?: ImplementRate,
+): ReadonlySet<string> {
+	const held = children.filter(
+		(child) => child.state === 'OPEN' && capped_of(child, rate) !== undefined,
+	)
 
-	for (const child of held) warn_capped(child)
+	for (const child of held) warn_capped(child, rate)
 
 	return new Set(held.map((child) => epic_graph.key_of(child)))
 }

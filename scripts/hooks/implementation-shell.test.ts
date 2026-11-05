@@ -159,6 +159,9 @@ describe('read-only investigation shell', () => {
 		'pnpm josh cost:audit --period 14',
 		'pnpm josh read:set fullrun',
 		'pnpm josh lbd 5757',
+		'pnpm josh effect:audit',
+		'pnpm josh effect:audit --days 7',
+		'pnpm josh effect:audit --days=7',
 	])('passes %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(false)
 	})
@@ -180,6 +183,9 @@ describe('read-only investigation shell refusals', () => {
 		'pnpm josh edit:files plan.json',
 		'pnpm josh edit:files - < plan.json',
 		'pnpm josh stop:guard',
+		'pnpm josh effect:audit --draft 6476',
+		'pnpm josh effect:audit --draft=6476',
+		'pnpm josh effect:audit --days 7 --draft 6476',
 	])('refuses the write or unregistered read %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(true)
 	})

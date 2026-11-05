@@ -4,6 +4,7 @@ import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
+import { session_cite } from './session-cite'
 
 // **The merged pull request that closes an issue GitHub left open**. A
 // `backlogrun` child whose pull request merged while GitHub did not apply its `closes #N`
@@ -24,17 +25,22 @@ import { z } from 'zod'
 // number closes a different issue — its cross-reference here is a mention, not a close.
 
 const LINE_SEPARATOR = '\n'
-// One compact JSON object per merged pull request that cross-references the issue, and a
+// One compact JSON object per pull request that cross-references the issue, and a
 // `{"reopened":true}` marker per reopen, in timeline order.
 const TIMELINE_FILTER = [
 	'.[]',
-	'| if .event == "cross-referenced" and .source.issue.pull_request.merged_at != null',
-	'then {url: .source.issue.html_url, repo: .source.issue.repository.full_name, body: (.source.issue.body // "")}',
+	'| if .event == "cross-referenced" and .source.issue.pull_request != null',
+	'then {url: .source.issue.html_url, repo: .source.issue.repository.full_name, body: (.source.issue.body // ""), state: (if .source.issue.pull_request.merged_at != null then "merged" else .source.issue.state end)}',
 	'elif .event == "reopened" then {reopened: true}',
 	'else empty end',
 ].join(' ')
 
-const reference_schema = z.object({ url: z.string(), repo: z.string(), body: z.string() })
+const reference_schema = z.object({
+	url: z.string(),
+	repo: z.string(),
+	body: z.string(),
+	state: z.enum(['open', 'closed', 'merged']).default('merged'),
+})
 const reopen_schema = z.object({ reopened: z.literal(true) })
 const row_schema = z.union([reference_schema, reopen_schema])
 
@@ -47,11 +53,19 @@ function is_reference(row: TimelineRow): row is MergedReference {
 	return 'url' in row
 }
 
-function parse_references(raw: string): Array<MergedReference> {
+function parse_row(line: string): TimelineRow {
+	const row = parse_json_object_or_undefined(line, row_schema)
+	if (row === undefined) throw new Error('the issue timeline contains an unreadable row')
+
+	return row
+}
+
+function parse_references(raw: string, state: 'open' | 'merged'): Array<MergedReference> {
 	const rows = raw
 		.split(LINE_SEPARATOR)
-		.map((line) => parse_json_object_or_undefined(line, row_schema))
-		.filter((row) => row !== undefined)
+		.filter((line) => line.trim() !== '')
+		.map((line) => parse_row(line))
+	if (state === 'open') return rows.filter((row) => is_reference(row))
 	const last_reopen = rows.findLastIndex((row) => !is_reference(row))
 
 	return rows.slice(last_reopen + 1).filter((row) => is_reference(row))
@@ -65,11 +79,12 @@ function pick_closing_pr(
 	return references.find(
 		(reference) =>
 			reference.repo === repo &&
+			reference.state === 'merged' &&
 			git_closes_keyword.parse_closes_issue_number(reference.body) === issue,
 	)?.url
 }
 
-async function read_closing_result(issue: string): Promise<ClosingRead> {
+async function read_result(issue: string, state: 'open' | 'merged'): Promise<ClosingRead> {
 	try {
 		const [raw, repo] = await Promise.all([
 			git_gh_exec.exec_gh_api({
@@ -82,10 +97,30 @@ async function read_closing_result(issue: string): Promise<ClosingRead> {
 
 		if (repo === undefined) return { kind: 'unreadable' }
 
-		return { kind: 'read', url: pick_closing_pr(parse_references(raw), issue, repo) }
+		const references = parse_references(raw, state)
+		const url =
+			state === 'merged'
+				? pick_closing_pr(references, issue, repo)
+				: references.find((reference) => reference.repo === repo && reference.state === 'open')?.url
+
+		return { kind: 'read', url }
 	} catch {
 		return { kind: 'unreadable' }
 	}
+}
+
+async function read_closing_result(issue: string): Promise<ClosingRead> {
+	return await read_result(issue, 'merged')
+}
+
+async function has_open_pr(issue: string): Promise<boolean> {
+	const result = await read_result(issue, 'open')
+
+	if (result.kind === 'unreadable') {
+		throw new Error(`the pull requests on ${session_cite.issue(issue)} could not be read`)
+	}
+
+	return result.url !== undefined
 }
 
 // Legacy callers leave the child unchanged when discovery is unavailable.
@@ -111,6 +146,11 @@ async function read_closing_number(issue: number): Promise<number | undefined> {
 	return result.kind === 'read' ? result.number : undefined
 }
 
-const issue_closing_pr = { read_closing_number, read_closing_number_result, read_closing_pr }
+const issue_closing_pr = {
+	read_closing_number,
+	read_closing_number_result,
+	read_closing_pr,
+	has_open_pr,
+}
 
 export { issue_closing_pr }

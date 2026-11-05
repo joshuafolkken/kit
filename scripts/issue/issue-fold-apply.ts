@@ -45,7 +45,9 @@ async function comment_fingerprint(issue_number: string): Promise<string | undef
 }
 
 // A comment added or edited after the assessment can change the decision as surely as a body edit.
-async function check_unchanged(fold: FoldWrite): Promise<ApplyResult | undefined> {
+async function check_unchanged(
+	fold: Pick<FoldWrite, 'issue_number' | 'existing_body' | 'comment_fingerprint'>,
+): Promise<ApplyResult | undefined> {
 	const checks = [
 		await reads_as(fold.issue_number, fold.existing_body),
 		await comment_fingerprint(fold.issue_number),
@@ -76,7 +78,7 @@ async function apply(fold: FoldWrite): Promise<ApplyResult> {
 	return (await reads_as(fold.issue_number, fold.body)) === true ? 'applied' : 'unverified'
 }
 
-const issue_fold_apply = { apply, comment_fingerprint }
+const issue_fold_apply = { apply, check_unchanged, comment_fingerprint }
 
 export type { ApplyResult, FoldWrite }
 export { issue_fold_apply }

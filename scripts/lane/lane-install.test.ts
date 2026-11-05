@@ -55,7 +55,6 @@ function remove_manifest(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	lane.directory = mkdtempSync(path.join(tmpdir(), 'lane-install-test-'))
 	write_manifest()
 })

@@ -51,10 +51,6 @@ const UNTRACKED_TEST_FILE = 'scripts/new-test.spec.ts'
 const UNTRACKED_DOC_FILE = 'docs/new.md'
 
 describe('git_staging.check_and_confirm_staging — tracked files', () => {
-	beforeEach(() => {
-		vi.clearAllMocks()
-	})
-
 	it('auto-stages tracked files when force=true and unstaged files exist', async () => {
 		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
 
@@ -84,10 +80,6 @@ describe('git_staging.check_and_confirm_staging — tracked files', () => {
 })
 
 describe('git_staging.check_and_confirm_staging — untracked files', () => {
-	beforeEach(() => {
-		vi.clearAllMocks()
-	})
-
 	it('also stages untracked non-ignored files when force=true', async () => {
 		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
 		vi.mocked(git_status.list_untracked_files).mockReturnValueOnce([
@@ -118,10 +110,6 @@ describe('git_staging.check_and_confirm_staging — untracked files', () => {
 // request of the ledger's own follows the merge. Both halves are pinned, because the ledger can be
 // either tracked or — in a repository taking its first observation — untracked.
 describe('git_staging.check_and_confirm_staging — the observation ledger rides the commit', () => {
-	beforeEach(() => {
-		vi.clearAllMocks()
-	})
-
 	it('stages the ledger with the tracked files when its grammar holds', async () => {
 		vi.mocked(git_status.check_unstaged).mockResolvedValueOnce(true)
 
@@ -167,7 +155,6 @@ describe('git_staging.check_and_confirm_staging — the observation ledger rides
 // commit still goes ahead, without the ledger, and says where the line is named.
 describe('git_staging.check_and_confirm_staging — a ledger that breaks the grammar', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		vi.mocked(observation_ledger_prepare.prepare).mockResolvedValueOnce([BROKEN_LINE])
 	})
 

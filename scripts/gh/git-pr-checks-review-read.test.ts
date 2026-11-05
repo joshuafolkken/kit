@@ -97,7 +97,6 @@ function unchanged_reads(): number {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	forget_pr_numbers()
 	git_gh_poll_read.forget_poll_reads()
 })

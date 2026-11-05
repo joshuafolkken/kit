@@ -25,7 +25,6 @@ const AT = '2026-10-08T08:00:00.000Z'
 const KIND = run_event_stream.EVENT_KIND
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	errors.length = 0
 	vi.spyOn(console, 'error').mockImplementation((...parts: Array<unknown>) => {
 		errors.push(parts.map(String).join(' '))

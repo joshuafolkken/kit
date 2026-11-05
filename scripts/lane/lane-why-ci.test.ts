@@ -1,6 +1,6 @@
 import type { TimingAnswer } from '#scripts/ci/ci-timing'
 import type { TimingRow } from '#scripts/ci/ci-timing-table'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { lane_why_ci } from './lane-why-ci'
 
 // joshuafolkken/kit#6124: `josh lane:why`'s followup CI cell names the longest job of the lane's runs
@@ -33,10 +33,6 @@ const TIMED: TimingAnswer = {
 		},
 	],
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('lane_why_ci.cell', () => {
 	it('names the longest job across the runs and its longest step', () => {

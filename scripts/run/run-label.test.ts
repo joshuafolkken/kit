@@ -14,7 +14,6 @@ const strip = vi.mocked(git_followup_label.strip_in_progress)
 const warnings: Array<string> = []
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	warnings.length = 0
 	vi.spyOn(console, 'warn').mockImplementation((line: string) => {
 		warnings.push(line)

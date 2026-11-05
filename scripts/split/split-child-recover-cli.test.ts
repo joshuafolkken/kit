@@ -46,7 +46,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	write.mockReset()
 })
 

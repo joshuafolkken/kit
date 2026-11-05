@@ -94,7 +94,7 @@ const errors: Array<string> = []
 beforeEach(() => {
 	printed.length = 0
 	errors.length = 0
-	vi.clearAllMocks()
+
 	default_session()
 	vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
 		printed.push(String(line))

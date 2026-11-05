@@ -33,7 +33,6 @@ function draft_text(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	writeFileSync(DRAFT, ROWS)
 	branch_mock.mockResolvedValue('4563-lane')

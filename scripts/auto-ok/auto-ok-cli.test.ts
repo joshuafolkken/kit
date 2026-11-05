@@ -32,7 +32,6 @@ vi.spyOn(console, 'info').mockImplementation(streams.info)
 vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	// The default answer for a call the case did not queue one for. Every wrapper answers
 	// `{ json, is_capped }` since joshuafolkken/kit#1067, so a bare `vi.fn()` returning `undefined`
 	// is a shape no caller can be handed — and the failed-read path is what an unqueued call means.
@@ -42,7 +41,7 @@ beforeEach(() => {
 })
 
 describe('josh auto-ok:next — the token on standard output', () => {
-	it('answers the newest opted-in issue, matching the next-issues display order', async () => {
+	it('answers the oldest opted-in issue, matching the next-issues display order', async () => {
 		issue_list.mockResolvedValueOnce(
 			listing_of([
 				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
@@ -51,7 +50,7 @@ describe('josh auto-ok:next — the token on standard output', () => {
 		)
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 	})
 
 	// Opting in is the default absence: a repository that has never used the label answers this on

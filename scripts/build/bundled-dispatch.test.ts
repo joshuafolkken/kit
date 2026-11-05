@@ -26,6 +26,7 @@ const UNLINKED: ReadonlySet<string> = new Set(['.git', 'dist', 'node_modules'])
 // reach GitHub.
 const NOT_AN_ISSUE = 'not-a-number'
 const INVOCATIONS: ReadonlyArray<ReadonlyArray<string>> = [
+	['completion', '--names'],
 	['doc:section', 'CLAUDE.md', 'Communication'],
 	['doc:read', 'CLAUDE.md'],
 	['read:set', 'backlogrun'],

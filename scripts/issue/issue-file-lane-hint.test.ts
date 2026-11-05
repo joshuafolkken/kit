@@ -1,5 +1,5 @@
 import { lane_net_read } from '#scripts/lane/lane-net-read'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
 
 // joshuafolkken/kit#5225: a refused `--found-during <N>` filing prints the causing-lane line filled
@@ -9,10 +9,6 @@ const ORIGIN = '5168'
 const MINUTES = 35
 const BARE_BODY = '## 背景\n\n- 種別: 非不具合\n'
 const net_minutes_of = vi.spyOn(lane_net_read, 'net_minutes_of')
-
-afterEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('issue_file_lane_hint.lines_of', () => {
 	it("ends in the causing-lane line filled from the origin's net minutes", async () => {

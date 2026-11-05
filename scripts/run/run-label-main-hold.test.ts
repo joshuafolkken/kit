@@ -21,7 +21,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	vi.restoreAllMocks()
 	rmSync(run_hold.hold_path(GIT_DIRECTORY), { force: true })
 })

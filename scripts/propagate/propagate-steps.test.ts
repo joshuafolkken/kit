@@ -37,7 +37,6 @@ const REFUSAL =
 	'gh: Validation Failed (HTTP 422)\n{"message":"Issues are disabled for this repository"}'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_api_sync.mockReturnValue(ISSUE_URL)
 })
 

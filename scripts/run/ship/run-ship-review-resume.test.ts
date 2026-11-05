@@ -72,7 +72,6 @@ const ATTEST_FAILED = { code: 1, out: 'attest failed' }
 const RECORD = 'review:record'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	phases.attest.mockReset().mockResolvedValue({ code: 0, out: '' })
 	phases.josh.mockReset().mockResolvedValue({ code: 0, out: '' })
 	phases.reuse.mockResolvedValue({ reuse: 'again', cause: 'unrecorded' })

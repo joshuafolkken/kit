@@ -56,7 +56,6 @@ function inputs(overrides: Partial<ScopeInputs> = {}): ScopeInputs {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_root.mockResolvedValue(REPOSITORY_ROOT)
 	mocked_changed.mockResolvedValue([CHANGED_SOURCE])
 })

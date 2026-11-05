@@ -64,7 +64,6 @@ const {
 } = gate_test_fixture.suite_records('child-bump-removed')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	clear_records()
 	repository.tree = AFTER_FIX
 	repository.base = BASE

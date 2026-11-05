@@ -1,11 +1,13 @@
 import {
 	auto_ok_fixture,
+	CREATED_EARLIER,
 	CREATED_LATER,
 	EPIC_NUMBER,
 	FAILURE_EXIT_CODE,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { listing_of } from '#scripts/gh/git-gh-issue-list-fixture'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { AUTO_OK_LABEL, BUG_LABEL, EPIC_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
@@ -83,6 +85,42 @@ describe('josh backlog:plan --waves — the width of a wave', () => {
 })
 
 describe('josh backlog:plan --waves — the first wave', () => {
+	it('places resumable work in an earlier wave than fresh work', async () => {
+		const rows = [open_row(FIRST, [AUTO_OK_LABEL]), open_row(SOLO, [AUTO_OK_LABEL])]
+
+		backlog_fixture.stub_backlog({ opted_in: rows, stashed: [SOLO] })
+		vi.spyOn(git_gh_command, 'issue_list_recent').mockResolvedValue(listing_of(rows))
+		vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: 1 })
+
+		expect(await backlog_plan_cli.run(['--waves'])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toContain(`Wave 1  ${backlog_fixture.cite(SOLO)}\n`)
+		expect(stdout()).toContain(`Wave 2  ${backlog_fixture.cite(FIRST)}\n`)
+	})
+})
+
+describe('josh backlog:plan --waves — ready order', () => {
+	it('matches oldest-first ties in the ready section and the first wave', async () => {
+		const rows = [
+			issue(FIRST, CREATED_LATER, [AUTO_OK_LABEL]),
+			issue(SOLO, CREATED_EARLIER, [AUTO_OK_LABEL]),
+		]
+
+		backlog_fixture.stub_backlog({ opted_in: rows })
+		vi.spyOn(git_gh_command, 'issue_list_recent').mockResolvedValue(listing_of(rows))
+		await backlog_plan_cli.run([])
+		const ready = stdout().split(backlog_plan.WAITING_HEADING)[0] ?? ''
+
+		streams.reset()
+		await backlog_plan_cli.run(['--waves'])
+		const first_wave =
+			stdout()
+				.split('\n')
+				.find((line) => line.startsWith('Wave 1 ')) ?? ''
+
+		expect(backlog_plan_cap_fixture.numbers_in(ready)).toEqual([SOLO, FIRST])
+		expect(backlog_plan_cap_fixture.numbers_in(first_wave)).toEqual([SOLO, FIRST])
+	})
+
 	it('matches the first wave in the ready section for seven issues and four lanes', async () => {
 		backlog_plan_cap_fixture.stub()
 		await backlog_plan_cli.run([])

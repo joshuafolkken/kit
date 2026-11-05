@@ -25,13 +25,14 @@ import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-ga
 import { backlog_next_size } from './backlog-next-size'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank } from './backlog-rank'
+import { backlog_resumable } from './backlog-resumable'
 import { backlog_wait_cause } from './backlog-wait-cause'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next.
 //
 // Neither half alone can give the answer. `epic:next` has the dependency graph and the execution
 // wave, but its input is **one epic's task list**. `auto-ok:next` sees the whole backlog, but it
-// orders by the display's newest-first ranking and reads no dependency at all.
+// orders by the display's ranking, oldest first on ties, and reads no dependency at all.
 //
 // This command is the route that asks the backlog itself what may start, and it is glue rather than a third implementation: the epic half runs
 // through `epic:next`'s own read → classify → report pipeline unchanged, the standalone half through
@@ -181,7 +182,7 @@ function running_of(
 ): ReadonlySet<string> {
 	return (
 		views[0]?.running ??
-		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo, context.tracking.index)
+		backlog_pool.running_set(graphs, context.opted_in.issues, context, context.tracking.index)
 	)
 }
 
@@ -215,6 +216,7 @@ function combine(
 		exclude: context.exclude,
 		repo: context.repo,
 		running: running_of(views, graphs, context),
+		implement_rate: context.implement_rate,
 	})
 
 	// The same checkout map `epic:next` hands `build_result`. Without it every bundle heading reads
@@ -241,7 +243,7 @@ function settled_views(
 	const settled = backlog_pool.settle_standalone(
 		views[0]?.running ?? running,
 		context.opted_in.issues,
-		context.repo,
+		context,
 		context.tracking.index,
 	)
 
@@ -268,7 +270,7 @@ function views_from(
 
 	return settled_views(
 		reads,
-		backlog_pool.running_set(graphs, context.opted_in.issues, context.repo, context.tracking.index),
+		backlog_pool.running_set(graphs, context.opted_in.issues, context, context.tracking.index),
 		context,
 	)
 }
@@ -298,7 +300,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 	// (joshuafolkken/kit#5502).
 	const untrusted = new Set([
 		...(await auto_ok_author.untrusted_child_keys(children, context.repo)),
-		...backlog_next_size.held_children(children),
+		...backlog_next_size.held_children(children, context.implement_rate),
 	])
 	// The defect priority and the ranking keys are applied here rather than when printing, so
 	// `backlog:plan` shows the order the run takes. The
@@ -308,7 +310,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		context.repo,
 	)
 
-	return backlog_rank.rank_result(ordered, context.repo)
+	return backlog_rank.rank_result(await backlog_resumable.read(ordered, context.repo), context.repo)
 }
 
 // Whether the `error` verdict is really a transport failure wearing the graph's clothes.

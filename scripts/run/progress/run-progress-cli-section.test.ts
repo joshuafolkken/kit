@@ -41,7 +41,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 describe('run:progress — the governing section at a --wait start', () => {

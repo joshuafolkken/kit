@@ -6,7 +6,7 @@ import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_closing_pr } from './issue-closing-pr'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
@@ -91,10 +91,6 @@ beforeEach(() => {
 	vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
 	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: undefined, is_capped: false })
 	scout.mockResolvedValue(undefined)
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 afterAll(() => {

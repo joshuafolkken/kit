@@ -47,9 +47,10 @@ function kept_body(criteria: string): string {
 }
 
 function stub_kept(body: string | undefined): ReturnType<typeof vi.fn> {
-	const read = vi.fn<typeof git_gh_command.issue_get_body>().mockResolvedValue(body)
+	const raw = body === undefined ? undefined : JSON.stringify({ number: Number(KEPT), body })
+	const read = vi.fn<typeof git_gh_command.issue_get_labels_and_body>().mockResolvedValue(raw)
 
-	vi.spyOn(git_gh_command, 'issue_get_body').mockImplementation(read)
+	vi.spyOn(git_gh_command, 'issue_get_labels_and_body').mockImplementation(read)
 
 	return read
 }

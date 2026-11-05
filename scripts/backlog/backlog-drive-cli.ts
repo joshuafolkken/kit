@@ -41,6 +41,7 @@ import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
+import { backlog_drive_retry } from './backlog-drive-retry'
 import { backlog_drive_seats } from './backlog-drive-seats'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
@@ -136,6 +137,7 @@ async function merge(issue: string, owner: string): Promise<MergeResult> {
 	const result = run_merge_driver.read(ran.out) ?? unprinted(ran.code)
 
 	await backlog_drive_named.mark_done(issue, result, owner)
+	if (result.outcome === 'merged') await backlog_drive_retry.after_merge(Number(issue))
 
 	return result
 }
@@ -201,9 +203,7 @@ function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'paus
 	return {
 		hold: holds.hold,
 		idle: backlog_drive_idle.notify,
-		paused: async () => {
-			await backlog_drive_paused.notify()
-		},
+		paused: backlog_drive_paused.notify,
 	}
 }
 

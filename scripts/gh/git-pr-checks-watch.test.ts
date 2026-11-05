@@ -113,7 +113,6 @@ const CODERABBIT_FAILING_WITH_PENDING = settled([
 ])
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	wait.mockResolvedValue(EMPTY_SNAPSHOT)
 })

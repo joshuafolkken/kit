@@ -94,7 +94,6 @@ function notes(): ReadonlyArray<string> {
 afterEach(() => vi.unstubAllEnvs())
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.target.mockResolvedValue('/ledger.jsonl')
 	mocks.all_events.mockResolvedValue([])

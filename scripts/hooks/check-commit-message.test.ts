@@ -1,5 +1,5 @@
 import os from 'node:os'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { branch: vi.fn(), git_directories: vi.fn() },
@@ -29,10 +29,6 @@ const import_calls = { info: console_spy.mock.calls.length, exit: exit_spy.mock.
 
 console_spy.mockRestore()
 exit_spy.mockRestore()
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('check-commit-message — side-effect-free import', () => {
 	it('does not call console.info or process.exit on import', () => {

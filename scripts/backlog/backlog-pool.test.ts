@@ -157,7 +157,7 @@ describe('backlog_pool.running_set', () => {
 		const running = backlog_pool.running_set(
 			[[epic_child(EPIC_CHILD)]],
 			[opted_in(ROW_NUMBER, [])],
-			READING_REPO,
+			{ repo: READING_REPO },
 			NO_TRACKING,
 		)
 
@@ -170,7 +170,7 @@ describe('backlog_pool.running_set', () => {
 		const running = backlog_pool.running_set(
 			[],
 			[opted_in(ROW_NUMBER, [NEEDS_DECISION_LABEL])],
-			READING_REPO,
+			{ repo: READING_REPO },
 			NO_TRACKING,
 		)
 
@@ -259,7 +259,7 @@ describe('backlog_pool.settle_standalone', () => {
 		const running = backlog_pool.running_set(
 			[],
 			[outside_blocked, behind],
-			READING_REPO,
+			{ repo: READING_REPO },
 			NO_TRACKING,
 		)
 
@@ -276,7 +276,7 @@ function epic_blocked_class(
 	rows: ReadonlyArray<OpenIssueData>,
 	tracking: ReadonlyMap<number, ReadonlyArray<number>>,
 ): { time: Array<number>; human: Array<number> } {
-	const running = backlog_pool.running_set(graphs, rows, READING_REPO, tracking)
+	const running = backlog_pool.running_set(graphs, rows, { repo: READING_REPO }, tracking)
 	const result = backlog_pool.classify_standalone([blocked_row('OPEN')], {
 		...STANDALONE_CONTEXT,
 		running,

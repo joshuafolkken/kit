@@ -79,7 +79,6 @@ function with_map(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	with_map()
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([OWN_SOURCE, OWN_TEST])

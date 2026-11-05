@@ -35,6 +35,8 @@ interface BoardPlan {
 	decision_waits?: ReadonlyMap<number, string> | undefined
 	is_backlog_live?: boolean | undefined
 	human_merge_prs?: ReadonlyMap<number, number> | undefined
+	// The same snapshot's worker identities that the header counts as occupied seats.
+	occupied_lanes?: ReadonlyArray<string> | undefined
 	waves: WavePlan
 	// Which opted-in epic tracks which child (`Plan.tracked`).
 	tracked: ReadonlyMap<number, number>
