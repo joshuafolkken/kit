@@ -10,6 +10,7 @@ describe('lane_stats_request.stats_request', () => {
 			limit: undefined,
 			sinks: undefined,
 			over: undefined,
+			why: undefined,
 			is_pairs: false,
 		})
 	})
@@ -18,6 +19,27 @@ describe('lane_stats_request.stats_request', () => {
 		expect(lane_stats_request.stats_request(['--period', '1', '--pairs'])?.is_pairs).toBe(true)
 	})
 
+	it('reads --why as the cause table with a positive threshold', () => {
+		expect(lane_stats_request.stats_request(['--period', '1', '--why', '40'])?.why).toBe(40)
+	})
+})
+
+describe('lane_stats_request.stats_request — why refusals', () => {
+	it.each([['--limit', '4'], ['--sinks'], ['--over', '40'], ['--pairs'], ['9']])(
+		'refuses --why beside %s',
+		(...flags) => {
+			expect(
+				lane_stats_request.stats_request(['--period', '1', '--why', '40', ...flags]),
+			).toBeUndefined()
+		},
+	)
+
+	it.each(['0', '-1', 'Infinity', 'soon'])('refuses --why %s', (minutes) => {
+		expect(lane_stats_request.stats_request(['--period', '1', '--why', minutes])).toBeUndefined()
+	})
+})
+
+describe('lane_stats_request.stats_request — other tables', () => {
 	it.each([['--limit', '4'], ['--sinks'], ['--over', '40']])(
 		'refuses --pairs beside %s',
 		(...flags) => {

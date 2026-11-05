@@ -169,7 +169,40 @@ describe('lane_measure_cli.run — stats --over', () => {
 		).resolves.toBe(0)
 		expect(String(info.mock.calls[0]?.[0])).toContain(SPLIT_FILED)
 	})
+})
 
+describe('lane_measure_cli.run — issue linking and causes', () => {
+	it('reads and links open issues in the over-time lane rows', async () => {
+		vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({
+			json: JSON.stringify([{ number: 6474, title: 'Speed up start to plan and implement' }]),
+			is_capped: false,
+		})
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+		await lane_measure_cli.run(['stats', '--period', '1', '--over', '40'], seeded_context())
+		expect(String(info.mock.calls[0]?.[0])).toContain(cited(6474))
+		expect(String(info.mock.calls[0]?.[0])).not.toContain('unread')
+	})
+
+	it('prints period-wide causes with one issue listing', async () => {
+		expect(lane_measure_cli.USAGE).toContain('josh lane:stats --period <days> --why <minutes>')
+		const listing = vi
+			.spyOn(git_gh_issue_list, 'issue_list')
+			.mockResolvedValue({ json: '[]', is_capped: false })
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+		await expect(
+			lane_measure_cli.run(['stats', '--period', '1', '--why', '40'], seeded_context()),
+		).resolves.toBe(0)
+		expect(String(info.mock.calls[0]?.[0])).toContain(
+			'| cause | lanes | total net min | open issues |',
+		)
+		expect(String(info.mock.calls[0]?.[0])).toContain('hub over cap')
+		expect(listing).toHaveBeenCalledOnce()
+	})
+})
+
+describe('lane_measure_cli.run — over refusals', () => {
 	it.each([
 		[['stats', '--period', '1', '--over', '0']],
 		[['stats', '--period', '1', '--over', '40', '--sinks']],
