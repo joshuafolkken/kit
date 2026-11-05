@@ -13,6 +13,7 @@ import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
+import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
 //
@@ -338,12 +339,17 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 // every tracked child; this function only applies it.
 // What the issue itself must hold: an author with write access (`auto-ok-author.ts`), every blocker
 // closed, its declared start date reached, and its declared size under the cap (joshuafolkken/kit#5502).
-function is_ready(issue: OpenIssueData, now: number): boolean {
+interface RunnableOptions {
+	now?: number
+	implement_rate?: ImplementRate | undefined
+}
+
+function is_ready(issue: OpenIssueData, options: RunnableOptions): boolean {
 	return (
 		auto_ok_author.is_author_trusted(issue) &&
 		is_unblocked(issue) &&
-		!size_estimate.is_issue_over_cap(issue) &&
-		issue_not_before.is_due(issue.body, now)
+		!size_estimate.is_issue_over_cap(issue, options.implement_rate) &&
+		issue_not_before.is_due(issue.body, options.now ?? Date.now())
 	)
 }
 
@@ -351,11 +357,11 @@ function is_runnable(
 	issue: OpenIssueData,
 	tracked: ReadonlyMap<number, number>,
 	exclude: ReadonlyArray<number>,
-	now: number = Date.now(),
+	options: RunnableOptions = {},
 ): boolean {
 	if (tracked.has(issue.number)) return false
 
-	return !exclude.includes(issue.number) && is_ready(issue, now)
+	return !exclude.includes(issue.number) && is_ready(issue, options)
 }
 
 function pick_next(
