@@ -53,22 +53,34 @@ async function with_prs(plan: BoardPlan | undefined): Promise<BoardPlan | undefi
 	return plan === undefined ? undefined : { ...plan, human_merge_prs: await read_prs(plan) }
 }
 
-// Move these rows out of both lanes and the offered queue into the waiting section.
+function waiting_children(plan: BoardPlan): Array<EpicChild> {
+	const { waves } = plan
+	const all = [...waves.waves.flat(), ...waves.unreached, ...(waves.running ?? [])]
+
+	return all.filter(
+		(child) =>
+			child.state === 'OPEN' &&
+			is_waiting(plan, child.number) &&
+			!plan.occupied_lanes?.includes(String(child.number)),
+	)
+}
+
+// Only workers that released their seat move into the human-merge waiting section.
 function overlay_of(
 	plan: BoardPlan,
 	statuses: Overlay['statuses'],
 ): Overlay & { waiting_numbers: ReadonlySet<number> } {
 	const { waves } = plan
-	const all = [...waves.waves.flat(), ...waves.unreached, ...(waves.running ?? [])]
-	const held = all.filter((child) => child.state === 'OPEN' && is_waiting(plan, child.number))
+	const held = waiting_children(plan)
 	const numbers = new Set(held.map((child) => child.number))
+	const hidden = new Set([...numbers, ...(plan.occupied_lanes ?? []).map(Number)])
 	const next = {
 		...waves,
 		...(waves.running !== undefined && {
 			running: waves.running.filter((child) => !numbers.has(child.number)),
 		}),
-		waves: waves.waves.map((wave) => wave.filter((child) => !numbers.has(child.number))),
-		unreached: [...waves.unreached.filter((child) => !numbers.has(child.number)), ...held],
+		waves: waves.waves.map((wave) => wave.filter((child) => !hidden.has(child.number))),
+		unreached: [...waves.unreached.filter((child) => !hidden.has(child.number)), ...held],
 	}
 
 	return {
