@@ -9,9 +9,8 @@ import { session_cite } from './session-cite'
 
 // The next-issues display printed when a workflow completes: up to five open issues in
 // priority order, so the user picks the next run from the completion output instead of opening the
-// issue list. Priority is recency — a newer issue usually encodes the most current understanding
-// of the backlog — with the label-based exclusions below, under the ranking keys `issue-rank.ts`
-// defines.
+// issue list. Equal ranking keys use oldest-first order, with the label-based exclusions below,
+// under the ranking keys `issue-rank.ts` defines.
 //
 // `prioritize` is also the order `epicrun` picks up `auto-ok` issues in.
 // The two ask one question — which open issue outside an epic is run next — so they share one
@@ -19,7 +18,7 @@ import { session_cite } from './session-cite'
 // at the end of every workflow, has just told the person is next.
 const FETCH_LIMIT = 20
 const DISPLAY_LIMIT = 5
-const HEADER = '🗒 Next issues (newest first):'
+const HEADER = '🗒 Next issues (oldest first on ties):'
 
 // Surfacing an `epic`, an `in-progress` or a `needs-decision` issue as "next" would suggest a run
 // the workflow rules forbid, duplicate, or cannot finish. The set itself is
@@ -36,10 +35,10 @@ function is_candidate(issue: OpenIssueData, completed_issue_number: number | und
 
 // ISO-8601 timestamps compare correctly as strings; the issue number breaks ties because two
 // issues created in one `josh epic` batch can share a timestamp to the second.
-function compare_newest_first(first: OpenIssueData, second: OpenIssueData): number {
-	if (first.createdAt === second.createdAt) return second.number - first.number
+function compare_oldest_first(first: OpenIssueData, second: OpenIssueData): number {
+	if (first.createdAt === second.createdAt) return first.number - second.number
 
-	return first.createdAt < second.createdAt ? 1 : -1
+	return first.createdAt < second.createdAt ? -1 : 1
 }
 
 // A row's blockers by number. **Lossy across repositories**: a blocker elsewhere sharing a number
@@ -62,7 +61,7 @@ function order(
 ): Array<OpenIssueData> {
 	const candidates = issues
 		.filter((issue) => is_candidate(issue, completed_issue_number))
-		.toSorted(compare_newest_first)
+		.toSorted(compare_oldest_first)
 	const dependents = issue_rank.count_dependents(candidates.map((issue) => dependency_row(issue)))
 
 	return issue_rank.rank(candidates, (issue) => ({
@@ -106,12 +105,8 @@ function format_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 // failed over a purely informational display.
 async function fetch_next_issue_lines(completed_issue_number?: number): Promise<Array<string>> {
 	try {
-		// **`is_capped` is deliberately not read here**. The paging is
-		// newest-first and this display keeps only the five newest of the twenty it asks for, so a
-		// listing the page ceiling cut short is a *prefix* of the one it would otherwise have got — the
-		// same five rows, in the same order. There is nothing the truncation hides that this display
-		// would have shown, and a warning above a correct list would be noise at the end of every
-		// completed run.
+		// This informational display ranks the recent issues fetched here. The unattended backlog
+		// reads the complete opted-in listing separately before applying the same ranking.
 		const { json } = await git_gh_command.issue_list_recent(FETCH_LIMIT)
 		if (json === undefined) return []
 

@@ -237,13 +237,13 @@ describe('the order of the pool', () => {
 		expect(stdout()).toBe(`${String(CHILD)}\n${String(NEW_ISSUE_NUMBER)}`)
 	})
 
-	it('ranks standalone issues newest first, as auto-ok:next does', async () => {
+	it('ranks standalone issues oldest first, as auto-ok:next does', async () => {
 		backlog_fixture.stub_backlog({
 			opted_in: [issue(OLD_ISSUE_NUMBER, CREATED_EARLIER), issue(NEW_ISSUE_NUMBER, CREATED_LATER)],
 		})
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(`${String(NEW_ISSUE_NUMBER)}\n${String(OLD_ISSUE_NUMBER)}`)
+		expect(stdout()).toBe(`${String(OLD_ISSUE_NUMBER)}\n${String(NEW_ISSUE_NUMBER)}`)
 	})
 })
 
