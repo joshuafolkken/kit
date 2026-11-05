@@ -24,6 +24,8 @@ const UNSEEN_EPIC = 'the open epics were not read in full, so an epic tracking i
 interface BlockedByRequest {
 	issue: string
 	prerequisite: string
+	// Caused-park filings leave placement to epic:bundle's single-epic decision.
+	is_relation_only?: boolean
 }
 
 async function is_blocked(request: BlockedByRequest): Promise<boolean> {
@@ -177,7 +179,14 @@ async function record(request: BlockedByRequest): Promise<string> {
 	if (await is_blocked(request)) return await settle_recorded(request)
 
 	const tracking = await tracking_epic(request)
-	if (tracking !== undefined) return await record_in_epic(tracking, request)
+
+	if (
+		tracking !== undefined &&
+		(request.is_relation_only !== true || tracking.is_prerequisite_child)
+	) {
+		return await record_in_epic(tracking, request)
+	}
+
 	await record_relation(request)
 
 	return 'recorded'

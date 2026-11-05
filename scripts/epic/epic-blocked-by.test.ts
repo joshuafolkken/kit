@@ -97,6 +97,29 @@ describe('epic_blocked_by.record — outside an epic', () => {
 	})
 })
 
+describe('epic_blocked_by.record — caused parks', () => {
+	it('keeps a caused-park prerequisite out of two different source epics', async () => {
+		const fetched = vi.spyOn(epic_index, 'fetch_epics')
+
+		epics_of(ISSUE_TRACKED)
+		await epic_blocked_by.record({ ...REQUEST, is_relation_only: true })
+		state.blockers = []
+		fetched.mockResolvedValue({ cutoff: 'none', epics: [{ number: 8, body: '- [ ] #12' }] })
+		await epic_blocked_by.record({ ...REQUEST, issue: '12', is_relation_only: true })
+
+		expect(add_children).not.toHaveBeenCalled()
+		expect(state.calls).toStrictEqual(['relation', 'relation'])
+	})
+
+	it('declares a relation-only record when both ends are already in one epic', async () => {
+		epics_of(BOTH_TRACKED)
+
+		await epic_blocked_by.record({ ...REQUEST, is_relation_only: true })
+
+		expect(state.calls).toStrictEqual(['relation', 'reconcile'])
+	})
+})
+
 describe('epic_blocked_by.record — inside an epic', () => {
 	it('adds an untracked prerequisite through `epic --add --before`', async () => {
 		epics_of(ISSUE_TRACKED)

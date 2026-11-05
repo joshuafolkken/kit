@@ -23,11 +23,12 @@ import { issue_file_deferral } from './issue-file-deferral'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_file_pass, type Filing } from './issue-file-pass'
-import { has_label_name, RUN_SOLO_LABEL } from './issue-labels'
+import { has_label_name, has_parked_label, RUN_SOLO_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_run_verdict } from './issue-run-verdict'
 import type { ScoutOutcome } from './issue-scout-cli'
+import { issue_state_cli } from './issue-state-cli'
 import { session_cite } from './session-cite'
 
 // `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
@@ -148,7 +149,10 @@ async function emit_filed(
 // The create has succeeded; report a recorder failure without inviting another filing.
 async function record_park(issue: string, prerequisite: string): Promise<void> {
 	try {
-		const result = await epic_blocked_by.record({ issue, prerequisite })
+		const read = await issue_state_cli.read_issue(issue)
+		if (read.kind !== 'state') throw new Error(`could not read park state: ${read.kind}`)
+		if (read.state.state !== 'OPEN' || !has_parked_label(read.state.labels)) return
+		const result = await epic_blocked_by.record({ issue, prerequisite, is_relation_only: true })
 
 		console.info(
 			`caused park ${session_cite.issue(issue)} blocked by ${session_cite.issue(prerequisite)}: ${result}`,
