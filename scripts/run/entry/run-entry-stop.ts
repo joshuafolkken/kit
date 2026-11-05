@@ -1,7 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { josh_command } from '#scripts/josh/josh-run'
 import { telegram_notify, type ConfirmInput } from '#scripts/notify/telegram-notify'
 import { lane_park } from '#scripts/rules/lane-park'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 
 // What `run:entry` does on the way out of a stop it decided itself.
 //
@@ -42,16 +42,15 @@ const NOTIFY_FAILED_NOTE =
 const RELEASED_NOTE = '(hold released by run:entry — the tree is free for the resume)'
 const RELEASE_FAILED_NOTE =
 	'(the hold could not be released — run `pnpm josh run:release` before stopping)'
-const should_forward_stderr = true
 const SUCCESS_EXIT_CODE = 0
 
 const BUDGET_REASON = 'the session budget is spent'
 const HOLD_REASON = 'the working tree is not held for this run — see the run:entry output'
 
 async function release(issue_number: string): Promise<boolean> {
-	const released = await josh_command.josh_run(['run:release', issue_number], should_forward_stderr)
+	const code = await run_hold_cli.run(['--release', issue_number])
 
-	return released.code === SUCCESS_EXIT_CODE
+	return code === SUCCESS_EXIT_CODE
 }
 
 function is_parking_child(): boolean {
