@@ -35,6 +35,7 @@ const DISTINCT_HINT = `--distinct ${String(DUPLICATE)}`
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
+const SOLO_ANSWERS = ['--defect', 'yes', '--verification', 'yes', '--every-run', 'yes']
 
 const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
 const ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
@@ -211,17 +212,22 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 
 // joshuafolkken/kit#3313: an untriaged opted-in Issue withholds every lane's candidate.
 describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
-	it('refuses an auto-ok filing with no run label before creating', async () => {
-		expect(await issue_file_cli.run(argv_of(judged_in_path))).toBe(FAILURE_EXIT_CODE)
-		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('--label run:solo')
-		expect(exec_gh_api).not.toHaveBeenCalled()
-	})
+	it.each([[], ['--label', 'run:solo'], ['--label', 'run:solo', '--defect', 'no']])(
+		'refuses unverified run labels %j before creating',
+		async (...extra) => {
+			expect(await issue_file_cli.run(argv_of(judged_in_path, ...extra))).toBe(FAILURE_EXIT_CODE)
+			expect(exec_gh_api).not.toHaveBeenCalled()
+		},
+	)
 
 	it('files an auto-ok filing judged run:solo', async () => {
-		expect(await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:solo'))).toBe(
-			SUCCESS_EXIT_CODE,
-		)
+		expect(
+			await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:solo', ...SOLO_ANSWERS)),
+		).toBe(SUCCESS_EXIT_CODE)
 		expect(create_body()).toMatchObject({ labels: ['run:solo', 'bug', 'auto-ok'] })
+		const comment = exec_gh_api.mock.calls[1]?.[0].body
+
+		expect(comment).toMatch(/defect: yes.*verification: yes.*every-run: yes/u)
 	})
 
 	it('files without a run label when auto-ok is not applied, as before', async () => {
