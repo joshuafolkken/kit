@@ -91,7 +91,6 @@ function current_checkout(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mkdirSync(project_root, { recursive: true })
 	mocked_resolve.mockReturnValue(CLI)
 	mocked_git_read.mockReturnValue(undefined)

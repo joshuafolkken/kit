@@ -67,7 +67,6 @@ function stub_change(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	stub_machine_state()
 	stub_change()

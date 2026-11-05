@@ -40,7 +40,7 @@ const printed: Array<string> = []
 
 beforeEach(() => {
 	printed.length = 0
-	vi.clearAllMocks()
+
 	run_mock.mockResolvedValue(0)
 	vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
 		printed.push(String(line))

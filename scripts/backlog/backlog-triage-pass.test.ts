@@ -41,7 +41,6 @@ function context(): PoolContext {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	fetch_pool.mockResolvedValue({ kind: 'read', issues: [], cutoff: 'none' })
 	read_context.mockResolvedValue(context())
 	classify.mockResolvedValue(result())

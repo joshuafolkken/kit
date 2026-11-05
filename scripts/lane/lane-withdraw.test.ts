@@ -99,7 +99,6 @@ function arrange_writes(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	arrange_open_lane()
 	arrange_writes()
 })

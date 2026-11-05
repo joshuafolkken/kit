@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-logic'
 import { execaSync } from 'execa'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { security_audit } from './security-audit'
 import { security_audit_logic } from './security-audit-logic'
 
@@ -21,10 +21,6 @@ function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSync
 
 const FLOOR_VERSION_OUTPUT = 'osv-scanner version: 2.6.0'
 const BELOW_FLOOR_VERSION_OUTPUT = 'osv-scanner version: 2.3.5'
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 const OSV_SCANNER = 'osv-scanner'
 const MISSING_BINARY = 'missing-bin'

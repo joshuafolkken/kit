@@ -60,7 +60,6 @@ function printed(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	// One attempt per stage, so a stage that is not reached costs no wall clock.
 	vi.stubEnv(release_progress.NPM_TIMEOUT_ENV, '1')
 	vi.stubEnv(release_progress.GITHUB_RELEASE_TIMEOUT_ENV, '1')

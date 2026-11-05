@@ -1,5 +1,5 @@
 import type { execaSync } from 'execa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { npm_registry } from './npm-registry'
 
 const execa_outcomes = vi.hoisted(() => vi.fn())
@@ -47,10 +47,6 @@ function packument_requests(): ReadonlyArray<ReadonlyArray<string>> {
 
 	return calls.filter(([command]) => command === process.execPath).map(([, argv]) => argv)
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('npm_registry.packument_url', () => {
 	it('encodes the scope separator of a scoped package', () => {

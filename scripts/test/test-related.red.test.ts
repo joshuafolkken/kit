@@ -81,7 +81,6 @@ function absolute(file: string): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.restoreAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)

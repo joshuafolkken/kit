@@ -45,7 +45,6 @@ const LANE: LaneInfo = {
 beforeEach(lane_seat_fixture.mock_start)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	for (const key of agent_session_environment.PARENT_SESSION_KEYS) vi.stubEnv(key, '')
 	vi.stubEnv('CLAUDE_CODE_SESSION_ID', 'session')
 	vi.stubEnv('CODEX_THREAD_ID', '')

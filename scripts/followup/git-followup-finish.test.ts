@@ -77,7 +77,7 @@ function silence_console(): void {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
+
 	worktree_directory_mock.mockResolvedValue(WORKTREE_DIRECTORY)
 	fetch_next_issue_lines_mock.mockResolvedValue([])
 	pending_release_mock.mockResolvedValue(PENDING_SENTINEL)

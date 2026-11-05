@@ -32,7 +32,6 @@ function errors(): ReadonlyArray<unknown> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.mocked(change_base.resolved_through_merge).mockResolvedValue(

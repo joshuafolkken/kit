@@ -47,7 +47,6 @@ vi.spyOn(console, 'info').mockImplementation(() => undefined)
 vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	order.length = 0
 	clear_record.mockImplementation(() => {
 		order.push('record')

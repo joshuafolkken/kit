@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { CLOSE_ANNOUNCEMENT, epic_close_comment } from './epic-close-comment'
 
 const { build_close_comment, read_close_comment_state } = epic_close_comment
@@ -32,10 +32,6 @@ function quote_of(body: string): string {
 
 	return `The auto-close said:\n\n${quoted}\n\nSo the batch is done.`
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('build_close_comment', () => {
 	it('names every child, near and far', () => {

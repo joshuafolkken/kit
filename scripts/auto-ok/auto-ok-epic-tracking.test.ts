@@ -67,7 +67,6 @@ function capped_epic_listing(): ReturnType<typeof listing_outcome> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	issue_list.mockResolvedValue(listing_outcome(undefined))
 	epic_list.mockResolvedValue(listing_outcome(epic_listing([])))
 	streams.reset()

@@ -25,7 +25,6 @@ afterEach(() => {
 	rmSync(CWD, { force: true, recursive: true })
 	rmSync(SOURCE, { force: true, recursive: true })
 	rmSync(NEXT_SOURCE, { force: true, recursive: true })
-	vi.clearAllMocks()
 })
 
 describe('OpenAI detached launch environment', () => {

@@ -40,7 +40,6 @@ function plan_of(unit_worker_cap: number | undefined, checks: Array<GateCheck> =
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_is_basic.mockReturnValue(false)
 	mocked_project_root.mockReturnValue(ROOT)
 	mocked_skip_reason.mockReturnValue(SKIP_REASON)

@@ -68,7 +68,6 @@ afterAll(() => {
 })
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mkdirSync(path.join(LANE_ROOT, ISSUE), { recursive: true })
 	vi.mocked(lane_registry.lane_root_directory).mockResolvedValue(LANE_ROOT)
 })

@@ -70,7 +70,6 @@ function expect_polled_with(stable_reads: number, observe?: unknown): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	watch.mockReset()
 	wait.mockReset()
 	wait.mockResolvedValue(SNAPSHOT)

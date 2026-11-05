@@ -16,7 +16,6 @@ const UNKNOWN = 'unknown'
 const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	apply_label.mockResolvedValue({ is_applied: true })
 })
 

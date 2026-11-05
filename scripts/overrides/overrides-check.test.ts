@@ -69,7 +69,6 @@ const { run_overrides_check, main } = await import('./overrides-check')
 // Every spy here is one mock for the whole file — uncleared, a call an earlier test made satisfies a
 // later test's assertion before the code under test runs.
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process, 'exit').mockImplementation(() => {
 		throw new Error(PROCESS_EXIT_CALLED)
 	})

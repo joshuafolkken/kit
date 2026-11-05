@@ -48,7 +48,6 @@ vi.spyOn(console, 'info').mockImplementation(streams.info)
 vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	epic_list.mockResolvedValue(listing_outcome(epic_listing([])))
 	streams.reset()
 })

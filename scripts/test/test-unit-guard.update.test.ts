@@ -28,7 +28,6 @@ function add_file(relative_path: string): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	unit_share_fixture.stub_share(undefined)
 	unit_share_fixture.stub_free(undefined)
 	unit_share_fixture.stub_claim(undefined)

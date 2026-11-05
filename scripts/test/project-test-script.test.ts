@@ -26,7 +26,6 @@ function write_manifest(manifest: unknown): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'project-test-script-'))
 })

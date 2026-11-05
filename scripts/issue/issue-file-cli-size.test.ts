@@ -4,7 +4,7 @@ import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_scout_cli } from './issue-scout-cli'
@@ -57,10 +57,6 @@ beforeEach(() => {
 	vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
 	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: undefined, is_capped: false })
 	scout.mockResolvedValue(undefined)
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 afterAll(() => {

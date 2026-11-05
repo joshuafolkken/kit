@@ -23,7 +23,6 @@ function promote_input(title?: string): Parameters<typeof epic_run.promote_epic>
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(vi.fn())
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 	vi.mocked(git_gh_command.issue_get_labels_and_body).mockResolvedValue(

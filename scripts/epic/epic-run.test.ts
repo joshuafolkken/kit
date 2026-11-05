@@ -35,7 +35,6 @@ function create_input(is_ordered: boolean): {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => {
 		/* suppress */
 	})

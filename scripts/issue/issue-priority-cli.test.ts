@@ -15,7 +15,6 @@ const mocked_raise = vi.mocked(issue_priority_raise.raise)
 
 beforeEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 describe('issue_priority_cli.run', () => {

@@ -30,7 +30,6 @@ function serve(text: string, ...labels: ReadonlyArray<string>): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_add.mockResolvedValue(true)
 })
 

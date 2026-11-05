@@ -57,8 +57,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
-
 	try {
 		rmSync(LIFE_TARGET, { force: true })
 	} catch {

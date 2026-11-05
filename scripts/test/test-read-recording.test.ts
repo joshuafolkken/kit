@@ -43,7 +43,6 @@ async function run_recording(environment: RecordingEnvironment): Promise<number>
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(git_command.head_commit).mockResolvedValue(HEAD)
 	vi.mocked(changed_paths.read_changed_since).mockResolvedValue([DIRTY])
 	vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([CHANGED])

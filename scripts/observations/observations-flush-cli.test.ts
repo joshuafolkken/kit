@@ -12,7 +12,6 @@ const mocked_flush = vi.mocked(observations_flush.flush)
 const chdir = vi.spyOn(process, 'chdir')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)

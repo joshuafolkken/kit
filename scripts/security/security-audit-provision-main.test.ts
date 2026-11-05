@@ -42,7 +42,6 @@ describe('security-audit-provision-main', () => {
 	})
 
 	it('records the model alone on a clear start, provisioning nothing', async () => {
-		vi.clearAllMocks()
 		await main_entry_fixture.run_entry(ENTRY, ['--session-model'])
 
 		expect(record_from_stdin).toHaveBeenCalledOnce()

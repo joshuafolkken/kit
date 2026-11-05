@@ -111,7 +111,6 @@ function stub_machine_state(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	mocked_root.mockResolvedValue(REPOSITORY_ROOT)
 	mocked_changed.mockResolvedValue([CHANGED_SOURCE])

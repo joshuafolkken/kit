@@ -18,7 +18,6 @@ const ISSUE = '4910'
 const PLANNED = ['scripts/lane/lane-overrun-mechanisms-cli.ts', 'docs/josh-commands-run.md']
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	uncleared_mock.mockReturnValue(true)
 	plan_paths_mock.mockResolvedValue([])
 })

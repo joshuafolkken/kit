@@ -110,7 +110,7 @@ function last_line(text: string): string {
 
 beforeEach(() => {
 	RECORDS.clear()
-	vi.clearAllMocks()
+
 	lint_fails()
 })
 

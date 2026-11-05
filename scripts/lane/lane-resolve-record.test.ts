@@ -31,7 +31,6 @@ async function refusal(): Promise<string> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	branch.mockResolvedValue(LANE)
 	head_commit.mockResolvedValue(HEAD_SHA)
 	ls_remote.mockResolvedValue(`${HEAD_SHA}\trefs/heads/${LANE}`)

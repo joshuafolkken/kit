@@ -136,7 +136,6 @@ function setup_run_mocks(): void {
 }
 
 function setup_skip_policy_mocks(): void {
-	vi.clearAllMocks()
 	silence_warnings()
 	setup_run_mocks()
 }
@@ -197,7 +196,6 @@ describe('warn_if_missing_closes', () => {
 	const BRANCH = 'my-feature-branch'
 
 	beforeEach(() => {
-		vi.clearAllMocks()
 		silence_warnings()
 	})
 

@@ -71,7 +71,6 @@ async function run_wrapup(input: Partial<WrapupInput>): Promise<void> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	vi.mocked(git_gh_command.issue_comment).mockResolvedValue('')
 	mocked_merge.mockResolvedValue()

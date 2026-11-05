@@ -49,7 +49,6 @@ function closed_numbers(): Array<string | undefined> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_close.mockResolvedValue(true)
 	mocked_comments.mockResolvedValue('[]')
 	mocked_get_child.mockImplementation(async (number) =>

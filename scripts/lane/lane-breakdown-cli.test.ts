@@ -55,7 +55,6 @@ function followup_lap(ended: number, minutes: number, step: string): LedgerEntry
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocks.evidence.mockResolvedValue({ evidence: [], unreadable: [] })
 	mocks.closing.mockResolvedValue({ kind: 'read', number: undefined })
 	vi.spyOn(console, 'error').mockReturnValue(undefined)

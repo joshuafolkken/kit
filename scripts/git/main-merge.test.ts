@@ -72,7 +72,6 @@ const LOCKFILE_INCOMING = `${CHANGED_FILE}\n${LOCKFILE}`
 const INSTALL_OUTPUT = 'ERR_PNPM_OUTDATED_LOCKFILE'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')

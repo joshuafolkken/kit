@@ -37,7 +37,6 @@ function unreadable_notes(): Array<string> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	mocked_list.mockResolvedValue(listing_outcome(JSON.stringify([{ number: 200, body: EPIC_BODY }])))
 })

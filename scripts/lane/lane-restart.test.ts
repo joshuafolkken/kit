@@ -75,7 +75,6 @@ function arrange_relaunch(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	arrange_running_child()
 	arrange_relaunch()
 })

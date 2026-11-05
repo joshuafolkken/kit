@@ -36,7 +36,6 @@ const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const record_lane_state = vi.spyOn(lane_ledger_write, 'record_lane_state')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	record_change.mockResolvedValue({ kind: 'skipped', reason: 'test' })

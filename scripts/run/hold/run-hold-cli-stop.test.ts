@@ -54,7 +54,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	vi.restoreAllMocks()
 	rmSync(TARGET, { force: true })
 })

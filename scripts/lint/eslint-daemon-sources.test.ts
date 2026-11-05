@@ -73,7 +73,6 @@ function remember_edit_of(relative: string): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mkdirSync(project_root, { recursive: true })
 	vi.mocked(resolve_package_bin).mockReturnValue(CLI)
 })

@@ -91,7 +91,6 @@ const PLANNED_LABELS = ['run:lane', 'run:planned']
 const info_lines: Array<string> = []
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	open_pr_mock.mockResolvedValue(false)
 	josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(HELD).mockResolvedValue(UNDER)
 	info_lines.length = 0

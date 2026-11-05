@@ -48,7 +48,6 @@ const TOUCHED = '--touched'
 const mocked_record = vi.spyOn(test_related_record, 'record_run')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([CHANGED_SOURCE])

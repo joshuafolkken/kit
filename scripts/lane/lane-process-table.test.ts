@@ -43,7 +43,6 @@ function row(
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 describe('lane_process_table.parse', () => {

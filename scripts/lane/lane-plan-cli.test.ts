@@ -62,7 +62,6 @@ const HOLDING = listing([running(HOLDER, '`scripts/lane/lane-phase.ts:82-94`'), 
 const HOLDER_LEFT = listing([running(LATER, '')])
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	record_yield.mockResolvedValue(undefined)

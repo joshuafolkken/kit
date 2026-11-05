@@ -48,7 +48,6 @@ async function merge_checked(
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.mocked(git_gh_command.is_head_moved).mockImplementation((failure) => failure === HEAD_MOVED)
 	mocked_merge.mockResolvedValue()

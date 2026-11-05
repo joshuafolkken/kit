@@ -12,7 +12,6 @@ const MINUTE_MS = 60_000
 const launch = vi.mocked(detached_launch.launch)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	launch.mockReturnValue({ kind: 'launched', pid: 1 })
 })

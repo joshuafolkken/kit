@@ -128,7 +128,6 @@ describe('issue_file_cli.record — caused parks', () => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-	vi.clearAllMocks()
 })
 
 // joshuafolkken/kit#4695: a split child is recorded against the lane child that found it, which is what

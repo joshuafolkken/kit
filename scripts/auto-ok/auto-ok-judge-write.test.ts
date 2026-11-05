@@ -25,7 +25,6 @@ vi.spyOn(console, 'info').mockImplementation(() => undefined)
 vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	apply_label.mockResolvedValue({ is_applied: true })
 	post_comment.mockResolvedValue('')
 	emit.mockResolvedValue()

@@ -1,5 +1,5 @@
 import { execa, execaSync } from 'execa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
 	BODY_FROM_STDIN,
 	GH_REQUEST_TIMEOUT_MESSAGE,
@@ -47,10 +47,6 @@ const GH_FAILED = 'failed'
 const VALIDATION_SUMMARY = 'gh: Validation Failed (HTTP 422)'
 const VALIDATION_BODY = '{"message":"Validation Failed","errors":[{"field":"title"}]}'
 const MULTILINE_BODY = '{"title":"t","body":"first line\\n\\n- second `line`\\n"}'
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('exec_gh_api_sync — the body never becomes an argument', () => {
 	// The whole reason the asynchronous path uses `--input -`: an issue body is multi-line markdown,

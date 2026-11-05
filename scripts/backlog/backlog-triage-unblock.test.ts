@@ -48,7 +48,6 @@ function reading_of(declaration: string): Awaited<ReturnType<typeof epic_read.re
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	listing_epics.mockResolvedValue([EPIC])
 	read_epic.mockResolvedValue(reading_of(DECLARED))
 	remove_order.mockResolvedValue(SUCCESS_EXIT_CODE)
