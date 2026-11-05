@@ -26,15 +26,17 @@ interface BufferedProcessResult {
 	elapsed_ms: number
 }
 
-// The two things a caller outside the fan-out needs to vary, and the only two.
+// The things a caller outside the fan-out needs to vary, and the only ones.
 // `lane:open` runs its install in the work tree it just created rather
 // than in the directory `josh` was typed in, and bounds it well under the fan-out's half hour
 // because an install that never answers has to end the command rather than hold a parallel run
-// open. Everything else — the buffering, the non-throwing exit, and the color policy that respects
-// `NO_COLOR` — is the same contract, so it is inherited rather than restated.
+// open. ESLint's runs hand in `child_environment()` with its heap added (`eslint-heap.ts`).
+// Everything else — the buffering and the non-throwing exit — is the same contract, so it is
+// inherited rather than restated.
 interface BufferedProcessOptions {
 	cwd?: string
 	timeout_ms?: number
+	environment?: NodeJS.ProcessEnv
 }
 
 // What execa reports about a child that produced no exit code. Declared here because execa's own
@@ -90,7 +92,7 @@ async function run_buffered_process(
 	// `undefined` for an optional `string`, and passing one anyway breaks execa's overload
 	// resolution — which silently widens `result.all` back to `string | undefined`.
 	const result = await execa(PNPM, [...command_args], {
-		env: child_environment(),
+		env: options.environment ?? child_environment(),
 		extendEnv: false,
 		all: true,
 		reject: false,
