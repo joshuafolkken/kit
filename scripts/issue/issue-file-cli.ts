@@ -26,6 +26,7 @@ import { issue_file_pass, type Filing } from './issue-file-pass'
 import { has_label_name, RUN_SOLO_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
+import { issue_run_verdict } from './issue-run-verdict'
 import type { ScoutOutcome } from './issue-scout-cli'
 import { session_cite } from './session-cite'
 
@@ -205,7 +206,7 @@ async function record_solo(
 ): Promise<void> {
 	if (!has_label_name(labels, RUN_SOLO_LABEL)) return
 	const { answers = {} } = filing.args
-	const body = `run:solo\n\n- defect: ${String(answers.defect)}\n- verification: ${String(answers.verification)}\n- every-run: ${String(answers['every-run'])}`
+	const body = issue_run_verdict.comment_with_answers(RUN_SOLO_LABEL, { ...answers, solo: true })
 
 	try {
 		await git_gh_command.issue_comment(String(issue_number_of(url)), body, filing.target)

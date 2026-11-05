@@ -1,0 +1,7 @@
+{
+	"reason": "Share solo-run answer formatting with issue filing; the shared formatter adds five net code lines and removes the filing-specific formatter.",
+	"date": "2026-11-05",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}
