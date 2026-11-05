@@ -26,7 +26,7 @@ const PROBE_FILE = 'eslint/checkout-rooted-parser.test.ts'
 const SOURCE = 'const x = 1\n'
 const HASH_OF_CONFIG = /"hashOfConfig":"(?<hash>[^"]+)"/u
 
-// The cache probe lints for real, and `parserOptions.project` would make that a typed lint over this
+// The cache probe lints for real, and the typed parser would make that a lint over this
 // repository's whole program. A checkout holding one file under a one-file `tsconfig.json` asks the
 // same question — does the hash of the config move with the checkout path — at a fraction of the cost.
 const PROBE_TSCONFIG = {
@@ -169,7 +169,8 @@ describe('create_base_config — a consumer block after it', () => {
 		const config = await resolved_config(REPO_ROOT, [consumer])
 
 		expect(config.languageOptions?.['parserOptions']).toMatchObject({
-			project: './tsconfig.json',
+			project: false,
+			projectService: true,
 			extraFileExtensions: ['.svelte'],
 		})
 	})

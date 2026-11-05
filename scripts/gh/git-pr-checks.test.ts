@@ -127,7 +127,6 @@ describe('evaluate_pr_state — pending: merge state not CLEAN', () => {
 
 function check_run(name: string): Record<string, string> {
 	return {
-		// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API uses `__typename` as the discriminator
 		__typename: 'CheckRun',
 		name,
 		status: 'completed',

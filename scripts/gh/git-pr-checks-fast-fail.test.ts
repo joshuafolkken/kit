@@ -114,11 +114,8 @@ describe('evaluate_pr_state — what the fast fail must not reach (#990)', () =>
 			mergeStateStatus: UNSTABLE,
 			reviewDecision: 'APPROVED',
 			statusCheckRollup: [
-				// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 				{ __typename: 'CheckRun', name: E2E, status: 'COMPLETED', conclusion: 'SKIPPED' },
-				// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 				{ __typename: 'CheckRun', name: SONAR_QUBE, status: 'COMPLETED', conclusion: 'SUCCESS' },
-				// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
 				{ __typename: 'StatusContext', context: CODE_RABBIT, state: 'PENDING' },
 			],
 		})
