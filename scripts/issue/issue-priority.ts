@@ -44,7 +44,7 @@ const CAUSE_LINE = /^- 原因の損失: (?<minutes>\d+(?:\.\d+)?) 分$/u
 const LOSS_HIGH_MINUTES = 30
 const SECURITY_PREFIX = '- セキュリティ:'
 const PARK_PREFIX = '- 原因の park:'
-const PARK_LINE = /^- 原因の park: #[1-9]\d*$/u
+const PARK_LINE = /^- 原因の park: #(?<issue>[1-9]\d*)$/u
 // Queues the Issue behind every undeclared one of its pool (joshuafolkken/kit#5310).
 const ORDER_PREFIX = '- 実施順:'
 const LAST_LINE = '- 実施順: 最後'
@@ -131,6 +131,15 @@ function is_security_line(line: string): boolean {
 
 function is_park_line(line: string): boolean {
 	return PARK_LINE.test(line)
+}
+
+// Repeated local declarations name every stopped Issue; examples and unsafe numbers never write.
+function parked_issues(body: string): ReadonlyArray<string> {
+	const issues = background_lines(body, PARK_PREFIX)
+		.map((line) => PARK_LINE.exec(line)?.groups?.['issue'])
+		.filter((issue): issue is string => issue !== undefined && Number.isSafeInteger(Number(issue)))
+
+	return [...new Set(issues)]
 }
 
 // Read for ranking, not a floor: one lane's estimate (joshuafolkken/kit#4960).
@@ -274,6 +283,7 @@ const issue_priority = {
 	lane_minutes,
 	lost_minutes,
 	order_problem,
+	parked_issues,
 	problem,
 	with_label,
 }
