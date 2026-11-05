@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises'
+import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
+import { epic_classify } from '#scripts/epic/epic-classify'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_fold_apply } from './issue-fold-apply'
 import { issue_fold_existing_cli } from './issue-fold-existing-cli'
@@ -10,6 +12,7 @@ const APPLY_FLAG = '--apply'
 const FINGERPRINT_FLAG = '--fingerprint'
 const ORIGINAL_CRITERION = 'Original criterion'
 const FINGERPRINT = 'assessed-thread'
+const RELATION_FAILURE = 'relation failed'
 const ASSESSMENT = {
 	content: 'compatible',
 	is_open: true,
@@ -114,17 +117,115 @@ describe('issue_fold_existing_cli.run --fingerprint', () => {
 	})
 })
 
+describe('issue_fold_existing_cli.run — confirmed duplicate dependencies', () => {
+	it('records only the explicitly named stopped issue against the existing duplicate', async () => {
+		vi.mocked(readFile).mockResolvedValue(JSON.stringify({ ...ASSESSMENT, content: 'duplicate' }))
+		const record = vi.spyOn(epic_blocked_by, 'record').mockResolvedValue('recorded')
+		const apply = vi.spyOn(issue_fold_apply, 'apply')
+
+		vi.spyOn(issue_fold_apply, 'check_unchanged').mockResolvedValue(undefined)
+
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', '--blocked', '34'])).toBe(0)
+		expect(record).toHaveBeenCalledExactlyOnceWith({ issue: '34', prerequisite: '12' })
+		expect(apply).not.toHaveBeenCalled()
+	})
+
+	it('reports a failed dependency record', async () => {
+		vi.mocked(readFile).mockResolvedValue(JSON.stringify({ ...ASSESSMENT, content: 'duplicate' }))
+		vi.spyOn(epic_blocked_by, 'record').mockRejectedValue(new Error(RELATION_FAILURE))
+		vi.spyOn(issue_fold_apply, 'check_unchanged').mockResolvedValue(undefined)
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', '--blocked', '34'])).toBe(1)
+		expect(error.mock.calls.join('\n')).toContain(RELATION_FAILURE)
+	})
+})
+
+describe('issue_fold_existing_cli.run — unchanged duplicate assessment', () => {
+	it.each(['changed', 'unreadable'] as const)(
+		'does not record a %s duplicate assessment',
+		async (refusal) => {
+			vi.mocked(readFile).mockResolvedValue(JSON.stringify({ ...ASSESSMENT, content: 'duplicate' }))
+			vi.spyOn(issue_fold_apply, 'check_unchanged').mockResolvedValue(refusal)
+			const record = vi.spyOn(epic_blocked_by, 'record')
+
+			vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+			expect(await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', '--blocked', '34'])).toBe(1)
+			expect(record).not.toHaveBeenCalled()
+		},
+	)
+})
+
+describe('issue_fold_existing_cli.run — read-only duplicate assessment', () => {
+	it.each([[], ['--json'], [APPLY_FLAG, '12']])(
+		'does not record a duplicate for %j',
+		async (...options) => {
+			vi.mocked(readFile).mockResolvedValue(JSON.stringify({ ...ASSESSMENT, content: 'duplicate' }))
+			const record = vi.spyOn(epic_blocked_by, 'record')
+
+			vi.spyOn(console, 'info').mockImplementation(() => undefined)
+			vi.spyOn(console, 'error').mockImplementation(() => undefined)
+			await issue_fold_existing_cli.run([PATH, ...options])
+			expect(record).not.toHaveBeenCalled()
+		},
+	)
+})
+
+describe('issue_fold_existing_cli.run — unconfirmed duplicate assessment', () => {
+	it.each(['compatible', 'separate', 'unknown'])(
+		'does not record %s as a duplicate',
+		async (content) => {
+			vi.mocked(readFile).mockResolvedValue(JSON.stringify({ ...ASSESSMENT, content }))
+			const record = vi.spyOn(epic_blocked_by, 'record')
+
+			vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+			expect(await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', '--blocked', '34'])).toBe(1)
+			expect(record).not.toHaveBeenCalled()
+		},
+	)
+})
+
+describe('issue_fold_existing_cli.run — duplicate readiness', () => {
+	it('keeps the stopped issue out of runnable children after the dependency is recorded', async () => {
+		vi.mocked(readFile).mockResolvedValue(JSON.stringify({ ...ASSESSMENT, content: 'duplicate' }))
+		const blocked_by: Array<{ repo: string; number: number }> = []
+		const repo = 'owner/repo'
+
+		vi.spyOn(issue_fold_apply, 'check_unchanged').mockResolvedValue(undefined)
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		vi.spyOn(epic_blocked_by, 'record').mockImplementation(async ({ prerequisite }) => {
+			blocked_by.push({ repo, number: Number(prerequisite) })
+
+			return 'recorded'
+		})
+		expect(await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', '--blocked', '34'])).toBe(0)
+		const result = epic_classify.classify_children([
+			{ number: 34, repo, state: 'OPEN', labels: [], blocked_by },
+			{ number: 12, repo, state: 'OPEN', labels: [], blocked_by: [] },
+		])
+
+		expect(result.runnable.map((entry) => entry.number)).toEqual([12])
+	})
+})
+
 describe('issue_fold_existing_cli.run refusals', () => {
 	it.each([
 		[[APPLY_FLAG]],
 		[[APPLY_FLAG, '0']],
 		[[APPLY_FLAG, '12', '--json']],
+		[[APPLY_FLAG, '12', '--blocked', 'owner/repo#34']],
+		[[APPLY_FLAG, '12', '--blocked', '0']],
 		[['--json', '12']],
 	])('prints the usage for the options %j', async (options) => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		expect(await issue_fold_existing_cli.run([PATH, ...options])).toBe(1)
 		expect(error.mock.calls.join('\n')).toContain('Usage')
+		expect(error.mock.calls.join('\n')).toContain('--blocked <stopped-issue>')
 	})
 
 	it.each(['draft_body', 'verification', 'comment_fingerprint'])(
