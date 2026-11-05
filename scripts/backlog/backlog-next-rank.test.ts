@@ -174,28 +174,35 @@ describe('backlog:next estimated size precedence', () => {
 })
 
 describe('backlog:next resumable ranking keys', () => {
-	it('offers stashed work before fresh work', async () => {
-		backlog_fixture.stub_backlog({
-			opted_in: [row(SIXTH, []), row(SEVENTH, [])],
-			stashed: [SEVENTH],
-		})
-
-		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(offered()).toStrictEqual([SEVENTH, SIXTH])
-	})
-
-	it.each([PRIORITY_CRITICAL_LABEL, PRIORITY_HIGH_LABEL])(
-		'keeps %s ahead of resumable work',
-		async (priority) => {
+	it.each(['stashed', 'paused', 'open_pr'] as const)(
+		'offers %s work before fresh work',
+		async (signal) => {
 			backlog_fixture.stub_backlog({
-				opted_in: [row(SIXTH, []), row(SEVENTH, [priority])],
-				stashed: [SIXTH],
+				opted_in: [row(SIXTH, []), row(SEVENTH, [])],
+				[signal]: [SEVENTH],
 			})
 
 			expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-			expect(offered()[0]).toBe(SEVENTH)
+			expect(offered()).toStrictEqual([SEVENTH, SIXTH])
 		},
 	)
+
+	it.each([
+		[PRIORITY_CRITICAL_LABEL, 'stashed'],
+		[PRIORITY_HIGH_LABEL, 'stashed'],
+		[PRIORITY_CRITICAL_LABEL, 'paused'],
+		[PRIORITY_HIGH_LABEL, 'paused'],
+		[PRIORITY_CRITICAL_LABEL, 'open_pr'],
+		[PRIORITY_HIGH_LABEL, 'open_pr'],
+	])('keeps %s ahead of %s work', async (priority, signal) => {
+		backlog_fixture.stub_backlog({
+			opted_in: [row(SIXTH, []), row(SEVENTH, [priority])],
+			[signal]: [SIXTH],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(offered()[0]).toBe(SEVENTH)
+	})
 })
 
 describe('backlog:next priority ranking keys', () => {

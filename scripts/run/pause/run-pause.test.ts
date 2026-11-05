@@ -3,6 +3,7 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_pause } from './run-pause'
+import { run_pause_comment } from './run-pause-comment'
 
 // joshuafolkken/kit#4160: the prerequisite pause as one command. Each write lands in an in-memory
 // stand-in for where it really lands — the stash stack, the Issue's comments, its blocked-by
@@ -92,6 +93,18 @@ const MESSAGE = 'run:pause: #10 waits on #11'
 const BLOCKED_BY = 'blocked-by'
 const RECORDED_IN_EPIC = 'recorded in epic'
 const BOTH_TRACKED = '- [ ] #10\n- [ ] #11'
+
+it('detects the exact paused issue without confusing a longer number', async () => {
+	state.comments = ['<!-- josh:run-pause #100 for #11 -->']
+	expect(await run_pause_comment.is_paused(REQUEST.issue)).toBe(false)
+	state.comments.push('<!-- josh:run-pause #10 for #11 -->')
+	expect(await run_pause_comment.is_paused(REQUEST.issue)).toBe(true)
+})
+
+it('refuses unreadable pause comments', async () => {
+	vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValueOnce(undefined)
+	await expect(run_pause_comment.is_paused(REQUEST.issue)).rejects.toThrow('could not be read')
+})
 
 beforeEach(() => {
 	Object.assign(state, {
