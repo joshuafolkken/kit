@@ -36,7 +36,6 @@ function input(): RelatedInput {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.mocked(test_related_record.with_test_count).mockResolvedValue({
 		exit_code: 0,
 		test_files: 1,

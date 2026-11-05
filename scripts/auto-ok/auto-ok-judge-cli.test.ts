@@ -41,7 +41,6 @@ vi.spyOn(console, 'info').mockImplementation(streams.info)
 vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	list_open.mockResolvedValue(listing_outcome(undefined))
 	list_comments.mockImplementation(async (issue) => auto_ok_judge_fixture.comments_of(issue))
 	apply_label.mockResolvedValue({ is_applied: true })

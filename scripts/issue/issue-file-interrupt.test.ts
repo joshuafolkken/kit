@@ -1,6 +1,6 @@
 import { epic_relations } from '#scripts/epic/epic-relations'
 import { INTERRUPT_ROUTE_LABEL, SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_interrupt } from './issue-file-interrupt'
 
 // joshuafolkken/kit#4768: an interrupt a lane files with `--blocks-finder` records its finder as
@@ -30,10 +30,6 @@ beforeEach(() => {
 	info.mockImplementation(() => undefined)
 	error.mockImplementation(() => undefined)
 	warn.mockImplementation(() => undefined)
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 describe('issue_file_interrupt.block_finder — a blocking interrupt with a finder', () => {

@@ -1,5 +1,5 @@
 import type { Interface } from 'node:readline/promises'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OperationCancelledError } from './git-error'
 import { ask_yes_no, ask_yes_no_simple, git_prompt } from './git-prompt'
 import { git_prompt_display } from './git-prompt-display'
@@ -26,10 +26,6 @@ function make_prompt(answers: Array<string>): Interface {
 
 	return { question: question_mock } as unknown as Interface
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('ask_yes_no (with separators)', () => {
 	it('returns true for y answer and shows separators', async () => {

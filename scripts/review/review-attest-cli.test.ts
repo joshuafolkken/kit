@@ -25,7 +25,6 @@ const FAILURE_EXIT = 1
 const WATCH_REFUSAL = 'Issue #3773 was updated after the review was briefed'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	check_mock.mockResolvedValue({ status: 'ok' })

@@ -48,7 +48,6 @@ function info_lines(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv(project_test_script.REENTRY_KEY, '')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-script-'))

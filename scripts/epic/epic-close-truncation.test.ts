@@ -24,7 +24,6 @@ const EMPTY_LISTING = '[]'
 const LISTING_SUBJECT = 'epic listing'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 

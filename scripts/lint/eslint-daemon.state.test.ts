@@ -65,7 +65,6 @@ function spawned_environment(): unknown {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('NODE_OPTIONS', '')
 	mkdirSync(project_root, { recursive: true })
 	vi.spyOn(process, 'cwd').mockReturnValue(project_root)

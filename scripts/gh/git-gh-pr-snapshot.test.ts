@@ -80,7 +80,6 @@ async function read_snapshot(
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	// The per-poll reads, answered by the same router (joshuafolkken/kit#4550).
 	mocked_conditional.mockImplementation(conditional_read_over(mocked_api))
 	forget_pr_numbers()

@@ -41,7 +41,6 @@ const CHANGED_FILE = 'scripts/gate/scoped-green.ts'
 const CHANGED_TREE = { [CHANGED_FILE]: 'digest' }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	mocked_base.mockResolvedValue(RESOLVED_COMMIT)

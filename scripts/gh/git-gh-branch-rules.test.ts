@@ -26,7 +26,6 @@ const REQUIRED_RULE = {
 const DELETION_RULE = { type: 'deletion' }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	forget_branch_rules()
 })
 

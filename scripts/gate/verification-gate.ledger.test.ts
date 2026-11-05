@@ -56,7 +56,6 @@ async function run_into(ledger_path: string | undefined, exit_code: number): Pro
 // so its checks never claim the real machine-wide budget — a mocked busy machine would otherwise
 // leave the unit claim waiting out `WAIT_CAP_MS`. No other lane's reservation reaches the sampler.
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv(core_budget.HELD_KEY, core_budget.HELD_VALUE)
 	vi.spyOn(core_budget, 'live_reservations').mockReturnValue([])
 	live_runs.mockReturnValue(0)

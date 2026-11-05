@@ -63,7 +63,6 @@ function in_a_lane(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')

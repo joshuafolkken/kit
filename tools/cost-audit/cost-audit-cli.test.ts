@@ -64,7 +64,6 @@ describe('cost_audit_cli.merged_query — the GitHub search for merged pull requ
 })
 
 function stub_sources(): void {
-	vi.clearAllMocks()
 	load.mockReturnValue(SESSIONS)
 	repo_name.mockResolvedValue('o/r')
 	exec_gh_api.mockResolvedValue(JSON.stringify({ total_count: 2 }))

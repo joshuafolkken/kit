@@ -114,7 +114,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 afterAll(() => {

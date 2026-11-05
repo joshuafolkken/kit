@@ -109,7 +109,6 @@ function merge_request(): GhApiRequest {
 
 describe('pr_merge', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		forget_pr_numbers()
 	})
 
@@ -140,7 +139,6 @@ describe('pr_merge', () => {
 
 describe('pr_merge — transient merge failures', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		forget_pr_numbers()
 	})
 
@@ -191,7 +189,6 @@ describe('is_head_moved', () => {
 // The recovery itself: a request that failed *after* its effect landed.
 describe('pr_merge — a merge request that failed after the merge landed', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		forget_pr_numbers()
 	})
 
@@ -238,7 +235,6 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 // joshuafolkken/kit#5229: the listing row stands in for a detail refused as too many files changed.
 describe('pr_merge — a read-back whose detail is too large', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		forget_pr_numbers()
 	})
 

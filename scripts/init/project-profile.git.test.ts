@@ -26,7 +26,6 @@ function fake_result(exit_code: number, stdout: string): ReturnType<typeof execa
 
 afterEach(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
-	vi.clearAllMocks()
 })
 
 describe('Git and GitHub detection', () => {

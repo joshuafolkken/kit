@@ -27,7 +27,6 @@ const args = { number: ISSUE } as unknown as ShipArguments
 const sections: ReadonlyArray<ShipSection> = []
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	detach_mock.is_supervised.mockReturnValue(true)
 	repository_mock.mockResolvedValue(REPOSITORY)
 	print_once_mock.mockReturnValue(0)

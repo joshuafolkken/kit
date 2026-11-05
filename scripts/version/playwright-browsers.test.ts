@@ -51,7 +51,6 @@ function uninstall_package(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	execa_sync_mock.mockReturnValue({ exitCode: 0 })
 	vi.spyOn(console, 'info').mockImplementation(() => {
 		/* suppress */

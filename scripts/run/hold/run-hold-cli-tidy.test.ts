@@ -40,7 +40,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	vi.clearAllMocks()
 	vi.restoreAllMocks()
 	rmSync(run_hold.hold_path(WORKTREE), { force: true })
 })

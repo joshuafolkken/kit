@@ -86,7 +86,6 @@ function warned_text(): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	mocked_get_body.mockResolvedValue('{"body":"existing content"}')
 	mocked_comment.mockResolvedValue('')

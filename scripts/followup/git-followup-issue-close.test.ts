@@ -25,7 +25,6 @@ async function ensure(issue_number: string | undefined): Promise<void> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	mocked_read.mockResolvedValue(CLOSED)
 	mocked_close.mockResolvedValue(true)

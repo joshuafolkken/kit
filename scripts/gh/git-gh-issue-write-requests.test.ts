@@ -13,7 +13,6 @@ vi.mock('./git-gh-exec', () => ({
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_api.mockResolvedValue('')
 })
 

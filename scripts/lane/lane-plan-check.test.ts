@@ -69,7 +69,6 @@ function holding(later_body: string): Awaited<ReturnType<typeof auto_ok_cli.fetc
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	budgets.mockResolvedValue([])
 	signals_of.mockResolvedValue(QUIET)
 	record_split_notice.mockResolvedValue(undefined)

@@ -39,7 +39,6 @@ function serve(body: string, association = TRUSTED, login = 'someone'): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	issue_edit_body.mockResolvedValue(BODY_URL)
 	issue_comment.mockResolvedValue(COMMENT_URL)
 })

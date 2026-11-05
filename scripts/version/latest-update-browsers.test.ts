@@ -75,7 +75,6 @@ function arrange_update(installed_after: string, update_status = 0): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.stubEnv('JOSH_PLAYWRIGHT_BROWSERS', '')
 	Object.assign(tree, { package_json: MANIFEST, installed: PREVIOUS_VERSION, install_status: 0 })
 	read_mock.mockImplementation(read_tree)

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import { observation_ledger_home } from './observation-ledger-home'
 
@@ -19,10 +19,6 @@ const mocked_read = vi.mocked(git_spawn.read)
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
-})
-
-beforeEach(() => {
-	vi.clearAllMocks()
 })
 
 describe('observation_ledger_home — where a writer appends', () => {

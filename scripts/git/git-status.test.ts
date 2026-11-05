@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { git_status } from './git-status'
 
 vi.mock('#scripts/lib/animation-helpers', () => ({
@@ -28,10 +28,6 @@ const UNTRACKED_FILE = 'new-file.ts'
 const UNTRACKED_LINES = `?? ${UNTRACKED_FILE}\n?? another.ts\n`
 const STAGED_CLEAN = 'M  package.json\n'
 const UNSTAGED_MODIFIED = ' M git-status.ts\n'
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('git_status.list_untracked_files', () => {
 	it('returns empty array for empty status output', () => {

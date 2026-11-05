@@ -123,6 +123,8 @@ const { STATE_GUARD, WORKER_GUARDS, READ_RECORDER } = unit_setup_files
 
 interface UnitProjectTest {
 	name: string
+	clearMocks: boolean
+	restoreMocks: boolean
 	env: Record<string, string>
 	include: ReadonlyArray<string>
 	exclude: ReadonlyArray<string>
@@ -148,6 +150,8 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 	return {
 		test: {
 			name: spec.name,
+			clearMocks: true,
+			restoreMocks: false,
 			env: ENV,
 			include: [...spec.include],
 			exclude: [...(spec.exclude ?? [])],

@@ -56,7 +56,6 @@ async function arrange_conflicted_merge(directory: string): Promise<void> {
 }
 
 beforeEach(async () => {
-	vi.clearAllMocks()
 	Object.assign(fixture, git_fixture_workspace.open_workspace('josh-lane-restart-'))
 	await arrange_conflicted_merge(fixture.workspace)
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(lane_at(fixture.workspace))

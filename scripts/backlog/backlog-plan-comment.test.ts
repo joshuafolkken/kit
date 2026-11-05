@@ -63,7 +63,6 @@ const PLANNED_CANDIDATE = {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	list_comments_mock.mockResolvedValue('[]')
 })
 

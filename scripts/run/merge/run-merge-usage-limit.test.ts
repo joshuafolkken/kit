@@ -66,7 +66,6 @@ function event(pos: number, text: string, kind = KIND): unknown {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	read_issue_mock.mockResolvedValue({
 		kind: 'state',
 		state: { state: 'OPEN', labels: ['in-progress'], is_human_review: false },

@@ -46,7 +46,6 @@ function comments_json(body: string, association = OWNER): string {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	is_trusted.mockImplementation(async (author) => author.association === OWNER)
 	list_comments.mockResolvedValue('[]')
 	record_split_filed.mockResolvedValue()

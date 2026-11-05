@@ -45,7 +45,6 @@ function unit_step_args(): string | undefined {
 // so a zero-weight check never queues behind one waiting for cores.
 describe('run_gate_steps — the start order', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
 	})
 
@@ -65,7 +64,6 @@ describe('run_gate_steps — the start order', () => {
 // joshuafolkken/kit#3903: a check whose inputs did not move since its record is reused, not run.
 describe('run_gate_steps — a reused check', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
 	})
 

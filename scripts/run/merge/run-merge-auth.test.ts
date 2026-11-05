@@ -68,7 +68,6 @@ const OUTAGE_LINE = JSON.stringify({
 })
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	read_issue_mock.mockResolvedValue({
 		kind: 'state',
 		state: { state: 'OPEN', labels: ['in-progress'], is_human_review: false },

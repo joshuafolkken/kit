@@ -1,5 +1,5 @@
 import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { backlog_triage_decision } from './backlog-triage-decision'
 
 const YES = 'yes'
@@ -11,8 +11,6 @@ const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 function argv(defect: string, verification: string, every_run: string): ReadonlyArray<string> {
 	return ['--defect', defect, '--verification', verification, '--every-run', every_run]
 }
-
-beforeEach(() => vi.clearAllMocks())
 
 describe('the three solo conditions', () => {
 	it.each([

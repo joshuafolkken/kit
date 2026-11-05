@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const COMMIT_MESSAGE = 'feat: add feature'
 const COMMIT_ERROR = 'commit failed'
@@ -24,10 +24,6 @@ vi.mock('./git-command', () => ({
 const { git_commit } = await import('./git-commit')
 const { git_command } = await import('./git-command')
 const mocked_commit = vi.mocked(git_command.commit)
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('git_commit.commit', () => {
 	it('calls git_command.commit with the provided message', async () => {

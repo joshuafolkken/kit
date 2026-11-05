@@ -79,7 +79,6 @@ function asked_graphql(): boolean {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_conditional.mockImplementation(conditional_read_over(mocked_api))
 	forget_pr_numbers()
 	forget_branch_rules()

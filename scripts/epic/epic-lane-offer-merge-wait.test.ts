@@ -66,7 +66,6 @@ function numbers_of(children: ReadonlyArray<EpicChild>): Array<number> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
 	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
 	merge_waiting_mock.mockResolvedValue(ONE_LANE)

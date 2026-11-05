@@ -14,7 +14,6 @@ const HEAD_LINE = `0123456789abcdef0123456789abcdef01234567\trefs/heads/${BRANCH
 const OFFLINE_MESSAGE = 'ssh: connect to host github.com port 22: Network is unreachable'
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	ls_remote_branch.mockResolvedValue('')
 })
 

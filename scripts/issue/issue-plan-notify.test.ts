@@ -36,7 +36,6 @@ function notice(overrides: { repo?: string; title?: string } = {}): {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(vi.fn())
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 	vi.mocked(git_gh_repo.repo_get_name_with_owner).mockResolvedValue('joshuafolkken/kit')

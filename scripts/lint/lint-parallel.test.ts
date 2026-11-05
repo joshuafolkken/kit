@@ -55,7 +55,6 @@ function mock_exit_codes(prettier_code: number, eslint_code: number): void {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 const WHOLE_TREE = '.'

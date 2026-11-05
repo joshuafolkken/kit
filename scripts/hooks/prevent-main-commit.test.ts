@@ -22,7 +22,6 @@ console_spy.mockRestore()
 exit_spy.mockRestore()
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	mocked_get_default_branch.mockResolvedValue('main')
 })
 

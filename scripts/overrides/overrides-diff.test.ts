@@ -37,7 +37,6 @@ vi.mock('./overrides-files', () => ({
 const { overrides_diff } = await import('./overrides-diff')
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	git_mock.state.commits = new Map([
 		['main^{commit}', BASE_COMMIT],
 		['HEAD^{commit}', BASE_COMMIT],

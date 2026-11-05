@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const ISSUE_INPUT = vi.hoisted(() => 'feat: add login #42')
 const FAKE_BRANCH_NAME = vi.hoisted(() => '42-fake-title')
@@ -150,10 +150,6 @@ describe('preflight before any git change', () => {
 })
 
 const PR_BODY = 'my pr body'
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('parse_positionals', () => {
 	it('returns undefined and is_auto_mode=false when positionals is empty', () => {

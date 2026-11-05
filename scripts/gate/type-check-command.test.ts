@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { project_checks } from './project-checks'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
@@ -29,10 +29,6 @@ function fake_result(exit_code: number): ExecaResult {
 
 	return result as ExecaResult
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 afterEach(() => {
 	vi.restoreAllMocks()

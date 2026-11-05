@@ -33,7 +33,6 @@ function write_manifest(content: string): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'kit-workspace-'))
 })
 

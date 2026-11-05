@@ -1,6 +1,6 @@
 import { epic_child_schema, type EpicChildData } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
 import { git_gh_issue_read as git_gh_issue, NOT_FOUND_STATUS } from './git-gh-issue-read'
@@ -61,10 +61,6 @@ function api_paths(): Array<string> {
 function gh_error(status: number | undefined): Error {
 	return gh_failure.attach(new Error('gh: some wording or other'), { status })
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 // joshuafolkken/kit#1024: `gh issue view` goes through GraphQL, which a cloud session is answered
 // 403 for. The failure arrived as `catch { return undefined }`, so an epic whose children could not

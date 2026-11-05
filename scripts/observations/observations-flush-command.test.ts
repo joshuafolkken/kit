@@ -153,7 +153,6 @@ async function rejected_flush(): Promise<string> {
 // The push -> PR -> merge path that had never run under a test before joshuafolkken/kit#1795.
 describe('observations_flush — the success path command sequence', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -199,7 +198,6 @@ describe('observations_flush — the success path command sequence', () => {
 // joshuafolkken/kit#5326: a lane child leaves the closed issues' comment rounds to this flush.
 describe('observations_flush — the comment-round carry', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -229,7 +227,6 @@ describe('observations_flush — the comment-round carry', () => {
 
 describe('observations_flush — a merged flush', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -274,7 +271,6 @@ describe('observations_flush — a merged flush', () => {
 
 describe('observations_flush — a commit the pre-commit hook rejects', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 	})
 
@@ -321,7 +317,6 @@ describe('observations_flush — a commit the pre-commit hook rejects', () => {
 
 describe('observations_flush — a rollback that cannot finish', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 		vi.mocked(git_command.checkout).mockRejectedValue(new Error(CHECKOUT_FAILURE))
 	})
@@ -342,7 +337,6 @@ describe('observations_flush — a default branch behind origin', () => {
 	const LEDGER_CONFLICT = 'Your local changes to the following files would be overwritten by merge'
 
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 		vi.mocked(git_command.commit_count_beyond).mockResolvedValue(COMMITS_BEHIND)
 	})
@@ -388,7 +382,6 @@ describe('observations_flush — a default branch behind origin', () => {
 
 describe('observations_flush — a flush branch that is still in the checkout', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
 		on_default_branch()
 		vi.mocked(git_command.branch).mockResolvedValue(FLUSH_BRANCH)
 	})

@@ -23,7 +23,6 @@ const list_comments = vi.mocked(git_gh_command.issue_list_comments)
 const { row } = auto_ok_judge_fixture
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	list_open.mockResolvedValue(listing_outcome(undefined))
 	list_comments.mockImplementation(async (issue) => auto_ok_judge_fixture.comments_of(issue))
 })

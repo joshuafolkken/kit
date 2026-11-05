@@ -8,7 +8,7 @@ import {
 	ESLINT_COMMIT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
@@ -35,10 +35,6 @@ function built(tool: string): ReadonlyArray<string> {
 function joined(tool: string): string {
 	return built(tool).join(' ')
 }
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 // joshuafolkken/kit#3948: the pre-commit hook's cache locations come from the same constants the
 // ignore rules are asserted against, joined so a flag stays paired with its value. The gate's location

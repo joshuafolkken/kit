@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { lane_resolve } from './lane-resolve'
 import { lane_resolve_cli } from './lane-resolve-cli'
 import { lane_resolve_record } from './lane-resolve-record'
@@ -16,10 +16,6 @@ const resolve = vi.spyOn(lane_resolve, 'resolve')
 const record = vi.spyOn(lane_resolve_record, 'record')
 const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-
-beforeEach(() => {
-	vi.clearAllMocks()
-})
 
 describe('lane_resolve_cli.run', () => {
 	it.each([[[]], [['abc']], [['1', '2']], [['abc', '--record']]])(

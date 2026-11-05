@@ -28,7 +28,6 @@ const is_process_failed = vi.mocked(buffered_process.is_process_failed)
 
 beforeEach(() => {
 	vi.restoreAllMocks()
-	vi.clearAllMocks()
 })
 
 test('skips basic cspell without configuration and names the reason', async () => {

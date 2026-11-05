@@ -72,7 +72,6 @@ function clean_up(): void {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	record_push_miss.mockResolvedValue()
 	clean_up()
 	repository.tree = CHANGED_TREE

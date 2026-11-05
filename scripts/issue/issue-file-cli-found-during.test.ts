@@ -8,7 +8,7 @@ import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_deferral } from './issue-file-deferral'
@@ -63,10 +63,6 @@ beforeEach(() => {
 	fold_clear.mockResolvedValue(true)
 	issue_list.mockResolvedValue({ json: undefined, is_capped: false })
 	scout.mockResolvedValue(undefined)
-})
-
-afterEach(() => {
-	vi.clearAllMocks()
 })
 
 afterAll(() => {
