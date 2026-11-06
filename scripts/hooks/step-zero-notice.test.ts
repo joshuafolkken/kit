@@ -7,6 +7,8 @@ import { step_zero_notice } from './step-zero-notice'
 const ROOT = '/repo'
 const RUNTIME_FILE = '/repo/scripts/hooks/example.ts'
 const DOC_FILE = '/repo/docs/guide.md'
+const PROMPT_FILE = '/repo/prompts/review.txt'
+const EXTERNAL_FILE = '/elsewhere/memory/note.ts'
 // Below `prompt-hook-brevity.test.ts`'s per-turn ceiling: the notice is still injected text.
 const NOTICE_CEILING_BYTES = 256
 
@@ -65,7 +67,7 @@ describe('step_zero_notice — when it speaks', () => {
 		).toBeUndefined()
 	})
 
-	it.each([DOC_FILE, '/repo/prompts/review.txt', '/elsewhere/memory/note.ts'])(
+	it.each([DOC_FILE, PROMPT_FILE, EXTERNAL_FILE])(
 		'stays silent, without spending its stamp, on a non-runtime path %s',
 		(file_path) => {
 			const transcript = fresh_transcript()
@@ -96,6 +98,53 @@ describe('step_zero_notice — a translated Codex patch', () => {
 
 		expect(step_zero_notice.notice(raw_payload, ROOT)).toBe(step_zero_notice.NOTICE)
 	})
+})
+
+describe('step_zero_notice — default root', () => {
+	it('uses the current directory when no root is provided', () => {
+		const file_path = path.join(process.cwd(), 'scripts/hooks/example.ts')
+		const raw = JSON.stringify({ tool_name: 'Edit', tool_input: { file_path } })
+
+		expect(step_zero_notice.is_runtime_edit(raw)).toBe(true)
+	})
+})
+
+describe('step_zero_notice — edits without history', () => {
+	it.each(['null', '""', undefined])(
+		'classifies edits with unavailable history %j',
+		(transcript) => {
+			for (const tool_name of ['Edit', 'Write']) {
+				const history = transcript === undefined ? '' : `,"transcript_path":${transcript}`
+				const raw = `{"tool_name":"${tool_name}","tool_input":{"file_path":"${RUNTIME_FILE}"}${history}}`
+
+				expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(true)
+				expect(step_zero_notice.notice(raw, ROOT)).toBeUndefined()
+			}
+		},
+	)
+
+	it.each([DOC_FILE, PROMPT_FILE, EXTERNAL_FILE])(
+		'excludes a non-runtime edit of %s without history',
+		(file_path) => {
+			const raw = JSON.stringify({ tool_name: 'Edit', tool_input: { file_path } })
+
+			expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(false)
+		},
+	)
+
+	it('classifies every translated patch path without history', () => {
+		const tool_input = { file_path: DOC_FILE, file_paths: [DOC_FILE, RUNTIME_FILE] }
+		const raw = JSON.stringify({ tool_name: 'Edit', tool_input })
+
+		expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(true)
+	})
+
+	it.each(['{}', 'invalid', '{"tool_name":"Read","tool_input":{"file_path":"app.ts"}}'])(
+		'excludes an invalid or non-edit call %s',
+		(raw) => {
+			expect(step_zero_notice.is_runtime_edit(raw, ROOT)).toBe(false)
+		},
+	)
 })
 
 describe('step_zero_notice — what it says', () => {
