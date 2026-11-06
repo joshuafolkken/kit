@@ -112,10 +112,10 @@ describe('lane_plan_size.oversize', () => {
 
 describe('lane_plan_size measured guide', () => {
 	it.each([
-		[12, 50, false],
-		[12, 51, true],
-		[7, 85, false],
-		[7, 86, true],
+		[12, 100, false],
+		[12, 101, true],
+		[4, 150, false],
+		[4, 151, true],
 		[undefined, 100, false],
 		[undefined, 101, true],
 	])(
@@ -134,9 +134,9 @@ describe('lane_plan_size measured guide', () => {
 
 	it('keeps the measured declaration correction and split and replan exemptions', () => {
 		const signals = { implement_rate: { median: 12, lanes: 1 }, lines_ratio: 1.5 }
-		const issues = declared(1, 70)
+		const issues = declared(1, 140)
 
-		expect(signalled(issues, signals)).toMatchObject({ reason: 'lines', measured: 105, limit: 100 })
+		expect(signalled(issues, signals)).toMatchObject({ reason: 'lines', measured: 210, limit: 200 })
 		expect(signalled(issues, { ...signals, split_filed: true })).toBeUndefined()
 		expect(replanned(issues, signals)).toBeUndefined()
 		expect(replanned(issues, signals, false)).toMatchObject({ reason: 'lines' })

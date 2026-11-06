@@ -8,6 +8,7 @@ import { size_estimate } from './size-estimate'
 
 const SPLIT_ROUTE = 'route:split'
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
+const EXCEEDS_GUIDE = 'exceeds the guide'
 // The over-guide estimate below projects past the stage budget at the slow rate, within it at the fast.
 const SLOW: ImplementRate = { median: 10, lanes: 4 }
 const FAST: ImplementRate = { median: 4, lanes: 3 }
@@ -20,15 +21,23 @@ function estimate(files: number, lines: number): string {
 	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト除く）`
 }
 
-const OVER_GUIDE = body_with(estimate(2, 70))
-const OVER_GUIDE_EXCUSED = body_with(estimate(2, 70), REASON)
+const OVER_GUIDE = body_with(estimate(2, 110))
+const OVER_GUIDE_EXCUSED = body_with(estimate(2, 110), REASON)
 const UNDER_GUIDE = body_with(estimate(1, 50))
 
 describe('size_estimate.guide_problem — the projected implement time', () => {
+	it('refuses an over-budget estimate within the floor without claiming a guide overrun', () => {
+		const problem = size_estimate.guide_problem(body_with(estimate(1, 70)), undefined, SLOW)
+
+		expect(problem).toContain('14 implement minute(s)')
+		expect(problem).toContain('over the 12-minute implement budget')
+		expect(problem).not.toContain(EXCEEDS_GUIDE)
+	})
+
 	it('refuses a reasoned estimate over the guide projecting past the budget', () => {
 		const problem = size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, SLOW) ?? ''
 
-		for (const part of ['14 implement minute(s)', '12-minute', '10.0 implement min', '4 lane(s)']) {
+		for (const part of ['22 implement minute(s)', '12-minute', '10.0 implement min', '4 lane(s)']) {
 			expect(problem).toContain(part)
 		}
 	})
@@ -40,7 +49,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	it('keeps the guide refusal for an unreasoned estimate within the budget', () => {
 		const problem = size_estimate.guide_problem(body_with(estimate(7, 120)), undefined, FAST)
 
-		expect(problem).toContain('exceeds the guide')
+		expect(problem).toContain(EXCEEDS_GUIDE)
 		expect(problem).not.toContain('implement budget')
 	})
 
@@ -68,7 +77,7 @@ describe('size_estimate.over_budget', () => {
 	it('answers the estimate of a reasoned body projecting past the budget', () => {
 		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, SLOW)).toEqual({
 			files: 2,
-			lines: 70,
+			lines: 110,
 			verdict: 'split',
 		})
 	})

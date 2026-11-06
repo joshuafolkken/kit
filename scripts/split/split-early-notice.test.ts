@@ -90,12 +90,12 @@ afterAll(async () => {
 })
 
 describe('split_early_notice.surface over the guide', () => {
-	it('uses the measured guide below the legacy bar (ac-9e07d12c)', async () => {
+	it('floors the measured guide at the legacy bar (ac-9e07d12c)', async () => {
 		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(numstat_of(3))
 		await split_early_notice.surface()
 
-		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('guide 2 files / 50 lines'))
+		expect(console.warn).not.toHaveBeenCalled()
 	})
 
 	it('shows the same notice main:merge prints', async () => {

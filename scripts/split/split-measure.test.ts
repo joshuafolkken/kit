@@ -33,7 +33,6 @@ const NEW_FILE_LINES = 50
 const TREE_BASE = 'tree-base-commit'
 const LEGACY_GUIDE = split_assess.guide_for(12)
 const SMALL_DIFF = '51\t0\tscripts/a.ts'
-const SMALL_GUIDE_TEXT = 'guide 2 files / 50 lines'
 
 const fixture = { root: '' }
 
@@ -71,15 +70,15 @@ describe('read_branch excludes quoted tests', () => {
 })
 
 describe('read_branch measured guide', () => {
-	it('carries the measured budget guide into verdict, reason and notices (ac-9e07d12c)', async () => {
+	it('floors the measured budget guide for verdict, reason and notices (ac-9e07d12c)', async () => {
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(SMALL_DIFF)
 		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
 		const measured = await split_measure.read_branch()
 
-		expect(measured.verdict).toBe('split')
-		expect(measured.guide).toEqual({ files: 2, lines: 50, cap: { files: 3, lines: 75 } })
-		expect(split_assess.reason(measured)).toContain(SMALL_GUIDE_TEXT)
-		expect(split_assess.notice(measured)).toContain(SMALL_GUIDE_TEXT)
+		expect(measured.verdict).toBe('single')
+		expect(measured.guide).toEqual(LEGACY_GUIDE)
+		expect(split_assess.reason(measured)).toContain('guide 8 files / 200 lines')
+		expect(split_assess.notice(measured)).toBeUndefined()
 	})
 
 	it('keeps the same diff single when no implement rate is measured (ac-9e07d12c)', async () => {

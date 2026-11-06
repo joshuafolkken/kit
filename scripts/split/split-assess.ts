@@ -63,7 +63,7 @@ const DEFAULT_GUIDE: SplitGuide = {
 function guide_for(minutes: number, measured?: ImplementRate): SplitGuide {
 	const lines = lane_implement_rate.lines_for(minutes, measured)
 
-	if (lines === undefined) return DEFAULT_GUIDE
+	if (lines === undefined || lines <= LINE_GUIDE) return DEFAULT_GUIDE
 	const files = (lines * FILE_GUIDE) / LINE_GUIDE
 
 	return { files, lines, cap: { files: files * CAP_FACTOR, lines: lines * CAP_FACTOR } }
