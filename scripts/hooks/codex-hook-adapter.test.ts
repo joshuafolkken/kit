@@ -102,10 +102,14 @@ describe('Codex unverified input scope', () => {
 
 describe('Codex reviewer without transcript history', () => {
 	it.each([NO_TRANSCRIPT, '', undefined])(
-		'allows reads with transcript path %s',
+		'allows reads with transcript path %s (ac-5495bec9)',
 		(transcript_path) => {
 			vi.stubEnv(agent_session_role.KEY, 'reviewer')
 			const raw_payload = JSON.stringify({
+				session_id: 'session-1',
+				cwd: process.cwd(),
+				hook_event_name: 'PreToolUse',
+				tool_use_id: 'call-1',
 				tool_name: 'Bash',
 				tool_input: { command: 'cat CLAUDE.md' },
 				transcript_path,
@@ -121,7 +125,7 @@ describe('Codex reviewer without transcript history', () => {
 		['exec_command', { cmd: SOURCE_WRITE }],
 		['apply_patch', patch_command(MIXED_PATHS)],
 		['apply_patch', 'unrecognized patch'],
-	])('refuses writes through %s without history', (tool_name, tool_input) => {
+	])('refuses writes through %s without history (ac-297ecc9c)', (tool_name, tool_input) => {
 		vi.stubEnv(agent_session_role.KEY, 'reviewer')
 		const raw_payload = JSON.stringify({ tool_name, tool_input, transcript_path: NO_TRANSCRIPT })
 
