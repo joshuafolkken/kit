@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
@@ -8,6 +6,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
 import { lane_child_invocation } from './lane-child-invocation'
 import type { LaneInfo } from './lane-registry'
@@ -15,9 +14,11 @@ import { lane_session_broker } from './lane-session-broker'
 import { openai_lane_ship } from './openai-lane-ship'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
+const make_directory = temporary_directory('suite')
+
 const ISSUE = '2084'
 const BRANCH = '2084-lane'
-const scratch = mkdtempSync(path.join(os.tmpdir(), 'openai-supervisor-test-'))
+const scratch = make_directory('openai-supervisor-test-')
 const repository = path.join(scratch, 'repository.git')
 const lane_directory = path.join(scratch, 'lane')
 const target = run_cut.cut_path(repository)
@@ -93,7 +94,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 test('starts the review broker around the supervised lane', async () => {

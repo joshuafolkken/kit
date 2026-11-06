@@ -1,19 +1,20 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan } from './lane-plan'
 import { lane_plan_probe } from './lane-plan-probe'
 import { lane_plan_signals } from './lane-plan-signals'
 
+const make_directory = temporary_directory('suite')
+
 // joshuafolkken/kit#6142: `run:review`'s open widens a plan through `extend`, which neither waits nor
 // yields — a clear check records the widened plan, a clash or an unread listing writes nothing.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-probe-'))
+const ROOT = make_directory('lane-plan-probe-')
 const directory = path.join(ROOT, 'lane')
 const HOLDER = 6036
 const LANE = 6035
@@ -52,17 +53,13 @@ function listing(lane_body = ''): Awaited<ReturnType<typeof auto_ok_cli.fetch_op
 beforeEach(() => {
 	fetch_opted_in.mockResolvedValue(listing())
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(ROOT, 'repository-')),
+		make_directory(path.join(ROOT, 'repository-')),
 	)
 	lane_plan.record(
 		{ issue: HOLDER, paths: [HELD], planned_at: '2026-11-01T00:00:00.000Z' },
 		directory,
 	)
 	lane_plan.record(LANE_PLAN, directory)
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('lane_plan_probe.extend', () => {

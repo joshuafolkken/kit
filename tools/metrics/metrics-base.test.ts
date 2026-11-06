@@ -1,7 +1,6 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Reading } from './metrics-base'
 import type { CachedReading } from './metrics-base-cache'
 import type { Metrics } from './metrics-logic'
@@ -28,7 +27,8 @@ const { metrics_base_cache } = await import('./metrics-base-cache')
 const { metrics_base } = await import('./metrics-base')
 const { metrics_ratchet } = await import('./metrics-ratchet')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'metrics-base-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('metrics-base-test-')
 const MERGE_BASE = 'aaaaaaa'
 const NAMED_COMMIT = 'bbbbbbb'
 const NAMED = 'HEAD^1'
@@ -47,7 +47,7 @@ const METRICS: Metrics = {
 }
 
 function root(): string {
-	return mkdtempSync(path.join(scratch, 'root-'))
+	return make_directory(path.join(scratch, 'root-'))
 }
 
 beforeEach(() => {
@@ -57,10 +57,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.resetAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('metrics_base.resolve_commit', () => {

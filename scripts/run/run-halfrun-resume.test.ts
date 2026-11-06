@@ -1,16 +1,17 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_state } from '#scripts/lane/lane-state'
 import { run_hold } from '#scripts/run/hold/run-hold'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { run_halfrun_resume } from './run-halfrun-resume'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2796: `fullrun #N` after a `halfrun` stop adopts the hold that stop marked, and adopts
 // nothing else — a `halfrun` still running, a `backlogrun` child, another issue's hold, a clean tree and
 // a free tree all fall through to the ordinary claim unchanged.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-halfrun-resume-test-'))
+const scratch = make_directory('run-halfrun-resume-test-')
 const TARGET = run_hold.hold_path(path.join(scratch, '.git'))
 const ISSUE = '2796'
 const OTHER_ISSUE = '2795'
@@ -24,7 +25,6 @@ afterEach(() => {
 })
 
 afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 	run_hold.release_hold(TARGET)
 })
 

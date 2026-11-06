@@ -1,22 +1,20 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3355: recording into the lane-limit measurement ledger never raises into the gate
 // or merge being measured, and each kind reads back through `lane-ledger.ts`.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-ledger-write-test-'))
+const scratch = make_directory('lane-ledger-write-test-')
 const AT = '2026-10-06T00:00:00.000Z'
 const GATE_MS = 90_000
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function ledger(name: string): string {
 	return path.join(scratch, `${name}.jsonl`)

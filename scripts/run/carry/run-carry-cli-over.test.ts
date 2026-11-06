@@ -1,10 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2760: a `backlogrun` parent that had taken its cut at 233k retyped the keyword in
 // the same conversation and was answered `resumed` by its own hand-off, at 232k and again at 258k. A
@@ -18,7 +19,7 @@ vi.mock('#scripts/git/git-command', () => ({
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-cli-over-'))
+const scratch = make_directory('run-carry-cli-over-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
@@ -47,7 +48,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a session over the context-cut threshold claims nothing', () => {

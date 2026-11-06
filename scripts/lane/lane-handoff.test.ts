@@ -1,13 +1,14 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_handoff } from './lane-handoff'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#2962: the one reading both stop hooks share — a lane child is handed off only while
 // its own detached ship is live.
@@ -96,7 +97,7 @@ describe('lane_handoff.ship_reader', () => {
 // joshuafolkken/kit#4466: a running ship inside `josh followup` waits on its merge alone; a stop, a
 // merge-and-gate again, or a successor supervisor takes the mark down so the lane counts again.
 function ship_at(result: ShipResult, is_merge_waiting: boolean): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'merge-wait-'))
+	const directory = make_directory('merge-wait-')
 	const target = path.join(directory, 'record.json')
 
 	run_ship_stage.mark_started(target, 'followup')

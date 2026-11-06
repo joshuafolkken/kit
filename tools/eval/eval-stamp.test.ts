@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { eval_stamp } from './eval-stamp'
 import {
 	STAMP_DOCUMENT,
@@ -20,11 +20,8 @@ const SKILL_ENTRY = '.claude/skills'
 const REVIEWED_FILE = 'prompts/review.md'
 const ORIGINAL_CONTENT = 'someone else owns this'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'josh-eval-stamp-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('josh-eval-stamp-test-')
 
 describe('eval_stamp.files_under', () => {
 	it('expands a file entry to itself', () => {

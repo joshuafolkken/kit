@@ -1,17 +1,18 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_wake_handoff } from '#scripts/run/wake/run-wake-handoff'
-import { afterAll, afterEach, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, expect, it, vi } from 'vitest'
 import { run_carry, type RunCarry } from './run-carry'
 import { run_carry_added } from './run-carry-added'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3697: a rewrite of the carry record never removes it first. `backlog:drive` and
 // the supervisor read the record from other processes, and a reader that lands between an unlink and
 // the create that follows it is told there is no run.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-atomic-test-'))
+const scratch = make_directory('run-carry-atomic-test-')
 const TARGET = run_carry.carry_path(path.join(scratch, 'repository.git'))
 
 type Rewrite = (carry: RunCarry) => void
@@ -39,10 +40,6 @@ function fresh_run(): RunCarry {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 it.each(REWRITES)('rewrites the record for %s without removing it first', (_name, rewrite) => {

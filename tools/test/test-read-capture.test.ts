@@ -1,26 +1,23 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
-import os from 'node:os'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { threadId } from 'node:worker_threads'
 import { test_read_trace } from '#scripts/test/test-read-trace'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { test_read_capture, type RecorderState } from '#tools/test/test-read-capture'
 import { test_read_capture_fixture } from '#tools/test/test-read-capture-fixture'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#4065: what the read recorder writes is what the test-read map is built from, so
 // a read must land under the test that made it, and every flush must land in a file of its own.
 
 const THIS_TEST = path.join('tools', 'test', 'test-read-capture.test.ts')
+const make_directory = temporary_directory()
 const READ_FILE = 'package.json'
 const OTHER_READ_FILE = 'tsconfig.json'
 
 // A state writing into a directory of its own, removed when the test finishes.
 function fresh_state(): RecorderState {
-	const directory = mkdtempSync(path.join(os.tmpdir(), 'test-read-capture-'))
-
-	onTestFinished(() => {
-		rmSync(directory, { recursive: true, force: true })
-	})
+	const directory = make_directory('test-read-capture-')
 
 	return { root: process.cwd(), directory, records: new Map(), flushes: 0 }
 }

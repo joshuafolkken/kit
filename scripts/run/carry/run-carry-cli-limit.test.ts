@@ -1,11 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#6147: a run the launcher's preflight did not begin still writes the lane limit it
 // starts under, so `lane:stats` sees a `.env` change between runs.
@@ -22,7 +24,7 @@ const { lane_limit_history } = await import('#scripts/lane/lane-limit-history')
 const git_directories = vi.mocked(git_command.git_directories)
 const record_launch = vi.mocked(lane_limit_history.record_launch)
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-cli-limit-'))
+const scratch = make_directory('run-carry-cli-limit-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
@@ -49,10 +51,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(carry_target(), { force: true })
 	rmSync(event_target(), { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('run:carry --begin records the lane limit', () => {

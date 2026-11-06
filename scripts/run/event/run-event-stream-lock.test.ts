@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_event_stream } from './run-event-stream'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3446: the parent, a cut successor and every lane child append to one stream, and an
 // unlocked read-then-rewrite lost one writer's events to another's or threw `EEXIST`. These pin the
@@ -29,7 +31,7 @@ const WRITER_SOURCE = [
 	"\trun_event_stream.append(target, 'note', `w${id} ${index}`, new Date().toISOString())",
 	'}',
 ].join('\n')
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-stream-lock-'))
+const TEMPORARY = make_directory('josh-run-event-stream-lock-')
 
 function fresh_target(): string {
 	return path.join(TEMPORARY, `${randomUUID()}.jsonl`)
@@ -47,10 +49,6 @@ async function run_writer(target: string, id: number): Promise<number | null> {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 describe('run_event_stream.append — concurrent writers', () => {

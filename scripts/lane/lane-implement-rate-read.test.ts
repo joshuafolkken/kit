@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_implement_rate_read } from './lane-implement-rate-read'
 import { lane_ledger } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_net_read } from './lane-net-read'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-implement-rate-read-test-'))
+const make_directory = temporary_directory('suite')
+
+const scratch = make_directory('lane-implement-rate-read-test-')
 const ISSUE = 6464
 const DISPATCHED_AT = '2026-10-24T03:00:00.000Z'
 const MERGED_AT = '2026-10-24T03:30:00.000Z'
@@ -18,10 +20,6 @@ const PERIOD_DAYS = 3
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 function context_of(): { ledger_path: string; events_path: string } {

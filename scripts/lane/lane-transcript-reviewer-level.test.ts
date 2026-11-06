@@ -1,11 +1,13 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { review_attest } from '#scripts/review/review-attest'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { lane_transcript_calls } from './lane-transcript-calls'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#5555: the prompt a reviewer is launched with opens with the brief's level, so the
 // transcript reader — and `lane:breakdown`'s `round 1 · <level>` row — carries it.
@@ -14,7 +16,7 @@ const CODE_SLOT = review_attest.REVIEW_SLOT.CODE
 const ISSUE = '5555'
 
 function brief_file(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'lane-reviewer-level-'))
+	const directory = make_directory('lane-reviewer-level-')
 	const file = path.join(directory, 'josh-ship-review-brief-code.md')
 
 	writeFileSync(file, 'medium\n## Rubric\n')

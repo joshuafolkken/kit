@@ -1,15 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Declared } from '#scripts/backlog/backlog-overlap'
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan, type LanePlan } from './lane-plan'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4864: a lane's recorded plan is read as its declaration in place of its body, and a lane
 // waits only on a holder that planned before it.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-'))
+const ROOT = make_directory('lane-plan-')
 const DIRECTORY = path.join(ROOT, 'lane')
 const EARLIER = 4858
 const LATER = 4859
@@ -26,12 +27,8 @@ const LATER_PLAN = plan(LATER, '2026-10-25T03:20:00.000Z')
 
 beforeEach(() => {
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(ROOT, 'repository-')),
+		make_directory(path.join(ROOT, 'repository-')),
 	)
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('lane_plan.with_plans', () => {

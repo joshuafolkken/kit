@@ -1,25 +1,22 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5144: `josh lane:value cell` prints any cell of a table `lane:stats` prints, by its
 // table title, row and column, as the one number a measurement declaration reads.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-measure-cli-cell-test-'))
+const scratch = make_directory('lane-measure-cli-cell-test-')
 const NOW = Date.parse('2026-10-06T12:00:00.000Z')
 const AT = new Date(NOW).toISOString()
 const SINCE = '2026-10-06T00:00Z'
 const FAILURE = 1
 const STAGE = 'review'
 const MEDIAN = 'median (min)'
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	vi.spyOn(console, 'error').mockReturnValue(undefined)

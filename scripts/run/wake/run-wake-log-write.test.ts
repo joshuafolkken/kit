@@ -1,7 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1759. The header write is the one operation on this path that can fail *after* the
 // log was opened — a full disk or a quota, where `openSync` succeeds because `ensure_log` already
@@ -26,13 +28,9 @@ vi.mock('node:fs', async () => {
 
 const { run_wake_session } = await import('./run-wake-session')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-wake-log-write-test-'))
+const scratch = make_directory('run-wake-log-write-test-')
 const LOG_TARGET = path.join(scratch, 'wake.log')
 const ARGV = { command: process.execPath, args: ['-e', '""'] }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function launched_with_failing_header(): { kind: string; notes: Array<string> } {
 	const notes: Array<string> = []

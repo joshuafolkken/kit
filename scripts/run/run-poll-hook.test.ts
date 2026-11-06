@@ -1,9 +1,11 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_poll_hook } from './run-poll-hook'
+
+const make_directory = temporary_directory('suite')
 
 const { josh_call_line, prompt_line, result_line, error_result_line } = time_transcript_fixture
 
@@ -11,7 +13,7 @@ const BRANCH = '3925-lane'
 const BOARD = 'pnpm josh run:board --chat'
 const AWAIT = 'pnpm josh lane:await 1'
 const CARRY_JSON = 'pnpm josh run:carry --json'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'run-poll-hook-'))
+const TEMPORARY = make_directory('run-poll-hook-')
 const sequence = { value: 0 }
 
 function write_transcript(lines: ReadonlyArray<string>): string {

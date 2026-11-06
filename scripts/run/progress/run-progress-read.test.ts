@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#1520. The readings behind the progress line: the silence record, and the three
 // answers a tick can produce — a child in flight, nothing in flight, and a listing nobody could read.
@@ -78,7 +80,7 @@ function issue_row(number: number, labels: ReadonlyArray<string>): OpenIssueData
 }
 
 beforeEach(() => {
-	temporary.directory = mkdtempSync(path.join(tmpdir(), 'josh-progress-'))
+	temporary.directory = make_directory('josh-progress-')
 	list_lanes.mockResolvedValue([])
 	read_child_state.mockResolvedValue({ branch_name: '1520-lane', pr_state: 'open' })
 	git_directories.mockResolvedValue([WORKTREE_GIT_DIR, REPOSITORY_GIT_DIR])
@@ -89,7 +91,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(temporary.directory, { force: true, recursive: true })
 	vi.resetAllMocks()
 })
 

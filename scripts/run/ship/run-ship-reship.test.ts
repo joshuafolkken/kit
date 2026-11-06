@@ -1,11 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { change_base } from '#scripts/git/change-base'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship } from './run-ship'
 import { run_ship_reship } from './run-ship-reship'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#6141: a re-ship after a review failure passes over the pre-detach region only
 // while the last stop of the issue was that failure, on the base the tree stands on now.
@@ -30,17 +32,15 @@ interface Stop {
 }
 
 const REVIEW_CHECK: Stop = { reason: 'review', cause: 'check', base: BASE }
-const directories: Array<string> = []
 
 function stage_mark(stage: string): Stop {
 	return { kind: 'stage', stage, elapsed_ms: 9 }
 }
 
 function ledger_of(stops: ReadonlyArray<Stop>): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-reship-'))
+	const directory = make_directory('josh-reship-')
 	const lines = stops.map((stop) => JSON.stringify({ kind: 'stop', at: AT, issue: ISSUE, ...stop }))
 
-	directories.push(directory)
 	const ledger = path.join(directory, 'ledger.jsonl')
 
 	writeFileSync(ledger, `${lines.join('\n')}\n`)
@@ -58,7 +58,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
 describe('run_ship_reship.is_due', () => {

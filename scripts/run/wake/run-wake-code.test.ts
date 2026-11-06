@@ -1,9 +1,11 @@
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { import_graph } from '#scripts/lint/import-graph'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_wake_code, type CodeSource } from './run-wake-code'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#4509: whether the supervisor still runs the code on disk.
 
@@ -19,8 +21,6 @@ const TSCONFIG = JSON.stringify({
 	include: ['*.ts'],
 })
 
-const roots: Array<string> = []
-
 // A source whose answers are scripted, one per read; the last answer repeats.
 function scripted(
 	heads: Array<string | undefined>,
@@ -33,10 +33,9 @@ function scripted(
 }
 
 function write_project(): string {
-	const created = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-code-test-'))
+	const created = make_directory('josh-run-wake-code-test-')
 	const root = realpathSync(created)
 
-	roots.push(root)
 	writeFileSync(path.join(root, 'tsconfig.json'), TSCONFIG)
 	writeFileSync(path.join(root, ENTRY), "import { a } from './a'\n\nexport const entry = a\n")
 	writeFileSync(path.join(root, IMPORTED), 'export const a = 1\n')
@@ -47,7 +46,6 @@ function write_project(): string {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 describe('run_wake_code.watch', () => {

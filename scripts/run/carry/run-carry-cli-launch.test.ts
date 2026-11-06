@@ -1,13 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3696: `--begin` starts the run's clock where `josh backlogrun` launched its owner,
 // so the board's `⏰` does not restart at the claim, and says the run is planning. A run with no launch
@@ -20,7 +22,7 @@ vi.mock('./run-carry-stash', () => ({ run_carry_stash: { report_orphans: vi.fn()
 
 const { git_command } = await import('#scripts/git/git-command')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-cli-launch-test-'))
+const scratch = make_directory('run-carry-cli-launch-test-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
@@ -65,10 +67,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks()
 	clear()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('run:carry --begin under a launch', () => {

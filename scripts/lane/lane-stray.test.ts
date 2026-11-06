@@ -1,8 +1,10 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StrayVerdict } from './lane-stray'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3370: what the lanes root holds that no registered work tree accounts for. The
 // registry, the in-flight count and the object listing are mocked; the directories are real, and the
@@ -21,7 +23,7 @@ const { lane_leftover } = await import('./lane-leftover')
 const { lane_paths } = await import('./lane-paths')
 const { lane_stray } = await import('./lane-stray')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-stray-test-'))
+const scratch = make_directory('lane-stray-test-')
 const root = path.join(scratch, '.kit-lanes')
 const REPOSITORY_FILE = 'scripts/a.ts'
 const REPOSITORY_CONTENT = 'export {}\n'
@@ -59,10 +61,6 @@ beforeEach(() => {
 	vi.mocked(lane_registry.registered_directories).mockResolvedValue([])
 	vi.mocked(lane_open.open_in_flight_count).mockReturnValue(0)
 	history_holding_the_repository_file()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('lane_stray.sweep_strays — what it removes', () => {

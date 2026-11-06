@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { GIT_BINARY_KEY } from '#scripts/git/constants'
@@ -6,11 +6,12 @@ import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { temporary_directory as directory_fixture } from '#tools/test/temporary-directory'
 import { test_network_guard } from '#tools/test/test-network-guard'
 import { test_repository_guard } from '#tools/test/test-repository-guard'
 import { GUARD_LOG_KEY } from '#tools/test/unit-guard-environment'
 import { execaSync } from 'execa'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#1353. Every defect this guard can have fails *open*: a shim that cannot run, a
 // record that cannot be read and a clean run are indistinguishable from the outside, and each one
@@ -38,22 +39,13 @@ const TEMPORARY_ROOT_NAME = 'records'
 // this machine happens to have installed.
 const ABSENT_BINARY = 'josh-no-such-binary-1515'
 
-const directories: Array<string> = []
+const make_directory = directory_fixture()
 
 // Tracked rather than removed inline: `disarm` removes the directory its log sits in, so a case that
 // asserts on `disarm` has nothing left to clean, and one that does not still must not leak.
 function temporary_directory(prefix: string = TEMP_PREFIX): string {
-	const directory = mkdtempSync(path.join(tmpdir(), prefix))
-
-	directories.push(directory)
-
-	return directory
+	return make_directory(prefix)
 }
-
-afterEach(() => {
-	for (const directory of directories) rmSync(directory, { recursive: true, force: true })
-	directories.length = 0
-})
 
 // `arm` writes to the worker's own environment, and a case that armed a scratch guard must hand the
 // rest of the worker back the real one — a leaked record path sends another test's findings nowhere.

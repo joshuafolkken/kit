@@ -1,11 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake, type RunWake, type WakeStopReason } from './run-wake'
 import { run_wake_cli } from './run-wake-cli'
@@ -15,6 +14,8 @@ import { run_wake_loop } from './run-wake-loop'
 import { run_wake_session } from './run-wake-session'
 import { run_wake_supervise } from './run-wake-supervise'
 import { run_wake_takeover } from './run-wake-takeover'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#4509: a supervisor whose code changed hands the run to a successor on the new code,
 // and says so on the run's stream; a successor that did not start is a failed stop, so it warns.
@@ -39,7 +40,7 @@ function context(): WakeContext {
 }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-cli-reload-'))
+	scratch.directory = make_directory('josh-wake-cli-reload-')
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 	vi.spyOn(run_wake_takeover, 'await_takeover').mockResolvedValue('taken')
 	vi.spyOn(console, 'error').mockReturnValue()
@@ -47,7 +48,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 describe('run_wake_cli.reload', () => {

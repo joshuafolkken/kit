@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { unit_run_marker } from '#scripts/test/unit-run-marker'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { vitest_config_workers } from './vitest-config-workers'
 
@@ -28,14 +28,15 @@ function workers(): number | undefined {
 	return vitest_config_workers.config_workers(MEASURED_CORES, probe.directory)
 }
 
+const make_directory = temporary_directory()
+
 beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), PROBE_PREFIX))
+	probe.directory = make_directory(PROBE_PREFIX)
 	process.env[unit_worker_share.NESTED_KEY] = ''
 })
 
 afterEach(() => {
 	process.env[unit_worker_share.NESTED_KEY] = outer_flag ?? ''
-	rmSync(probe.directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
@@ -7,14 +5,17 @@ import { lane_spent } from '#scripts/lane/lane-spent'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AddPorts } from './run-add'
 import { run_add_cli } from './run-add-cli'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3433: `run:add` refuses a malformed request and a repository with no run, and
 // writes a queued issue into a live named run's record.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-add-cli-test-'))
+const scratch = make_directory('run-add-cli-test-')
 const GIT_DIRECTORY = path.join(scratch, 'repository.git')
 const ADDED_ISSUE = 3433
 const USAGE_EXIT_CODE = 2
@@ -57,10 +58,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 describe('parse_request', () => {

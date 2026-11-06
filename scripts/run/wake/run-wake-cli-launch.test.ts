@@ -1,17 +1,19 @@
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_await, type AwaitPorts } from './run-wake-await'
 import { run_wake_cli } from './run-wake-cli'
 import type { WakeContext } from './run-wake-describe'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3804: Claude Code removes its token from what its Bash tool starts, so the
 // supervisor is started by `josh backlogrun` itself, before the parent has carried a run. Pinned here:
@@ -34,7 +36,7 @@ vi.mock('#scripts/gh/gh-spawn', () => ({
 const { git_command } = await import('#scripts/git/git-command')
 const spawned = vi.mocked(spawn)
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-wake-cli-launch-test-'))
+const scratch = make_directory('run-wake-cli-launch-test-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun #3804'
@@ -132,7 +134,6 @@ afterEach(() => {
 
 afterAll(() => {
 	clear()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('run_wake_cli.start_for_launch', () => {

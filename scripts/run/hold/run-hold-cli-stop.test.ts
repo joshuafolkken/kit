@@ -1,13 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { lane_state } from '#scripts/lane/lane-state'
 import { test_e2e_stamp } from '#scripts/test/test-e2e-stamp'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
 import { run_stop_notify } from './run-stop-notify'
+
+const make_directory = temporary_directory('suite')
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), head_commit: vi.fn(), status: vi.fn() },
@@ -24,7 +26,7 @@ vi.mock('#scripts/test/test-e2e-stamp', () => ({
 	test_e2e_stamp: { is_current_tree: vi.fn() },
 }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-cli-stop-test-'))
+const scratch = make_directory('run-hold-cli-stop-test-')
 const WORKTREE = path.join(scratch, '.git')
 const TARGET = run_hold.hold_path(WORKTREE)
 const ISSUE = '4135'
@@ -56,10 +58,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(TARGET, { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a marked stop sends its own confirmation', () => {

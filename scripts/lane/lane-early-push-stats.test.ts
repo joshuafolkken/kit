@@ -1,23 +1,20 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { lane_early_push_stats } from './lane-early-push-stats'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_stats } from './lane-stats'
 import { lane_stats_tables } from './lane-stats-tables'
 
+const make_directory = temporary_directory('suite')
+
 const NOW = Date.parse('2026-11-04T12:00:00Z')
 const WINDOW = lane_stats.window_of(1, NOW)
-const scratch = mkdtempSync(path.join(tmpdir(), 'early-push-'))
+const scratch = make_directory('early-push-')
 const SOURCE = 'review'
 const REASON = 'dirty-tree'
 const KIND = 'early-push'
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
 
 describe('lane early push decisions', () => {
 	it('roundtrips skip reasons through the ledger into lane:stats', async () => {

@@ -1,11 +1,13 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#1719. What the supervisor spawns is the one place it could widen what may be run,
 // so the argument vector is pinned rather than left to reading.
@@ -133,12 +135,8 @@ const POLL_INTERVAL_MS = 50
 const log_scratch = { directory: '', target: '' }
 
 beforeEach(() => {
-	log_scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-log-test-'))
+	log_scratch.directory = make_directory('josh-run-wake-log-test-')
 	log_scratch.target = path.join(log_scratch.directory, 'wake.log')
-})
-
-afterEach(() => {
-	rmSync(log_scratch.directory, { force: true, recursive: true })
 })
 
 async function settle(): Promise<void> {

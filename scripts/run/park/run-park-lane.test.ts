@@ -1,13 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park_lane } from './run-park-lane'
+
+const make_directory = temporary_directory('suite')
 
 const ISSUE = '4132'
 const SEAT = 3
 const BODY = 'Which option?\n'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'run-park-lane-'))
+const WORK_DIRECTORY = make_directory('run-park-lane-')
 const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
 const LANE_DIRECTORY = path.join(LANE_ROOT, ISSUE)
 
@@ -20,10 +22,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	rmSync(LANE_DIRECTORY, { recursive: true, force: true })
-})
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 // joshuafolkken/kit#5840: a park from inside a lane names the lane it keeps.

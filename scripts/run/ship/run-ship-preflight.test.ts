@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Unmet } from '#scripts/git/git-preflight'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { report_format_reference } from '#scripts/report/report-format-reference'
 import { acceptance_map } from '#scripts/review/acceptance-map'
 import { live_evidence } from '#scripts/review/live-evidence'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const problems_mock = vi.hoisted(() => vi.fn<() => Promise<Array<Unmet>>>())
 const paths_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
@@ -79,7 +81,7 @@ const UNPLANNED = 'unplanned: scripts/gate/gate-plan.ts'
 const ISSUE = '3154'
 const EVIDENCE_BODY =
 	'## 実機証跡\n\n`pnpm josh ship --log 2946`\n\n```\nstopped at: === preflight ===\n```\n'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-preflight-'))
+const TEMPORARY = make_directory('josh-ship-preflight-')
 const MISSING_BODY = path.join(TEMPORARY, 'missing.md')
 const TWO_PROBLEMS = '2 pull-request precondition(s)'
 const GIT_FAILURE = 'git status failed'
@@ -174,10 +176,6 @@ describe('run_ship_preflight.stage — the lane plan', () => {
 const TREE_BODY = cli_body_repository
 	.create(TEMPORARY)
 	.write(cli_body_repository.UNIGNORED_DIRECTORY, EVIDENCE_BODY)
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
 
 describe('run_ship_preflight.stage — every pull-request precondition at once', () => {
 	it('reports the classification and the missing evidence together, before the scoped pair', async () => {

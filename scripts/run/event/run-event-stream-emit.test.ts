@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2205: the write side of the event stream. Two things are pinned — the target is
 // keyed on the run's identity (the common git directory `run-carry.ts` uses, the second of the two paths
@@ -22,14 +24,10 @@ const { run_carry } = await import('#scripts/run/carry/run-carry')
 const WORKTREE = '/repo/.git/worktrees/lane'
 const REPOSITORY = '/repo/.git'
 const GIT_GONE = 'git is gone'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-emit-'))
+const TEMPORARY = make_directory('josh-run-event-emit-')
 
 beforeEach(() => {
 	git_directories_mock.mockReset()
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 describe('run_event_stream_emit.stream_target', () => {

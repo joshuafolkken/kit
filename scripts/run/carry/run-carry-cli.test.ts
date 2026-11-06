@@ -1,13 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1714. Two things are pinned here that prose alone would let a rewrite lose:
 // standard output is one token on every path, and `--begin` never starts a second budget over a
@@ -30,7 +32,7 @@ const git_directories = vi.mocked(git_command.git_directories)
 const { DEAD_PID, has_native_start_probe: has_owner_probe } = process_identity_fixture
 
 const TEST_PREFIX = 'run-carry-cli-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = make_directory(TEST_PREFIX)
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
@@ -76,10 +78,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(target(), { force: true })
 	rmSync(event_target(), { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('the record is keyed to the repository rather than the work tree', () => {

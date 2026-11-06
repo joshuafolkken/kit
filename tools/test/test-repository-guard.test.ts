@@ -1,11 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { temporary_directory as directory_fixture } from '#tools/test/temporary-directory'
 import { test_network_guard } from '#tools/test/test-network-guard'
 import { test_repository_guard } from '#tools/test/test-repository-guard'
 import { execaSync } from 'execa'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#1530. The guard's own defects fail open exactly as the network guard's do — a
 // shim that never refuses and a run that never wrote look alike from the outside — so every case
@@ -21,20 +21,11 @@ const GIT_DIRECTORY = '.git'
 const REAL_GIT = test_network_guard.GIT_BINARY ?? test_network_guard.GIT_SHIM_NAME
 const NETWORK_CALL = 'gh api repos/joshuafolkken/kit/issues/1'
 
-const directories: Array<string> = []
+const make_directory = directory_fixture()
 
 function temporary_directory(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), TEMP_PREFIX))
-
-	directories.push(directory)
-
-	return directory
+	return make_directory(TEMP_PREFIX)
 }
-
-afterEach(() => {
-	for (const directory of directories) rmSync(directory, { recursive: true, force: true })
-	directories.length = 0
-})
 
 // The fixtures are built with the real binary and a cleared environment, which is the very idiom
 // under test — a setup that went through the shim would be asserting on itself.

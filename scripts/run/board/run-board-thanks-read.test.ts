@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { run_board_thanks_read, type ThanksDependencies } from './run-board-thanks-read'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3809: the roster is read at run time, kept in the project's record for five
 // minutes, and a read that fails — or times out — keeps the last answer, or none.
@@ -13,11 +15,7 @@ const ROSTER = 'name,url\nfish,\nKittenLab,https://x.com/KittenLab\n'
 const FISH = { name: 'fish', url: undefined }
 const KITTEN = { name: 'KittenLab', url: 'https://x.com/KittenLab' }
 const TIMED_OUT = new DOMException('The operation was aborted due to timeout', 'TimeoutError')
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-board-thanks-read-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const scratch = make_directory('run-board-thanks-read-test-')
 
 interface Clock {
 	now_ms: number
@@ -25,7 +23,7 @@ interface Clock {
 
 // Each test keeps its own record, so no answer leaks from one into the next.
 function dependencies(fetch_text: () => Promise<string>, clock: Clock): ThanksDependencies {
-	const record_path = path.join(mkdtempSync(path.join(scratch, 'case-')), 'thanks.json')
+	const record_path = path.join(make_directory(path.join(scratch, 'case-')), 'thanks.json')
 
 	return { fetch_text, record_path, now: () => clock.now_ms }
 }

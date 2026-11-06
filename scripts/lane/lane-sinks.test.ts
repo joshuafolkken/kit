@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
 import { lane_over } from './lane-over'
 import { lane_sinks } from './lane-sinks'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5701: the stages the period's lanes over the threshold spent their time in, summed
 // over every such lane's breakdown and its laps, the longest total first.
@@ -24,11 +25,7 @@ const HUB_LANE = 104
 const THRESHOLD = 30
 const FOLLOWUP_CI = 'followup CI'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-sinks-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
+const scratch = make_directory('lane-sinks-test-')
 
 function at(minute: number): string {
 	return new Date(START + minute * MINUTE_MS).toISOString()

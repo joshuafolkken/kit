@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { time_density_cli } from './time-density-cli'
@@ -10,19 +10,14 @@ import { time_density_cli } from './time-density-cli'
 const LONG_TURNS = 40
 const ONE_CALL = 1
 
-const roots: Array<string> = []
+const make_directory = temporary_directory()
 
 function fresh_root(): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'density-'))
-
-	roots.push(root)
-
-	return root
+	return make_directory('density-')
 }
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 // A lane worktree under `root` whose `.git` file points into `root/main`.

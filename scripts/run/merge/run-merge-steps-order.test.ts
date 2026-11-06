@@ -1,13 +1,13 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { poll } from '#scripts/lib/poll'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_merge } from './run-merge'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4734: the merge is put on record dated to the ownership check, ahead of the lane
 // close, and only once the primary checkout synced — a failed sync leaves the child for the next pass.
@@ -29,7 +29,7 @@ const CONTEXT = {
 	owner: run_carry.NO_OWNER,
 }
 // No `.git` in it, so the merged path closes it without a stash.
-const LANE_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-order-'))
+const LANE_DIRECTORY = make_directory('lane-order-')
 const CARRY: RunCarry = {
 	invocation: 'backlogrun #4734',
 	started_at: new Date().toISOString(),

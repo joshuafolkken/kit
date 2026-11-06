@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShipArguments } from './run-ship-steps'
+
+const make_directory = temporary_directory()
 
 const { directories_mock, on_tree_mock } = vi.hoisted(() => ({
 	directories_mock: vi.fn<() => Promise<ReadonlyArray<string>>>(),
@@ -61,13 +61,9 @@ const SHIP_ARGS: ShipArguments = {
 const scratch = { directory: '' }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'run-ship-pre-detach-pinned-kept-'))
+	scratch.directory = make_directory('run-ship-pre-detach-pinned-kept-')
 	directories_mock.mockResolvedValue([scratch.directory])
 	on_tree_mock.mockResolvedValue(RESTARTED)
-})
-
-afterEach(() => {
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 async function shipped(): Promise<{ code: number; out: string }> {

@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
@@ -8,17 +6,20 @@ import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { line_budget } from '#scripts/lines/line-budget'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan } from './lane-plan'
 import { lane_plan_cli } from './lane-plan-cli'
 import { lane_plan_signals } from './lane-plan-signals'
 import { lane_plan_wait } from './lane-plan-wait'
 
+const make_directory = temporary_directory('suite')
+
 // joshuafolkken/kit#6140: a lane's blocking `lane:plan` wait on a holder writes a `plan-wait` start and
 // end around it, so `lane:breakdown` counts the wait as a row of its own.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-check-wait-event-'))
+const ROOT = make_directory('lane-plan-check-wait-event-')
 const HOLDER = 5162
 const LATER = 5171
 const HELD = 'scripts/test/vitest-failure-summary.ts'
@@ -56,10 +57,6 @@ vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(Date.now() + WAIT_AHEAD_M
 vi.spyOn(lane_plan_wait, 'hold').mockResolvedValue('free')
 
 const emit = vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
-})
 
 describe('lane:plan bounded wait — the plan-wait events (#6140)', () => {
 	it('writes a plan-wait start and end around the wait, naming the lane and the holder', async () => {

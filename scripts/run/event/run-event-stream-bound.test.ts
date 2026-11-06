@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_board_phase, type Phase } from '#scripts/run/board/run-board-phase'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_event_stream } from './run-event-stream'
 import { run_event_stream_fixture } from './run-event-stream-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3541: the bound drops a ship-stage `start` after the lines `run:board` draws
 // nothing from, so a shipped child's track keeps every stage it passed through.
@@ -21,15 +22,11 @@ const NEWEST_START = `${ISSUE} gate start`
 const LEADING_COUNT = 4
 // The `done` and the heartbeat: the lines that draw nothing.
 const SILENT_COUNT = 2
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-stream-bound-'))
+const TEMPORARY = make_directory('josh-run-event-stream-bound-')
 
 function fresh_target(): string {
 	return path.join(TEMPORARY, `${randomUUID()}.jsonl`)
 }
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
 
 function append_many(target: string, kind: string, count: number): void {
 	run_event_stream_fixture.fill(target, kind, count, (index) => `#${String(index)} line`)

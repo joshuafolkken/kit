@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 
@@ -40,18 +41,14 @@ vi.mock('#scripts/run/run-prrun-resume', () => ({
 }))
 
 const { run_entry_cli } = await import('./run-entry-cli')
-const scratch = mkdtempSync(path.join(tmpdir(), 'entry-dispatch-'))
+const scratch = make_directory('entry-dispatch-')
 const ISSUE = '4156'
 const OTHER_ISSUE = 4157
 const OK = 0
 const fixture = { target: '' }
 
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
-
 beforeEach(() => {
-	fixture.target = path.join(mkdtempSync(path.join(scratch, 'case-')), 'ledger.jsonl')
+	fixture.target = path.join(make_directory(path.join(scratch, 'case-')), 'ledger.jsonl')
 	vi.spyOn(lane_ledger, 'target').mockResolvedValue(fixture.target)
 	josh_run_mock.mockReset().mockResolvedValueOnce({ code: OK, out: 'fresh' })
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)

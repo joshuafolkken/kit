@@ -1,8 +1,10 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2857: a lane directory git no longer registers is removed only when removing it
 // loses nothing. `git_spawn` is mocked so the object listing is the fixture's; the files themselves are
@@ -13,7 +15,7 @@ vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 const { git_spawn } = await import('#scripts/git/git-spawn')
 const { lane_leftover } = await import('./lane-leftover')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-leftover-test-'))
+const scratch = make_directory('lane-leftover-test-')
 const CONFIG_PATH = '.codex/config.toml'
 const CONFIG_CONTENT = 'model = "x"\n'
 const SKILLS_PATH = '.agents/skills'
@@ -72,10 +74,6 @@ beforeEach(() => {
 	cases.directory = path.join(scratch, String(cases.index))
 	mkdirSync(cases.directory, { recursive: true })
 	vi.mocked(git_spawn.read).mockReset()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('lane_leftover.blob_id', () => {

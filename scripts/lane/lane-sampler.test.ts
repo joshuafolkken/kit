@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3643: a `backlogrun` samples its own machine load — one sample when the drive
 // starts, one a minute while it runs, none once it stopped — and a sample that cannot be read never
@@ -16,14 +17,10 @@ const { lane_ledger } = await import('./lane-ledger')
 const { lane_sampler } = await import('./lane-sampler')
 const { run_event_stream } = await import('#scripts/run/event/run-event-stream')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-sampler-test-'))
+const scratch = make_directory('lane-sampler-test-')
 const TICKS = 3
 // joshuafolkken/kit#5032: a closed lid's half hour, past the tick that was due.
 const SLEEP_MS = 30 * 60_000
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function fresh_ledger(): string {
 	return path.join(scratch, `${randomUUID()}.jsonl`)

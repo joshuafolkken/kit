@@ -1,15 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_carry } from './run-carry'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-scheduler-'))
-const INVOCATION = 'backlogrun'
+const make_directory = temporary_directory('suite')
 
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const scratch = make_directory('run-carry-scheduler-')
+const INVOCATION = 'backlogrun'
 
 describe('run_carry scheduler', () => {
 	it.each(['anthropic', 'openai'] as const)('keeps %s through persistence', (provider) => {

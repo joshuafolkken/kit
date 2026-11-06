@@ -1,13 +1,15 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seat } from './lane-seat'
 import { lane_seat_ownership } from './lane-seat-ownership'
 import { lane_seat_start } from './lane-seat-start'
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-seat-start-'))
+const make_directory = temporary_directory('suite')
+
+const ROOT = make_directory('lane-seat-start-')
 const MAIN = path.join(ROOT, 'kit')
 const LANES = path.join(ROOT, '.kit-lanes')
 const ISSUE = '5444'

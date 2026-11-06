@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
@@ -7,7 +5,8 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { line_budget } from '#scripts/lines/line-budget'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan } from './lane-plan'
 import { lane_plan_check } from './lane-plan-check'
@@ -16,11 +15,13 @@ import { lane_plan_signals } from './lane-plan-signals'
 import { lane_plan_wait } from './lane-plan-wait'
 import { lane_yield } from './lane-yield'
 
+const make_directory = temporary_directory('suite')
+
 // joshuafolkken/kit#5211: joshuafolkken/kit#5171 investigated for six minutes before `lane:plan` found
 // joshuafolkken/kit#5162 holding its file and gave the lane back. The probe answers the same overlap and
 // writes nothing; the entry probe gives the lane back before any reading, on the paths dispatch gated on.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-check-'))
+const ROOT = make_directory('lane-plan-check-')
 const HOLDER = 5162
 const LATER = 5171
 const HELD = 'scripts/test/vitest-failure-summary.ts'
@@ -77,16 +78,12 @@ beforeEach(() => {
 	record_yield.mockResolvedValue(undefined)
 	release.mockResolvedValue(SUCCESS)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(ROOT, 'repository-')),
+		make_directory(path.join(ROOT, 'repository-')),
 	)
 	lane_plan.record(
 		{ issue: HOLDER, paths: [HELD], planned_at: '2000-01-01T00:00:00.000Z' },
 		directory,
 	)
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('lane:plan --probe', () => {

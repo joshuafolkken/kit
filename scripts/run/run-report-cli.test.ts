@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_report } from './run-report'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2249: `josh run:report`. The stream target and the pending-merge count are both
 // mocked, so the CLI is exercised end to end — it renders the appended events through the generator and
@@ -45,7 +46,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 
 const { run_report_cli } = await import('./run-report-cli')
 
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-report-cli-'))
+const TEMPORARY = make_directory('josh-run-report-cli-')
 const AT = '2026-09-21T00:00:00.000Z'
 const EARLIER_AT = '2026-09-19T18:00:14.732Z'
 const EARLIER_TEXT = '#2216 merged'
@@ -81,10 +82,6 @@ beforeEach(() => {
 
 		return true
 	})
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 describe('run_report_cli.run', () => {

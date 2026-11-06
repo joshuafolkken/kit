@@ -1,16 +1,10 @@
-import {
-	chmodSync,
-	mkdirSync,
-	mkdtempSync,
-	rmSync,
-	statSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_seat_ownership } from './lane-seat-ownership'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1490: the open lanes and their seats are read from git and from each lane's own
 // `.env`, never from a ledger. That is what makes `git worktree remove` erase the record of a seat
@@ -35,17 +29,13 @@ const { git_worktree } = await import('#scripts/git/git-worktree')
 const { git_command } = await import('#scripts/git/git-command')
 const { lane_registry } = await import('./lane-registry')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-registry-test-'))
+const scratch = make_directory('lane-registry-test-')
 const MAIN_TREE = path.join(scratch, 'kit')
 // What `lane_paths.default_lane_root(MAIN_TREE)` derives, since that is what `list_lanes` now asks
 // for: a work tree only counts as a lane when it sits at `<lane root>/<issue>`, and the root is
 // derived from the main work tree the listing names first.
 const LANE_DIRECTORY = '.kit-lanes'
 const LANE_ROOT = path.join(scratch, LANE_DIRECTORY)
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 const HEAD_LINE = 'HEAD 0000000000000000000000000000000000000000'
 const LANE_BRANCH_LINE = 'branch refs/heads/1490-lane'

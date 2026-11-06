@@ -1,14 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_capacity } from './lane-capacity'
 import { lane_ledger } from './lane-ledger'
 import { lane_limit_cli, type LimitPorts } from './lane-limit-cli'
 import { lane_limit_history } from './lane-limit-history'
 import { lane_limit_override } from './lane-limit-override'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#6166: a run started under one `JOSH_LANE_LIMIT` returns to it on `lane:limit
 // --reset`, though the shell's `.env` reads another by then — the ledger and the status line alike.
@@ -19,7 +21,7 @@ const EDITED_LIMIT = 4
 const OVERRIDE_LIMIT = 5
 const IN_USE = 1
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-limit-reset-'))
+const scratch = make_directory('lane-limit-reset-')
 const LEDGER = path.join(scratch, 'ledger.jsonl')
 const run = { repository: '' }
 
@@ -65,10 +67,6 @@ afterEach(() => {
 	run_carry.end_carry(carry_target())
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('lane:limit --reset after the .env moved', () => {

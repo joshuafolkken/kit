@@ -1,11 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_action } from '#scripts/lane/lane-session-action'
 import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { historical_log_evidence } from './historical-log-evidence'
+
+const make_directory = temporary_directory()
 
 const location = vi.hoisted(() => vi.fn())
 
@@ -20,7 +22,7 @@ const fixture = { directory: '', paths: new Array<string>() }
 const SHIP_KIND = 'ship-review'
 
 beforeEach(() => {
-	fixture.directory = mkdtempSync(path.join(os.tmpdir(), 'historical-evidence-'))
+	fixture.directory = make_directory('historical-evidence-')
 	fixture.paths = [
 		lane_session_action.review_paths(fixture.directory).log,
 		lane_session_action.review_paths(fixture.directory, 'interaction').log,
@@ -31,7 +33,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	for (const source of fixture.paths) stamp_file.remove_stamp(source)
-	rmSync(fixture.directory, { recursive: true, force: true })
 })
 
 function write_logs(): void {

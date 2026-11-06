@@ -1,10 +1,11 @@
-import { mkdtempSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { usage_state_path } from '#scripts/usage/usage-state-path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_quota_status } from './run-board-quota-status'
+
+const make_directory = temporary_directory()
 
 const AT = '2026-11-04T12:00:00Z'
 const WINDOW = { used_percentage: 42, resets_at: 1000 }
@@ -60,7 +61,7 @@ describe('run_board_quota_status shared record', () => {
 	let root = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'quota-status-'))
+		root = make_directory('quota-status-')
 		vi.stubEnv('CLAUDE_CONFIG_DIR', root)
 	})
 

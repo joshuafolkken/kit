@@ -1,16 +1,18 @@
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { realpathSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_cut, type RunCut } from './run-cut'
 import { run_cut_adoption } from './run-cut-adoption'
 
+const make_directory = temporary_directory('suite')
+
 // joshuafolkken/kit#2484: the parent reads a lane's carried cut from outside the lane, so the record
 // has to be found by the lane's path rather than by the process's own checkout.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-cut-lane-test-'))
+const scratch = make_directory('run-cut-lane-test-')
 const ISSUE = '1839'
 const BRANCH = '1839-lane'
 const GIT_DIR = 'GIT_DIR'
@@ -58,7 +60,6 @@ function with_inherited_git_directory<T>(git_directory: string, read: () => T): 
 
 afterAll(() => {
 	for (const record of records) rmSync(record, { force: true })
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a lane’s cut read from outside the lane', () => {

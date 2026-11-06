@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
@@ -7,10 +5,13 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan } from './lane-plan'
 import { lane_plan_cli } from './lane-plan-cli'
 import { lane_yield } from './lane-yield'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4864: joshuafolkken/kit#4858 and joshuafolkken/kit#4859 declared disjoint paths
 // and both edited `scripts/lane/lane-overrun.ts`. The later plan is held back before implementing and
@@ -19,7 +20,7 @@ import { lane_yield } from './lane-yield'
 // joshuafolkken/kit#4926: the held-back lane polled up to nine minutes a call, two to four calls, with its
 // seat taken. It now gives its lane back on the first answer, and a docs-only overlap holds nothing.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-cli-'))
+const ROOT = make_directory('lane-plan-cli-')
 const DIRECTORY = path.join(ROOT, 'lane')
 const HOLDER = 4858
 const LATER = 4859
@@ -67,16 +68,12 @@ beforeEach(() => {
 	record_yield.mockResolvedValue(undefined)
 	release.mockResolvedValue(SUCCESS)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(ROOT, 'repository-')),
+		make_directory(path.join(ROOT, 'repository-')),
 	)
 	lane_plan.record(
 		{ issue: HOLDER, paths: [OVERRUN, PRIORITY, RUN_DOC], planned_at: '2000-01-01T00:00:00.000Z' },
 		DIRECTORY,
 	)
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('lane:plan — a plan that edits a file an earlier plan holds', () => {

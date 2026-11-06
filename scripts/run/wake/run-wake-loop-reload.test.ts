@@ -1,10 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_loop } from './run-wake-loop'
 import { run_wake_loop_fixture } from './run-wake-loop-fixture'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#4509: the supervisor reloads its code at a pass boundary, before it drives or
 // launches anything for that pass.
@@ -13,13 +15,9 @@ const { ENDED, HANDED_OFF, IN_FLIGHT, INVOCATION, NOW, recorder } = run_wake_loo
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-loop-reload-test-'))
+	scratch.directory = make_directory('josh-run-wake-loop-reload-test-')
 	scratch.target = path.join(scratch.directory, 'wake.json')
 	run_wake.write_wake(scratch.target, run_wake.fresh_wake(INVOCATION, NOW))
-})
-
-afterEach(() => {
-	rmSync(scratch.directory, { force: true, recursive: true })
 })
 
 describe('run_wake_loop.run_loop — reloading on new code', () => {

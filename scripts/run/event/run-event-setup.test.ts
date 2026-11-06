@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_event_scope } from './run-event-scope'
 import { run_event_setup } from './run-event-setup'
 import { run_event_stream, type RunEvent } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 import { run_event_stream_fixture } from './run-event-stream-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3696: the stages of a run's start, each one `setup` event. Pinned here — the words
 // each stage writes, that only a lane opening names an issue, that the event is a trace the position
@@ -19,7 +20,7 @@ const REPOSITORY = '/repo/.git'
 const AT = '2026-10-12T09:00:00.000Z'
 const MERGED = '#7 merged'
 const STREAM_GONE = 'the stream is gone'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-setup-'))
+const TEMPORARY = make_directory('josh-run-event-setup-')
 
 const OPENING_278 = run_event_setup.opening_lane('278')
 // The stages of one lane's launch, in the order the launch passes them.
@@ -58,10 +59,6 @@ function stage_target(): string {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 describe('run_event_setup stages', () => {

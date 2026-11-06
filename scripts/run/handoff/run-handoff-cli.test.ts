@@ -1,16 +1,18 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import type { LaunchRequest } from '#scripts/run/detached-launch'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_handoff_cli, type HandoffPorts } from './run-handoff-cli'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5352: `josh run:handoff` waits for a kickoff, detaches a run and hands backlogrun on.
 
 // joshuafolkken/kit#6056: the brief is read through `cli_body`, so it is a real file outside any work tree.
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-handoff-'))
+const TEMPORARY = make_directory('josh-run-handoff-')
 const BRIEF_FILE = path.join(TEMPORARY, 'brief.md')
 const MISSING_BRIEF = path.join(TEMPORARY, 'missing.md')
 const BRIEF_FLAG = '--brief-file'
@@ -104,10 +106,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 describe('run_handoff_cli.run', () => {

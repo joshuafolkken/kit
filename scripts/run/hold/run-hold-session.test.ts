@@ -1,13 +1,14 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_hold, type RunHold } from './run-hold'
 import { run_hold_session } from './run-hold-session'
 
+const make_directory = temporary_directory('suite')
+
 // joshuafolkken/kit#3961: the Stop hook announces only this session's own pause, and only once.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-session-test-'))
+const scratch = make_directory('run-hold-session-test-')
 const TARGET = path.join(scratch, 'hold.json')
 const TAKEN_AT = '2026-10-01T00:00:00.000Z'
 const BEFORE = '2026-10-01T00:01:00.000Z'
@@ -18,10 +19,6 @@ const OTHER_PID = 4343
 const OWN_START = 'Thu Oct  1 00:00:00 2026'
 const HOLD: RunHold = { issue: '7', taken_at: TAKEN_AT, pid: OWN_PID }
 const OWN = { owner_pid: OWN_PID, owner_start: OWN_START }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 describe('run_hold_session.is_session_hold', () => {
 	it.each([

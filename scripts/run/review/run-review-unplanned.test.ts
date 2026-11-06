@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
@@ -11,13 +9,16 @@ import { lane_plan_probe } from '#scripts/lane/lane-plan-probe'
 import { lane_plan_wait } from '#scripts/lane/lane-plan-wait'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review_unplanned } from './run-review-unplanned'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#6142: joshuafolkken/kit#6035 met `CLAUDE.md`'s holder only at the ship's `unplanned`
 // preflight and could only wait on it. `run:review`'s open asks `lane:plan` first.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'run-review-unplanned-'))
+const ROOT = make_directory('run-review-unplanned-')
 const directory = path.join(ROOT, 'lane')
 const HOLDER = 6036
 const LANE = 6035
@@ -56,7 +57,7 @@ beforeEach(() => {
 	fetch_opted_in.mockResolvedValue(listing())
 	vi.spyOn(lane_plan_wait, 'deadline').mockResolvedValue(undefined)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(ROOT, 'repository-')),
+		make_directory(path.join(ROOT, 'repository-')),
 	)
 	lane_plan.record(
 		{ issue: HOLDER, paths: [HELD], planned_at: '2026-11-01T00:00:00.000Z' },
@@ -66,10 +67,6 @@ beforeEach(() => {
 		{ issue: LANE, paths: [PLANNED], planned_at: LANE_PLANNED_AT, cleared: true },
 		directory,
 	)
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('run_review_unplanned.refusal', () => {

@@ -1,14 +1,16 @@
 import { spawn } from 'node:child_process'
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { figure_format } from '#scripts/lib/figure-format'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_state, type LaneChange } from './lane-state'
+
+const make_directory = temporary_directory()
 
 const ISSUE = '4268'
 const OTHER_ISSUE = '4300'
@@ -41,7 +43,7 @@ async function record_at(change: LaneChange, now: Date): Promise<void> {
 }
 
 beforeEach(() => {
-	state.directory = mkdtempSync(path.join(tmpdir(), 'lane-state-'))
+	state.directory = make_directory('lane-state-')
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 })
 
@@ -49,7 +51,6 @@ afterEach(() => {
 	stamp_file.remove_stamp(run_carry.carry_path(state.directory))
 	stamp_file.remove_stamp(lane_state.state_path(state.directory, ISSUE))
 	stamp_file.remove_stamp(lane_state.state_path(state.directory, OTHER_ISSUE))
-	rmSync(state.directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

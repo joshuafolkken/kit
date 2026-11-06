@@ -1,21 +1,19 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { lane_broker_server } from './lane-broker-server'
+
+const make_directory = temporary_directory()
 
 // The record naming which process serves a lane's brokered sessions (joshuafolkken/kit#3840).
 
 const state = { directory: '' }
 
 beforeEach(() => {
-	state.directory = mkdtempSync(path.join(tmpdir(), 'lane-broker-server-'))
-})
-
-afterEach(() => {
-	rmSync(state.directory, { recursive: true, force: true })
+	state.directory = make_directory('lane-broker-server-')
 })
 
 function response_target(): string {

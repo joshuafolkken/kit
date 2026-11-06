@@ -1,14 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_carry, type RunCarry } from './run-carry'
 import { run_carry_added } from './run-carry-added'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3433: `run:add` puts an issue into a live `--only` run without touching the
 // invocation the ownership comparison reads, and `remaining_of` folds it into the named list.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-added-test-'))
+const scratch = make_directory('run-carry-added-test-')
 const NAMED_ONLY_INVOCATION = 'backlogrun #1762 #1749 --only'
 const START = new Date('2026-09-10T00:00:00.000Z')
 
@@ -33,10 +34,6 @@ function added_run(): RunCarry {
 		{ issue: 3434, is_priority: false },
 	])
 }
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
 
 describe('explicit retry', () => {
 	it('retries only the requested issue while preserving counts, ownership and other completions', () => {
