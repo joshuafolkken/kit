@@ -1,20 +1,17 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { lane_sleep } from './lane-sleep'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5032: a sampler tick later than a few intervals is the host's sleep, recorded on the
 // run stream as one event and read back as the span every lane's net time takes out.
 
 const INTERVAL_MS = 60_000
 const START = Date.parse('2026-10-26T12:00:00.000Z')
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-sleep-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
+const scratch = make_directory('lane-sleep-test-')
 
 describe('lane_sleep.gap_of', () => {
 	it('reads a tick within three intervals as on time, however slow', () => {

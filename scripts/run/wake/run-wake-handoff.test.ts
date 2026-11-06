@@ -1,16 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { run_wake_handoff, type WakeSession } from './run-wake-handoff'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5743. The supervisor adopts the record for the session it is about to wake and
 // moves the owner to the launched process, so the session counts without a `run:carry --resume`.
 
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-handoff-'))
+const TEMPORARY = make_directory('josh-run-wake-handoff-')
 const TARGET = path.join(TEMPORARY, 'carry.json')
 const INVOCATION = 'backlogrun --max 5'
 // A pid no process holds, so the recorded owner reads as dead.
@@ -50,10 +52,6 @@ function hand_off_and_on(session: WakeSession, pid: number): void {
 	run_wake_handoff.hand_to(TARGET, owner)
 	run_wake_handoff.hand_on(TARGET, owner, pid)
 }
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	rmSync(TARGET, { force: true })

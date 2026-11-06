@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it } from 'vitest'
 import { metrics_base_cache, type CachedReading } from './metrics-base-cache'
 
 // joshuafolkken/kit#4382: the merge-base reading is keyed on the commit and on the ruler — the
 // sources the metrics command loads — so a changed ruler measures the base again.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'metrics-base-cache-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('metrics-base-cache-test-')
 const COMMAND = path.join('tools', 'metrics', 'metrics-command.ts')
 const HELPER = path.join('tools', 'metrics', 'helper.ts')
 const UNRELATED = path.join('scripts', 'unrelated.ts')
@@ -27,7 +28,7 @@ function file(root: string, relative: string, text: string): void {
 }
 
 function ruler(): string {
-	const root = mkdtempSync(path.join(scratch, 'root-'))
+	const root = make_directory(path.join(scratch, 'root-'))
 
 	file(root, COMMAND, "import { helper } from './helper'\n")
 	file(root, HELPER, 'export const helper = 1\n')
@@ -51,10 +52,6 @@ function stored(name: string, root: string): string {
 
 afterEach(() => {
 	for (const target of written.splice(0)) stamp_file.remove_stamp(target)
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('metrics_base_cache.ruler_files', () => {

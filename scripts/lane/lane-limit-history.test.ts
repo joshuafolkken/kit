@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LimitChoice } from './lane-capacity'
 import type { LedgerEntry } from './lane-ledger'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#6139: every lane-limit change is a ledger line, and `lane:stats` labels a period the
 // limit moved in with each limit it held rather than the one it reads now.
@@ -24,7 +25,7 @@ const { lane_limit_history } = await import('./lane-limit-history')
 const { lane_ledger_write } = await import('./lane-ledger-write')
 const { lane_measure_cli } = await import('./lane-measure-cli')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-limit-history-test-'))
+const scratch = make_directory('lane-limit-history-test-')
 const CURRENT_LIMIT = 4
 const LAUNCH_LIMIT = 3
 const PROBLEM: LimitChoice = { kind: 'problem', problem: 'JOSH_LANE_LIMIT is not a number' }
@@ -40,10 +41,6 @@ const SWITCH = '2026-11-03T03:51:00.000Z'
 function limit_at(at: string, limit: number): LedgerEntry {
 	return { kind: 'limit', at, limit }
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 beforeEach(() => {
 	lane_limit_mock.mockReset().mockResolvedValue({ kind: 'limit', limit: CURRENT_LIMIT })

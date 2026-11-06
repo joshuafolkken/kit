@@ -1,13 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import type { RunCarry } from './run-carry'
 import { run_carry_ended } from './run-carry-ended'
 
+const make_directory = temporary_directory('suite')
+
 // joshuafolkken/kit#3439: the run `--end` closed stays readable until the next `--end` replaces it.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-ended-test-'))
+const scratch = make_directory('run-carry-ended-test-')
 const STARTED_AT = '2026-10-08T09:00:00.000Z'
 const EPIC_RUN = 'backlogrun #3431'
 const ENDED_AT = new Date('2026-10-08T12:00:00.000Z')
@@ -23,10 +25,6 @@ function carry(invocation: string): RunCarry {
 		outages: 0,
 	}
 }
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
 
 describe('run_carry_ended', () => {
 	it.each(['anthropic', 'openai'] as const)(

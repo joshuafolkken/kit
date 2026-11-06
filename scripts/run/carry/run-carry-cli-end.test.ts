@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
 import { run_carry_ended } from './run-carry-ended'
+
+const make_directory = temporary_directory('suite')
 
 // What `--end` does once per invocation, on the read of a record that is still there.
 //
@@ -37,7 +38,7 @@ const report_orphans = vi.mocked(run_carry_stash.report_orphans)
 const { run_merge_collect } = await import('#scripts/run/merge/run-merge-collect')
 const collect_merged = vi.mocked(run_merge_collect.collect_merged)
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-end-cli-test-'))
+const scratch = make_directory('run-carry-end-cli-test-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
@@ -51,10 +52,6 @@ beforeEach(() => {
 	josh_run.mockClear()
 	report_orphans.mockClear()
 	run_carry.end_carry(run_carry.carry_path(REPOSITORY))
-})
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 describe('run:carry --end — the batch flushes no ledger at its end', () => {

@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park_cli } from './run-park-cli'
+
+const make_directory = temporary_directory('suite')
 
 const {
 	apply_mock,
@@ -43,7 +45,7 @@ vi.mock('#scripts/run/run-step-section', () => ({
 const ISSUE = '4132'
 const LABEL = 'needs-decision'
 const DIRECTORY = '/lane/4132'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'run-park-cli-'))
+const WORK_DIRECTORY = make_directory('run-park-cli-')
 const BODY_FILE = path.join(WORK_DIRECTORY, 'park.md')
 const QUESTION = 'Which option?'
 const BODY = `${QUESTION}\n`
@@ -64,10 +66,6 @@ beforeEach(() => {
 	print_once_mock.mockReset().mockReturnValue(0)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
-})
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 // joshuafolkken/kit#4132: one call parks a lane child, and one call takes the park back off.

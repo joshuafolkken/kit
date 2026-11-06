@@ -1,12 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { backlog_drive } from '#scripts/backlog/backlog-drive'
 import { backlog_drive_fixture } from '#scripts/backlog/backlog-drive-fixture'
 import { core_budget, type ReserveOptions } from '#scripts/gate/core-budget'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaunchContext, LaunchOutcome } from './lane-launch-cli'
 import { lane_launch_pending } from './lane-launch-pending'
+
+const make_directory = temporary_directory()
 
 const { claim } = core_budget
 const CONTEXT: LaunchContext = { issue: '17', stash: undefined }
@@ -15,7 +15,7 @@ const MEMORY_MB = 810
 const probe = { directory: '', available: 0 }
 
 beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-lane-launch-pending-'))
+	probe.directory = make_directory('josh-lane-launch-pending-')
 	probe.available = 0
 	vi.spyOn(core_budget, 'claim').mockImplementation((weight: number, options?: ReserveOptions) =>
 		claim(weight, {
@@ -31,7 +31,6 @@ beforeEach(() => {
 afterEach(() => {
 	lane_launch_pending.keep([])
 	vi.restoreAllMocks()
-	rmSync(probe.directory, { recursive: true, force: true })
 })
 
 describe('lane_launch_pending.launch', () => {

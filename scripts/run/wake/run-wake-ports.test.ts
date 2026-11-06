@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
@@ -9,11 +7,14 @@ import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_ports } from './run-wake-ports'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#3738: the supervisor says on the run's stream that the judgment session it woke is
 // running, so the board tells a session at work from a driver still waiting for one. Only a session
@@ -57,12 +58,11 @@ function stages(): Array<string> {
 // here rather than spawned.
 beforeEach(() => {
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-ports-'))
+	scratch.directory = make_directory('josh-wake-ports-')
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 describe('the supervisor waking a judgment session', () => {

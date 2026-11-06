@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
@@ -8,6 +6,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_cli } from './run-ship-cli'
@@ -20,6 +19,8 @@ import { run_ship_probe } from './run-ship-probe'
 import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
 import { run_ship_scoped } from './run-ship-scoped'
 import { run_ship_synced_scope } from './run-ship-synced-scope'
+
+const make_directory = temporary_directory()
 
 // Exercise the CLI and the real scoped pair with isolated, real green records. Only the command
 // runner and external ship stages are stubbed; no check writes a record for the surrounding checkout.
@@ -104,7 +105,7 @@ function stub_ship(): void {
 }
 
 beforeEach(() => {
-	current.directory = mkdtempSync(path.join(tmpdir(), 'ship-scoped-retry-'))
+	current.directory = make_directory('ship-scoped-retry-')
 	current.digest = 'before'
 	current.is_lint_red = true
 	calls.length = 0
@@ -123,7 +124,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(current.directory, { recursive: true, force: true })
 })
 
 async function ship(): Promise<number> {

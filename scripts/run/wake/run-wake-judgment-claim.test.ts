@@ -1,14 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { josh_command } from '#scripts/josh/josh-run'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_cli } from '#scripts/run/carry/run-carry-cli'
 import { run_carry_cli_fixture } from '#scripts/run/carry/run-carry-cli-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3238, joshuafolkken/kit#5743: a session woken on a judgment branch is handed a
 // record the supervisor has already adopted for it. Followed as the hand-off material words it — act,
@@ -22,7 +23,7 @@ vi.mock('#scripts/git/git-command', () => ({
 const { git_command } = await import('#scripts/git/git-command')
 const git_directories = vi.mocked(git_command.git_directories)
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-wake-judgment-claim-'))
+const scratch = make_directory('run-wake-judgment-claim-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --idle 0'
@@ -85,7 +86,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a session woken on a judgment branch', () => {

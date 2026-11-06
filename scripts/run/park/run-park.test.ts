@@ -1,16 +1,17 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park } from './run-park'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4132: the park record is what lets `lane-park` fall silent on a child that parked,
 // so it is read back synchronously, keyed by repository and issue, and bounded.
 
 const ISSUE = '4132'
 const OTHER_ISSUE = '4133'
-const REPOSITORY = mkdtempSync(path.join(tmpdir(), 'run-park-'))
+const REPOSITORY = make_directory('run-park-')
 const DIRECTORY = path.join(REPOSITORY, 'lane')
 const NOW = new Date('2026-10-18T00:00:00.000Z')
 
@@ -22,10 +23,6 @@ afterEach(() => {
 	run_park.clear(ISSUE, DIRECTORY)
 	run_park.clear(OTHER_ISSUE, DIRECTORY)
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(REPOSITORY, { recursive: true, force: true })
 })
 
 describe('run_park', () => {

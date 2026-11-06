@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3355: `lane:sample` appends one load sample and `lane:stats` prints the period's
 // table row; a malformed verb or flag is refused rather than measured as a zero period.
@@ -18,17 +20,13 @@ const { lane_measure_cli } = await import('./lane-measure-cli')
 const { lane_stats } = await import('./lane-stats')
 const { run_event_stream } = await import('#scripts/run/event/run-event-stream')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-measure-cli-test-'))
+const scratch = make_directory('lane-measure-cli-test-')
 const NOW = Date.parse('2026-10-06T12:00:00.000Z')
 const AT = new Date(NOW).toISOString()
 const FAILURE = 1
 const SINCE = '2026-10-06T00:00Z'
 const SESSION_FILE = 'session.jsonl'
 const GATE_STOP: LedgerEntry = { kind: 'stop', at: AT, issue: 1, reason: 'gate' }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 interface TestContext {
 	ledger_path: string
@@ -272,7 +270,7 @@ describe('lane_measure_cli.run — stats round 2', () => {
 describe('lane_measure_cli.run — stats transcripts', () => {
 	it('prints the transcript table over the directories the context names', async () => {
 		const context = fresh_context()
-		const directory = mkdtempSync(path.join(scratch, 'transcripts-'))
+		const directory = make_directory(path.join(scratch, 'transcripts-'))
 		const block = { type: 'tool_use', id: 't', input: { command: 'pnpm josh gate' } }
 		const line = { type: 'assistant', timestamp: AT, message: { content: [block] } }
 
@@ -312,7 +310,7 @@ function lane_state(state: string, minute: number): string {
 // A read spans the pause so the test can distinguish active tool time from paused time.
 function paused_lane_transcript(): string {
 	const directory = path.join(
-		mkdtempSync(path.join(scratch, 'paused-')),
+		make_directory(path.join(scratch, 'paused-')),
 		`-kit-lanes-${String(PAUSED_ISSUE)}`,
 	)
 	const read = { type: 'tool_use', id: 'r', name: 'Read', input: {} }
@@ -357,7 +355,7 @@ describe('lane_measure_cli.run — stats paused lanes', () => {
 
 // An edit-only session isolates tool time from the rest of the lane's work.
 function edit_transcript(): string {
-	const directory = mkdtempSync(path.join(scratch, 'value-'))
+	const directory = make_directory(path.join(scratch, 'value-'))
 	const use = { type: 'tool_use', id: 'e', name: 'Edit', input: {} }
 	const result = { type: 'tool_result', tool_use_id: 'e', content: 'ok' }
 	const ended = new Date(NOW + 1500).toISOString()

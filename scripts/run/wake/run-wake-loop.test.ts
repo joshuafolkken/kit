@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake, type RunWake } from './run-wake'
 import { run_wake_loop, type DriveResult } from './run-wake-loop'
 import { run_wake_loop_fixture } from './run-wake-loop-fixture'
 import type { LaunchResult } from './run-wake-session'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#1719. The loop is where "one wake per cut" either holds or does not, and no test
 // of the decision alone can see it: what matters is what the supervisor writes back between passes.
@@ -88,13 +89,9 @@ describe('run_wake_loop.run_loop — closing again what a process outlived', () 
 })
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-loop-test-'))
+	scratch.directory = make_directory('josh-run-wake-loop-test-')
 	scratch.target = path.join(scratch.directory, 'wake.json')
 	run_wake.write_wake(scratch.target, run_wake.fresh_wake(INVOCATION, NOW))
-})
-
-afterEach(() => {
-	rmSync(scratch.directory, { force: true, recursive: true })
 })
 
 describe('run_wake_loop.run_loop — one wake per cut', () => {

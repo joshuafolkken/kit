@@ -1,11 +1,13 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { document_section } from '#scripts/document/document-section'
 import { document_section_cli } from '#scripts/document/document-section-cli'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_step } from './run-step'
 import { run_step_section } from './run-step-section'
+
+const make_directory = temporary_directory()
 
 const SUCCESS = 0
 const FAILURE = 1
@@ -165,16 +167,12 @@ describe('run_step_section — an unresolved heading fails', () => {
 	let root = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'run-step-section-'))
+		root = make_directory('run-step-section-')
 		mkdirSync(path.join(root, SKILL_DIRECTORY), { recursive: true })
 		writeFileSync(
 			path.join(root, SKILL_DIRECTORY, 'split-assessment.md'),
 			'# Split\n\n## Renamed\n',
 		)
-	})
-
-	afterEach(() => {
-		rmSync(root, { recursive: true, force: true })
 	})
 
 	it('fails when the named heading is gone from the document', () => {
@@ -186,12 +184,8 @@ describe('run_step_section — a consumer-shaped root', () => {
 	let root = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'run-step-section-consumer-'))
+		root = make_directory('run-step-section-consumer-')
 		writeFileSync(path.join(root, 'package.json'), '{}\n')
-	})
-
-	afterEach(() => {
-		rmSync(root, { recursive: true, force: true })
 	})
 
 	it.each([...run_step_section.GOVERNING_SECTIONS.keys()])(

@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cost_audit_fixture } from './cost-audit-fixture'
 import { cost_audit_read } from './cost-audit-read'
 
@@ -96,7 +96,8 @@ describe('cost_audit_read.load — each session carries its lane', () => {
 })
 
 // joshuafolkken/kit#5971: a delegated unit's agent type from the `meta.json` beside its transcript.
-const META_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'cost-audit-meta-'))
+const make_directory = temporary_directory('suite')
+const META_DIRECTORY = make_directory('cost-audit-meta-')
 
 // A unit transcript's path in the fixture directory, a fixed `meta.json` written beside it when given.
 function unit_path(id: string, meta: string | undefined): string {
@@ -104,10 +105,6 @@ function unit_path(id: string, meta: string | undefined): string {
 
 	return path.join(META_DIRECTORY, `agent-${id}.jsonl`)
 }
-
-afterAll(() => {
-	rmSync(META_DIRECTORY, { recursive: true, force: true })
-})
 
 describe('cost_audit_read.agent_type_of — the meta.json beside a unit transcript', () => {
 	it('reads the agent type a fixed meta.json names', () => {

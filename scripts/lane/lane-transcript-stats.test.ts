@@ -1,10 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { lane_stats } from './lane-stats'
 import type { ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4418: `lane:stats` reports the transcript-side lane metrics with fixed definitions —
 // a chained verification call is counted apart from a solo one and kept out of the per-command
@@ -25,11 +27,7 @@ const WAITED = 'waited for the core budget'
 const TIME_MEDIAN = 'tool time per session, median (min)'
 const TEST_MEDIAN = 'test:related median, solo (s)'
 const NOT_MEASURED = 'not measured'
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-transcript-stats-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
+const scratch = make_directory('lane-transcript-stats-test-')
 
 function call(overrides: Partial<ToolCall>): ToolCall {
 	return {

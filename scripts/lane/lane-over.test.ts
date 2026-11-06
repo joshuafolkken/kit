@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { session_cite } from '#scripts/issue/session-cite'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
 import { lane_over } from './lane-over'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5988: the #5953 lane of 2026-11-03 — four split notices, the #5958 split child,
 // a blocking round 1, a yield to #5943 dispatched again after #5943 merged, and the
@@ -27,11 +28,7 @@ const WINDOW = {
 	until_ms: Date.parse('2026-11-04T00:00:00.000Z'),
 }
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-over-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
+const scratch = make_directory('lane-over-test-')
 
 function at(clock: string): string {
 	return `2026-11-03T${clock}:00.000Z`

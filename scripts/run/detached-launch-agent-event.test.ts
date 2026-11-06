@@ -1,12 +1,14 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_event } from '#scripts/agent/agent-event'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { detached_launch } from './detached-launch'
+
+const make_directory = temporary_directory()
 
 const POLL_LIMIT = 60
 const POLL_INTERVAL_MS = 50
@@ -20,7 +22,6 @@ const ENV_NAME = 'codex-environment'
 const scratch = { directory: '', log: '' }
 
 afterEach(() => {
-	if (scratch.directory !== '') rmSync(scratch.directory, { force: true, recursive: true })
 	scratch.directory = ''
 	vi.unstubAllEnvs()
 })
@@ -101,7 +102,7 @@ async function run_provider_failure(): Promise<{
 	launch_kind: string
 	output: string
 }> {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'fake-codex-provider-'))
+	scratch.directory = make_directory('fake-codex-provider-')
 	scratch.log = path.join(scratch.directory, LOG_NAME)
 	const fake = arrange_provider_fakes()
 	const built = agent_argv.resolve('fullrun #2071', agent_role_profile.WORKER, {
@@ -118,7 +119,7 @@ async function run_provider_failure(): Promise<{
 }
 
 async function run_fake(events: ReadonlyArray<unknown>): Promise<string> {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'fake-codex-'))
+	scratch.directory = make_directory('fake-codex-')
 	scratch.log = path.join(scratch.directory, LOG_NAME)
 	detached_launch.launch(
 		{
@@ -168,10 +169,10 @@ describe('detached fake Codex failure through the provider adapter', () => {
 
 	it('passes auth and a platform TMPDIR without exposing the token in argv or logs', async () => {
 		const { calls, environment, output } = await run_provider_failure()
-		const [token, temporary_directory] = readFileSync(environment, 'utf8').trim().split('\n', 2)
+		const [token, temporary_root] = readFileSync(environment, 'utf8').trim().split('\n', 2)
 
 		expect(token).toBe(GH_TOKEN)
-		expect(temporary_directory).toBe(PLATFORM_TEMP_ROOT)
+		expect(temporary_root).toBe(PLATFORM_TEMP_ROOT)
 		expect(readFileSync(calls, 'utf8')).not.toContain(GH_TOKEN)
 		expect(output).not.toContain(GH_TOKEN)
 	})

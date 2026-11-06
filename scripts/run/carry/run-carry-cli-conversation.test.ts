@@ -1,13 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { run_headless } from '#scripts/run/run-headless'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3137, through the command a session actually types. `backlogrun #2847` began its
 // record with `--owner "$PPID"` from a conversation whose process a VS Code restart then replaced; the
@@ -25,7 +27,7 @@ const git_directories = vi.mocked(git_command.git_directories)
 
 const { DEAD_PID } = process_identity_fixture
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-cli-conversation-test-'))
+const scratch = make_directory('run-carry-cli-conversation-test-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun #2847'
@@ -73,10 +75,6 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 	rmSync(target(), { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a record whose owner process restarted inside the same conversation', () => {

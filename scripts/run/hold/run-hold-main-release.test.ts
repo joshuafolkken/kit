@@ -1,12 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { main_entry_fixture } from '#scripts/josh/main-entry-fixture'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_park } from '#scripts/run/park/run-park'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
+
+const make_directory = temporary_directory('suite')
 
 const { directories, repository } = vi.hoisted(() => ({
 	directories: vi.fn(),
@@ -29,7 +31,7 @@ const SUCCESS = 0
 const FAILURE = 1
 const ENTRY = path.resolve('scripts/run/hold/run-hold-main.ts')
 const ORIGINAL_DIRECTORY = process.cwd()
-const SCRATCH = mkdtempSync(path.join(tmpdir(), 'run-release-child-'))
+const SCRATCH = make_directory('run-release-child-')
 const LANE = path.join(SCRATCH, '.kit-lanes', ISSUE)
 const GIT_DIRECTORY = path.join(SCRATCH, '.git')
 const errors: Array<string> = []
@@ -53,10 +55,6 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
 	process.chdir(ORIGINAL_DIRECTORY)
-})
-
-afterAll(() => {
-	rmSync(SCRATCH, { recursive: true, force: true })
 })
 
 describe('direct run:release from a dispatched lane child', () => {

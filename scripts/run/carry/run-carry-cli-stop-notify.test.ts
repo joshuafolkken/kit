@@ -1,10 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
 import { run_carry_cli_fixture } from './run-carry-cli-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2136: `--end --stopped` pushes one ⏸️ confirmation as it clears the record, so a
 // person learns a headless run halted after a session cut. The send is mocked, so the wiring — and the
@@ -25,7 +27,7 @@ const { telegram_notify } = await import('#scripts/notify/telegram-notify')
 const confirm = vi.mocked(telegram_notify.confirm)
 
 const TEST_PREFIX = 'run-carry-stop-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
+const scratch = make_directory(TEST_PREFIX)
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
@@ -46,10 +48,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(target(), { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('a stop announced to the person after a session cut', () => {

@@ -1,11 +1,12 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { review_attest } from '#scripts/review/review-attest'
 import { run_ship_brokered_review } from '#scripts/run/ship/run-ship-brokered-review'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_broker, type BrokerAction } from './lane-session-broker'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#4714: the request ship sends, read by the broker's own schema, and the refusal that
 // marks the supervisor's code for a re-check.
@@ -56,7 +57,7 @@ vi.mock('./lane-session-reread', () => ({ lane_session_reread: { reread: reread_
 const state = { directory: '' }
 
 beforeEach(() => {
-	state.directory = mkdtempSync(path.join(tmpdir(), 'review-broker-request-'))
+	state.directory = make_directory('review-broker-request-')
 	LANE.directory = path.join(state.directory, 'lane')
 	resolve_mock.mockReturnValue(path.join(state.directory, '.git'))
 	argv_mock.mockReset().mockReturnValue({
@@ -72,7 +73,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(state.directory, { recursive: true, force: true })
 })
 
 async function served<T>(run: () => Promise<T>): Promise<T> {

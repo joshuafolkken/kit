@@ -1,9 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { removed_tests } from '#scripts/review/removed-tests'
 import type { TitleChanges } from '#scripts/review/removed-tests-check'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const { branch_mock, changes_mock, existing_mock } = vi.hoisted(() => ({
 	branch_mock: vi.fn<() => Promise<string>>(),
@@ -25,7 +27,7 @@ const { run_ship_removed_rows } = await import('./run-ship-removed-rows')
 const TITLE = 'removed_tests.removed > lists a test the change deleted'
 const PENDING = `- \`${TITLE}\` — 未記入`
 const ROWS = '## 受け入れ条件の対応\n\n- `ac-12345678` the criterion — 未記入\n'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-removed-rows-'))
+const TEMPORARY = make_directory('josh-ship-removed-rows-')
 const DRAFT = path.join(TEMPORARY, 'josh-ship-body-4563.md')
 
 function draft_text(): string {
@@ -38,10 +40,6 @@ beforeEach(() => {
 	branch_mock.mockResolvedValue('4563-lane')
 	existing_mock.mockResolvedValue(DRAFT)
 	changes_mock.mockResolvedValue({ removed: [TITLE], added: [] })
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { recursive: true, force: true })
 })
 
 describe('run_ship_removed_rows.surface — the removed tests before the ship', () => {

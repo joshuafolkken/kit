@@ -1,11 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { acceptance_map } from '#scripts/review/acceptance-map'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests } from '#scripts/review/removed-tests'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShipArguments } from './run-ship-steps'
+
+const make_directory = temporary_directory('suite')
 
 const directories_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 
@@ -21,7 +23,7 @@ const { run_ship_body_draft } = await import('./run-ship-body-draft')
 const ISSUE = '4168'
 const ROWS = '## 受け入れ条件の対応\n\n- `ac-12345678` the criterion — 未記入'
 const FILLED = '## 受け入れ条件の対応\n\n- `ac-12345678` the criterion — 満たした: test\n'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-body-draft-'))
+const TEMPORARY = make_directory('josh-ship-body-draft-')
 const OWN_BODY = path.join(TEMPORARY, 'own-body.md')
 const GIT_DIRECTORY = path.join(TEMPORARY, 'git')
 const BODY_FLAG = '--body-file'
@@ -43,10 +45,6 @@ mkdirSync(GIT_DIRECTORY)
 beforeEach(() => {
 	rmSync(path.join(GIT_DIRECTORY, `josh-ship-body-${ISSUE}.md`), { force: true })
 	directories_mock.mockReset().mockResolvedValue([GIT_DIRECTORY, TEMPORARY])
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { recursive: true, force: true })
 })
 
 describe('run_ship_body_draft.prepare — the draft in the work tree git directory', () => {

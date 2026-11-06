@@ -1,17 +1,19 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { durable_state } from '#scripts/josh/durable-state'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_investigation_record } from './run-investigation-record'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5765: the investigator's conclusion is kept outside the tree, so a later `run:prep`
 // of the run prints it rather than asking for the same delegation again. joshuafolkken/kit#6153: it is
 // a durable run record, so it outlives a yielding lane's work tree and its git directory.
 
 const ISSUE = '5765'
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-investigation-record-'))
+const TEMPORARY = make_directory('josh-investigation-record-')
 const FINDINGS = '- `run:prep` builds its report in scripts/run/run-prep.ts:97'
 
 async function record_path(): Promise<string> {
@@ -24,12 +26,8 @@ async function record_path(): Promise<string> {
 
 beforeEach(() => {
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(TEMPORARY, 'repository-')),
+		make_directory(path.join(TEMPORARY, 'repository-')),
 	)
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { recursive: true, force: true })
 })
 
 describe('run_investigation_record.load — the saved conclusion as a durable run record', () => {

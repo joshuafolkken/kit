@@ -1,15 +1,16 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { launch, launch_target } from './josh-ready'
 
 const INPUT = 'source.ts'
+const make_directory = temporary_directory('suite')
 const OUTPUT = 'josh.js'
 const SOURCE = 'export const value = 1'
 const FAILURE = 7
-const root = mkdtempSync(path.join(tmpdir(), 'josh-ready-'))
+const root = make_directory('josh-ready-')
 const original_argv = process.argv
 const MANIFEST = 'package.json'
 const MANIFEST_CONTENT = '{"type":"module"}'

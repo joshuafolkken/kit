@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry, ShipLapEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
 import { lane_pairs } from './lane-pairs'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#6189: the period's scoped pair laps by named-file count and split-failure reason,
 // and its capped `josh test:related` runs by hub, each row's runs and minutes.
@@ -18,11 +19,7 @@ const HUB = 'scripts/josh/josh-aliases.ts'
 const NO_GRAPH = 'no import graph could be built'
 const UNRESOLVED = 'the work tree holds a file TypeScript does not resolve'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-pairs-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
+const scratch = make_directory('lane-pairs-test-')
 
 function at(minute: number): string {
 	return new Date(START + minute * MINUTE_MS).toISOString()

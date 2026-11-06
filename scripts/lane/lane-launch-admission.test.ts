@@ -1,13 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { core_budget, type ReserveOptions } from '#scripts/gate/core-budget'
 import { core_wait } from '#scripts/gate/core-wait'
 import type { MachineReading } from '#scripts/gate/machine-capacity'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_launch_admission } from './lane-launch-admission'
 import type { LaunchContext, LaunchOutcome } from './lane-launch-cli'
 import { lane_paths } from './lane-paths'
+
+const make_directory = temporary_directory()
 
 const CONTEXT: LaunchContext = { issue: '17', stash: undefined }
 const LAUNCHED: LaunchOutcome = { kind: 'launched', pid: String(process.pid) }
@@ -20,14 +20,13 @@ const HELD_ERROR = 'still held'
 const probe = { directory: '', now: 1, polls: 0 }
 
 beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-lane-launch-admission-'))
+	probe.directory = make_directory('josh-lane-launch-admission-')
 	probe.now = 1
 	probe.polls = 0
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(probe.directory, { recursive: true, force: true })
 })
 
 function stub_machine(

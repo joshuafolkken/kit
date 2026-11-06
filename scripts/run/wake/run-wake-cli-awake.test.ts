@@ -1,14 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_await } from './run-wake-await'
 import { run_wake_cli } from './run-wake-cli'
 import { run_wake_code } from './run-wake-code'
 import { run_wake_session } from './run-wake-session'
 import { run_wake_supervise } from './run-wake-supervise'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5173: the supervisor keeps the host awake on its own pid once it holds the run, so
 // a reload's successor, which runs this same `--loop`, keeps it awake on its own pid in turn.
@@ -19,7 +20,7 @@ vi.mock('#scripts/git/git-command', () => ({
 
 const { git_command } = await import('#scripts/git/git-command')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-wake-cli-awake-test-'))
+const scratch = make_directory('run-wake-cli-awake-test-')
 const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5 --idle 30'
@@ -40,10 +41,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('josh run:wake --loop — the host stays awake', () => {

@@ -1,18 +1,18 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import type { RunHold } from '#scripts/run/hold/run-hold'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { run_cut } from './run-cut'
 import { run_cut_decline } from './run-cut-decline'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3881: once `run:cut --impl` answered `not-a-lane` / `unready`, the guard still
 // refused an edit every reissue window. The record keeps it silent for the rest of the same hold.
 
 const ISSUE = '3881'
 const TAKEN_AT = '2026-10-16T00:00:00.000Z'
-const DIRECTORY = mkdtempSync(path.join(tmpdir(), 'run-cut-decline-'))
+const DIRECTORY = make_directory('run-cut-decline-')
 
 function hold_taken(taken_at: string): RunHold {
 	return { issue: ISSUE, taken_at, pid: 1, is_fullrun: true }
@@ -27,7 +27,6 @@ afterEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(DIRECTORY, { force: true, recursive: true })
 })
 
 describe('run_cut_decline.is_declined_sync', () => {

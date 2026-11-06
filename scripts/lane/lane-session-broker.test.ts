@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
 import { lane_session_broker, type BrokerAction, type BrokerAnswer } from './lane-session-broker'
+
+const make_directory = temporary_directory()
 
 const resolve_mock = vi.hoisted(() => vi.fn())
 const argv_mock = vi.hoisted(() => vi.fn())
@@ -62,7 +64,7 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 const state = { directory: '' }
 
 beforeEach(() => {
-	state.directory = mkdtempSync(path.join(tmpdir(), 'review-broker-'))
+	state.directory = make_directory('review-broker-')
 	LANE.directory = path.join(state.directory, 'lane')
 	CLAUDE_LANE.directory = LANE.directory
 	resolve_mock.mockReturnValue(path.join(state.directory, '.git'))
@@ -78,7 +80,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(state.directory, { recursive: true, force: true })
 })
 
 async function invalid_request(): Promise<void> {
@@ -208,9 +209,9 @@ it("marks the reviewer as the lane's child rather than inheriting the server's e
 
 describe('lane_session_broker — the relaunch action', () => {
 	it('relaunches a Claude lane child with the ship-stop invocation', async () => {
-		const relaunch = vi
-			.spyOn(lane_relaunch, 'relaunch')
-			.mockResolvedValue({ kind: 'launched', pid: 1 })
+		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
+
+		relaunch.mockResolvedValue({ kind: 'launched', pid: 1 })
 
 		expect(await request_relaunch(CLAUDE_LANE)).toStrictEqual(SUCCESS)
 		expect(relaunch).toHaveBeenCalledWith(

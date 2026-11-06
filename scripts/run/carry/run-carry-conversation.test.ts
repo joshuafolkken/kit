@@ -1,10 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_carry, type RunCarry } from './run-carry'
 import { run_carry_conversation } from './run-carry-conversation'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3137: an interactive conversation outlives its process — a restart resumes it in a
 // new one, writing on into the same transcript — so the carry record's owner is the conversation as
@@ -12,7 +14,7 @@ import { run_carry_conversation } from './run-carry-conversation'
 // how a resumed conversation takes the record's owner back.
 
 const { DEAD_PID } = process_identity_fixture
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-carry-conversation-test-'))
+const scratch = make_directory('run-carry-conversation-test-')
 const EMPTY_DIRECTORY = path.join(scratch, 'empty')
 const PROJECT_DIRECTORY = path.join(scratch, 'project')
 const SESSION_ID = 'conversation-3137'
@@ -26,10 +28,6 @@ const NEW_PID = 55_250
 mkdirSync(EMPTY_DIRECTORY)
 mkdirSync(PROJECT_DIRECTORY)
 writeFileSync(TRANSCRIPT, '{}\n')
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function record(overrides: Partial<RunCarry> = {}): RunCarry {
 	return {

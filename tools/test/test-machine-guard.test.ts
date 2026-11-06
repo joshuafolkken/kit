@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#3415: the machine guard is a worker setup file, so this suite runs under it exactly
 // as every gate suite does — what it reads here is what they read.
@@ -17,11 +17,10 @@ describe('the unit suite never reads the machine it runs on', () => {
 	let directory: string
 
 	beforeEach(() => {
-		directory = mkdtempSync(path.join(tmpdir(), 'machine-guard-'))
+		directory = make_directory('machine-guard-')
 	})
 
 	afterEach(() => {
-		rmSync(directory, { recursive: true, force: true })
 		mocked_execa.mockClear()
 	})
 

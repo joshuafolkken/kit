@@ -1,13 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { run_maintenance } from '#scripts/run/run-maintenance'
 import { run_preflight } from '#scripts/run/run-preflight'
 import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_hold } from './run-hold'
 import { run_hold_cli } from './run-hold-cli'
+
+const make_directory = temporary_directory('suite')
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
@@ -21,7 +23,7 @@ vi.mock('#scripts/run/run-maintenance', () => ({ run_maintenance: { sweep: vi.fn
 vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
 const sweep = vi.mocked(run_maintenance.sweep)
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-hold-cli-tidy-test-'))
+const scratch = make_directory('run-hold-cli-tidy-test-')
 const WORKTREE = path.join(scratch, '.git')
 const ISSUE = '2701'
 const OTHER_ISSUE = '2700'
@@ -42,10 +44,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(run_hold.hold_path(WORKTREE), { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 // joshuafolkken/kit#2701: merged lanes and stashes are swept at every run start, which is the claim.

@@ -1,9 +1,12 @@
-import { mkdtempSync, readFileSync } from 'node:fs'
-import { getPriority, tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
+import { getPriority } from 'node:os'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { detached_launch, type LaunchArgv } from './detached-launch'
 import { launch_priority } from './launch-priority'
+
+const make_directory = temporary_directory()
 
 const PID = 4242
 const DETACHED_TIMEOUT_MS = 5000
@@ -24,7 +27,7 @@ function ignore_error(_note: string): void {
 }
 
 function launch_log_path(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'launch-priority-'))
+	const directory = make_directory('launch-priority-')
 
 	return path.join(directory, 'launch.log')
 }

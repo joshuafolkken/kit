@@ -1,22 +1,16 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	statSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { GATE_CACHE_FILES } from '#scripts/josh/josh-command-types'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_registry } from './lane-open-registry-fixture'
 import { lane_paths } from './lane-paths'
 import type { LaneInfo } from './lane-registry'
 import { lane_seat } from './lane-seat'
 import { lane_seat_fixture } from './lane-seat-fixture'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1490, joshuafolkken/kit#1494: opening a lane produces a work tree that keeps the
 // project's own `PORT_SEED` and adds its seat in `JOSH_LANE_SEAT`. `git_command` is mocked because
@@ -50,7 +44,7 @@ const { eslint_warm } = await import('#scripts/lint/eslint-warm')
 const { lane_leftover } = await import('./lane-leftover')
 const { lane_open } = await import('./lane-open')
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-open-test-'))
+const scratch = make_directory('lane-open-test-')
 const REPOSITORY_ROOT = path.join(scratch, 'kit')
 const LANE_ROOT = path.join(scratch, 'lanes')
 const BOT_TOKEN = 'TELEGRAM_BOT_TOKEN=abc:123'
@@ -79,7 +73,6 @@ function install_answers(is_installed: boolean, output: string): void {
 }
 
 afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 	Reflect.deleteProperty(process.env, lane_paths.LANE_ROOT_KEY)
 })
 

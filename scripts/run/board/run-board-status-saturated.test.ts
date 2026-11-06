@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_fixture } from '#scripts/run/event/run-event-stream-fixture'
 import { run_ship_stage, type Stage } from '#scripts/run/ship/run-ship-stage'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_board_lane_state } from './run-board-lane-state'
 import { run_board_status, type ItemStatus } from './run-board-status'
+
+const make_directory = temporary_directory('suite')
 
 const { NO_LANES } = run_board_lane_state
 
@@ -33,11 +34,7 @@ const RUN_STAGES: ReadonlyArray<Stage> = [
 	STAGE.FOLLOWUP,
 ]
 const SHIPPED_TRACK = ['investigate', 'implement', 'ship', 'review', 'sync', 'gate', 'commit']
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-board-status-saturated-'))
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
-})
+const TEMPORARY = make_directory('josh-run-board-status-saturated-')
 
 // A stream whose positions leave one slot free, with the child launched and implementing on it.
 function saturated(): string {

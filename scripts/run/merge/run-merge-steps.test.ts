@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
@@ -12,7 +12,10 @@ import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const add_label_mock = vi.hoisted(() => vi.fn())
 const unmark_mock = vi.hoisted(() => vi.fn())
@@ -159,7 +162,7 @@ describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () =>
 // joshuafolkken/kit#2476: the merged path removed a lane by force while it still held work the child had
 // popped back from a park, so the close now stashes that work first.
 // A real directory with a `.git` entry, so the merged path reads it as a work tree.
-const LANE_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-'))
+const LANE_DIRECTORY = make_directory('lane-')
 
 mkdirSync(path.join(LANE_DIRECTORY, '.git'))
 const LANE_CLOSE_MESSAGE = `${CONTEXT.child}: uncommitted work at lane close`

@@ -1,14 +1,16 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { live_evidence } from '#scripts/review/live-evidence'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 const existing_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 const tree_mock = vi.hoisted(() => vi.fn<() => Promise<GateTree>>())
 // Read by the `tree-verdict` mock's factory, which runs at the module's `import` below, after this.
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-evidence-'))
+const TEMPORARY = make_directory('josh-ship-evidence-')
 
 vi.mock('./run-ship-body-draft', () => ({ run_ship_body_draft: { existing: existing_mock } }))
 vi.mock('#scripts/gate/gate-tree', () => ({ gate_tree: { read_gate_tree: tree_mock } }))
@@ -43,10 +45,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { recursive: true, force: true })
 })
 
 function draft_text(): string {

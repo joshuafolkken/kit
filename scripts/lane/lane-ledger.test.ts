@@ -1,20 +1,18 @@
-import { appendFileSync, mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { appendFileSync } from 'node:fs'
 import path from 'node:path'
 import { json_value } from '#scripts/lib/json-value'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3355: the lane-limit measurement ledger is append-only JSONL that survives a
 // malformed line.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'lane-ledger-test-'))
+const scratch = make_directory('lane-ledger-test-')
 const AT = '2026-10-06T00:00:00.000Z'
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function ledger(name: string): string {
 	return path.join(scratch, `${name}.jsonl`)

@@ -1,10 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_hold } from '#scripts/run/hold/run-hold'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_prrun_resume } from './run-prrun-resume'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3023: `fullrun #N` after a `prrun` stop resumes from where the stop left the pull
 // request — the tail only once merged, the merge alone while nothing moved, the gate again otherwise —
@@ -21,7 +22,7 @@ vi.mock('#scripts/git/git-branch', () => ({
 }))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { head_commit: head_commit_mock } }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-prrun-resume-test-'))
+const scratch = make_directory('run-prrun-resume-test-')
 const TARGET = run_hold.hold_path(path.join(scratch, '.git'))
 const ISSUE = '3023'
 const OTHER_ISSUE = '3022'
@@ -56,10 +57,6 @@ beforeEach(() => {
 afterEach(() => {
 	run_hold.release_hold(TARGET)
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('run_prrun_resume.decide — what is left after a prrun stop', () => {

@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { lane_close } from './lane-close'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3772, #5841: the merged-lane close and `run:merge --stash` keep a lane's uncommitted
 // work through one writer — one stash message `stash:pop` matches, and one Issue comment naming it. A
@@ -20,7 +22,7 @@ const { lane_preserve } = await import('./lane-preserve')
 const ISSUE = '5841'
 const OCCASION = 'stopped unit'
 const CAUSE = 'the unit stopped'
-const LANE_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-preserve-'))
+const LANE_DIRECTORY = make_directory('lane-preserve-')
 
 mkdirSync(path.join(LANE_DIRECTORY, '.git'))
 
@@ -82,7 +84,7 @@ describe('lane_preserve.preserve_lane — a directory with no .git', () => {
 
 	it('answers true untouched — the remnant of an interrupted close holds nothing git could keep', async () => {
 		const push = lane_with_changes(true)
-		const directory = mkdtempSync(path.join(tmpdir(), 'lane-preserve-bare-'))
+		const directory = make_directory('lane-preserve-bare-')
 
 		vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
 			existing: undefined,

@@ -1,10 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#4775: a reason an earlier run on the branch accepted carries a later run with none
 // past the same places, and only those.
@@ -20,14 +22,13 @@ const NEWER_REASON = 'a newer reason'
 const scratch = { directory: '' }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'run-review-pinned-accepted-'))
+	scratch.directory = make_directory('run-review-pinned-accepted-')
 	vi.spyOn(git_command, 'git_directories').mockResolvedValue([scratch.directory])
 	vi.spyOn(git_command, 'branch').mockResolvedValue(BRANCH)
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 async function accept(unpinned: ReadonlyArray<string>): Promise<void> {

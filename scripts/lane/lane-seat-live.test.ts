@@ -1,8 +1,8 @@
 import { once } from 'node:events'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:net'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, expect, it, vi } from 'vitest'
 import { lane_environment } from './lane-environment'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -10,7 +10,9 @@ import { lane_seat, type SeatReservation } from './lane-seat'
 import { lane_seat_ownership } from './lane-seat-ownership'
 import { lane_seat_start } from './lane-seat-start'
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-seat-live-'))
+const make_directory = temporary_directory('suite')
+
+const ROOT = make_directory('lane-seat-live-')
 const MAIN = path.join(ROOT, 'kit')
 const LANES = path.join(ROOT, '.kit-lanes')
 const DIRECTORY = path.join(LANES, '5444')

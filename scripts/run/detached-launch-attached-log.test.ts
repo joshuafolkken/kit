@@ -1,14 +1,15 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_event } from '#scripts/agent/agent-event'
 import { json_value } from '#scripts/lib/json-value'
-import { afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { run_board_operation } from './board/run-board-operation'
 import { detached_launch } from './detached-launch'
 
-const directories: Array<string> = []
+const make_directory = temporary_directory()
+
 const STAMP_SCHEMA = z.object({ timestamp: z.string() })
 const SOURCE = `
 process.stdout.write('{"type":"item.started","item":');
@@ -19,16 +20,11 @@ setTimeout(() => {
 }, 10);
 `
 
-afterEach(() => {
-	for (const directory of directories.splice(0)) rmSync(directory, { recursive: true })
-})
-
 async function recorded(): Promise<{ output: string; before: number; after: number }> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'attached-log-'))
+	const directory = make_directory('attached-log-')
 	const log_path = path.join(directory, 'output.log')
 	const errors: Array<string> = []
 
-	directories.push(directory)
 	const before = Date.now()
 	const result = await detached_launch.launch_attached(
 		{

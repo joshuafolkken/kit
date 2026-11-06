@@ -1,15 +1,17 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { run_cut_handoff, type Handoff } from './run-cut-handoff'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#2354: the handoff carries the run's instruction and work state across a cut, so a
 // fresh process resumes on what it was told to do rather than the working tree alone. These pin the
 // write→read round trip the acceptance requires, the completeness check the resume gates on, and the
 // block printed to the resumed session.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-cut-handoff-test-'))
+const scratch = make_directory('run-cut-handoff-test-')
 
 const INSTRUCTION = 'Add the field; do not touch the schema migration.'
 const REMAINING_ITEM = 'wire the CLI'
@@ -20,10 +22,6 @@ const HANDOFF: Handoff = {
 	remaining: [REMAINING_ITEM],
 	untouched: [UNTOUCHED_ITEM],
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 describe('a handoff written and read back', () => {
 	it('round-trips every field through JSON', () => {

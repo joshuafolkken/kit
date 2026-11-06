@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { build_text, telegram_notify } from '#scripts/notify/telegram-notify'
@@ -8,9 +6,12 @@ import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_stranded_detect, type WatchedRun } from '#scripts/run/run-stranded-detect'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_finish } from './run-wake-finish'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#3242. The Telegram limit cuts a long body from the tail, so the line that says
 // where the log is must come before the failure note, or the cut takes it.
@@ -142,7 +143,7 @@ describe('run_wake_finish.record_failure', () => {
 
 // The states a failed supervisor actually meets, read through the real judgement and real records: the
 // driver adopted the record for this very process, or the record stopped reading altogether.
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-wake-finish-test-'))
+const scratch = make_directory('run-wake-finish-test-')
 
 function watched_in(name: string): WatchedRun {
 	return {
@@ -165,10 +166,6 @@ function own_carry(): RunCarry {
 describe('run_wake_finish.record_failure — the records a failed supervisor leaves', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
-	})
-
-	afterAll(() => {
-		rmSync(scratch, { recursive: true, force: true })
 	})
 
 	it('leaves the event when the driver left the record owned by this very process', async () => {

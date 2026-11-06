@@ -1,9 +1,10 @@
-import { mkdtempSync } from 'node:fs'
 import { mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { run_board_quota_read } from './run-board-quota-read'
+
+const make_directory = temporary_directory()
 
 const { claude_files, claude_reading, codex_files } = run_board_quota_read
 const NOW_MS = Date.parse('2026-10-29T12:00:00')
@@ -50,7 +51,7 @@ function temporary_root(): () => string {
 	let root = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'quota-read-'))
+		root = make_directory('quota-read-')
 	})
 
 	afterEach(async () => {
@@ -225,7 +226,7 @@ describe('run_board_quota_read files', () => {
 
 describe('run_board_quota_read.read_head', () => {
 	it("reads a file's first bytes, and the whole of a shorter one", async () => {
-		const root = mkdtempSync(path.join(tmpdir(), 'quota-head-'))
+		const root = make_directory('quota-head-')
 		const file = path.join(root, 'head.log')
 
 		await writeFile(file, 'abcdef')

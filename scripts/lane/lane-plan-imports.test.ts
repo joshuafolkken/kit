@@ -1,14 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { main_guard } from '#scripts/lib/main-guard'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan_imports } from './lane-plan-imports'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#5928: joshuafolkken/kit#5846 imported `epic.ts`, which ran `main()` on import, and
 // found out only from `main-guard-boundary.test.ts` after implementing. The plan names it first.
 
-const DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-plan-imports-'))
+const DIRECTORY = make_directory('lane-plan-imports-')
 const ISSUE = '5846'
 const GUARDED = 'epic-audit-cli.ts'
 const UNCONDITIONAL = 'epic.ts'
@@ -31,10 +33,6 @@ writeFileSync(path.join(DIRECTORY, IMPORTABLE), 'export const epic_schema = {}\n
 
 beforeEach(() => {
 	error.mockImplementation(vi.fn())
-})
-
-afterAll(() => {
-	rmSync(DIRECTORY, { recursive: true, force: true })
 })
 
 describe('lane_plan_imports.split', () => {

@@ -2,14 +2,12 @@ import { ChildProcess, spawn, spawnSync, type SpawnSyncReturns } from 'node:chil
 import {
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readFileSync,
 	realpathSync,
 	rmSync,
 	utimesSync,
 	writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { build_hooks } from '#scripts/build/build-hooks'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
@@ -18,6 +16,7 @@ import {
 	type BundleBuilds,
 	type HookLaunch,
 } from '#tools/hooks/hook-bundle-ready'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import {
 	afterEach,
 	beforeEach,
@@ -52,6 +51,7 @@ const {
 } = hook_bundle_ready
 
 const BUILD_TIMEOUT_MS = 60_000
+const make_directory = temporary_directory()
 const BUILD_ERROR = 'Transform failed'
 const REFUSED = 2
 const PACKAGE_ROOT = path.join(import.meta.dirname, '..', '..')
@@ -88,12 +88,9 @@ function spawn_result(status: number): SpawnSyncReturns<string> {
 // Inside a directory of its own, so the lock and the failure record a build leaves beside the bundles
 // are removed with it.
 function create_out_directory(): string {
-	const parent = mkdtempSync(path.join(tmpdir(), 'hook-bundle-ready-'))
+	const parent = make_directory('hook-bundle-ready-')
 	const out_directory = path.join(parent, 'hooks')
 
-	onTestFinished(() => {
-		rmSync(parent, { recursive: true, force: true })
-	})
 	mkdirSync(out_directory)
 
 	return out_directory

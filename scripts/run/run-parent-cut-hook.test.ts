@@ -1,13 +1,14 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_headless } from './run-headless'
 import { run_parent_cut_hook, type ParentCutState } from './run-parent-cut-hook'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#2947: a `backlogrun` parent past the shared threshold is steered to the hand-off at
 // its next call, not only at a merge.
@@ -47,7 +48,7 @@ function priced_on(billed: ReadonlyArray<number>): ParentCutState {
 
 // A payload naming a transcript in a fresh directory, so each test starts with no refusal recorded.
 function fresh_payload(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'parent-cut-'))
+	const directory = make_directory('parent-cut-')
 
 	return JSON.stringify({ transcript_path: path.join(directory, 'session.jsonl') })
 }

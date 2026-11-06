@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
 	backlog_drive,
@@ -7,9 +5,12 @@ import {
 	type DriveState,
 } from '#scripts/backlog/backlog-drive'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { expect, test } from 'vitest'
 import { run_wake } from './run-wake'
 import { run_wake_loop, type LoopPorts } from './run-wake-loop'
+
+const make_directory = temporary_directory()
 
 const NOW = new Date('2026-09-24T00:00:00.000Z')
 const ISSUE = '1'
@@ -104,7 +105,7 @@ function wake_ports(world: World): LoopPorts {
 }
 
 test('runs a no-judgment backlog to completion without a parent agent', async () => {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-harness-'))
+	const directory = make_directory('josh-drive-harness-')
 	const target = path.join(directory, 'wake.json')
 	const world: World = { started: false, merged: false, agents: 0, reports: 0 }
 
@@ -114,5 +115,4 @@ test('runs a no-judgment backlog to completion without a parent agent', async ()
 
 	expect(stop.reason).toBe('ended')
 	expect(world).toStrictEqual({ started: true, merged: true, agents: 0, reports: 1 })
-	rmSync(directory, { recursive: true, force: true })
 })

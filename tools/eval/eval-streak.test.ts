@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { eval_streak, type Streak } from './eval-streak'
 
 // A real file in a throwaway directory rather than a mock: what this module is for is surviving
@@ -13,12 +13,10 @@ function target(): string {
 	return path.join(sandbox.directory, 'streak.json')
 }
 
-beforeEach(() => {
-	sandbox.directory = mkdtempSync(path.join(tmpdir(), 'josh-eval-streak-test-'))
-})
+const make_directory = temporary_directory()
 
-afterEach(() => {
-	rmSync(sandbox.directory, { force: true, recursive: true })
+beforeEach(() => {
+	sandbox.directory = make_directory('josh-eval-streak-test-')
 })
 
 function streak(verdict: string, count: number): Streak {

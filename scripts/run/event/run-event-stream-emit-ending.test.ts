@@ -1,7 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { rmSync } from 'node:fs'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#4481: every writer of an ending emits through `emit`, which records the child's lane
 // time on the event once, from the stream's launch or the lane record's.
@@ -19,7 +20,7 @@ const { run_event_stream_emit } = await import('./run-event-stream-emit')
 const { run_event_stream } = await import('./run-event-stream')
 
 const KIND = run_event_stream.EVENT_KIND
-const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-run-event-ending-'))
+const TEMPORARY = make_directory('josh-run-event-ending-')
 const LAUNCHED_AT = new Date('2026-10-22T07:09:38.000Z')
 const ENDED_AT = new Date('2026-10-22T07:17:30.000Z')
 const MERGED_TEXT = '#4430 merged'
@@ -36,10 +37,6 @@ beforeEach(() => {
 	git_directories_mock.mockReset()
 	read_state_mock.mockReset()
 	git_directories_mock.mockResolvedValue(['/repo/.git/worktrees/lane', TEMPORARY])
-})
-
-afterAll(() => {
-	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
 // The newest event on the stream, removing the stream afterwards.

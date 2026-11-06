@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_safe_text } from '#scripts/agent/agent-safe-text'
@@ -9,8 +7,11 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_step_section_driver } from '#scripts/run/run-step-section-driver'
 import { run_step_section_table } from '#scripts/run/run-step-section-table'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_wake_driver } from './run-wake-driver'
+
+const make_directory = temporary_directory()
 
 const INVOCATION = 'backlogrun #2509 --max 5 --only'
 const OUTPUT = 'merge over #2509\nresume: --owner 1 --exclude 2509'
@@ -28,7 +29,7 @@ const DEFAULT_NEXT = `${ALREADY_CLAIMED} act on the result by the sections below
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-wake-driver-'))
+	scratch.directory = make_directory('josh-wake-driver-')
 	scratch.target = path.join(scratch.directory, 'carry.json')
 	run_carry.begin_carry(scratch.target, INVOCATION, run_carry.NO_OWNER, new Date())
 	// The stage a claim writes goes to the checkout's own stream, which is a live run's: never from a test.
@@ -37,7 +38,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 test('passes validated budget flags to the driver and leaves named issues in the carry record', () => {

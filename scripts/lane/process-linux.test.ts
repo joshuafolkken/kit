@@ -1,10 +1,12 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, expect, it } from 'vitest'
 import { process_linux } from './process-linux'
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'process-linux-'))
+const make_directory = temporary_directory('suite')
+
+const ROOT = make_directory('process-linux-')
 const PID = '123'
 const CWD = '/work/.kit-lanes/5444'
 const LANE_MARK = 'JOSH_LANE_CHILD=5444\0'
