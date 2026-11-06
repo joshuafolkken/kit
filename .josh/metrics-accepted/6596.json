@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #6596: bounded per-Issue line-size approvals require source validation, persistent audit evidence and scope checks; existing size and overlap gates remain active.",
+	"date": "2026-11-06",
+	"growth": {
+		"scripts.code_lines": 100
+	}
+}

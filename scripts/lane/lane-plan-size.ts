@@ -6,6 +6,7 @@ import { split_assess } from '#scripts/split/split-assess'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
+import { lane_plan_approval } from './lane-plan-approval'
 import { lane_stage_budget } from './lane-stage-budget'
 
 // The size bar `josh lane:plan` holds a plan to (joshuafolkken/kit#5533): a plan whose files outgrow
@@ -152,6 +153,29 @@ function lines_over(declared: number, signals: PlanSignals): MeasureOver | undef
 	return measured > limit ? { reason: 'lines', declared, limit, measured } : undefined
 }
 
+function unapproved(
+	over: MeasureOver | undefined,
+	plan: LanePlan,
+	approval: LanePlan['size_approval'],
+): MeasureOver | undefined {
+	if (over === undefined || approval === undefined) return over
+	const is_within = lane_plan_approval.allows(approval, plan, over)
+
+	return is_within ? undefined : over
+}
+
+function planned_lines(
+	declared: number,
+	signals: PlanSignals,
+	plan: LanePlan,
+	recorded: LanePlan | undefined,
+): MeasureOver | undefined {
+	const approval = plan.size_approval ?? recorded?.size_approval
+	if (approval === undefined && lane_plan.is_sized(recorded)) return undefined
+
+	return unapproved(lines_over(declared, signals), plan, approval)
+}
+
 function measure_over(
 	declared: Declared,
 	signals: PlanSignals,
@@ -159,9 +183,11 @@ function measure_over(
 	recorded: LanePlan | undefined,
 ): MeasureOver | undefined {
 	if (signals.split_filed) return undefined
-	const lines = lane_plan.is_sized(recorded) ? undefined : lines_over(declared.lines, signals)
 
-	return hunks_over(declared.files, unplanned_hunks(signals, plan, recorded)) ?? lines
+	return (
+		hunks_over(declared.files, unplanned_hunks(signals, plan, recorded)) ??
+		planned_lines(declared.lines, signals, plan, recorded)
+	)
 }
 
 // `undefined` while every axis stays within its bar, or no size is declared; files first, then hunks, then lines.

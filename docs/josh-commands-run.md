@@ -1414,7 +1414,9 @@ A `run:planned` candidate's plan comment (the latest trusted one carrying `### �
 
 A plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does.
 
-So does a tree whose changed hunks pass twice the declared files, or whose declared lines times the recent lines ratio pass 200 — until the lane files a split child. A re-plan of a plan that met the size bar, or cleared, skips the lines check. Each `split` writes a `split-notice` with its reason to the lane ledger. The hunks count skips a file the recorded plan lists.
+Hunks over twice declared files or declared lines × recent ratio over 200 also split. Sized re-plans skip lines checks unless approved. Splits log their reason; hunks exclude planned files.
+
+`--size-approval <json-file>`: `issue`, `paths`, `declared_lines`, `max_lines`, `source` (same-issue trusted comment URL), `rationale`. Records author/body; rechecks scope. Only lines overflow is approved.
 
 `--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
 

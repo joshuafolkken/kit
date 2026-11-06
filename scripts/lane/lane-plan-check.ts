@@ -231,6 +231,7 @@ function placed(plan: LanePlan, directory: string): LanePlan {
 
 	return {
 		...plan,
+		size_approval: recorded.size_approval,
 		planned_at: recorded.planned_at,
 		yielded: recorded.yielded,
 		waits_until: recorded.waits_until,
