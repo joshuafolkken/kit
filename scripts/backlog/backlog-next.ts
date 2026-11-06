@@ -212,11 +212,9 @@ function combine(
 	const standalone = backlog_pool.standalone_rows(context.opted_in.issues)
 	const from_epics = epic_half(views, context, untrusted)
 	const from_standalone = backlog_pool.classify_standalone(standalone, {
+		...context,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-		exclude: context.exclude,
-		repo: context.repo,
 		running: running_of(views, graphs, context),
-		implement_rate: context.implement_rate,
 	})
 
 	// The same checkout map `epic:next` hands `build_result`. Without it every bundle heading reads
@@ -300,7 +298,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 	// (joshuafolkken/kit#5502).
 	const untrusted = new Set([
 		...(await auto_ok_author.untrusted_child_keys(children, context.repo)),
-		...backlog_next_size.held_children(children, context.implement_rate),
+		...backlog_next_size.held_children(children, context.implement_rate, context.growth),
 	])
 	// The defect priority and the ranking keys are applied here rather than when printing, so
 	// `backlog:plan` shows the order the run takes. The
@@ -456,7 +454,7 @@ async function context_of(
 		return undefined
 	}
 
-	return { opted_in, tracking, repo, exclude, implement_rate: await lane_net_read.implement_rate() }
+	return { opted_in, tracking, repo, exclude, ...(await lane_net_read.measurements()) }
 }
 
 async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {

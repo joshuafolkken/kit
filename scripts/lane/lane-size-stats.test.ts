@@ -61,3 +61,18 @@ describe('lane_size_stats.lines_ratio', () => {
 		expect(lane_size_stats.lines_ratio([], WINDOW)).toBeUndefined()
 	})
 })
+
+describe('lane_size_stats.ratios', () => {
+	it('uses separate medians from the same merged lanes (ac-4b828b0f)', () => {
+		const entries = [size(1, 2, 300), size(2, 8, 100), merge(1), merge(2)]
+
+		expect(lane_size_stats.ratios(entries, WINDOW)).toEqual({ files: 2.5, lines: 2 })
+	})
+
+	it('omits only the axis with no declaration and preserves measured zero (ac-45cdc50c)', () => {
+		const zero = { ...size(1, 0, 0), declared: { files: 0, lines: 100 } }
+
+		expect(lane_size_stats.ratios([zero, merge(1)], WINDOW)).toEqual({ lines: 0 })
+		expect(lane_size_stats.ratios([], WINDOW)).toEqual({})
+	})
+})

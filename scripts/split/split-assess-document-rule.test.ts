@@ -49,7 +49,10 @@ describe('split-assessment.md states the lane:plan growth bar', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
 		expect(split_assess.DECLARED_GROWTH_FACTOR).toBe(2)
-		expect(document).toContain('`lane:plan` answers `split` past\ntwice the declared files')
+		expect(document).toContain('median actual / declared ratios, separately for files and lines')
+		expect(document).toContain('independent of speed measurement')
+		expect(document).toContain('Each unmeasured axis uses the fallback of 2')
+		expect(document).toContain('`lane:plan` answers `split` past the declared files × files ratio')
 	})
 })
 

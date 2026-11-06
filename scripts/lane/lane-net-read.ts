@@ -11,7 +11,7 @@ import type { MeasureContext } from './lane-sampler'
 
 type ReadContext = Pick<MeasureContext, 'ledger_path' | 'events_path'>
 
-const { implement_rate, read_ledger } = lane_implement_rate_read
+const { implement_rate, measurements, read_ledger } = lane_implement_rate_read
 
 // The run's event stream, read for the parks that end a stop's wait.
 async function read_events(context: ReadContext): Promise<ReadonlyArray<RunEvent>> {
@@ -40,6 +40,7 @@ async function net_minutes_of(
 
 const lane_net_read = {
 	implement_rate,
+	measurements,
 	net_minutes_of,
 	read_events,
 	read_ledger,

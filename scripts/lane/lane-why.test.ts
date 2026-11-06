@@ -135,6 +135,10 @@ describe('lane_why.projected_of', () => {
 		expect(lane_why.projected_of(body, rate)).toBeCloseTo(20)
 	})
 
+	it('projects with the measured lines ratio independently of files', () => {
+		expect(lane_why.projected_of(body, rate, { files: 3, lines: 1.5 })).toBeCloseTo(15)
+	})
+
 	it('answers undefined with no body, no estimate or no rate', () => {
 		expect(lane_why.projected_of(undefined, rate)).toBeUndefined()
 		expect(lane_why.projected_of('## 背景\n\nno estimate\n', rate)).toBeUndefined()

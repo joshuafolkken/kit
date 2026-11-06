@@ -8,6 +8,7 @@ import type { ImplementRate } from './lane-implement-rate'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_sinks } from './lane-sinks'
 import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
+import type { SizeRatios } from './lane-size-stats'
 import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 import { lane_stats } from './lane-stats'
 import { lane_why_ci } from './lane-why-ci'
@@ -44,12 +45,13 @@ interface OverStage {
 function projected_of(
 	body: string | undefined,
 	rate: ImplementRate | undefined,
+	growth?: SizeRatios,
 ): number | undefined {
 	const estimate = body === undefined ? undefined : size_estimate.declared_size(body)
 
 	if (estimate === undefined || rate === undefined) return undefined
 
-	return size_estimate.projected_minutes(estimate, rate)
+	return size_estimate.projected_minutes(estimate, rate, growth)
 }
 
 function over_of(stage: Stage): OverStage | undefined {

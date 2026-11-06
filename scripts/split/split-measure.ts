@@ -63,6 +63,16 @@ async function untracked_numstat(root: string, files: ReadonlyArray<string>): Pr
 	return rows.join(NEWLINE)
 }
 
+async function read_guide(): Promise<ReturnType<typeof split_assess.guide_for>> {
+	const measured = await lane_implement_rate_read.measurements()
+
+	return split_assess.guide_for(
+		lane_stage_budget.BUDGET_MINUTES.implement,
+		measured.implement_rate,
+		measured.growth,
+	)
+}
+
 async function read_branch(): Promise<ReturnType<typeof split_assess.assess>> {
 	const base = await change_base.resolved_through_merge()
 
@@ -77,12 +87,8 @@ async function read_branch(): Promise<ReturnType<typeof split_assess.assess>> {
 	const numstat = `${tracked}${NEWLINE}${await untracked_numstat(root, files)}`
 
 	const adjusted = await split_relocations.without_relocations(root, base, numstat, files)
-	const guide = split_assess.guide_for(
-		lane_stage_budget.BUDGET_MINUTES.implement,
-		await lane_implement_rate_read.implement_rate(),
-	)
 
-	return split_assess.assess(adjusted, guide)
+	return split_assess.assess(adjusted, await read_guide())
 }
 
 const split_measure = { line_count, read_branch }

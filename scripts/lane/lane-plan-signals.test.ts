@@ -73,6 +73,7 @@ describe('lane_plan_signals measured rate', () => {
 		const tree = { hunk_files: [], committed_files: [] }
 
 		expect(lane_plan_signals.signals_from(ISSUE, tree, entries, NOW)).toMatchObject({
+			files_ratio: 1,
 			lines_ratio: 2,
 			implement_rate: { median: 30, lanes: 1 },
 		})
@@ -88,6 +89,7 @@ describe('lane_plan_signals.signals_from', () => {
 		expect(lane_plan_signals.signals_from(ISSUE, tree, entries, NOW)).toStrictEqual({
 			hunk_files: ['a.ts'],
 			committed_files: ['b.ts'],
+			files_ratio: 1,
 			lines_ratio: 2,
 			implement_rate: undefined,
 			split_filed: false,
@@ -102,6 +104,7 @@ describe('lane_plan_signals.signals_from', () => {
 		expect(lane_plan_signals.signals_from(ISSUE, tree, [filed], NOW)).toStrictEqual({
 			hunk_files: [],
 			committed_files: [],
+			files_ratio: undefined,
 			lines_ratio: undefined,
 			implement_rate: undefined,
 			split_filed: true,

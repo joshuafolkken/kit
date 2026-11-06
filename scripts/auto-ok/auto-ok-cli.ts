@@ -14,6 +14,8 @@ import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
+import { lane_net_read } from '#scripts/lane/lane-net-read'
+import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
 //
@@ -342,13 +344,14 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 interface RunnableOptions {
 	now?: number
 	implement_rate?: ImplementRate | undefined
+	growth?: SizeRatios | undefined
 }
 
 function is_ready(issue: OpenIssueData, options: RunnableOptions): boolean {
 	return (
 		auto_ok_author.is_author_trusted(issue) &&
 		is_unblocked(issue) &&
-		!size_estimate.is_issue_over_cap(issue, options.implement_rate) &&
+		!size_estimate.is_issue_over_cap(issue, options.implement_rate, options.growth) &&
 		issue_not_before.is_due(issue.body, options.now ?? Date.now())
 	)
 }
@@ -368,8 +371,11 @@ function pick_next(
 	issues: ReadonlyArray<OpenIssueData>,
 	tracked: ReadonlyMap<number, number> = new Map(),
 	exclude: ReadonlyArray<number> = [],
+	options: RunnableOptions = {},
 ): OpenIssueData | undefined {
-	return git_next_issues.order(issues).find((issue) => is_runnable(issue, tracked, exclude))
+	return git_next_issues
+		.order(issues)
+		.find((issue) => is_runnable(issue, tracked, exclude, options))
 }
 
 // Why there is nothing to run. "No open issue carries the label" and "every opted-in issue is
@@ -406,7 +412,7 @@ function warn_gaps(context: PickupContext, has_answer: boolean): void {
 
 // Grouped rather than passed one by one: the pickup now answers from two listings, and the
 // parameter limit is four.
-interface PickupContext {
+interface PickupContext extends RunnableOptions {
 	issues: ReadonlyArray<OpenIssueData>
 	cutoff: ScanCutoff
 	tracked: ReadonlyMap<number, number>
@@ -416,7 +422,7 @@ interface PickupContext {
 
 function report(context: PickupContext): number {
 	const { issues } = context
-	const next = pick_next(issues, context.tracked, context.exclude)
+	const next = pick_next(issues, context.tracked, context.exclude, context)
 
 	warn_gaps(context, next !== undefined)
 
@@ -448,6 +454,7 @@ async function answer(
 	}
 
 	return report({
+		...(await lane_net_read.measurements()),
 		issues: read.issues,
 		cutoff: read.cutoff,
 		tracked: epic_index.withheld_children(tracking.index, read.issues),

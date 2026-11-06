@@ -20,7 +20,7 @@ const SPECIAL_FILES = [
 ]
 const STAGE_ALL = ['add', '--all']
 const NO_VERIFY = '--no-verify'
-const LEGACY_GUIDE = { files: 8, lines: 200, cap: { files: 12, lines: 300 } }
+const LEGACY_GUIDE = { files: 8, lines: 200, cap: { files: 12, lines: 300 }, growth: {} }
 const fixture: FixtureWorkspace = {
 	workspace: '',
 	previous_cwd: '',

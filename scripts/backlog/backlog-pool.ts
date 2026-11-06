@@ -11,6 +11,7 @@ import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { EPIC_LABEL, has_any_label, PARKED_LABELS } from '#scripts/issue/issue-labels'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
+import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 
 // The candidate pool `josh backlog:next` answers from.
 //
@@ -45,6 +46,7 @@ type ConsideredContext = Pick<StandaloneContext, 'tracked' | 'exclude' | 'repo'>
 interface SizeContext {
 	repo: string
 	implement_rate?: ImplementRate | undefined
+	growth?: SizeRatios | undefined
 }
 
 interface StandaloneContext extends SizeContext {
@@ -78,7 +80,7 @@ function is_stuck(
 	return (
 		!auto_ok_author.is_author_trusted(issue) ||
 		has_any_label(issue.labels, DECISION_LABELS) ||
-		size_estimate.is_issue_over_cap(issue, context.implement_rate) ||
+		size_estimate.is_issue_over_cap(issue, context.implement_rate, context.growth) ||
 		waits_outside(issue, running, context.repo)
 	)
 }
