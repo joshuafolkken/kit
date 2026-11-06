@@ -4,6 +4,7 @@ import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
+import { lane_plan_approval } from './lane-plan-approval'
 
 // The files a lane child plans to edit, recorded by `josh lane:plan` once its work summary settles.
 //
@@ -22,6 +23,7 @@ const lane_plan_schema = z.object({
 	issue: z.number(),
 	paths: z.array(z.string()),
 	planned_at: z.string(),
+	size_approval: lane_plan_approval.approval_schema.optional(),
 	cleared: z.boolean().optional(),
 	// The plan met the size bar (`lane-plan-size.ts`), whatever the overlap check answered after it.
 	sized: z.boolean().optional(),

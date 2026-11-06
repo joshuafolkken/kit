@@ -1,6 +1,7 @@
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { hook_tool_payload } from '#scripts/josh/hook-tool-payload'
 import { json_value } from '#scripts/lib/json-value'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 
@@ -72,29 +73,25 @@ function is_runtime_file(
 	return !test_declared_logic.is_exempt(relative.split(path.sep).join('/'))
 }
 
-function is_candidate(
-	raw_payload: string,
-	root: string,
-	should_include_external = false,
-): string | undefined {
-	const payload = hook_decision.parse_hook_payload(raw_payload)
-
-	if (payload === undefined || !EDIT_TOOLS.has(payload.tool_name)) return undefined
-
-	const has_runtime_file = edited_paths(payload.tool_input).some((file_path) =>
-		is_runtime_file(file_path, root, should_include_external),
-	)
-
-	return has_runtime_file ? payload.transcript_path : undefined
-}
-
 // Whether the payload edits a runtime file under `root` — the edit Step 0 and the lane plan precede.
 function is_runtime_edit(
 	raw_payload: string,
 	root: string = process.cwd(),
 	should_include_external = false,
 ): boolean {
-	return is_candidate(raw_payload, root, should_include_external) !== undefined
+	const payload = hook_tool_payload.parse(raw_payload)
+	if (payload === undefined || !EDIT_TOOLS.has(payload.tool_name)) return false
+
+	return edited_paths(payload.tool_input).some((file_path) =>
+		is_runtime_file(file_path, root, should_include_external),
+	)
+}
+
+function is_candidate(raw_payload: string, root: string): string | undefined {
+	const payload = hook_decision.parse_hook_payload(raw_payload)
+	if (payload === undefined || !is_runtime_edit(raw_payload, root)) return undefined
+
+	return payload.transcript_path
 }
 
 function notice(raw_payload: string, root: string = process.cwd()): string | undefined {

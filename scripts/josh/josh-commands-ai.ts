@@ -427,7 +427,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue',
 		category: 'AI tools',
 		reference: [
-			'<issue> <path>... [--probe] [--imports <path>...]',
+			'<issue> <path>... [--probe] [--size-approval <json-file>] [--imports <path>...]',
 			'automation',
 			['files', 'network'],
 		],

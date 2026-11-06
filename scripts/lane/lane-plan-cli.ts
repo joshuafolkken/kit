@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import type { LanePlan } from './lane-plan'
+import { lane_plan_approval } from './lane-plan-approval'
 import { lane_plan_check } from './lane-plan-check'
 import { lane_plan_imports } from './lane-plan-imports'
 
@@ -11,8 +13,19 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const PROBE_FLAG = '--probe'
 const USAGE =
-	'Usage: josh lane:plan <issue-number> <path> [<path> ...] [--probe] [--imports <path> ...]'
+	'Usage: josh lane:plan <issue-number> <path> [<path> ...] [--probe] [--size-approval <json-file>] [--imports <path> ...]'
 const { YIELD_EXIT_CODE } = lane_plan_check
+
+async function planned(
+	tokens: ReadonlyArray<string>,
+	directory: string,
+): Promise<LanePlan | undefined> {
+	const input = lane_plan_approval.split(tokens)
+	const plan = lane_plan_check.plan_of(input.tokens, new Date())
+	if (plan === undefined) return undefined
+
+	return await lane_plan_approval.attach(lane_plan_check.placed(plan, directory), input.file)
+}
 
 async function run(
 	argv: ReadonlyArray<string>,
@@ -21,7 +34,7 @@ async function run(
 	const { plan: tokens, imports } = lane_plan_imports.split(
 		argv.filter((token) => token !== PROBE_FLAG),
 	)
-	const plan = lane_plan_check.plan_of(tokens, new Date())
+	const plan = await planned(tokens, directory)
 
 	if (plan === undefined) {
 		console.error(USAGE)
@@ -32,7 +45,7 @@ async function run(
 	const action = argv.includes(PROBE_FLAG)
 		? lane_plan_check.probe_answer
 		: lane_plan_check.check_plan
-	const code = await action(lane_plan_check.placed(plan, directory), directory)
+	const code = await action(plan, directory)
 
 	lane_plan_imports.report(String(plan.issue), imports, directory)
 
