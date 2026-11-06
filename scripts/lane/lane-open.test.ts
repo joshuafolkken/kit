@@ -4,11 +4,13 @@ import { GATE_CACHE_FILES } from '#scripts/josh/josh-command-types'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_environment } from './lane-environment'
 import { lane_registry } from './lane-open-registry-fixture'
 import { lane_paths } from './lane-paths'
 import type { LaneInfo } from './lane-registry'
 import { lane_seat } from './lane-seat'
 import { lane_seat_fixture } from './lane-seat-fixture'
+import { lane_seat_ownership } from './lane-seat-ownership'
 
 const make_directory = temporary_directory('suite')
 
@@ -67,6 +69,7 @@ const PREVIEW_BASE = 4173
 const LEFTHOOK_WARNING = 'lefthook install failed: git hooks are NOT installed.'
 const INSTALL_FAILURE = 'ERR_PNPM_OUTDATED_LOCKFILE'
 const REFUSAL = 'holds files'
+const PORT_KINDS = ['development', 'preview'] as const
 
 function install_answers(is_installed: boolean, output: string): void {
 	vi.mocked(lane_install.install_dependencies).mockResolvedValue({ is_installed, output })
@@ -351,83 +354,81 @@ describe('refusing to open a lane', () => {
 		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
 	})
 
-	// Read as free, that lane's seat would go to the new lane while its ports are still bound.
-	it('fails loudly when a live lane seat cannot be read, rather than allocating over it', async () => {
-		lanes_are([live_lane(OTHER_ISSUE, undefined)])
-
-		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(/#1491/u)
-		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
-	})
-
-	// Reported as a success, the caller would capture the directory and type the first `pnpm josh …`
-	// into a lane nothing runs in — the failure the install exists to remove, with a success line
-	// above it (joshuafolkken/kit#1554). The refusal names both ways out, because the work tree is
-	// left on disk and either one needs it.
-	it('refuses the lane when the install failed, naming both ways out', async () => {
+	// Reported as success, a failed install leaves a lane nothing runs in (#1554).
+	it('refuses a failed install with its output and both recovery commands', async () => {
 		install_answers(false, INSTALL_FAILURE)
-
 		const failure = lane_open.open_lane(ISSUE)
 
 		await expect(failure).rejects.toThrow(/pnpm josh lane:close 1490/u)
 		await expect(failure).rejects.toThrow(/install --frozen-lockfile/u)
-	})
-
-	// Diagnosing it needs pnpm's own words; the caller has nothing else to go on.
-	it('carries the failed install output into the refusal', async () => {
-		install_answers(false, INSTALL_FAILURE)
-
-		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(new RegExp(INSTALL_FAILURE, 'u'))
+		await expect(failure).rejects.toThrow(new RegExp(INSTALL_FAILURE, 'u'))
 	})
 })
 
-// joshuafolkken/kit#2147: a concurrent open reads a lane whose `.env` is not yet on disk as
-// unreadable, but a lane still being created is not broken — it holds a seat lock across that window.
-// The guard tolerates as many unreadable lanes as there are locks held and stops on any beyond that.
-describe('the unreadable-lane guard against a lane still being opened', () => {
-	// A held lock accounts for one open in flight; an unreadable lane beyond that is genuinely broken
-	// and still stops the allocation, so the guard is not disarmed by any lock at all.
-	it('still refuses when more lanes are unreadable than there are seat locks held', async () => {
-		mkdirSync(seat_lock_path(1), { recursive: true })
-		lanes_are([live_lane(OTHER_ISSUE, undefined), live_lane('1492', undefined)])
+it.each(PORT_KINDS)('quarantines an unreadable lane with its %s port bound', async (kind) => {
+	const ports = lane_environment.read_lane_ports(lane_environment.lane_file_content(ROOT_ENV, 1))
 
-		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(/#1491/u)
-		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
+	vi.mocked(lane_seat_ownership.snapshot).mockResolvedValue({
+		running: new Set(),
+		ports: new Set([ports[kind]]),
 	})
+	const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	lanes_are([live_lane(OTHER_ISSUE, undefined)])
+
+	const outcome = await lane_open.open_lane(ISSUE)
+
+	expect(outcome.kind).toBe('opened')
+	expect(lane_environment_file(ISSUE)).toContain(SEAT_2_LINE)
+	expect(report).toHaveBeenCalledWith(expect.stringMatching(/#1491.*unreadable \.env/u))
+})
+
+it('refuses allocation when port ownership cannot be read', async () => {
+	vi.mocked(lane_seat_ownership.snapshot).mockResolvedValue(undefined)
+
+	await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(lane_seat_ownership.UNREADABLE)
+	expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
+})
+
+it('opens beyond a held lock even when multiple lanes are unreadable', async () => {
+	mkdirSync(seat_lock_path(1), { recursive: true })
+	lanes_are([live_lane(OTHER_ISSUE, undefined), live_lane('1492', undefined)])
+
+	const outcome = await lane_open.open_lane(ISSUE)
+
+	expect(outcome.kind).toBe('opened')
+	expect(lane_environment_file(ISSUE)).toContain(SEAT_2_LINE)
 })
 
 // joshuafolkken/kit#1849: a fresh work tree has none of the git-ignored gate caches, so the lane's
 // first `josh gate` runs cold; opening copies them from the main checkout so it starts warm. The
 // unit-level behavior is `lane-cache.test.ts`; what belongs here is that the open wires the main
 // repository root through to the copy.
-describe('opening a lane — its verification caches', () => {
-	it('seeds the gate caches the main checkout has into the new lane', async () => {
-		for (const cache_file of GATE_CACHE_FILES) {
-			writeFileSync(path.join(REPOSITORY_ROOT, cache_file), JSON.stringify({ cache_file }))
-		}
+it('seeds the gate caches the main checkout has into the new lane', async () => {
+	for (const cache_file of GATE_CACHE_FILES) {
+		writeFileSync(path.join(REPOSITORY_ROOT, cache_file), JSON.stringify({ cache_file }))
+	}
 
-		await lane_open.open_lane(ISSUE)
+	await lane_open.open_lane(ISSUE)
 
-		for (const cache_file of GATE_CACHE_FILES) {
-			expect(readFileSync(path.join(LANE_ROOT, ISSUE, cache_file), 'utf8')).toBe(
-				JSON.stringify({ cache_file }),
-			)
-		}
-	})
+	for (const cache_file of GATE_CACHE_FILES) {
+		expect(readFileSync(path.join(LANE_ROOT, ISSUE, cache_file), 'utf8')).toBe(
+			JSON.stringify({ cache_file }),
+		)
+	}
 })
 
 // joshuafolkken/kit#1627: a branch that is already here is attached to rather than created, and the
 // absent start point is how that reaches git. Which of the three answers `lane_start_point` gives is
 // its own suite's; what belongs here is that `lane:open` passes it straight through.
-describe('opening a lane on a branch that already exists', () => {
-	it('asks git for no start point, so the work tree lands on that branch', async () => {
-		vi.mocked(git_command.branch_exists).mockResolvedValue(true)
+it('asks git for no start point, so the work tree lands on that branch', async () => {
+	vi.mocked(git_command.branch_exists).mockResolvedValue(true)
 
-		await lane_open.open_lane(ISSUE)
+	await lane_open.open_lane(ISSUE)
 
-		expect(vi.mocked(git_worktree.worktree_add)).toHaveBeenCalledWith(
-			path.join(LANE_ROOT, ISSUE),
-			'1490-lane',
-			undefined,
-		)
-	})
+	expect(vi.mocked(git_worktree.worktree_add)).toHaveBeenCalledWith(
+		path.join(LANE_ROOT, ISSUE),
+		'1490-lane',
+		undefined,
+	)
 })

@@ -1065,7 +1065,9 @@ pnpm josh lane:prune
 
 <!-- /usage -->
 
-`lane:open` cuts from the default branch, installs dependencies, and warms the gate caches and hook bundles from the main checkout.
+`lane:open` branches from default, installs dependencies, copies main's gate caches/hooks.
+
+Unreadable `.env`: report lane/reason on stderr; check ports before allocating other seats. Failed process/socket probes refuse allocation.
 
 `lane:prune` names each lane it keeps, with why, on stderr.
 
@@ -1074,9 +1076,9 @@ pnpm josh lane:prune
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
 - `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 8); applied by `josh epic:next`. A live `lane:limit` override takes precedence; memory admission may hold starts below the limit.
 
-**Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
+**Output / exit codes:** `lane:open` prints its directory on stdout, reasons on stderr; refusal exits non-zero with empty stdout. Seats `1..9` (main: 0) are claimed atomically. Install failure fails; warming is best-effort. `lane:list`: one row per lane — issue, seat, ports, branch, state, directory, output path, profile.
 
-**The `in-progress` / lane difference:** `lane:list` names on stderr an issue carrying `in-progress` with no open lane, and a lane whose issue lacks the label. It never changes a label.
+**`in-progress` / lane:** `lane:list` reports label/lane mismatches on stderr without changing labels.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune` in detail".
 

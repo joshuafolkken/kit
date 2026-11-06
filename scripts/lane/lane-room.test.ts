@@ -115,6 +115,14 @@ describe('lane_room.read — the lane state record', () => {
 	})
 })
 
+it('counts only readable seats toward seat capacity', async () => {
+	const lanes = [lane_of(PAUSED), { ...lane_of(RUNNING), seat: 1 }]
+
+	const room = await lane_room.read(lanes, async () => lane_process_table.parse(LISTING))
+
+	expect(room.use.seated).toBe(1)
+})
+
 describe('lane_room.read', () => {
 	it('reads one asynchronous `ps` and no synchronous spawn, leaving the lane recorded paused uncounted', async () => {
 		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(LANES)

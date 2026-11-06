@@ -6,7 +6,7 @@ const PROBLEM = 'process ownership unreadable'
 describe('lane seat allocation', () => {
 	it('rejects unreadable ownership even when a reservation exists', () => {
 		expect(() => {
-			lane_seat.guard_readable('/missing', [
+			lane_seat.guard_readable([
 				{
 					issue: '5444',
 					branch: '5444-lane',
