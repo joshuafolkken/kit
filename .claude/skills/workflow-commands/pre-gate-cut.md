@@ -110,8 +110,8 @@ clears. Outside a
 lane, `run:cut --impl` prints the held run's instruction: on `over`, keep the hold, send a
 `confirmation` Telegram naming `fullrun #<N>`, end the turn. **It fires on every threshold crossing,
 not once per run**; **An edit reissued right after a refusal passes**; **The run's own handoff
-`Write` always passes**; **An unmeasurable session
-warrants the cut**; **It is silent between a cut and its resume** (`scripts/rules/implementation-cut.ts`).
+`Write` always passes**; **An unmeasurable session is not cut**;
+**It is silent between a cut and its resume** (`scripts/rules/implementation-cut.ts`).
 A child that ended without cutting is detected by
 `pnpm josh run:ending <N> --output <path>`.
 

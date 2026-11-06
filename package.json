@@ -22,7 +22,7 @@
 		"type": "git",
 		"url": "git+https://github.com/joshuafolkken/kit.git"
 	},
-	"packageManager": "pnpm@12.16.0+sha512.e9ccc91a0b8d52da297c16841f9ee05f3ddd631bd757ef26a211687d4a38de653c614453649294438c58be74c2ba62d53e633a4e153708c012296d0f3ee27b36",
+	"packageManager": "pnpm@12.17.0+sha512.b8d223ebec04b580a89ed206daa71d1bccb6a1ee1d52efa95cc3b0db75271561df8f0d8e2c43add39c5ec08018af7a8a95108e7090f95a29f88727b7a40fd53d",
 	"engines": {
 		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
@@ -226,12 +226,12 @@
 		"@playwright/test": "^1.64.1",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.1.0",
 		"@stylistic/eslint-plugin": "^5.10.0",
-		"@types/node": "^26.6.5",
+		"@types/node": "^26.6.6",
 		"@types/run-parallel": "^1.1.2",
 		"@types/semver": "^7.8.0",
 		"cspell": "^10.4.0",
 		"esbuild": "^0.28.2",
-		"eslint": "^10.13.0",
+		"eslint": "^10.14.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-import-resolver-typescript": "^4.4.5",
 		"eslint-plugin-import-x": "^4.17.1",
@@ -240,17 +240,17 @@
 		"eslint-plugin-unicorn": "^79.0.0",
 		"eslint_d": "^15.0.3",
 		"fast-check": "^4.10.2",
-		"globals": "^17.13.0",
+		"globals": "^17.14.0",
 		"lefthook": "^2.2.2",
 		"prettier": "^3.9.10",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.65.1",
+		"rollup": "^4.67.4",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.1.0",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.72.1",
-		"vitest": "^5.0.5"
+		"vitest": "^5.1.0"
 	},
 	"dependencies": {
 		"cli-spinners": "^3.4.0",
@@ -260,9 +260,9 @@
 		"import-meta-resolve": "^4.2.0",
 		"js-yaml": "^5.5.0",
 		"jsonc-parser": "^3.3.1",
-		"ora": "^9.4.1",
+		"ora": "^10.0.0",
 		"run-parallel": "^1.2.0",
-		"semver": "^7.8.5",
+		"semver": "^7.8.6",
 		"string-width": "^8.3.0",
 		"terminal-link": "^5.0.0",
 		"tsx": "^4.23.15",
@@ -271,7 +271,7 @@
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "12.16.0+sha512.e9ccc91a0b8d52da297c16841f9ee05f3ddd631bd757ef26a211687d4a38de653c614453649294438c58be74c2ba62d53e633a4e153708c012296d0f3ee27b36",
+			"version": "12.17.0+sha512.b8d223ebec04b580a89ed206daa71d1bccb6a1ee1d52efa95cc3b0db75271561df8f0d8e2c43add39c5ec08018af7a8a95108e7090f95a29f88727b7a40fd53d",
 			"onFail": "download"
 		}
 	}

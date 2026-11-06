@@ -67,7 +67,7 @@ describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 		// a reissue through, so a `busy` / `failed` verdict no longer leaves the context growing unwatched.
 		'**It fires on every threshold crossing, not once per run**',
 		'**An edit reissued right after a refusal passes**',
-		'**An unmeasurable session warrants the cut**',
+		'**An unmeasurable session is not cut**',
 		'**It is silent between a cut and its resume**',
 		'the implementation resume clears the record',
 		// joshuafolkken/kit#3734: a lane child sent the ⏸️ confirmation for a cut that resumes itself.

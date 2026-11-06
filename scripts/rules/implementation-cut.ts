@@ -163,15 +163,10 @@ function refusable_issue(call: GuardedCall, state: LaneCostState): string | unde
 	return is_handoff_write(call, state.directory, issue) ? undefined : issue
 }
 
-// **An unmeasurable session is cut in a lane and left alone outside one.** A lane child's safety net is
-// the pre-gate direction below; a held run outside a lane is a person's own session, so only a measured
-// `over` interrupts it — a provider with no transcript would otherwise refuse every edit it makes.
+// Only a measured `over` warrants a cut, inside or outside a lane (joshuafolkken/kit#6575).
+// An unmeasurable verdict is undetermined: relaunching cannot supply a provider's missing transcript.
 function warrants_the_cut(state: LaneCostState): boolean {
-	const verdict = state.verdict()
-
-	if (lane_child_issue(state) === undefined) return verdict === cost_verdict.OVER_VERDICT
-
-	return verdict !== cost_verdict.UNDER_VERDICT
+	return state.verdict() === cost_verdict.OVER_VERDICT
 }
 
 // **The tool-name test comes first and the world is consulted second, the cost measurement last.** This
@@ -180,11 +175,8 @@ function warrants_the_cut(state: LaneCostState): boolean {
 // a dispatched child makes in an uncut lane — where crossing the threshold is exactly the event this
 // guard exists to catch.
 //
-// **The unmeasurable direction matches the pre-gate cut**. A session that
-// cannot be priced reads as warranting the cut, the same safety-net direction `pre-gate-cut.ts`'s
-// `warrants_the_cut` takes (`verdict !== UNDER_VERDICT`): the two rules read one statistic against one
-// threshold, so they must not disagree about whether an unmeasurable session is due a cut. Whether the
-// cut could be taken is asked only once it is warranted, so an under-threshold edit spawns no git.
+// Whether the cut could be taken is asked only once a measured `over` warrants it, so an
+// under-threshold or unmeasurable edit spawns no git.
 function is_over_threshold_edit(
 	call: GuardedCall,
 	state: LaneCostState = current_state(),

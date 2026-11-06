@@ -70,8 +70,8 @@ runs:
       if: inputs.install == 'true'
       shell: bash
       env:
-        SAFE_CHAIN_INSTALLER_VERSION: 1.5.26
-        SAFE_CHAIN_INSTALLER_SHA256: 9e4af7107f06d9c0d758cb08fb36804c2af88e24972f3a9d3f8c2bd0ca002adf
+        SAFE_CHAIN_INSTALLER_VERSION: 1.5.27
+        SAFE_CHAIN_INSTALLER_SHA256: 600ebddcb3aaf1fd53653a8d7985df44528722c0f5ee7eb9fff86f26a1a4e5a8
       run: |
         export CURL_HOME
         CURL_HOME=$(mktemp -d "$RUNNER_TEMP/safe-chain-curl.XXXXXX")

@@ -178,9 +178,12 @@ describe('uncut_run_issue', () => {
 describe('is_over_threshold_edit', () => {
 	// **The firing case, and the acceptance condition #2310 pins**: an edit in a marked lane child whose
 	// recent-context cost is over threshold.
-	it.each([[EDIT], ['Write']])('fires on a %j in an over-threshold uncut lane child', (name) => {
-		expect(implementation_cut.is_over_threshold_edit(edit_call(name), state_of())).toBe(true)
-	})
+	it.each([[EDIT], ['Write']])(
+		'fires on a %j in an over-threshold uncut lane child (ac-e8e1364b)',
+		(name) => {
+			expect(implementation_cut.is_over_threshold_edit(edit_call(name), state_of())).toBe(true)
+		},
+	)
 
 	// **Below the threshold it does not fire** — the other half of the acceptance condition.
 	it('says nothing when the recent-context cost is under threshold', () => {
@@ -189,14 +192,11 @@ describe('is_over_threshold_edit', () => {
 		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
 	})
 
-	// **The unmeasurable direction matches the pre-gate cut** (joshuafolkken/kit#2385): a session that
-	// cannot be priced warrants the cut as a safety net, the `verdict !== UNDER_VERDICT` reading
-	// `pre-gate-cut.ts`'s `warrants_the_cut` takes, so the two rules never disagree about whether an
-	// unmeasurable session is due a cut.
-	it('fires when the session cannot be measured, the pre-gate-cut safety-net direction', () => {
+	// joshuafolkken/kit#6575: relaunching cannot make a provider's missing transcript measurable.
+	it('allows an edit when the lane child cannot be measured (ac-d67534a4)', () => {
 		const state = state_of({ verdict: (): CostVerdict => UNMEASURABLE })
 
-		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(true)
+		expect(implementation_cut.is_over_threshold_edit(edit_call(), state)).toBe(false)
 	})
 
 	// **The cost read is gated behind the cheap checks.** A non-edit call and a call outside an uncut
