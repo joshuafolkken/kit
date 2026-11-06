@@ -1,5 +1,4 @@
 import { backlog_occupied } from '#scripts/backlog/backlog-occupied'
-import { lane_capacity } from './lane-capacity'
 import { lane_process_table, type TableRead } from './lane-process-table'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_snapshot_trace } from './lane-snapshot-trace'
@@ -47,10 +46,7 @@ async function read(
 ): Promise<LaneRoom> {
 	const open = lanes ?? (await lane_registry.list_lanes())
 	const occupancy = await occupancy_of(open, table)
-	const seated =
-		lane_registry.unreadable_lanes(open).length > 0
-			? lane_capacity.seated_limit(Infinity)
-			: lane_registry.used_seats(open).length
+	const seated = lane_registry.used_seats(open).length
 	const use = { occupied: occupancy.occupied.length, seated, unknown: occupancy.unknown }
 
 	return { ...occupancy, use }

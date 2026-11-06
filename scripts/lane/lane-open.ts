@@ -164,7 +164,8 @@ async function clear_the_way(
 	issue: string,
 	lanes: ReadonlyArray<LaneInfo>,
 ): Promise<void> {
-	lane_seat.guard_readable(root, lanes)
+	lane_seat.guard_readable(lanes)
+	lane_seat.report_quarantined(root, lanes)
 	await lane_leftover.reclaim(lane_paths.lane_directory(root, issue))
 }
 

@@ -56,16 +56,25 @@ function unreadable_description(lane: LaneInfo): string {
 	return `${session_cite.issue(lane.issue)} (${lane.directory}): ${lane.seat_problem ?? 'unreadable .env'}`
 }
 
-function guard_readable(root: string, lanes: ReadonlyArray<LaneInfo>): void {
-	const unreadable = lane_registry.unreadable_lanes(lanes)
-	const unknown = unreadable.filter(
-		(lane) => lane.seat_problem !== undefined || !existsSync(lock_path(root, `lane-${lane.issue}`)),
-	)
+function guard_readable(lanes: ReadonlyArray<LaneInfo>): void {
+	const unknown = lanes.filter((lane) => lane.seat_problem !== undefined)
 	if (unknown.length === 0) return
 
 	throw new Error(
 		`Cannot read lane port ownership: ${unknown.map((lane) => unreadable_description(lane)).join(', ')}`,
 	)
+}
+
+function report_quarantined(root: string, lanes: ReadonlyArray<LaneInfo>): void {
+	const unknown = lane_registry
+		.unreadable_lanes(lanes)
+		.filter((lane) => !existsSync(lock_path(root, `lane-${lane.issue}`)))
+
+	for (const lane of unknown) {
+		console.error(
+			`Quarantined lane ${unreadable_description(lane)}; checking candidate ports before allocation.`,
+		)
+	}
 }
 
 function candidates(lanes: ReadonlyArray<LaneInfo>, issue: string): Array<number> {
@@ -88,10 +97,10 @@ async function ports_available(seat: number, lane: LaneInfo | undefined): Promis
 	)
 }
 
-async function available(root: string, issue: string, seat: number): Promise<boolean> {
+async function available(issue: string, seat: number): Promise<boolean> {
 	const lanes = await lane_registry.list_lanes()
 
-	guard_readable(root, lanes)
+	guard_readable(lanes)
 
 	if (lane_registry.used_seats(lanes.filter((lane) => lane.issue !== issue)).includes(seat)) {
 		return false
@@ -108,7 +117,7 @@ async function try_seat(root: string, issue: string, seat: number): Promise<stri
 	let is_held = false
 
 	try {
-		is_held = await available(root, issue, seat)
+		is_held = await available(issue, seat)
 
 		return is_held ? lock : undefined
 	} finally {
@@ -135,7 +144,7 @@ async function reserve_locked(
 ): Promise<SeatReservation | undefined> {
 	const lanes = await lane_registry.list_lanes()
 
-	guard_readable(root, lanes)
+	guard_readable(lanes)
 
 	const selected = await first_available(root, issue, candidates(lanes, issue))
 
@@ -159,7 +168,7 @@ async function reserve(root: string, issue: string): Promise<SeatReservation | u
 	return undefined
 }
 
-const lane_seat = { guard_readable, open_in_flight_count, release, reserve }
+const lane_seat = { guard_readable, open_in_flight_count, release, report_quarantined, reserve }
 
 export { lane_seat }
 export type { SeatReservation }
