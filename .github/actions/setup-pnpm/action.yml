@@ -55,7 +55,7 @@ runs:
     # (joshuafolkken/kit#5315). Caching it in pnpm's store, rather than taking Node from setup-node's
     # tool cache, keeps setup-node the one place the default Node version is written.
     - name: Setup pnpm
-      uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
+      uses: pnpm/setup@fa36a5ef7dcdefc3a7cb25655c122e00cf6e636e # v3.1.2
       with:
         version: ${{ steps.pnpm-version.outputs.version }}
         runtime: ${{ inputs.runtime }}
