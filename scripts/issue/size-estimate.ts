@@ -1,6 +1,8 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
+import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
+import { declared_growth } from '#scripts/split/declared-growth'
 import { split_assess, type SizeMeasurement } from '#scripts/split/split-assess'
 import { z } from 'zod'
 import { SPLIT_ROUTE_LABEL } from './issue-labels'
@@ -15,9 +17,8 @@ import { markdown_section } from './markdown-section'
 // judged by one `verdict_for`. An epic (a body carrying `## Split rationale`) declares no estimate:
 // its children do.
 //
-// joshuafolkken/kit#5654: lanes land at twice their declaration at the median (`lane:stats`, files
-// and lines alike), so the guide and the cap judge the declaration multiplied by
-// `split_assess.DECLARED_GROWTH_FACTOR`. `parse` keeps the declared counts: `lane:plan` reads them as declared.
+// Each axis grows by the recent merged lanes' median, independently of the implement rate.
+// `parse` keeps the declared counts: `lane:plan` reads them as declared.
 
 const BACKGROUND_HEADING = '## 背景'
 const EPIC_HEADING = '## Split rationale'
@@ -33,7 +34,6 @@ const MISSING = `missing size estimate: declare \`${DECLARATION}\` under ${BACKG
 const EXAMPLE = `${PREFIX} 約 3 ファイル / 60 行（テスト除く）`
 const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 const estimate_schema = z.object({ files: z.coerce.number(), lines: z.coerce.number() })
-const { DECLARED_GROWTH_FACTOR } = split_assess
 const IMPLEMENT_BUDGET = lane_stage_budget.BUDGET_MINUTES.implement
 
 function declared(body: string, prefix: string): string | undefined {
@@ -91,8 +91,8 @@ function is_epic(body: string): boolean {
 }
 
 // A declared count as the guide and the cap judge it.
-function grown(count: number): number {
-	return count * DECLARED_GROWTH_FACTOR
+function grown(count: number, axis: 'files' | 'lines', growth?: SizeRatios): number {
+	return count * declared_growth.factor(growth, axis)
 }
 
 function guide_for(rate?: ImplementRate): ReturnType<typeof split_assess.guide_for> {
@@ -101,7 +101,11 @@ function guide_for(rate?: ImplementRate): ReturnType<typeof split_assess.guide_f
 
 // The declared estimate, its verdict judged on the grown counts, or `undefined` when there is none or
 // it does not parse.
-function parse(body: string, rate?: ImplementRate): SizeMeasurement | undefined {
+function parse(
+	body: string,
+	rate?: ImplementRate,
+	growth?: SizeRatios,
+): SizeMeasurement | undefined {
 	const read = estimate_schema.safeParse(VALUE_PATTERN.exec(declared(body, PREFIX) ?? '')?.groups)
 
 	if (!read.success) return undefined
@@ -110,16 +114,26 @@ function parse(body: string, rate?: ImplementRate): SizeMeasurement | undefined 
 	return {
 		files,
 		lines,
-		verdict: split_assess.verdict_for(grown(files), grown(lines), guide_for(rate)),
+		verdict: split_assess.verdict_for(
+			grown(files, 'files', growth),
+			grown(lines, 'lines', growth),
+			guide_for(rate),
+		),
 	}
 }
 
 // The declared counts, the factor and the grown counts, as every refusal prints them.
-function projected(estimate: SizeMeasurement): string {
-	const declared_counts = `${String(estimate.files)} file(s) / ${String(estimate.lines)} line(s)`
-	const grown_counts = `${String(grown(estimate.files))} file(s) / ${String(grown(estimate.lines))} line(s)`
+function growth_text(growth?: SizeRatios): string {
+	return growth?.files === undefined && growth?.lines === undefined
+		? `× ${String(declared_growth.factor(growth, 'files'))}`
+		: `(${declared_growth.text(growth)})`
+}
 
-	return `size estimate ${declared_counts} × ${String(DECLARED_GROWTH_FACTOR)} = ${grown_counts}`
+function projected(estimate: SizeMeasurement, growth?: SizeRatios): string {
+	const declared_counts = `${String(estimate.files)} file(s) / ${String(estimate.lines)} line(s)`
+	const grown_counts = `${String(grown(estimate.files, 'files', growth))} file(s) / ${String(grown(estimate.lines, 'lines', growth))} line(s)`
+
+	return `size estimate ${declared_counts} ${growth_text(growth)} = ${grown_counts}`
 }
 
 // The shape check `issue:lint` makes: the declaration is there and parses. The guide needs the route,
@@ -137,21 +151,25 @@ function is_excused(body: string, route: string | undefined): boolean {
 }
 
 // The counts and any guide overrun, shared by filing refusals and `backlog:next`'s offer note.
-function exceeded(estimate: SizeMeasurement, rate?: ImplementRate): string {
-	if (estimate.verdict === split_assess.SINGLE_VERDICT) return projected(estimate)
+function exceeded(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
+	if (estimate.verdict === split_assess.SINGLE_VERDICT) return projected(estimate, growth)
 	const guide = guide_for(rate)
 
-	return `${projected(estimate)} exceeds the guide (more than ${String(guide.files)} files or ${String(guide.lines)} lines)`
+	return `${projected(estimate, growth)} exceeds the guide (more than ${String(guide.files)} files or ${String(guide.lines)} lines)`
 }
 
-function refusal(estimate: SizeMeasurement, rate?: ImplementRate): string {
-	return `${exceeded(estimate, rate)} — file it split (\`--route split\`) or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+function refusal(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
+	return `${exceeded(estimate, rate, growth)} — file it split (\`--route split\`) or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // The declared estimate when it is over the guide, whatever excuses it; `undefined` under it or with
 // no parsable estimate.
-function guide_exceeded(body: string, rate?: ImplementRate): SizeMeasurement | undefined {
-	const estimate = parse(body, rate)
+function guide_exceeded(
+	body: string,
+	rate?: ImplementRate,
+	growth?: SizeRatios,
+): SizeMeasurement | undefined {
+	const estimate = parse(body, rate, growth)
 
 	return estimate?.verdict === split_assess.SPLIT_VERDICT ? estimate : undefined
 }
@@ -163,8 +181,9 @@ function over_guide(
 	body: string,
 	route: string | undefined,
 	rate?: ImplementRate,
+	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	return is_excused(body, route) ? undefined : guide_exceeded(body, rate)
+	return is_excused(body, route) ? undefined : guide_exceeded(body, rate, growth)
 }
 
 // joshuafolkken/kit#5935: a split filing passes the guide at filing, yet a lane still lands past its
@@ -174,8 +193,9 @@ function split_over_guide(
 	body: string,
 	route: string | undefined,
 	rate?: ImplementRate,
+	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	return route === SPLIT_ROUTE_LABEL ? guide_exceeded(body, rate) : undefined
+	return route === SPLIT_ROUTE_LABEL ? guide_exceeded(body, rate, growth) : undefined
 }
 
 // The declared estimate when it is over the cap; a declared reason does not excuse it, only a split
@@ -184,12 +204,17 @@ function over_cap(
 	body: string,
 	route: string | undefined,
 	rate?: ImplementRate,
+	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	const estimate = parse(body, rate)
+	const estimate = parse(body, rate, growth)
 
 	if (estimate === undefined || route === SPLIT_ROUTE_LABEL) return undefined
 
-	return split_assess.is_over_cap(grown(estimate.files), grown(estimate.lines), guide_for(rate))
+	return split_assess.is_over_cap(
+		grown(estimate.files, 'files', growth),
+		grown(estimate.lines, 'lines', growth),
+		guide_for(rate),
+	)
 		? estimate
 		: undefined
 }
@@ -204,33 +229,42 @@ function route_of(labels: ReadonlyArray<string>): string | undefined {
 function is_issue_over_cap(
 	issue: Pick<OpenIssueData, 'body' | 'labels'>,
 	rate?: ImplementRate,
+	growth?: SizeRatios,
 ): boolean {
 	const labels = issue.labels?.map((label) => label.name) ?? []
 
-	return over_cap(issue.body ?? '', route_of(labels), rate) !== undefined
+	return over_cap(issue.body ?? '', route_of(labels), rate, growth) !== undefined
 }
 
 // The counts against the cap, shared by the filing refusal and `backlog:next`'s withheld note.
-function capped(estimate: SizeMeasurement, rate?: ImplementRate): string {
+function capped(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
 	const { cap } = guide_for(rate)
 
-	return `${projected(estimate)} exceeds the cap (more than ${String(cap.files)} files or ${String(cap.lines)} lines), which \`${REASON_PREFIX}\` does not excuse`
+	return `${projected(estimate, growth)} exceeds the cap (more than ${String(cap.files)} files or ${String(cap.lines)} lines), which \`${REASON_PREFIX}\` does not excuse`
 }
 
-function cap_refusal(estimate: SizeMeasurement, rate?: ImplementRate): string {
-	return `${capped(estimate, rate)} — file an ordered epic of \`--route split\` children instead (the mechanical changes first, the child that switches the setting on last); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+function cap_refusal(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
+	return `${capped(estimate, rate, growth)} — file an ordered epic of \`--route split\` children instead (the mechanical changes first, the child that switches the setting on last); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // The implement minutes the grown declared lines take at the measured rate.
-function projected_minutes(estimate: SizeMeasurement, rate: ImplementRate): number {
-	return lane_implement_rate.minutes_for(grown(estimate.lines), rate)
+function projected_minutes(
+	estimate: SizeMeasurement,
+	rate: ImplementRate,
+	growth?: SizeRatios,
+): number {
+	return lane_implement_rate.minutes_for(grown(estimate.lines, 'lines', growth), rate)
 }
 
-function budget_refusal(estimate: SizeMeasurement, rate: ImplementRate): string {
-	const minutes = Math.round(projected_minutes(estimate, rate))
+function budget_refusal(
+	estimate: SizeMeasurement,
+	rate: ImplementRate,
+	growth?: SizeRatios,
+): string {
+	const minutes = Math.round(projected_minutes(estimate, rate, growth))
 	const measured = `${rate.median.toFixed(1)} implement min / 100 lines over ${String(rate.lanes)} lane(s)`
 
-	return `${exceeded(estimate, rate)} and projects ${String(minutes)} implement minute(s) at ${measured}, over the ${String(IMPLEMENT_BUDGET)}-minute implement budget, which \`${REASON_PREFIX}\` does not excuse — file it split (\`--route split\`); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${exceeded(estimate, rate, growth)} and projects ${String(minutes)} implement minute(s) at ${measured}, over the ${String(IMPLEMENT_BUDGET)}-minute implement budget, which \`${REASON_PREFIX}\` does not excuse — file it split (\`--route split\`); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // joshuafolkken/kit#6025: an estimate whose projected implement time exceeds the stage
@@ -241,22 +275,26 @@ function over_budget(
 	body: string,
 	route: string | undefined,
 	rate: ImplementRate | undefined,
+	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	const estimate = route === SPLIT_ROUTE_LABEL ? undefined : parse(body, rate)
+	const estimate = route === SPLIT_ROUTE_LABEL ? undefined : parse(body, rate, growth)
 
 	if (estimate === undefined || rate === undefined) return undefined
 
-	return projected_minutes(estimate, rate) > IMPLEMENT_BUDGET ? estimate : undefined
+	return projected_minutes(estimate, rate, growth) > IMPLEMENT_BUDGET ? estimate : undefined
 }
 
 function budget_problem(
 	body: string,
 	route: string | undefined,
 	rate: ImplementRate | undefined,
+	growth?: SizeRatios,
 ): string | undefined {
-	const estimate = over_budget(body, route, rate)
+	const estimate = over_budget(body, route, rate, growth)
 
-	return estimate === undefined || rate === undefined ? undefined : budget_refusal(estimate, rate)
+	return estimate === undefined || rate === undefined
+		? undefined
+		: budget_refusal(estimate, rate, growth)
 }
 
 // The filing refusal for an estimate over the cap, else over the implement budget at `rate`, else over
@@ -265,14 +303,15 @@ function guide_problem(
 	body: string,
 	route: string | undefined,
 	rate?: ImplementRate,
+	growth?: SizeRatios,
 ): string | undefined {
-	const over = over_cap(body, route, rate)
+	const over = over_cap(body, route, rate, growth)
 
-	if (over !== undefined) return cap_refusal(over, rate)
-	const estimate = over_guide(body, route, rate)
-	const guide_refusal = estimate === undefined ? undefined : refusal(estimate, rate)
+	if (over !== undefined) return cap_refusal(over, rate, growth)
+	const estimate = over_guide(body, route, rate, growth)
+	const guide_refusal = estimate === undefined ? undefined : refusal(estimate, rate, growth)
 
-	return budget_problem(body, route, rate) ?? guide_refusal
+	return budget_problem(body, route, rate, growth) ?? guide_refusal
 }
 
 // The declared file count, or `undefined` when there is no estimate or it does not parse.

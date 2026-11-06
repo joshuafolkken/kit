@@ -59,7 +59,10 @@ beforeEach(() => {
 	vi.spyOn(issue_sample_source, 'problem').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
 	vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue(NO_DUPLICATES)
-	vi.spyOn(lane_net_read, 'implement_rate').mockResolvedValue(undefined)
+	vi.spyOn(lane_net_read, 'measurements').mockResolvedValue({
+		implement_rate: undefined,
+		growth: {},
+	})
 })
 
 afterAll(() => {
@@ -132,8 +135,26 @@ describe('issue_file_pass.labels_in_one_pass — a measurement already declared'
 
 // joshuafolkken/kit#6025: the size estimate is judged at the ledger's recent implement rate.
 describe('issue_file_pass.labels_in_one_pass — the implement rate', () => {
+	it('admits measured growth under the guide when no speed is measured', async () => {
+		vi.mocked(lane_net_read.measurements).mockResolvedValue({
+			implement_rate: undefined,
+			growth: { files: 1, lines: 1 },
+		})
+		const body = CLEAR_BODY.replace(
+			CLEAR_ESTIMATE,
+			'- 規模見積もり: 約 6 ファイル / 150 行（テスト除く）',
+		)
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(body))).toBeDefined()
+	})
+})
+
+describe('issue_file_pass.labels_in_one_pass — measured speed', () => {
 	it('refuses a reasoned estimate the ledger rate projects past the budget', async () => {
-		vi.mocked(lane_net_read.implement_rate).mockResolvedValue({ median: 10, lanes: 4 })
+		vi.mocked(lane_net_read.measurements).mockResolvedValue({
+			implement_rate: { median: 10, lanes: 4 },
+			growth: {},
+		})
 		const body = CLEAR_BODY.replace(
 			CLEAR_ESTIMATE,
 			'- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）\n- 分割しない理由: 一体で入れる',
@@ -147,7 +168,10 @@ describe('issue_file_pass.labels_in_one_pass — the implement rate', () => {
 		{ lines: 30, passes: true },
 		{ lines: 50, passes: false },
 	])('judges $lines declared lines at the measured rate', async ({ lines, passes }) => {
-		vi.mocked(lane_net_read.implement_rate).mockResolvedValue({ median: 17.7, lanes: 316 })
+		vi.mocked(lane_net_read.measurements).mockResolvedValue({
+			implement_rate: { median: 17.7, lanes: 316 },
+			growth: {},
+		})
 		const estimate = `- 規模見積もり: 約 1 ファイル / ${String(lines)} 行（テスト除く）`
 		const body = CLEAR_BODY.replace(CLEAR_ESTIMATE, () => estimate)
 

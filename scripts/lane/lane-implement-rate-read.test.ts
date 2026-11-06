@@ -17,6 +17,7 @@ const MERGED_AT = '2026-10-24T03:30:00.000Z'
 const NOW_MS = Date.parse('2026-10-24T04:00:00.000Z')
 const EXPECTED_RATE = { median: 10, lanes: 1 }
 const PERIOD_DAYS = 3
+const BOUNDARY = Date.parse('2026-10-27T03:30:00.000Z')
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -107,7 +108,7 @@ describe.each([
 
 	it('includes the three-day boundary and excludes older merges', async () => {
 		const context = measured_context()
-		const boundary = Date.parse('2026-10-27T03:30:00.000Z')
+		const boundary = BOUNDARY
 
 		expect(lane_implement_rate_read.PERIOD_DAYS).toBe(PERIOD_DAYS)
 		await expect(reader.implement_rate(context, boundary)).resolves.toStrictEqual(EXPECTED_RATE)
@@ -115,4 +116,37 @@ describe.each([
 	})
 
 	context_tests(reader)
+})
+
+describe('measurements', () => {
+	it('reads growth without an implement duration (ac-4b828b0f)', async () => {
+		const context = context_of()
+
+		lane_ledger_write.append(context.ledger_path, {
+			kind: 'size',
+			at: DISPATCHED_AT,
+			issue: ISSUE,
+			declared: { files: 2, lines: 100 },
+			actual: { files: 3, lines: 120 },
+		})
+		lane_ledger_write.append(context.ledger_path, { kind: 'merge', at: MERGED_AT, issue: ISSUE })
+		await expect(lane_implement_rate_read.measurements(context, NOW_MS)).resolves.toEqual({
+			implement_rate: undefined,
+			growth: { files: 1.5, lines: 1.2 },
+		})
+	})
+
+	it('shares the three-day boundary with rate measurement (ac-4b828b0f)', async () => {
+		const context = measured_context()
+		const boundary = BOUNDARY
+
+		await expect(lane_implement_rate_read.measurements(context, boundary)).resolves.toEqual({
+			implement_rate: EXPECTED_RATE,
+			growth: { files: 1, lines: 2 },
+		})
+		await expect(lane_implement_rate_read.measurements(context, boundary + 1)).resolves.toEqual({
+			implement_rate: undefined,
+			growth: {},
+		})
+	})
 })

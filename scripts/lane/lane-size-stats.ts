@@ -10,6 +10,11 @@ const COLUMNS = [
 ]
 const DECIMALS = 1
 
+interface SizeRatios {
+	files?: number | undefined
+	lines?: number | undefined
+}
+
 function sizes_of(entries: ReadonlyArray<LedgerEntry>): Array<SizeEntry> {
 	return entries
 		.filter((entry): entry is SizeEntry => entry.kind === 'size')
@@ -31,11 +36,11 @@ function merged_sizes(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow):
 }
 
 function ratio_of(sizes: ReadonlyArray<SizeEntry>, axis: 'files' | 'lines'): number | undefined {
-	const ratios = sizes
+	const values = sizes
 		.filter((size) => size.declared[axis] > 0)
 		.map((size) => size.actual[axis] / size.declared[axis])
 
-	return lane_stats.median(ratios)
+	return lane_stats.median(values)
 }
 
 function ratio_cell(sizes: ReadonlyArray<SizeEntry>, axis: 'files' | 'lines'): string {
@@ -47,6 +52,14 @@ function ratio_cell(sizes: ReadonlyArray<SizeEntry>, axis: 'files' | 'lines'): s
 // The period's `lines actual / declared median`, read by `josh lane:plan` (joshuafolkken/kit#5568).
 function lines_ratio(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): number | undefined {
 	return ratio_of(merged_sizes(entries, window), 'lines')
+}
+
+function ratios(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): SizeRatios {
+	const sizes = merged_sizes(entries, window)
+	const files = ratio_of(sizes, 'files')
+	const lines = ratio_of(sizes, 'lines')
+
+	return { ...(files !== undefined && { files }), ...(lines !== undefined && { lines }) }
 }
 
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
@@ -63,6 +76,7 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n')
 }
 
-const lane_size_stats = { lines_ratio, merged_sizes, table }
+const lane_size_stats = { lines_ratio, merged_sizes, ratios, table }
 
 export { lane_size_stats }
+export type { SizeRatios }

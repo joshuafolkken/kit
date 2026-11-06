@@ -7,7 +7,7 @@ import { lane_why_cli } from './lane-why-cli'
 
 const mocks = vi.hoisted(() => ({
 	read_records: vi.fn(),
-	implement_rate: vi.fn(),
+	measurements: vi.fn(),
 	issue_get_body: vi.fn<() => Promise<string | undefined>>(),
 	read_issues: vi.fn(),
 	timing_of: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock(import('./lane-net-read'), async (import_original) => {
 		lane_net_read: {
 			...lane_net_read,
 			read_records: mocks.read_records,
-			implement_rate: mocks.implement_rate,
+			measurements: mocks.measurements,
 		},
 	}
 })
@@ -68,13 +68,28 @@ beforeEach(() => {
 		entries: lane(61),
 		events: [{ pos: 1, at: at(10), kind: 'plan', text: `#${String(ISSUE)} plan` }],
 	})
-	mocks.implement_rate.mockResolvedValue(undefined)
+	mocks.measurements.mockResolvedValue({ implement_rate: undefined, growth: {} })
 	mocks.issue_get_body.mockResolvedValue(undefined)
 	mocks.read_issues.mockResolvedValue(undefined)
 	mocks.timing_of.mockRejectedValue(new Error('gh failed'))
 })
 
 describe('lane_why_cli.run', () => {
+	it('projects declared lines with the measured growth', async () => {
+		mocks.issue_get_body.mockResolvedValue(
+			'## 背景\n\n- 規模見積もり: 約 1 ファイル / 100 行（テスト除く）',
+		)
+		mocks.measurements.mockResolvedValue({
+			implement_rate: { median: 10, lanes: 1 },
+			growth: { files: 3, lines: 1.5 },
+		})
+
+		await expect(lane_why_cli.run([String(ISSUE)])).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('| 15.0 min |'))
+	})
+})
+
+describe('lane_why_cli.run output', () => {
 	it('prints the table with blank cells when the Issue, rate and listing are unreadable', async () => {
 		await expect(lane_why_cli.run([String(ISSUE)])).resolves.toBe(0)
 		expect(console.info).toHaveBeenCalledWith(

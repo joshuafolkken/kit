@@ -13,7 +13,7 @@ vi.mock('#scripts/git/git-command', () => ({
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved_through_merge: vi.fn() } }))
 vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
-	lane_implement_rate_read: { implement_rate: vi.fn() },
+	lane_implement_rate_read: { measurements: vi.fn() },
 }))
 vi.mock('./split-relocations', () => ({
 	split_relocations: {
@@ -31,7 +31,7 @@ const { lane_implement_rate_read } = await import('#scripts/lane/lane-implement-
 const NEW_FILE_COUNT = 11
 const NEW_FILE_LINES = 50
 const TREE_BASE = 'tree-base-commit'
-const LEGACY_GUIDE = split_assess.guide_for(12)
+const LEGACY_GUIDE = split_assess.guide_for(12, undefined, {})
 const SMALL_DIFF = '51\t0\tscripts/a.ts'
 
 const fixture = { root: '' }
@@ -46,7 +46,10 @@ beforeEach(() => {
 	vi.mocked(git_command.diff_numstat_since).mockResolvedValue('')
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
 	vi.mocked(change_base.resolved_through_merge).mockResolvedValue(TREE_BASE)
-	vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue(undefined)
+	vi.mocked(lane_implement_rate_read.measurements).mockResolvedValue({
+		implement_rate: undefined,
+		growth: {},
+	})
 })
 
 afterEach(async () => {
@@ -70,9 +73,25 @@ describe('read_branch excludes quoted tests', () => {
 })
 
 describe('read_branch measured guide', () => {
+	it('carries growth without speed into notices and reasons (ac-75138e94)', async () => {
+		vi.mocked(lane_implement_rate_read.measurements).mockResolvedValue({
+			implement_rate: undefined,
+			growth: { files: 1, lines: 1.25 },
+		})
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(SMALL_DIFF)
+		const measured = await split_measure.read_branch()
+		const notice = split_assess.notice(measured, { files: 1, lines: 40 })
+
+		expect(notice).toContain('growth files × 1 (measured) / lines × 1.25 (measured)')
+		expect(split_assess.reason(measured)).toContain('guide 8 files / 200 lines (fallback)')
+	})
+
 	it('floors the measured budget guide for verdict, reason and notices (ac-9e07d12c)', async () => {
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(SMALL_DIFF)
-		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
+		vi.mocked(lane_implement_rate_read.measurements).mockResolvedValue({
+			implement_rate: { median: 24, lanes: 1 },
+			growth: {},
+		})
 		const measured = await split_measure.read_branch()
 
 		expect(measured.verdict).toBe('single')

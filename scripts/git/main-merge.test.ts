@@ -24,7 +24,7 @@ vi.mock('./change-base', () => ({
 	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
 vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
-	lane_implement_rate_read: { implement_rate: vi.fn() },
+	lane_implement_rate_read: { measurements: vi.fn() },
 }))
 
 // The guard's one git read — the paths the default branch would bring in.
@@ -97,7 +97,10 @@ beforeEach(() => {
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 	vi.mocked(git_command.diff_numstat_since).mockResolvedValue('')
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
-	vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue(undefined)
+	vi.mocked(lane_implement_rate_read.measurements).mockResolvedValue({
+		implement_rate: undefined,
+		growth: {},
+	})
 })
 
 describe('merging the default branch into the current branch', () => {
@@ -308,7 +311,10 @@ function over_guide_numstat(): string {
 
 describe('the measured split notice before the gate', () => {
 	it.each([51, 200])('keeps %s lines silent at the fallback floor (ac-9e07d12c)', async (lines) => {
-		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
+		vi.mocked(lane_implement_rate_read.measurements).mockResolvedValue({
+			implement_rate: { median: 24, lanes: 1 },
+			growth: {},
+		})
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(
 			`${String(lines)}\t0\t${CHANGED_FILE}`,
 		)
@@ -319,7 +325,10 @@ describe('the measured split notice before the gate', () => {
 	})
 
 	it('warns past the fallback floor with a slow measured rate', async () => {
-		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
+		vi.mocked(lane_implement_rate_read.measurements).mockResolvedValue({
+			implement_rate: { median: 24, lanes: 1 },
+			growth: {},
+		})
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(`201\t0\t${CHANGED_FILE}`)
 
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)

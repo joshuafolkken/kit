@@ -2,15 +2,17 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
-import { split_assess } from '#scripts/split/split-assess'
+import { declared_growth } from '#scripts/split/declared-growth'
+import { split_assess, type SplitGuide } from '#scripts/split/split-assess'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
+import type { SizeRatios } from './lane-size-stats'
 import { lane_stage_budget } from './lane-stage-budget'
 
 // The size bar `josh lane:plan` holds a plan to (joshuafolkken/kit#5533): a plan whose files outgrow
-// twice the size estimate its Issue declares is refused, not recorded, and the lane splits the rest
+// the size estimate times the period's files ratio is refused, not recorded, and the lane splits the rest
 // off rather than writing why it stays one. Two lanes declared at 4 files planned 9 with that comment
 // and shipped 16 and 18, their implement step twice the median. Files count as the declaration counts
 // them (`size-estimate.ts`): tests excluded, documents and snapshots included. An Issue with no
@@ -18,8 +20,8 @@ import { lane_stage_budget } from './lane-stage-budget'
 //
 // **Two more axes answer `split`** (joshuafolkken/kit#5568), since declarations run short — merged lanes
 // changed 1.5 times the files and 1.8 times the lines they declared, so twice the files alone rarely
-// fired: the probed hunks past twice the declared files, and the declared lines times the period's
-// `lines actual / declared median` (`split_assess.DECLARED_GROWTH_FACTOR` without one) past the line guide. Both
+// fired: the probed hunks past the grown declared files, and the declared lines times the period's
+// `lines actual / declared median` past the line guide. Each unmeasured axis uses 2. Both
 // stand down once the lane has filed a split child: the lines axis reads the declaration alone, and the
 // hunks the tree already holds would otherwise refuse every re-plan the ship's `unplanned` stop asks for.
 // The lines axis also stands down on a re-plan of a cleared plan (joshuafolkken/kit#5600): the
@@ -46,6 +48,7 @@ type SplitReason = 'files' | 'hunks' | 'lines'
 interface PlanSignals {
 	hunk_files: ReadonlyArray<string>
 	committed_files: ReadonlyArray<string>
+	files_ratio?: number | undefined
 	lines_ratio: number | undefined
 	implement_rate: ImplementRate | undefined
 	split_filed: boolean
@@ -67,7 +70,7 @@ interface MeasureOver {
 	measured: number
 }
 
-type Oversize = FilesOver | MeasureOver
+type Oversize = (FilesOver | MeasureOver) & { guide?: SplitGuide }
 
 interface Declared {
 	files: number
@@ -84,6 +87,18 @@ function declared_of(issue: number, issues: ReadonlyArray<OpenIssueData>): Decla
 // Whether the bar applies at all — read before the signals, so an undeclared Issue measures nothing.
 function declares(issue: number, issues: ReadonlyArray<OpenIssueData>): boolean {
 	return declared_of(issue, issues) !== undefined
+}
+
+function ratios_of(signals: PlanSignals): SizeRatios {
+	return { files: signals.files_ratio, lines: signals.lines_ratio }
+}
+
+function guide_of(signals: PlanSignals): SplitGuide {
+	return split_assess.guide_for(
+		lane_stage_budget.BUDGET_MINUTES.implement,
+		signals.implement_rate,
+		ratios_of(signals),
+	)
 }
 
 // The files the recorded plan already held stay first, so the ones this re-run adds are the ones split off.
@@ -111,8 +126,9 @@ function files_over(
 	plan: LanePlan,
 	declared: number,
 	recorded: LanePlan | undefined,
+	signals: PlanSignals,
 ): FilesOver | undefined {
-	const limit = declared * split_assess.DECLARED_GROWTH_FACTOR
+	const limit = declared * declared_growth.factor(ratios_of(signals), 'files')
 	const counted = plan.paths.filter((file) => !test_declared_logic.is_test_file(file))
 
 	if (counted.length <= limit || files_approved(plan, declared, recorded, counted.length)) {
@@ -152,20 +168,19 @@ function unplanned_hunks(
 	return run_ship_planned.unplanned_of(planned, signals.hunk_files).length
 }
 
-function hunks_over(declared: number, hunks: number): MeasureOver | undefined {
-	const limit = declared * split_assess.DECLARED_GROWTH_FACTOR
+function hunks_over(
+	declared: number,
+	hunks: number,
+	signals: PlanSignals,
+): MeasureOver | undefined {
+	const limit = declared * declared_growth.factor(ratios_of(signals), 'files')
 
 	return hunks > limit ? { reason: 'hunks', declared, limit, measured: hunks } : undefined
 }
 
 function lines_over(declared: number, signals: PlanSignals): MeasureOver | undefined {
-	const measured = Math.round(
-		declared * (signals.lines_ratio ?? split_assess.DECLARED_GROWTH_FACTOR),
-	)
-	const limit = split_assess.guide_for(
-		lane_stage_budget.BUDGET_MINUTES.implement,
-		signals.implement_rate,
-	).lines
+	const measured = Math.round(declared * declared_growth.factor(ratios_of(signals), 'lines'))
+	const limit = guide_of(signals).lines
 
 	return measured > limit ? { reason: 'lines', declared, limit, measured } : undefined
 }
@@ -203,7 +218,7 @@ function measure_over(
 	if (signals.split_filed) return undefined
 
 	return (
-		hunks_over(declared.files, unplanned_hunks(signals, plan, recorded)) ??
+		hunks_over(declared.files, unplanned_hunks(signals, plan, recorded), signals) ??
 		planned_lines(declared.lines, signals, plan, recorded)
 	)
 }
@@ -218,9 +233,11 @@ function oversize(
 	const declared = declared_of(plan.issue, issues)
 	if (declared === undefined) return undefined
 
-	return (
-		files_over(plan, declared.files, recorded) ?? measure_over(declared, signals, plan, recorded)
-	)
+	const over =
+		files_over(plan, declared.files, recorded, signals) ??
+		measure_over(declared, signals, plan, recorded)
+
+	return over === undefined ? undefined : { ...over, guide: guide_of(signals) }
 }
 
 function bar_tail(): string {
@@ -229,7 +246,7 @@ function bar_tail(): string {
 
 function files_text(issue: number, over: FilesOver): string {
 	const counted = over.kept.length + over.split_off.length
-	const bar = `${String(counted)} files (tests excluded), over ${String(over.limit)} — ${String(split_assess.DECLARED_GROWTH_FACTOR)} times the ${String(over.declared)} its \`- 規模見積もり:\` declares`
+	const bar = `${String(counted)} files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`- 規模見積もり:\` declares`
 	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
 
 	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. ${bar_tail()}`
@@ -237,7 +254,7 @@ function files_text(issue: number, over: FilesOver): string {
 
 function measure_bar(over: MeasureOver): string {
 	if (over.reason === 'hunks') {
-		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(split_assess.DECLARED_GROWTH_FACTOR)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
+		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
 	}
 
 	return `\`- 規模見積もり:\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)}-line guide`
@@ -248,7 +265,10 @@ function measure_text(issue: number, over: MeasureOver): string {
 }
 
 function refusal_text(issue: number, over: Oversize): string {
-	return over.reason === 'files' ? files_text(issue, over) : measure_text(issue, over)
+	const text = over.reason === 'files' ? files_text(issue, over) : measure_text(issue, over)
+	const guide = over.guide ?? split_assess.guide_for(lane_stage_budget.BUDGET_MINUTES.implement)
+
+	return `${text} ${split_assess.policy_text(guide)}`
 }
 
 const lane_plan_size = { declares, oversize, refusal_text }

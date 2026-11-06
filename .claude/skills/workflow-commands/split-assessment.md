@@ -7,20 +7,20 @@ several. Every command applies it identically.
 
 **The default is not to split.** Two questions have to answer yes **together**:
 
-1. **Two or more separately-mergeable deliverables (separability)?**
-2. Either size axis over the guide? (test files excluded) Count docs, snapshots and command listings.
+1. Mergeable parts (separability)?
+2. Over guide? (test files excluded) Count docs/snapshots/listings.
 
-Use the same trailing 3-day period as the implement budget and median
-implement minutes per 100 actual changed lines:
-line guide = implement budget ÷ measured minutes per 100 lines × 100;
-file guide = line guide × (fallback file guide / fallback line guide).
+The same trailing 3-day period as the implement budget;
+median implement minutes per 100 actual changed lines;
+implement budget ÷ measured minutes per 100 lines × 100 → line guide;
+line guide × (fallback file guide / fallback line guide) → file guide.
 Floor (also the unmeasured fallback):
 **more than 8 changed files or more than 200 changed lines**.
 
-One-commit deliverables stay single up to **the cap, 1.5 times the guide**; over cap or projected
-implement budget, always split. Double declared estimates.
-`lane:plan` answers `split` past
-twice the declared files (files or hunks) or the line guide.
+Split above **the cap, 1.5 times the guide**, or budget.
+Merged lanes' median actual / declared ratios, separately for files and lines,
+independent of speed measurement. Each unmeasured axis uses the fallback of 2.
+`lane:plan` answers `split` past the declared files × files ratio (files or hunks), or line guide.
 
 ## The same two questions decide the filing-time fold
 

@@ -9,6 +9,7 @@ const NO_DELETE = '0'
 const A_TS = 'scripts/a.ts'
 const TAB_PATH = 'scripts/a\tb.ts'
 const OBSERVATION_RECORD = '.josh/observations/6391.md'
+const GUIDE_TEXT = 'guide 8 files / 200 lines'
 
 // A numstat row: added, deleted, path.
 function row(added: string, deleted: string, path: string): string {
@@ -174,7 +175,7 @@ describe('notice', () => {
 			split_assess.notice({ files: 8, lines: 200, verdict: 'single' }, declared),
 		).toBeUndefined()
 		expect(split_assess.notice({ files: 9, lines: 10, verdict: 'split' }, declared)).toContain(
-			'guide 8 files / 200 lines',
+			GUIDE_TEXT,
 		)
 	})
 })
@@ -186,7 +187,8 @@ describe('notice against a declared size', () => {
 	it('fires at 7 files, past 3 declared files × 2', () => {
 		const notice = split_assess.notice({ files: 7, lines: 40, verdict: 'single' }, DECLARED)
 
-		expect(notice).toContain('declared 3 files / 40 lines × 2 = 6 files / 80 lines')
+		expect(notice).toContain('declared 3 files / 40 lines; growth files × 2 (fallback)')
+		expect(notice).toContain('= 6 files / 80 lines')
 	})
 
 	it('fires at 81 lines, past 40 declared lines × 2', () => {
@@ -208,7 +210,7 @@ describe('notice against a declaration grown past the guide', () => {
 			{ files: 8, lines: 200 },
 		)
 
-		expect(notice).toContain('(guide 8 files / 200 lines)')
+		expect(notice).toContain(GUIDE_TEXT)
 	})
 
 	it('caps only the axis grown past the guide', () => {
@@ -217,9 +219,7 @@ describe('notice against a declaration grown past the guide', () => {
 			{ files: 3, lines: 150 },
 		)
 
-		expect(notice).toContain(
-			'declared 3 files / 150 lines × 2, capped at the guide = 6 files / 200 lines',
-		)
+		expect(notice).toContain('lines × 2 (fallback), capped at the guide = 6 files / 200 lines')
 	})
 
 	it('falls back to the guide for a declaration of zero lines', () => {

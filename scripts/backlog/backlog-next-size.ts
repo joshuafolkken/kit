@@ -5,6 +5,7 @@ import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
+import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import { split_assess, type SizeMeasurement } from '#scripts/split/split-assess'
 import type { PoolContext } from './backlog-gate-scope'
 import { backlog_pool } from './backlog-pool'
@@ -39,12 +40,14 @@ function warning_of(
 	body: string,
 	route: string | undefined,
 	rate: ImplementRate | undefined,
+	growth?: SizeRatios,
 ): Warning | undefined {
 	const guide =
-		size_estimate.over_guide(body, route, rate) ?? size_estimate.split_over_guide(body, route, rate)
+		size_estimate.over_guide(body, route, rate, growth) ??
+		size_estimate.split_over_guide(body, route, rate, growth)
 
 	if (guide !== undefined) return { estimate: guide, remedy: remedy_of(route) }
-	const budget = size_estimate.over_budget(body, route, rate)
+	const budget = size_estimate.over_budget(body, route, rate, growth)
 
 	return budget === undefined ? undefined : { estimate: budget, remedy: BUDGET_REMEDY }
 }
@@ -52,12 +55,12 @@ function warning_of(
 function note_of(issue: OpenIssueData, context: PoolContext): string | undefined {
 	const labels = issue.labels?.map((label) => label.name) ?? []
 	const route = size_estimate.route_of(labels)
-	const warning = warning_of(issue.body ?? '', route, context.implement_rate)
+	const warning = warning_of(issue.body ?? '', route, context.implement_rate, context.growth)
 
 	if (warning === undefined) return undefined
 	const cited = session_cite.issue(issue.number, undefined, context.repo)
 
-	return `${cited} ${size_estimate.exceeded(warning.estimate, context.implement_rate)} ${warning.remedy} — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${cited} ${size_estimate.exceeded(warning.estimate, context.implement_rate, context.growth)} ${warning.remedy} — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // One stderr line per offered number over the guide; the stdout tokens stay bare numbers.
@@ -83,19 +86,20 @@ interface CapRow {
 function capped_of(
 	row: Pick<CapRow, 'body' | 'labels'>,
 	rate?: ImplementRate,
+	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	return size_estimate.over_cap(row.body ?? '', size_estimate.route_of(row.labels), rate)
+	return size_estimate.over_cap(row.body ?? '', size_estimate.route_of(row.labels), rate, growth)
 }
 
 // The withheld note: the counts against the cap and what a person does about it.
-function warn_capped(row: CapRow, rate?: ImplementRate): void {
-	const estimate = capped_of(row, rate)
+function warn_capped(row: CapRow, rate?: ImplementRate, growth?: SizeRatios): void {
+	const estimate = capped_of(row, rate, growth)
 
 	if (estimate === undefined) return
 	const cited = session_cite.issue(row.number, undefined, row.repo)
 
 	console.error(
-		`${cited} not offered: ${size_estimate.capped(estimate, rate)} — split it; split-assessment.md → "${split_assess.QUESTION_SECTION}"`,
+		`${cited} not offered: ${size_estimate.capped(estimate, rate, growth)} — split it; split-assessment.md → "${split_assess.QUESTION_SECTION}"`,
 	)
 }
 
@@ -111,7 +115,9 @@ function warn_over_cap(context: PoolContext): void {
 	const rows = backlog_pool.to_children(issues, context.repo)
 
 	for (const row of rows) {
-		if (considered.has(epic_graph.key_of(row))) warn_capped(row, context.implement_rate)
+		if (considered.has(epic_graph.key_of(row))) {
+			warn_capped(row, context.implement_rate, context.growth)
+		}
 	}
 }
 
@@ -120,12 +126,13 @@ function warn_over_cap(context: PoolContext): void {
 function held_children(
 	children: ReadonlyArray<EpicChild>,
 	rate?: ImplementRate,
+	growth?: SizeRatios,
 ): ReadonlySet<string> {
 	const held = children.filter(
-		(child) => child.state === 'OPEN' && capped_of(child, rate) !== undefined,
+		(child) => child.state === 'OPEN' && capped_of(child, rate, growth) !== undefined,
 	)
 
-	for (const child of held) warn_capped(child, rate)
+	for (const child of held) warn_capped(child, rate, growth)
 
 	return new Set(held.map((child) => epic_graph.key_of(child)))
 }

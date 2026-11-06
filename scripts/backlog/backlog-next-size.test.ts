@@ -79,6 +79,17 @@ beforeEach(() => {
 })
 
 describe('backlog:next with an estimate over the split guide', () => {
+	it('offers measured growth within the guide without a speed measurement', async () => {
+		backlog_fixture.stub_backlog({ opted_in: [sized()], growth: { files: 1, lines: 1 } })
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
+		expect(stderr()).not.toContain(EXCEEDS_GUIDE)
+		expect(stderr()).not.toContain(EXCEEDS_CAP)
+	})
+})
+
+describe('backlog:next over the guide', () => {
 	it('offers the issue and notes it is over the guide', async () => {
 		backlog_fixture.stub_backlog({ opted_in: [sized()] })
 

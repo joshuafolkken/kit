@@ -20,7 +20,7 @@ vi.mock('#scripts/git/change-base', () => ({
 	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
 vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
-	lane_implement_rate_read: { implement_rate: vi.fn() },
+	lane_implement_rate_read: { measurements: vi.fn() },
 }))
 
 vi.mock('./split-relocations', () => ({
@@ -72,7 +72,10 @@ beforeEach(() => {
 	vi.mocked(git_command.diff_numstat_since).mockResolvedValue(OVER_GUIDE_NUMSTAT)
 	record_split_notice.mockResolvedValue()
 	read_declared.mockResolvedValue(undefined)
-	vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue(undefined)
+	vi.mocked(lane_implement_rate_read.measurements).mockResolvedValue({
+		implement_rate: undefined,
+		growth: {},
+	})
 })
 
 afterEach(async () => {
@@ -91,7 +94,10 @@ afterAll(async () => {
 
 describe('split_early_notice.surface over the guide', () => {
 	it('floors the measured guide at the legacy bar (ac-9e07d12c)', async () => {
-		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
+		vi.mocked(lane_implement_rate_read.measurements).mockResolvedValue({
+			implement_rate: { median: 24, lanes: 1 },
+			growth: {},
+		})
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(numstat_of(3))
 		await split_early_notice.surface()
 

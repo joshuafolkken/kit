@@ -74,6 +74,18 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 
 // joshuafolkken/kit#6066: the judgment `backlog:next` notes on, shared with the filing refusal.
 describe('size_estimate.over_budget', () => {
+	it('uses the measured lines growth at the budget boundary', () => {
+		const body = body_with(estimate(1, 80), REASON)
+
+		expect(
+			size_estimate.over_budget(body, undefined, SLOW, { files: 9, lines: 1.5 }),
+		).toBeUndefined()
+		expect(size_estimate.over_budget(body, undefined, SLOW, { files: 1, lines: 1.6 })).toBeDefined()
+		expect(
+			size_estimate.guide_problem(body, undefined, SLOW, { files: 1, lines: 1.5 }),
+		).toBeUndefined()
+	})
+
 	it('answers the estimate of a reasoned body projecting past the budget', () => {
 		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, SLOW)).toEqual({
 			files: 2,

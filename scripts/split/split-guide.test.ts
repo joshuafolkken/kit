@@ -84,7 +84,7 @@ describe('notices with a derived guide', () => {
 		const measured = { files: 1, lines: 41, verdict: 'single' } as const
 
 		expect(split_assess.notice(measured, { files: 2, lines: 20 }, SMALL_GUIDE)).toContain(
-			'declared 2 files / 20 lines × 2, capped at the guide = 2 files / 40 lines',
+			'declared 2 files / 20 lines; growth files × 2 (fallback) / lines × 2 (fallback), capped at the guide = 2 files / 40 lines',
 		)
 		expect(split_assess.notice(measured, { files: 0, lines: 0 }, SMALL_GUIDE)).toBeUndefined()
 	})

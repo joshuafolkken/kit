@@ -77,10 +77,12 @@ function signals_from(
 	now_ms: number,
 ): PlanSignals {
 	const window = lane_stats.window_of(RATIO_PERIOD_DAYS, now_ms)
+	const ratios = lane_size_stats.ratios(entries, window)
 
 	return {
 		...tree,
-		lines_ratio: lane_size_stats.lines_ratio(entries, window),
+		files_ratio: ratios.files,
+		lines_ratio: ratios.lines,
 		implement_rate: lane_implement_rate.rate(entries, window),
 		split_filed: split_resolution.split_issues(entries).has(issue),
 	}

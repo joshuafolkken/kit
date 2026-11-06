@@ -102,6 +102,43 @@ describe('size_estimate.guide_problem', () => {
 	})
 })
 
+describe('size_estimate measured growth', () => {
+	it('uses separate files and lines medians without an implement rate', () => {
+		const body = body_with(estimate(6, 150))
+
+		expect(
+			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1 }),
+		).toBeUndefined()
+		expect(
+			size_estimate.over_guide(body, undefined, undefined, { files: 1.5, lines: 1 }),
+		).toBeDefined()
+		expect(
+			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1.5 }),
+		).toBeDefined()
+	})
+
+	it('falls back only on the missing axis', () => {
+		const body = body_with(estimate(5, 101))
+
+		expect(size_estimate.over_guide(body, undefined, undefined, { files: 1 })).toBeDefined()
+		expect(size_estimate.over_guide(body, undefined, undefined, { lines: 1 })).toBeDefined()
+		expect(
+			size_estimate.over_guide(body, undefined, undefined, { files: 1, lines: 1 }),
+		).toBeUndefined()
+	})
+
+	it('compares grown files and lines with the cap using strict boundaries', () => {
+		const growth = { files: 1.5, lines: 3 }
+		const within = body_with(estimate(8, 100))
+		const files = body_with(estimate(9, 100))
+		const lines = body_with(estimate(8, 101))
+
+		expect(size_estimate.over_cap(within, undefined, undefined, growth)).toBeUndefined()
+		expect(size_estimate.over_cap(files, undefined, undefined, growth)).toBeDefined()
+		expect(size_estimate.over_cap(lines, undefined, undefined, growth)).toBeDefined()
+	})
+})
+
 // joshuafolkken/kit#5935: the split child's exemption holds at filing; `backlog:next` warns on it.
 describe('size_estimate.split_over_guide', () => {
 	it('answers a split child over the guide for the offer warning', () => {

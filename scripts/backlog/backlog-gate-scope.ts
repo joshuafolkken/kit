@@ -3,6 +3,7 @@ import { epic_graph } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_plan } from '#scripts/lane/lane-plan'
+import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import { lane_state } from '#scripts/lane/lane-state'
 import { backlog_plan_comment } from './backlog-plan-comment'
 import { backlog_pool } from './backlog-pool'
@@ -19,6 +20,7 @@ interface PoolContext {
 	repo: string
 	exclude: ReadonlyArray<number>
 	implement_rate: ImplementRate | undefined
+	growth?: SizeRatios | undefined
 }
 
 // The rows the offer's cap bounds — the standalone half.

@@ -24,7 +24,8 @@ async function records_of(issue: number): Promise<WhyRecords | undefined> {
 	if (breakdown === undefined) return undefined
 
 	const body = await git_gh_issue_read.issue_get_body(String(issue))
-	const projected = lane_why.projected_of(body, await lane_net_read.implement_rate())
+	const { implement_rate, growth } = await lane_net_read.measurements()
+	const projected = lane_why.projected_of(body, implement_rate, growth)
 
 	const [issues, timing] = await Promise.all([lane_sinks_issues.read(), lane_why_ci.read(issue)])
 

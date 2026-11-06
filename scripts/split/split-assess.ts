@@ -1,7 +1,9 @@
 import { git_path_quoting } from '#scripts/git/git-path-quoting'
 import { run_record_path } from '#scripts/josh/run-record-path'
 import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
+import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
+import { declared_growth } from './declared-growth'
 
 // The size half of the split assessment, measured rather than estimated.
 //
@@ -39,6 +41,7 @@ interface DeclaredSize {
 
 interface SplitGuide extends DeclaredSize {
 	cap: DeclaredSize
+	growth?: SizeRatios
 }
 
 // The guide's single source: `split-assessment.md` states these once and a test pins the two equal.
@@ -60,21 +63,23 @@ const DEFAULT_GUIDE: SplitGuide = {
 }
 
 // Keep fractional thresholds: rounding would change the budget's strict comparison boundary.
-function guide_for(minutes: number, measured?: ImplementRate): SplitGuide {
+function guide_for(minutes: number, measured?: ImplementRate, growth?: SizeRatios): SplitGuide {
 	const lines = lane_implement_rate.lines_for(minutes, measured)
+	const correction = growth === undefined ? {} : { growth }
 
-	if (lines === undefined || lines <= LINE_GUIDE) return DEFAULT_GUIDE
+	if (lines === undefined || lines <= LINE_GUIDE) return { ...DEFAULT_GUIDE, ...correction }
 	const files = (lines * FILE_GUIDE) / LINE_GUIDE
 
-	return { files, lines, cap: { files: files * CAP_FACTOR, lines: lines * CAP_FACTOR } }
+	return {
+		files,
+		lines,
+		cap: { files: files * CAP_FACTOR, lines: lines * CAP_FACTOR },
+		...correction,
+	}
 }
 
-// The correction a declared size estimate takes before it is judged — the filing's guide and cap
-// (`size-estimate.ts`), `lane:plan`'s files and hunks bars, and its lines axis when the period has no
-// measured ratio. Its source is `lane:stats`' "measured lanes" table: at lanes 209-210 (2026-11-02)
-// `files actual / declared median` read 2.0 and `lines actual / declared median` 1.7
-// (joshuafolkken/kit#5945; earlier 1.5 / 1.8, joshuafolkken/kit#5533, joshuafolkken/kit#5654).
-const DECLARED_GROWTH_FACTOR = 2
+// Compatibility name for the unmeasured-axis fallback; the guide carries measured growth.
+const DECLARED_GROWTH_FACTOR = declared_growth.FALLBACK
 
 const SPLIT_VERDICT: SplitVerdict = 'split'
 const SINGLE_VERDICT: SplitVerdict = 'single'
@@ -166,6 +171,12 @@ function guide_text(guide: SplitGuide): string {
 	return `guide ${String(guide.files)} files / ${String(guide.lines)} lines`
 }
 
+function policy_text(guide: SplitGuide): string {
+	const source = guide.lines > LINE_GUIDE ? 'measured' : 'fallback'
+
+	return `${guide_text(guide)} (${source}); ${declared_growth.text(guide.growth)}`
+}
+
 // The sentence printed on stderr: what was counted, against which guide, and what the verdict does
 // and does not mean.
 function reason(
@@ -174,18 +185,18 @@ function reason(
 ): string {
 	const tail = measurement.verdict === SPLIT_VERDICT ? SPLIT_TAIL : SINGLE_TAIL
 
-	return `${counted(measurement)} (${guide_text(guide)}) — ${tail}`
+	return `${counted(measurement)} (${policy_text(guide)}) — ${tail}`
 }
 
 interface NoticeBar extends DeclaredSize {
 	text: string
 }
 
-// The declared size grown by `DECLARED_GROWTH_FACTOR`, each axis capped at the guide: a large
+// The declared size grown by its axis's measured ratio, each axis capped at the guide: a large
 // declaration never lifts the bar past the guide, which the notice held before the declaration counted.
 function grown_bar(declared: DeclaredSize, guide: SplitGuide): NoticeBar {
-	const grown_files = declared.files * DECLARED_GROWTH_FACTOR
-	const grown_lines = declared.lines * DECLARED_GROWTH_FACTOR
+	const grown_files = declared.files * declared_growth.factor(guide.growth, 'files')
+	const grown_lines = declared.lines * declared_growth.factor(guide.growth, 'lines')
 	const files = Math.min(grown_files, guide.files)
 	const lines = Math.min(grown_lines, guide.lines)
 	const capped = files < grown_files || lines < grown_lines ? ', capped at the guide' : ''
@@ -194,7 +205,7 @@ function grown_bar(declared: DeclaredSize, guide: SplitGuide): NoticeBar {
 	return {
 		files,
 		lines,
-		text: `${declaration} × ${String(DECLARED_GROWTH_FACTOR)}${capped} = ${String(files)} files / ${String(lines)} lines`,
+		text: `${declaration}; ${declared_growth.text(guide.growth)}${capped} = ${String(files)} files / ${String(lines)} lines`,
 	}
 }
 
@@ -233,7 +244,7 @@ function notice(
 
 	if (measurement.files <= bar.files && measurement.lines <= bar.lines) return undefined
 
-	return `split notice: ${counted(measurement)} (${bar.text}) — over the bar. Before the run:cut, ${NOTICE_ACTION}`
+	return `split notice: ${counted(measurement)} (${bar.text}; ${policy_text(guide)}) — over the bar. Before the run:cut, ${NOTICE_ACTION}`
 }
 
 const split_assess = {
@@ -252,6 +263,7 @@ const split_assess = {
 	is_over_cap,
 	notice,
 	parse_numstat,
+	policy_text,
 	reason,
 	verdict_for,
 }
