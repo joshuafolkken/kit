@@ -86,7 +86,7 @@ describe('the split question explains the measured guide', () => {
 		expect(document).toContain('implement minutes per 100 actual changed lines')
 		expect(document).toContain('implement budget ÷ measured minutes per 100 lines × 100')
 		expect(document).toContain('line guide × (fallback file guide / fallback line guide)')
-		expect(document).toContain('Without a measured rate, fall back to')
+		expect(document).toContain('Floor (also the unmeasured fallback)')
 		expect(document).toContain('more than 8 changed files or more than 200 changed lines')
 		expect(document).toContain('the cap, 1.5 times the guide')
 	})

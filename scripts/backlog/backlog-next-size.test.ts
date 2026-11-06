@@ -122,6 +122,20 @@ describe('backlog:next with an estimate over the split guide', () => {
 
 // joshuafolkken/kit#6066: the reason excuses the guide, not the projected implement budget.
 describe('backlog:next with a measured implement rate', () => {
+	it('warns on budget alone for an estimate within the guide floor', async () => {
+		const body = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）'
+
+		backlog_fixture.stub_backlog({
+			opted_in: [{ ...sized(), body }],
+			implement_rate: { median: 10, lanes: 4 },
+		})
+		await backlog_next.run([])
+
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
+		expect(stderr()).toContain(BUDGET_NOTE)
+		expect(stderr()).not.toContain(EXCEEDS_GUIDE)
+	})
+
 	it('notes a reasoned issue projected over the implement budget', async () => {
 		backlog_fixture.stub_backlog({ opted_in: [sized(REASON)], implement_rate: SLOW })
 
@@ -164,13 +178,13 @@ describe('backlog:next with measured size limits', () => {
 		])
 
 		backlog_fixture.stub_backlog({
-			opted_in: [sized_at(6), behind],
+			opted_in: [sized_at(7), behind],
 			implement_rate: { median: 10, lanes: 4 },
 		})
 		await backlog_next.run([])
 
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.stop)
-		expect(stderr()).toContain('exceeds the cap (more than 7.199999999999999 files or 180 lines)')
+		expect(stderr()).toContain('exceeds the cap (more than 12 files or 300 lines)')
 	})
 
 	it('warns a split child with the measured guide while exempting it from the cap', async () => {

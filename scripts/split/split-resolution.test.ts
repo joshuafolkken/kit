@@ -110,7 +110,7 @@ describe('split_resolution.ledger_refusal measured guide', () => {
 		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
 		const guide = split_assess.guide_for(12, { median: 24, lanes: 1 })
 
-		read_branch.mockResolvedValueOnce(split_assess.assess('51\t0\tscripts/a.ts', guide))
+		read_branch.mockResolvedValueOnce(split_assess.assess('201\t0\tscripts/a.ts', guide))
 
 		expect(await split_resolution.ledger_refusal(ISSUE)).toContain(NO_CHILD)
 	})

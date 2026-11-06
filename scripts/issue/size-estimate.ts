@@ -136,8 +136,9 @@ function is_excused(body: string, route: string | undefined): boolean {
 	return route === SPLIT_ROUTE_LABEL || (declared(body, REASON_PREFIX) ?? '') !== ''
 }
 
-// The counts against the guide, shared by the filing refusal and `backlog:next`'s offer note.
+// The counts and any guide overrun, shared by filing refusals and `backlog:next`'s offer note.
 function exceeded(estimate: SizeMeasurement, rate?: ImplementRate): string {
+	if (estimate.verdict === split_assess.SINGLE_VERDICT) return projected(estimate)
 	const guide = guide_for(rate)
 
 	return `${projected(estimate)} exceeds the guide (more than ${String(guide.files)} files or ${String(guide.lines)} lines)`

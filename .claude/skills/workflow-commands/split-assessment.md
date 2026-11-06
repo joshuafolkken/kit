@@ -14,7 +14,7 @@ Use the same trailing 3-day period as the implement budget and median
 implement minutes per 100 actual changed lines:
 line guide = implement budget ÷ measured minutes per 100 lines × 100;
 file guide = line guide × (fallback file guide / fallback line guide).
-Without a measured rate, fall back to
+Floor (also the unmeasured fallback):
 **more than 8 changed files or more than 200 changed lines**.
 
 One-commit deliverables stay single up to **the cap, 1.5 times the guide**; over cap or projected

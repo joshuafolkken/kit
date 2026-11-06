@@ -2,15 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { split_assess } from './split-assess'
 
 const BUDGET_MINUTES = 12
-const MEASURED = { median: 17.7, lanes: 1 }
+const MEASURED = { median: 3.7, lanes: 1 }
 const GUIDE = split_assess.guide_for(BUDGET_MINUTES, MEASURED)
-const SMALL_GUIDE = split_assess.guide_for(BUDGET_MINUTES, { median: 24, lanes: 1 })
+const SMALL_GUIDE = { files: 2, lines: 50, cap: { files: 3, lines: 75 } }
 const SMALL_GUIDE_TEXT = 'guide 2 files / 50 lines'
 
 describe('guide_for', () => {
+	it.each([6, 17.7, 24])('floors a measured guide at the fallback for rate %s', (median) => {
+		expect(split_assess.guide_for(BUDGET_MINUTES, { median, lanes: 1 })).toEqual(
+			split_assess.guide_for(BUDGET_MINUTES),
+		)
+	})
+
 	it('derives both axes and caps from the measured implement budget (ac-b4d39f6d)', () => {
-		expect(GUIDE.lines).toBeCloseTo(1200 / 17.7)
-		expect(GUIDE.files).toBeCloseTo((1200 / 17.7) * (8 / 200))
+		expect(GUIDE.lines).toBeCloseTo(1200 / 3.7)
+		expect(GUIDE.files).toBeCloseTo((1200 / 3.7) * (8 / 200))
 		expect(GUIDE.cap.lines).toBeCloseTo(GUIDE.lines * 1.5)
 		expect(GUIDE.cap.files).toBeCloseTo(GUIDE.files * 1.5)
 	})
