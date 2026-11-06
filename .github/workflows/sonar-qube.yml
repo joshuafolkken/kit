@@ -95,7 +95,7 @@ jobs:
           key: ${{ runner.os }}-sonar-${{ hashFiles('.github/workflows/sonar-qube.yml') }}
       - name: SonarQube Scan
         if: env.SONAR_TOKEN != ''
-        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
         with:
           # Wait for the SonarCloud Quality Gate and fail this job when the gate is red. The gate
           # judges ratings and ratios, not counts, so it alone lets a few new code smells or a small
