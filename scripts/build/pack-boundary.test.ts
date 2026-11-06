@@ -54,6 +54,7 @@ interface PackageManifest {
 // `lane:open` its eslint warm-up by URL. The hook sources (the Codex adapter's fallback included) are
 // seeded from `HOOK_BUNDLES`.
 const PATH_LAUNCHED_ENTRIES = [
+	'scripts/gate/change-scope-action.ts',
 	'scripts/gh/fix-gh-packages.ts',
 	'scripts/lane/lane-session-reread-main.ts',
 	'scripts/lane/openai-lane-supervisor-entry.ts',

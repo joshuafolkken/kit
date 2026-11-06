@@ -26,7 +26,11 @@ function step_named(name: string): WorkflowStep | undefined {
 }
 
 function ran_step_names(token: string, event_name: string): ReadonlyArray<string> {
-	const context: ContextTree = { env: { SONAR_TOKEN: token }, github: { event_name } }
+	const context: ContextTree = {
+		env: { SONAR_TOKEN: token },
+		github: { event_name },
+		needs: { 'change-scope': { result: 'success' } },
+	}
 
 	return sonar_steps()
 		.filter(

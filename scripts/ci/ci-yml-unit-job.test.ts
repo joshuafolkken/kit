@@ -123,6 +123,7 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 			STATIC_JOB,
 			UNIT_JOB,
 			NODE_COMPAT_JOB,
+			'change-scope',
 		])
 	})
 
@@ -143,7 +144,7 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 	// A skipped half passes only beside the positive proof output. The explicit comparisons keep an
 	// unrelated skip — the shape that made joshuafolkken/kit#991 merge — from becoming success.
 	it('accepts fresh success or a proven reuse, and exits non-zero otherwise', () => {
-		expect(aggregate_script()).toContain("= 'success' ]")
+		expect(aggregate_script()).toContain('= "${SUCCESS}" ]')
 		expect(aggregate_script()).toContain("REUSE_RESULT}\" = 'true'")
 		expect(aggregate_script()).toContain("STATIC_RESULT}\" = 'skipped'")
 		expect(aggregate_script()).toContain("UNIT_RESULT}\" = 'skipped'")

@@ -23,7 +23,12 @@ function aggregate_script(): string {
 
 function aggregate_exit_status(results: Readonly<Record<string, string>>): number {
 	const run = spawnSync('bash', ['-c', aggregate_script()], {
-		env: { PATH: process.env['PATH'], ...results },
+		env: {
+			PATH: process.env['PATH'],
+			SCOPE_RESULT: 'success',
+			RUNTIME_CHANGED: 'true',
+			...results,
+		},
 		encoding: 'utf8',
 	})
 
@@ -31,6 +36,33 @@ function aggregate_exit_status(results: Readonly<Record<string, string>>): numbe
 }
 
 describe('the Checks job fails unless the Node build matrix passed', () => {
+	it('rejects failed static checks even when documentation unit shards are skipped', () => {
+		expect(
+			aggregate_exit_status({
+				...FRESH_RUN,
+				NODE_RESULT: 'success',
+				STATIC_RESULT: 'failure',
+				UNIT_RESULT: 'skipped',
+				RUNTIME_CHANGED: 'false',
+			}),
+		).not.toBe(0)
+	})
+
+	it('accepts skipped unit shards only for proven documentation changes', () => {
+		const skipped = { ...FRESH_RUN, NODE_RESULT: 'success', UNIT_RESULT: 'skipped' }
+
+		expect(aggregate_exit_status({ ...skipped, RUNTIME_CHANGED: 'false' })).toBe(0)
+		expect(aggregate_exit_status(skipped)).not.toBe(0)
+	})
+
+	it.each(['failure', 'cancelled', 'skipped', ''])(
+		'rejects failed classification: %s',
+		(scope_result) => {
+			expect(
+				aggregate_exit_status({ ...FRESH_RUN, NODE_RESULT: 'success', SCOPE_RESULT: scope_result }),
+			).not.toBe(0)
+		},
+	)
 	it.each([FRESH_RUN, REUSED_RUN])('passes when every result is green (%o)', (run) => {
 		expect(aggregate_exit_status({ ...run, NODE_RESULT: 'success' })).toBe(0)
 	})

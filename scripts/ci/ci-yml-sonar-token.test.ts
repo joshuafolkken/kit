@@ -29,6 +29,7 @@ function step_runs(step: WorkflowStep, token: string): boolean {
 	const context: ContextTree = {
 		[ENV_CONTEXT]: { [TOKEN_KEY]: token },
 		github: { event_name: PULL_REQUEST_EVENT },
+		needs: { 'change-scope': { result: 'success' } },
 	}
 
 	return step.if === undefined || workflow_expression_fixture.evaluate_condition(step.if, context)

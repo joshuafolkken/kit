@@ -1,0 +1,19 @@
+name: Classify changes
+description: Classify documentation changes and consumer package changes without installing dependencies.
+outputs:
+  runtime:
+    description: Whether executable checks are required.
+    value: ${{ steps.scope.outputs.runtime }}
+  publish:
+    description: Whether the consumer package changed.
+    value: ${{ steps.scope.outputs.publish }}
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-node
+    - id: scope
+      shell: bash
+      env:
+        CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        CHANGE_HEAD: ${{ github.sha }}
+      run: node "$GITHUB_WORKSPACE/scripts/gate/change-scope-action.ts"
