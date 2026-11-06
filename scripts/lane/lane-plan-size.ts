@@ -93,16 +93,33 @@ function ordered(counted: ReadonlyArray<string>, recorded: ReadonlyArray<string>
 	return [...counted.filter((file) => held.has(file)), ...counted.filter((file) => !held.has(file))]
 }
 
+function files_approved(
+	plan: LanePlan,
+	declared: number,
+	recorded: LanePlan | undefined,
+	measured: number,
+): boolean {
+	const approval = plan.size_approval ?? recorded?.size_approval
+
+	return (
+		approval !== undefined &&
+		lane_plan_approval.allows(approval, plan, { reason: 'files', declared, measured })
+	)
+}
+
 function files_over(
 	plan: LanePlan,
 	declared: number,
-	recorded: ReadonlyArray<string>,
+	recorded: LanePlan | undefined,
 ): FilesOver | undefined {
 	const limit = declared * split_assess.DECLARED_GROWTH_FACTOR
 	const counted = plan.paths.filter((file) => !test_declared_logic.is_test_file(file))
 
-	if (counted.length <= limit) return undefined
-	const files = ordered(counted, recorded)
+	if (counted.length <= limit || files_approved(plan, declared, recorded, counted.length)) {
+		return undefined
+	}
+
+	const files = ordered(counted, recorded?.paths ?? [])
 	const tests = plan.paths.filter((file) => test_declared_logic.is_test_file(file))
 	const kept = files.slice(0, limit)
 
@@ -159,7 +176,8 @@ function unapproved(
 	approval: LanePlan['size_approval'],
 ): MeasureOver | undefined {
 	if (over === undefined || approval === undefined) return over
-	const is_within = lane_plan_approval.allows(approval, plan, over)
+	if (over.reason !== 'lines') return over
+	const is_within = lane_plan_approval.allows(approval, plan, { ...over, reason: over.reason })
 
 	return is_within ? undefined : over
 }
@@ -201,8 +219,7 @@ function oversize(
 	if (declared === undefined) return undefined
 
 	return (
-		files_over(plan, declared.files, recorded?.paths ?? []) ??
-		measure_over(declared, signals, plan, recorded)
+		files_over(plan, declared.files, recorded) ?? measure_over(declared, signals, plan, recorded)
 	)
 }
 

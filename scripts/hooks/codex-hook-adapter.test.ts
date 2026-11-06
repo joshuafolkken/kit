@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { json_value } from '#scripts/lib/json-value'
 import { issue_comments } from '#scripts/rules/issue-comments'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
@@ -18,6 +19,10 @@ const MARKDOWN_FILE = path.join(TEST_DIRECTORY, 'notes.md')
 const THIRD_FILE = path.join(TEST_DIRECTORY, 'third.json')
 const ALLOW: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
 const UNKNOWN_INPUT = 'Cannot verify'
+const HANDOFF = 'lane:dispatch'
+const SOURCE_WRITE = 'echo changed > scripts/example.ts'
+const NO_TRANSCRIPT = json_value.parse_or_undefined('null')
+const MIXED_PATHS = ['notes.md', 'scripts/example.ts']
 const PATCH_TOOLS = ['apply_patch', 'functions.apply_patch']
 const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 
@@ -57,13 +62,13 @@ describe('Codex implementation scope', () => {
 		vi.stubEnv(agent_session_role.KEY, 'scheduler')
 		const raw_payload = JSON.stringify({
 			tool_name,
-			tool_input: patch_command(['notes.md', 'scripts/example.ts']),
+			tool_input: patch_command(MIXED_PATHS),
 			transcript_path: path.join(TEST_DIRECTORY, 'scope.jsonl'),
 		})
 
 		const { reason } = codex_hook_adapter.pretool_outcome(raw_payload)
 
-		expect(reason).toContain('lane:dispatch')
+		expect(reason).toContain(HANDOFF)
 		expect(reason).not.toContain(UNKNOWN_INPUT)
 	})
 
@@ -73,7 +78,7 @@ describe('Codex implementation scope', () => {
 			vi.stubEnv(agent_session_role.KEY, undefined)
 			const raw_payload = JSON.stringify({
 				tool_name,
-				tool_input: { cmd: 'echo changed > scripts/example.ts' },
+				tool_input: { cmd: SOURCE_WRITE },
 				transcript_path: path.join(TEST_DIRECTORY, 'shell-scope.jsonl'),
 			})
 
@@ -93,6 +98,35 @@ describe('Codex unverified input scope', () => {
 			)
 		},
 	)
+})
+
+describe('Codex reviewer without transcript history', () => {
+	it.each([NO_TRANSCRIPT, '', undefined])(
+		'allows reads with transcript path %s',
+		(transcript_path) => {
+			vi.stubEnv(agent_session_role.KEY, 'reviewer')
+			const raw_payload = JSON.stringify({
+				tool_name: 'Bash',
+				tool_input: { command: 'cat CLAUDE.md' },
+				transcript_path,
+			})
+
+			expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toBeUndefined()
+			expect(hook_decision.parse_hook_payload(raw_payload)).toBeUndefined()
+		},
+	)
+
+	it.each([
+		['Bash', { command: SOURCE_WRITE }],
+		['exec_command', { cmd: SOURCE_WRITE }],
+		['apply_patch', patch_command(MIXED_PATHS)],
+		['apply_patch', 'unrecognized patch'],
+	])('refuses writes through %s without history', (tool_name, tool_input) => {
+		vi.stubEnv(agent_session_role.KEY, 'reviewer')
+		const raw_payload = JSON.stringify({ tool_name, tool_input, transcript_path: NO_TRANSCRIPT })
+
+		expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toContain(HANDOFF)
+	})
 })
 
 describe('Codex orchestration scope', () => {

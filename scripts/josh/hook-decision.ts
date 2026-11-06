@@ -5,6 +5,7 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
+import { hook_tool_payload } from './hook-tool-payload'
 import { josh_environment_file } from './josh-environment-file'
 import { stamp_file } from './stamp-file'
 
@@ -26,14 +27,12 @@ import { stamp_file } from './stamp-file'
 // **`agent_id` is what makes a delegated unit answerable with its own file**.
 // The path in the payload is the *parent* session's whichever agent issued the call, so without this
 // field a guard judges the parent's frozen timeline and refuses nothing at all inside a fork.
-const payload_schema = z.object({
+const payload_schema = hook_tool_payload.schema.extend({
 	transcript_path: z.string().min(1),
 	// **`nullish`, not `optional`.** A payload spelling the absent agent as `null` has to read as "no
 	// fork"; rejected, it would fail `safeParse` for the whole payload and take the guard off every
 	// call of the main line, in silence — the failure every other path here is written to avoid.
 	agent_id: z.string().nullish(),
-	tool_name: z.string().min(1),
-	tool_input: z.unknown(),
 	// The session's model where the harness hands it over (a Codex payload); Claude Code names it on
 	// the transcript's assistant entries instead (`scripts/rules/main-model.ts`).
 	model: z.string().nullish(),

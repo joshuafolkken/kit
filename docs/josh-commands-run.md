@@ -1416,7 +1416,7 @@ A plan over twice the files its `- 規模見積もり:` declares (tests excluded
 
 Hunks over twice declared files or declared lines × recent ratio over 200 also split. Sized re-plans skip lines checks unless approved. Splits log their reason; hunks exclude planned files.
 
-`--size-approval <json-file>`: `issue`, `paths`, `declared_lines`, `max_lines`, `source` (same-issue trusted comment URL), `rationale`. Records author/body; rechecks scope. Only lines overflow is approved.
+`--size-approval <json-file>`: `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` or `declared_files`/`max_files`. Records author/body; checks scope. Other gates remain.
 
 `--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
 

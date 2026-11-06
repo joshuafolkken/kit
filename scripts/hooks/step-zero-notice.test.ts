@@ -81,6 +81,15 @@ describe('step_zero_notice — when it speaks', () => {
 })
 
 describe('step_zero_notice — a translated Codex patch', () => {
+	it.each(['Edit', 'Write'])('classifies %s without recording a history notice', (tool_name) => {
+		const raw_payload = JSON.stringify({ tool_name, tool_input: { file_path: RUNTIME_FILE } })
+		const documentation_payload = JSON.stringify({ tool_name, tool_input: { file_path: DOC_FILE } })
+
+		expect(step_zero_notice.is_runtime_edit(raw_payload, ROOT)).toBe(true)
+		expect(step_zero_notice.is_runtime_edit(documentation_payload, ROOT)).toBe(false)
+		expect(step_zero_notice.notice(raw_payload, ROOT)).toBeUndefined()
+	})
+
 	it('reminds when the runtime file is not the first one the patch lists', () => {
 		const tool_input = { file_path: DOC_FILE, file_paths: [DOC_FILE, RUNTIME_FILE] }
 		const raw_payload = payload('Edit', tool_input, fresh_transcript())

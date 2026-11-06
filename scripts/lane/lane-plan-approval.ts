@@ -7,15 +7,26 @@ import type { LanePlan } from './lane-plan'
 
 // The operator maps a human approval to this bounded scope; prose is retained as evidence, never
 // interpreted as an instruction. A trusted comment alone does not approve an unbounded size bypass.
-const scope_schema = z.object({
+const evidence_schema = z.object({
 	issue: z.number().int().positive(),
 	paths: z.array(z.string().min(1)).min(1),
-	declared_lines: z.number().int().positive(),
-	max_lines: z.number().int().positive(),
 	source: z.url(),
 	rationale: z.string().trim().min(1),
 })
-const approval_schema = scope_schema.extend({ author: z.string(), body: z.string() })
+const scope_schema = z.union([
+	evidence_schema.extend({
+		declared_lines: z.number().int().positive(),
+		max_lines: z.number().int().positive(),
+	}),
+	evidence_schema.extend({
+		declared_files: z.number().int().positive(),
+		max_files: z.number().int().positive(),
+	}),
+])
+const approval_schema = z.intersection(
+	scope_schema,
+	z.object({ author: z.string(), body: z.string() }),
+)
 type SizeApproval = z.infer<typeof approval_schema>
 const FLAG = '--size-approval'
 const FLAG_WIDTH = 2
@@ -61,16 +72,34 @@ async function attach(plan: LanePlan, file: string | undefined): Promise<LanePla
 	return approval === undefined ? undefined : { ...plan, size_approval: approval }
 }
 
+function bounds(
+	approval: SizeApproval,
+	reason: 'lines' | 'files',
+): { declared: number; max: number } | undefined {
+	if (reason === 'lines' && 'declared_lines' in approval) {
+		return { declared: approval.declared_lines, max: approval.max_lines }
+	}
+
+	if (reason === 'files' && 'declared_files' in approval) {
+		return { declared: approval.declared_files, max: approval.max_files }
+	}
+
+	return undefined
+}
+
 function allows(
 	approval: SizeApproval,
 	plan: LanePlan,
-	over: { declared: number; measured: number },
+	over: { reason: 'lines' | 'files'; declared: number; measured: number },
 ): boolean {
+	const bound = bounds(approval, over.reason)
+	if (bound === undefined) return false
+
 	return (
 		approval.issue === plan.issue &&
 		plan.paths.every((file) => approval.paths.includes(file)) &&
-		over.declared === approval.declared_lines &&
-		over.measured <= approval.max_lines
+		over.declared === bound.declared &&
+		over.measured <= bound.max
 	)
 }
 

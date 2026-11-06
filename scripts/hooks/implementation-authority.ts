@@ -1,5 +1,5 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
-import { hook_decision } from '#scripts/josh/hook-decision'
+import { hook_tool_payload } from '#scripts/josh/hook-tool-payload'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { implementation_shell } from './implementation-shell'
 import { step_zero_notice } from './step-zero-notice'
@@ -17,7 +17,7 @@ function edit_refusal(tool_input: unknown): string | undefined {
 
 // The rule an unverified write matched (joshuafolkken/kit#5793), so a false refusal can be diagnosed.
 function unverified_write(raw_payload: string): string | undefined {
-	const payload = hook_decision.parse_hook_payload(raw_payload)
+	const payload = hook_tool_payload.parse(raw_payload)
 	if (payload === undefined) return 'an unparsed hook payload'
 	if (['apply_patch', 'exec'].includes(payload.tool_name)) return `\`${payload.tool_name}\` input`
 	if (['Edit', 'Write'].includes(payload.tool_name)) return edit_refusal(payload.tool_input)

@@ -39,6 +39,14 @@ const APPROVAL = {
 	body: '#6594 の再分割しない例外承認。品質ゲートは省略しない。',
 }
 const APPROVAL_FLAG = '--size-approval'
+const FILE_APPROVAL = {
+	issue: ISSUE,
+	paths: PATHS,
+	declared_files: 1,
+	max_files: PATHS.length,
+	source: APPROVAL.source,
+	rationale: 'Approved listed files only; retain line and hunk limits.',
+}
 const FLAGS = [APPROVAL_FLAG, '.josh/tmp/6594-size.json']
 const QUIET = {
 	hunk_files: [],
@@ -235,5 +243,50 @@ describe('lane:plan approval on a later registration', () => {
 
 		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS, ...FLAGS], DIRECTORY)).toBe(1)
 		expect(lane_plan.read(ISSUE, DIRECTORY)).toBeUndefined()
+	})
+})
+
+function file_scope_setup(): void {
+	fetch.mockResolvedValue(listing(ISSUE, 1))
+	signals.mockResolvedValue({ ...QUIET, lines_ratio: 1 })
+	vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(JSON.stringify(FILE_APPROVAL))
+}
+
+describe('lane:plan bounded file approval', () => {
+	beforeEach(file_scope_setup)
+
+	it('records file evidence and reuses it for the same approved plan', async () => {
+		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS, ...FLAGS], DIRECTORY)).toBe(SUCCESS)
+		expect(lane_plan.read(ISSUE, DIRECTORY)?.size_approval).toMatchObject(FILE_APPROVAL)
+		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS], DIRECTORY)).toBe(SUCCESS)
+	})
+
+	it('refuses the same file overflow without an explicit approval', async () => {
+		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS], DIRECTORY)).toBe(
+			lane_plan_check.SPLIT_EXIT_CODE,
+		)
+	})
+
+	it.each([
+		{ ...FILE_APPROVAL, max_files: 2 },
+		{ ...FILE_APPROVAL, declared_files: 2 },
+		{ ...FILE_APPROVAL, paths: PATHS.slice(1) },
+	])('refuses file scope mismatch %j', async (scope) => {
+		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(JSON.stringify(scope))
+
+		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS, ...FLAGS], DIRECTORY)).toBe(
+			lane_plan_check.SPLIT_EXIT_CODE,
+		)
+	})
+
+	it.each([
+		{ ...QUIET, lines_ratio: 1.3 },
+		{ ...QUIET, lines_ratio: 1, hunk_files: ['extra.ts', 'extra.ts', 'extra.ts'] },
+	])('retains the independent line and hunk limits %j', async (input) => {
+		signals.mockResolvedValue(input)
+
+		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS, ...FLAGS], DIRECTORY)).toBe(
+			lane_plan_check.SPLIT_EXIT_CODE,
+		)
 	})
 })
