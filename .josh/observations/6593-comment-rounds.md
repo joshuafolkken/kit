@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/issue/size-estimate.ts:143 | 2026-11-06 | #6593 | fixed
+- k:followup-unrelated-test-rerun | d1 | 2026-11-06 | scripts/git/main-merge.test.ts | followup reran Unit Tests (5/6); failed outside the change: isolated scripts/git/main-merge.test.ts > the measured split notice before the gate > uses the measured guide below the legacy bar (ac-9e07d12c)
