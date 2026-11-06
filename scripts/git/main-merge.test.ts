@@ -307,12 +307,23 @@ function over_guide_numstat(): string {
 }
 
 describe('the measured split notice before the gate', () => {
-	it('uses the measured guide below the legacy bar (ac-9e07d12c)', async () => {
+	it.each([51, 200])('keeps %s lines silent at the fallback floor (ac-9e07d12c)', async (lines) => {
 		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
-		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(`51\t0\t${CHANGED_FILE}`)
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(
+			`${String(lines)}\t0\t${CHANGED_FILE}`,
+		)
 
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
-		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('guide 2 files / 50 lines'))
+		expect(console.warn).not.toHaveBeenCalled()
+		expect(record_notice).not.toHaveBeenCalled()
+	})
+
+	it('warns past the fallback floor with a slow measured rate', async () => {
+		vi.mocked(lane_implement_rate_read.implement_rate).mockResolvedValue({ median: 24, lanes: 1 })
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(`201\t0\t${CHANGED_FILE}`)
+
+		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('guide 8 files / 200 lines'))
 	})
 })
 
