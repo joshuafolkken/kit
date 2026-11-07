@@ -7,7 +7,7 @@ import type { Classification } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_next } from '#scripts/epic/epic-next'
-import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
+import type { EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
@@ -280,10 +280,7 @@ function views_from(
 // being written beside it: the plan and the run cannot disagree about what may start, because there
 // is one answer and two renderings of it. `undefined` is the refusal — already reported.
 async function resolve(context: PoolContext): Promise<EpicNextResult | undefined> {
-	const references = backlog_pool
-		.opted_in_epics(context.opted_in.issues, context.tracking.index)
-		.map((number) => ({ number }))
-	const { reads, notices, refusal } = await epic_next_read.read_snapshots(references, context.repo)
+	const { reads, notices, refusal } = await backlog_pool.read_epics(context)
 
 	for (const notice of notices) console.error(notice)
 
