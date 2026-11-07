@@ -31,14 +31,17 @@ import { gh_reachability } from './git-gh-reachability'
 // `issue_dependencies_summary` can read `total_blocked_by: 0` while this endpoint returns a real
 // relation. Trusting the counter there makes `epic:next` call a graph that agrees with itself
 // contradictory and exit 1, which stops an unattended run at its first step with nothing to fix.
+//
+// Sent with the previous process's ETag (joshuafolkken/kit#6701): `backlog:next` reads every open
+// blocked issue's relations each offer, and an unchanged set answers `304`, which costs no core.
 async function read_blocked_by_listing(
 	issue_number: string,
 	repo?: string,
 	exact_total?: number,
 ): Promise<BlockedBy> {
-	const json = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
-	})
+	const json = await git_gh_etag_read.read(
+		`${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
+	)
 
 	return git_gh_issue_rest.to_blocked_by(json, exact_total)
 }
