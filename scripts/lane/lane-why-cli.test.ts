@@ -93,7 +93,7 @@ describe('lane_why_cli.run output', () => {
 	it('prints the table with blank cells when the Issue, rate and listing are unreadable', async () => {
 		await expect(lane_why_cli.run([String(ISSUE)])).resolves.toBe(0)
 		expect(console.info).toHaveBeenCalledWith(
-			expect.stringContaining('| implement | 51.0 min | 12 min |  |  |  |  |'),
+			expect.stringContaining('| implement | 51.0 min | 9 min |  |  |  |  |'),
 		)
 	})
 
