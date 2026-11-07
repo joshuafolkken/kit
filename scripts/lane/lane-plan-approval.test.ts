@@ -74,6 +74,50 @@ describe('lane plan size approval source', () => {
 	})
 })
 
+const APPROVED_BY = { author: COMMENT.author, body: COMMENT.body }
+const FILES_AXIS = { declared_files: 1, max_files: 2 }
+const LINES_ONLY = { ...SCOPE, ...APPROVED_BY }
+const FILES_ONLY = {
+	issue: ISSUE,
+	paths: SCOPE.paths,
+	source: SOURCE,
+	rationale: SCOPE.rationale,
+	...FILES_AXIS,
+	...APPROVED_BY,
+}
+const BOTH = { ...LINES_ONLY, ...FILES_AXIS }
+const PLAN = { issue: ISSUE, paths: SCOPE.paths, planned_at: COMMENT.created_at }
+const LINES_OVER = { reason: 'lines' as const, declared: 170, measured: 204 }
+const FILES_OVER = { reason: 'files' as const, declared: 1, measured: 2 }
+
+describe('lane plan size approval on both axes', () => {
+	it('keeps both axes of one approval file instead of stripping one', async () => {
+		read_file.mockReturnValue(JSON.stringify({ ...SCOPE, ...FILES_AXIS }))
+
+		expect(await lane_plan_approval.read(FILE, ISSUE)).toEqual(BOTH)
+	})
+
+	it.each([LINES_OVER, FILES_OVER])('allows each axis within its bound %j', (over) => {
+		expect(lane_plan_approval.allows(BOTH, PLAN, over)).toBe(true)
+	})
+
+	it('keeps a single-axis approval from loosening the other axis', () => {
+		expect(lane_plan_approval.allows(LINES_ONLY, PLAN, FILES_OVER)).toBe(false)
+		expect(lane_plan_approval.allows(FILES_ONLY, PLAN, LINES_OVER)).toBe(false)
+	})
+
+	it.each([
+		[{ ...BOTH, declared_files: 2 }, FILES_OVER],
+		[{ ...BOTH, declared_lines: 171 }, LINES_OVER],
+		[{ ...BOTH, max_files: 1 }, FILES_OVER],
+		[{ ...BOTH, max_lines: 203 }, LINES_OVER],
+		[{ ...BOTH, paths: ['other.ts'] }, FILES_OVER],
+		[{ ...BOTH, issue: ISSUE + 1 }, LINES_OVER],
+	])('refuses a mismatched both-axes scope %j', (approval, over) => {
+		expect(lane_plan_approval.allows(approval, PLAN, over)).toBe(false)
+	})
+})
+
 describe('lane plan size approval arguments', () => {
 	it('removes only the explicit approval file argument', () => {
 		expect(lane_plan_approval.split(['6594', ONE_FILE, FLAG, FILE])).toEqual({
