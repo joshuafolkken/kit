@@ -313,11 +313,11 @@ describe('is_uncut_gate', () => {
 		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(false)
 	})
 
-	// An unmeasurable session keeps the old unconditional cut as the safety net.
-	it('fires on an uncut lane gate when the recent context cannot be measured', () => {
+	// joshuafolkken/kit#6576: unmeasurable is undetermined, not over — a relaunch could not measure it either.
+	it('says nothing about an uncut lane gate when the recent context cannot be measured', () => {
 		const state = state_of(LANE_DIRECTORY, undefined, CONTEXT_UNMEASURABLE)
 
-		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(true)
+		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(false)
 	})
 })
 
@@ -362,8 +362,8 @@ describe('delivered_rules.delivery — inside a lane checkout', () => {
 		process.env[lane_child_marker.KEY] = ISSUE
 		// `current_state` prices the live session, which read the machine's whole transcript corpus —
 		// timing out against a large home and passing in CI, where there is none (joshuafolkken/kit#2772).
-		// Held at the CI answer, which keeps the unconditional cut.
-		vi.spyOn(cost_cli, 'session_verdict').mockReturnValue(CONTEXT_UNMEASURABLE)
+		// Held at `over`, the one verdict that takes the cut.
+		vi.spyOn(cost_cli, 'session_verdict').mockReturnValue(CONTEXT_OVER)
 	})
 
 	afterAll(() => {

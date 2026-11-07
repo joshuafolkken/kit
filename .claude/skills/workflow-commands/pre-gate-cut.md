@@ -118,8 +118,8 @@ A child that ended without cutting is detected by
 ## The threshold
 
 The threshold is the break-even context `scripts/cost-runtime/context-cut-payback.ts` prices at the
-session's model — `pnpm josh cost --cut` prints it, no fixed figure fits every model; both cuts and the parent hand-off read the same verdict,
-and an unmeasurable session is always cut. Both cuts end the turn **before** the gate, so the push is never a
+session's model — `pnpm josh cost --cut` prints it, no fixed figure fits every model; both cuts and the parent hand-off read the same verdict;
+neither cut fires when it is unmeasurable. Both cuts end the turn **before** the gate, so the push is never a
 turn boundary (`chain-rule.md`).
 
 ## A lane child records its park before it stops

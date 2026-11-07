@@ -28,6 +28,10 @@ import { followup_main_move } from './followup-main-move'
 // stops `followup` as before, and each such rerun leaves an observation (`followup-failed-tests.ts`).
 // A job that failed only for waiting on such a job is rerun with it (`followup-job-needs.ts`).
 //
+// **A job red because the runner could not download an action is rerun too** (joshuafolkken/kit#6673):
+// the download fails before the action's own steps run, whether in "Set up job" or in a composite step,
+// so nothing in the change was exercised. The runner's own error line in the log tells it apart.
+//
 // The rerun endpoint reruns **every** failed job of a run, and GitHub refuses it while the run is still
 // going. So each run is waited out first, and it is rerun only when every job that failed in it
 // qualifies: a run holding a job that failed on the change itself is never rerun, or a test the change
@@ -40,6 +44,10 @@ const ACTIONS_APP_SLUG = 'github-actions'
 const PASSING_STEP_CONCLUSIONS: ReadonlySet<string> = new Set(['success', 'skipped'])
 const RUN_COMPLETED = 'completed'
 const FIRST_ATTEMPT = 1
+
+// The runner's last word after its download retries, or its failure to look the action up at all.
+const ACTION_DOWNLOAD_ERROR =
+	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu
 
 // The longest `timeout-minutes` in `ci.yml` is 10; a run still going past that is not one a rerun helps.
 const COMPLETE_ATTEMPTS = 40
@@ -140,9 +148,9 @@ function is_first_failure(job: Job): boolean {
 	)
 }
 
-// A job whose every step passed stopped on the runner; one red on its first attempt is judged by the
-// failed tests its log names. The log endpoint redirects to the plain text, which `gh api` follows; a
-// vitest log is colored.
+// A job whose every step passed stopped on the runner; one red on its first attempt is rerun when its
+// log shows an action download failing, and otherwise judged by the failed tests its log names. The log
+// endpoint redirects to the plain text, which `gh api` follows; a vitest log is colored.
 async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged> {
 	if (has_every_step_passed(job)) return { job, verdict: RERUN_VERDICT }
 	if (!is_first_failure(job)) return { job, verdict: KEPT_VERDICT }
@@ -151,6 +159,8 @@ async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged
 		path: actions_api_path(`jobs/${String(job.id)}/logs`),
 		should_allow_escapes: true,
 	})
+	if (ACTION_DOWNLOAD_ERROR.test(log)) return { job, verdict: RERUN_VERDICT }
+
 	const tests = followup_failed_tests.read_failed_tests(log)
 
 	return { job, verdict: followup_failed_tests.verdict_of(tests, changed), tests }
@@ -254,7 +264,7 @@ async function rerun(branch_name: string, entries: ReadonlyArray<Judged>): Promi
 	const names = jobs.map((job) => job.name)
 
 	console.info(
-		`🔁 Rerunning CI jobs that stopped after every step passed or failed only outside the change: ${names.join(', ')}`,
+		`🔁 Rerunning CI jobs that stopped after every step passed, failed downloading an action, or failed only outside the change: ${names.join(', ')}`,
 	)
 	await followup_failed_tests.record(
 		entries.flatMap(({ job, tests }) => (tests === undefined ? [] : { job: job.name, tests })),
