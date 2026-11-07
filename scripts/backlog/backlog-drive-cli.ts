@@ -39,6 +39,7 @@ import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_paused } from './backlog-drive-paused'
+import { backlog_drive_rate } from './backlog-drive-rate'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_retry } from './backlog-drive-retry'
@@ -243,7 +244,7 @@ function child_ports(
 }
 
 async function offer_for(state: DriveState, context: DriveContext): Promise<OfferRead | undefined> {
-	const read = await read_offer(state, context)
+	const read = await backlog_drive_rate.measured(async () => await read_offer(state, context))
 
 	lane_launch_cli.keep_pending(read?.verdict === 'run' ? read.issues : [])
 
@@ -386,6 +387,7 @@ const backlog_drive_cli = {
 	merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
+	offer_for,
 	parse: backlog_drive_args.parse,
 	read_offer,
 	resume_line: backlog_drive_args.resume_line,
