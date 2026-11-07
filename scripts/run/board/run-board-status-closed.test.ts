@@ -124,4 +124,15 @@ describe('run_board_status.settle_closed with a parked child reopened', () => {
 			ended_ms: T2,
 		})
 	})
+
+	// A close from before a relaunch belongs to the issue's earlier life, whatever the listing holds.
+	it('keeps one parked again after a relaunch past its earlier close', () => {
+		const relaunched = new Map([[ISSUE, { state: 'parked' as const, started_ms: T2 + 1 }]])
+		const read = { ...read_closed(closed_issue({ is_not_planned: true })), open_numbers: undefined }
+
+		expect(run_board_status.settle_closed(relaunched, read).get(ISSUE)).toStrictEqual({
+			state: 'parked',
+			started_ms: T2 + 1,
+		})
+	})
 })

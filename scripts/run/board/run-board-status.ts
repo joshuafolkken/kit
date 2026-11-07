@@ -401,12 +401,12 @@ function unsettled(issue: number, status: ItemStatus, read: OpenRead): ItemStatu
 // dates the close, so a closed child never waits in 🙋 decision (joshuafolkken/kit#6535).
 function parked_settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
 	const closed = read.closed.get(issue)
+	// `undefined` too for a close dated before this launch — an earlier life's close never settles it.
+	const settled_closed = closed_status(status, closed)
 
-	if (closed === undefined || read.read_ms === undefined) {
-		return closed_status(status, closed) ?? status
-	}
+	if (closed === undefined || settled_closed === undefined) return status
 
-	return run_board_closed.is_reopened(issue, closed, read) ? status : closed_as(status, closed)
+	return run_board_closed.is_reopened(issue, closed, read) ? status : settled_closed
 }
 
 function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
