@@ -232,7 +232,7 @@ function providers_of(view: QuotaView): ReadonlyArray<QuotaProvider> {
 		: [first, ...PROVIDERS.filter((provider) => provider !== first)]
 }
 
-function name_of(provider: QuotaProvider, view: QuotaView): string {
+function name_of(provider: QuotaProvider | typeof GITHUB, view: QuotaView): string {
 	if (view.scheduler_provider === undefined) return provider
 
 	const mark = provider === view.scheduler_provider ? SCHEDULER_MARK : '  '
@@ -296,7 +296,9 @@ function rate_limit_bodies(view: QuotaView): Array<string> {
 }
 
 function rate_limit_rows(view: QuotaView): Array<string> {
-	return rate_limit_bodies(view).map((body) => `${INDENT}${name_cell(GITHUB)}${body}`)
+	return rate_limit_bodies(view).map(
+		(body) => `${INDENT}${name_cell(name_of(GITHUB, view))}${body}`,
+	)
 }
 
 // `claude 42/68 ≈9/5`: each column's percent, `—` where none stands, then its count.
