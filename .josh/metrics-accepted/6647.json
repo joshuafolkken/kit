@@ -1,0 +1,7 @@
+{
+	"reason": "lane:plan --single waives the files axis for one deliverable (#6647): flag parsing, the waiver and its refusal/notice text",
+	"date": "2026-11-07",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}
