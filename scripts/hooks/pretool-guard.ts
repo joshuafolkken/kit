@@ -12,6 +12,7 @@ import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_revert } from './bash-revert'
 import { batch_outcome } from './batch-guard'
+import { hook_ledger } from './hook-ledger'
 import { implementation_authority } from './implementation-authority'
 import { lane_plan_guard } from './lane-plan-guard'
 import { shell_rules_notice } from './shell-rules-notice'
@@ -34,6 +35,8 @@ import { step_zero_notice } from './step-zero-notice'
 // process needs no switch of its own.
 
 const CLEAR: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
+// The name a refusal is recorded under in the hook ledger (`hook-ledger.ts`).
+const HOOK_NAME = 'pretool-guard'
 
 function is_clear(outcome: GuardOutcome): boolean {
 	return outcome.reason === undefined && outcome.notice === undefined && outcome.fault === undefined
@@ -223,6 +226,11 @@ function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite)
 	else process.stdout.write(`${envelope}\n`)
 }
 
+// The ledger line for a judged call — written by both harnesses' entries, after their verdict.
+async function record_refusal(judged_payload: string, outcome: GuardOutcome): Promise<void> {
+	await hook_ledger.record_reason(HOOK_NAME, outcome.reason, judged_payload)
+}
+
 // **The guards judge the call that will run.** A rewritten call reaches every guard already made
 // right, so the rewriting row stays quiet on it while any other guard's refusal still wins over the
 // rewrite. The Codex adapter cannot rewrite a call, so it goes on judging the call as typed.
@@ -232,7 +240,10 @@ async function respond(raw_payload: string): Promise<void> {
 	const judged = rewrite?.payload ?? raw_payload
 
 	bash_revert.stamp(judged)
-	emit(judged, await pretool_outcome_async(judged), rewrite)
+	const outcome = await pretool_outcome_async(judged)
+
+	emit(judged, outcome, rewrite)
+	await record_refusal(judged, outcome)
 }
 
 const pretool_guard = {
@@ -241,6 +252,7 @@ const pretool_guard = {
 	foreground_rewrite,
 	mark_phase,
 	pretool_outcome,
+	record_refusal,
 	respond,
 }
 
