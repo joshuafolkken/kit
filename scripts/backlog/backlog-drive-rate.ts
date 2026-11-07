@@ -1,9 +1,12 @@
 import { gh_core_rate_limit, type CoreAllowance } from '#scripts/gh/gh-core-rate-limit'
+import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
 // GitHub's REST core rate limit, read before and after each `backlog:drive` offer cycle, so the run's
-// events carry what the account spent across a cycle (joshuafolkken/kit#6558). `used` is account-wide:
+// events carry what the account spent across a cycle (joshuafolkken/kit#6558). The cycle measured is
+// the `backlog:offer` read: a named offer answers from the carry record without it, and is left
+// unmeasured so a drive with nothing to read spends no `gh` spawn either. `used` is account-wide:
 // lanes and other processes on the same account add to it, so a cycle's delta is an upper bound on
 // what the cycle itself spent. `gh api rate_limit` spends none of it.
 // **A failed read never stops the offer**: the cycle's event is written as missing instead.
@@ -50,6 +53,11 @@ async function measured<T>(cycle: () => Promise<T>): Promise<T> {
 	return result
 }
 
-const backlog_drive_rate = { measured }
+/** The drive's `backlog:offer` read, run as the measured cycle. */
+async function offer_run(argv: ReadonlyArray<string>): Promise<JoshResult> {
+	return await measured(async () => await josh_command.josh_run(argv, true))
+}
+
+const backlog_drive_rate = { measured, offer_run }
 
 export { backlog_drive_rate }

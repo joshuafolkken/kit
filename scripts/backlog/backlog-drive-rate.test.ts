@@ -1,10 +1,13 @@
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { josh_command } from '#scripts/josh/josh-run'
+import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { backlog_drive } from './backlog-drive'
+import { backlog_drive, type OfferRead } from './backlog-drive'
 import type { DriveContext } from './backlog-drive-args'
 import { backlog_drive_cli } from './backlog-drive-cli'
+import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_rate } from './backlog-drive-rate'
 
@@ -95,15 +98,53 @@ const CONTEXT: DriveContext = {
 	stopped: undefined,
 }
 
-describe('backlog_drive_cli.offer_for', () => {
-	it('reads every production offer through the rate-limit measurement', async () => {
-		const read = { verdict: 'watch', issues: [], retries: 0 }
-		const measured = vi.spyOn(backlog_drive_rate, 'measured').mockResolvedValue(read)
+const STARTED_AT = '2026-11-08T00:00:00.000Z'
+const STATE = backlog_drive.initial_state([], STARTED_AT)
+const OFFER_ARGV = ['backlog:offer']
+const CARRY: RunCarry = {
+	invocation: 'backlogrun',
+	started_at: STARTED_AT,
+	merged: 0,
+	filed: 0,
+	cuts: 0,
+	failures: 0,
+	outages: 0,
+}
 
-		vi.spyOn(backlog_drive_owner, 'assert_current').mockRejectedValue(new Error('unmeasured'))
-		const state = backlog_drive.initial_state([], '2026-11-08T00:00:00.000Z')
+function stub_offer_path(named: OfferRead | undefined): ReturnType<typeof vi.spyOn> {
+	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
+	vi.spyOn(backlog_drive_named_offer, 'read').mockResolvedValue(named)
 
-		await expect(backlog_drive_cli.offer_for(state, CONTEXT)).resolves.toBe(read)
-		expect(measured).toHaveBeenCalledTimes(1)
+	return vi.spyOn(backlog_drive_rate, 'offer_run').mockResolvedValue({ code: 1, out: '', err: '' })
+}
+
+describe('backlog_drive_cli.read_offer', () => {
+	it('reads the backlog:offer listing through the rate-limit measurement', async () => {
+		const offer_run = stub_offer_path(undefined)
+
+		await expect(backlog_drive_cli.read_offer(STATE, CONTEXT)).resolves.toBeUndefined()
+		expect(offer_run).toHaveBeenCalledTimes(1)
+	})
+
+	it('leaves a named offer, which reads no listing, unmeasured', async () => {
+		const named: OfferRead = { verdict: 'watch', issues: [], retries: 0 }
+		const offer_run = stub_offer_path(named)
+
+		await expect(backlog_drive_cli.read_offer(STATE, CONTEXT)).resolves.toBe(named)
+		expect(offer_run).not.toHaveBeenCalled()
+	})
+})
+
+describe('backlog_drive_rate.offer_run', () => {
+	it('runs the offer command between the two rate reads and keeps its result', async () => {
+		const result = { code: 0, out: 'run', err: '' }
+		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue(result)
+
+		stub_reads(rate_json(1, RESET_SECONDS), rate_json(4, RESET_SECONDS))
+		const emit = stub_emit()
+
+		await expect(backlog_drive_rate.offer_run(OFFER_ARGV)).resolves.toBe(result)
+		expect(run).toHaveBeenCalledWith(OFFER_ARGV, true)
+		expect(emit).toHaveBeenCalledTimes(1)
 	})
 })

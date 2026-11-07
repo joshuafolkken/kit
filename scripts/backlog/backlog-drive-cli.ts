@@ -102,7 +102,7 @@ async function read_offer(
 	if (named !== undefined) return named
 
 	const argv = backlog_drive_offer_argv.offer_argv(state, carry, context.forwarded)
-	const result = await josh_command.josh_run(argv, should_forward_stderr)
+	const result = await backlog_drive_rate.offer_run(argv)
 
 	const offer = result.code === SUCCESS_EXIT_CODE ? to_offer(result.out) : undefined
 
@@ -244,7 +244,7 @@ function child_ports(
 }
 
 async function offer_for(state: DriveState, context: DriveContext): Promise<OfferRead | undefined> {
-	const read = await backlog_drive_rate.measured(async () => await read_offer(state, context))
+	const read = await read_offer(state, context)
 
 	lane_launch_cli.keep_pending(read?.verdict === 'run' ? read.issues : [])
 
@@ -387,7 +387,6 @@ const backlog_drive_cli = {
 	merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
-	offer_for,
 	parse: backlog_drive_args.parse,
 	read_offer,
 	resume_line: backlog_drive_args.resume_line,
