@@ -114,6 +114,25 @@ describe('backlog_drive.run_loop — a dated wait', () => {
 	})
 })
 
+describe('backlog_drive.run_loop — a passed dated wait', () => {
+	it('asks once per interval while the offer keeps a passed deadline', async () => {
+		const { ports, calls } = harness({})
+		const passed_ms = ports.now().getTime() - 1
+
+		async function offer(): Promise<OfferRead> {
+			calls.push('offer')
+
+			return { verdict: 'watch', issues: [], retries: 0, not_before_ms: passed_ms }
+		}
+
+		const window_ms = CONFIG.offer_ms * WATCHED_INTERVALS
+
+		await backlog_drive.run_loop(state(), { ...CONFIG, window_ms }, { ...ports, offer })
+
+		expect(asks(calls)).toBe(WATCHED_INTERVALS + 1)
+	})
+})
+
 describe('backlog_drive.run_loop — the ask interval', () => {
 	it('hands the loop the interval the budget names', () => {
 		const config = backlog_drive_cli.loop_config(undefined)

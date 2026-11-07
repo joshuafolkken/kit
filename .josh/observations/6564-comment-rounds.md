@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/gh/git-gh-rate-limit.ts:83 | 2026-11-07 | #6564
+- rf:project-conventions | low | scripts/gh/git-gh-rate-limit.ts:25 | 2026-11-07 | #6564
+- k:followup-unrelated-test-rerun | d1 | 2026-11-07 | scripts/build/pack-boundary.test.ts | followup reran Unit Tests (3/6); failed outside the change: isolated scripts/build/pack-boundary.test.ts > the published package carries nothing kit-internal > ships no scripts module that no consumer entry reaches

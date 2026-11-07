@@ -23,12 +23,25 @@ describe('backlog_offer_timing', () => {
 		expect(backlog_offer_timing.due_ms(undefined, NOW_MS, INTERVAL_MS)).toBe(NOW_MS + INTERVAL_MS)
 	})
 
+	it.each([NOW_MS, NOW_MS - 1])(
+		'falls back to the interval once the last ask reached deadline %s',
+		(deadline) => {
+			expect(backlog_offer_timing.due_ms(deadline, NOW_MS, INTERVAL_MS)).toBe(NOW_MS + INTERVAL_MS)
+		},
+	)
+
 	it.each([
 		[undefined, INTERVAL_MS],
 		[NOW_MS + 1, 1],
-		[NOW_MS, 0],
-		[NOW_MS - 1, 0],
+		[NOW_MS + INTERVAL_MS + 1, INTERVAL_MS],
 	])('bounds the local wait for deadline %s', (deadline, expected) => {
 		expect(backlog_offer_timing.sleep_ms(deadline, INTERVAL_MS, NOW_MS)).toBe(expected)
 	})
+
+	it.each([NOW_MS, NOW_MS - 1])(
+		'waits the full interval once deadline %s has passed',
+		(deadline) => {
+			expect(backlog_offer_timing.sleep_ms(deadline, INTERVAL_MS, NOW_MS)).toBe(INTERVAL_MS)
+		},
+	)
 })
