@@ -57,6 +57,7 @@ beforeEach(() => {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(scratch.directory)
 	vi.spyOn(poll, 'sleep').mockResolvedValue()
 	vi.spyOn(gh_core_rate_limit, 'read_allowance').mockResolvedValue(undefined)
+	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 	run_carry.begin_carry(
 		run_carry.carry_path(scratch.directory),
@@ -86,7 +87,7 @@ it('starts an issue opted in during the idle watch after one failed read of the 
 	expect(result.state.in_flight).toStrictEqual([OPTED_IN])
 })
 
-// joshuafolkken/kit#6563: the production offer path checks the core allowance before reading an offer.
+// joshuafolkken/kit#6563: the open offer checks the core allowance before reading `backlog:offer`.
 it('offers a wait until the reset instead of reading an offer while the core allowance is below the floor', async () => {
 	const reset_ms = Date.now()
 	const josh_run = vi.spyOn(josh_command, 'josh_run')
@@ -97,7 +98,7 @@ it('offers a wait until the reset instead of reading an offer while the core all
 		reset_ms,
 	})
 
-	const read = await backlog_drive_cli.offer_for(backlog_drive.initial_state([], ACTIVE), CONTEXT)
+	const read = await backlog_drive_cli.read_offer(backlog_drive.initial_state([], ACTIVE), CONTEXT)
 
 	expect(read).toMatchObject({ verdict: 'wait', issues: [], not_before_ms: reset_ms })
 	expect(josh_run).not.toHaveBeenCalled()

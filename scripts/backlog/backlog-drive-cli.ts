@@ -100,7 +100,9 @@ async function read_offer(
 ): Promise<OfferRead | undefined> {
 	const carry = await backlog_drive_owner.assert_current(context.owner)
 	const named = await backlog_drive_named_offer.read(carry, state, context)
-	if (named !== undefined) return named
+	// joshuafolkken/kit#6563: the open offer's read waits out a dry core allowance.
+	const answered = named ?? (await backlog_drive_rate_limit.held(state))
+	if (answered !== undefined) return answered
 
 	const argv = backlog_drive_offer_argv.offer_argv(state, carry, context.forwarded)
 	const result = await backlog_drive_rate.offer_run(argv)
@@ -245,7 +247,7 @@ function child_ports(
 }
 
 async function offer_for(state: DriveState, context: DriveContext): Promise<OfferRead | undefined> {
-	const read = (await backlog_drive_rate_limit.held(state)) ?? (await read_offer(state, context))
+	const read = await read_offer(state, context)
 
 	lane_launch_cli.keep_pending(read?.verdict === 'run' ? read.issues : [])
 
@@ -387,7 +389,6 @@ const backlog_drive_cli = {
 	merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
-	offer_for,
 	parse: backlog_drive_args.parse,
 	read_offer,
 	resume_line: backlog_drive_args.resume_line,
