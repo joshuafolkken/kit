@@ -3,8 +3,11 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import {
 	CHECK_WAIT_INTERVAL_MS,
+	compute_max_attempts,
 	DEFAULT_MAX_ATTEMPTS,
+	DEFAULT_STABLE_READS,
 	DEFAULT_TIMEOUT_SECONDS,
+	WATCH_CONFIRMED_STABLE_READS,
 } from './git-pr-checks'
 
 // #851: the merge wait must outlast consumer CI that includes E2E,
@@ -95,5 +98,35 @@ describe('DEFAULT_TIMEOUT_SECONDS', () => {
 		const waited_seconds = (DEFAULT_MAX_ATTEMPTS - 1) * interval_seconds
 
 		expect(waited_seconds).toBeGreaterThanOrEqual(DEFAULT_TIMEOUT_SECONDS)
+		expect(waited_seconds).toBeLessThan(DEFAULT_TIMEOUT_SECONDS + interval_seconds)
+	})
+})
+
+// #6691: every tick spends billed REST core reads, so the interval is the rate-limit lever. Changing
+// it must change only how often the wait reads, never how long it waits or how many settled reads
+// it needs.
+describe('poll cadence', () => {
+	const interval_seconds = CHECK_WAIT_INTERVAL_MS / MS_PER_SECOND
+
+	it('polls every 20 seconds', () => {
+		expect(CHECK_WAIT_INTERVAL_MS).toBe(20_000)
+	})
+
+	// `get_configured_max_attempts` derives a `JOSH_CI_TIMEOUT_SECONDS` budget through this same call
+	// (`git-pr-checks.test.ts` pins that), so the bound holds for an overridden budget too.
+	it.each([60, 181, 3840])(
+		'waits out a %d-second JOSH_CI_TIMEOUT_SECONDS budget without an extra interval',
+		(timeout_seconds) => {
+			const attempts = compute_max_attempts(timeout_seconds, CHECK_WAIT_INTERVAL_MS)
+			const waited_seconds = (attempts - 1) * interval_seconds
+
+			expect(waited_seconds).toBeGreaterThanOrEqual(timeout_seconds)
+			expect(waited_seconds).toBeLessThan(timeout_seconds + interval_seconds)
+		},
+	)
+
+	it('keeps the settled-read counts', () => {
+		expect(DEFAULT_STABLE_READS).toBe(2)
+		expect(WATCH_CONFIRMED_STABLE_READS).toBe(1)
 	})
 })
