@@ -50,10 +50,12 @@ import { lane_stage_budget } from './lane-stage-budget'
 type SplitReason = 'files' | 'hunks' | 'lines'
 
 // What `lane:plan` measured beside the plan (`lane-plan-signals.ts`); one `hunk_files` entry per hunk,
-// one `committed_files` entry per file the branch changed between its base and `HEAD`.
+// one `committed_files` entry per file the branch changed between its base and `HEAD`, and the files
+// that base already holds (undefined when the base does not resolve).
 interface PlanSignals {
 	hunk_files: ReadonlyArray<string>
 	committed_files: ReadonlyArray<string>
+	base_files?: ReadonlySet<string> | undefined
 	files_ratio?: number | undefined
 	lines_ratio: number | undefined
 	implement_rate: ImplementRate | undefined
