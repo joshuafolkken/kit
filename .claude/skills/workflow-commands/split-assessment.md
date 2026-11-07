@@ -1,7 +1,7 @@
 # The split assessment — one definition, every entry point
 
-Before any entry point starts work on an Issue, decide whether the request is **one** deliverable or
-several. Every command applies it identically.
+Before work on an Issue starts, decide whether it is **one** deliverable or several; every entry
+point applies this.
 
 ## The question
 
@@ -18,9 +18,9 @@ Floor (also the unmeasured fallback):
 **more than 8 changed files or more than 200 changed lines**.
 
 Split above **the cap, 1.5 times the guide**, or budget.
-Merged lanes' median actual / declared ratios, separately for files and lines,
-independent of speed measurement. Each unmeasured axis uses the fallback of 2.
-`lane:plan` answers `split` past the declared files × files ratio (files or hunks), or line guide.
+Merged lanes' median actual / declared ratios per axis, apart from speed; unmeasured: 2.
+`lane:plan` answers `split` past the declared files × files ratio (files or hunks), or line guide;
+one deliverable past files → `--single` (`lane-plan-size.ts`).
 
 ## The same two questions decide the filing-time fold
 

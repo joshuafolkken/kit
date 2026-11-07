@@ -40,6 +40,12 @@ import { lane_stage_budget } from './lane-stage-budget'
 // hunks of the files it adds. A cleared record with no `cleared_paths` — one narrowed before #5672, or a
 // lane's first cleared plan — has the files this lane's branch has committed stand in for that history
 // (joshuafolkken/kit#5684): only the ship commits, and its preflight held each commit to the plan of its time.
+//
+// **A plan declared one deliverable (`--single`) is not refused on the files axis** (joshuafolkken/kit#6647):
+// a split needs a separately-mergeable part as well as the size (split-assessment.md → "The question"), and
+// a short declaration alone would push the lane into a split child that takes every acceptance criterion.
+// The overrun still goes on the ledger, so the pre-gate `run:cut` verifies the deliverable
+// (`split-verified-single.ts`); the hunks and lines axes refuse as before.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
 
@@ -223,7 +229,25 @@ function measure_over(
 	)
 }
 
-// `undefined` while every axis stays within its bar, or no size is declared; files first, then hunks, then lines.
+// Whether `over` is a files-axis overrun of a plan declared one deliverable — noted, not refused.
+function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
+	return plan.single === true && over?.reason === 'files'
+}
+
+// Files first, then hunks, then lines; a waived files overrun stands only once the other axes pass.
+function first_over(
+	plan: LanePlan,
+	declared: Declared,
+	recorded: LanePlan | undefined,
+	signals: PlanSignals,
+): FilesOver | MeasureOver | undefined {
+	const files = files_over(plan, declared.files, recorded, signals)
+	if (files !== undefined && !is_waived(plan, files)) return files
+
+	return measure_over(declared, signals, plan, recorded) ?? files
+}
+
+// `undefined` while every axis stays within its bar, or no size is declared.
 function oversize(
 	plan: LanePlan,
 	issues: ReadonlyArray<OpenIssueData>,
@@ -233,9 +257,7 @@ function oversize(
 	const declared = declared_of(plan.issue, issues)
 	if (declared === undefined) return undefined
 
-	const over =
-		files_over(plan, declared.files, recorded, signals) ??
-		measure_over(declared, signals, plan, recorded)
+	const over = first_over(plan, declared, recorded, signals)
 
 	return over === undefined ? undefined : { ...over, guide: guide_of(signals) }
 }
@@ -249,7 +271,11 @@ function files_text(issue: number, over: FilesOver): string {
 	const bar = `${String(counted)} files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`- 規模見積もり:\` declares`
 	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
 
-	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. ${bar_tail()}`
+	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
+}
+
+function waiver_text(issue: number, files: number, limit: number): string {
+	return `single (files): ${session_cite.issue(issue)}'s plan holds ${String(files)} files (tests excluded), over ${String(limit)}, recorded as one deliverable and noted on the ledger — the pre-gate \`run:cut\` answers \`split-unresolved\` unless every ship-draft acceptance row is met and \`lint:related\` and \`test:related\` are green (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
 }
 
 function measure_bar(over: MeasureOver): string {
@@ -271,7 +297,7 @@ function refusal_text(issue: number, over: Oversize): string {
 	return `${text} ${split_assess.policy_text(guide)}`
 }
 
-const lane_plan_size = { declares, oversize, refusal_text }
+const lane_plan_size = { declares, is_waived, oversize, refusal_text, waiver_text }
 
 export { lane_plan_size }
 export type { Oversize, PlanSignals, SplitReason }

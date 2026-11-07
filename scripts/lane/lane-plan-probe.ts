@@ -83,12 +83,13 @@ function is_oversize(found: Extended): found is typeof OVERSIZE {
 }
 
 // **A plan widened without the wait**: `run:review`'s open records a clear widening and stops on a clash
-// itself. An oversize widening — `lane:plan`'s `split` — a clash or an unread listing writes nothing and
-// is returned; the ship's `unplanned` preflight still checks.
+// itself. An oversize widening — `lane:plan`'s `split`, which a `--single` plan's waived files overrun is
+// not — a clash or an unread listing writes nothing and is returned; the ship's `unplanned` preflight still checks.
 async function extend(plan: LanePlan, directory: string): Promise<Extended> {
 	const issues = await opted_in()
+	const over = await oversize_of(plan, issues, directory)
 
-	if ((await oversize_of(plan, issues, directory)) !== undefined) return OVERSIZE
+	if (over !== undefined && !lane_plan_size.is_waived(plan, over)) return OVERSIZE
 	const found = probe(plan, issues, directory)
 
 	if (found === undefined) record_cleared(plan, directory)
