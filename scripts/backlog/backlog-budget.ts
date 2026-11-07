@@ -29,12 +29,13 @@ const IDLE_WAIT_HOURS = 8
 const DEFAULT_IDLE_MINUTES = IDLE_WAIT_HOURS * MINUTES_PER_HOUR
 const DEFAULT_IDLE_MS = DEFAULT_IDLE_MINUTES * MS_PER_MINUTE
 
-// **The one interval between two asks for work, whether lanes are running or nothing is.** The driver
-// and the wake supervisor both read it from here. The loop is a process, so an ask spends no AI turn,
-// and a watch is polled as often as a running batch; a child collected in between is asked about at
-// once, without waiting it out. `backlogrun-progress.md` → "Waiting, and never waiting forever" holds
-// the row; the figure is here because `idle_watch_reason` below has to say it.
-const OFFER_INTERVAL_SECONDS = 60
+// **The one interval between two asks for work, whether lanes are running or nothing is.** The loop is
+// a process, so an ask spends no AI turn, and a watch is polled as often as a running batch; a child
+// collected in between is asked about at once, without waiting it out. `backlogrun-progress.md` →
+// "Waiting, and never waiting forever" holds the row; the figure is here because `idle_watch_reason`
+// below has to say it. Three minutes keeps the asks within the REST core budget while lanes run
+// (joshuafolkken/kit#6718); the wake supervisor's pause is its own (`run-wake-window.ts`).
+const OFFER_INTERVAL_SECONDS = 180
 const OFFER_INTERVAL_MS = OFFER_INTERVAL_SECONDS * MS_PER_SECOND
 
 const RUN_VERDICT = 'run'
