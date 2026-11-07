@@ -137,10 +137,12 @@ async function write_posttool_context(raw_payload: string): Promise<void> {
 // the phase mark reads is in place; the mark follows the written envelope.
 async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
-	const outcome = pretool_outcome(raw_payload)
+	const judged = pretool_payload(raw_payload)
+	const outcome = pretool_guard.pretool_outcome(judged)
 
 	hook_decision.emit_outcome(outcome)
 	await pretool_guard.mark_phase(outcome)
+	await pretool_guard.record_refusal(judged, outcome)
 }
 
 // Codex's payload reaches this adapter, not `respond_from_stdin`, so it is captured here, untranslated.
