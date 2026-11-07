@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/gh/git-gh-exec.ts:184 | 2026-11-07 | #6612 | false-positive
+- rf:none | none | - | 2026-11-07 | #6612
