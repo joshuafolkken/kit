@@ -1,9 +1,9 @@
 import { stripVTControlCharacters } from 'node:util'
+import { gh_core_rate_limit, type CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
 import type { Quotas } from './run-board-quota-read'
-import { run_board_rate_limit, type CoreRateLimit } from './run-board-rate-limit'
 
 // joshuafolkken/kit#6559: the live board reads GitHub's core rate limit through the shared reader, one
 // plain frame draws it on the usage row, and a failed read leaves the board drawn without it.
@@ -34,7 +34,7 @@ async function once_frame(read_rate_limit: () => Promise<CoreRateLimit | undefin
 
 describe('run_board_cli.LIVE_PORTS rate limit', () => {
 	it('reads the core rate limit through the shared reader', async () => {
-		const read_core = vi.spyOn(run_board_rate_limit, 'read_core').mockResolvedValue(CORE)
+		const read_core = vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(CORE)
 
 		await expect(run_board_cli.LIVE_PORTS.read_rate_limit?.()).resolves.toStrictEqual(CORE)
 		expect(read_core).toHaveBeenCalledOnce()

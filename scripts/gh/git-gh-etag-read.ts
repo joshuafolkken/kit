@@ -1,7 +1,9 @@
+import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { shared_cache, type CacheSlot } from '#scripts/josh/shared-cache'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
+import { git_gh_exec } from './git-gh-exec'
 
 // A `gh api` GET sent with the ETag of the answer the previous josh process read, kept on disk
 // (joshuafolkken/kit#6560). `backlog:next` and `issue:scout` each run as a fresh process a minute or
@@ -67,7 +69,19 @@ async function read(path: string): Promise<string> {
 	return settled.body
 }
 
-const git_gh_etag_read = { read, settle, slot_of }
+// A listing whose first page holds `per_page` rows (joshuafolkken/kit#6699). The ETag covers one page
+// only, so a full first page — more may follow — is read unconditionally with `--paginate` instead;
+// an answer that is no array is handed back for the caller's own parser to reject.
+async function read_listing(path: string, per_page: number): Promise<string> {
+	const first = await read(path)
+	const rows = parse_json_array_or_undefined(first, z.unknown())
+
+	if (rows === undefined || rows.length < per_page) return first
+
+	return await git_gh_exec.exec_gh_api({ path, should_paginate: true })
+}
+
+const git_gh_etag_read = { read, read_listing, settle, slot_of }
 
 export type { KeptAnswer }
 export { git_gh_etag_read }

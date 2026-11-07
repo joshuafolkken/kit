@@ -9,6 +9,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_park } from './run-park'
+import { run_park_body } from './run-park-body'
 import { run_park_lane } from './run-park-lane'
 import { run_park_release } from './run-park-release'
 
@@ -34,15 +35,17 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const CLEAR_FLAG = '--clear'
-const USAGE = `Usage: josh run:park <issue-number> --body-file <path> | <issue-number> ${CLEAR_FLAG}`
+const USAGE = `Usage: josh run:park <issue-number> --body-file <path> | <issue-number> ${CLEAR_FLAG}\n\n${run_park_body.FORMAT}`
 const CLEAR_OPTIONS = { clear: { type: 'boolean' } } as const
 
-function has_recommendation(body: string): boolean {
-	if (!/推奨|recommend/iu.test(body)) return false
+// **A park carries the child's recommendation** (joshuafolkken/kit#6669): a body off the schema is
+// refused before any write, naming the missing piece and the schema.
+function is_refused(body: string): boolean {
+	const problem = run_park_body.problem_of(body)
 
-	console.error(
-		'Park refused: the reason contains a recommendation. Apply decision-autonomy in prompts/collaboration-workflow/operating-rules.md. For a reversible Tier A choice, adopt it and record the decision with pnpm josh epic --decide <E> <N...> --decision-file <path|-> (対象 / 採用 / 却下 / 理由 / 決定日), then continue. Tier C still requires explicit authorization; state the required action without recommending a choice.',
-	)
+	if (problem === undefined) return false
+
+	console.error(`Park refused: ${problem}.\n${run_park_body.FORMAT}`)
 
 	return true
 }
@@ -67,7 +70,7 @@ async function release(issue_number: string, directory: string): Promise<number>
 async function park(request: CommentRequest, directory: string): Promise<number> {
 	const { issue_number, body } = request
 
-	if (has_recommendation(body)) return FAILURE_EXIT_CODE
+	if (is_refused(body)) return FAILURE_EXIT_CODE
 
 	const lane_body = run_park_lane.with_lane_note(body, directory)
 	const write = await issue_park.apply(issue_number, NEEDS_DECISION_LABEL, lane_body)
