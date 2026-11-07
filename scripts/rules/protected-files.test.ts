@@ -1,6 +1,7 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { protected_files } from './protected-files'
 
@@ -21,8 +22,10 @@ function is_not_consumer(): boolean {
 	return false
 }
 
+const make_directory = temporary_directory()
+
 function settings_path_in(manifest: string | undefined): string {
-	const root = mkdtempSync(path.join(os.tmpdir(), 'protected-files-'))
+	const root = make_directory('protected-files-')
 
 	if (manifest !== undefined) writeFileSync(path.join(root, 'package.json'), manifest)
 

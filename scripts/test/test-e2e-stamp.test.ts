@@ -1,11 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { GateTree } from '#scripts/gate/gate-tree'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { test_e2e_stamp } from './test-e2e-stamp'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'test-e2e-stamp-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('test-e2e-stamp-test-')
 const BASE = 'base-commit'
 const FILE_A = 'src/a.ts'
 const FILE_B = 'src/b.ts'
@@ -14,10 +14,6 @@ const TREE: GateTree = { files: { [FILE_A]: 'digest-a' }, base: BASE }
 function stamp_at(name: string): string {
 	return path.join(scratch, `${name}.json`)
 }
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 describe('the record of a green test:e2e', () => {
 	it('matches the tree it was taken on', () => {

@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
 
@@ -58,14 +58,11 @@ const SHALLOW_ROOT_MAP: ReadMap = {
 // A holder rather than a top-level `let`: `unicorn/no-top-level-assignment-in-function` refuses a
 // hook assigning to a top-level binding, so the per-test common directory lives on this object.
 const common = { directory: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	common.directory = mkdtempSync(path.join(tmpdir(), 'josh-test-read-map-'))
+	common.directory = make_directory('josh-test-read-map-')
 	mocked_common.mockReturnValue(common.directory)
-})
-
-afterEach(() => {
-	rmSync(common.directory, { recursive: true, force: true })
 })
 
 describe('test_read_map.merge_records', () => {

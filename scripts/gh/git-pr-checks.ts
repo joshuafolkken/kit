@@ -16,7 +16,7 @@ import { blocked_cause, missing_context_error } from './git-pr-checks-missing'
 import { parse_pr_state_snapshot, read_string, type PrStateSnapshot } from './git-pr-checks-parse'
 
 const SECONDS_TO_MS = 1000
-const CHECK_WAIT_INTERVAL_MS = 10_000
+const CHECK_WAIT_INTERVAL_MS = 20_000
 // The wait has to outlast what the CI it is watching is allowed to take, or it gives up on a run
 // that is still legitimately progressing — which happened to consumers whose
 // suite includes E2E: `followup` became a command that needed `JOSH_CI_TIMEOUT_SECONDS` set by hand
@@ -55,7 +55,7 @@ const DEFAULT_STABLE_READS = 2
 // poll's first settled read then closes — so a second interval merely re-proves it (#5080).
 const WATCH_CONFIRMED_STABLE_READS = 1
 
-// **A read that failed is not a verdict.** The loop reads every ten seconds, so a dropped connection,
+// **A read that failed is not a verdict.** The loop reads every twenty seconds, so a dropped connection,
 // a rate limit or one request over its budget is the kind of failure the *next* poll answers — and
 // ending a merge wait on one of them costs the whole run again, so the fetch catches them rather
 // than rejecting straight out of the loop.

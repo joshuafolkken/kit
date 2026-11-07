@@ -424,10 +424,10 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/lane/lane-plan-cli.ts',
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
-			'Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue',
+			"Record a lane child's planned files; yield its lane, naming file and holder, when an earlier-planned running lane declares or plans one; `--size-approval` bounds lines/files",
 		category: 'AI tools',
 		reference: [
-			'<issue> <path>... [--probe] [--size-approval <json-file>] [--imports <path>...]',
+			'<issue> <path>... [--probe] [--single] [--size-approval <json-file>] [--imports <path>...]',
 			'automation',
 			['files', 'network'],
 		],

@@ -1,12 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import typescript from 'typescript'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { import_graph } from './import-graph'
 import { import_test_inputs } from './import-test-inputs'
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'josh-closed-inputs-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('josh-closed-inputs-')
 const TEST_NAME = 'unit.test.ts'
 const TSCONFIG = 'tsconfig.json'
 const TEST = path.join(ROOT, TEST_NAME)
@@ -16,10 +17,6 @@ const PURE_SOURCE = 'export const value = 1'
 const NODE_CONFIG = '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext"}}'
 const PACKAGE_IMPORT = '#value'
 const SOURCE_IMPORT = 'import { value } from "./source"; export { value }'
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
-})
 
 describe('import_test_inputs', () => {
 	it('walks known dependencies with cycles only once', () => {
@@ -64,7 +61,7 @@ describe('import_graph.test_inputs — runtime ambiguity', () => {
 		['mts', 'mjs'],
 		['cts', 'cjs'],
 	])('refuses type/runtime resolution ambiguity: %s and %s', async (typed, runtime) => {
-		const directory = mkdtempSync(path.join(ROOT, 'ambiguous-'))
+		const directory = make_directory('ambiguous-')
 		const test = path.join(directory, TEST_NAME)
 
 		writeFileSync(path.join(directory, TSCONFIG), '{}')
@@ -111,7 +108,7 @@ describe('import_graph.test_inputs', () => {
 
 describe('import_graph.test_inputs — conditional imports', () => {
 	it('refuses a types condition pointing to a different plain source than runtime', async () => {
-		const directory = mkdtempSync(path.join(ROOT, 'conditional-'))
+		const directory = make_directory('conditional-')
 		const test = path.join(directory, TEST_NAME)
 
 		writeFileSync(path.join(directory, TSCONFIG), NODE_CONFIG)
@@ -134,7 +131,7 @@ describe('import_graph.test_inputs — conditional imports', () => {
 
 describe('import_graph.test_inputs — module suffixes', () => {
 	it('refuses a type-checker suffix that can differ from runtime resolution', async () => {
-		const directory = mkdtempSync(path.join(ROOT, 'suffix-'))
+		const directory = make_directory('suffix-')
 		const test = path.join(directory, TEST_NAME)
 
 		writeFileSync(

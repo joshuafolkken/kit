@@ -31,14 +31,17 @@ import { gh_reachability } from './git-gh-reachability'
 // `issue_dependencies_summary` can read `total_blocked_by: 0` while this endpoint returns a real
 // relation. Trusting the counter there makes `epic:next` call a graph that agrees with itself
 // contradictory and exit 1, which stops an unattended run at its first step with nothing to fix.
+//
+// Sent with the previous process's ETag (joshuafolkken/kit#6701): `backlog:next` reads every open
+// blocked issue's relations each offer, and an unchanged set answers `304`, which costs no core.
 async function read_blocked_by_listing(
 	issue_number: string,
 	repo?: string,
 	exact_total?: number,
 ): Promise<BlockedBy> {
-	const json = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
-	})
+	const json = await git_gh_etag_read.read(
+		`${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
+	)
 
 	return git_gh_issue_rest.to_blocked_by(json, exact_total)
 }
@@ -104,8 +107,9 @@ async function read_relations(
 	}
 }
 
-// The request itself: the epic body is sent with the previous process's ETag
-// (joshuafolkken/kit#6560), every other read unconditionally.
+// The request itself: the epic body (joshuafolkken/kit#6560), the run board's closed-child view
+// (joshuafolkken/kit#6696) and its decision issues (joshuafolkken/kit#6700) are sent with the
+// previous process's ETag, every other read unconditionally.
 type PathRead = (path: string) => Promise<string>
 
 async function read_unconditionally(path: string): Promise<string> {
@@ -209,9 +213,10 @@ async function issue_view_json_classified(
 	issue_number: string,
 	fields: string,
 	repo?: string,
+	read_path?: PathRead,
 ): Promise<IssueRead> {
 	try {
-		const issue = await read_issue_fields(issue_number, fields, repo)
+		const issue = await read_issue_fields(issue_number, fields, repo, read_path)
 
 		return { kind: 'read', json: JSON.stringify(issue) }
 	} catch (error) {
@@ -282,8 +287,9 @@ async function issue_view_json(
 	issue_number: string,
 	fields: string,
 	repo?: string,
+	read_path?: PathRead,
 ): Promise<string | undefined> {
-	const read = await issue_view_json_classified(issue_number, fields, repo)
+	const read = await issue_view_json_classified(issue_number, fields, repo, read_path)
 
 	return read.kind === 'read' ? read.json : undefined
 }
@@ -367,19 +373,29 @@ async function issue_get_labels_and_body(issue_number: string): Promise<string |
 // and the page size — is single-sourced in `git-gh-api-path.ts` and read from there by both.
 //
 // `repo` names the repository like the reads above do — `issue:read --repo` reads another repository's
-// thread (joshuafolkken/kit#5851); absent, it is the repository the command runs in.
+// thread (joshuafolkken/kit#5851); absent, it is the repository the command runs in. `read_path`
+// replaces the paged request, as `read_comments_conditionally` does for the run board.
 async function issue_list_comments(
 	issue_number: string,
 	timeout_ms?: number,
 	repo?: string,
+	read_path?: PathRead,
 ): Promise<string | undefined> {
 	const path = `${git_gh_api_path.issue_comments_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`
 
 	try {
-		return await git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms })
+		return await (read_path?.(path) ??
+			git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms }))
 	} catch {
 		return undefined
 	}
+}
+
+// The comment listing sent with the previous process's ETag (joshuafolkken/kit#6700): the run board
+// re-reads a decision child's thread every two minutes, and an unchanged first page answers `304`.
+// A full first page is read paged instead, by `read_listing`.
+async function read_comments_conditionally(path: string): Promise<string> {
+	return await git_gh_etag_read.read_listing(path, git_gh_api_path.FULL_PAGE_SIZE)
 }
 
 // Whether the relations endpoint has nothing at that number at all. Probed for its status rather
@@ -456,6 +472,7 @@ const git_gh_issue_read = {
 	issue_get_plan_fields_classified,
 	issue_get_labels_and_body,
 	issue_list_comments,
+	read_comments_conditionally,
 }
 
 export type { IssueRead, IssueReadFailure, IssueReadReason }

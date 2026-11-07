@@ -1,3 +1,4 @@
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -44,6 +45,8 @@ describe('run_board_closed.read_closed', () => {
 		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledWith(
 			'3439',
 			'title,state,stateReason,closedAt,labels',
+			undefined,
+			git_gh_etag_read.read,
 		)
 	})
 })

@@ -1,7 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
+import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Quotas } from './run-board-quota-read'
-import type { CoreRateLimit } from './run-board-rate-limit'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 
 // joshuafolkken/kit#6559, joshuafolkken/kit#6621: GitHub's core rate limit is drawn as a usage gauge
@@ -92,20 +92,29 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 	})
 })
 
+describe('run_board_render_quota.usage_part rate limit row beside 7d-only rows', () => {
+	it('starts the 7d-only gauges and the github gauge at one column, github without `1h`', () => {
+		const week = { minutes: 10_080, used_percent: 46, resets_ms: NOW_MS + 24 * HOUR_MS }
+		const reading = { windows: [week], taken_ms: NOW_MS }
+		const { rows } = part_of({ quotas: { claude: reading, codex: reading }, rate_limit: CORE })
+
+		expect(rows.map((row) => row.indexOf('%'))).toStrictEqual([18, 18, 18])
+		expect(rows.join('\n')).not.toMatch(/ {2}—|1h|7d/u)
+	})
+})
+
 describe('run_board_render_quota.usage_part rate limit summary', () => {
 	it('sums the allowance up in the folded line', () => {
 		expect(part_of({ rate_limit: CORE }).summary).toBe(
-			'claude 42/— · codex —/— · github 38% 1877/5000 ↻ 12:33',
+			'claude 42 · codex — · github 38% 1877/5000 ↻ 12:33',
 		)
 	})
 
 	it('sums the allowance up without a reset once it has passed', () => {
-		expect(part_of({ rate_limit: PASSED }).summary).toBe(
-			'claude 42/— · codex —/— · github 0% 0/5000',
-		)
+		expect(part_of({ rate_limit: PASSED }).summary).toBe('claude 42 · codex — · github 0% 0/5000')
 	})
 
 	it('sums the usage limits up as before where the allowance could not be read', () => {
-		expect(part_of({ rate_limit: undefined }).summary).toBe('claude 42/— · codex —/—')
+		expect(part_of({ rate_limit: undefined }).summary).toBe('claude 42 · codex —')
 	})
 })

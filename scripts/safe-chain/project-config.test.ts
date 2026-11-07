@@ -1,10 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { yaml_document } from '#scripts/lib/yaml-document'
 import { release_age } from '#scripts/version/release-age'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { project_config } from './project-config'
+
+const make_directory = temporary_directory()
 
 const WORKSPACE =
 	"minimumReleaseAgeExclude:\n  - vite\n  - '@types/node'\n  - tsx\n  - '@joshuafolkken/kit'\n"
@@ -170,17 +172,13 @@ describe('kit project configuration', () => {
 
 describe('project_config.sync_project_config', () => {
 	it('creates and updates the project config from a consumer workspace', () => {
-		const root = mkdtempSync(path.join(tmpdir(), 'safe-chain-config-'))
+		const root = make_directory('safe-chain-config-')
 		const workspace_path = path.join(root, WORKSPACE_FILE)
 		const config_path = path.join(root, AIKIDO_FILE)
 
-		try {
-			writeFileSync(workspace_path, WORKSPACE)
-			expect(project_config.sync_project_config(root)).toBe(true)
-			expect(exclusions(readFileSync(config_path, 'utf8'))).toEqual(EXPECTED_EXCLUSIONS)
-			expect(project_config.sync_project_config(root)).toBe(false)
-		} finally {
-			rmSync(root, { recursive: true, force: true })
-		}
+		writeFileSync(workspace_path, WORKSPACE)
+		expect(project_config.sync_project_config(root)).toBe(true)
+		expect(exclusions(readFileSync(config_path, 'utf8'))).toEqual(EXPECTED_EXCLUSIONS)
+		expect(project_config.sync_project_config(root)).toBe(false)
 	})
 })

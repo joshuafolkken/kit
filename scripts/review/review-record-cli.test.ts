@@ -1,10 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
 import { review_record_cli } from './review-record-cli'
@@ -79,7 +79,8 @@ vi.mock('./review-record-pinned', () => ({
 	review_record_pinned: { restart_if_moved: restart_mock },
 }))
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-record-')
 const NOW = new Date('2026-09-22T00:00:00Z')
 const COMMENT_URL = 'https://example.test/comment\n'
 const GH_REFUSED = new Error('gh refused')
@@ -87,10 +88,6 @@ const GH_REFUSED = new Error('gh refused')
 // These fixtures model a primary checkout; lane and failed-probe cases live in the lane test.
 beforeEach(() => {
 	vi.spyOn(git_common_directory, 'directories').mockReturnValue([TEST_DIR, TEST_DIR])
-})
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
 })
 
 function root_of(name: string): string {

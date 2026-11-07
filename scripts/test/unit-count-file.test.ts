@@ -1,18 +1,15 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { unit_count_file } from './unit-count-file'
 
 // joshuafolkken/kit#4465: `josh test:related` reads the run's test-file count from a file it names.
 
 const COUNT = 25
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'unit-count-file-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('unit-count-file-test-')
 
 describe('unit_count_file.write_count — the reporter side', () => {
 	it('writes the count to the named file', async () => {

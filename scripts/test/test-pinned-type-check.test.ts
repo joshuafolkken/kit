@@ -1,12 +1,12 @@
-import { mkdtempSync } from 'node:fs'
-import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, readFile, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_reach } from './test-pinned-reach'
 import { test_pinned_type_check } from './test-pinned-type-check'
 
+const make_directory = temporary_directory()
 const FILE = 'scripts/git/git-schemas.ts'
 const READER = 'scripts/git/git-reader.ts'
 const OTHER = 'scripts/git/git-other.ts'
@@ -79,26 +79,22 @@ describe('test_pinned_type_check.is_red', () => {
 
 	// joshuafolkken/kit#5505: the check itself tells a tsc that could not start from a clean pass.
 	it('reads a tree with no tsc green, as a check that never ran, writing the scoped tsconfig', async () => {
-		const parent = mkdtempSync(path.join(tmpdir(), 'josh-type-check-'))
+		const parent = make_directory('josh-type-check-')
 		const tree = path.join(parent, 'tree')
 
-		try {
-			await mkdir(tree)
+		await mkdir(tree)
 
-			await expect(test_pinned_type_check.is_red({ parent, tree }, [FILE])).resolves.toBe(false)
-			await expect(test_pinned_type_check.check({ parent, tree }, [FILE])).resolves.toStrictEqual({
-				ran: false,
-				red: false,
-			})
+		await expect(test_pinned_type_check.is_red({ parent, tree }, [FILE])).resolves.toBe(false)
+		await expect(test_pinned_type_check.check({ parent, tree }, [FILE])).resolves.toStrictEqual({
+			ran: false,
+			red: false,
+		})
 
-			const written = await readFile(path.join(tree, test_pinned_type_check.CONFIG_NAME), 'utf8')
+		const written = await readFile(path.join(tree, test_pinned_type_check.CONFIG_NAME), 'utf8')
 
-			expect(written).toBe(
-				test_pinned_type_check.config_text([FILE], path.join(parent, 'josh-pinned.tsbuildinfo')),
-			)
-		} finally {
-			await rm(parent, { recursive: true, force: true })
-		}
+		expect(written).toBe(
+			test_pinned_type_check.config_text([FILE], path.join(parent, 'josh-pinned.tsbuildinfo')),
+		)
 	})
 })
 
@@ -117,28 +113,22 @@ async function strict_tree(parent: string): Promise<string> {
 // joshuafolkken/kit#5385
 describe('test_pinned_type_check.check with tsc', () => {
 	it('reads a type error red and an unread local green', async () => {
-		const parent = mkdtempSync(path.join(tmpdir(), 'josh-type-check-tsc-'))
+		const parent = make_directory('josh-type-check-tsc-')
 
 		// joshuafolkken/kit#5505: a color-forcing environment, as a detached ship's gate, must not hide it.
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		try {
-			const tree = await strict_tree(parent)
+		const tree = await strict_tree(parent)
 
-			await writeFile(path.join(tree, 'unread.ts'), "const unread = 1\nexport const kept = 'x'\n")
-			await writeFile(path.join(tree, 'wrong.ts'), "export const wrong: number = 'x'\n")
+		await writeFile(path.join(tree, 'unread.ts'), "const unread = 1\nexport const kept = 'x'\n")
+		await writeFile(path.join(tree, 'wrong.ts'), "export const wrong: number = 'x'\n")
 
-			await expect(
-				test_pinned_type_check.check({ parent, tree }, ['unread.ts']),
-			).resolves.toStrictEqual({ ran: true, red: false })
-			await expect(
-				test_pinned_type_check.check({ parent, tree }, ['wrong.ts']),
-			).resolves.toStrictEqual({ ran: true, red: true })
-			await expect(test_pinned_type_check.is_red({ parent, tree }, ['wrong.ts'])).resolves.toBe(
-				true,
-			)
-		} finally {
-			await rm(parent, { recursive: true, force: true })
-		}
+		await expect(
+			test_pinned_type_check.check({ parent, tree }, ['unread.ts']),
+		).resolves.toStrictEqual({ ran: true, red: false })
+		await expect(
+			test_pinned_type_check.check({ parent, tree }, ['wrong.ts']),
+		).resolves.toStrictEqual({ ran: true, red: true })
+		await expect(test_pinned_type_check.is_red({ parent, tree }, ['wrong.ts'])).resolves.toBe(true)
 	})
 })

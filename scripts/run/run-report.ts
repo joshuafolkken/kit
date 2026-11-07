@@ -22,6 +22,10 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 // holds the start time, and a scope nobody could determine prints a notice rather than everything. **The
 // scoping itself is `run-event-scope.ts`'s**, shared with every other stream consumer rather than kept
 // private here.
+//
+// **The per-offer `rate-limit` line is left out**: `backlog:drive` writes one every offer cycle
+// (joshuafolkken/kit#6558), so listing it would bury the merges and parks the summary is for.
+const UNREPORTED_KINDS: ReadonlySet<string> = new Set([run_event_stream.EVENT_KIND.RATE_LIMIT])
 
 const LINE_SEPARATOR = '\n'
 
@@ -57,7 +61,9 @@ function build_report(input: ReportInput): string {
 	const lines =
 		scoped === undefined
 			? [UNKNOWN_SCOPE_NOTICE]
-			: scoped.map((event) => run_event_stream.format_event(event))
+			: scoped
+					.filter((event) => !UNREPORTED_KINDS.has(event.kind))
+					.map((event) => run_event_stream.format_event(event))
 	const tail = release_tail(input.release)
 
 	return [...lines, ...(tail === undefined ? [] : [tail])].join(LINE_SEPARATOR)

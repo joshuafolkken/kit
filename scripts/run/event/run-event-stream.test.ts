@@ -263,6 +263,32 @@ describe('run_event_stream.append — the bound keeps the findings', () => {
 	})
 })
 
+// joshuafolkken/kit#6695: a process's GitHub usage is a trace the bound drops before a position.
+describe('run_event_stream — gh usage', () => {
+	it('skips a gh-usage event for the last position', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.MERGE, '#7 merged', AT)
+		run_event_stream.append(target, KIND.GH_USAGE, '{"command":"run:board","calls":3}', AT)
+
+		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.MERGE)
+	})
+
+	it('drops the oldest gh-usage events before a position such as a cut', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.CUT, '#3245 cut', AT)
+
+		fill(target, KIND.GH_USAGE, EVENT_CAP, (index) => `usage ${String(index)}`)
+
+		const events = run_event_stream.read_events(target)
+
+		expect(events).toHaveLength(EVENT_CAP)
+		expect(events[0]?.kind).toBe(KIND.CUT)
+		expect(events[1]?.text).toBe('usage 1')
+	})
+})
+
 // Lines the bound may not drop, one lane-phase per slot — a full stream unless `count` says fewer.
 function fill_with_lane_phases(target: string, count = EVENT_CAP): void {
 	fill(target, KIND.LANE_PHASE, count, (index) => `#${String(index)} implement`)

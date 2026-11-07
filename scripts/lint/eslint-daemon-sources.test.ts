@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
@@ -29,7 +29,8 @@ const EXPORTS_BEFORE = 'export const a = 1\n'
 const EXPORTS_AFTER = 'export const a = 1\nexport const b = 2\n'
 const HEAD = 'aaaa'
 
-const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-sources-'))
+const make_directory = temporary_directory('suite')
+const project_root = make_directory('eslint-daemon-sources-')
 
 function write_file(relative: string, content: string = JSON_BODY): void {
 	const file = path.join(project_root, relative)

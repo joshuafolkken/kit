@@ -1,3 +1,4 @@
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
@@ -30,6 +31,15 @@ const STILL_OPEN = 'open' as const
 // What one issue answered: closed, still open, or `undefined` when it could not be read.
 type ClosedRead = ClosedIssue | typeof STILL_OPEN | undefined
 
+// How a closed child ended — merged, withdrawn as not planned, or done.
+type ClosedState = 'merged' | 'withdrawn' | 'done'
+
+// The open listing a closed read is weighed against, and when it was read.
+interface ListingRead {
+	open_numbers: ReadonlySet<number> | undefined
+	read_ms: number | undefined
+}
+
 // Every issue that answered as closed, and whether every issue answered at all — an ended run stops
 // asking only once a read answered whole, so a transient failure is never kept as still open.
 interface ClosedAnswer {
@@ -60,8 +70,16 @@ function closed_ms_of(view: ClosedView): number | undefined {
 // `STILL_OPEN` for an issue the listing it was missing from was older than this read; `undefined` for one
 // whose issue or timeline could not be read. Either is asked again on the next read, so a transient
 // failure is never kept as closed-not-merged.
+//
+// Sent with the previous ETag (joshuafolkken/kit#6696): a parked or human child stays a candidate after
+// its run ends, so the board asks every two minutes, and an unchanged issue answers `304` for no core.
 async function read_closed(issue: number): Promise<ClosedRead> {
-	const json = await git_gh_issue_read.issue_view_json(String(issue), CLOSED_FIELDS)
+	const json = await git_gh_issue_read.issue_view_json(
+		String(issue),
+		CLOSED_FIELDS,
+		undefined,
+		git_gh_etag_read.read,
+	)
 	const view = json === undefined ? undefined : parse_json_object_or_undefined(json, closed_schema)
 
 	if (view === undefined) return undefined
@@ -95,7 +113,22 @@ async function read_all(
 	return { closed, is_whole: answers.every(({ answer }) => answer !== undefined) }
 }
 
-const run_board_closed = { STILL_OPEN, read_all, read_closed }
+function state_of(closed: ClosedIssue): ClosedState {
+	if (closed.is_merged) return 'merged'
+
+	return closed.is_not_planned ? 'withdrawn' : 'done'
+}
+
+// A person reopened the child when a listing read after its close holds it again. A listing read
+// before the close — the plan an ended run holds — proves nothing, so it kept a closed child in
+// 🙋 decision (joshuafolkken/kit#6535).
+function is_reopened(issue: number, closed: ClosedIssue, listing: ListingRead): boolean {
+	if (listing.open_numbers?.has(issue) !== true) return false
+
+	return closed.closed_ms === undefined || (listing.read_ms ?? -Infinity) > closed.closed_ms
+}
+
+const run_board_closed = { STILL_OPEN, is_reopened, read_all, read_closed, state_of }
 
 export { run_board_closed }
-export type { ClosedAnswer, ClosedIssue }
+export type { ClosedAnswer, ClosedIssue, ListingRead }

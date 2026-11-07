@@ -39,6 +39,7 @@ import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_offer_argv } from './backlog-drive-offer-argv'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_paused } from './backlog-drive-paused'
+import { backlog_drive_rate } from './backlog-drive-rate'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_retry } from './backlog-drive-retry'
@@ -101,7 +102,7 @@ async function read_offer(
 	if (named !== undefined) return named
 
 	const argv = backlog_drive_offer_argv.offer_argv(state, carry, context.forwarded)
-	const result = await josh_command.josh_run(argv, should_forward_stderr)
+	const result = await backlog_drive_rate.offer_run(argv)
 
 	const offer = result.code === SUCCESS_EXIT_CODE ? to_offer(result.out) : undefined
 

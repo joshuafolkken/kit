@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { josh_command } from '#scripts/josh/josh-run'
 import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -54,6 +55,7 @@ beforeEach(() => {
 	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-reread-'))
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(scratch.directory)
 	vi.spyOn(poll, 'sleep').mockResolvedValue()
+	vi.spyOn(gh_core_rate_limit, 'read_allowance').mockResolvedValue(undefined)
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 	run_carry.begin_carry(
 		run_carry.carry_path(scratch.directory),

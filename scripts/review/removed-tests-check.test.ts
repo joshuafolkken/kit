@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import ts from 'typescript'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { removed_tests } from './removed-tests'
 
 const base_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
@@ -32,7 +32,8 @@ const { removed_tests_check } = await import('./removed-tests-check')
 const BASE = 'fedcba9876543210fedcba9876543210fedcba98'
 const KEPT_FILE = 'scripts/board.test.ts'
 const DELETED_FILE = 'scripts/gone.test.ts'
-const ROOT = mkdtempSync(path.join(tmpdir(), 'josh-removed-tests-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('josh-removed-tests-')
 const BOARD_AT_BASE =
 	"describe('board', () => {\n\tit('kept', () => {})\n\tit('dropped', () => {})\n})\n"
 const BOARD_NOW = "describe('board', () => {\n\tit('kept', () => {})\n})\n"
@@ -43,10 +44,6 @@ const AT_BASE: Readonly<Record<string, string>> = {
 	[`${BASE}:${KEPT_FILE}`]: BOARD_AT_BASE,
 	[`${BASE}:${DELETED_FILE}`]: GONE_AT_BASE,
 }
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
-})
 
 beforeEach(() => {
 	mkdirSync(path.join(ROOT, 'scripts'), { recursive: true })

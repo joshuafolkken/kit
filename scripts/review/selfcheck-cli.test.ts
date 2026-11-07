@@ -1,10 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { change_base } from '#scripts/git/change-base'
 import { git_command } from '#scripts/git/git-command'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { review_finding_ledger } from './review-finding-ledger'
 import { review_interaction } from './review-interaction'
 import { selfcheck_cli } from './selfcheck-cli'
@@ -13,15 +12,12 @@ import { selfcheck_report } from './selfcheck-report'
 const USAGE_LINE = 'usage: josh review:selfcheck [--interaction-answered]'
 const DUE = ['scripts/run/ship/x.ts']
 const ISSUE = 5832
-const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'selfcheck-record-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIRECTORY = make_directory('selfcheck-record-')
 
 afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
-})
-
-afterAll(() => {
-	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
 })
 
 // A checkout on the issue's branch whose ledger holds only round 1's `/code-review` line.

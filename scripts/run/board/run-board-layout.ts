@@ -1,9 +1,7 @@
 import type { Declared } from '#scripts/backlog/backlog-overlap'
-import { backlog_plan, type PlanContext } from '#scripts/backlog/backlog-plan'
+import type { PlanContext } from '#scripts/backlog/backlog-plan'
 import type { WavePlan } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import type { IssueReference } from '#scripts/epic/epic-reference'
-import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	has_label_name,
 	NEEDS_DECISION_LABEL,
@@ -17,6 +15,7 @@ import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_kind, type BoardPriority } from './run-board-kind'
+import { run_board_standing_waits } from './run-board-standing-waits'
 import type { ItemState, ItemStatus } from './run-board-status'
 
 // The plan with each issue's status laid over it — pure, so the order the board
@@ -113,6 +112,8 @@ interface RowRead {
 	is_backlog_live?: boolean | undefined
 	titles: ReadonlyMap<number, string>
 	labels: ReadonlyMap<number, ReadonlyArray<string>>
+	// Each planned child's standing blockers, which a touched stalled row waits on in place of its retry.
+	waits?: ReadonlyMap<number, ReadonlyArray<string>> | undefined
 }
 
 const NO_READ: RowRead = { titles: new Map(), labels: new Map() }
@@ -133,23 +134,9 @@ function is_settled(state: ItemState): boolean {
 	return SETTLED_STATES.has(state)
 }
 
-// A blocker the plan still names, unless the stream has already seen it merge — the plan was read up
-// to two minutes ago, and a merge since then is no longer worth waiting on.
-function is_waiting_on(edge: IssueReference, overlay: Overlay): boolean {
-	const { context } = overlay.plan
-	const is_merged =
-		edge.repo === context.repo && overlay.statuses.get(edge.number)?.state === 'merged'
-
-	return !is_merged && backlog_plan.is_standing(edge, context)
-}
-
-function reference_of(edge: IssueReference, repo: string): string {
-	return edge.repo === repo ? String(edge.number) : issue_cite.plain(edge.number, edge.repo)
-}
-
 // Whether a blocker the plan names still stands for `child` — the wait its row draws as 🔗.
 function is_blocked(child: EpicChild, overlay: Overlay): boolean {
-	return child.blocked_by.some((edge) => is_waiting_on(edge, overlay))
+	return child.blocked_by.some((edge) => run_board_standing_waits.is_waiting_on(edge, overlay))
 }
 
 // Why a waiting row waits, or what resumes a stalled one.
@@ -162,7 +149,7 @@ function plan_reason(
 	if (state === 'human') return run_board_decision.plan_reason(child.number, overlay.plan)
 
 	if (state === 'stopped') {
-		return run_board_ending_reason.stalled_reason(child.number, overlay.plan.is_backlog_live)
+		return run_board_ending_reason.stalled_reason(child.number, overlay.plan, waits)
 	}
 
 	return state === 'waiting' ? overlay.reason_of?.(child, waits) : undefined
@@ -170,9 +157,7 @@ function plan_reason(
 
 function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow {
 	const { context } = overlay.plan
-	const waits = child.blocked_by
-		.filter((edge) => is_waiting_on(edge, overlay))
-		.map((edge) => reference_of(edge, context.repo))
+	const waits = run_board_standing_waits.waits_of(child, overlay)
 	const reason = plan_reason(child, state, overlay, waits)
 
 	return {
@@ -345,6 +330,7 @@ function layout_of(
 	const read = {
 		...plan,
 		titles: plan.context.titles,
+		waits: run_board_standing_waits.by_number(children_of(plan), overlay),
 	}
 
 	return {

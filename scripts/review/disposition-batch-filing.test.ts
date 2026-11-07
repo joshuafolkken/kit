@@ -1,7 +1,6 @@
-import { mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import { readFileSync } from 'node:fs'
 import { issue_lint_cli } from '#scripts/issue/issue-lint-cli'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { disposition_batch, type BatchFinding } from './disposition-batch'
 import { disposition_batch_filing } from './disposition-batch-filing'
@@ -26,12 +25,14 @@ function finding(line: string = FINDING_LINE): BatchFinding {
 	return first
 }
 
-function temporary_directory(): string {
-	return mkdtempSync(path.join(tmpdir(), 'disposition-filing-'))
+const make_directory = temporary_directory()
+
+function filing_directory(): string {
+	return make_directory('disposition-filing-')
 }
 
 function drafted(): { body_path: string; command: string } {
-	const [filing] = disposition_batch_filing.write_filings([finding()], ISSUE, temporary_directory())
+	const [filing] = disposition_batch_filing.write_filings([finding()], ISSUE, filing_directory())
 
 	if (filing === undefined) throw new Error('no filing written')
 
@@ -99,7 +100,7 @@ describe('disposition_batch_filing.filing_lines', () => {
 		const lines = disposition_batch_filing.filing_lines(
 			[finding(), finding(DROPPED_LINE)],
 			[FOUND_DURING_FLAG, String(ISSUE)],
-			temporary_directory(),
+			filing_directory(),
 		)
 
 		expect(lines?.filter((line) => line.startsWith('pnpm josh issue:file'))).toHaveLength(1)

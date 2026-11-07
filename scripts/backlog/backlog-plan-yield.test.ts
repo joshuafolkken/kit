@@ -1,6 +1,7 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { AUTO_OK_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
@@ -28,6 +29,8 @@ function stub_pool(): void {
 	)
 
 	backlog_fixture.stub_backlog({ opted_in: rows, in_progress: [] })
+	// The wave is cut at the lane limit; a live run's carried limit must not cut the pool.
+	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: rows.length })
 	vi.spyOn(git_gh_command, 'issue_list_recent').mockResolvedValue({
 		json: JSON.stringify(rows),
 		is_capped: false,

@@ -76,7 +76,7 @@ describe('lane_breakdown_cli.run', () => {
 			[
 				'Net time by stage, longest first, 61 min of net time (`pnpm josh lane:breakdown 4970`):',
 				'',
-				'- implement 51.0 min, over budget +39 min (editing & thinking 51.0 min)',
+				'- implement 51.0 min, over budget +42 min (editing & thinking 51.0 min)',
 				'- start to plan 10.0 min, over budget +7 min',
 				'- waits taken out (park, outage, usage limit, yield, host sleep) 0.0 min, of which yield wait 0.0 min, of which host sleep 0.0 min',
 				'- Largest time sinks (stages and laps overlap): implement 51.0 min; start to plan 10.0 min',

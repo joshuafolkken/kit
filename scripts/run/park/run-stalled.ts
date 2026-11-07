@@ -77,6 +77,12 @@ function row_text(child: number | string, cause = '', is_backlog_live = false): 
 	return cause === '' ? resume : `${resume} (${cause})`
 }
 
+// A stalled child an open blocker still holds resumes after that blocker, not on a retry: `#6474`
+// for a board wait of this repository, `owner/repo#N` as it is for another's.
+function waiting_text(waits: ReadonlyArray<string>): string {
+	return `waiting on ${waits.map((wait) => (wait.includes('#') ? wait : issue_cite.plain(wait))).join(', ')}`
+}
+
 const run_stalled = {
 	CUT_NOT_RELAUNCHED,
 	SESSION_UNFINISHED,
@@ -87,6 +93,7 @@ const run_stalled = {
 	resume_of,
 	row_text,
 	session_unfinished,
+	waiting_text,
 }
 
 export { run_stalled }
