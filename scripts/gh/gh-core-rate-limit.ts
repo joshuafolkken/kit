@@ -17,6 +17,10 @@ interface CoreRateLimit {
 	reset_ms: number
 }
 
+interface CoreAllowance extends CoreUsage {
+	remaining: number
+}
+
 type CoreExec = (request: GhApiRequest) => Promise<string>
 
 const core_schema = z.object({
@@ -57,7 +61,18 @@ async function read_usage(
 	return { used: core.used, reset_ms: core.reset * MS_PER_SECOND }
 }
 
-const gh_core_rate_limit = { read_core, read_usage }
+// `backlog:drive`'s per-offer reading (joshuafolkken/kit#6558): the usage with what is left, uncounted
+// for the same reason as `read_usage`.
+async function read_allowance(
+	exec: CoreExec = git_gh_exec.exec_gh_api_uncounted,
+): Promise<CoreAllowance | undefined> {
+	const core = await read_parsed(exec)
+	if (core === undefined) return undefined
+
+	return { used: core.used, remaining: core.remaining, reset_ms: core.reset * MS_PER_SECOND }
+}
+
+const gh_core_rate_limit = { read_allowance, read_core, read_usage }
 
 export { gh_core_rate_limit }
-export type { CoreRateLimit }
+export type { CoreAllowance, CoreRateLimit }
