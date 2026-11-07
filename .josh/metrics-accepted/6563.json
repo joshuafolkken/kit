@@ -1,0 +1,7 @@
+{
+	"reason": "#6563 adds the backlog:drive rate-limit hold module (+15 code lines)",
+	"date": "2026-11-07",
+	"growth": {
+		"scripts.code_lines": 15
+	}
+}
