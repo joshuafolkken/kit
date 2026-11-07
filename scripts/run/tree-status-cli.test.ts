@@ -97,6 +97,14 @@ describe('tree_status_cli.run reads the tree as it is', () => {
 		)
 	})
 
+	it('disables the optional index refresh before the status subcommand', async () => {
+		await tree_status_cli.run([])
+
+		const [arguments_] = read_mock.mock.calls[0] ?? []
+
+		expect(arguments_?.slice(0, 2)).toEqual(['--no-optional-locks', 'status'])
+	})
+
 	it('reports a clean tree and an empty stash', async () => {
 		read_mock.mockResolvedValue(`## ${BRANCH}`)
 		stash_list_mock.mockResolvedValue([])
