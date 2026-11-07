@@ -1,3 +1,4 @@
+import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { josh_command } from '#scripts/josh/josh-run'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
@@ -114,6 +115,7 @@ const CARRY: RunCarry = {
 function stub_offer_path(named: OfferRead | undefined): ReturnType<typeof vi.spyOn> {
 	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
 	vi.spyOn(backlog_drive_named_offer, 'read').mockResolvedValue(named)
+	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
 
 	return vi.spyOn(backlog_drive_rate, 'offer_run').mockResolvedValue({ code: 1, out: '', err: '' })
 }
