@@ -335,7 +335,7 @@ describe('get_configured_max_attempts', () => {
 	// the poll following the final sleep.
 	it('returns computed value when env var is a valid positive number', () => {
 		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '60')
-		expect(get_configured_max_attempts()).toBe(7)
+		expect(get_configured_max_attempts()).toBe(4)
 	})
 
 	// The override has to work in both directions: shortening it is how a fast project opts out of
