@@ -1,4 +1,5 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { NEEDS_DECISION_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_read } from '#scripts/issue/issue-read'
@@ -110,6 +111,7 @@ describe('run_board_decision_read.with_decisions', () => {
 			String(PERSON),
 			'number,title,body,state,labels,blockedBy',
 			REPO,
+			git_gh_etag_read.read,
 		)
 	})
 })
