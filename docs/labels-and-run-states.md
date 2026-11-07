@@ -17,15 +17,15 @@ Issue labels and entry states. Procedures: [`workflow-commands`](../.claude/skil
 
 ## Labels a run applies
 
-| Label            | What it means                                                                                                                                                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `in-progress`    | A run holds a working tree for this Issue. Remove a stale one only once the tree is clean ([Recover a stopped run](./how-to/recover-a-run.md)).                                                                                      |
-| `needs-decision` | The run parked the Issue for your answer, including a child ending with a question or confirmation notification. The backlog skips it; the wait does not increase consecutive failures.                                              |
-| `run:stalled`    | The run parked the Issue on a mechanical failure. `session unfinished` means no question or confirmation was found. Fix the cause, then use `pnpm josh run:add N --retry` in the live backlogrun, or `fullrun #N` when none is live. |
-| `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                                                                                                       |
-| `measured`       | A measurement-only Issue a run closed itself with `josh issue:measured`: the result is commented on it, and no pull request was needed.                                                                                              |
-| `measured:unmet` | Set with `measured` by `josh issue:measured --unmet`: the measurement fell short of the expected effect it checked. `josh effect:audit` reads it.                                                                                    |
-| `epic`           | The Issue tracks child Issues and the order they land in.                                                                                                                                                                            |
+| Label            | What it means                                                                                                                                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `in-progress`    | A run holds a working tree for this Issue. Remove a stale one only once the tree is clean ([Recover a stopped run](./how-to/recover-a-run.md)).                                                                               |
+| `needs-decision` | The run parked the Issue for your answer, including a child ending with a question or confirmation notification. The backlog skips it; the wait does not increase consecutive failures.                                       |
+| `run:stalled`    | A mechanical failure parked it (`session unfinished`: no question or confirmation found). Fix the cause, then `pnpm josh run:add N --retry` in a live backlogrun, else `fullrun #N`. An open blocker shows `waiting on #<B>`. |
+| `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                                                                                                |
+| `measured`       | A measurement-only Issue a run closed itself with `josh issue:measured`: the result is commented on it, and no pull request was needed.                                                                                       |
+| `measured:unmet` | Set with `measured` by `josh issue:measured --unmet`: the measurement fell short of the expected effect it checked. `josh effect:audit` reads it.                                                                             |
+| `epic`           | The Issue tracks child Issues and the order they land in.                                                                                                                                                                     |
 
 ### `needs-human-review` — the opposite label
 
