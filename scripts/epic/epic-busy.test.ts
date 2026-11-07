@@ -116,9 +116,12 @@ describe('epic_busy.read_repository — a parked issue', () => {
 	// GitHub keeps the spelling a label was created with, so the comparison is the one
 	// `issue-labels.ts` defines rather than an equality test written here.
 	it('is detected whatever case the label carries', () => {
-		const parked = issue(HOLDER_NUMBER, CREATED_EARLIER, [NEEDS_DECISION_LABEL.toUpperCase()])
+		const parked = issue(HOLDER_NUMBER, CREATED_EARLIER, [
+			IN_PROGRESS_LABEL,
+			NEEDS_DECISION_LABEL.toUpperCase(),
+		])
 
-		expect(epic_busy.is_parked(parked)).toBe(true)
+		expect(epic_busy.is_holder(parked)).toBe(false)
 	})
 
 	// joshuafolkken/kit#1679: the run that applied `already-done` committed nothing and left a clean
@@ -144,7 +147,7 @@ function stopped_child(): ReturnType<typeof issue> {
 // `git switch main && git pull` on top of that work.
 describe('epic_busy.read_repository — a child stopped for human review', () => {
 	it('is not parked', () => {
-		expect(epic_busy.is_parked(stopped_child())).toBe(false)
+		expect(epic_busy.is_holder(stopped_child())).toBe(true)
 	})
 
 	it('holds the repository', async () => {

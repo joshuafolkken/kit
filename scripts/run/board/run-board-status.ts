@@ -1,9 +1,9 @@
 import {
 	has_label_name,
-	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
+import { issue_run_hold } from '#scripts/issue/issue-run-hold'
 import type { Span } from '#scripts/lane/lane-spans'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
@@ -11,7 +11,7 @@ import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_checks } from './run-board-checks'
-import type { ClosedIssue } from './run-board-closed'
+import { run_board_closed, type ClosedIssue, type ListingRead } from './run-board-closed'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_ending_states } from './run-board-ending-states'
 import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
@@ -330,10 +330,8 @@ function since_launch(
 }
 
 // The open listing the plan was read with, and when it was read.
-interface OpenRead {
-	// `undefined` when the listing was cut short, so absence from it proves nothing.
-	open_numbers: ReadonlySet<number> | undefined
-	read_ms: number | undefined
+// `open_numbers` is `undefined` when the listing was cut short, so absence from it proves nothing.
+interface OpenRead extends ListingRead {
 	// The children read closed from GitHub (`run-board-closed.ts`), by number.
 	closed: ReadonlyMap<number, ClosedIssue>
 	// Each listed issue's label names, by number; an issue the listing did not hold has none to read.
@@ -358,7 +356,7 @@ function labelled_state(labels: ReadonlyArray<string> | undefined): ItemState | 
 	if (has_label_name(labels, NEEDS_DECISION_LABEL)) return 'human'
 	if (has_label_name(labels, RUN_STALLED_LABEL)) return 'stopped'
 
-	return has_label_name(labels, IN_PROGRESS_LABEL) ? undefined : 'stopped'
+	return issue_run_hold.is_held(labels) ? undefined : 'stopped'
 }
 
 function labelled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
@@ -378,20 +376,18 @@ function is_closed_before_launch(status: ItemStatus, closed: ClosedIssue): boole
 	return closed.closed_ms < launch
 }
 
-function closed_state(closed: ClosedIssue): ItemState {
-	if (closed.is_merged) return 'merged'
-
-	return closed.is_not_planned ? 'withdrawn' : 'done'
+// A child read closed ends when GitHub says it closed — merged, withdrawn as not planned, or done.
+function closed_as(status: ItemStatus, closed: ClosedIssue): ItemStatus {
+	return { ...settled_as(status, run_board_closed.state_of(closed)), ended_ms: closed.closed_ms }
 }
 
-// A child read closed ends when GitHub says it closed — merged, withdrawn as not planned, or done.
 function closed_status(
 	status: ItemStatus,
 	closed: ClosedIssue | undefined,
 ): ItemStatus | undefined {
 	if (closed === undefined || is_closed_before_launch(status, closed)) return undefined
 
-	return { ...settled_as(status, closed_state(closed)), ended_ms: closed.closed_ms }
+	return closed_as(status, closed)
 }
 
 function unsettled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
@@ -400,12 +396,17 @@ function unsettled(issue: number, status: ItemStatus, read: OpenRead): ItemStatu
 	return from_closed ?? labelled(issue, status, read)
 }
 
-// The closed read is kept for the run, so a parked child a person reopened since is told apart by the
-// listing holding it again.
+// The closed read is kept for the run, so a parked child a person reopened since is told apart by a
+// listing read after the close holding it again. Once a listing has landed, that — not the launch —
+// dates the close, so a closed child never waits in 🙋 decision (joshuafolkken/kit#6535).
 function parked_settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
-	if (read.open_numbers?.has(issue) === true) return status
+	const closed = read.closed.get(issue)
 
-	return closed_status(status, read.closed.get(issue)) ?? status
+	if (closed === undefined || read.read_ms === undefined) {
+		return closed_status(status, closed) ?? status
+	}
+
+	return run_board_closed.is_reopened(issue, closed, read) ? status : closed_as(status, closed)
 }
 
 function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
