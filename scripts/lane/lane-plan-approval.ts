@@ -13,15 +13,20 @@ const evidence_schema = z.object({
 	source: z.url(),
 	rationale: z.string().trim().min(1),
 })
+const lines_axis = {
+	declared_lines: z.number().int().positive(),
+	max_lines: z.number().int().positive(),
+}
+const files_axis = {
+	declared_files: z.number().int().positive(),
+	max_files: z.number().int().positive(),
+}
+// Each axis is checked on its own. The both-axes member leads: a union keeps its first match and
+// strips the keys that member does not declare (joshuafolkken/kit#6657).
 const scope_schema = z.union([
-	evidence_schema.extend({
-		declared_lines: z.number().int().positive(),
-		max_lines: z.number().int().positive(),
-	}),
-	evidence_schema.extend({
-		declared_files: z.number().int().positive(),
-		max_files: z.number().int().positive(),
-	}),
+	evidence_schema.extend({ ...lines_axis, ...files_axis }),
+	evidence_schema.extend(lines_axis),
+	evidence_schema.extend(files_axis),
 ])
 const approval_schema = z.intersection(
 	scope_schema,
