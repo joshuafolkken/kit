@@ -383,18 +383,21 @@ async function wait_for_pr_success_default(
 // Where a pull request GitHub merges on its own stands. `failed` is what
 // auto-merge never fires under — a red required check, a conflict, a requested change — so a wait on
 // it ends now rather than at the budget; a red check outside the required list is not among them
-// (`is_auto_merge_blocked`). A read that failed answers `waiting`, so a poll asks again.
+// (`is_auto_merge_blocked`). One detail read answers both merged and the gate (joshuafolkken/kit#6721);
+// only a read that failed asks `pr_is_merged`, and otherwise answers `waiting`, so a poll asks again.
 type MergeProgress = 'merged' | 'failed' | 'waiting'
 
+function to_merge_progress(snapshot: PrStateSnapshot): MergeProgress {
+	if (snapshot.is_merged === true) return 'merged'
+
+	return is_auto_merge_blocked(snapshot) ? 'failed' : 'waiting'
+}
+
 async function read_merge_progress(branch_name: string): Promise<MergeProgress> {
-	if (await git_gh_pr_auto_merge.pr_is_merged(branch_name)) return 'merged'
-
 	try {
-		const snapshot = await default_fetch_pr_state(branch_name)
-
-		return is_auto_merge_blocked(snapshot) ? 'failed' : 'waiting'
+		return to_merge_progress(await default_fetch_pr_state(branch_name))
 	} catch {
-		return 'waiting'
+		return (await git_gh_pr_auto_merge.pr_is_merged(branch_name)) ? 'merged' : 'waiting'
 	}
 }
 
