@@ -53,7 +53,7 @@ may take.** The idle watch is on by default while the maximum is not:
 **`--idle 0` is the only way to turn the watch off.** The default's single source is
 `scripts/backlog/backlog-budget.ts` → `IDLE_WAIT_HOURS` — the only 8 hours the run knows: nothing is
 counted from the run's start, so no run is ended by its own age. A watch is polled
-at the loop's one 60-second interval, the same as a running batch
+at the loop's one 180-second interval, as a running batch is
 (`scripts/backlog/backlog-budget.ts` → `OFFER_INTERVAL_SECONDS`).
 
 **`backlog:offer` asks `backlog:budget` on every iteration** and hands back one verdict:
@@ -69,11 +69,11 @@ when it last had work, so refreshing it restarts the idle watch. Both are ISO-86
 `--merged` and `--running` both count against the maximum. **No ending abandons a lane**: whatever would
 have ended the run answers `watch` while `--running` is above zero.
 
-| Verdict | What the loop does                                                                                                                                                |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `run`   | Start what `backlog:next` offered, up to the free lanes and no more than the maximum still allows                                                                 |
-| `watch` | Ask again at the 60-second interval, whether or not anything of this run's is in flight; a collected child is asked about at once. Nothing is held while watching |
-| `stop`  | Report and finish. The reason it printed **is** the termination reason the completion report carries                                                              |
+| Verdict | What the loop does                                                                                                                                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `run`   | Start what `backlog:next` offered, up to the free lanes and no more than the maximum still allows                                                                  |
+| `watch` | Ask again at the 180-second interval, whether or not anything of this run's is in flight; a collected child is asked about at once. Nothing is held while watching |
+| `stop`  | Report and finish. The reason it printed **is** the termination reason the completion report carries                                                               |
 
 **At the drain the retrospective fires before the watch** (joshuafolkken/kit#2335): `backlog:offer`
 marks the drain on the event stream and `run:step` fires the retrospective there, so the watch that
@@ -109,14 +109,14 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 - **Parking is not stopping.** Only the consecutive-failure guard can turn repeated parks into a stop.
 - **A driver that cannot read the carry record asks again before it ends** (joshuafolkken/kit#3697).
   `backlog:drive` checks the record before every offer, merge and launch; a read that is not
-  `carried` is repeated up to 6 times at the 60-second offer interval, each failed read logged with
+  `carried` is repeated up to 6 times at the 180-second offer interval, each failed read logged with
   what it answered and whether the file was there
   (`scripts/backlog/backlog-drive-owner.ts` → `READ_ATTEMPTS`). One failed read therefore costs one
   interval of the idle watch, never the rest of it. Two records are not re-read: one `run:carry --end`
   ended stops at once with `The carry record is no longer active.`, and one another owner holds
   stops with `The driver no longer owns the carry record.`
 - **A named issue whose state does not read is read again before a session hears of it**
-  (joshuafolkken/kit#3739). The failure is a `wait`, so the next offer — 60 seconds on — reads it again
+  (joshuafolkken/kit#3739). The failure is a `wait`, so the next offer — 180 seconds on — reads it again
   while the children in flight are still collected. The third consecutive failure (`backlog:offer`'s
   retry limit) hands back `offer`, with the issue and why the read failed on stderr; a number that
   resolves to nothing is handed back at once (`scripts/backlog/backlog-drive-unread.ts`).

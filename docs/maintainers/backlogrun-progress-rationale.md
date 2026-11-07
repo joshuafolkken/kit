@@ -125,10 +125,12 @@ child — waits that cost no AI turns.
 to be stopped for, and the 8 hours a run promises is the wait after its hands became free
 (`backlogrun-steps-rationale.md` → "Why the idle watch lasts 8 hours from when the hands became free").
 
-**Why a watch is polled at the same 60 seconds as a running batch.** The slower idle poll existed
+**Why a watch is polled at the same 180 seconds as a running batch.** The slower idle poll existed
 because every ask billed the parent session's whole history; the loop is now a process
 (`backlogrun-driver.md`), an ask spends no AI turn, and one interval is one number to keep true
 (joshuafolkken/kit#3691). A child collected inside the interval is still asked about at once.
+
+The figure is 180, not 60, because each ask spends REST core budget (joshuafolkken/kit#6718).
 
 **Why a silent unit is measured by unchanged output.** A working unit rewrites its transcript
 continuously, so unchanged output — not the child's duration — is the signal.

@@ -158,7 +158,7 @@ the `auto-ok` that arrived four minutes later, and a 30-minute watch was a secon
 the run's start**: a bound counted from the start would end a run whose children were still working,
 and would leave a late wait shorter than the one promised. So an empty backlog, a backlog whose every
 opted-in issue waits on a person, and a listing that could not be read all wait the same 8 hours, and
-a child that runs restarts them. **A watch is polled at the loop's one 60-second
+a child that runs restarts them. **A watch is polled at the loop's one 180-second
 interval, the same as a running batch** (joshuafolkken/kit#3691): the loop is a process, so an ask
 spends no AI turn, and a second, slower interval was only a number the documents and the code disagreed
 on; the reason `backlog:budget` prints names the interval so a reader sees it rather than remembering it.
