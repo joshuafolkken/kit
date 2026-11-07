@@ -89,7 +89,7 @@ describe('cutting a lane child before the gate', () => {
 
 // joshuafolkken/kit#2312: the pre-gate cut is taken only when the current per-request cost is
 // over the shared threshold. Below it a short lane has no accumulation worth a resume's cost, so the
-// gate runs uncut; an unmeasurable session keeps the old unconditional cut as the safety net.
+// gate runs uncut; an unmeasurable session is undetermined and runs uncut too (joshuafolkken/kit#6576).
 describe('the pre-gate cut is conditional on the current context', () => {
 	it('skips the cut and continues to the gate when the context is under the threshold', async () => {
 		session_verdict.mockReturnValue(CONTEXT_UNDER)
@@ -112,14 +112,17 @@ describe('the pre-gate cut is conditional on the current context', () => {
 		expect(launch).toHaveBeenCalledOnce()
 	})
 
-	// An unmeasurable session cannot be priced, so the old unconditional cut stands as the safety net.
-	it('takes the cut when the context cannot be measured', async () => {
+	// An unmeasurable session cannot be priced, and a relaunch could not price it either, so it is not cut.
+	it('skips the cut and continues to the gate when the context cannot be measured', async () => {
 		session_verdict.mockReturnValue(CONTEXT_UNMEASURABLE)
 
 		const code = await run_cut_cli.run([ISSUE])
 
 		expect(code).toBe(0)
-		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
+		expect(verdict()).toBe(run_cut_cli.UNDER_THRESHOLD_VERDICT)
+		expect(launch).not.toHaveBeenCalled()
+		expect(printed_errors()).toContain('cannot be measured')
+		expect(printed_errors()).not.toContain('under the shared cut threshold')
 	})
 
 	// The condition guards the pre-gate phase alone; the implementation-phase caller gates its own
