@@ -2,6 +2,7 @@ import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
 import { git_gh_etag_read } from './git-gh-etag-read'
+import { git_gh_exec } from './git-gh-exec'
 
 // joshuafolkken/kit#6560: a read sent with the ETag the previous josh process kept on disk, so a
 // listing or a body that has not changed since costs no rate limit.
@@ -103,5 +104,67 @@ describe('git_gh_etag_read.read — a failure', () => {
 		answer_with(UNCHANGED)
 
 		await expect(git_gh_etag_read.read(PATH)).rejects.toThrow(PATH)
+	})
+})
+
+// joshuafolkken/kit#6699: the first page through the ETag layer, every page once it is full.
+const LISTING_PATH = 'repos/{owner}/{repo}/pulls?state=open&per_page=2'
+const PER_PAGE = 2
+const ONE_ROW = '[{"number":1}]'
+const TWO_ROWS = '[{"number":1},{"number":2}]'
+const ALL_PAGES = '[{"number":1},{"number":2}][{"number":3}]'
+
+function isolate_listing(): () => void {
+	vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(ALL_PAGES)
+
+	return shared_cache_fixture.isolate_shared_cache(git_gh_etag_read.slot_of(LISTING_PATH))
+}
+
+describe('git_gh_etag_read.read_listing — the ETag', () => {
+	beforeEach(isolate_listing)
+
+	it('answers an unchanged short page from the 304 without an unconditional gh api', async () => {
+		answer_with({ kind: 'changed', etag: ETAG, body: ONE_ROW }, UNCHANGED)
+
+		expect(await git_gh_etag_read.read_listing(LISTING_PATH, PER_PAGE)).toBe(ONE_ROW)
+		expect(await git_gh_etag_read.read_listing(LISTING_PATH, PER_PAGE)).toBe(ONE_ROW)
+		expect(sent_etags()).toStrictEqual([undefined, ETAG])
+		expect(git_gh_exec.exec_gh_api).not.toHaveBeenCalled()
+	})
+
+	it('answers the new page when the listing changed', async () => {
+		const changed = '[{"number":5}]'
+
+		answer_with(
+			{ kind: 'changed', etag: ETAG, body: ONE_ROW },
+			{ kind: 'changed', etag: NEW_ETAG, body: changed },
+		)
+
+		expect(await git_gh_etag_read.read_listing(LISTING_PATH, PER_PAGE)).toBe(ONE_ROW)
+		expect(await git_gh_etag_read.read_listing(LISTING_PATH, PER_PAGE)).toBe(changed)
+		expect(git_gh_exec.exec_gh_api).not.toHaveBeenCalled()
+	})
+})
+
+describe('git_gh_etag_read.read_listing — the page size', () => {
+	beforeEach(isolate_listing)
+
+	it('reads every page with --paginate when the first page is full', async () => {
+		answer_with({ kind: 'changed', etag: ETAG, body: TWO_ROWS })
+
+		expect(await git_gh_etag_read.read_listing(LISTING_PATH, PER_PAGE)).toBe(ALL_PAGES)
+		expect(git_gh_exec.exec_gh_api).toHaveBeenCalledWith({
+			path: LISTING_PATH,
+			should_paginate: true,
+		})
+	})
+
+	it('hands back an answer that is no array for the caller to reject', async () => {
+		const message = '{"message":"API rate limit exceeded"}'
+
+		answer_with({ kind: 'changed', etag: undefined, body: message })
+
+		expect(await git_gh_etag_read.read_listing(LISTING_PATH, PER_PAGE)).toBe(message)
+		expect(git_gh_exec.exec_gh_api).not.toHaveBeenCalled()
 	})
 })
