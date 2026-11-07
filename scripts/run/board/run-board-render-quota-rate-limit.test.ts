@@ -1,7 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
+import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Quotas } from './run-board-quota-read'
-import type { CoreRateLimit } from './run-board-rate-limit'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 
 // joshuafolkken/kit#6559, joshuafolkken/kit#6621: GitHub's core rate limit is drawn as a usage gauge

@@ -1,7 +1,22 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { gh_request_tally } from './gh-request-tally'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { gh_request_tally, type CoreUsage } from './gh-request-tally'
 
 // joshuafolkken/kit#6694: the process-wide counts of gh requests and 304 answers.
+// joshuafolkken/kit#6697: the core `used` difference around the process's calls.
+
+const RESET_MS = 1_793_000_000_000
+const START: CoreUsage = { used: 679, reset_ms: RESET_MS }
+const END: CoreUsage = { used: 712, reset_ms: RESET_MS }
+
+function reader_of(
+	...readings: Array<CoreUsage | undefined>
+): ReturnType<typeof vi.fn<() => Promise<CoreUsage | undefined>>> {
+	const read = vi.fn<() => Promise<CoreUsage | undefined>>()
+
+	for (const reading of readings) read.mockResolvedValueOnce(reading)
+
+	return read
+}
 
 beforeEach(() => {
 	gh_request_tally.reset()
@@ -34,5 +49,57 @@ describe('gh_request_tally', () => {
 		gh_request_tally.reset()
 
 		expect(gh_request_tally.snapshot()).toStrictEqual({ calls: 0, not_modified: 0 })
+	})
+})
+
+describe('gh_request_tally.core_delta', () => {
+	it('reads once before the first counted call and answers the difference at the end', async () => {
+		const read = reader_of(START, END)
+
+		gh_request_tally.watch_core(read)
+		gh_request_tally.count_call()
+		gh_request_tally.count_call()
+
+		expect(read).toHaveBeenCalledTimes(1)
+		await expect(gh_request_tally.core_delta()).resolves.toBe(END.used - START.used)
+		expect(read).toHaveBeenCalledTimes(2)
+		expect(gh_request_tally.snapshot().calls).toBe(2)
+	})
+
+	it('reads nothing and answers none for a process that made no call', async () => {
+		const read = reader_of(START, END)
+
+		gh_request_tally.watch_core(read)
+
+		await expect(gh_request_tally.core_delta()).resolves.toBeUndefined()
+		expect(read).not.toHaveBeenCalled()
+	})
+
+	it('reads nothing for a process that never watched the allowance', async () => {
+		gh_request_tally.count_call()
+
+		await expect(gh_request_tally.core_delta()).resolves.toBeUndefined()
+	})
+})
+
+describe('gh_request_tally.core_delta — readings that answer none', () => {
+	it.each([
+		['the start reading failed', undefined, END],
+		['the end reading failed', START, undefined],
+		['the window refilled between the readings', START, { used: 3, reset_ms: RESET_MS + 1 }],
+	])('answers none without throwing when %s', async (_case, start, end) => {
+		gh_request_tally.watch_core(reader_of(start, end))
+		gh_request_tally.count_call()
+
+		await expect(gh_request_tally.core_delta()).resolves.toBeUndefined()
+	})
+
+	it('answers none without throwing when the reader itself rejects', async () => {
+		const read = vi.fn<() => Promise<CoreUsage | undefined>>().mockRejectedValue(new Error('spawn'))
+
+		gh_request_tally.watch_core(read)
+		gh_request_tally.count_call()
+
+		await expect(gh_request_tally.core_delta()).resolves.toBeUndefined()
 	})
 })
