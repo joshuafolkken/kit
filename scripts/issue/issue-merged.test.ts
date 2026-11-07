@@ -180,6 +180,7 @@ describe('issue_merged.page_rows', () => {
 	it.each([
 		['a full page, which more may follow', FULL_BODY],
 		['an answer that is no array', '{"message":"Not Found"}'],
+		['an event of a shape the schema does not know', '[{"event":"labeled","label":{"name":null}}]'],
 	])('answers nothing for %s, so the paged read takes over', (_label, raw) => {
 		expect(issue_merged.page_rows(raw)).toBeUndefined()
 	})

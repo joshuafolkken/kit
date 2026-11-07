@@ -1,7 +1,7 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
+import { read_json_listing } from '#scripts/git/parse-json-array'
 import { MEASURED_LABEL } from '#scripts/issue/issue-labels'
 import { z } from 'zod'
 
@@ -122,11 +122,11 @@ function row_of(entry: TimelineEvent): Array<TimelineRow> {
 // page — more may follow — or one that does not parse is read whole with `--paginate` and the filter.
 // The rows of a first page read as JSON; `undefined` for a full page or one that does not parse.
 function page_rows(raw: string): Array<TimelineRow> | undefined {
-	const page = parse_json_array_or_undefined(raw, event_schema)
+	const page = read_json_listing(raw, event_schema)
 
-	if (page === undefined || page.length >= PER_PAGE) return undefined
+	if (page.kind !== 'read' || page.rows.length >= PER_PAGE) return undefined
 
-	return page.flatMap((entry) => row_of(entry))
+	return page.rows.flatMap((entry) => row_of(entry))
 }
 
 async function read_rows(issue: string): Promise<Array<TimelineRow>> {
