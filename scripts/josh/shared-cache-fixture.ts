@@ -4,17 +4,18 @@ import { vi } from 'vitest'
 import { shared_cache, type CacheSlot } from './shared-cache'
 import { stamp_file } from './stamp-file'
 
-// Keys `slot` to a repository root of the test's own, so a suite never reads, writes or clears the
+// Keys `slots` to a repository root of the test's own, so a suite never reads, writes or clears the
 // machine-wide record a concurrent lane's run of the same suite keeps (joshuafolkken/kit#4550).
-// Returns the teardown that removes the test's record — return it from `beforeEach`. It removes the
-// path it was given, so it holds whether or not the spy has been restored first.
-function isolate_shared_cache(slot: CacheSlot): () => void {
+// Returns the teardown that removes the test's records — return it from `beforeEach`. It removes the
+// paths it was given, so it holds whether or not the spy has been restored first. Every slot a test
+// reaches is named in one call: a second call moves the root, leaving the first call's record behind.
+function isolate_shared_cache(...slots: ReadonlyArray<CacheSlot>): () => void {
 	const root = `/shared-cache-test/${randomUUID()}`
 
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(root)
 
-	return function remove_record(): void {
-		stamp_file.remove_stamp(stamp_file.stamp_path(slot.prefix, root))
+	return function remove_records(): void {
+		for (const slot of slots) stamp_file.remove_stamp(stamp_file.stamp_path(slot.prefix, root))
 	}
 }
 

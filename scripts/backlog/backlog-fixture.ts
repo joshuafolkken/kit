@@ -3,6 +3,7 @@ import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_child_source } from '#scripts/epic/epic-child-source'
 import { epic_schema } from '#scripts/epic/epic-index'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
+import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
@@ -213,9 +214,14 @@ function stub_environment(): void {
 	)
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
 	vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(REACHABLE_STATUS)
-	// The closed children a scan keeps for the next one, held per test so no case answers from
-	// another's record or the machine's own.
-	onTestFinished(shared_cache_fixture.isolate_shared_cache(epic_child_source.CLOSED_CACHE))
+	// The closed children and the write roles a scan keeps for the next one, held per test so no case
+	// answers from another's record or the machine's own.
+	onTestFinished(
+		shared_cache_fixture.isolate_shared_cache(
+			epic_child_source.CLOSED_CACHE,
+			gh_permission_cache.WRITERS_CACHE,
+		),
+	)
 }
 
 // The two reads the defect priority adds: the rate, and each candidate's body — beside the implement
