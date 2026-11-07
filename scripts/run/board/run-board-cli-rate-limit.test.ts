@@ -47,7 +47,7 @@ describe('run_board_cli.run --once rate limit', () => {
 
 		expect(code).toBe(0)
 		expect(frame).toContain('⛽ usage')
-		expect(frame).toMatch(/github\s+4321\/5000 ↻ /u)
+		expect(frame).toMatch(/github\s+14% \S+ {2}↻ \S+\s+679\/5000/u)
 	})
 
 	it('draws the board and the usage limits without the allowance when the read fails', async () => {

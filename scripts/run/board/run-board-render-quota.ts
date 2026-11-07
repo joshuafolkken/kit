@@ -55,6 +55,8 @@ const COLUMNS = [
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
 const SCHEDULER_MARK = '🤖'
 const GITHUB = 'github'
+// GitHub's core REST allowance refills hourly.
+const CORE_WINDOW_MINUTES = 60
 const LEGEND = [
 	LABEL,
 	`${SCHEDULER_MARK} scheduler`,
@@ -70,6 +72,14 @@ interface QuotaHold {
 }
 
 type Shade = (typeof GAUGE_SHADES)[(typeof LEVELS)[number]]
+
+// GitHub's core REST allowance as a gauge: the percent spent, ┊, the reset and `used/limit`.
+interface Allowance {
+	used_percent: number
+	pace: number
+	reset: string
+	spent: string
+}
 
 interface QuotaView {
 	quotas?: Quotas | undefined
@@ -276,27 +286,44 @@ function counts_text(reading: QuotaReading | undefined, now_ms: number): string 
 	return ` ${COUNT_MARK}${texts.join('/')}`
 }
 
-// `4321/5000 ↻ 14:00`: GitHub's core REST calls left this window, and when it refills. A reading
-// whose reset has passed is drawn full, with no reset: the next window starts at the next call.
-function allowance_text(rate_limit: CoreRateLimit, now_ms: number): string {
-	const limit = String(rate_limit.limit)
+// GitHub's core REST calls spent this hour-long window (`1877/5000`) and when it refills
+// (joshuafolkken/kit#6621). A reading whose reset has passed has spent none and has no reset: the
+// next window starts at the next call.
+function allowance_of(rate_limit: CoreRateLimit, now_ms: number): Allowance {
+	const { limit, remaining, reset_ms } = rate_limit
+	const is_open = reset_ms > now_ms
+	const used = is_open ? limit - remaining : 0
+	const used_percent = (used / limit) * PERCENT
+	const window = { minutes: CORE_WINDOW_MINUTES, used_percent, resets_ms: reset_ms }
 
-	if (rate_limit.reset_ms <= now_ms) return `${limit}/${limit}`
-
-	const reset = reset_text(rate_limit.reset_ms, now_ms)
-
-	return `${String(rate_limit.remaining)}/${limit} ${RESET_MARK} ${reset}`
+	return {
+		used_percent,
+		pace: is_open ? pace_of(window, now_ms) : 0,
+		reset: is_open ? `${RESET_MARK} ${reset_text(reset_ms, now_ms)}` : '',
+		spent: `${String(used)}/${String(limit)}`,
+	}
 }
 
 // Nothing where the allowance could not be read.
-function rate_limit_bodies(view: QuotaView): Array<string> {
+function allowances_of(view: QuotaView): Array<Allowance> {
 	const { rate_limit, now_ms } = view
 
-	return rate_limit === undefined ? [] : [allowance_text(rate_limit, now_ms)]
+	return rate_limit === undefined ? [] : [allowance_of(rate_limit, now_ms)]
 }
 
 function rate_limit_rows(view: QuotaView): Array<string> {
-	return rate_limit_bodies(view).map((body) => `${INDENT}${name_cell(GITHUB)}${body}`)
+	return allowances_of(view).map(({ used_percent, pace, reset, spent }) => {
+		const gauge = gauge_text(used_percent, pace, reset, spent)
+
+		return `${INDENT}${name_cell(GITHUB)}${gauge}`.trimEnd()
+	})
+}
+
+// `github 38% 1877/5000 ↻ 15:23`.
+function rate_limit_summary({ used_percent, reset, spent }: Allowance): string {
+	const percent = run_board_machine.percent_text(used_percent).trimStart()
+
+	return `${GITHUB} ${percent} ${spent} ${reset}`.trimEnd()
 }
 
 // `claude 42/68 ≈9/5`: each column's percent, `—` where none stands, then its count.
@@ -308,7 +335,7 @@ function summary_of(view: QuotaView): string {
 		return `${name} ${percents_text(reading, view.now_ms)}${counts_text(reading, view.now_ms)}`
 	})
 
-	const rate_limit = rate_limit_bodies(view).map((body) => `${GITHUB} ${body}`)
+	const rate_limit = allowances_of(view).map((allowance) => rate_limit_summary(allowance))
 
 	return [...parts, ...rate_limit].join(SEPARATOR)
 }
