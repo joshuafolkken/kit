@@ -4,6 +4,7 @@ import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { error_text } from '#scripts/lib/error-message'
 import { token_shape } from '#scripts/lib/token-shape'
 import { execa, execaSync } from 'execa'
+import { gh_request_tally } from './gh-request-tally'
 import { check_gh_installed } from './git-gh-check'
 import { gh_failure } from './git-gh-failure'
 import { gh_retry } from './git-gh-retry'
@@ -167,6 +168,8 @@ async function spawn_gh_command(
 	await check_gh_installed()
 	const options = to_spawn_options(timeout_ms, cwd)
 
+	gh_request_tally.count_call()
+
 	try {
 		const { stdout } = await execa('gh', arguments_, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
@@ -199,6 +202,8 @@ async function spawn_gh_command_with_stdin(input: StdinCommand): Promise<string>
 	// Built ahead of the call so the spawn itself stays on one line: `// NOSONAR` suppresses the rule
 	// only on the line it sits on, and a wrapped call moves that line away from the reported one.
 	const options = { input: input.stdin_body, ...to_spawn_options(input.timeout_ms, input.cwd) }
+
+	gh_request_tally.count_call()
 
 	try {
 		const { stdout } = await execa('gh', input.args, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -251,6 +256,7 @@ async function spawn_gh_api_status(path: string, timeout_ms?: number): Promise<n
 
 	try {
 		await check_gh_installed()
+		gh_request_tally.count_call()
 		const { stdout } = await execa('gh', ['api', '--include', '--silent', path], options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return parse_status_line(stdout)
@@ -270,6 +276,8 @@ async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<nu
 // answers `undefined`, which is what that check would have led to anyway.
 function exec_gh_api_status_sync(path: string, timeout_ms?: number): number | undefined {
 	const options = to_spawn_options(timeout_ms)
+
+	gh_request_tally.count_call()
 
 	try {
 		const { stdout } = execaSync('gh', ['api', '--include', '--silent', path], options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
@@ -414,6 +422,8 @@ function exec_gh_api_sync(request: GhApiRequest): string {
 	refuse_credential_body(request)
 	const body_option = request.body === undefined ? {} : { input: request.body }
 	const options = { ...body_option, ...to_spawn_options(request.timeout_ms, request.cwd) }
+
+	gh_request_tally.count_call()
 
 	try {
 		const { stdout } = execaSync('gh', to_gh_api_args(request), options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
