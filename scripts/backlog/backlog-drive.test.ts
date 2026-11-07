@@ -51,12 +51,12 @@ describe('backlog_drive.run_pass — the lane limit', () => {
 		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([OFFERED])
 	})
 
-	it('launches nothing when no lane is free', async () => {
+	it('does not ask the offer when no lane is free', async () => {
 		const offered = offer('run', [OFFERED])
 		const { ports, calls } = harness({ offers: [offered], free_lanes: [NO_FREE_LANES] })
 		const result = await backlog_drive.run_pass(state(), true, ports)
 
-		expect(calls).toStrictEqual(['offer'])
+		expect(calls).toStrictEqual([])
 		expect(result.kind).toBe('continue')
 	})
 
@@ -75,7 +75,7 @@ describe('backlog_drive.run_pass — the lane limit', () => {
 describe('backlog_drive.run_pass — a refused launch at the lane limit', () => {
 	it('waits rather than handing back a lane:open refused because every lane is taken', async () => {
 		const offered = offer('run', [OFFERED])
-		const script = { offers: [offered], unopened_launches: [OFFERED], free_lanes: [1, 0] }
+		const script = { offers: [offered], unopened_launches: [OFFERED], free_lanes: [1, 1, 0] }
 		const { ports } = harness(script)
 		const result = await backlog_drive.run_pass(state(), true, ports)
 
@@ -84,7 +84,7 @@ describe('backlog_drive.run_pass — a refused launch at the lane limit', () => 
 
 	it('hands back a launch that failed after its lane took the last seat', async () => {
 		const offered = offer('run', [OFFERED])
-		const script = { offers: [offered], failed_launches: [OFFERED], free_lanes: [1, 0] }
+		const script = { offers: [offered], failed_launches: [OFFERED], free_lanes: [1, 1, 0] }
 		const { ports } = harness(script)
 		const result = await backlog_drive.run_pass(state(), true, ports)
 
@@ -111,7 +111,7 @@ describe('backlog_drive.run_pass — a kept lane', () => {
 
 		await backlog_drive.run_pass(state(), true, ports)
 
-		expect(calls).toStrictEqual(['offer'])
+		expect(calls).toStrictEqual([])
 	})
 })
 

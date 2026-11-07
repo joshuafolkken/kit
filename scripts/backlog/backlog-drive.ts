@@ -344,8 +344,7 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 }
 
 // One pass: collect every child that ended, then — unless a `stop` has been read — ask what to start.
-// `should_offer` is the caller's throttle on the one network read; a collection always asks, because a
-// lane just freed.
+// `should_offer` throttles the network read; a collection can ask immediately if a seat is free.
 function is_offering(before: DriveState, after: DriveState, should_offer: boolean): boolean {
 	return !after.is_stopping && (should_offer || after.in_flight.length !== before.in_flight.length)
 }
@@ -370,7 +369,9 @@ async function run_pass(
 	if (collected.kind === 'end') return collected
 	if (!is_offering(held, collected.state, should_offer)) return settle(collected)
 
-	return settle(await ask_offer(collected.state, ports))
+	const free_lanes = await ports.free_lanes()
+
+	return settle(free_lanes === 0 ? collected : await ask_offer(collected.state, ports))
 }
 
 interface LoopConfig {
