@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_lane_handover } from './review-lane-handover'
 import { review_record_cli } from './review-record-cli'
 
@@ -23,17 +23,14 @@ vi.mock('#scripts/run/ship/run-ship-probe', () => ({
 	run_ship_probe: { is_pushed_clean: vi.fn().mockResolvedValue(false) },
 }))
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-reuse-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-record-reuse-')
 const NOW = new Date('2026-10-25T00:00:00Z')
 const ISSUE = 4763
 const NOT_REUSED = 'Not reused'
 const REUSED_DELTA = 'Reused, delta to round 2:'
 const RUN_REVIEW = 'run:review'
 const RUN_REVIEW_STEP = `pnpm josh ${RUN_REVIEW}`
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
 
 beforeEach(() => {
 	vi.spyOn(review_lane_handover, 'is_reopen_refused').mockResolvedValue(false)

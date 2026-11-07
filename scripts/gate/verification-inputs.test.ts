@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { gate_labels } from './gate-labels'
 import { verification_inputs } from './verification-inputs'
 
@@ -9,6 +9,7 @@ import { verification_inputs } from './verification-inputs'
 // the declaration — the configurations it cannot narrow past, and the fingerprint of its tools and
 // environment.
 
+const make_directory = temporary_directory()
 const PACKAGE_JSON = 'package.json'
 const SOURCE_FILE = 'scripts/thing.ts'
 const NODE_ENV = 'NODE_ENV'
@@ -65,7 +66,7 @@ describe('verification_inputs.configures', () => {
 // joshuafolkken/kit#5380: a rule module the eslint config does not import yet changes no lint result,
 // so a change to it alone must not switch `lint --changed` to the whole tree.
 function write_project(config_source = "import './eslint/base.js'\n"): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'kit-lint-config-reach-'))
+	const root = make_directory('kit-lint-config-reach-')
 
 	mkdirSync(path.join(root, 'eslint', 'rules'), { recursive: true })
 	writeFileSync(path.join(root, ESLINT_CONFIG), config_source)
@@ -90,7 +91,6 @@ describe('verification_inputs.configures for the eslint config modules', () => {
 			const root = write_project()
 
 			expect(verification_inputs.configures(gate_labels.LINT_LABEL, [relative], root)).toBe(true)
-			rmSync(root, { recursive: true, force: true })
 		},
 	)
 
@@ -99,7 +99,6 @@ describe('verification_inputs.configures for the eslint config modules', () => {
 		const relatives = ['eslint/rules/pending.js']
 
 		expect(verification_inputs.configures(gate_labels.LINT_LABEL, relatives, root)).toBe(false)
-		rmSync(root, { recursive: true, force: true })
 	})
 })
 
@@ -121,7 +120,6 @@ describe('verification_inputs.configures for local import forms', () => {
 			}),
 		)
 		expect(verification_inputs.configures(gate_labels.LINT_LABEL, [WIRED_MODULE], root)).toBe(true)
-		rmSync(root, { recursive: true, force: true })
 	})
 })
 
@@ -150,12 +148,8 @@ describe('verification_inputs.fingerprint', () => {
 	let root = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'verification-inputs-'))
+		root = make_directory('verification-inputs-')
 		install(root, 'typescript', '5.0.0')
-	})
-
-	afterEach(() => {
-		rmSync(root, { recursive: true, force: true })
 	})
 
 	function of(label: string, environment: Record<string, string> = {}): string {

@@ -184,9 +184,10 @@ function row_of(line: string): Row | undefined {
 	return { id: group(groups, 'id'), kind: group(groups, 'kind'), rest: group(groups, 'rest') }
 }
 
+// A row inside a code fence is an example the body quotes, not a claim (joshuafolkken/kit#6574).
 function rows_of(pr_body = ''): MapRows {
 	const rows = markdown_section
-		.section_lines(pr_body, MAP_HEADING)
+		.fence_free_lines(markdown_section.section_lines(pr_body, MAP_HEADING).join('\n'))
 		.map((line) => row_of(line))
 		.filter((row): row is Row => row !== undefined)
 	const met = rows.filter((row) => row.kind === MET).map((row) => row.id)

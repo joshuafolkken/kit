@@ -1,5 +1,6 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { size_estimate } from '#scripts/issue/size-estimate'
+import { split_assess } from '#scripts/split/split-assess'
 import { describe, expect, it } from 'vitest'
 import type { LanePlan } from './lane-plan'
 import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-size'
@@ -9,6 +10,7 @@ import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-siz
 // joshuafolkken/kit#5568: the probed hunks and the projected lines answer `split` too, with their reason.
 
 const ISSUE = 5533
+const FORMER_IMPLEMENT_BUDGET = 12
 const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト除く）\n'
 const PLANNED_AT = '2026-10-31T00:00:00.000Z'
 const TEST_FILE = 'scripts/lane/lane-plan-size.test.ts'
@@ -110,12 +112,25 @@ describe('lane_plan_size.oversize', () => {
 	})
 })
 
+// joshuafolkken/kit#6540: the lane budget rebalance shrank the implement budget the guide derives from.
+describe('lane_plan_size rebalanced implement budget', () => {
+	it('splits a measurement the former implement budget passed (ac-4e84878a)', () => {
+		const implement_rate = { median: 4, lanes: 1 }
+		const former = split_assess.guide_for(FORMER_IMPLEMENT_BUDGET, implement_rate)
+
+		expect(signalled(declared(1, former.lines / 2), { implement_rate })).toMatchObject({
+			reason: 'lines',
+			measured: former.lines,
+		})
+	})
+})
+
 describe('lane_plan_size measured guide', () => {
 	it.each([
 		[12, 100, false],
 		[12, 101, true],
-		[4, 150, false],
-		[4, 151, true],
+		[3, 150, false],
+		[3, 151, true],
 		[undefined, 100, false],
 		[undefined, 101, true],
 	])(

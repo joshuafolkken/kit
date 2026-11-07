@@ -1,12 +1,12 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { expect, it } from 'vitest'
 import { ci_yml_fixture } from './ci-yml-fixture'
 
-const DIRECTORIES: Array<string> = []
+const make_directory = temporary_directory()
 const INSTALLER = '#!/bin/sh\nset -e\ncurl binary\necho installed\n'
 const CURL = `#!/bin/sh
 set -e
@@ -19,14 +19,9 @@ cp "$RUNNER_TEMP/source" "$2"
 `
 const RETRY_SETTINGS = 'retry = 3\nretry-delay = 2\nretry-max-time = 60\n'
 
-afterEach(() => {
-	for (const directory of DIRECTORIES.splice(0)) rmSync(directory, { recursive: true, force: true })
-})
-
 function setup(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'safe-chain-download-'))
+	const directory = make_directory('safe-chain-download-')
 
-	DIRECTORIES.push(directory)
 	writeFileSync(path.join(directory, 'source'), INSTALLER)
 	writeFileSync(path.join(directory, 'curl'), CURL, { mode: 0o755 })
 

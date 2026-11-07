@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { related_heavy_tests, type HeavyReader } from './related-heavy-tests'
 import type { RelatedScope } from './test-related-scope'
@@ -105,6 +105,8 @@ describe('related_heavy_tests.exclude_flags — the test named for a changed mod
 	})
 })
 
+const make_directory = temporary_directory()
+
 function write_file(root: string, file: string, text: string): void {
 	mkdirSync(path.join(root, path.dirname(file)), { recursive: true })
 	writeFileSync(path.join(root, file), text)
@@ -112,7 +114,7 @@ function write_file(root: string, file: string, text: string): void {
 
 describe('related_heavy_tests.exclude_flags — the records it reads off the checkout', () => {
 	it('resolves nothing through a conditional package import instead of throwing', () => {
-		const root = mkdtempSync(path.join(tmpdir(), 'related-heavy-tests-'))
+		const root = make_directory('related-heavy-tests-')
 		const package_imports = Object.fromEntries<unknown>([
 			[CONDITIONAL_ALIAS, { node: './c.js' }],
 			[SCRIPTS_ALIAS, SCRIPTS_TARGET],
@@ -133,6 +135,5 @@ describe('related_heavy_tests.exclude_flags — the records it reads off the che
 		}
 
 		expect(related_heavy_tests.exclude_flags(at_root, root)).toEqual([EXCLUDE_FLAG, HEAVY_FILE])
-		rmSync(root, { recursive: true, force: true })
 	})
 })

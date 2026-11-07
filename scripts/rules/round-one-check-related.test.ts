@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -27,7 +27,8 @@ const DETACH_LINE = time_transcript_fixture.josh_call_line(
 )
 const OPEN_ROUND = [BRIEF_LINE, FIX_LINE].join('\n')
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'round-one-check-related-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('round-one-check-related-')
 const ENTRY_DIRECTORY = process.cwd()
 const LANE_DIRECTORY = path.join(WORK_DIRECTORY, '.kit-lanes', ISSUE)
 const WRITTEN_TRANSCRIPTS = new Set<string>()
@@ -59,8 +60,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('round_one_check_related.fixes_an_open_round', () => {

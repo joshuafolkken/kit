@@ -67,6 +67,8 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Bundle the working tree’s read-only pre-check: branch, status, stash list, run hold',
 		category: 'AI tools',
+		// Reads the branch, status, stash list and hold only; a consultation scope runs it.
+		is_read_only: true,
 		reference: ['', 'automation', ['git', 'files']],
 		usage: { examples: [{ arguments: '' }] },
 	},

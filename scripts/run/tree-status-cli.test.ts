@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { josh_read_only } from '#scripts/josh/josh-read-only'
 import type { RunHold } from '#scripts/run/hold/run-hold'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tree_status } from './tree-status'
@@ -97,6 +98,14 @@ describe('tree_status_cli.run reads the tree as it is', () => {
 		)
 	})
 
+	it('disables the optional index refresh before the status subcommand', async () => {
+		await tree_status_cli.run([])
+
+		const [arguments_] = read_mock.mock.calls[0] ?? []
+
+		expect(arguments_?.slice(0, 2)).toEqual(['--no-optional-locks', 'status'])
+	})
+
 	it('reports a clean tree and an empty stash', async () => {
 		read_mock.mockResolvedValue(`## ${BRANCH}`)
 		stash_list_mock.mockResolvedValue([])
@@ -168,5 +177,11 @@ describe('tree:status is read-only', () => {
 describe('josh tree:status registration', () => {
 	it('is registered as a josh command', () => {
 		expect(COMMAND_MAP['tree:status']?.script).toBe(CLI_PATH)
+	})
+
+	// A consultation scope runs only what passes the read-only check, and every rule asks for this
+	// pre-check before a tree assumption (joshuafolkken/kit#6554).
+	it('passes the read-only check a consultation scope applies (ac-9c5edfb6)', () => {
+		expect(josh_read_only.refusal(['tree:status'])).toBeUndefined()
 	})
 })

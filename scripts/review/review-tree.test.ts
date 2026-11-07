@@ -1,9 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { review_tree } from './review-tree'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#2998: a review's ledger line appended after the gate moved the changed-file map,
 // so the ledger commit `pnpm josh followup` pushes no longer matched the green record and the pre-push
@@ -17,12 +19,8 @@ describe('review_tree.tree_of — observation ledger', () => {
 	let root = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'josh-review-tree-ledger-'))
+		root = make_directory('josh-review-tree-ledger-')
 		writeFileSync(path.join(root, CODE_FILE), 'code')
-	})
-
-	afterEach(() => {
-		rmSync(root, { recursive: true, force: true })
 	})
 
 	it('leaves ledger paths out of the map and keeps every other path', () => {

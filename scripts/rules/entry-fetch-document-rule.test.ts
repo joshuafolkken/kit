@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
 import { entry_read_set } from '#scripts/document/entry-read-set'
 import { read_set_cli } from '#scripts/document/read-set-cli'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 
 // Point-of-use files stay outside the entry read set, and fetches use the settings' Bash output cap
 // rather than restating it. Structural assertions on `entry_read_set` and the settings keep both
@@ -39,13 +39,12 @@ const SUBSECTION_TABLE_SKILL = `## 1. Which file to read
 | \`followup.md\` | Before issuing \`pnpm josh followup\` (\`followup.md\` → "When it runs") |
 `
 
-const temporary_roots: Array<string> = []
+const make_directory = temporary_directory()
 
 function fixture_root(skill: string, settings: string): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'read-set-'))
+	const root = make_directory('read-set-')
 	const skill_directory = path.join(root, entry_read_set.SKILL_DIRECTORY)
 
-	temporary_roots.push(root)
 	mkdirSync(skill_directory, { recursive: true })
 	writeFileSync(path.join(skill_directory, entry_read_set.SKILL_FILE), skill, 'utf8')
 	writeFileSync(path.join(root, '.claude', 'settings.json'), settings, 'utf8')
@@ -56,10 +55,6 @@ function fixture_root(skill: string, settings: string): string {
 function cap_of(settings: string): number {
 	return entry_read_set.bash_output_cap(fixture_root(SUBSECTION_TABLE_SKILL, settings))
 }
-
-afterAll(() => {
-	for (const root of temporary_roots) rmSync(root, { force: true, recursive: true })
-})
 
 function declared_cap(): number {
 	return Number(claude_settings_fixture.load_settings().env[CAP_KEY])

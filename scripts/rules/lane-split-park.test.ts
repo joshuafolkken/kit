@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -28,7 +28,8 @@ const PROMOTE_MINUTE = 1
 const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
 const REASON = lane_split_park.LANE_SPLIT_PARK_REASON
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-split-park-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('lane-split-park-')
 const ENTRY_DIRECTORY = process.cwd()
 const LANE_DIRECTORY = path.join(WORK_DIRECTORY, '.kit-lanes', ISSUE)
 const WRITTEN_TRANSCRIPTS = new Set<string>()
@@ -65,8 +66,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('promoted_issues', () => {

@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { effective_limit } from './effective-limit'
 import { line_budget } from './line-budget'
@@ -28,6 +28,7 @@ const FIXTURE_ROOT = path.join(
 	'node_modules',
 	`.josh-lines-fixture-${String(process.pid)}`,
 )
+const make_directory = temporary_directory()
 const NO_ESLINT_PREFIX = 'josh-lines-no-eslint-'
 const CONFIG_NAME = 'eslint.config.js'
 // A project root that holds no configuration of its own, beside the fixture and for the same reasons.
@@ -131,10 +132,8 @@ describe('effective_limit.options_for — the consumer’s own eslint answers', 
 	// Never kit's number as a fallback: that is the defect this file exists to remove, and a silent
 	// fallback would restore it in exactly the case nobody can see.
 	it('answers nothing at all where there is no eslint to ask', async () => {
-		const root = mkdtempSync(path.join(tmpdir(), NO_ESLINT_PREFIX))
+		const root = make_directory(NO_ESLINT_PREFIX)
 		const options = await effective_limit.options_for([path.join(root, 'a.js')], root)
-
-		rmSync(root, { recursive: true, force: true })
 
 		expect(options.size).toBe(0)
 	})

@@ -1,14 +1,15 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { cases } from './cases-logic'
 
 // joshuafolkken/kit#2246: `cases` reads the changed paths and answers which I/O boundaries they cross
 // and the abnormal cases each owes. Fixtures are written to a temp directory so the answers do not
 // ride on the current contents of real repository files.
 
-const directory = mkdtempSync(path.join(tmpdir(), 'cases-'))
+const make_directory = temporary_directory('suite')
+const directory = make_directory('cases-')
 
 function fixture(name: string, content: string): string {
 	const target = path.join(directory, name)
@@ -27,10 +28,6 @@ const INERT_PATH = fixture(
 	'export function add(a: number, b: number) { return a + b }\n',
 )
 const MISSING_PATH = path.join(directory, 'missing.ts')
-
-afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
-})
 
 describe('cases.boundaries_in', () => {
 	it('answers network for a fetch call', () => {

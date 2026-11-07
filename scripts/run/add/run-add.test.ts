@@ -1,4 +1,9 @@
-import { AUTO_OK_LABEL, PRIORITY_HIGH_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
+import {
+	AUTO_OK_LABEL,
+	EPIC_LABEL,
+	PRIORITY_HIGH_LABEL,
+	RUN_LANE_LABEL,
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
 import { run_add, type AddPorts, type IssueView } from './run-add'
 
@@ -10,11 +15,13 @@ const CLOSED_ISSUE = 3434
 const UNREADABLE_ISSUE = 3435
 const BLOCKED_ISSUE = 3436
 const BLOCKER = 3400
+const EPIC_ISSUE = 6358
 
 const VIEWS = new Map<number, IssueView>([
 	[OPEN_ISSUE, { is_open: true, blockers: [] }],
 	[CLOSED_ISSUE, { is_open: false, blockers: [] }],
 	[BLOCKED_ISSUE, { is_open: true, blockers: [BLOCKER] }],
+	[EPIC_ISSUE, { is_open: true, labels: [EPIC_LABEL], blockers: [] }],
 ])
 
 function fake_ports(refused_label?: string): AddPorts & { applied: Array<string> } {
@@ -85,6 +92,22 @@ describe('add_all', () => {
 		const outcomes = await run_add.add_all([CLOSED_ISSUE, OPEN_ISSUE], true, fake_ports())
 
 		expect(outcomes.map((outcome) => outcome.issue)).toStrictEqual([CLOSED_ISSUE, OPEN_ISSUE])
+	})
+})
+
+// joshuafolkken/kit#6535: an epic let into the run was warned about on every board redraw instead.
+describe('add_all with an epic', () => {
+	it('refuses it without labelling it, saying why', async () => {
+		const ports = fake_ports()
+
+		expect(await run_add.add_all([EPIC_ISSUE], true, ports)).toStrictEqual([
+			{
+				kind: 'refused',
+				issue: EPIC_ISSUE,
+				reason: 'epic — a run implements its children, never the epic itself',
+			},
+		])
+		expect(ports.applied).toStrictEqual([])
 	})
 })
 

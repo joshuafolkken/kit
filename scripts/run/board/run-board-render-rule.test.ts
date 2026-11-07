@@ -14,7 +14,7 @@ const WIDE = 300
 const NARROW = 90
 const LONG_TITLE = 'A lane title long enough that the board cuts it on an ellipsis'
 const RULE_MARKS = ['── ', '▾ ', '▸ ']
-const PHASE_AGE = 10 * MINUTE
+const PHASE_AGE = 8 * MINUTE
 // The least a narrowed lane title keeps (`run-board-render-title.ts` TITLE_FLOOR).
 const TITLE_FLOOR = 8
 

@@ -5,6 +5,7 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
+import { hook_payload_capture } from './hook-payload-capture'
 import { hook_tool_payload } from './hook-tool-payload'
 import { josh_environment_file } from './josh-environment-file'
 import { stamp_file } from './stamp-file'
@@ -497,6 +498,7 @@ async function respond_from_stdin(
 	const raw_payload = await text(process.stdin)
 
 	load_environment_file()
+	hook_payload_capture.capture(command, raw_payload)
 	await respond(raw_payload)
 }
 

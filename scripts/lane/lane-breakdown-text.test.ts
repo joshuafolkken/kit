@@ -36,7 +36,7 @@ const REPORT: Report = {
 }
 
 const IMPLEMENT_TEXT =
-	'implement 51.0 min, over budget +39 min (editing & thinking 41.0 min, gate 10.0 min, 2 backgrounded calls, their waits in editing & thinking)'
+	'implement 51.0 min, over budget +42 min (editing & thinking 41.0 min, gate 10.0 min, 2 backgrounded calls, their waits in editing & thinking)'
 const PLAN_TEXT = 'start to plan 10.0 min, over budget +7 min'
 const EXCLUDED_TEXT =
 	'waits taken out (park, outage, usage limit, yield, host sleep) 3.0 min, of which yield wait 1.0 min, of which host sleep 1.0 min'
@@ -284,8 +284,8 @@ describe('lane_breakdown_text.report_of — ship laps', () => {
 	})
 })
 
-// joshuafolkken/kit#5563: a stage past its share of a lane's 30-minute budget says by how much; one
-// within it carries nothing.
+// joshuafolkken/kit#5563, joshuafolkken/kit#6540: a stage past its share of a lane's 25-minute budget
+// says by how much; one within it carries nothing.
 function report_with(stages: Report['breakdown']['stages']): Report {
 	return { ...REPORT, breakdown: { ...REPORT.breakdown, stages } }
 }
@@ -294,13 +294,15 @@ describe('lane_breakdown_text — stage budget', () => {
 	it('writes the minutes an implement of 20 min ran past its budget', () => {
 		const report = report_with([{ name: 'implement', ms: 20 * MINUTE_MS }])
 
-		expect(lane_breakdown_text.line(report)).toContain(': implement 20.0 min, over budget +8 min (')
+		expect(lane_breakdown_text.line(report)).toContain(
+			': implement 20.0 min, over budget +11 min (',
+		)
 	})
 
 	it('writes nothing beside a stage within its budget', () => {
 		const report = report_with([
 			{ name: lane_breakdown.PLAN_STAGE, ms: 3 * MINUTE_MS },
-			{ name: 'ship gate', ms: 9 * MINUTE_MS },
+			{ name: 'ship gate', ms: 8 * MINUTE_MS },
 			{ name: lane_breakdown.FOLLOWUP_STAGE, ms: 5 * MINUTE_MS },
 		])
 
@@ -316,8 +318,8 @@ describe('lane_breakdown_text — stage budget', () => {
 	})
 
 	it('checks a ship stage against the whole ship budget', () => {
-		const report = report_with([{ name: 'ship gate', ms: 11 * MINUTE_MS }])
+		const report = report_with([{ name: 'ship gate', ms: 9 * MINUTE_MS }])
 
-		expect(lane_breakdown_text.line(report)).toContain(': ship gate 11.0 min, over budget +1 min;')
+		expect(lane_breakdown_text.line(report)).toContain(': ship gate 9.0 min, over budget +1 min;')
 	})
 })

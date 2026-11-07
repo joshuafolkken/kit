@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { broad_investigation } from './broad-investigation'
 
 // joshuafolkken/kit#5351: which tool calls are broad investigation. The shell half has its own test
@@ -10,7 +10,8 @@ import { broad_investigation } from './broad-investigation'
 const { READ_LINE_CAP, is_broad_investigation, is_delegated_investigation } = broad_investigation
 const ONE_FILE = 'package.json'
 const PROMPT = 'Find where the guard reads the transcript'
-const FIXTURES = mkdtempSync(path.join(tmpdir(), 'broad-investigation-'))
+const make_directory = temporary_directory('suite')
+const FIXTURES = make_directory('broad-investigation-')
 
 // A file of `lines` lines, each ending in a newline.
 function file_of(lines: number): string {
@@ -26,10 +27,6 @@ function file_of(lines: number): string {
 
 const AT_CAP = file_of(READ_LINE_CAP)
 const PAST_CAP = file_of(READ_LINE_CAP + 1)
-
-afterAll(() => {
-	rmSync(FIXTURES, { recursive: true, force: true })
-})
 
 function dispatch(input: Record<string, unknown>): { name: string; input: unknown } {
 	return { name: 'Agent', input: { prompt: PROMPT, ...input } }

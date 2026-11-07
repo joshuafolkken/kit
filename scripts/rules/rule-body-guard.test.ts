@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { read_repo_file, RULE_DELIVERY_RATIONALE } from '#scripts/document/ai-document-fixture'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -48,7 +48,8 @@ const LINK_NEW = 'See [docs](https://example.com/b) for the rule and its rationa
 const TYPO_OLD = 'The agent must alwyas read the comments before it implements the Issue.'
 const TYPO_NEW = TYPO_OLD.replace('alwyas', 'always')
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'rule-body-guard-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('rule-body-guard-')
 const ENTRY_DIRECTORY = process.cwd()
 const WRITTEN_TRANSCRIPTS = new Set<string>()
 
@@ -94,8 +95,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('is_rule_document', () => {
