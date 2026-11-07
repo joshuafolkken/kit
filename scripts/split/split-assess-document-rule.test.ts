@@ -34,6 +34,13 @@ describe('split-assessment.md carries the pre-gate notice steps', () => {
 		expect(document).toContain('`split-unresolved` even with a')
 		expect(document).not.toContain('Keep it one Issue')
 	})
+
+	it('lets one verified deliverable answer the notice without a child (ac-75da8719)', () => {
+		const document = read_repo_file(SPLIT_ASSESSMENT)
+
+		expect(document).toContain('One verified deliverable, nothing left to split')
+		expect(document).toContain('scripts/split/split-verified-single.ts')
+	})
 })
 
 // joshuafolkken/kit#4675: a filing over the guide is refused with a pointer at the question's heading.

@@ -56,7 +56,9 @@ once per Issue. Stop implementation before `pnpm josh run:cut <N>`
   On its duplicate refusal → `issue-fold-existing.md`, applying with `--apply <M> --found-during <N>`.
 - Reissue the cut, then gate and ship the green part; do not resume implementing the rest.
 
-Without a split child or a split fold on record, the pre-gate `run:cut` answers `split-unresolved` even with a
+- One verified deliverable, nothing left to split (every ship-draft acceptance row `満たした`, `lint:related` and `test:related` green on this tree) → reissue the cut without a child: `scripts/split/split-verified-single.ts`.
+
+Without a split child, a split fold or that verified deliverable, the pre-gate `run:cut` answers `split-unresolved` even with a
 `- 分割しない理由:` comment. The notice never creates an epic.
 
 ## What each entry point does with the answer
