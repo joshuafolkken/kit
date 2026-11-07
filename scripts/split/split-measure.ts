@@ -19,7 +19,8 @@ import { split_relocations } from './split-relocations'
 // `git diff --numstat` counts it. An entry with no readable content — a dangling symlink, a nested
 // repository's directory — still counts as a file, of zero lines, so one such entry cannot reject
 // the whole measurement.
-// Exact relocations are removed after combining both halves (joshuafolkken/kit#6360).
+// Exact relocations are removed after combining both halves (joshuafolkken/kit#6360). The files the
+// branch adds group a new scripts module with its importer, as `lane:plan` does (joshuafolkken/kit#6724).
 //
 // joshuafolkken/kit#4696: **the tracked half is measured from the tree's base, through a merge in
 // progress** (`change_base.resolved_through_merge`). A merge of the default branch stopped on a
@@ -88,7 +89,7 @@ async function read_branch(): Promise<ReturnType<typeof split_assess.assess>> {
 
 	const adjusted = await split_relocations.without_relocations(root, base, numstat, files)
 
-	return split_assess.assess(adjusted, await read_guide())
+	return split_assess.assess(adjusted.numstat, await read_guide(), new Set(adjusted.added))
 }
 
 const split_measure = { line_count, read_branch }

@@ -17,7 +17,12 @@ vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
 }))
 vi.mock('./split-relocations', () => ({
 	split_relocations: {
-		without_relocations: vi.fn(async (_root: string, _base: string, numstat: string) => numstat),
+		without_relocations: vi.fn(
+			async (_root: string, _base: string, numstat: string, added: Array<string>) => ({
+				numstat,
+				added,
+			}),
+		),
 	},
 }))
 
@@ -54,6 +59,24 @@ beforeEach(() => {
 
 afterEach(async () => {
 	await rm(fixture.root, { recursive: true, force: true })
+})
+
+// joshuafolkken/kit#6724: the files the branch adds reach the measure, so a new module and the
+// importer of its directory count as one file, as `lane:plan` counts them.
+describe('read_branch on a new module and its importer', () => {
+	it('counts an untracked module and the tracked importer of its directory as one file', async () => {
+		await mkdir(path.join(fixture.root, 'scripts/x'), { recursive: true })
+		const new_module = 'scripts/x/new.ts'
+
+		await writeFile(path.join(fixture.root, new_module), lines_of(NEW_FILE_LINES))
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue('5\t0\tscripts/x/cli.ts')
+		vi.mocked(git_command.untracked_names).mockResolvedValue(new_module)
+
+		const measurement = await split_measure.read_branch()
+
+		expect(measurement.files).toBe(1)
+		expect(measurement.lines).toBe(NEW_FILE_LINES + 5)
+	})
 })
 
 describe('read_branch excludes quoted tests', () => {

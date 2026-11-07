@@ -28,6 +28,34 @@ function runtime_numstat(count: number, lines: number): string {
 	).join('\n')
 }
 
+// joshuafolkken/kit#6724: the split notice counted a new scripts module and its importer as two files
+// while `lane:plan` cleared them as one, so `run:cut` asked to split off the importer.
+describe('split notice on lane:plan units', () => {
+	const new_module = 'scripts/x/new.ts'
+	const plan_diff = [
+		add_row(1, new_module),
+		add_row(1, 'scripts/x/cli.ts'),
+		add_row(1, 'docs/a.md'),
+		add_row(1, 'scripts/x/b.ts'),
+	].join('\n')
+	const guide = split_assess.guide_for(12, undefined, { files: 1.5 })
+	const declared = { files: 2, lines: 20 }
+
+	it('prints no notice when the new module and its importer count as one', () => {
+		const measurement = split_assess.assess(plan_diff, guide, new Set([new_module]))
+
+		expect(measurement.files).toBe(3)
+		expect(split_assess.notice(measurement, declared)).toBeUndefined()
+	})
+
+	it('still counts each file alone when no file is added', () => {
+		const measurement = split_assess.assess(plan_diff, guide)
+
+		expect(measurement.files).toBe(4)
+		expect(split_assess.notice(measurement, declared)).toContain('split notice')
+	})
+})
+
 describe('parse_numstat', () => {
 	it('sums added and deleted into changed lines', () => {
 		const [change] = split_assess.parse_numstat(row('12', '5', A_TS))

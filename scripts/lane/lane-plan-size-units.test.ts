@@ -1,5 +1,6 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { describe, expect, it } from 'vitest'
+import { split_assess } from '#scripts/split/split-assess'
+import { describe, expect, it, vi } from 'vitest'
 import type { LanePlan } from './lane-plan'
 import { lane_plan_size, type PlanSignals } from './lane-plan-size'
 
@@ -35,6 +36,18 @@ function oversize_of(paths: Array<string>, file_count = 1, signals = SIGNALS): u
 
 	return lane_plan_size.oversize(plan, declared(file_count), undefined, signals)
 }
+
+// joshuafolkken/kit#6724: the split notice groups on the same units, so the two cannot drift.
+describe('lane_plan_size.oversize grouping through the split notice', () => {
+	it('groups the plan with split_assess.units_of', () => {
+		const units_of = vi.spyOn(split_assess, 'units_of')
+
+		oversize_of([MODULE, MODULE_TEST, IMPORTER])
+
+		expect(units_of).toHaveBeenCalledWith([MODULE, IMPORTER], new Set([MODULE]))
+		units_of.mockRestore()
+	})
+})
 
 describe('lane_plan_size.oversize on a new scripts module', () => {
 	it('does not split a new module from its importer when the importer is counted in the plan', () => {
