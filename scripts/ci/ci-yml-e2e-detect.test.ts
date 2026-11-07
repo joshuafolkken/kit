@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { test_e2e_guard } from '#scripts/test/test-e2e-guard'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture } from './ci-yml-fixture'
 
 // CI and `pnpm josh test:e2e` must detect the same suite: a skipped CI job counts as passing, so
@@ -24,11 +24,8 @@ const TS_CONFIG = 'playwright.config.ts'
 const ROUTE_SPEC = 'src/routes/home.e2e.ts'
 const { TEMPLATE_CI_YML, RUNTIME_CI_YML, find_job, find_step_by_id, step_run } = ci_yml_fixture
 
-const workspace = mkdtempSync(path.join(tmpdir(), 'e2e-detect-'))
-
-afterAll(() => {
-	rmSync(workspace, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const workspace = make_directory('e2e-detect-')
 
 function detect_script(relative_path: string): string {
 	return step_run(find_step_by_id(find_job(relative_path, DETECT_JOB), DETECT_STEP_ID))

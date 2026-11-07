@@ -1,15 +1,7 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	realpathSync,
-	renameSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, renameSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { import_graph, type ImportGraph } from './import-graph'
 
 // joshuafolkken/kit#4415: what a cached lint verdict read besides its own file. Each case writes a
@@ -56,13 +48,11 @@ const PACKAGE_USER = 'uses-package.ts'
 const USED_NUMBER = 'export declare const used: number\n'
 const USED_ANY = 'export declare const used: any\n'
 
-const roots: Array<string> = []
+const make_directory = temporary_directory()
 
 function write_project(files: ReadonlyArray<readonly [string, string]>): string {
-	const created = mkdtempSync(path.join(tmpdir(), 'kit-import-graph-'))
-	const root = realpathSync(created)
+	const root = realpathSync(make_directory('kit-import-graph-'))
 
-	roots.push(root)
 	for (const [name, content] of files) writeFileSync(path.join(root, name), content)
 
 	return root
@@ -102,10 +92,6 @@ function write_package_user(): string {
 
 	return root
 }
-
-afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
-})
 
 describe('import_graph.closure_hash', () => {
 	it('changes when a file two imports away changes', async () => {

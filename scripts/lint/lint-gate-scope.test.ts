@@ -1,13 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { lint_gate_scope } from './lint-gate-scope'
+
+const make_directory = temporary_directory()
 
 // joshuafolkken/kit#4085: the gate lints the branch's changed files, and falls back to the whole tree
 // wherever a cache entry would not see the change — CI, a changed configuration, an unreadable change.
@@ -26,15 +28,13 @@ function scope_of(relative: string): ReturnType<typeof lint_gate_scope.resolve_g
 
 describe('lint_gate_scope.resolve_gate_scope for unimported modules', () => {
 	it('uses the supplied checkout config rather than the running checkout config', () => {
-		const root = mkdtempSync(path.join(tmpdir(), 'kit-lint-scope-'))
+		const root = make_directory('kit-lint-scope-')
 		const rule = path.join(root, WIRED_RULE)
 
 		mkdirSync(path.dirname(rule), { recursive: true })
 		writeFileSync(rule, '')
 		writeFileSync(path.join(root, ESLINT_CONFIG), '')
-		onTestFinished(() => {
-			rmSync(root, { recursive: true, force: true })
-		})
+
 		expect(lint_gate_scope.resolve_gate_scope([rule], root, NOT_CI).mode).toBe('related')
 	})
 

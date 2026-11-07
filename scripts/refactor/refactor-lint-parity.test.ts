@@ -1,9 +1,9 @@
-import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { refactor_lint } from './refactor-lint'
 
 vi.setConfig({ testTimeout: SUITE_TIMEOUT_MS })
@@ -12,6 +12,7 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const RULE = '@typescript-eslint/naming-convention'
 const NAMING_CATEGORY = 'naming-convention'
 const EXTERNAL_FILES = ['scripts/ci/ci-yml-fixture.ts', 'scripts/josh/josh-commands-maintenance.ts']
+const make_directory = temporary_directory()
 const PROBE_FILE = 'probe.ts'
 const PROBE_SOURCE = [
 	`// eslint-disable-next-line ${RULE} -- External workflow key`,
@@ -29,12 +30,8 @@ plugins: { '@typescript-eslint': ts.plugin }, rules: naming_convention_rules }]
 `
 
 function probe_checkout(): string {
-	const temporary_root = mkdtempSync(path.join(tmpdir(), 'kit-refactor-parity-'))
-	const root = realpathSync(temporary_root)
+	const root = realpathSync(make_directory('kit-refactor-parity-'))
 
-	onTestFinished(() => {
-		rmSync(root, { recursive: true, force: true })
-	})
 	writeFileSync(path.join(root, 'eslint.config.mjs'), PROBE_CONFIG)
 	symlinkSync(path.join(ROOT, 'node_modules'), path.join(root, 'node_modules'), 'dir')
 	writeFileSync(path.join(root, 'tsconfig.json'), JSON.stringify({ include: [PROBE_FILE] }))

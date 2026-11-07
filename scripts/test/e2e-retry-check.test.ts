@@ -1,6 +1,6 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	CRASH_SIGNATURES,
@@ -45,6 +45,7 @@ const TEARDOWN_LOG = `
 Error in ProxyController: Error inside ProxyWorker
 `
 
+const make_directory = temporary_directory()
 const CUSTOM_LOG_DIRECTORY = 'custom-logs/'
 const LOG_FILE_NAME = 'wrangler.log'
 const FIRST_LOG_FILE_NAME = 'wrangler-first.log'
@@ -131,11 +132,7 @@ describe('e2e retry check log reading', () => {
 	let directory = ''
 
 	beforeEach(() => {
-		directory = mkdtempSync(path.join(tmpdir(), 'e2e-retry-check-'))
-	})
-
-	afterEach(() => {
-		rmSync(directory, { recursive: true, force: true })
+		directory = make_directory('e2e-retry-check-')
 	})
 
 	it('reads nothing rather than throwing when the directory was never created', () => {
@@ -172,11 +169,7 @@ describe('e2e retry check log path shapes', () => {
 	let directory = ''
 
 	beforeEach(() => {
-		directory = mkdtempSync(path.join(tmpdir(), 'e2e-retry-path-'))
-	})
-
-	afterEach(() => {
-		rmSync(directory, { recursive: true, force: true })
+		directory = make_directory('e2e-retry-path-')
 	})
 
 	// WRANGLER_LOG_PATH may name a file rather than a directory — a spelling wrangler supports, and
@@ -248,13 +241,12 @@ describe('e2e retry check output', () => {
 	let directory = ''
 
 	beforeEach(() => {
-		directory = mkdtempSync(path.join(tmpdir(), 'e2e-retry-output-'))
+		directory = make_directory('e2e-retry-output-')
 	})
 
 	afterEach(() => {
 		restore_environment('GITHUB_OUTPUT', original_output)
 		restore_environment('WRANGLER_LOG_PATH', original_log_path)
-		rmSync(directory, { recursive: true, force: true })
 	})
 
 	// The workflow branches on this one line; a fact the step does not publish is a retry that never

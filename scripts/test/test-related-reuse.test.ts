@@ -1,15 +1,16 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import { since_green } from '#scripts/gate/since-green'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_reach } from './test-pinned-reach'
 import { test_related_reuse } from './test-related-reuse'
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'josh-test-reuse-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('josh-test-reuse-')
 const SOURCE = path.join(ROOT, 'source.ts')
 const CHANGED = path.join(ROOT, 'changed.test.ts')
 const UNCHANGED = path.join(ROOT, 'unchanged.test.ts')
@@ -36,9 +37,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('test_related_reuse', () => {

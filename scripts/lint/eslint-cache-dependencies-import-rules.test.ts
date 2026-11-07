@@ -1,10 +1,10 @@
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { create_base_config } from '#eslint/base.js'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { ESLint } from 'eslint'
 import ts from 'typescript-eslint'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 
 // joshuafolkken/kit#3641 / #3667 / #4420: an import rule's verdict is about a fact that lives in
@@ -39,8 +39,8 @@ const FIXTURE_FILES: Array<[string, string]> = [
 
 // `realpathSync`: macOS hands back `/var/…`, a symlink to `/private/var/…`, and the resolver
 // answers with the real path — the two have to agree for a cycle to close.
-const created_root = mkdtempSync(path.join(tmpdir(), 'kit-eslint-cache-import-rules-'))
-const root = realpathSync(created_root)
+const make_directory = temporary_directory('suite')
+const root = realpathSync(make_directory('kit-eslint-cache-import-rules-'))
 const cache_file = path.join(root, '.eslintcache')
 
 for (const [name, source] of FIXTURE_FILES) {
@@ -84,10 +84,6 @@ async function files_reported(rule: string): Promise<Array<string>> {
 		.filter((result) => result.messages.some((message) => message.ruleId === rule))
 		.map((result) => path.basename(result.filePath))
 }
-
-afterAll(() => {
-	rmSync(root, { recursive: true, force: true })
-})
 
 describe('eslint_cache_dependencies.guard — a cycle closed by editing one side', () => {
 	it('reports the cycle on both sides while it is there, and again from the cache', async () => {

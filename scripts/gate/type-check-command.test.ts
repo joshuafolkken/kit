@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { project_checks } from './project-checks'
 
@@ -12,13 +12,12 @@ const mocked_execa = vi.mocked(execa_module.execa)
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 
-const roots: Array<string> = []
+const make_directory = temporary_directory()
 const NODE_MANIFEST = '{"name":"app"}'
 
 function fixture(manifest: string): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'josh-type-check-'))
+	const root = make_directory('josh-type-check-')
 
-	roots.push(root)
 	writeFileSync(path.join(root, 'package.json'), manifest)
 
 	return root
@@ -32,7 +31,6 @@ function fake_result(exit_code: number): ExecaResult {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 describe('josh check on a basic project', () => {
