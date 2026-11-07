@@ -2,6 +2,7 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_github } from './run-board-github'
 import type { BoardPlan } from './run-board-layout'
 import { run_board_tick } from './run-board-tick'
 
@@ -101,6 +102,55 @@ describe('run_board_tick.tick — a parked child a person closed', () => {
 
 		expect(row_of(lines)).toContain(`🙋 ${String(ISSUE)}`)
 		expect(lines[0]).toContain('⏳ 1  💤 0')
+	})
+})
+
+// joshuafolkken/kit#6535: a decision child closed while the listing still held it — a listing read
+// before the close, or the one an ended run holds — stayed in 🙋 decision.
+describe('run_board_tick.tick — a decision child the listing still holds', () => {
+	const HOLDING: BoardPlan = {
+		...PLAN,
+		context: { ...PLAN.context, open_numbers: new Set([ISSUE]) },
+	}
+	const DECISION_ROW = `🙋 ${String(ISSUE)}`
+
+	// Two redraws an interval apart, each closed read answering the next of `answers`.
+	async function lines_after(
+		answers: ReadonlyArray<ClosedAnswer>,
+		local = LOCAL_PARKED,
+	): Promise<Array<string>> {
+		const { ports, frames, read_closed, clock } = harness(local, [HOLDING, HOLDING])
+
+		for (const answer of answers) read_closed.mockResolvedValueOnce(answer)
+
+		const first = await tick(FRESH_STATE, ports)
+
+		clock.now_ms += run_board_github.PLAN_RETRY_MS + 1
+		await tick(first, ports)
+
+		return (frames.at(-1) ?? '').split('\n')
+	}
+
+	it('draws it closed once a closed read dates the close after the listing', async () => {
+		const lines = await lines_after([answer_of({ is_not_planned: true })])
+
+		expect(row_of(lines)).toContain(`🚫`)
+		expect(lines.join('\n')).not.toContain(DECISION_ROW)
+	})
+
+	it('keeps it waiting when the listing read after its close holds it again', async () => {
+		const reopened = answer_of({ closed_ms: run_board_fixture.START - 1 })
+		const lines = await lines_after([reopened])
+
+		expect(row_of(lines)).toContain(DECISION_ROW)
+	})
+
+	it('draws it closed when the person closes it after the run ended', async () => {
+		const ended = { ...LOCAL_PARKED, ended_ms: run_board_fixture.START - 1 }
+		const still_open: ClosedAnswer = { closed: new Map(), is_whole: true }
+		const lines = await lines_after([still_open, answer_of({ is_not_planned: true })], ended)
+
+		expect(lines.join('\n')).not.toContain(DECISION_ROW)
 	})
 })
 
