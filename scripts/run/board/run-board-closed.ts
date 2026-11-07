@@ -1,3 +1,4 @@
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
@@ -69,8 +70,16 @@ function closed_ms_of(view: ClosedView): number | undefined {
 // `STILL_OPEN` for an issue the listing it was missing from was older than this read; `undefined` for one
 // whose issue or timeline could not be read. Either is asked again on the next read, so a transient
 // failure is never kept as closed-not-merged.
+//
+// Sent with the previous ETag (joshuafolkken/kit#6696): a parked or human child stays a candidate after
+// its run ends, so the board asks every two minutes, and an unchanged issue answers `304` for no core.
 async function read_closed(issue: number): Promise<ClosedRead> {
-	const json = await git_gh_issue_read.issue_view_json(String(issue), CLOSED_FIELDS)
+	const json = await git_gh_issue_read.issue_view_json(
+		String(issue),
+		CLOSED_FIELDS,
+		undefined,
+		git_gh_etag_read.read,
+	)
 	const view = json === undefined ? undefined : parse_json_object_or_undefined(json, closed_schema)
 
 	if (view === undefined) return undefined
