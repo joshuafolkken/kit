@@ -298,7 +298,8 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 	const snapshot = await poll.poll_for(
 		async () => {
 			attempt += 1
-			console.info(`Checking PR status… (${String(attempt)}/${String(options.max_attempts)})`)
+			// No `/max_attempts`: under the backoff that count is the budget, not the reads it makes.
+			console.info(`Checking PR status… (read ${String(attempt)})`)
 			await options.before_poll?.()
 			const carried = await attempt_pr_success_poll({
 				options,

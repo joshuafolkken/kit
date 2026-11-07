@@ -38,7 +38,7 @@ import {
 // soon as the pull request is open.
 //
 // **What is lost is the live table.** `gh` printed each check's name and state as it changed; the
-// poll prints `Checking PR status… (n/N)` instead. The trade is accepted because the display was
+// poll prints `Checking PR status… (read n)` instead. The trade is accepted because the display was
 // never load-bearing — no caller parsed it — and because keeping it would have left the merge gate's
 // last GraphQL call in place, which is a 403 in a cloud session.
 
