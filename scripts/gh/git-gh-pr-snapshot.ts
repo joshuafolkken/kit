@@ -10,7 +10,7 @@ import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 import { to_gh_state } from './git-gh-rest-state'
 
 // The merge gate's pull request state snapshot, rebuilt from REST — GraphQL only for the merge state
-// of a pull request whose REST detail GitHub refuses as too large (`resolve_pull`).
+// of a pull request whose REST detail GitHub refuses as too large or answers 304 (`resolve_pull`).
 //
 // `gh pr view --json mergeStateStatus,reviewDecision,statusCheckRollup` is answered 403 in a cloud
 // session, and all three fields are GraphQL-only: one has no REST

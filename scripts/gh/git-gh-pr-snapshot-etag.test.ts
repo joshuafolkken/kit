@@ -107,6 +107,21 @@ describe('pr_get_checks_snapshot — the detail read through the poll ETag', () 
 		expect(detail_reads()).toBe(1)
 		expect(snapshot.merge_state_status).toBe('CLEAN')
 	})
+
+	// The real conditional read answers a failure as `unreadable` rather than throwing.
+	it('reads the detail unconditionally where the conditional read fails', async () => {
+		route({ mergeable_state: 'clean' })
+		const fresh = conditional_read_over(mocked_api)
+
+		mocked_conditional.mockImplementation(async (path, etag) =>
+			path === pr_detail_path() ? { kind: 'unreadable' } : await fresh(path, etag),
+		)
+
+		const snapshot = await read_tick()
+
+		expect(detail_reads()).toBe(1)
+		expect(snapshot.merge_state_status).toBe('CLEAN')
+	})
 })
 
 describe('pr_get_checks_snapshot — a detail answered 200', () => {
