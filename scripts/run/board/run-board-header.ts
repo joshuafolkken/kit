@@ -13,8 +13,7 @@ import { run_board_now, type NowLine } from './run-board-now'
 import type { SessionOperations } from './run-board-operation-read'
 import { run_board_priority } from './run-board-priority'
 import type { ProcessGroups } from './run-board-process-groups'
-import type { QuotaProvider, Quotas } from './run-board-quota-read'
-import type { QuotaHold } from './run-board-render-quota'
+import type { QuotaHold, QuotaView } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_title } from './run-board-render-title'
 import type { RunActivity } from './run-board-status'
@@ -67,7 +66,9 @@ interface BoardUsage {
 	scale: UsageScale
 }
 
-interface BoardHeader {
+// Claude's and Codex's usage-limit windows and GitHub's core rate limit are the usage row's
+// (`run-board-render-quota.ts`).
+interface BoardHeader extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 'rate_limit'> {
 	now_ms: number
 	started_ms: number
 	// Set once the run has ended: the title then says when, and how long it took.
@@ -92,10 +93,7 @@ interface BoardHeader {
 	usages?: BoardUsage | undefined
 	// The claims waiting in the machine-wide core budget (`run-board-render-waits.ts`).
 	budget_waits?: ReadonlyArray<BudgetWait> | undefined
-	// Claude's and Codex's usage-limit windows, and the usage limit holding the run's launches
-	// (`run-board-render-quota.ts`); `undefined` where none was read or none holds.
-	quotas?: Quotas | undefined
-	scheduler_provider?: QuotaProvider | undefined
+	// The usage limit holding the run's launches; `undefined` where none holds.
 	quota_hold?: QuotaHold | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined

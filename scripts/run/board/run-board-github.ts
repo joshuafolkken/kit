@@ -213,6 +213,32 @@ function fold_closed(state: BoardState): BoardState {
 	}
 }
 
+// The core rate limit is asked as often as the plan; a read in flight is not launched again.
+function launch_rate_limit(state: BoardState, gather: Gather): BoardState {
+	const { read_rate_limit } = gather.ports
+
+	if (
+		read_rate_limit === undefined ||
+		state.rate_limit_fetch !== undefined ||
+		!is_due(state.rate_limit_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+	) {
+		return state
+	}
+
+	const rate_limit_fetch = run_board_fetch.launch(read_rate_limit, undefined)
+
+	return { ...state, rate_limit_fetch, rate_limit_attempted_ms: gather.now_ms }
+}
+
+// A failed read answers `undefined`, which clears the last allowance rather than drawing a stale one.
+function fold_rate_limit(state: BoardState): BoardState {
+	const answer = state.rate_limit_fetch?.answer()
+
+	if (answer === undefined) return state
+
+	return { ...state, rate_limit: answer.value, rate_limit_fetch: undefined }
+}
+
 // At the `settled` pace, waits for a read in flight to land.
 async function settle(pending: Fetch<unknown> | undefined, pace: Pace): Promise<void> {
 	if (pending !== undefined && pace === 'settled') await pending.landed
@@ -235,17 +261,19 @@ function keep_snapshot(before: BoardState, after: BoardState, gather: Gather): v
 }
 
 // Folds what landed and launches what is due — the plan first, since the closed children are read off
-// the plan's listing.
+// the plan's listing; the rate limit beside the plan, since nothing waits on it.
 async function gather_github(state: BoardState, gather: Gather): Promise<BoardState> {
-	const planned = launch_plan(fold_plan(state), gather)
+	const folded = fold_plan(fold_rate_limit(state))
+	const planned = launch_rate_limit(launch_plan(folded, gather), gather)
 
 	await settle(planned.plan_fetch, gather.pace)
+	await settle(planned.rate_limit_fetch, gather.pace)
 
 	const closing = launch_closed(fold_closed(fold_plan(planned)), gather)
 
 	await settle(closing.closed_fetch, gather.pace)
 
-	const gathered = fold_closed(closing)
+	const gathered = fold_rate_limit(fold_closed(closing))
 
 	keep_snapshot(state, gathered, gather)
 

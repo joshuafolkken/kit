@@ -4,6 +4,7 @@ import { run_board_fit, type DetailPart } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import { run_board_machine } from './run-board-machine'
 import type { QuotaProvider, QuotaReading, Quotas, QuotaWindow } from './run-board-quota-read'
+import type { CoreRateLimit } from './run-board-rate-limit'
 import { run_board_render_section } from './run-board-render-section'
 
 // The `⛽ usage` section (joshuafolkken/kit#5395): Claude's and Codex's usage-limit windows, one row
@@ -11,7 +12,8 @@ import { run_board_render_section } from './run-board-render-section'
 // its length ends the row. Each bar carries ┊, how far through its window the clock is, so a bar past
 // it is spending faster than the window refills; ↻ is when the window resets. ≈ after it is how many
 // more tasks like the recent ones fit in what is left (joshuafolkken/kit#5508), its column kept blank
-// where none could be told so the 7d column stays put.
+// where none could be told so the 7d column stays put. GitHub's core REST allowance follows on its own
+// row (joshuafolkken/kit#6559).
 
 const { GAUGE_SHADES, bar_of } = run_board_labels
 const { minute_of, two_digits } = figure_format
@@ -52,6 +54,7 @@ const COLUMNS = [
 ]
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
 const SCHEDULER_MARK = '🤖'
+const GITHUB = 'github'
 const LEGEND = [
 	LABEL,
 	`${SCHEDULER_MARK} scheduler`,
@@ -73,6 +76,8 @@ interface QuotaView {
 	scheduler_provider?: QuotaProvider | undefined
 	now_ms: number
 	hold?: QuotaHold | undefined
+	// GitHub's core REST allowance, drawn after the usage-limit rows; none where it could not be read.
+	rate_limit?: CoreRateLimit | undefined
 }
 
 // The column nearer `minutes` by ratio: 30 days stands under `7d`, an hour under `5h`.
@@ -267,6 +272,29 @@ function counts_text(reading: QuotaReading | undefined, now_ms: number): string 
 	return ` ${COUNT_MARK}${texts.join('/')}`
 }
 
+// `4321/5000 ↻ 14:00`: GitHub's core REST calls left this window, and when it refills. A reading
+// whose reset has passed is drawn full, with no reset: the next window starts at the next call.
+function allowance_text(rate_limit: CoreRateLimit, now_ms: number): string {
+	const limit = String(rate_limit.limit)
+
+	if (rate_limit.reset_ms <= now_ms) return `${limit}/${limit}`
+
+	const reset = reset_text(rate_limit.reset_ms, now_ms)
+
+	return `${String(rate_limit.remaining)}/${limit} ${RESET_MARK} ${reset}`
+}
+
+// Nothing where the allowance could not be read.
+function rate_limit_bodies(view: QuotaView): Array<string> {
+	const { rate_limit, now_ms } = view
+
+	return rate_limit === undefined ? [] : [allowance_text(rate_limit, now_ms)]
+}
+
+function rate_limit_rows(view: QuotaView): Array<string> {
+	return rate_limit_bodies(view).map((body) => `${INDENT}${padded(GITHUB, NAME_WIDTH)}${body}`)
+}
+
 // `claude 42/68 ≈9/5`: each column's percent, `—` where none stands, then its count.
 function summary_of(view: QuotaView): string {
 	const parts = providers_of(view).map((provider) => {
@@ -276,7 +304,9 @@ function summary_of(view: QuotaView): string {
 		return `${name} ${percents_text(reading, view.now_ms)}${counts_text(reading, view.now_ms)}`
 	})
 
-	return parts.join(SEPARATOR)
+	const rate_limit = rate_limit_bodies(view).map((body) => `${GITHUB} ${body}`)
+
+	return [...parts, ...rate_limit].join(SEPARATOR)
 }
 
 function rule_columns(): Array<{ label: string; start: number }> {
@@ -290,10 +320,11 @@ function rule_columns(): Array<{ label: string; start: number }> {
 function usage_part(view: QuotaView): DetailPart | undefined {
 	if (view.quotas === undefined) return undefined
 
-	const lines = providers_of(view).map((provider) => ({
-		text: row_of(provider, view),
-		is_detail: false,
-	}))
+	const rows = [
+		...providers_of(view).map((provider) => row_of(provider, view)),
+		...rate_limit_rows(view),
+	]
+	const lines = rows.map((text) => ({ text, is_detail: false }))
 	const rule = run_board_render_section.columns_rule(LABEL, rule_columns())
 
 	return { head: ['', rule], lines, label: LABEL, summary: summary_of(view) }
