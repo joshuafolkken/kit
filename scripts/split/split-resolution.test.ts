@@ -20,6 +20,8 @@ const OWNER = 'OWNER'
 const REASON = `${REASON_PREFIX} the rest shares one schema change`
 const LEDGER_PATH = '/ledger.jsonl'
 const NO_CHILD = 'has no split child'
+const APPEND_FAILED = 'append failed'
+const FOLD_TARGET = '4701'
 
 const NOTICE: LedgerEntry = {
 	kind: lane_ledger.KIND.SPLIT_NOTICE,
@@ -160,7 +162,7 @@ describe('split_resolution.record_child', () => {
 	it('reports the existing child URL and a recovery command when recording fails', async () => {
 		const child = 'https://github.com/joshuafolkken/kit/issues/4700'
 
-		record_split_filed.mockRejectedValueOnce(new Error('append failed'))
+		record_split_filed.mockRejectedValueOnce(new Error(APPEND_FAILED))
 
 		await expect(
 			split_resolution.record_child({
@@ -188,5 +190,36 @@ describe('split_resolution.record_child', () => {
 		})
 
 		expect(record_split_filed).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6630: a split part folded into an existing Issue answers the notice.
+describe('split_resolution.record_fold', () => {
+	const fold = { origin: String(ISSUE), target: FOLD_TARGET }
+
+	it('records the fold target as the origin lane split child', async () => {
+		await split_resolution.record_fold(fold)
+
+		expect(record_split_filed).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			child: `#${FOLD_TARGET}`,
+		})
+	})
+
+	it('lets the recorded fold answer the notice while an unanswered notice still refuses', async () => {
+		await split_resolution.record_fold(fold)
+		const recorded = record_split_filed.mock.calls[0]?.[0] ?? { issue: OTHER_ISSUE, child: '' }
+		const entry: LedgerEntry = { kind: lane_ledger.KIND.SPLIT_FILED, at: AT, ...recorded }
+
+		expect(await split_resolution.refusal(ISSUE, [NOTICE, entry])).toBeUndefined()
+		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toContain(NO_CHILD)
+	})
+
+	it('names the folded issue and the cause when recording fails', async () => {
+		record_split_filed.mockRejectedValueOnce(new Error(APPEND_FAILED))
+
+		await expect(split_resolution.record_fold(fold)).rejects.toThrow(
+			new RegExp(`Folded into .*${FOLD_TARGET}.*${APPEND_FAILED}`, 'u'),
+		)
 	})
 })

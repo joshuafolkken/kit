@@ -81,6 +81,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['lane/lane-plan-wait-event.ts', 2],
 	['lane/lane-session-broker.ts', 1],
 	['lane/lane-withdraw.ts', 1],
+	// The folded split child's ledger `child`, which `split-resolution.ts` reads back.
+	['split/split-resolution.ts', 1],
 	// Yield and withdrawal event payloads; their renderer resolves session citations.
 	['lane/lane-yield.ts', 2],
 	['run/merge/run-merge-usage-limit.ts', 1],
