@@ -60,6 +60,16 @@ describe('run_report.build_report — enumeration', () => {
 		for (const one of EVENTS) expect(report).toContain(run_event_stream.format_event(one))
 		expect(report).toContain(PARK_TEXT)
 	})
+
+	it('leaves out the per-offer rate-limit lines, so a long run keeps its merges readable', () => {
+		const rate_text = '{"used_delta":3,"remaining":4997,"reset":"2026-09-21T01:00:00.000Z"}'
+		const events = [...EVENTS, event(4, KIND.RATE_LIMIT, rate_text)]
+
+		const report = run_report.build_report({ events, release: SKIP, scope: SCOPE })
+
+		expect(report).not.toContain(rate_text)
+		expect(report).toContain('#7 merged')
+	})
 })
 
 describe('run_report.build_report — the retrospective result', () => {

@@ -2,7 +2,8 @@ import type { OptedIn } from '#scripts/backlog/backlog-gate-scope'
 import type { Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_conditional } from '#scripts/gh/git-gh-conditional'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import {
@@ -84,6 +85,8 @@ beforeEach(() => {
 		waves: [result.waiting],
 		unreached: [],
 	}))
+	// The decision read's ETag requests (joshuafolkken/kit#6700) stay offline, answering nothing.
+	vi.spyOn(git_gh_conditional, 'read_conditional').mockResolvedValue({ kind: 'unreadable' })
 })
 
 describe('run_board_plan.read_plan', () => {
@@ -161,7 +164,7 @@ describe('run_board_plan.read_plan human merge pull requests', () => {
 			fetch_open: vi.fn(async () => ({ rows: [labelled], is_capped: false })),
 		}
 
-		vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(
+		vi.spyOn(git_gh_etag_read, 'read_listing').mockResolvedValue(
 			JSON.stringify([{ number: EPIC, body: `closes #${String(SINGLE)}` }]),
 		)
 		const plan = await run_board_plan.read_plan({ issues: only ? [SINGLE] : [], only }, read)
@@ -189,6 +192,7 @@ describe('run_board_plan.read_plan decision questions', () => {
 			String(SINGLE),
 			undefined,
 			REPO,
+			git_gh_issue_read.read_comments_conditionally,
 		)
 	})
 })
