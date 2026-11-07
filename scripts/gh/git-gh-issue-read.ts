@@ -107,8 +107,8 @@ async function read_relations(
 	}
 }
 
-// The request itself: the epic body is sent with the previous process's ETag
-// (joshuafolkken/kit#6560), every other read unconditionally.
+// The request itself: the epic body (joshuafolkken/kit#6560) and the run board's closed-child view
+// (joshuafolkken/kit#6696) are sent with the previous process's ETag, every other read unconditionally.
 type PathRead = (path: string) => Promise<string>
 
 async function read_unconditionally(path: string): Promise<string> {
@@ -212,9 +212,10 @@ async function issue_view_json_classified(
 	issue_number: string,
 	fields: string,
 	repo?: string,
+	read_path?: PathRead,
 ): Promise<IssueRead> {
 	try {
-		const issue = await read_issue_fields(issue_number, fields, repo)
+		const issue = await read_issue_fields(issue_number, fields, repo, read_path)
 
 		return { kind: 'read', json: JSON.stringify(issue) }
 	} catch (error) {
@@ -285,8 +286,9 @@ async function issue_view_json(
 	issue_number: string,
 	fields: string,
 	repo?: string,
+	read_path?: PathRead,
 ): Promise<string | undefined> {
-	const read = await issue_view_json_classified(issue_number, fields, repo)
+	const read = await issue_view_json_classified(issue_number, fields, repo, read_path)
 
 	return read.kind === 'read' ? read.json : undefined
 }
