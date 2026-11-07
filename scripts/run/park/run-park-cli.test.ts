@@ -48,7 +48,17 @@ const DIRECTORY = '/lane/4132'
 const WORK_DIRECTORY = make_directory('run-park-cli-')
 const BODY_FILE = path.join(WORK_DIRECTORY, 'park.md')
 const QUESTION = 'Which option?'
-const BODY = `${QUESTION}\n`
+const OPTIONS = [
+	'### 選択肢',
+	'1. Keep the account',
+	'   - 層: A',
+	'   - 必要な権限: owner コメント',
+	'2. Rotate the account',
+	'   - 層: C',
+	'   - 必要な権限: 人',
+].join('\n')
+const PICK = '### 推奨\n1 cheaper and reversible'
+const BODY = `## ${QUESTION}\n\n${OPTIONS}\n\n${PICK}\n`
 const BODY_FILE_FLAG = '--body-file'
 const PARK_ARGV = [ISSUE, BODY_FILE_FLAG, BODY_FILE]
 const LANE_BODY = `${QUESTION}\n\n---\n- Lane directory: \`${DIRECTORY}\`\n`
@@ -68,22 +78,40 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
 
-// joshuafolkken/kit#4132: one call parks a lane child, and one call takes the park back off.
-describe('run:park', () => {
-	it.each(['推奨: A', 'recommend A', 'Recommended: A', 'RECOMMENDATION: A'])(
-		'refuses a reason containing %s before any park write',
-		async (recommendation) => {
-			writeFileSync(BODY_FILE, `${QUESTION}\n${recommendation}`)
+// joshuafolkken/kit#6669: the contract is inverted — a body off the schema is refused, a
+// recommendation is required.
+describe('run:park body schema', () => {
+	it.each([
+		['no recommendation section', `${QUESTION}\n\n${OPTIONS}\n`, '### 推奨 needs one line'],
+		['an option with no tier', `${OPTIONS.replace('   - 層: C\n', '')}\n\n${PICK}`, 'option 2'],
+	])('refuses a body with %s before any park write', async (_case, body, problem) => {
+		writeFileSync(BODY_FILE, body)
 
-			await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
-			expect(apply_mock).not.toHaveBeenCalled()
-			expect(record_mock).not.toHaveBeenCalled()
-			expect(console.error).toHaveBeenCalledWith(
-				expect.stringContaining('pnpm josh epic --decide <E> <N...> --decision-file <path|->'),
-			)
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+		expect(apply_mock).not.toHaveBeenCalled()
+		expect(record_mock).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(problem))
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Park body schema:'))
+	})
+
+	it.each([PICK, '### 推奨\n推奨なし both need the owner'])(
+		'parks a body whose recommendation reads %j',
+		async (pick) => {
+			writeFileSync(BODY_FILE, `${OPTIONS}\n\n${pick}\n`)
+
+			await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
+			expect(apply_mock).toHaveBeenCalledWith(ISSUE, LABEL, expect.stringContaining(pick))
 		},
 	)
 
+	it('shows the body schema in the usage', () => {
+		expect(run_park_cli.USAGE).toContain('### 選択肢')
+		expect(run_park_cli.USAGE).toContain('### 推奨')
+	})
+})
+
+// joshuafolkken/kit#4132: one call parks a lane child, and one call takes the park back off.
+describe('run:park', () => {
 	it('comments, applies needs-decision and records the park', async () => {
 		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
 		expect(apply_mock).toHaveBeenCalledWith(ISSUE, LABEL, expect.stringContaining(QUESTION))
