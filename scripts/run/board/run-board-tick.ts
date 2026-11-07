@@ -233,7 +233,10 @@ function links_of(repo: string | undefined, link: Link): Links {
 	}
 }
 
-type Gauges = Pick<BoardHeader, 'machine' | 'usages' | 'budget_waits' | 'quotas' | 'quota_hold'>
+type Gauges = Pick<
+	BoardHeader,
+	'machine' | 'usages' | 'budget_waits' | 'quotas' | 'quota_hold' | 'rate_limit'
+>
 
 // The machine's gauges and the usage-limit windows, with the limit that holds the run's launches.
 function gauges_of(state: BoardState, local: LocalRead): Gauges {
@@ -247,6 +250,7 @@ function gauges_of(state: BoardState, local: LocalRead): Gauges {
 		budget_waits: state.budget_waits,
 		quotas: state.quotas,
 		quota_hold,
+		rate_limit: state.rate_limit,
 	}
 }
 

@@ -246,7 +246,7 @@ function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 	return [...lead, ...plan, ...more, ...notes]
 }
 
-// The throughput rows and the usage gauges give way whole: their two rows are no details to drop.
+// The throughput rows and the usage gauges give way whole: their rows are no details to drop.
 function gauge_lines(parts: FrameParts, cut: Cut): Array<string> {
 	const kept = [cut.throughput ? undefined : parts.throughput, cut.usage ? undefined : parts.usage]
 
