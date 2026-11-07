@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { package_path } from '#scripts/init/init-paths'
-import { expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { expect, it } from 'vitest'
 
+const make_directory = temporary_directory()
 const SCRIPT = package_path('scripts/gate/change-scope-action.ts')
 const MANIFEST = 'package.json'
 const SKIPPED = 'runtime=false\npublish=false\n'
@@ -18,11 +19,8 @@ function git(root: string, args: Array<string>): string {
 }
 
 function repository(): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'change-scope-action-'))
+	const root = make_directory('change-scope-action-')
 
-	onTestFinished(() => {
-		rmSync(root, { recursive: true, force: true })
-	})
 	git(root, ['init', '--quiet'])
 	writeFileSync(path.join(root, MANIFEST), JSON.stringify({ version: '1.0.0', files: ['src'] }))
 	git(root, ['add', MANIFEST])

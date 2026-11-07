@@ -1,8 +1,6 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { review_record_cli } from './review-record-cli'
 
 // joshuafolkken/kit#4850: `review:record` printed only the line count, so a lane child reopened
@@ -30,14 +28,11 @@ vi.mock('./review-record-interaction', async (original) => {
 	return { review_record_interaction: { ...review_record_interaction, report_due: vi.fn() } }
 })
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-handover-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-record-handover-')
 const NOW = new Date('2026-10-25T00:00:00Z')
 const ISSUE = 4850
 const SHIP_STEP = 'pnpm josh ship --detach --review'
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
 
 function lane_child(is_child: boolean): void {
 	vi.spyOn(lane_child_marker, 'marked_issue').mockReturnValue(is_child ? String(ISSUE) : undefined)

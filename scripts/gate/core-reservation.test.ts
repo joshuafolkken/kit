@@ -1,7 +1,6 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
@@ -15,15 +14,16 @@ const TRANSFERRED_AT = 456
 const CHILD_START = 'child-start'
 const probe = { directory: '', target: '' }
 
+const make_directory = temporary_directory()
+
 beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-core-reservation-'))
+	probe.directory = make_directory('josh-core-reservation-')
 	probe.target = path.join(probe.directory, `${core_budget.RESERVED_PREFIX}child.json`)
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
-	rmSync(probe.directory, { recursive: true, force: true })
 })
 
 describe('core_reservation.transfer', () => {

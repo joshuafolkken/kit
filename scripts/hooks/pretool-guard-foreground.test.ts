@@ -1,10 +1,10 @@
-import { closeSync, mkdtempSync, openSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { closeSync, openSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { piped_verification } from '#scripts/rules/piped-verification'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#3154: a lane child's backgrounded `josh ship` is run in the foreground instead of
@@ -33,6 +33,7 @@ vi.mock('#scripts/lane/lane-phase', () => ({
 
 const { pretool_guard } = await import('./pretool-guard')
 
+const make_directory = temporary_directory()
 const LANE_SHIP = 'pnpm josh ship --detach "Title #1"'
 const PIPED_LINT = 'pnpm josh lint:related 2>&1 | tail -5'
 const CLEAR: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
@@ -57,7 +58,7 @@ function outside_lane(): boolean {
 
 // A real transcript file so the composed guards run their normal disk path rather than failing open.
 function fresh_transcript(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pretool-guard-foreground-'))
+	const directory = make_directory('pretool-guard-foreground-')
 	const transcript_path = path.join(directory, 'transcript.jsonl')
 
 	writeFileSync(transcript_path, '{"type":"user"}\n')

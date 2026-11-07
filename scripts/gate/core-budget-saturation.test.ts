@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
 import type { MachineReading } from './machine-capacity'
@@ -28,12 +28,10 @@ const CPU_SATURATED_LINE = '⏳ a step waits for the core budget — CPU saturat
 
 const probe = { directory: '' }
 
-beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-core-budget-saturation-test-'))
-})
+const make_directory = temporary_directory()
 
-afterEach(() => {
-	rmSync(probe.directory, { recursive: true, force: true })
+beforeEach(() => {
+	probe.directory = make_directory('josh-core-budget-saturation-test-')
 })
 
 function busy(busy_cores: number): () => Promise<MachineReading> {

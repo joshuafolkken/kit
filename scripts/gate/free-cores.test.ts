@@ -1,7 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
 import { core_weights } from './core-weights'
@@ -26,12 +24,10 @@ function reading_of(busy_cores: number | undefined): () => Promise<MachineReadin
 	return async () => ({ ...UNREAD, busy_cores })
 }
 
-beforeEach(() => {
-	ctx.directory = mkdtempSync(path.join(tmpdir(), 'free-cores-'))
-})
+const make_directory = temporary_directory()
 
-afterEach(() => {
-	rmSync(ctx.directory, { recursive: true, force: true })
+beforeEach(() => {
+	ctx.directory = make_directory('free-cores-')
 })
 
 describe('free_cores.read', () => {

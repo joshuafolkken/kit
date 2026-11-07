@@ -1,13 +1,15 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { review_prompt_level } from './review-prompt-level'
 
 // joshuafolkken/kit#5555: a reviewer prompt opens with the brief's level, so `lane:breakdown` prints it.
 
+const make_directory = temporary_directory()
+
 function brief_file(text: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'review-prompt-level-'))
+	const directory = make_directory('review-prompt-level-')
 	const file = path.join(directory, 'brief.md')
 
 	writeFileSync(file, text)
