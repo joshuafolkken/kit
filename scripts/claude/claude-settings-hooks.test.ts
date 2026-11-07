@@ -56,10 +56,11 @@ const MINIMUM_STOP_GUARD_TIMEOUT_SECONDS = STARTUP_ALLOWANCE_SECONDS
 // Splitting on `|` alone would read the equally valid `"Edit, Write, Bash"` as one tool named
 // `Edit, Write, Bash` and fail every case below on a settings file that is correct.
 const TOOL_SEPARATORS = /[|,]/u
-// The formatter needs exactly the two edit tools: a shell call names no edited file to format
+// The formatter needs only the two edit tools: a shell call names no edited file to format
 // (joshuafolkken/kit#1930). Batching belongs to the PreToolUse guard, which can intervene before
-// the call without adding formatter overhead to every command (joshuafolkken/kit#1337).
-const FORMAT_TOOLS = ['Edit', 'Write']
+// the call without adding formatter overhead to every command (joshuafolkken/kit#1337). `Bash` is
+// matched for the consultation-scope revert alone, which never starts a formatter (joshuafolkken/kit#6589).
+const FORMAT_TOOLS = ['Edit', 'Write', 'Bash']
 // The union of the composed guards' matchers, since one process now answers for all of them.
 // `Bash` is where the rule delivery guard (joshuafolkken/kit#1524) and the read-only half of the
 // batching guard bind; `Edit` carries the largest share of the batching guard's recoverable round

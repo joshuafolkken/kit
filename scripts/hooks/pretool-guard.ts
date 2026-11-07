@@ -10,6 +10,7 @@ import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
 import { run_poll_hook } from '#scripts/run/run-poll-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { bash_revert } from './bash-revert'
 import { batch_outcome } from './batch-guard'
 import { implementation_authority } from './implementation-authority'
 import { lane_plan_guard } from './lane-plan-guard'
@@ -225,10 +226,12 @@ function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite)
 // **The guards judge the call that will run.** A rewritten call reaches every guard already made
 // right, so the rewriting row stays quiet on it while any other guard's refusal still wins over the
 // rewrite. The Codex adapter cannot rewrite a call, so it goes on judging the call as typed.
+// A consultation session's shell is stamped here for the `PostToolUse` revert (`bash-revert.ts`).
 async function respond(raw_payload: string): Promise<void> {
 	const rewrite = rule_rewrite.rewrite(raw_payload)
 	const judged = rewrite?.payload ?? raw_payload
 
+	bash_revert.stamp(judged)
 	emit(judged, await pretool_outcome_async(judged), rewrite)
 }
 
