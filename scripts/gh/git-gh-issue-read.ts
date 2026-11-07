@@ -5,6 +5,7 @@ import { git_gh_etag_read } from './git-gh-etag-read'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure, type GhFailure } from './git-gh-failure'
 import { git_gh_helpers } from './git-gh-helpers'
+import { git_gh_issue_graphql } from './git-gh-issue-graphql'
 import {
 	BLOCKED_BY_FIELD,
 	git_gh_issue_rest,
@@ -395,6 +396,40 @@ async function issue_list_comments(
 	}
 }
 
+// One issue's fields and its comment listing, in the shapes `issue_view_json_classified` and
+// `issue_list_comments` answer. One GraphQL query serves both when it can (joshuafolkken/kit#6722),
+// so a read costs no REST core; when it cannot, the two REST reads are made side by side as before,
+// and they are what tells a missing number from a failed read.
+interface IssueWithComments {
+	read: IssueRead
+	comments_json: string | undefined
+}
+
+async function issue_read_with_comments(
+	issue_number: string,
+	fields: string,
+	repo?: string,
+): Promise<IssueWithComments> {
+	const graphql = await git_gh_issue_graphql.read_issue(issue_number, repo)
+
+	if (graphql === undefined) {
+		const [read, comments_json] = await Promise.all([
+			issue_view_json_classified(issue_number, fields, repo),
+			issue_list_comments(issue_number, undefined, repo),
+		])
+
+		return { read, comments_json }
+	}
+
+	const requested = git_gh_issue_rest.split_fields(fields)
+	const issue = git_gh_issue_rest.to_gh_issue(graphql.rest, requested, graphql.blocked_by)
+
+	return {
+		read: { kind: 'read', json: JSON.stringify(issue) },
+		comments_json: graphql.comments_json,
+	}
+}
+
 // The comment listing sent with the previous process's ETag (joshuafolkken/kit#6700): the run board
 // re-reads a decision child's thread every two minutes, and an unchanged first page answers `304`.
 // A full first page is read paged instead, by `read_listing`.
@@ -476,8 +511,9 @@ const git_gh_issue_read = {
 	issue_get_plan_fields_classified,
 	issue_get_labels_and_body,
 	issue_list_comments,
+	issue_read_with_comments,
 	read_comments_conditionally,
 }
 
-export type { IssueRead, IssueReadFailure, IssueReadReason }
+export type { IssueRead, IssueReadFailure, IssueReadReason, IssueWithComments }
 export { git_gh_issue_read, read_blocked_by, NOT_FOUND_STATUS }

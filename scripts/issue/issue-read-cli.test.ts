@@ -11,10 +11,19 @@ const comments_mock = vi.hoisted(() => vi.fn())
 const info_mock = vi.hoisted(() => vi.fn())
 const error_mock = vi.hoisted(() => vi.fn())
 
+// The combined read answers what its REST fallback's two reads would, so the cases keep stubbing those.
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
-		issue_view_json_classified: classified_mock,
-		issue_list_comments: comments_mock,
+		async issue_read_with_comments(
+			issue_number: string,
+			fields: string,
+			repo?: string,
+		): Promise<{ read: unknown; comments_json: unknown }> {
+			return {
+				read: await classified_mock(issue_number, fields, repo),
+				comments_json: await comments_mock(issue_number, undefined, repo),
+			}
+		},
 	},
 }))
 
