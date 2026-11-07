@@ -1,7 +1,7 @@
 {
-	"reason": "lane:plan --single waives the files axis for one deliverable (#6647): flag parsing, the waiver and its refusal/notice text",
+	"reason": "lane:plan --single records one deliverable past its declared files (#6647), and run:review's widening now applies the same files-axis waiver as lane:plan --probe",
 	"date": "2026-11-07",
 	"growth": {
-		"scripts.code_lines": 27
+		"scripts.code_lines": 28
 	}
 }

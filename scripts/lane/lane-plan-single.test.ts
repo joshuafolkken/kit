@@ -11,6 +11,7 @@ import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan } from './lane-plan'
 import { lane_plan_check } from './lane-plan-check'
 import { lane_plan_cli } from './lane-plan-cli'
+import { lane_plan_probe } from './lane-plan-probe'
 import { lane_plan_signals } from './lane-plan-signals'
 import { lane_plan_wait } from './lane-plan-wait'
 import { lane_yield } from './lane-yield'
@@ -120,5 +121,20 @@ describe('lane:plan size bar without a waiver', () => {
 
 	it('names `--single` in the usage', () => {
 		expect(lane_plan_cli.USAGE).toContain(`[${SINGLE}]`)
+	})
+})
+
+// `run:review`'s open widens a recorded plan by one unplanned file; it must agree with `lane:plan`'s answer.
+describe('lane_plan_probe.extend on a widened plan', () => {
+	const WIDENED = { issue: ISSUE, paths: [...GROWN, PROBED], planned_at: '2026-11-08T00:00:00Z' }
+
+	it('records a `--single` plan whose only overrun is the waived files axis', async () => {
+		expect(await lane_plan_probe.extend({ ...WIDENED, single: true }, directory)).toBeUndefined()
+		expect(lane_plan.read(ISSUE, directory)).toMatchObject({ paths: WIDENED.paths, single: true })
+	})
+
+	it('answers `oversize` to the same widening without `--single`, recording nothing', async () => {
+		expect(lane_plan_probe.is_oversize(await lane_plan_probe.extend(WIDENED, directory))).toBe(true)
+		expect(lane_plan.read(ISSUE, directory)).toBeUndefined()
 	})
 })
