@@ -1370,7 +1370,7 @@ pnpm josh lane:why 6050   # the cause table an overrun investigation joins by ha
 
 <!-- /usage -->
 
-One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`), longest first, no model run.
+One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`: a lane's 25 minutes as plan 3, implement 9, ship 8 and followup 5), longest first, no model run.
 
 The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last and the lane branch's longest CI job and that job's longest step (`ci:timing`, the branch's latest commit), a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
 

@@ -1,4 +1,5 @@
-import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
+import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
+import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
 import { describe, expect, it } from 'vitest'
 import { size_estimate } from './size-estimate'
 
@@ -12,6 +13,13 @@ const EXCEEDS_GUIDE = 'exceeds the guide'
 // The over-guide estimate below projects past the stage budget at the slow rate, within it at the fast.
 const SLOW: ImplementRate = { median: 10, lanes: 4 }
 const FAST: ImplementRate = { median: 4, lanes: 3 }
+// The over-guide estimate below projects within the budget joshuafolkken/kit#6540 replaced and past
+// the current one at this rate.
+const BETWEEN: ImplementRate = { median: 5, lanes: 3 }
+const FORMER_IMPLEMENT_BUDGET = 12
+// The over-guide estimate's declared lines grown by the fallback factor.
+const GROWN_OVER_GUIDE_LINES = 220
+const OVER_BUDGET = 'over the 9-minute implement budget'
 
 function body_with(...lines: ReadonlyArray<string>): string {
 	return ['## 背景', '', '- 種別: 非不具合', ...lines, '', '## 現象', '', 'x'].join('\n')
@@ -23,21 +31,21 @@ function estimate(files: number, lines: number): string {
 
 const OVER_GUIDE = body_with(estimate(2, 110))
 const OVER_GUIDE_EXCUSED = body_with(estimate(2, 110), REASON)
-const UNDER_GUIDE = body_with(estimate(1, 50))
+const UNDER_GUIDE = body_with(estimate(1, 40))
 
 describe('size_estimate.guide_problem — the projected implement time', () => {
 	it('refuses an over-budget estimate within the floor without claiming a guide overrun', () => {
 		const problem = size_estimate.guide_problem(body_with(estimate(1, 70)), undefined, SLOW)
 
 		expect(problem).toContain('14 implement minute(s)')
-		expect(problem).toContain('over the 12-minute implement budget')
+		expect(problem).toContain(OVER_BUDGET)
 		expect(problem).not.toContain(EXCEEDS_GUIDE)
 	})
 
 	it('refuses a reasoned estimate over the guide projecting past the budget', () => {
 		const problem = size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, SLOW) ?? ''
 
-		for (const part of ['22 implement minute(s)', '12-minute', '10.0 implement min', '4 lane(s)']) {
+		for (const part of ['22 implement minute(s)', '9-minute', '10.0 implement min', '4 lane(s)']) {
 			expect(problem).toContain(part)
 		}
 	})
@@ -47,7 +55,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	})
 
 	it('keeps the guide refusal for an unreasoned estimate within the budget', () => {
-		const problem = size_estimate.guide_problem(body_with(estimate(7, 120)), undefined, FAST)
+		const problem = size_estimate.guide_problem(body_with(estimate(6, 110)), undefined, FAST)
 
 		expect(problem).toContain(EXCEEDS_GUIDE)
 		expect(problem).not.toContain('implement budget')
@@ -75,7 +83,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 // joshuafolkken/kit#6066: the judgment `backlog:next` notes on, shared with the filing refusal.
 describe('size_estimate.over_budget', () => {
 	it('uses the measured lines growth at the budget boundary', () => {
-		const body = body_with(estimate(1, 80), REASON)
+		const body = body_with(estimate(1, 60), REASON)
 
 		expect(
 			size_estimate.over_budget(body, undefined, SLOW, { files: 9, lines: 1.5 }),
@@ -98,5 +106,18 @@ describe('size_estimate.over_budget', () => {
 		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, FAST)).toBeUndefined()
 		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, undefined)).toBeUndefined()
 		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, SPLIT_ROUTE, SLOW)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6540: the lane budget rebalance shrank the implement budget.
+describe('size_estimate.guide_problem — the rebalanced implement budget', () => {
+	it('refuses an estimate the former implement budget passed (ac-a815e182)', () => {
+		const projected = lane_implement_rate.minutes_for(GROWN_OVER_GUIDE_LINES, BETWEEN)
+		const problem = size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, BETWEEN)
+
+		expect(projected).toBeLessThanOrEqual(FORMER_IMPLEMENT_BUDGET)
+		expect(projected).toBeGreaterThan(lane_stage_budget.BUDGET_MINUTES.implement)
+		expect(problem).toContain('11 implement minute(s)')
+		expect(problem).toContain(OVER_BUDGET)
 	})
 })
