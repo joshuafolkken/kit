@@ -84,6 +84,12 @@ describe('split_verified_single.all_met', () => {
 		expect(split_verified_single.all_met(body(DONE), rows)).toBe(false)
 	})
 
+	it('refuses a criterion whose only met row is a fenced example (ac-9bf51e20)', () => {
+		const fenced = draft('~~~md', row(REST, '満たした: example only'), '~~~')
+
+		expect(split_verified_single.all_met(body(REST), fenced)).toBe(false)
+	})
+
 	it('refuses an Issue with no acceptance criteria', () => {
 		expect(split_verified_single.all_met('no criteria', draft())).toBe(false)
 	})
