@@ -1,10 +1,10 @@
 import { styleText } from 'node:util'
+import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import { figure_format } from '#scripts/lib/figure-format'
 import { run_board_fit, type DetailPart } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import { run_board_machine } from './run-board-machine'
 import type { QuotaProvider, QuotaReading, Quotas, QuotaWindow } from './run-board-quota-read'
-import type { CoreRateLimit } from './run-board-rate-limit'
 import { run_board_render_section } from './run-board-render-section'
 
 // The `⛽ usage` section (joshuafolkken/kit#5395): Claude's and Codex's usage-limit windows, one row

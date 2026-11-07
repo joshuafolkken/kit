@@ -398,6 +398,21 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 	return await gh_retry.with_retry(async () => await send_gh_api(request))
 }
 
+// `exec_gh_api` without the count, for the request tally's own core allowance reading
+// (`gh-request-tally.ts`): `GET /rate_limit` costs no quota and is the measurement, not a measured
+// call. It takes no slot and no retry, so the reading never waits behind the calls it measures.
+async function exec_gh_api_uncounted(request: GhApiRequest): Promise<string> {
+	const options = to_spawn_options(request.timeout_ms, request.cwd)
+
+	try {
+		const { stdout } = await execa('gh', to_gh_api_args(request), options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+
+		return stdout.trimEnd()
+	} catch (error) {
+		throw to_gh_error(error)
+	}
+}
+
 // The synchronous twin of `exec_gh_api`, for a caller that cannot await. `josh propagate` runs each
 // consumer's steps as a sequential chain of `execaSync` spawns with inherited stdio, and that shape
 // reaches from `open_issue` up through `RunStep`, `run_target` and `run_targets` — so the issue it
@@ -451,6 +466,7 @@ const git_gh_exec = {
 	exec_gh_command,
 	exec_gh_command_with_stdin,
 	exec_gh_api,
+	exec_gh_api_uncounted,
 	exec_gh_api_sync,
 	read_gh_api_sync,
 	exec_gh_api_status,

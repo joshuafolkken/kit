@@ -1,5 +1,6 @@
 import { execa, execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { gh_core_rate_limit } from './gh-core-rate-limit'
 import { gh_request_tally } from './gh-request-tally'
 import { gh_spawn } from './gh-spawn'
 import { git_gh_exec } from './git-gh-exec'
@@ -28,6 +29,7 @@ const VALIDATION_SUMMARY = 'gh: Validation Failed (HTTP 422)'
 const VALIDATION_BODY = '{"message":"Validation Failed","status":"422"}'
 const VALIDATION_STATUS = 422
 const RETRY_ATTEMPTS = 3
+const RATE_LIMIT_ARGS = ['api', 'rate_limit', '--jq', '.resources.core']
 
 // execa's Result types are large interfaces; these tests only read `stdout`.
 function async_result(stdout: string): ExecaResult {
@@ -40,6 +42,10 @@ function sync_result(stdout: string): ExecaSyncResult {
 
 function spawn_failure(stdout: string, stderr = ''): Error {
 	return Object.assign(new Error('Command failed with exit code 1'), { stdout, stderr })
+}
+
+function core_reading(used: number): string {
+	return JSON.stringify({ limit: 5000, used, remaining: 5000 - used, reset: 1_793_000_000 })
 }
 
 function calls(): number {
@@ -119,6 +125,25 @@ describe('gh_request_tally — failed and retried spawns', () => {
 
 		await expect(git_gh_exec.exec_gh_api({ path: PATH })).rejects.toThrow('Command failed')
 		expect(calls()).toBe(RETRY_ATTEMPTS)
+	})
+})
+
+describe('gh_request_tally — the core allowance reading', () => {
+	it('reads rate_limit through the uncounted spawn around a counted call', async () => {
+		// The start reading spawns first, inside the counted call, before the request's own spawn.
+		mocked_execa
+			.mockResolvedValueOnce(async_result(core_reading(10)))
+			.mockResolvedValueOnce(async_result('ok'))
+			.mockResolvedValueOnce(async_result(core_reading(14)))
+		gh_request_tally.watch_core(gh_core_rate_limit.read_usage)
+
+		await git_gh_exec.exec_gh_api({ path: PATH })
+
+		await expect(gh_request_tally.core_delta()).resolves.toBe(4)
+		expect(calls()).toBe(1)
+		expect(mocked_execa).toHaveBeenNthCalledWith(1, 'gh', RATE_LIMIT_ARGS, expect.anything())
+		expect(mocked_execa).toHaveBeenNthCalledWith(2, 'gh', ['api', PATH], expect.anything())
+		expect(mocked_execa).toHaveBeenNthCalledWith(3, 'gh', RATE_LIMIT_ARGS, expect.anything())
 	})
 })
 
