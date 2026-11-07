@@ -92,6 +92,11 @@ describe('lane:plan --single on the files axis', () => {
 		expect(lane_plan.read(ISSUE, directory)).toBeUndefined()
 	})
 
+	it('reads `--single` ahead of the issue number as the flag, not the issue', async () => {
+		expect(await lane_plan_cli.run([SINGLE, ...PLAN], directory)).toBe(SUCCESS)
+		expect(lane_plan.read(ISSUE, directory)).toMatchObject({ paths: GROWN, single: true })
+	})
+
 	it('keeps a recorded `--single` on a re-plan that omits the flag', async () => {
 		await lane_plan_cli.run([...PLAN, SINGLE], directory)
 
