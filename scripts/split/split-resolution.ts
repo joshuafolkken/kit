@@ -1,3 +1,4 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import {
@@ -7,6 +8,7 @@ import {
 	type SplitNoticeEntry,
 } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { error_text } from '#scripts/lib/error-message'
 import { split_assess } from './split-assess'
 import { split_early_notice } from './split-early-notice'
 import { split_measure } from './split-measure'
@@ -93,6 +95,34 @@ async function record_child({ route, found_during, child }: Filing): Promise<voi
 	}
 }
 
-const split_resolution = { ledger_refusal, notices, record_child, refusal, split_issues }
+interface Fold {
+	origin: string
+	target: string
+}
+
+// joshuafolkken/kit#6630: the split part folded into existing Issue `target`
+// (`josh issue:fold-existing --apply <target> --found-during <origin>`) answers the notice as its child.
+async function record_fold({ origin, target }: Fold): Promise<void> {
+	try {
+		await lane_ledger_write.record_split_filed({
+			issue: Number(origin),
+			child: issue_cite.plain(target),
+		})
+	} catch (error) {
+		throw new Error(
+			`Folded into ${session_cite.issue(target)}, but split-child evidence for ${session_cite.issue(origin)} could not be recorded: ${error_text.message_of(error)}`,
+			{ cause: error },
+		)
+	}
+}
+
+const split_resolution = {
+	ledger_refusal,
+	notices,
+	record_child,
+	record_fold,
+	refusal,
+	split_issues,
+}
 
 export { split_resolution }
