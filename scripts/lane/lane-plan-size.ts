@@ -46,8 +46,16 @@ import { lane_stage_budget } from './lane-stage-budget'
 // a short declaration alone would push the lane into a split child that takes every acceptance criterion.
 // The overrun still goes on the ledger, so the pre-gate `run:cut` verifies the deliverable
 // (`split-verified-single.ts`); the hunks and lines axes refuse as before.
+//
+// **A new scripts module and its importer count and split as one file** (joshuafolkken/kit#6635), or
+// the kept lane ships a module `pack-boundary.test.ts` finds unreached. As in `epic-split-reach.ts`, a
+// planned scripts module the base holds is a candidate importer, here only one in the new module's
+// directory; with no `base_files`, every file stands alone.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
+
+const SCRIPTS_DIRECTORY = 'scripts/'
+const TYPESCRIPT = '.ts'
 
 // What `lane:plan` measured beside the plan (`lane-plan-signals.ts`); one `hunk_files` entry per hunk,
 // one `committed_files` entry per file the branch changed between its base and `HEAD`, and the files
@@ -116,6 +124,44 @@ function ordered(counted: ReadonlyArray<string>, recorded: ReadonlyArray<string>
 	return [...counted.filter((file) => held.has(file)), ...counted.filter((file) => !held.has(file))]
 }
 
+function is_scripts_module(file: string): boolean {
+	return file.startsWith(SCRIPTS_DIRECTORY) && file.endsWith(TYPESCRIPT)
+}
+
+function directory_of(file: string): string {
+	return file.slice(0, file.lastIndexOf('/') + 1)
+}
+
+// Each new module beside the first free planned module of its directory the base holds, both ways round —
+// matched by directory, not plan order, so an unrelated file listed first does not take the pair.
+function partners_of(files: ReadonlyArray<string>, base: ReadonlySet<string>): Map<string, string> {
+	const modules = files.filter((file) => is_scripts_module(file))
+	const added = modules.filter((file) => !base.has(file))
+	const partners = new Map<string, string>()
+
+	for (const module of added) {
+		const importer = modules.find(
+			(file) =>
+				base.has(file) && !partners.has(file) && directory_of(file) === directory_of(module),
+		)
+		if (importer !== undefined) partners.set(module, importer).set(importer, module)
+	}
+
+	return partners
+}
+
+// The counted files grouped into what splits as one, each group at its first file.
+function units_of(files: ReadonlyArray<string>, signals: PlanSignals): Array<Array<string>> {
+	const partners = partners_of(files, signals.base_files ?? new Set(files))
+
+	return files.flatMap((file) => {
+		const partner = partners.get(file)
+		if (partner === undefined) return [[file]]
+
+		return files.indexOf(partner) < files.indexOf(file) ? [] : [[file, partner]]
+	})
+}
+
 function files_approved(
 	plan: LanePlan,
 	declared: number,
@@ -138,16 +184,16 @@ function files_over(
 ): FilesOver | undefined {
 	const limit = declared * declared_growth.factor(ratios_of(signals), 'files')
 	const counted = plan.paths.filter((file) => !test_declared_logic.is_test_file(file))
+	const units = units_of(ordered(counted, recorded?.paths ?? []), signals)
 
-	if (counted.length <= limit || files_approved(plan, declared, recorded, counted.length)) {
+	if (units.length <= limit || files_approved(plan, declared, recorded, units.length)) {
 		return undefined
 	}
 
-	const files = ordered(counted, recorded?.paths ?? [])
 	const tests = plan.paths.filter((file) => test_declared_logic.is_test_file(file))
-	const kept = files.slice(0, limit)
+	const kept = units.slice(0, limit).flat()
 
-	return { reason: 'files', declared, limit, kept, split_off: files.slice(limit), tests }
+	return { reason: 'files', declared, limit, kept, split_off: units.slice(limit).flat(), tests }
 }
 
 // The files an earlier clear held — the recorded history, else, for a cleared record that predates it,
