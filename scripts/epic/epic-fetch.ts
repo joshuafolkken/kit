@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueReadFailure } from '#scripts/gh/git-gh-issue-read'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
+import { epic_child_source, type ChildSource } from './epic-child-source'
 import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue, type EpicIssue } from './epic-issue'
@@ -9,9 +10,10 @@ import { epic_relation_recheck } from './epic-relation-recheck'
 
 // Reading an epic and its children from GitHub.
 //
-// All execution state lives on GitHub and nowhere else — no local state file. A run interrupted
-// halfway is resumed by asking again, which is the whole reason `epic:next` can be the base of an
-// unattended run.
+// All execution state lives on GitHub and nowhere else — no local state file; the closed-child
+// record `backlog:next` passes in is a cache of GitHub's answer, never a source of its own. A run
+// interrupted halfway is resumed by asking again, which is the whole reason `epic:next` can be the
+// base of an unattended run.
 
 const CHILD_LIMIT = 200
 
@@ -190,16 +192,58 @@ function is_body_unreachable(failure: IssueReadFailure | undefined): boolean {
 	return failure !== undefined && git_gh_command.is_unreachable_read(failure)
 }
 
-// Every child the epic's task list tracks, in the order the body lists them.
+// A child the source already answered is primed exactly as a read one is, and asks nothing else.
+async function known_or_read(
+	issue_number: number,
+	known: ReadonlyMap<number, EpicChild>,
+	repo: string,
+	scope?: string,
+): Promise<ChildRead> {
+	const child = known.get(issue_number)
+	if (child === undefined) return await fetch_child_read(issue_number, repo, scope)
+
+	await issue_sample_prime.prime([child.body])
+
+	return { child, is_unreachable: false }
+}
+
+// A closed child answered without a read that an open sibling waits on is read again: reopened, it
+// holds that sibling, as it did when every child was read.
+async function recheck_blockers(
+	reads: ReadonlyArray<ChildRead>,
+	child_numbers: ReadonlyArray<number>,
+	known: ReadonlyMap<number, EpicChild>,
+	repo: string,
+): Promise<ReadonlyArray<ChildRead>> {
+	const waited = epic_child_source.waited_closed(to_children(reads), known, repo)
+	if (waited.size === 0) return reads
+
+	return await Promise.all(
+		reads.map(async (read, index) => {
+			const issue_number = child_numbers[index] ?? 0
+
+			return waited.has(issue_number) ? await fetch_child_read(issue_number, repo) : read
+		}),
+	)
+}
+
+// Every child the epic's task list tracks, in the order the body lists them. Given a `source`, a
+// child it already knows is not read again (`epic-child-source.ts`).
 async function fetch_children(
 	child_numbers: ReadonlyArray<number>,
 	repo: string,
 	scope?: string,
+	source?: ChildSource,
 ): Promise<FetchedChildren> {
 	const limited = child_numbers.slice(0, CHILD_LIMIT)
-	const reads = await Promise.all(
-		limited.map(async (issue_number) => await fetch_child_read(issue_number, repo, scope)),
+	const now_ms = Date.now()
+	const known = epic_child_source.known(source, repo, now_ms)
+	const answered = await Promise.all(
+		limited.map(async (issue_number) => await known_or_read(issue_number, known, repo, scope)),
 	)
+	const reads = await recheck_blockers(answered, limited, known, repo)
+
+	epic_child_source.remember_closed(source, repo, to_children(reads), now_ms)
 
 	return {
 		children: to_children(reads),
@@ -336,6 +380,7 @@ async function fetch_epic(
 	epic_number: number,
 	repo: string,
 	current_repo: string = repo,
+	source?: ChildSource,
 ): Promise<EpicSnapshot> {
 	const scope = scope_for(repo, current_repo)
 	const epic_body = await fetch_epic_body(epic_number, scope)
@@ -343,7 +388,7 @@ async function fetch_epic(
 	// runs in. Derived from the epic's own repository instead, a qualified reference to somebody else's
 	// epic would make their whole organization readable.
 	const owner = epic_cross_repo.owner_of(current_repo)
-	const local = await fetch_children(epic_body.child_numbers, repo, scope)
+	const local = await fetch_children(epic_body.child_numbers, repo, scope, source)
 	const remote = await fetch_external_children(epic_body.external, owner)
 
 	return await to_snapshot(epic_body, { repo, current_repo }, local, remote)

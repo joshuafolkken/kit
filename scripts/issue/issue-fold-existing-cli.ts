@@ -5,6 +5,7 @@ import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { z } from 'zod'
 import { issue_fold_apply, type ApplyResult } from './issue-fold-apply'
 import { issue_fold_existing } from './issue-fold-existing'
@@ -16,7 +17,8 @@ const JSON_FLAG = '--json'
 const APPLY_FLAG = '--apply'
 const BLOCKED_FLAG = '--blocked'
 const FINGERPRINT_FLAG = '--fingerprint'
-const USAGE = `Usage: josh issue:fold-existing <assessment.json> [${JSON_FLAG} | ${APPLY_FLAG} <issue-number> [${BLOCKED_FLAG} <stopped-issue>]] | ${FINGERPRINT_FLAG} <issue-number>`
+const FOUND_DURING_FLAG = '--found-during'
+const USAGE = `Usage: josh issue:fold-existing <assessment.json> [${JSON_FLAG} | ${APPLY_FLAG} <issue-number> [${BLOCKED_FLAG} <stopped-issue> | ${FOUND_DURING_FLAG} <split-origin>]] | ${FINGERPRINT_FLAG} <issue-number>`
 
 const APPLY_REPORTS: Readonly<Record<ApplyResult, string>> = {
 	applied: 'folded — the body was written, its priority floor applied and the re-read carries it.',
@@ -30,17 +32,20 @@ const APPLY_REPORTS: Readonly<Record<ApplyResult, string>> = {
 
 type Mode =
 	| { kind: 'print'; should_json: boolean }
-	| { kind: 'apply'; issue_number: string }
+	| { kind: 'apply'; issue_number: string; found_during?: string }
 	| { kind: 'duplicate'; issue_number: string; blocked: string }
+
+type ApplyMode = Extract<Mode, { kind: 'apply' }>
 
 const NO_OPTION = ''
 const FLAG_VALUE_ARITY = 2
-const DUPLICATE_ARITY = 4
-const duplicate_options_schema = z.tuple([
+const PAIRED_ARITY = 4
+const issue_number_schema = z.string().regex(issue_number_shape.ISSUE_NUMBER_PATTERN)
+const paired_options_schema = z.tuple([
 	z.literal(APPLY_FLAG),
-	z.string().regex(issue_number_shape.ISSUE_NUMBER_PATTERN),
-	z.literal(BLOCKED_FLAG),
-	z.string().regex(issue_number_shape.ISSUE_NUMBER_PATTERN),
+	issue_number_schema,
+	z.enum([BLOCKED_FLAG, FOUND_DURING_FLAG]),
+	issue_number_schema,
 ])
 const PRINT_MODES: ReadonlyMap<string, Mode> = new Map([
 	[NO_OPTION, { kind: 'print', should_json: false }],
@@ -90,7 +95,36 @@ function print_assessment(input: Assessment, should_json: boolean): number {
 	return SUCCESS_EXIT_CODE
 }
 
-async function apply_fold(input: Assessment, issue_number: string): Promise<number> {
+function report_apply(issue_number: string, result: ApplyResult): void {
+	const line = `Issue ${session_cite.issue(issue_number)} ${APPLY_REPORTS[result]}`
+
+	if (result === 'applied') {
+		console.info(line)
+	} else {
+		console.error(line)
+	}
+}
+
+// joshuafolkken/kit#6630: `--found-during <N>` records the fold as lane N's split child, so the
+// fold `issue:file`'s duplicate refusal points to answers the split notice too.
+async function record_split_fold({ issue_number, found_during }: ApplyMode): Promise<number> {
+	if (found_during === undefined) return SUCCESS_EXIT_CODE
+
+	try {
+		await split_resolution.record_fold({ origin: found_during, target: issue_number })
+		console.info(
+			`Recorded ${session_cite.issue(issue_number)} as ${session_cite.issue(found_during)}'s split child.`,
+		)
+
+		return SUCCESS_EXIT_CODE
+	} catch (error) {
+		console.error(error_text.message_of(error))
+
+		return FAILURE_EXIT_CODE
+	}
+}
+
+async function apply_fold(input: Assessment, mode: ApplyMode): Promise<number> {
 	const body = folded_body(input)
 
 	if (body === undefined) {
@@ -100,20 +134,15 @@ async function apply_fold(input: Assessment, issue_number: string): Promise<numb
 	}
 
 	const result = await issue_fold_apply.apply({
-		issue_number,
+		issue_number: mode.issue_number,
 		existing_body: input.existing_body,
 		comment_fingerprint: input.comment_fingerprint,
 		body,
 	})
-	const line = `Issue ${session_cite.issue(issue_number)} ${APPLY_REPORTS[result]}`
 
-	if (result === 'applied') {
-		console.info(line)
-	} else {
-		console.error(line)
-	}
+	report_apply(mode.issue_number, result)
 
-	return result === 'applied' ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return result === 'applied' ? await record_split_fold(mode) : FAILURE_EXIT_CODE
 }
 
 async function read_assessment(path: string): Promise<Assessment | undefined> {
@@ -169,7 +198,7 @@ async function assess(path: string, mode: Mode): Promise<number> {
 	}
 
 	if (mode.kind === 'duplicate') return await apply_duplicate(input, mode)
-	if (mode.kind === 'apply') return await apply_fold(input, mode.issue_number)
+	if (mode.kind === 'apply') return await apply_fold(input, mode)
 
 	return print_assessment(input, mode.should_json)
 }
@@ -182,18 +211,21 @@ function parse_apply([option, value]: ReadonlyArray<string>): Mode | undefined {
 		: undefined
 }
 
-function parse_duplicate(options: ReadonlyArray<string>): Mode | undefined {
-	const parsed = duplicate_options_schema.safeParse(options)
+// `--apply <N>` paired with `--blocked <M>` (a duplicate) or `--found-during <M>` (a split fold).
+function parse_paired(options: ReadonlyArray<string>): Mode | undefined {
+	const parsed = paired_options_schema.safeParse(options)
 
 	if (!parsed.success) return undefined
-	const [, issue_number, , blocked] = parsed.data
+	const [, issue_number, flag, value] = parsed.data
 
-	return { kind: 'duplicate', issue_number, blocked }
+	return flag === BLOCKED_FLAG
+		? { kind: 'duplicate', issue_number, blocked: value }
+		: { kind: 'apply', issue_number, found_during: value }
 }
 
 // No option and `--json` print; `--apply <N>` writes.
 function parse_mode(options: ReadonlyArray<string>): Mode | undefined {
-	if (options.length === DUPLICATE_ARITY) return parse_duplicate(options)
+	if (options.length === PAIRED_ARITY) return parse_paired(options)
 	if (options.length === FLAG_VALUE_ARITY) return parse_apply(options)
 
 	return options.length <= 1 ? PRINT_MODES.get(options.join(NO_OPTION)) : undefined

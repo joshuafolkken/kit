@@ -56,6 +56,13 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 		)
 	})
 
+	it('starts the github name at the codex name column while a scheduler is marked', () => {
+		const { rows } = part_of({ rate_limit: CORE, scheduler_provider: 'claude' })
+
+		expect(rows[2]?.indexOf('github')).toBe(rows[1]?.indexOf('codex'))
+		expect(rows[2]).toMatch(/^ {5}github\s+38% .*↻ 12:33\s+1877\/5000$/u)
+	})
+
 	it('puts the pace mark where the clock is through the hour-long window', () => {
 		const rate_limit = { ...CORE, remaining: 5000, reset_ms: NOW_MS + 15 * MINUTE_MS }
 

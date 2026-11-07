@@ -242,7 +242,7 @@ function providers_of(view: QuotaView): ReadonlyArray<QuotaProvider> {
 		: [first, ...PROVIDERS.filter((provider) => provider !== first)]
 }
 
-function name_of(provider: QuotaProvider, view: QuotaView): string {
+function name_of(provider: QuotaProvider | typeof GITHUB, view: QuotaView): string {
 	if (view.scheduler_provider === undefined) return provider
 
 	const mark = provider === view.scheduler_provider ? SCHEDULER_MARK : '  '
@@ -315,7 +315,7 @@ function rate_limit_rows(view: QuotaView): Array<string> {
 	return allowances_of(view).map(({ used_percent, pace, reset, spent }) => {
 		const gauge = gauge_text(used_percent, pace, reset, spent)
 
-		return `${INDENT}${name_cell(GITHUB)}${gauge}`.trimEnd()
+		return `${INDENT}${name_cell(name_of(GITHUB, view))}${gauge}`.trimEnd()
 	})
 }
 

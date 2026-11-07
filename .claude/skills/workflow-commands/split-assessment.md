@@ -53,9 +53,10 @@ once per Issue. Stop implementation before `pnpm josh run:cut <N>`
 - Keep only the green part: narrow this branch and this Issue's acceptance criteria to the verified work.
 - File the rest as a split child with `pnpm josh issue:file --route split --found-during <N>`.
   On its direction refusal → `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.
+  On its duplicate refusal → `issue-fold-existing.md`, applying with `--apply <M> --found-during <N>`.
 - Reissue the cut, then gate and ship the green part; do not resume implementing the rest.
 
-Without a split child on record, the pre-gate `run:cut` answers `split-unresolved` even with a
+Without a split child or a split fold on record, the pre-gate `run:cut` answers `split-unresolved` even with a
 `- 分割しない理由:` comment. The notice never creates an epic.
 
 ## What each entry point does with the answer

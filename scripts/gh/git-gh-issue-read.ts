@@ -1,6 +1,7 @@
 import type { IssueReference } from '#scripts/issue/issue-reference'
 import { gh_author_association } from './gh-author-association'
 import { git_gh_api_path } from './git-gh-api-path'
+import { git_gh_etag_read } from './git-gh-etag-read'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure, type GhFailure } from './git-gh-failure'
 import { git_gh_helpers } from './git-gh-helpers'
@@ -103,6 +104,14 @@ async function read_relations(
 	}
 }
 
+// The request itself: the epic body is sent with the previous process's ETag
+// (joshuafolkken/kit#6560), every other read unconditionally.
+type PathRead = (path: string) => Promise<string>
+
+async function read_unconditionally(path: string): Promise<string> {
+	return await git_gh_exec.exec_gh_api({ path })
+}
+
 // One issue through REST, answered in the field names `gh issue view --json` used. Every read below
 // goes through it, so the request, the field mapping and the blocker relations are decided once.
 //
@@ -110,13 +119,15 @@ async function read_relations(
 // labels-and-body reads never name it — and, when it was, only when the issue itself reports a
 // blocker to fetch. Both guards are about the same cost: relations are read per issue across the
 // whole open backlog, so an unconditional second request would double that pass.
+
 async function read_issue_fields(
 	issue_number: string,
 	fields: string,
 	repo?: string,
+	read_path: PathRead = read_unconditionally,
 ): Promise<Record<string, unknown>> {
 	const rest = git_gh_issue_rest.parse_rest_issue(
-		await git_gh_exec.exec_gh_api({ path: git_gh_api_path.issue_api_path(issue_number, repo) }),
+		await read_path(git_gh_api_path.issue_api_path(issue_number, repo)),
 	)
 	const requested = git_gh_issue_rest.split_fields(fields)
 	const blocked_by = requested.includes(BLOCKED_BY_FIELD)
@@ -217,9 +228,10 @@ async function issue_view_field_classified(
 	issue_number: string,
 	field: string,
 	repo?: string,
+	read_path?: PathRead,
 ): Promise<FieldRead> {
 	try {
-		const issue = await read_issue_fields(issue_number, field, repo)
+		const issue = await read_issue_fields(issue_number, field, repo, read_path)
 
 		return { kind: 'read', text: git_gh_issue_rest.to_field_text(issue[field]) }
 	} catch (error) {
@@ -255,8 +267,9 @@ async function issue_get_body(issue_number: string, repo?: string): Promise<stri
 // The body, plus why it produced nothing when it did. An epic's body is the one read whose absence
 // is indistinguishable from a legitimate answer — an epic with no task list and an epic nobody could
 // read both parse to zero children — so the caller that builds the dependency graph takes this one.
+// `backlog:next` reads every open epic's body each scan, so it goes with the previous ETag.
 async function issue_get_body_classified(issue_number: string, repo?: string): Promise<FieldRead> {
-	return await issue_view_field_classified(issue_number, 'body', repo)
+	return await issue_view_field_classified(issue_number, 'body', repo, git_gh_etag_read.read)
 }
 
 // A JSON view of one issue, for every caller that wants several fields at once. Callers differ only

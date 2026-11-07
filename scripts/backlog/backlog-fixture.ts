@@ -1,7 +1,9 @@
 import { auto_ok_fixture } from '#scripts/auto-ok/auto-ok-fixture'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
+import { epic_child_source } from '#scripts/epic/epic-child-source'
 import { epic_schema } from '#scripts/epic/epic-index'
 import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
+import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
@@ -18,11 +20,12 @@ import {
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 } from '#scripts/issue/issue-labels'
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { lane_await } from '#scripts/lane/lane-await'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
-import { vi } from 'vitest'
+import { onTestFinished, vi } from 'vitest'
 import { backlog_resume_reads } from './backlog-resume-reads'
 
 // One description of a backlog, stubbed across every read `josh backlog:next` makes.
@@ -211,6 +214,14 @@ function stub_environment(): void {
 	)
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
 	vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(REACHABLE_STATUS)
+	// The closed children and the write roles a scan keeps for the next one, held per test so no case
+	// answers from another's record or the machine's own.
+	onTestFinished(
+		shared_cache_fixture.isolate_shared_cache(
+			epic_child_source.CLOSED_CACHE,
+			gh_permission_cache.WRITERS_CACHE,
+		),
+	)
 }
 
 // The two reads the defect priority adds: the rate, and each candidate's body — beside the implement

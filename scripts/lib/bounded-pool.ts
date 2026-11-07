@@ -105,6 +105,38 @@ async function bounded_map<Item, Result>(
 		.map((result) => result.value)
 }
 
-const bounded_pool = { bounded_map, pool_width }
+// The same width for tasks that arrive one at a time from independent callers sharing it
+// (`git-gh-exec.ts`'s `gh` spawns). A finished or failed task hands its slot to the oldest waiter.
+function limiter(limit: number): Limiter {
+	const width = pool_width(limit, Infinity)
+	const waiting: Array<() => void> = []
+	let active = 0
+
+	return {
+		async run<Result>(task: () => Promise<Result>): Promise<Result> {
+			if (active < width) active += 1
+			else {
+				await new Promise<void>((resolve) => {
+					waiting.push(resolve)
+				})
+			}
+
+			try {
+				return await task()
+			} finally {
+				const next = waiting.shift()
+
+				if (next === undefined) active -= 1
+				else next()
+			}
+		},
+	}
+}
+
+interface Limiter {
+	run: <Result>(task: () => Promise<Result>) => Promise<Result>
+}
+
+const bounded_pool = { bounded_map, limiter, pool_width }
 
 export { bounded_pool }
