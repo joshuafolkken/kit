@@ -1,14 +1,16 @@
 import { readFile } from 'node:fs/promises'
 import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { epic_classify } from '#scripts/epic/epic-classify'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { issue_fold_apply } from './issue-fold-apply'
+import { issue_fold_apply, type ApplyResult } from './issue-fold-apply'
 import { issue_fold_existing_cli } from './issue-fold-existing-cli'
 
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }))
 
 const PATH = 'assessment.json'
 const APPLY_FLAG = '--apply'
+const FOUND_DURING_FLAG = '--found-during'
 const FINGERPRINT_FLAG = '--fingerprint'
 const ORIGINAL_CRITERION = 'Original criterion'
 const FINGERPRINT = 'assessed-thread'
@@ -96,6 +98,48 @@ describe('issue_fold_existing_cli.run --apply', () => {
 
 		expect(await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12'])).toBe(1)
 		expect(apply).not.toHaveBeenCalled()
+	})
+})
+
+function applied(result: ApplyResult = 'applied'): ReturnType<typeof vi.spyOn> {
+	vi.mocked(readFile).mockResolvedValue(JSON.stringify(ASSESSMENT))
+	vi.spyOn(issue_fold_apply, 'apply').mockResolvedValue(result)
+	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	return vi.spyOn(split_resolution, 'record_fold').mockResolvedValue()
+}
+
+// joshuafolkken/kit#6630: a split part folded into an existing Issue answers the origin lane's notice.
+describe('issue_fold_existing_cli.run --apply --found-during', () => {
+	it('records the fold target as the origin lane split child', async () => {
+		const record_fold = applied()
+
+		expect(
+			await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', FOUND_DURING_FLAG, '34']),
+		).toBe(0)
+		expect(record_fold).toHaveBeenCalledExactlyOnceWith({ origin: '34', target: '12' })
+	})
+
+	it('records nothing without --found-during or when the fold does not complete', async () => {
+		const record_fold = applied('changed')
+
+		expect(
+			await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', FOUND_DURING_FLAG, '34']),
+		).toBe(1)
+		vi.mocked(issue_fold_apply.apply).mockResolvedValue('applied')
+		expect(await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12'])).toBe(0)
+		expect(record_fold).not.toHaveBeenCalled()
+	})
+
+	it('fails with the cause when the split child cannot be recorded', async () => {
+		applied().mockRejectedValue(new Error(RELATION_FAILURE))
+		const error = vi.mocked(console.error)
+
+		expect(
+			await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', FOUND_DURING_FLAG, '34']),
+		).toBe(1)
+		expect(error.mock.calls.join('\n')).toContain(RELATION_FAILURE)
 	})
 })
 
@@ -219,6 +263,8 @@ describe('issue_fold_existing_cli.run refusals', () => {
 		[[APPLY_FLAG, '12', '--json']],
 		[[APPLY_FLAG, '12', '--blocked', 'owner/repo#34']],
 		[[APPLY_FLAG, '12', '--blocked', '0']],
+		[[APPLY_FLAG, '12', FOUND_DURING_FLAG, '#34']],
+		[[APPLY_FLAG, '12', '--other', '34']],
 		[['--json', '12']],
 	])('prints the usage for the options %j', async (options) => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
