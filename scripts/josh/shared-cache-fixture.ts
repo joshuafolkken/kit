@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { vi } from 'vitest'
-import type { CacheSlot } from './shared-cache'
+import { shared_cache, type CacheSlot } from './shared-cache'
 import { stamp_file } from './stamp-file'
 
 // Keys `slot` to a repository root of the test's own, so a suite never reads, writes or clears the
@@ -18,6 +18,22 @@ function isolate_shared_cache(slot: CacheSlot): () => void {
 	}
 }
 
-const shared_cache_fixture = { isolate_shared_cache }
+// Keeps every slot's record in this test's memory rather than on disk, for a suite whose reads walk
+// more slots than one `isolate_shared_cache` teardown removes — the per-path ETag records
+// (joshuafolkken/kit#6560). The TTL is not applied: a test reads its own records back at once.
+function keep_in_memory(): void {
+	const records = new Map<string, unknown>()
+
+	vi.spyOn(shared_cache, 'write').mockImplementation((slot, key, value) => {
+		records.set(`${slot.prefix}${key}`, value)
+	})
+	vi.spyOn(shared_cache, 'read').mockImplementation((slot, key, schema) => {
+		const parsed = schema.safeParse(records.get(`${slot.prefix}${key}`))
+
+		return parsed.success ? parsed.data : undefined
+	})
+}
+
+const shared_cache_fixture = { isolate_shared_cache, keep_in_memory }
 
 export { shared_cache_fixture }

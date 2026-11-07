@@ -3,6 +3,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { FULL_PAGE_QUERY } from './git-gh-api-path'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
+import { git_gh_etag_read, type KeptAnswer } from './git-gh-etag-read'
 import { git_gh_exec } from './git-gh-exec'
 
 // The merge gate's per-poll reads, each sent with the ETag of this process's previous answer
@@ -22,11 +23,6 @@ import { git_gh_exec } from './git-gh-exec'
 const UNREADABLE_POLL_MESSAGE = 'gh api could not read a merge-gate poll'
 const PAGE_SIZE = 100
 
-interface KeptAnswer {
-	etag: string
-	body: string
-}
-
 const kept_by_path = new Map<string, KeptAnswer>()
 
 const page_schema = z.object({ total_count: z.number() })
@@ -41,13 +37,12 @@ function unreadable(path: string, answer: ConditionalRead): Error {
 }
 
 function to_body(path: string, answer: ConditionalRead): string {
-	const previous = kept_by_path.get(path)
+	const settled = git_gh_etag_read.settle(kept_by_path.get(path), answer)
 
-	if (previous !== undefined && answer.kind === 'unchanged') return previous.body
-	if (answer.kind !== 'changed') throw unreadable(path, answer)
-	if (answer.etag !== undefined) kept_by_path.set(path, { etag: answer.etag, body: answer.body })
+	if (settled === undefined) throw unreadable(path, answer)
+	if (settled.kept !== undefined) kept_by_path.set(path, settled.kept)
 
-	return answer.body
+	return settled.body
 }
 
 // The answer for `path`, or the previous one where GitHub says it has not changed. A failure throws,
