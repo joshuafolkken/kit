@@ -128,7 +128,7 @@ function records_the_park(command: string): boolean {
 // clone `CLAUDE.md` prohibits.
 const LANE_PARK_REASON =
 	'⛔ lane child park: this session is a dispatched lane child, so a stop for a person parks first: ' +
-	'`pnpm josh run:park <N> --body-file <path>` (options with their tiers, a recommendation, stash — the park schema it prints; it applies ' +
+	'`pnpm josh run:park <N> --body-file <path>` (options, tiers, recommendation, stash — it applies ' +
 	'`needs-decision`); a ' +
 	'`needs-human-review` / `already-done` stop already is. The park is the stop: no notify ' +
 	'after it. Refused once per run ' +
