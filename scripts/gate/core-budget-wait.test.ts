@@ -1,9 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { lane_paths } from '#scripts/lane/lane-paths'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
 import type { WaitSink } from './core-wait-record'
@@ -21,12 +21,10 @@ const PRESSURED: MachineReading = { busy_cores: 0, available_mb: 0, memory_press
 
 const probe = { directory: '' }
 
-beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-core-budget-wait-test-'))
-})
+const make_directory = temporary_directory()
 
-afterEach(() => {
-	rmSync(probe.directory, { recursive: true, force: true })
+beforeEach(() => {
+	probe.directory = make_directory('josh-core-budget-wait-test-')
 })
 
 function write_blocker(fields: object): void {

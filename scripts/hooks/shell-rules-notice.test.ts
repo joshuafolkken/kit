@@ -1,24 +1,24 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it } from 'vitest'
 import { shell_rules_notice } from './shell-rules-notice'
 
 // Below `step-zero-notice.test.ts`'s ceiling: the notice is injected text, delivered once.
 const NOTICE_CEILING_BYTES = 256
 
+const make_directory = temporary_directory()
 const created: Array<string> = []
 
 afterEach(() => {
 	for (const transcript of created.splice(0)) {
 		rmSync(shell_rules_notice.stamp_path(transcript), { force: true })
-		rmSync(path.dirname(transcript), { recursive: true, force: true })
 	}
 })
 
 // A fresh transcript per case, so the once-per-session stamp never dedupes one case against another.
 function fresh_transcript(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'shell-rules-'))
+	const directory = make_directory('shell-rules-')
 	const transcript = path.join(directory, 'transcript.jsonl')
 
 	created.push(transcript)

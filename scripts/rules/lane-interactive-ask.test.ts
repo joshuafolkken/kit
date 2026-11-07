@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_interactive_ask } from './lane-interactive-ask'
@@ -20,7 +20,8 @@ const ASK_INPUT = { questions: [{ question: 'Which library?', options: [{ label:
 const ASK_CALL = { name: ASK_TOOL, input: ASK_INPUT }
 const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-interactive-ask-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('lane-interactive-ask-')
 // The directory vitest was launched from, restored before WORK_DIRECTORY is removed. The suite pins its
 // working directory to the non-lane WORK_DIRECTORY per test to stay hermetic: the trigger reads the
 // live process.cwd() to decide whether a checkout is a lane, so a run started inside a lane worktree
@@ -65,8 +66,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('cwd isolation', () => {

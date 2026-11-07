@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
@@ -7,13 +6,15 @@ import { json_value } from '#scripts/lib/json-value'
 import { issue_comments } from '#scripts/rules/issue-comments'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { codex_hook_adapter } from './codex-hook-adapter'
 import { format_edited_file, parse_edited_path, type CommandRunner } from './format-edited-file'
 import { pretool_guard } from './pretool-guard'
 
-const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'codex-hook-adapter-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIRECTORY = make_directory('codex-hook-adapter-')
 const TYPESCRIPT_FILE = path.join(TEST_DIRECTORY, 'app.ts')
 const MARKDOWN_FILE = path.join(TEST_DIRECTORY, 'notes.md')
 const THIRD_FILE = path.join(TEST_DIRECTORY, 'third.json')
@@ -28,10 +29,6 @@ const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 
 writeFileSync(TYPESCRIPT_FILE, 'export const value = 1\n')
 writeFileSync(MARKDOWN_FILE, '# Notes\n')
-
-afterAll(() => {
-	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
-})
 
 afterEach(() => {
 	vi.restoreAllMocks()

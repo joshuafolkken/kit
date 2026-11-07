@@ -1,27 +1,24 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { project_checks } from '#scripts/gate/project-checks'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { review_code_tree } from './review-code-tree'
 import { review_finding_ledger } from './review-finding-ledger'
 import { review_interaction, type InteractionStatus } from './review-interaction'
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-interaction-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-interaction-')
 const ISSUE = 4276
 const DATE = '2026-09-22'
 const DUE = ['scripts/run/ship/x.ts']
 const NOT_DUE = ['scripts/review/x.ts']
 const NOT_REQUIRED: InteractionStatus = 'not-required'
 const BASE = '0123456789abcdef0123456789abcdef01234567'
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
 
 // A checkout whose ledger holds `content` in the issue's file.
 function root_with(name: string, content: string): string {

@@ -1,16 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import {
-	chmodSync,
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
 
 // joshuafolkken/kit#4449: a main push that reuses a pull request's Checks skips `static-checks`, so
@@ -166,11 +158,7 @@ describe("a reused main push warms the runner's Node.js lineage", () => {
 const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR']
 const UNTRUSTED = ['CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'NONE', '']
 const STUB_PREFIX = 'Linux-eslint-cache-v24.1.0-0a1b-2c3d-'
-const work_directory = mkdtempSync(path.join(tmpdir(), 'seed-eslint-cache-'))
-
-afterAll(() => {
-	rmSync(work_directory, { recursive: true, force: true })
-})
+const make_directory = temporary_directory()
 
 function write_stub_gh(directory: string): void {
 	const stub = path.join(directory, 'bin', 'gh')
@@ -181,7 +169,7 @@ function write_stub_gh(directory: string): void {
 }
 
 function run_download(association: string): { did_download: boolean; output: string } {
-	const directory = mkdtempSync(path.join(work_directory, 'run-'))
+	const directory = make_directory('seed-eslint-cache-run-')
 	const output_path = path.join(directory, 'output')
 
 	write_stub_gh(directory)

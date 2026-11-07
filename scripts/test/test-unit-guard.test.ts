@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { LANE_SEAT_KEY, PORT_SEED_KEY } from '#ports'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_recording } from './test-read-recording'
@@ -76,6 +76,7 @@ function expect_isolated_environment(options: Record<string, unknown>): void {
 }
 
 const ctx = { project_directory: '' }
+const make_directory = temporary_directory()
 
 const { stub_claim, stub_free, stub_share } = unit_share_fixture
 
@@ -83,13 +84,12 @@ beforeEach(() => {
 	stub_share(undefined)
 	stub_free(undefined)
 	stub_claim(undefined)
-	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-'))
+	ctx.project_directory = make_directory('unit-guard-')
 })
 
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	rmSync(ctx.project_directory, { recursive: true, force: true })
 })
 
 function add_vitest_package(): void {

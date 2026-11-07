@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { review_attest } from './review-attest'
 import { review_fix_round, type RecordedRound } from './review-fix-round'
@@ -16,7 +16,8 @@ vi.mock('./review-record-comment', () => ({
 	review_record_comment: { is_after_push: vi.fn().mockResolvedValue(false) },
 }))
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'review-record-fix-round-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('review-record-fix-round-')
 const NOW = new Date('2026-11-04T00:00:00Z')
 const ISSUE = 6286
 const FILE = 'a.ts'
@@ -35,7 +36,6 @@ beforeAll(() => {
 afterAll(() => {
 	vi.restoreAllMocks()
 	stamp_file.remove_stamp(stamp_file.stamp_path('josh-review-fix-round-', ROOT))
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 function recorded(): RecordedRound {

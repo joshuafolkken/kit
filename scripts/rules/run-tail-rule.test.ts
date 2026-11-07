@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { read_unwrapped } from '#scripts/document/ai-document-fixture'
 import { test_declared_changed } from '#scripts/test/test-declared-changed'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { run_tail_rule } from './run-tail-rule'
@@ -32,7 +32,8 @@ const SKIPPED_PUSH = 'pnpm josh git -y --skip-commit --skip-push'
 // denominator alike.
 const NOT_THE_PUSH_STEP = 'pnpm josh gate'
 const NOW_MS = 1_700_000_000_000
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'run-tail-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('run-tail-')
 const WRITTEN_TRANSCRIPTS = new Set<string>()
 
 function call_of(command: string, is_background?: boolean): { name: string; input: unknown } {
@@ -83,8 +84,6 @@ afterAll(() => {
 		rmSync(delivered_rules.delivery_path(RUN_TAIL, transcript), { force: true })
 		rmSync(delivered_rules.delivery_path(DECLARED, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('is_push_step', () => {
