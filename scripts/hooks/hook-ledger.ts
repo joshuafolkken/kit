@@ -31,10 +31,12 @@ const COMMAND_FIELDS: ReadonlyArray<string> = ['command', 'file_path', 'pattern'
 
 const input_schema = z.record(z.string(), z.unknown())
 
+// Each field falls back on its own, so a `null` transcript (`hook-decision.ts` reads it nullish) keeps
+// the tool and command it came with; `command_of` reads the input whatever its shape.
 const payload_schema = z.object({
-	tool_name: z.string().default(STOP_TOOL),
-	tool_input: input_schema.default({}),
-	transcript_path: z.string().default(''),
+	tool_name: z.string().catch(STOP_TOOL),
+	tool_input: z.unknown().optional(),
+	transcript_path: z.string().catch(''),
 })
 
 const EMPTY_PAYLOAD = payload_schema.parse({})

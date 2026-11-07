@@ -73,6 +73,22 @@ describe('hook_ledger.record', () => {
 	})
 })
 
+describe('hook_ledger.record payload fields', () => {
+	it('keeps the tool and command of a payload whose transcript is null', async () => {
+		vi.mocked(git_spawn.read).mockResolvedValue('6587-lane')
+		const directory = path.join(scratch, 'null-transcript')
+		const raw_payload = `{"tool_name":"Bash","tool_input":{"command":"${COMMAND}"},"transcript_path":null}`
+
+		await hook_ledger.record({ hook: HOOK, reason: BATCHING_REASON, raw_payload }, directory)
+
+		expect(JSON.parse(lines_in(directory)[0] ?? '')).toMatchObject({
+			tool: 'Bash',
+			session: '',
+			command: COMMAND,
+		})
+	})
+})
+
 describe('hook_ledger.blocked_reason', () => {
 	it('reads the reason a Stop envelope blocks with, and nothing from a notice alone', () => {
 		const block = JSON.stringify({ decision: 'block', reason: BATCHING_REASON, systemMessage: 'x' })
