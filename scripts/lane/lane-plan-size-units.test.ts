@@ -59,12 +59,24 @@ describe('lane_plan_size.oversize on a new scripts module', () => {
 			split_off: [added],
 		})
 	})
+})
 
+describe('lane_plan_size.oversize pairing a new scripts module with its importer', () => {
 	it('splits a new module off together with its importer when the importer comes later', () => {
 		const document = 'docs/backlog-drive.md'
 
 		expect(oversize_of([document, MODULE, IMPORTER])).toMatchObject({
 			kept: [document],
+			split_off: [MODULE, IMPORTER],
+		})
+	})
+
+	it('pairs a new module with a planned file of its own directory, not an unrelated one listed first', () => {
+		const unrelated = 'scripts/lane/lane-unrelated.ts'
+		const listed = { ...SIGNALS, base_files: new Set([IMPORTER, unrelated]) }
+
+		expect(oversize_of([unrelated, MODULE, IMPORTER], 1, listed)).toMatchObject({
+			kept: [unrelated],
 			split_off: [MODULE, IMPORTER],
 		})
 	})

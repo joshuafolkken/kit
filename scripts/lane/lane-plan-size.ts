@@ -49,7 +49,8 @@ import { lane_stage_budget } from './lane-stage-budget'
 //
 // **A new scripts module and its importer count and split as one file** (joshuafolkken/kit#6635), or
 // the kept lane ships a module `pack-boundary.test.ts` finds unreached. As in `epic-split-reach.ts`, a
-// planned file the base holds is a candidate importer; with no `base_files`, every file stands alone.
+// planned scripts module the base holds is a candidate importer, here only one in the new module's
+// directory; with no `base_files`, every file stands alone.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
 
@@ -123,20 +124,30 @@ function ordered(counted: ReadonlyArray<string>, recorded: ReadonlyArray<string>
 	return [...counted.filter((file) => held.has(file)), ...counted.filter((file) => !held.has(file))]
 }
 
-// Each new module beside the importer it takes, both ways round.
-function partners_of(files: ReadonlyArray<string>, base: ReadonlySet<string>): Map<string, string> {
-	const importers = files.filter((file) => file.endsWith(TYPESCRIPT) && base.has(file))
-	const modules = files.filter(
-		(file) => file.startsWith(SCRIPTS_DIRECTORY) && file.endsWith(TYPESCRIPT) && !base.has(file),
-	)
-	const pairs = modules
-		.slice(0, importers.length)
-		.map((module, index): [string, string] => [module, importers[index] ?? module])
+function is_scripts_module(file: string): boolean {
+	return file.startsWith(SCRIPTS_DIRECTORY) && file.endsWith(TYPESCRIPT)
+}
 
-	return new Map([
-		...pairs,
-		...pairs.map(([module, importer]): [string, string] => [importer, module]),
-	])
+function directory_of(file: string): string {
+	return file.slice(0, file.lastIndexOf('/') + 1)
+}
+
+// Each new module beside the first free planned module of its directory the base holds, both ways round —
+// matched by directory, not plan order, so an unrelated file listed first does not take the pair.
+function partners_of(files: ReadonlyArray<string>, base: ReadonlySet<string>): Map<string, string> {
+	const modules = files.filter((file) => is_scripts_module(file))
+	const added = modules.filter((file) => !base.has(file))
+	const partners = new Map<string, string>()
+
+	for (const module of added) {
+		const importer = modules.find(
+			(file) =>
+				base.has(file) && !partners.has(file) && directory_of(file) === directory_of(module),
+		)
+		if (importer !== undefined) partners.set(module, importer).set(importer, module)
+	}
+
+	return partners
 }
 
 // The counted files grouped into what splits as one, each group at its first file.
@@ -173,7 +184,6 @@ function files_over(
 ): FilesOver | undefined {
 	const limit = declared * declared_growth.factor(ratios_of(signals), 'files')
 	const counted = plan.paths.filter((file) => !test_declared_logic.is_test_file(file))
-
 	const units = units_of(ordered(counted, recorded?.paths ?? []), signals)
 
 	if (units.length <= limit || files_approved(plan, declared, recorded, units.length)) {
