@@ -35,8 +35,8 @@ const CAP_NOTE =
 const REASON = '- 分割しない理由: 1 コミットで入れる'
 const REPO = 'joshuafolkken/kit'
 // The doubled declaration projects over the implement budget at the slow rate, within it at the fast.
-const SLOW: ImplementRate = { median: 5, lanes: 4 }
-const FAST: ImplementRate = { median: 1, lanes: 3 }
+const SLOW: ImplementRate = { median: 3.75, lanes: 4 }
+const FAST: ImplementRate = { median: 0.75, lanes: 3 }
 const BUDGET_NOTE = 'projected over the implement budget'
 const MEASURED_GUIDE_NOTE = 'more than 9.6 files or 240 lines'
 const EXCEEDS_CAP = 'exceeds the cap'

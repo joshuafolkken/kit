@@ -80,7 +80,7 @@ describe('lane plan growth provenance', () => {
 		const text = refusal(7, {
 			files_ratio: 1.5,
 			lines_ratio: 3,
-			implement_rate: { median: 4, lanes: 1 },
+			implement_rate: { median: 3, lanes: 1 },
 		})
 
 		expect(text).toContain('guide 12 files / 300 lines (measured)')
