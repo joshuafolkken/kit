@@ -155,8 +155,11 @@ async function read_issue_fields(
 // neither a transport problem nor a permission one. `kind` is unchanged so the callers that only
 // separate "there is nothing at that number" from "the read failed" need no edit.
 type IssueReadReason = 'unreachable' | 'rejected' | 'malformed'
+// `detail` is the failed request's error text (gh's stderr summary and the response body), kept so a
+// report can tell an exhausted rate limit from expired auth (#6614); a `malformed` read has none.
 type IssueReadFailure =
-	{ kind: 'missing' } | { kind: 'unreadable'; reason: IssueReadReason; status: number | undefined }
+	| { kind: 'missing' }
+	| { kind: 'unreadable'; reason: IssueReadReason; status: number | undefined; detail?: string }
 type IssueRead = IssueReadFailure | { kind: 'read'; json: string }
 type FieldRead = IssueReadFailure | { kind: 'read'; text: string | undefined }
 
@@ -205,6 +208,7 @@ function to_read_failure(error: unknown): IssueReadFailure {
 		kind: 'unreadable',
 		reason: to_unreadable_reason(failure.status),
 		status: failure.status,
+		detail: error instanceof Error ? error.message : String(error),
 	}
 }
 
