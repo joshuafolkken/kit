@@ -1,6 +1,7 @@
 import {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
+	EPIC_LABEL,
 	has_label_name,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
@@ -9,6 +10,7 @@ import {
 	RUN_LANE_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
+import { issue_run_hold } from '#scripts/issue/issue-run-hold'
 import type { CarryAddition } from '#scripts/run/carry/run-carry-added'
 
 // `josh run:add` — put an issue into a live `backlogrun`. A pool run picks an issue up only once it
@@ -41,12 +43,8 @@ interface AddContext {
 }
 
 const DEFAULT_CONTEXT: AddContext = { is_retry: false, done: [], active: new Set() }
-const PROTECTED_LABELS = [
-	NEEDS_DECISION_LABEL,
-	NEEDS_HUMAN_REVIEW_LABEL,
-	ALREADY_DONE_LABEL,
-	IN_PROGRESS_LABEL,
-]
+const PROTECTED_LABELS = [NEEDS_DECISION_LABEL, NEEDS_HUMAN_REVIEW_LABEL, ALREADY_DONE_LABEL]
+const EPIC_REFUSAL = `${EPIC_LABEL} — a run implements its children, never the epic itself`
 
 type AddOutcome =
 	| { kind: 'queued'; issue: number; blockers: ReadonlyArray<number> }
@@ -94,11 +92,21 @@ function terminal_refusal(issue: number, context: AddContext): string | undefine
 	return context.settled?.has(issue) ? 'not a mechanical stop' : undefined
 }
 
-function refusal(issue: number, view: IssueView, context: AddContext): string | undefined {
-	const labels = view.labels ?? []
+// The label that bars the issue from a run, or why it is barred: an epic is tracked, never run, and
+// `in-progress` bars it only where the shared reader says a run holds it (`issue-run-hold.ts`).
+function label_refusal(labels: ReadonlyArray<string>): string | undefined {
+	if (has_label_name(labels, EPIC_LABEL)) return EPIC_REFUSAL
+
 	const protected_label = PROTECTED_LABELS.find((label) => has_label_name(labels, label))
 
-	if (protected_label !== undefined) return protected_label
+	return protected_label ?? (issue_run_hold.is_held(labels) ? IN_PROGRESS_LABEL : undefined)
+}
+
+function refusal(issue: number, view: IssueView, context: AddContext): string | undefined {
+	const labels = view.labels ?? []
+	const label = label_refusal(labels)
+
+	if (label !== undefined) return label
 	if (context.active.has(String(issue))) return 'active lane'
 	if (retry_required(issue, labels, context)) return 'use --retry'
 

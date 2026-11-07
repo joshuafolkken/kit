@@ -923,7 +923,7 @@ pnpm josh backlog:budget --answer candidates --started "$started" --active "$act
 
 <!-- /usage -->
 
-Read-only. stdout is `run`, `watch`, `stop` or `triage`; empty with exit 1 if unreadable. An idle watch polls every 60 s.
+Read-only. stdout is `run`, `watch`, `stop` or `triage`; empty with exit 1 if unreadable. An idle watch polls every 180 s.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:budget` in detail".
 

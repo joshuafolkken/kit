@@ -1,16 +1,17 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/build/local-bin'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { edited_cspell, type CspellRequest } from './edited-cspell'
 
 // joshuafolkken/kit#2296: the edit hook reports the edited file's cspell unknown words as
 // additionalContext, and reports nothing when there are none — and never fails the edit, however the
 // spell check behaves.
 
-const DIRECTORY = mkdtempSync(path.join(tmpdir(), 'edited-cspell-'))
+const make_directory = temporary_directory('suite')
+const DIRECTORY = make_directory('edited-cspell-')
 const TEXT = 'content'
 // A real cspell start takes about a second, two of them more under a loaded machine.
 const LIVE_TIMEOUT_MS = 60_000
@@ -26,10 +27,6 @@ function file_of(name: string): string {
 async function never_called(): Promise<string> {
 	throw new Error('runner should not have been called')
 }
-
-afterAll(() => {
-	rmSync(DIRECTORY, { recursive: true, force: true })
-})
 
 describe('format_unknown_words', () => {
 	it('names each unknown word under a header', () => {

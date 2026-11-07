@@ -8,6 +8,7 @@ import { split_assess } from './split-assess'
 import { split_early_notice } from './split-early-notice'
 import { split_measure } from './split-measure'
 import { split_resolution } from './split-resolution'
+import { split_verified_single } from './split-verified-single'
 
 const { REASON_PREFIX } = split_assess
 
@@ -20,6 +21,8 @@ const OWNER = 'OWNER'
 const REASON = `${REASON_PREFIX} the rest shares one schema change`
 const LEDGER_PATH = '/ledger.jsonl'
 const NO_CHILD = 'has no split child'
+const APPEND_FAILED = 'append failed'
+const FOLD_TARGET = '4701'
 
 const NOTICE: LedgerEntry = {
 	kind: lane_ledger.KIND.SPLIT_NOTICE,
@@ -40,6 +43,7 @@ const is_trusted = vi.spyOn(gh_author_association, 'is_trusted')
 const record_split_filed = vi.spyOn(lane_ledger_write, 'record_split_filed')
 const read_branch = vi.spyOn(split_measure, 'read_branch')
 const declared = vi.spyOn(split_early_notice, 'declared')
+const verified = vi.spyOn(split_verified_single, 'verified')
 
 function comments_json(body: string, association = OWNER): string {
 	return JSON.stringify([{ user: { login: 'someone' }, body, author_association: association }])
@@ -51,6 +55,7 @@ beforeEach(() => {
 	record_split_filed.mockResolvedValue()
 	read_branch.mockResolvedValue({ files: 11, lines: 550, verdict: 'split' })
 	declared.mockResolvedValue(undefined)
+	verified.mockResolvedValue(false)
 })
 
 describe('split_resolution.refusal for a noticed issue with no answer', () => {
@@ -141,7 +146,28 @@ describe('split_resolution.ledger_refusal', () => {
 
 		expect(await split_resolution.ledger_refusal(ISSUE)).toContain(NO_CHILD)
 	})
+})
 
+describe('split_resolution.ledger_refusal verified single deliverable', () => {
+	it('answers a notice over the bar with one verified deliverable (ac-8e54309c)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+		verified.mockResolvedValueOnce(true)
+
+		expect(await split_resolution.ledger_refusal(ISSUE)).toBeUndefined()
+		expect(verified).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('keeps the notice over the bar while work is unverified (ac-30747931)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+
+		expect(await split_resolution.ledger_refusal(ISSUE)).toContain(NO_CHILD)
+		expect(verified).toHaveBeenCalledWith(ISSUE)
+	})
+})
+
+describe('split_resolution.ledger_refusal ledger reads', () => {
 	it('reads the repository ledger', async () => {
 		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
 		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
@@ -160,7 +186,7 @@ describe('split_resolution.record_child', () => {
 	it('reports the existing child URL and a recovery command when recording fails', async () => {
 		const child = 'https://github.com/joshuafolkken/kit/issues/4700'
 
-		record_split_filed.mockRejectedValueOnce(new Error('append failed'))
+		record_split_filed.mockRejectedValueOnce(new Error(APPEND_FAILED))
 
 		await expect(
 			split_resolution.record_child({
@@ -188,5 +214,36 @@ describe('split_resolution.record_child', () => {
 		})
 
 		expect(record_split_filed).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6630: a split part folded into an existing Issue answers the notice.
+describe('split_resolution.record_fold', () => {
+	const fold = { origin: String(ISSUE), target: FOLD_TARGET }
+
+	it('records the fold target as the origin lane split child', async () => {
+		await split_resolution.record_fold(fold)
+
+		expect(record_split_filed).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			child: `#${FOLD_TARGET}`,
+		})
+	})
+
+	it('lets the recorded fold answer the notice while an unanswered notice still refuses', async () => {
+		await split_resolution.record_fold(fold)
+		const recorded = record_split_filed.mock.calls[0]?.[0] ?? { issue: OTHER_ISSUE, child: '' }
+		const entry: LedgerEntry = { kind: lane_ledger.KIND.SPLIT_FILED, at: AT, ...recorded }
+
+		expect(await split_resolution.refusal(ISSUE, [NOTICE, entry])).toBeUndefined()
+		expect(await split_resolution.refusal(ISSUE, [NOTICE])).toContain(NO_CHILD)
+	})
+
+	it('names the folded issue and the cause when recording fails', async () => {
+		record_split_filed.mockRejectedValueOnce(new Error(APPEND_FAILED))
+
+		await expect(split_resolution.record_fold(fold)).rejects.toThrow(
+			new RegExp(`Folded into .*${FOLD_TARGET}.*${APPEND_FAILED}`, 'u'),
+		)
 	})
 })

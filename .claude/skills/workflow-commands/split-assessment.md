@@ -1,7 +1,7 @@
 # The split assessment — one definition, every entry point
 
-Before any entry point starts work on an Issue, decide whether the request is **one** deliverable or
-several. Every command applies it identically.
+Before work on an Issue starts, decide whether it is **one** deliverable or several; every entry
+point applies this.
 
 ## The question
 
@@ -18,9 +18,9 @@ Floor (also the unmeasured fallback):
 **more than 8 changed files or more than 200 changed lines**.
 
 Split above **the cap, 1.5 times the guide**, or budget.
-Merged lanes' median actual / declared ratios, separately for files and lines,
-independent of speed measurement. Each unmeasured axis uses the fallback of 2.
-`lane:plan` answers `split` past the declared files × files ratio (files or hunks), or line guide.
+Merged lanes' median actual / declared ratios per axis, apart from speed; unmeasured: 2.
+`lane:plan` answers `split` past the declared files × files ratio (files or hunks), or line guide;
+one deliverable past files → `--single` (`lane-plan-size.ts`).
 
 ## The same two questions decide the filing-time fold
 
@@ -53,9 +53,12 @@ once per Issue. Stop implementation before `pnpm josh run:cut <N>`
 - Keep only the green part: narrow this branch and this Issue's acceptance criteria to the verified work.
 - File the rest as a split child with `pnpm josh issue:file --route split --found-during <N>`.
   On its direction refusal → `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.
+  On its duplicate refusal → `issue-fold-existing.md`, applying with `--apply <M> --found-during <N>`.
 - Reissue the cut, then gate and ship the green part; do not resume implementing the rest.
 
-Without a split child on record, the pre-gate `run:cut` answers `split-unresolved` even with a
+- One verified deliverable, nothing left to split (every ship-draft acceptance row `満たした`, `lint:related` and `test:related` green on this tree) → reissue the cut without a child: `scripts/split/split-verified-single.ts`.
+
+Without a split child, a split fold or that verified deliverable, the pre-gate `run:cut` answers `split-unresolved` even with a
 `- 分割しない理由:` comment. The notice never creates an epic.
 
 ## What each entry point does with the answer

@@ -1,13 +1,14 @@
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { copyFileSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { claude_plugin_config } from '#scripts/init/claude-plugin-config'
 import { hook_command_bootstrap } from '#scripts/init/hook-command-bootstrap-fixture'
 import { hook_launch } from '#scripts/init/hook-launch'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 
+const make_directory = temporary_directory()
 const RUN_HOOK_SOURCE = fileURLToPath(new URL('run-hook.sh', import.meta.url))
 const WORKTREE = '.claude/worktrees/agent-demo'
 // Each stub prints the directory the hook runs in, which is all these tests ask about.
@@ -57,13 +58,9 @@ function hook_directory(command: string, launch_directory: string, is_root_named
 }
 
 beforeEach(() => {
-	const temporary_root = mkdtempSync(path.join(tmpdir(), 'kit-run-hook-worktree-'))
+	const temporary_root = make_directory('kit-run-hook-worktree-')
 
 	workspace.root = realpathSync(temporary_root)
-})
-
-afterEach(() => {
-	rmSync(workspace.root, { recursive: true, force: true })
 })
 
 const LAUNCHES: ReadonlyArray<readonly [string, string, string]> = [

@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { reuse_world, type World } from '#scripts/gate/reuse-world-fixture'
 
@@ -13,8 +12,8 @@ interface Disk {
 	base: number
 }
 
-function create_disk(): Disk {
-	return { root: mkdtempSync(path.join(tmpdir(), 'reuse-disk-')), written: new Map(), base: 0 }
+function create_disk(root: string): Disk {
+	return { root, written: new Map(), base: 0 }
 }
 
 function put(disk: Disk, relative: string, content: string | undefined): void {

@@ -165,7 +165,7 @@ describe('issue_file_pass.labels_in_one_pass — measured speed', () => {
 	})
 
 	it.each([
-		{ lines: 30, passes: true },
+		{ lines: 25, passes: true },
 		{ lines: 50, passes: false },
 	])('judges $lines declared lines at the measured rate', async ({ lines, passes }) => {
 		vi.mocked(lane_net_read.measurements).mockResolvedValue({

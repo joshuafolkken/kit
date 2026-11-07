@@ -1,7 +1,9 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { AuthorFields } from '#scripts/gh/gh-author-association'
+import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_author } from './auto-ok-author'
 import { auto_ok_cli } from './auto-ok-cli'
@@ -50,6 +52,9 @@ vi.spyOn(console, 'error').mockImplementation(streams.error)
 beforeEach(() => {
 	epic_list.mockResolvedValue(listing_outcome(epic_listing([])))
 	streams.reset()
+
+	// The asks are shared, so each test keeps its write roles in a record of its own.
+	return shared_cache_fixture.isolate_shared_cache(gh_permission_cache.WRITERS_CACHE)
 })
 
 describe('auto_ok_author.with_author_trust', () => {

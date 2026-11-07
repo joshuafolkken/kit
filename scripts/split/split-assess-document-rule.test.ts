@@ -34,6 +34,13 @@ describe('split-assessment.md carries the pre-gate notice steps', () => {
 		expect(document).toContain('`split-unresolved` even with a')
 		expect(document).not.toContain('Keep it one Issue')
 	})
+
+	it('lets one verified deliverable answer the notice without a child (ac-75da8719)', () => {
+		const document = read_repo_file(SPLIT_ASSESSMENT)
+
+		expect(document).toContain('One verified deliverable, nothing left to split')
+		expect(document).toContain('scripts/split/split-verified-single.ts')
+	})
 })
 
 // joshuafolkken/kit#4675: a filing over the guide is refused with a pointer at the question's heading.
@@ -49,10 +56,16 @@ describe('split-assessment.md states the lane:plan growth bar', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
 		expect(split_assess.DECLARED_GROWTH_FACTOR).toBe(2)
-		expect(document).toContain('median actual / declared ratios, separately for files and lines')
-		expect(document).toContain('independent of speed measurement')
-		expect(document).toContain('Each unmeasured axis uses the fallback of 2')
+		expect(document).toContain('median actual / declared ratios per axis, apart from speed')
+		expect(document).toContain('unmeasured: 2')
 		expect(document).toContain('`lane:plan` answers `split` past the declared files × files ratio')
+	})
+
+	// joshuafolkken/kit#6647: the single-deliverable rule names the flag `lane:plan` waives the files axis on.
+	it('points one deliverable past the files axis at --single', () => {
+		expect(read_repo_file(SPLIT_ASSESSMENT)).toContain(
+			'one deliverable past files → `--single` (`lane-plan-size.ts`)',
+		)
 	})
 })
 

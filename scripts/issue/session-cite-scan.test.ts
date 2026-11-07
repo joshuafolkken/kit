@@ -81,6 +81,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['lane/lane-plan-wait-event.ts', 2],
 	['lane/lane-session-broker.ts', 1],
 	['lane/lane-withdraw.ts', 1],
+	// The folded split child's ledger `child`, which `split-resolution.ts` reads back.
+	['split/split-resolution.ts', 1],
 	// Yield and withdrawal event payloads; their renderer resolves session citations.
 	['lane/lane-yield.ts', 2],
 	['run/merge/run-merge-usage-limit.ts', 1],
@@ -98,13 +100,13 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['lane/lane-pause-cli.ts', 2],
 	['lane/lane-phase.ts', 1],
 	['lane/lane-restart.ts', 1],
-	['run/board/run-board-layout.ts', 1],
 	['run/board/run-board-notes.ts', 1],
 	// The run board's frame, which a person watches in a terminal or on Telegram; `run:board --chat`
 	// answers with it inside one code block, where nothing is linked.
 	['run/board/run-board-now.ts', 1],
 	['run/board/run-board-process-groups.ts', 1],
 	['run/board/run-board-render-notes.ts', 1],
+	['run/board/run-board-standing-waits.ts', 1],
 	['run/cut/run-cut-cli.ts', 1],
 	['run/cut/run-cut-report.ts', 1],
 	['run/cut/run-cut-resume.ts', 1],
@@ -120,8 +122,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/merge/run-merge-cli.ts', 6],
 	['run/merge/run-merge-decision.ts', 1],
 	['run/merge/run-merge-human-review.ts', 1],
-	// The `run:stalled` park event, and the resume command a park comment and a board row name.
-	['run/park/run-stalled.ts', 2],
+	// The `run:stalled` park event, the resume command a park comment and a board row name, and the
+	// blocker a stalled board row waits on.
+	['run/park/run-stalled.ts', 3],
 	// The `run:pause` stash name, its idempotence marker, and the pause comment on the paused Issue.
 	['run/pause/run-pause.ts', 2],
 	['run/pause/run-pause-comment.ts', 1],

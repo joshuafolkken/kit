@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
@@ -23,15 +23,15 @@ const BLOCKER = `${core_budget.RESERVED_PREFIX}blocker.json`
 const UNREAD: MachineReading = { busy_cores: undefined, available_mb: undefined }
 const { UNIT_LABEL } = gate_labels
 
+const make_directory = temporary_directory()
 const probe = { directory: '' }
 
 beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-unit-narrowing-test-'))
+	probe.directory = make_directory('josh-unit-narrowing-test-')
 })
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-	rmSync(probe.directory, { recursive: true, force: true })
 })
 
 function write_blocker(weight: number): void {

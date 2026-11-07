@@ -157,6 +157,19 @@ describe('split_direction.refusal_of — the commands of a split-off file', () =
 	})
 })
 
+describe('split_direction.references — a command registry', () => {
+	it('ignores the command names a command registry lists (ac-8a4dc7bb)', () => {
+		const path = 'scripts/josh/josh-commands-issue.ts'
+		const read = vi
+			.spyOn(file_reader, 'read_if_readable')
+			.mockReturnValue("'issue:fold-existing': { script: 'x' }")
+		const body = kept_body('`issue:fold-existing --apply <M> --found-during <N>` が畳み込む')
+
+		expect(split_direction.references(body, `\`${path}\``)).toEqual([])
+		expect(read).not.toHaveBeenCalled()
+	})
+})
+
 describe('split_direction.references', () => {
 	it('reads no module from the words of a command line or a directory', () => {
 		const body = kept_body('`pnpm josh gate` と `run:entry` と `scripts/split/` が緑')

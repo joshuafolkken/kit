@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MISSING_NOTICE, REQUIRED_MISSING_ERROR, secretlint_scan } from './secretlint-scan'
 
@@ -19,13 +19,14 @@ function install_secretlint_binary(): string {
 	return bin_path
 }
 
+const make_directory = temporary_directory()
+
 beforeEach(() => {
-	ctx.project_root = mkdtempSync(path.join(tmpdir(), 'secretlint-scan-'))
+	ctx.project_root = make_directory('secretlint-scan-')
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(ctx.project_root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

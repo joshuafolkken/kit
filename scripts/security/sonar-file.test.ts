@@ -1,11 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { sonar_file } from './sonar-file'
 
 // Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sonar-file-test-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('sonar-file-test-')
 const SRC_PATH = path.join(TEST_DIR, 'src', 'template.properties')
 const SONAR_DEST_NAME = 'sonar-project.properties'
 const DEST_PATH = path.join(TEST_DIR, 'dest', SONAR_DEST_NAME)
@@ -24,7 +25,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
+	rmSync(path.join(TEST_DIR, 'src'), { recursive: true, force: true })
+	rmSync(path.join(TEST_DIR, 'dest'), { recursive: true, force: true })
 })
 
 describe('sonar_file.write_sonar_file — substitution', () => {

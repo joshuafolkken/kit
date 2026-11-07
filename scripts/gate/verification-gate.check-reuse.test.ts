@@ -1,10 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckRecords } from './check-reuse'
 import { gate_test_fixture } from './gate-test-fixture'
@@ -31,14 +30,14 @@ const mocked_execa = vi.mocked(execa_module.execa)
 // gate reads and the repository root are planted rather than read.
 
 const RECORDS = gate_test_fixture.suite_records('check-reuse')
-const scratch = mkdtempSync(path.join(tmpdir(), 'verification-gate-check-reuse-test-'))
+const make_directory = temporary_directory('suite')
 const TREE: GateTree = { files: { [path.join('scripts', 'a.ts')]: 'digest-a' }, base: 'base-a' }
 // lint, the type check, cspell (joshuafolkken/kit#5156), exports, metrics and — through the test-read
 // map — the unit step (joshuafolkken/kit#4314).
 const SCOPED_CHECKS = 6
 
 function check_records(): CheckRecords {
-	const directory = mkdtempSync(path.join(scratch, 'checks-'))
+	const directory = make_directory('verification-gate-check-reuse-test-checks-')
 
 	return function record_of(label: string): string {
 		return path.join(directory, `${label}.json`)
@@ -78,7 +77,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	RECORDS.clear()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('run_verification_gate — the per-check records', () => {

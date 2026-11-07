@@ -38,6 +38,21 @@ describe('josh read-only invocations', () => {
 	})
 })
 
+// `tree:status` is declared read-only on its own; the writing commands registered beside it stay
+// refused (joshuafolkken/kit#6554).
+describe('tree status declaration', () => {
+	it('passes tree:status (ac-50a9add1)', () => {
+		expect(josh_read_only.refusal(['tree:status'])).toBeUndefined()
+	})
+
+	it.each([[['run:pause', '1091', '--for', '1102']], [['run:split', '1091']], [['run:stale']]])(
+		'refuses the writing command %j beside it (ac-5f5c93b1)',
+		(args) => {
+			expect(josh_read_only.refusal(args)).toContain('is not read-only')
+		},
+	)
+})
+
 describe('effect audit write flags', () => {
 	const COMMAND = 'effect:audit'
 

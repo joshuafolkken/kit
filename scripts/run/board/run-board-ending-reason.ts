@@ -35,18 +35,25 @@ function withdraw_reason(event: RunEvent): string {
 	return rest === event.text ? '' : rest.trim()
 }
 
-// A `run:stalled` park reads as its cause and the action that resumes it (`run-stalled.ts`); any other
-// park as its reason.
-function park_row_reason(issue: number, reason: string, is_backlog_live: boolean): string {
+// A `run:stalled` park reads as its cause and the action that resumes it (`run-stalled.ts`), or as
+// the blockers that still hold it; any other park as its reason.
+function park_row_reason(
+	issue: number,
+	reason: string,
+	is_backlog_live: boolean,
+	waits: ReadonlyArray<string> = [],
+): string {
 	const cause = run_stalled.cause_of(reason)
 
-	return cause === undefined
-		? reason
-		: run_stalled.row_text(
-				issue,
-				run_board_render_title.title_of(cause, CAUSE_LIMIT),
-				is_backlog_live,
-			)
+	if (cause === undefined) return reason
+
+	if (waits.length > 0) return run_stalled.waiting_text(waits)
+
+	return run_stalled.row_text(
+		issue,
+		run_board_render_title.title_of(cause, CAUSE_LIMIT),
+		is_backlog_live,
+	)
 }
 
 // The reason an ending event gives, `undefined` for an event that is neither a park nor a withdraw or
@@ -74,9 +81,16 @@ function recorded_of(event: RunEvent): EndingRecord {
 	}
 }
 
-// Label-only stalls have no event cause; the current run still selects their resume action.
-function stalled_reason(number: number, is_backlog_live = false): RowReason {
-	return { tail: run_stalled.row_text(number, '', is_backlog_live) }
+// Label-only stalls have no event cause; the current run still selects their resume action, unless a
+// standing blocker holds the row, which then waits on it.
+function stalled_reason(
+	number: number,
+	read: Pick<RowRead, 'is_backlog_live'>,
+	waits: ReadonlyArray<string> = [],
+): RowReason {
+	if (waits.length > 0) return { tail: run_stalled.waiting_text(waits) }
+
+	return { tail: run_stalled.row_text(number, '', read.is_backlog_live) }
 }
 
 const STALLED_STATES: ReadonlySet<string> = new Set(['stopped', 'parked'])
@@ -101,15 +115,16 @@ function tail_of(status: ItemStatus): string | undefined {
 // Raw event reasons remain cacheable; only drawing selects an action from the current live state.
 function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
 	const reason = tail_of(status)
+	const waits = read.waits?.get(number)
 
 	if (reason !== undefined) {
-		const tail = park_row_reason(number, reason, read.is_backlog_live === true)
+		const tail = park_row_reason(number, reason, read.is_backlog_live === true, waits)
 
 		return { reason: { tail } }
 	}
 
 	return is_stalled(status, read.labels.get(number))
-		? { reason: stalled_reason(number, read.is_backlog_live) }
+		? { reason: stalled_reason(number, read, waits) }
 		: {}
 }
 

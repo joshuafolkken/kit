@@ -1,4 +1,4 @@
-import { run_board_rate_limit, type CoreRateLimit } from '#scripts/run/board/run-board-rate-limit'
+import { gh_core_rate_limit, type CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import type { DriveState, OfferRead } from './backlog-drive'
 
 // joshuafolkken/kit#6563: an offer spent while GitHub's core REST allowance is nearly dry fails every
@@ -15,7 +15,7 @@ type CoreReader = () => Promise<CoreRateLimit | undefined>
 // usual — the allowance is above the floor, or it could not be read, which never stops the offer.
 async function held(
 	state: DriveState,
-	read_core: CoreReader = run_board_rate_limit.read_core,
+	read_core: CoreReader = gh_core_rate_limit.read_core,
 ): Promise<OfferRead | undefined> {
 	const core = await read_core()
 

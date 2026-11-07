@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -18,7 +18,8 @@ import {
 	SWITCH_ENV_KEY,
 } from './batch-guard'
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'batch-guard-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('batch-guard-')
 // The directory vitest was launched from, restored in teardown. The candidate test now reads the live
 // process.cwd() and `JOSH_LANE_CHILD` to decide whether the session is a dispatched lane child
 // (joshuafolkken/kit#2138), so the lane case chdirs into a lane checkout and this puts it back.
@@ -128,8 +129,6 @@ afterAll(() => {
 		rmSync(refusal_path(transcript), { force: true })
 		rmSync(notice_refusal_path(transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 // **Every case here that names no tool is a `Read` payload**, which is what `payload_of` defaults to —

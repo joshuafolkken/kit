@@ -1,7 +1,8 @@
+import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
 import { describe, expect, it } from 'vitest'
 import { split_assess } from './split-assess'
 
-const BUDGET_MINUTES = 12
+const BUDGET_MINUTES = lane_stage_budget.BUDGET_MINUTES.implement
 const MEASURED = { median: 3.7, lanes: 1 }
 const GUIDE = split_assess.guide_for(BUDGET_MINUTES, MEASURED)
 const SMALL_GUIDE = { files: 2, lines: 50, cap: { files: 3, lines: 75 } }
@@ -15,8 +16,8 @@ describe('guide_for', () => {
 	})
 
 	it('derives both axes and caps from the measured implement budget (ac-b4d39f6d)', () => {
-		expect(GUIDE.lines).toBeCloseTo(1200 / 3.7)
-		expect(GUIDE.files).toBeCloseTo((1200 / 3.7) * (8 / 200))
+		expect(GUIDE.lines).toBeCloseTo((BUDGET_MINUTES * 100) / 3.7)
+		expect(GUIDE.files).toBeCloseTo(((BUDGET_MINUTES * 100) / 3.7) * (8 / 200))
 		expect(GUIDE.cap.lines).toBeCloseTo(GUIDE.lines * 1.5)
 		expect(GUIDE.cap.files).toBeCloseTo(GUIDE.files * 1.5)
 	})

@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_args } from './backlog-drive-args'
 import { backlog_drive_cli } from './backlog-drive-cli'
+import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_retry } from './backlog-drive-retry'
@@ -350,7 +351,7 @@ it('reports before ending the carry record', async () => {
 	const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: 'report' })
 	const error = vi.spyOn(console, 'error').mockImplementation(vi.fn())
 
-	await backlog_drive_cli.finish({
+	await backlog_drive_finish.finish({
 		reason: 'stop',
 		token: 'stop',
 		issue: undefined,

@@ -159,6 +159,22 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 | `JOSH_POLL_GUARD`           | No       | on      | A `backlogrun` parent or wake session repeating a state read with nothing decided in between.                          |
 | `JOSH_SCOPED_GREEN`         | No       | on      | `josh gate` refusing a tree never scoped-green; `josh pre-push-unit` reusing the `test:related` green record.          |
 
+### Hook payload capture
+
+| Variable                | Required | Default | Used when                                                                                                                            |
+| ----------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `JOSH_HOOK_CAPTURE_DIR` | No       | off     | A directory: `pretool:guard`, `stop:guard` and the Codex hook adapter save each raw stdin payload there as `<hook>-<tool>-<n>.json`. |
+
+#### Capturing hook payload fixtures
+
+`scripts/hooks/hook-payload-replay.test.ts` replays every payload in `scripts/hooks/fixtures/` through the `pretool:guard` entry, once as a consultation session and once as a lane. To add one:
+
+1. Launch the provider in this checkout with the variable set, the role unset so a write is refused rather than made: `env -u JOSH_AGENT_ROLE JOSH_HOOK_CAPTURE_DIR=/tmp/hook-capture claude -p "<prompt making the tool call>"`, or `codex exec` the same way.
+2. Copy the capture into `scripts/hooks/fixtures/` as `claude-<tool>.json` or `codex-<tool>.json` — the `codex-` prefix routes the replay through the Codex adapter.
+3. Replace the checkout path with `__ROOT__`, the home directory with `__HOME__` and the transcript's project directory with `__PROJECT__`, and an id cspell flags with a readable one. Nothing else is edited.
+
+A fixture whose tool is `Edit`, `Write` or `apply_patch` is expected refused in consultation and allowed in a lane; every other fixture is expected allowed in both.
+
 ### Rule evaluation
 
 | Variable                | Required | Default  | Used when                                                                                     |

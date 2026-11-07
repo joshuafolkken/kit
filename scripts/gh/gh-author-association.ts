@@ -1,3 +1,4 @@
+import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { author_fields_schema } from '#scripts/git/git-schemas'
@@ -12,8 +13,9 @@ import { z } from 'zod'
 // **`author_association` alone does not say "can write"** (joshuafolkken/kit#4037). `OWNER` does, so it
 // is trusted without a request. `MEMBER` is any member of the owning org, whatever their access to this
 // repository, and `COLLABORATOR` includes outside collaborators with read or triage access only — so
-// those two are asked of the collaborator-permission endpoint, once per login per process, and trusted
-// only on a write role. A lookup that fails is not trust.
+// those two are asked of the collaborator-permission endpoint, once per login per process — or, for a
+// shared ask, once per login per hour — and trusted only on a write role. A lookup that fails is not
+// trust.
 const OWNER = 'OWNER'
 const ASKED_ASSOCIATIONS: ReadonlySet<string> = new Set(['MEMBER', 'COLLABORATOR'])
 const WRITE_ROLES: ReadonlySet<string> = new Set(['admin', 'maintain', 'write'])
@@ -32,12 +34,14 @@ const permission_schema = z.looseObject({
 
 // `timeout_ms` bounds the lookup for a caller inside a hook's own timeout (`issue-watch`). `repo` is
 // the repository the row was read from (`issue:read --repo`, joshuafolkken/kit#5851): write access is a
-// property of one repository, so it is asked of that one; absent, the session's.
+// property of one repository, so it is asked of that one; absent, the session's. `is_shared` reads and
+// keeps a write role in the cross-process record (`gh-permission-cache.ts`, joshuafolkken/kit#6613).
 interface Author {
 	login: string | undefined
 	association: string | null | undefined
 	timeout_ms?: number | undefined
 	repo?: string | undefined
+	is_shared?: boolean | undefined
 }
 
 interface AuthorFields {
@@ -62,7 +66,7 @@ function has_write_role(raw: string): boolean {
 }
 
 // `undefined` for a lookup that failed, which is not an answer.
-async function ask_permission(asked: AskedAuthor): Promise<boolean | undefined> {
+async function read_permission(asked: AskedAuthor): Promise<boolean | undefined> {
 	try {
 		const path = permission_path(asked.login, asked.repo)
 		const raw = await git_gh_exec.exec_gh_api({ path, timeout_ms: asked.timeout_ms })
@@ -71,6 +75,20 @@ async function ask_permission(asked: AskedAuthor): Promise<boolean | undefined> 
 	} catch {
 		return undefined
 	}
+}
+
+// A shared ask answers from the record a write role read by another process left, and leaves one.
+async function ask_permission(asked: AskedAuthor): Promise<boolean | undefined> {
+	if (asked.is_shared !== true) return await read_permission(asked)
+	const repo = asked.repo ?? ''
+
+	if (gh_permission_cache.is_writer(repo, asked.login)) return true
+
+	const has_write = await read_permission(asked)
+
+	if (has_write === true) gh_permission_cache.remember_writer(repo, asked.login)
+
+	return has_write
 }
 
 // A failed lookup is not remembered: the backlog driver keeps one process for hours, so one dropped

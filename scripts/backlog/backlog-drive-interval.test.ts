@@ -158,9 +158,12 @@ describe('backlog_drive.run_loop — the ask interval', () => {
 		expect(asks(calls)).toBe(WATCHED_INTERVALS + 1)
 	})
 
+	// joshuafolkken/kit#6718: stretching the interval must not delay the re-offer after a merge.
 	it('asks at once after a child is collected inside the interval', async () => {
 		const { ports, calls } = harness({})
 		const finishes_at_ms = ports.now().getTime() + POLL_MS * FINISH_AFTER_POLLS
+
+		expect(POLL_MS * WINDOW_POLLS).toBeLessThan(backlog_budget.OFFER_INTERVAL_MS)
 
 		function is_finished(): boolean {
 			return ports.now().getTime() >= finishes_at_ms && !calls.includes(`merge ${FIRST_CHILD}`)

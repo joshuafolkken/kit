@@ -12,7 +12,7 @@ const RESET_MS = 1_793_000_000_000
 const STATE = { ...backlog_drive.initial_state([], ACTIVE), retries: RETRIES }
 
 function core_of(remaining: number): string {
-	return JSON.stringify({ limit: LIMIT, remaining, reset: RESET_SECONDS })
+	return JSON.stringify({ used: LIMIT - remaining, limit: LIMIT, remaining, reset: RESET_SECONDS })
 }
 
 afterEach(() => {

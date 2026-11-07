@@ -107,12 +107,32 @@ describe('run_board_status.settle_closed with a parked child', () => {
 })
 
 describe('run_board_status.settle_closed with a parked child reopened', () => {
-	it('keeps one parked once the listing holds it again after its closed read', () => {
+	it('keeps one parked once a listing read after its close holds it again', () => {
+		const read = read_closed(closed_issue({ is_not_planned: true }))
+		const after_close = { ...read, open_numbers: new Set([ISSUE]), read_ms: T2 + 1 }
+
+		expect(settle('parked', after_close)).toStrictEqual({ state: 'parked', started_ms: T0 })
+	})
+
+	// joshuafolkken/kit#6535: the listing an ended run holds was read before the close.
+	it('settles one a listing read before its close still holds', () => {
 		const read = read_closed(closed_issue({ is_not_planned: true }))
 
 		expect(settle('parked', { ...read, open_numbers: new Set([ISSUE]) })).toStrictEqual({
-			state: 'parked',
+			state: 'withdrawn',
 			started_ms: T0,
+			ended_ms: T2,
+		})
+	})
+
+	// A close from before a relaunch belongs to the issue's earlier life, whatever the listing holds.
+	it('keeps one parked again after a relaunch past its earlier close', () => {
+		const relaunched = new Map([[ISSUE, { state: 'parked' as const, started_ms: T2 + 1 }]])
+		const read = { ...read_closed(closed_issue({ is_not_planned: true })), open_numbers: undefined }
+
+		expect(run_board_status.settle_closed(relaunched, read).get(ISSUE)).toStrictEqual({
+			state: 'parked',
+			started_ms: T2 + 1,
 		})
 	})
 })

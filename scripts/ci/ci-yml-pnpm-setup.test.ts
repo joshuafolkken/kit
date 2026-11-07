@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { package_path } from '#scripts/init/init-paths'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import semver from 'semver'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -10,6 +10,7 @@ import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
 // The step is found by the action name, never by its pin, so a Dependabot bump of the SHA alone
 // keeps the suite green and auto-merges (joshuafolkken/kit#4147).
+const make_directory = temporary_directory()
 const ACTION = 'pnpm/setup@'
 const SHA_PINNED_ACTION = /^pnpm\/setup@[\da-f]{40}$/u
 const VERSION_INPUT = '${{ steps.pnpm-version.outputs.version }}'
@@ -77,24 +78,20 @@ function action_call(workflow_path: string, job_name: string): WorkflowStep | un
 }
 
 function run_resolver(steps: Steps, manifest: unknown): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'kit-pnpm-version-'))
+	const directory = make_directory('kit-pnpm-version-')
 	const output_path = path.join(directory, 'github-output')
 	const script = steps.find((step) => step.id === RESOLVER_ID)?.run ?? ''
 
-	try {
-		writeFileSync(path.join(directory, PACKAGE_JSON), JSON.stringify(manifest))
-		const result = spawnSync('bash', ['-e', '-c', script], {
-			cwd: directory,
-			encoding: 'utf8',
-			env: { ...process.env, GITHUB_OUTPUT: output_path },
-		})
+	writeFileSync(path.join(directory, PACKAGE_JSON), JSON.stringify(manifest))
+	const result = spawnSync('bash', ['-e', '-c', script], {
+		cwd: directory,
+		encoding: 'utf8',
+		env: { ...process.env, GITHUB_OUTPUT: output_path },
+	})
 
-		expect(result.status, result.stderr).toBe(0)
+	expect(result.status, result.stderr).toBe(0)
 
-		return readFileSync(output_path, 'utf8')
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	return readFileSync(output_path, 'utf8')
 }
 
 function expect_pnpm_before_use(steps: Steps): void {

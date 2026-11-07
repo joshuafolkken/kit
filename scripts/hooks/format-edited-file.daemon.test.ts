@@ -1,8 +1,6 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { format_edited_file } from './format-edited-file'
 import {
 	make_directory_helpers,
@@ -11,12 +9,9 @@ import {
 } from './format-edited-file-fixtures'
 
 // Its own temp directory and teardown, for the reason format-edited-file.diagnostics.test.ts gives.
-const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'format-edited-daemon-refresh-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIRECTORY = make_directory('format-edited-daemon-refresh-')
 const { write_fixture } = make_directory_helpers(TEST_DIRECTORY)
-
-afterAll(() => {
-	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
-})
 
 afterEach(() => {
 	vi.restoreAllMocks()
