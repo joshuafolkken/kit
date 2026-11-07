@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { test_declared_commit } from './test-declared-commit'
@@ -20,7 +20,8 @@ const A_RUNTIME_LINE = 'export const x = 1\n'
 const A_CHANGED_LINE = 'export const x = 2\n'
 const DECLARED = 'test-declared'
 const RUN_TAIL = 'run-tail'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'test-declared-rule-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('test-declared-rule-')
 const ENTRY_DIRECTORY = process.cwd()
 const WRITTEN_TRANSCRIPTS = new Set<string>()
 
@@ -85,8 +86,6 @@ afterAll(() => {
 		rmSync(delivered_rules.delivery_path(DECLARED, target), { force: true })
 		rmSync(delivered_rules.delivery_path(RUN_TAIL, target), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('delivered_rules.delivery — the test-declared rule at the commit stage', () => {

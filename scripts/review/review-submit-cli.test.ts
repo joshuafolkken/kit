@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PassThrough, Readable } from 'node:stream'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The stamp files live in memory, so the test never writes the findings file a real ship in this
 // checkout reads.
@@ -34,16 +34,13 @@ const ROUND_FLAG = '--round'
 const CONFORMING_REVIEW = 'REVIEW TARGET MISMATCH'
 const SUMMARY_ONLY_REVIEW = '### Summary\n\ngo'
 
-const REVIEW_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'review-submit-'))
+const make_directory = temporary_directory('suite')
+const REVIEW_DIRECTORY = make_directory('review-submit-')
 
 beforeEach(() => {
 	stamps.clear()
 	vi.spyOn(console, 'info').mockReturnValue()
 	vi.spyOn(console, 'error').mockReturnValue()
-})
-
-afterAll(() => {
-	rmSync(REVIEW_DIRECTORY, { recursive: true, force: true })
 })
 
 function review_file(markdown: string): string {

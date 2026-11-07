@@ -1,12 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { copyFileSync, mkdirSync, symlinkSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { build } from 'esbuild'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { eslint_heap } from './eslint-heap'
 import { eslint_memory } from './eslint-memory.js'
 
+const make_directory = temporary_directory()
 const MEMORY_LINE = /ESLint peak RSS: (?<mib>\d+\.\d) MiB/gu
 const ROOT = process.cwd()
 const MANIFEST = 'package.json'
@@ -19,12 +20,9 @@ process.exitCode = result.exit_code ?? 1
 `
 
 function package_fixture(): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'eslint-memory bundle-'))
+	const root = make_directory('eslint-memory bundle-')
 	const directory = path.join(root, 'node_modules', 'kit')
 
-	onTestFinished(() => {
-		rmSync(root, { recursive: true, force: true })
-	})
 	mkdirSync(path.join(directory, 'scripts', 'lint'), { recursive: true })
 	copyFileSync(path.join(ROOT, MANIFEST), path.join(directory, MANIFEST))
 	copyFileSync(path.join(ROOT, MEMORY_SOURCE), path.join(directory, MEMORY_SOURCE))

@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
@@ -8,11 +7,13 @@ import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_ship_lap } from '#scripts/run/ship/run-ship-lap'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_related_verdict } from './test-related-verdict'
 import { test_unit_guard } from './test-unit-guard'
 
-const SCRATCH = mkdtempSync(path.join(tmpdir(), 'test-related-verdict-'))
+const make_directory = temporary_directory('suite')
+const SCRATCH = make_directory('test-related-verdict-')
 const SOURCE = 'source.ts'
 const TREE = { files: { [SOURCE]: 'digest' }, base: 'base' }
 const OTHER = 'other.ts'
@@ -38,10 +39,6 @@ afterEach(() => {
 	rmSync(SCRATCH, { recursive: true, force: true })
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
-})
-
-afterAll(() => {
-	rmSync(SCRATCH, { recursive: true, force: true })
 })
 
 describe('test_related_verdict.run', () => {

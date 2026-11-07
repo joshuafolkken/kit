@@ -1,9 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_labels } from './gate-labels'
 import { gate_tree, type GateTree } from './gate-tree'
 import type { MovedParts } from './moved-paths'
@@ -14,7 +13,8 @@ import { since_green } from './since-green'
 // sync's own changes included — and the whole branch change wherever that cannot be told.
 
 const PREFIX = 'since-green-test-'
-const scratch = mkdtempSync(path.join(tmpdir(), PREFIX))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory(PREFIX)
 const stamp = file_map_stamp.create(PREFIX, scratch, () => 'inputs-a')
 const other_inputs = file_map_stamp.create(PREFIX, scratch, () => 'inputs-b')
 const FROM_MAIN = 'scripts/from-main.ts'
@@ -51,10 +51,6 @@ function base_moved(...paths: ReadonlyArray<string>): void {
 beforeEach(() => {
 	read_git.mockReset()
 	read_tree.mockReset()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('since_green.read_moved_parts — what it narrows to', () => {

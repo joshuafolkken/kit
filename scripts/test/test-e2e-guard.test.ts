@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_e2e_guard } from './test-e2e-guard'
@@ -21,13 +21,10 @@ function fake_result(exit_code: number | undefined): ExecaResult {
 }
 
 const ctx = { project_directory: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'e2e-guard-'))
-})
-
-afterEach(() => {
-	rmSync(ctx.project_directory, { recursive: true, force: true })
+	ctx.project_directory = make_directory('e2e-guard-')
 })
 
 function add_playwright_package(): void {

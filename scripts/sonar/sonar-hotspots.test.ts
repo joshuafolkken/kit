@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import {
 	DEFER_BRANCH,
@@ -25,6 +25,7 @@ const MANAGED_PREFIX = 'managed:'
 const TO_REVIEW = 'TO_REVIEW'
 const REVIEWED = 'REVIEWED'
 const TMP_PREFIX = 'sonar-'
+const make_directory = temporary_directory()
 const PROPERTIES_NAME = 'sonar-project.properties'
 
 function captured_lines(disposition: HotspotDisposition): Array<string> {
@@ -45,15 +46,11 @@ function captured_lines(disposition: HotspotDisposition): Array<string> {
 }
 
 function read_key_from_properties(contents: string): string | undefined {
-	const directory = mkdtempSync(path.join(tmpdir(), TMP_PREFIX))
+	const directory = make_directory(TMP_PREFIX)
 
-	try {
-		writeFileSync(path.join(directory, PROPERTIES_NAME), contents)
+	writeFileSync(path.join(directory, PROPERTIES_NAME), contents)
 
-		return sonar_project.read_project_key(directory)
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	return sonar_project.read_project_key(directory)
 }
 
 function hotspot(overrides: Partial<Hotspot>): Hotspot {

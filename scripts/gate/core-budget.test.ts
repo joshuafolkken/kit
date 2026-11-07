@@ -1,10 +1,10 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget, type LiveReservation } from './core-budget'
@@ -39,8 +39,10 @@ function gate_reservations(gate_index: number, unit_weight: number): Array<LiveR
 	)
 }
 
+const make_directory = temporary_directory()
+
 function probe_directory(): string {
-	return mkdtempSync(path.join(tmpdir(), PROBE_PREFIX))
+	return make_directory(PROBE_PREFIX)
 }
 
 function write_marker(directory: string, name: string, payload: unknown): void {
@@ -105,10 +107,6 @@ describe('core_budget.live_reservations — who counts as holding a place', () =
 
 	beforeEach(() => {
 		directory = probe_directory()
-	})
-
-	afterEach(() => {
-		rmSync(directory, { recursive: true, force: true })
 	})
 
 	it('counts a marker whose process is still alive', () => {
@@ -176,13 +174,7 @@ function write_blocking_marker(directory: string): void {
 }
 
 async function with_probe<T>(run: (directory: string) => Promise<T>): Promise<T> {
-	const directory = probe_directory()
-
-	try {
-		return await run(directory)
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	return await run(probe_directory())
 }
 
 // The solo path: nothing else holds a place, so the claim is the ledger's head and is admitted on the
