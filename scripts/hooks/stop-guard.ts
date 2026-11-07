@@ -4,6 +4,7 @@ import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
+import { hook_ledger } from '#scripts/hooks/hook-ledger'
 import { stop_actions } from '#scripts/hooks/stop-actions'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
@@ -39,6 +40,9 @@ import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 // a hook that failed closed would wedge a run over its own plumbing. The hook runs the fixed
 // operations itself (send the notify, release the hold) and `stop_hook_active` is the backstop, so failing
 // open here costs at most a missed nudge, never a stuck run.
+
+// The name a refusal is recorded under in the hook ledger (`hook-ledger.ts`).
+const HOOK_NAME = 'stop-guard'
 
 // The hold record for this working tree. `unreadable` reads as absent: the safe direction for a stop
 // guard is not to act, and an unreadable record is not proof a run is holding.
@@ -240,6 +244,8 @@ async function write_stop_decision(raw_payload: string): Promise<void> {
 	if (envelope === undefined) return
 
 	process.stdout.write(`${envelope}\n`)
+	// Read off the written envelope, so a stop held by a failed action is counted beside a bare reason.
+	await hook_ledger.record_reason(HOOK_NAME, hook_ledger.blocked_reason(envelope), raw_payload)
 }
 
 const stop_guard = { outcome_of, stop_outcome_for_payload }

@@ -205,6 +205,24 @@ describe('Codex pre-tool adaptation', () => {
 	})
 })
 
+// joshuafolkken/kit#6587: a Codex refusal reaches the hook ledger like a Claude one.
+describe('Codex pre-tool hook ledger', () => {
+	it('hands the ledger the outcome, judged as the adapted Edit call', async () => {
+		const outcome: GuardOutcome = { ...ALLOW, reason: '⛔ batching: reissue' }
+
+		vi.spyOn(pretool_guard, 'pretool_outcome').mockReturnValue(outcome)
+		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
+		vi.spyOn(hook_decision, 'emit_outcome').mockReturnValue(undefined)
+		vi.spyOn(pretool_guard, 'mark_phase').mockResolvedValue(undefined)
+		const record = vi.spyOn(pretool_guard, 'record_refusal').mockResolvedValue(undefined)
+		const raw_payload = codex_payload([TYPESCRIPT_FILE])
+
+		await codex_hook_adapter.write_pretool_outcome(raw_payload)
+
+		expect(record).toHaveBeenCalledWith(codex_hook_adapter.pretool_payload(raw_payload), outcome)
+	})
+})
+
 // joshuafolkken/kit#3920: the rewrite is Claude Code's `updatedInput`, so Codex keeps the refusal.
 describe('Codex pre-tool rewrites', () => {
 	it('still refuses a body-only Issue read rather than rewriting it', () => {
