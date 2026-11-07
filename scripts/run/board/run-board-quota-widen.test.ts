@@ -85,7 +85,7 @@ describe('run_board_quota_held.quota_reader — the lanes done across the rise',
 		})?.summary
 
 		expect(claude?.per_task?.[SEVEN_DAYS]).toBeCloseTo((NEWEST_USED - FIRST_USED) / FIRST_LAUNCH)
-		expect(summary).toContain('≈—/247')
+		expect(summary).toContain(' ≈247 ')
 	})
 
 	it('widens the list until a lane ended before the oldest reading, reading no further', async () => {
