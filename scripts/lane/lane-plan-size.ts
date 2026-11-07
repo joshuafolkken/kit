@@ -50,12 +50,10 @@ import { lane_stage_budget } from './lane-stage-budget'
 // **A new scripts module and its importer count and split as one file** (joshuafolkken/kit#6635), or
 // the kept lane ships a module `pack-boundary.test.ts` finds unreached. As in `epic-split-reach.ts`, a
 // planned scripts module the base holds is a candidate importer, here only one in the new module's
-// directory; with no `base_files`, every file stands alone.
+// directory; with no `base_files`, every file stands alone. The grouping is the split notice's
+// (`split_assess.units_of`, joshuafolkken/kit#6724).
 
 type SplitReason = 'files' | 'hunks' | 'lines'
-
-const SCRIPTS_DIRECTORY = 'scripts/'
-const TYPESCRIPT = '.ts'
 
 // What `lane:plan` measured beside the plan (`lane-plan-signals.ts`); one `hunk_files` entry per hunk,
 // one `committed_files` entry per file the branch changed between its base and `HEAD`, and the files
@@ -124,42 +122,12 @@ function ordered(counted: ReadonlyArray<string>, recorded: ReadonlyArray<string>
 	return [...counted.filter((file) => held.has(file)), ...counted.filter((file) => !held.has(file))]
 }
 
-function is_scripts_module(file: string): boolean {
-	return file.startsWith(SCRIPTS_DIRECTORY) && file.endsWith(TYPESCRIPT)
-}
-
-function directory_of(file: string): string {
-	return file.slice(0, file.lastIndexOf('/') + 1)
-}
-
-// Each new module beside the first free planned module of its directory the base holds, both ways round —
-// matched by directory, not plan order, so an unrelated file listed first does not take the pair.
-function partners_of(files: ReadonlyArray<string>, base: ReadonlySet<string>): Map<string, string> {
-	const modules = files.filter((file) => is_scripts_module(file))
-	const added = modules.filter((file) => !base.has(file))
-	const partners = new Map<string, string>()
-
-	for (const module of added) {
-		const importer = modules.find(
-			(file) =>
-				base.has(file) && !partners.has(file) && directory_of(file) === directory_of(module),
-		)
-		if (importer !== undefined) partners.set(module, importer).set(importer, module)
-	}
-
-	return partners
-}
-
-// The counted files grouped into what splits as one, each group at its first file.
+// The counted files grouped into what splits as one, on the split notice's units: a planned file the base
+// does not hold is added.
 function units_of(files: ReadonlyArray<string>, signals: PlanSignals): Array<Array<string>> {
-	const partners = partners_of(files, signals.base_files ?? new Set(files))
+	const base = signals.base_files ?? new Set(files)
 
-	return files.flatMap((file) => {
-		const partner = partners.get(file)
-		if (partner === undefined) return [[file]]
-
-		return files.indexOf(partner) < files.indexOf(file) ? [] : [[file, partner]]
-	})
+	return split_assess.units_of(files, new Set(files.filter((file) => !base.has(file))))
 }
 
 function files_approved(

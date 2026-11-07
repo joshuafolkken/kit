@@ -8,6 +8,11 @@ interface DeletedBlob {
 	object: string
 }
 
+interface RelocatedDiff {
+	numstat: string
+	added: ReadonlyArray<string>
+}
+
 interface RawChange {
 	header: string
 	file: string
@@ -78,23 +83,26 @@ async function candidates(root: string, files: ReadonlyArray<string>): Promise<A
 }
 
 // Exact relocations carry no implementation lines. Each deletion can answer only one addition;
-// edited moves and unrelated additions/deletions retain their full numstat contribution.
+// edited moves and unrelated additions/deletions retain their full numstat contribution. The files
+// the branch adds, tracked or not, come back beside it for the split notice's units
+// (joshuafolkken/kit#6724).
 async function without_relocations(
 	root: string,
 	base: string,
 	numstat: string,
 	untracked: ReadonlyArray<string>,
-): Promise<string> {
+): Promise<RelocatedDiff> {
 	const raw = await git_spawn.read([...RAW_OPTIONS, base, '--'])
-	const added = await candidates(root, [...added_paths(raw), ...untracked])
-	const paired = paired_paths(raw, added)
-
-	return numstat
+	const added = [...added_paths(raw), ...untracked]
+	const paired = paired_paths(raw, await candidates(root, added))
+	const rows = numstat
 		.split('\n')
 		.filter((row) => !paired.has(row.split('\t').slice(PAIR_FIELDS).join('\t')))
-		.join('\n')
+
+	return { numstat: rows.join('\n'), added }
 }
 
 const split_relocations = { without_relocations }
 
+export type { RelocatedDiff }
 export { split_relocations }

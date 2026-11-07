@@ -84,6 +84,9 @@ const DECLARED_GROWTH_FACTOR = declared_growth.FALLBACK
 const SPLIT_VERDICT: SplitVerdict = 'split'
 const SINGLE_VERDICT: SplitVerdict = 'single'
 
+const SCRIPTS_DIRECTORY = 'scripts/'
+const TYPESCRIPT = '.ts'
+
 const BINARY_MARKER = '-'
 const NUMSTAT_FIELDS = 3
 
@@ -125,6 +128,49 @@ function is_deliverable(change: FileChange): boolean {
 	return !test_declared_logic.is_test_file(file) && !run_record_path.is_run_record(file)
 }
 
+function is_scripts_module(file: string): boolean {
+	return file.startsWith(SCRIPTS_DIRECTORY) && file.endsWith(TYPESCRIPT)
+}
+
+function directory_of(file: string): string {
+	return file.slice(0, file.lastIndexOf('/') + 1)
+}
+
+// Each added module beside the first free listed module of its directory that is not added, both ways
+// round — matched by directory, not list order, so an unrelated file listed first does not take the pair.
+function partners_of(
+	files: ReadonlyArray<string>,
+	added: ReadonlySet<string>,
+): Map<string, string> {
+	const modules = files.filter((file) => is_scripts_module(file))
+	const partners = new Map<string, string>()
+	const new_modules = modules.filter((file) => added.has(file))
+
+	for (const module of new_modules) {
+		const importer = modules.find(
+			(file) =>
+				!added.has(file) && !partners.has(file) && directory_of(file) === directory_of(module),
+		)
+		if (importer !== undefined) partners.set(module, importer).set(importer, module)
+	}
+
+	return partners
+}
+
+// The files grouped into what splits as one, each group at its first file: a new scripts module and an
+// importer of its directory count as one (joshuafolkken/kit#6635), for `lane:plan` and the split notice
+// alike (joshuafolkken/kit#6724). With no `added` file, every file stands alone.
+function units_of(files: ReadonlyArray<string>, added: ReadonlySet<string>): Array<Array<string>> {
+	const partners = partners_of(files, added)
+
+	return files.flatMap((file) => {
+		const partner = partners.get(file)
+		if (partner === undefined) return [[file]]
+
+		return files.indexOf(partner) < files.indexOf(file) ? [] : [[file, partner]]
+	})
+}
+
 // `split` when **either** guide is exceeded — the AND form never fired, even on the lanes cut twice
 // mid-implementation (joshuafolkken/kit#5384). A filing's declared estimate and `backlog:next`'s offer
 // are judged by this same call (`issue/size-estimate.ts`).
@@ -141,21 +187,28 @@ function is_over_cap(files: number, lines: number, guide: SplitGuide = DEFAULT_G
 	return files > guide.cap.files || lines > guide.cap.lines
 }
 
-function measure(changes: ReadonlyArray<FileChange>, guide?: SplitGuide): SizeMeasurement {
+// `added` lists the files the branch adds, so a new module and its importer count as one file.
+function measure(
+	changes: ReadonlyArray<FileChange>,
+	guide?: SplitGuide,
+	added: ReadonlySet<string> = new Set(),
+): SizeMeasurement {
 	const runtime = changes.filter((change) => is_deliverable(change))
 	const lines = runtime.reduce((total, change) => total + change.changed_lines, 0)
+	const paths = runtime.map((change) => git_path_quoting.unquote(change.path))
+	const files = units_of(paths, added).length
 
 	return {
-		files: runtime.length,
+		files,
 		lines,
-		verdict: verdict_for(runtime.length, lines, guide),
+		verdict: verdict_for(files, lines, guide),
 		...(guide !== undefined && { guide }),
 	}
 }
 
 // The size measurement of a raw `git diff --numstat`, the one call the CLI makes.
-function assess(raw: string, guide?: SplitGuide): SizeMeasurement {
-	return measure(parse_numstat(raw), guide)
+function assess(raw: string, guide?: SplitGuide, added?: ReadonlySet<string>): SizeMeasurement {
+	return measure(parse_numstat(raw), guide, added)
 }
 
 const SPLIT_TAIL =
@@ -265,6 +318,7 @@ const split_assess = {
 	parse_numstat,
 	policy_text,
 	reason,
+	units_of,
 	verdict_for,
 }
 
