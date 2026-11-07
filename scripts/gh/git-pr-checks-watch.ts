@@ -1,3 +1,4 @@
+import { POLL_BACKOFF } from '#scripts/lib/poll'
 import {
 	CHECK_WAIT_INTERVAL_MS,
 	compute_max_attempts,
@@ -37,7 +38,7 @@ import {
 // soon as the pull request is open.
 //
 // **What is lost is the live table.** `gh` printed each check's name and state as it changed; the
-// poll prints `Checking PR status… (n/N)` instead. The trade is accepted because the display was
+// poll prints `Checking PR status… (read n)` instead. The trade is accepted because the display was
 // never load-bearing — no caller parsed it — and because keeping it would have left the merge gate's
 // last GraphQL call in place, which is a 403 in a cloud session.
 
@@ -152,6 +153,7 @@ async function watch_until_settled(branch_name: string, observe?: SnapshotObserv
 			PR_CHECKS_WATCH_TIMEOUT_MS / SECONDS_TO_MS,
 			CHECK_WAIT_INTERVAL_MS,
 		),
+		backoff: POLL_BACKOFF,
 		required_stable_reads: DEFAULT_STABLE_READS,
 		evaluator: CHECKS_SETTLED_EVALUATOR,
 	})
