@@ -1,4 +1,4 @@
-import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { IN_PROGRESS_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { describe, expect, it, vi } from 'vitest'
 import { run_add, type AddContext, type AddPorts } from './run-add'
 
@@ -41,8 +41,25 @@ it('preserves remaining dependencies when explicitly retrying (ac-505a5dfa)', as
 	])
 })
 
+describe('retry and the shared in-progress reader', () => {
+	it('protects an issue a run holds', async () => {
+		const ports = ports_for([IN_PROGRESS_LABEL.toUpperCase()])
+
+		expect(await run_add.add_all([ISSUE], true, ports, CONTEXT)).toMatchObject([
+			{ kind: 'refused', reason: IN_PROGRESS_LABEL },
+		])
+		expect(ports.apply_label).not.toHaveBeenCalled()
+	})
+
+	it('retries a stalled issue still labelled in-progress', async () => {
+		const ports = ports_for([RUN_STALLED_LABEL, IN_PROGRESS_LABEL])
+
+		expect(await run_add.add_all([ISSUE], true, ports, CONTEXT)).toMatchObject([{ kind: 'queued' }])
+	})
+})
+
 describe('retry protection', () => {
-	it.each(['needs-decision', 'needs-human-review', 'already-done', 'in-progress'])(
+	it.each(['needs-decision', 'needs-human-review', 'already-done'])(
 		'protects %s',
 		async (label) => {
 			const ports = ports_for([RUN_STALLED_LABEL, label.toUpperCase()])

@@ -211,7 +211,7 @@ Adds to this repository's live `backlogrun` at the next free lane, without inter
 
 - Epic children are read on every driver pass and need no `run:add`.
 - Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`. Named runs also record additions beside their unchanged invocation.
-- Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
+- Refuses closed/unreadable issues, epics, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
 - Each `add` event wakes `run:progress --wait`.
 - `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
 
@@ -874,7 +874,7 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 
 <!-- /usage -->
 
-`.vscode/tasks.json`, which `josh init` creates and `josh sync` refreshes, ships it as the `josh: run board` task, started by hand from "Tasks: Run Task".
+`.vscode/tasks.json`, from `josh init` and `josh sync`, ships it as the `josh: run board` task, started by hand from "Tasks: Run Task".
 
 The header is three lines — the first two in three columns, the third a spinner and time under the second column, then the kind's icon and words under the third:
 
