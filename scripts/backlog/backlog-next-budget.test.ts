@@ -15,9 +15,11 @@ import { backlog_resume_reads } from './backlog-resume-reads'
 // joshuafolkken/kit#6610: the `gh` calls one `backlog:next` scan makes, counted on a fixed backlog of
 // 11 epic children across three epics. The count is every read at the `gh` boundary the fixture
 // stubs — the `git_gh_command` reads, the reachability probe, and the `exec_gh_api` reads the resume
-// signals make for real here. The rest of the epic (#6611, #6613) lowers `SCAN_CALL_CAP`.
+// signals make for real here. #6611 reuses the listed rows for open children, so none is read on
+// its own; #6613 lowers `SCAN_CALL_CAP` further.
 
 const { console_streams } = auto_ok_fixture
+const GET_CHILD = 'issue_get_state_and_relations_classified'
 
 const EPICS = [
 	{ number: 950, children: [951, 952, 953, 954] },
@@ -25,12 +27,15 @@ const EPICS = [
 	{ number: 970, children: [971, 972, 973] },
 ]
 const CHILDREN = EPICS.flatMap((epic) => epic.children)
-// Read per child before #6610: its comments, its timeline and the repository's name.
-const PRE_FIX_READS_PER_CHILD = 3
+// Read per child before #6610 and #6611: its comments, its timeline, the repository's name and the
+// child itself.
+const PRE_FIX_READS_PER_CHILD = 4
 // One open pull request listing and one GraphQL query, however many children there are.
 const RESUME_READS = 2
+// The listed children are candidates, so each one's body is read too (11 of the 21); without #6611
+// the scan read each listed child again, 32 calls.
 const SCAN_CALL_CAP = 21
-const PRE_FIX_SCAN_CALLS = 52
+const PRE_FIX_SCAN_CALLS = 63
 
 const streams = console_streams()
 
@@ -45,11 +50,17 @@ async function answer(request: GhApiRequest): Promise<string> {
 	return request.path === GRAPHQL_PATH ? comments_answer() : ''
 }
 
-function stub(): void {
+// The children are opted in with their epics, so the listing returns each one's row.
+function stub(is_listed = true): void {
+	const listed = is_listed ? CHILDREN : []
+
 	backlog_fixture.stub_backlog({
-		opted_in: EPICS.map((epic) =>
-			auto_ok_fixture.issue(epic.number, CREATED_EARLIER, [AUTO_OK_LABEL, EPIC_LABEL]),
-		),
+		opted_in: [
+			...EPICS.map((epic) =>
+				auto_ok_fixture.issue(epic.number, CREATED_EARLIER, [AUTO_OK_LABEL, EPIC_LABEL]),
+			),
+			...listed.map((child) => auto_ok_fixture.issue(child, CREATED_EARLIER, [AUTO_OK_LABEL])),
+		],
 		epics: EPICS,
 		children: CHILDREN.map((number) => ({ number })),
 	})
@@ -73,13 +84,24 @@ function scan_calls(): number {
 	return command_calls + exec_calls
 }
 
-beforeEach(() => {
+function reset_scan(is_listed = true): void {
 	vi.restoreAllMocks()
 	vi.spyOn(console, 'info').mockImplementation(streams.info)
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(console, 'warn').mockImplementation(streams.error)
 	streams.reset()
-	stub()
+	stub(is_listed)
+}
+
+async function scan_output(is_listed: boolean): Promise<string> {
+	reset_scan(is_listed)
+	await backlog_next.run([])
+
+	return streams.stdout()
+}
+
+beforeEach(() => {
+	reset_scan()
 })
 
 it('keeps one scan of 11 epic children under the gh call cap', async () => {
@@ -91,4 +113,15 @@ it('keeps one scan of 11 epic children under the gh call cap', async () => {
 
 	expect(pre_fix).toBe(PRE_FIX_SCAN_CALLS)
 	expect(calls).toBeLessThanOrEqual(SCAN_CALL_CAP)
+})
+
+it('reads no listed open epic child on its own', async () => {
+	expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+	expect(git_gh_command[GET_CHILD]).not.toHaveBeenCalled()
+})
+
+it('answers the same as when every listed child is read on its own', async () => {
+	const from_reads = await scan_output(false)
+
+	expect(await scan_output(true)).toBe(from_reads)
 })
