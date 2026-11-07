@@ -183,6 +183,10 @@ const EVENT_KIND = {
 	// JSON text with the cycle's `used_delta`, `remaining` and `reset`, or `is_missing` when a read failed
 	// (`backlog-drive-rate.ts`). A trace written every cycle, so the bound rolls it off with the heartbeats.
 	RATE_LIMIT: 'rate-limit',
+	// One josh process's GitHub usage, written as it ends (joshuafolkken/kit#6695, `gh-usage-event.ts`): its
+	// command, the gh calls, the 304 answers and the core `used` difference, as JSON text. A trace, and
+	// disposable: a reader wants the last hour of it, not the run's whole history.
+	GH_USAGE: 'gh-usage',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -210,6 +214,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SLEEP,
 	EVENT_KIND.PLAN_WAIT,
 	EVENT_KIND.RATE_LIMIT,
+	EVENT_KIND.GH_USAGE,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
@@ -223,6 +228,7 @@ const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.SETUP,
 	EVENT_KIND.PR_CHECKS,
 	EVENT_KIND.RATE_LIMIT,
+	EVENT_KIND.GH_USAGE,
 ])
 
 const event_schema = z.object({
@@ -232,7 +238,7 @@ const event_schema = z.object({
 	text: z.string(),
 	// The child's time on a lane, recorded once by the writer of an ending (joshuafolkken/kit#4481), so a
 	// reader never has to find its launch again. An event written before it has none. A `sleep` event
-	// carries the sleep's length here.
+	// carries the sleep's length here, and a `gh-usage` event its process's run time.
 	elapsed_ms: z.number().optional(),
 })
 
