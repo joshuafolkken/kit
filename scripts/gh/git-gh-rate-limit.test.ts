@@ -70,6 +70,7 @@ describe('gh_rate_limit.failure_hint', () => {
 describe('gh_rate_limit.is_exhausted', () => {
 	it.each([
 		['a body naming the primary limit', RATE_LIMIT_BODY, true],
+		['GraphQL wording', 'API rate limit already exceeded for user ID 1.', true],
 		['a secondary limit', 'You have exceeded a secondary rate limit. (HTTP 403)', true],
 		[
 			'a 429 with a spent remaining header',

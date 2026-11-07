@@ -3,7 +3,8 @@ import { git_gh_exec } from './git-gh-exec'
 
 // Whether a failed GitHub read failed on an exhausted rate limit, and when it resets (#6564). While
 // the limit is spent, `gh auth status` itself reports the token invalid, so the auth hint sent a lane
-// child into an authentication stop. Every reader of a failed GitHub read classifies it here, once.
+// child into an authentication stop. The single classifier `issue:read` (#6614) and `run:merge`
+// (#6502) are to share.
 //
 // The input is text — gh's stderr summary and the response body (`to_gh_error`), headers under
 // `--include`, or a stop record — so a reader holding no error object can classify it too.
@@ -16,7 +17,7 @@ const RATE_LIMIT_STATUSES: ReadonlySet<number> = new Set([
 ])
 const MILLISECONDS_PER_SECOND = 1000
 // GitHub's own wording for the primary and the secondary limit, in the body and in gh's summary.
-const RATE_LIMIT_MESSAGE = /rate limit exceeded|exceeded a secondary rate limit/iu
+const RATE_LIMIT_MESSAGE = /rate limit (?:already )?exceeded|exceeded a secondary rate limit/iu
 const EXHAUSTED_HEADER = /^x-ratelimit-remaining:\s*0\s*$/imu
 const RESET_HEADER = /^x-ratelimit-reset:\s*(?<epoch>\d+)\s*$/imu
 // gh's summary `(HTTP 403)`, a header status line `HTTP/2.0 403 Forbidden`, or the error document's
