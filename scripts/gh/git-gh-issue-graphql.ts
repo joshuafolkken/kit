@@ -186,4 +186,4 @@ async function read_issue(
 const git_gh_issue_graphql = { read_issue }
 
 export type { IssueWithComments }
-export { git_gh_issue_graphql, ISSUE_QUERY }
+export { git_gh_issue_graphql }
