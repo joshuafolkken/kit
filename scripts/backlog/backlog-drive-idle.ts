@@ -17,7 +17,7 @@ import type { DrivePorts, DriveState, OfferRead, PassResult } from './backlog-dr
 // to start. A stall was notified instead and reached nobody with anything to do, since the next dispatch
 // resolved it; this fires only once nothing is left for the loop itself to do.
 //
-// **Once per idle episode**: the loop asks once a minute while it watches, so the marker on the stream
+// **Once per idle episode**: the loop asks every offer interval while it watches, so the marker on the stream
 // (`emit_once_since_with`, reset by a `child-launch`) holds every repeat back, and the pool is read only
 // for an episode that is new.
 
