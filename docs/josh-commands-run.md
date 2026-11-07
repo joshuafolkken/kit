@@ -342,11 +342,15 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:cut` in
 Park a lane child for a decision, or clear the park.
 
 ```bash
-pnpm josh run:park 1839 --body-file .josh/tmp/park-1839.md   # comment, needs-decision, the local record, then run:release
+pnpm josh run:park 1839 --body-file .josh/tmp/park-1839.md   # options, tiers and a recommendation; then needs-decision, the record, run:release
 pnpm josh run:park 1839 --clear                              # remove needs-decision and the record
 ```
 
 <!-- /usage -->
+
+The body follows one schema (`scripts/run/park/run-park-body.ts`): numbered options under `### 選択肢`, each with `- 層: A|B|C` and `- 必要な権限: …`, then one `### 推奨` line — `<option number> <reason>`, or `推奨なし <reason>`.
+
+A body off the schema is refused before any write, naming the missing piece and printing the schema; the usage prints it too.
 
 The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
 

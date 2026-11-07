@@ -192,7 +192,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '1839 --body-file .josh/tmp/park-1839.md',
-					note: 'comment, needs-decision, the local record, then run:release',
+					note: 'options, tiers and a recommendation; then needs-decision, the record, run:release',
 				},
 				{ arguments: '1839 --clear', note: 'remove needs-decision and the record' },
 			],
