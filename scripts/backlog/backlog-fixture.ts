@@ -12,7 +12,6 @@ import { git_stash } from '#scripts/git/stash/git-stash'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import {
 	BUG_LABEL,
 	NOT_BEFORE_LABEL,
@@ -23,8 +22,8 @@ import { lane_await } from '#scripts/lane/lane-await'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
-import { run_pause_comment } from '#scripts/run/pause/run-pause-comment'
 import { vi } from 'vitest'
+import { backlog_resume_reads } from './backlog-resume-reads'
 
 // One description of a backlog, stubbed across every read `josh backlog:next` makes.
 //
@@ -261,11 +260,13 @@ function stub_listings(input: BacklogInput, epics: ReadonlyArray<EpicInput>): vo
 }
 
 function stub_resumable(input: BacklogInput): void {
-	vi.spyOn(run_pause_comment, 'is_paused').mockImplementation(async (issue) =>
-		(input.paused ?? []).includes(Number(issue)),
+	const paused = new Set((input.paused ?? []).map(String))
+
+	vi.spyOn(backlog_resume_reads, 'paused_issues').mockImplementation(
+		async (issues) => new Set(issues.filter((issue) => paused.has(issue))),
 	)
-	vi.spyOn(issue_closing_pr, 'has_open_pr').mockImplementation(async (issue) =>
-		(input.open_pr ?? []).includes(Number(issue)),
+	vi.spyOn(backlog_resume_reads, 'open_pr_issues').mockResolvedValue(
+		new Set((input.open_pr ?? []).map(String)),
 	)
 	vi.spyOn(git_stash, 'list').mockResolvedValue(
 		(input.stashed ?? []).map((number) => ({
