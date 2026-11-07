@@ -161,15 +161,21 @@ function count_text(count: number | undefined): string {
 	return count === undefined ? '' : `${COUNT_MARK}${String(count)}`
 }
 
+// Percent, bar with ┊ at `pace`, then the caller's `reset` and `count` (either may be empty).
+function gauge_text(used_percent: number, pace: number, reset: string, count: string): string {
+	const shade = GAUGE_SHADES[level_of(used_percent, pace)]
+	const percent = run_board_machine.percent_text(used_percent)
+	const bar = bar_text(used_percent, pace, shade)
+
+	return padded(`${percent} ${bar}  ${padded(reset, RESET_WIDTH)}  ${count}`)
+}
+
 function cell_of(window: QuotaWindow, now_ms: number, per_task?: number): string {
 	const shown = current(window, now_ms)
-	const pace = pace_of(shown, now_ms)
-	const shade = GAUGE_SHADES[level_of(shown.used_percent, pace)]
-	const percent = run_board_machine.percent_text(shown.used_percent)
-	const reset = padded(`${RESET_MARK} ${reset_text(shown.resets_ms, now_ms)}`, RESET_WIDTH)
+	const reset = `${RESET_MARK} ${reset_text(shown.resets_ms, now_ms)}`
 	const count = count_text(count_of(window, now_ms, per_task))
 
-	return padded(`${percent} ${bar_text(shown.used_percent, pace, shade)}  ${reset}  ${count}`)
+	return gauge_text(shown.used_percent, pace_of(shown, now_ms), reset, count)
 }
 
 // Each column's window, `undefined` where the provider reported none that stands in it.
@@ -234,10 +240,8 @@ function name_of(provider: QuotaProvider, view: QuotaView): string {
 	return `${mark} ${provider}`
 }
 
-function name_cell(provider: QuotaProvider, view: QuotaView): string {
-	const name = name_of(provider, view)
-
-	return `${name}${' '.repeat(NAME_WIDTH - run_board_fit.width_of(name))}`
+function name_cell(name: string): string {
+	return padded(name, NAME_WIDTH)
 }
 
 // Claude's row reads its hold while a usage limit stops the run's launches.
@@ -248,7 +252,7 @@ function row_of(provider: QuotaProvider, view: QuotaView): string {
 			? hold_text(hold, now_ms)
 			: reading_text(view.quotas?.[provider], now_ms)
 
-	return `${INDENT}${name_cell(provider, view)}${body}`
+	return `${INDENT}${name_cell(name_of(provider, view))}${body}`
 }
 
 function percents_text(reading: QuotaReading | undefined, now_ms: number): string {
@@ -292,7 +296,7 @@ function rate_limit_bodies(view: QuotaView): Array<string> {
 }
 
 function rate_limit_rows(view: QuotaView): Array<string> {
-	return rate_limit_bodies(view).map((body) => `${INDENT}${padded(GITHUB, NAME_WIDTH)}${body}`)
+	return rate_limit_bodies(view).map((body) => `${INDENT}${name_cell(GITHUB)}${body}`)
 }
 
 // `claude 42/68 ≈9/5`: each column's percent, `—` where none stands, then its count.
@@ -330,7 +334,7 @@ function usage_part(view: QuotaView): DetailPart | undefined {
 	return { head: ['', rule], lines, label: LABEL, summary: summary_of(view) }
 }
 
-const run_board_render_quota = { LEGEND, usage_part }
+const run_board_render_quota = { LEGEND, gauge_text, usage_part }
 
 export { run_board_render_quota }
 export type { QuotaHold, QuotaView }

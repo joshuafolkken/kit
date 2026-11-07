@@ -1,5 +1,6 @@
 import { has_timed_out } from '#scripts/git/git-execa-error'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { error_text } from '#scripts/lib/error-message'
 import { token_shape } from '#scripts/lib/token-shape'
 import { execa, execaSync } from 'execa'
@@ -152,7 +153,13 @@ function to_gh_error(error: unknown): Error {
 	)
 }
 
-async function exec_gh_command(
+// One width for every asynchronous `gh` spawn, so `Promise.all` fan-outs anywhere (`backlog:next`
+// reads up to hundreds) stay under GitHub's secondary rate limit. Held around the spawn only:
+// `with_retry`'s backoff waits outside a slot.
+const GH_SPAWN_CONCURRENCY = 8
+const gh_slots = bounded_pool.limiter(GH_SPAWN_CONCURRENCY)
+
+async function spawn_gh_command(
 	arguments_: Array<string>,
 	timeout_ms?: number,
 	cwd?: string,
@@ -169,14 +176,24 @@ async function exec_gh_command(
 	}
 }
 
-async function exec_gh_command_with_stdin(input: {
+async function exec_gh_command(
+	arguments_: Array<string>,
+	timeout_ms?: number,
+	cwd?: string,
+): Promise<string> {
+	return await gh_slots.run(async () => await spawn_gh_command(arguments_, timeout_ms, cwd))
+}
+
+interface StdinCommand {
 	args: Array<string>
 	stdin_body: string
 	// `number | undefined` rather than plain optional: `exec_gh_api` forwards its own optional field,
 	// which `exactOptionalPropertyTypes` will not narrow for it.
 	timeout_ms?: number | undefined
 	cwd?: string | undefined
-}): Promise<string> {
+}
+
+async function spawn_gh_command_with_stdin(input: StdinCommand): Promise<string> {
 	await check_gh_installed()
 
 	// Built ahead of the call so the spawn itself stays on one line: `// NOSONAR` suppresses the rule
@@ -190,6 +207,10 @@ async function exec_gh_command_with_stdin(input: {
 	} catch (error) {
 		throw to_gh_error(error)
 	}
+}
+
+async function exec_gh_command_with_stdin(input: StdinCommand): Promise<string> {
+	return await gh_slots.run(async () => await spawn_gh_command_with_stdin(input))
 }
 
 // The status line `gh api --include` prints before the headers, e.g. `HTTP/2.0 404 Not Found`.
@@ -220,7 +241,7 @@ function status_of_failure(error: unknown): number | undefined {
 // spawn beside four bounded ones would be an inconsistency in the same file. A timeout reaches the
 // `catch` and answers `undefined`, which already means "no status was reached", which its one
 // caller already reads as a failed read rather than as a 404.
-async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<number | undefined> {
+async function spawn_gh_api_status(path: string, timeout_ms?: number): Promise<number | undefined> {
 	// Hoisted so the spawn below fits on one line, which `// NOSONAR` requires — it suppresses only
 	// the line it sits on. The **argument list** stays an inline literal for the opposite reason:
 	// `gh-subcommand-guard.ts` resolves the subcommand from it, and hoisting that into a `const`
@@ -236,6 +257,10 @@ async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<nu
 	} catch (error) {
 		return status_of_failure(error)
 	}
+}
+
+async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<number | undefined> {
+	return await gh_slots.run(async () => await spawn_gh_api_status(path, timeout_ms))
 }
 
 // The synchronous twin of `exec_gh_api_status`, for `epic-cross-repo.ts`, whose resolver is
@@ -425,4 +450,4 @@ const git_gh_exec = {
 
 export type { GhApiRequest }
 export { git_gh_exec, has_stderr_field, has_stdout_field }
-export { BODY_FROM_STDIN, GH_REQUEST_TIMEOUT_MESSAGE, GH_REQUEST_TIMEOUT_MS }
+export { BODY_FROM_STDIN, GH_REQUEST_TIMEOUT_MESSAGE, GH_REQUEST_TIMEOUT_MS, GH_SPAWN_CONCURRENCY }
