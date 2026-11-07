@@ -14,9 +14,13 @@ const FAILURE_EXIT_CODE = 1
 // exactly that distinction.
 type ReadFailureKind = 'missing' | 'unreadable'
 
+// Said of an unreadable read whose cause the caller did not classify.
+const UNCLASSIFIED_CAUSE = 'a rate limit, expired auth, or a dropped connection'
+
 interface NumberReport<K extends string> {
 	issue_number: string
-	result: { kind: K | ReadFailureKind }
+	// `hint` is the classified cause of an unreadable read — `gh_rate_limit.failure_hint` (#6614).
+	result: { kind: K | ReadFailureKind; hint?: string }
 }
 
 interface FailureTerms<K extends string> {
@@ -36,14 +40,19 @@ function print_blocks(blocks: ReadonlyArray<string>, separator: string, label: s
 // A number that resolves to nothing is an answer — a typo, or another repository's number quoted in
 // prose — and it is reported as one. Everything else is a gap, and the message says so, because the
 // caller's next move differs: a gap is retried, an answer is not.
-function report_failure(kind: ReadFailureKind, issue_number: string, misreading: string): void {
+function report_failure(
+	kind: ReadFailureKind,
+	issue_number: string,
+	misreading: string,
+	hint: string | undefined,
+): void {
 	if (kind === 'missing') {
 		console.error(
 			`✖ issue ${session_cite.issue(issue_number)} does not resolve — check the number and the repository`,
 		)
 	} else {
 		console.error(
-			`✖ could not read issue ${session_cite.issue(issue_number)} — a rate limit, expired auth, or a dropped connection. This is not "${misreading}"`,
+			`✖ could not read issue ${session_cite.issue(issue_number)} — ${hint ?? UNCLASSIFIED_CAUSE}. This is not "${misreading}"`,
 		)
 	}
 }
@@ -56,11 +65,11 @@ function report_one_failure<K extends string>(
 	report: NumberReport<K>,
 	terms: FailureTerms<K>,
 ): boolean {
-	const { kind } = report.result
+	const { kind, hint } = report.result
 
 	if (!is_failure_kind(kind)) return false
 
-	report_failure(kind, report.issue_number, terms.misreading)
+	report_failure(kind, report.issue_number, terms.misreading, hint)
 
 	return true
 }

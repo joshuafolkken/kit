@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { bash_output_cap_reader } from '#scripts/document/bash-output-cap'
 import { capped_print_fixture } from '#scripts/document/capped-print-fixture'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { gh_rate_limit } from '#scripts/gh/git-gh-rate-limit'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_read } from './issue-read'
 
 const classified_mock = vi.hoisted(() => vi.fn())
@@ -232,6 +234,42 @@ describe('issue_read_cli.run — a number that produced nothing', () => {
 	it('names --repo in the usage it prints', async () => {
 		expect(await issue_read_cli.run([ISSUE, '--rep=x'])).toBe(FAILURE)
 		expect(reported()).toContain('[--repo <owner/repo>]')
+	})
+})
+
+// joshuafolkken/kit#6614: a rate-limited read was reported with the same guess as expired auth, and a
+// lane child stopped on an authentication failure while its token was fine.
+const RESET_EPOCH = '1762400400'
+const RESET_ISO = '2025-11-06T03:40:00.000Z'
+const FORBIDDEN_STATUS = 403
+const UNAUTHORIZED_STATUS = 401
+const RATE_LIMIT_DETAIL = `gh: API rate limit exceeded for user ID 1. (HTTP 403)\n{"message":"API rate limit exceeded for user ID 1.","status":"403"}`
+const AUTH_DETAIL = `gh: Bad credentials (HTTP 401)\n{"message":"Bad credentials","status":"401"}`
+
+function fail_read(detail: string, status: number): void {
+	classified_mock.mockResolvedValue({ kind: 'unreadable', reason: 'rejected', status, detail })
+	comments_mock.mockResolvedValue(undefined)
+}
+
+describe('issue_read_cli.run — the cause of a failed read', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reports an exhausted rate limit with its reset time', async () => {
+		vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(RESET_EPOCH)
+		fail_read(RATE_LIMIT_DETAIL, FORBIDDEN_STATUS)
+
+		expect(await issue_read_cli.run([ISSUE])).toBe(FAILURE)
+		expect(reported()).toContain(gh_rate_limit.exhausted_message(new Date(RESET_ISO)))
+	})
+
+	it('reports a 401 with the authentication hint', async () => {
+		fail_read(AUTH_DETAIL, UNAUTHORIZED_STATUS)
+
+		expect(await issue_read_cli.run([ISSUE])).toBe(FAILURE)
+		expect(reported()).toContain(gh_rate_limit.AUTH_HINT)
+		expect(reported()).not.toContain('rate limit')
 	})
 })
 
