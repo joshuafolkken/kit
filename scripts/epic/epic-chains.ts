@@ -36,7 +36,7 @@ function render_chains(chains: Chains): Array<string> {
 		.map((chain) => chain.map((number) => to_issue_reference(number)).join(DEPENDENCY_ARROW))
 }
 
-// Each relation once: a fan-out spliced in front of its hub names `#M -> #A` on every line through it,
+// Each relation once: a fan-out spliced in front of its hub names `#N -> #M` on every line through it,
 // and that is one relation, not one per line.
 function links_of(chains: Chains): Array<DependencyLink> {
 	const links = chains.flatMap((chain) => chain_links(chain))
@@ -62,8 +62,9 @@ function diff_links(before: Chains, after: Chains): LinkDiff {
 	}
 }
 
-// The indices of the chains naming `target`. More than one is ambiguous rather than wrong: the
-// declaration is readable, but "immediately before #M" does not identify a single place.
+// The indices of the chains naming `target`. More than one can be ambiguous rather than wrong: the
+// declaration is readable, but "immediately before #M" identifies a single place only when every
+// chain gives `#M` the same predecessor (`is_single_place`).
 function chains_containing(chains: Chains, target: number): Array<number> {
 	return chains
 		.map((chain, index) => (chain.includes(target) ? index : -1))
