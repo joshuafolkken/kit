@@ -17,8 +17,9 @@ function is_window_spent(run: LoopRun, config: LoopConfig, now_ms: number): bool
 	return now_ms - run.started_ms >= config.window_ms
 }
 
+// A deadline is due once: one the last ask already reached falls back to the interval.
 function due_ms(deadline: number | undefined, offered_ms: number, interval_ms: number): number {
-	return deadline ?? offered_ms + interval_ms
+	return deadline !== undefined && deadline > offered_ms ? deadline : offered_ms + interval_ms
 }
 
 function deadline_of(state: DriveState): number | undefined {
@@ -30,7 +31,8 @@ function deadline_of(state: DriveState): number | undefined {
 function sleep_ms(deadline: number | undefined, milliseconds: number, now_ms: number): number {
 	const remaining = (deadline ?? Infinity) - now_ms
 
-	return Math.min(milliseconds, Math.max(0, remaining))
+	// A passed deadline waits the full interval; sleep(0) would spin until a seat frees.
+	return remaining > 0 ? Math.min(milliseconds, remaining) : milliseconds
 }
 
 function sleeper(
