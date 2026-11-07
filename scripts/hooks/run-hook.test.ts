@@ -4,20 +4,19 @@ import {
 	copyFileSync,
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readFileSync,
 	realpathSync,
-	rmSync,
 	writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 import { hook_command_bootstrap } from '#scripts/init/hook-command-bootstrap-fixture'
 import { hook_launch } from '#scripts/init/hook-launch'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 
+const make_directory = temporary_directory()
 const RUN_HOOK_SOURCE = fileURLToPath(new URL('run-hook.sh', import.meta.url))
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const LAUNCHER = 'scripts/hooks/run-hook.sh'
@@ -149,11 +148,7 @@ function initialize_repository(git_arguments: ReadonlyArray<string>): void {
 }
 
 beforeEach(() => {
-	workspace.root = mkdtempSync(path.join(tmpdir(), 'kit-run-hook-'))
-})
-
-afterEach(() => {
-	rmSync(workspace.root, { recursive: true, force: true })
+	workspace.root = make_directory('kit-run-hook-')
 })
 
 describe('run-hook.sh in kit checkout', () => {

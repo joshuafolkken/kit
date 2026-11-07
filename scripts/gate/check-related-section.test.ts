@@ -1,8 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_section } from './check-related-section'
@@ -20,7 +19,8 @@ vi.mock('./check-related-reuse', () => ({
 	},
 }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'check-related-section-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('check-related-section-test-')
 const LOG_TARGET = path.join(scratch, 'check-related.log')
 const TEST_COMMAND = 'test:related'
 const LINE_COUNT = 60
@@ -79,10 +79,6 @@ async function run_all_report(is_full: boolean): Promise<string> {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 // joshuafolkken/kit#5204: a whole `test:related` output went past the tool result's size limit.

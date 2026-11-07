@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { pr_classification } from './pr-classification'
+
+const make_directory = temporary_directory()
 
 const HUMAN = 'contributor'
 const BOT = 'dependabot[bot]'
@@ -154,27 +156,23 @@ it('rejects legacy release labels alongside a new classification', () => {
 // The `opened` payload carries no labels because `josh pr` labels the pull request in a second call;
 // the check has to judge the labels as they stand, or that run fails for good (joshuafolkken/kit#2712).
 it('judges the labels the pull request has now, not the ones its event carried', () => {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pr-classification-'))
+	const directory = make_directory('pr-classification-')
 	const event_path = path.join(directory, 'event.json')
 	const requests: Array<string> = []
 
-	try {
-		writeFileSync(
-			event_path,
-			JSON.stringify({
-				pull_request: { number: PULL_NUMBER, user: { login: HUMAN }, labels: [] },
-				repository: { full_name: REPOSITORY },
-			}),
-		)
-		const error = pr_classification.check_event(event_path, (repository, pull_number) => {
-			requests.push(`${repository}#${String(pull_number)}`)
+	writeFileSync(
+		event_path,
+		JSON.stringify({
+			pull_request: { number: PULL_NUMBER, user: { login: HUMAN }, labels: [] },
+			repository: { full_name: REPOSITORY },
+		}),
+	)
+	const error = pr_classification.check_event(event_path, (repository, pull_number) => {
+		requests.push(`${repository}#${String(pull_number)}`)
 
-			return [BUGFIX]
-		})
+		return [BUGFIX]
+	})
 
-		expect(error).toBeUndefined()
-		expect(requests).toEqual([`${REPOSITORY}#${String(PULL_NUMBER)}`])
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	expect(error).toBeUndefined()
+	expect(requests).toEqual([`${REPOSITORY}#${String(PULL_NUMBER)}`])
 })

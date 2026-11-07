@@ -1,7 +1,6 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import { rmSync } from 'node:fs'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it } from 'vitest'
 import { implementation_cut_verdict } from './implementation-cut-verdict'
 
@@ -11,7 +10,8 @@ import { implementation_cut_verdict } from './implementation-cut-verdict'
 // stamp. This suite pins that a burst of edits inside the window shares one read and that the first
 // edit past it re-reads.
 
-const DIRECTORY = mkdtempSync(path.join(tmpdir(), 'impl-cut-verdict-'))
+const make_directory = temporary_directory('suite')
+const DIRECTORY = make_directory('impl-cut-verdict-')
 const OVER: CostVerdict = 'over'
 const UNDER: CostVerdict = 'under'
 const NOW_MS = 5_000_000

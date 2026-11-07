@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { REQUIRE_ENV } from '#scripts/security/secretlint-scan'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
 
 // joshuafolkken/kit#4657: the pre-commit secretlint scan skips when its binary is missing and never
@@ -113,14 +113,12 @@ function scanned_arguments(): Array<string> {
 	}
 }
 
+const make_directory = temporary_directory()
+
 beforeEach(() => {
-	ctx.root = mkdtempSync(path.join(tmpdir(), 'ci-secret-scan-'))
+	ctx.root = make_directory('ci-secret-scan-')
 	install_stub_pnpm()
 	commit_base()
-})
-
-afterEach(() => {
-	rmSync(ctx.root, { recursive: true, force: true })
 })
 
 describe.each(WORKFLOWS)('the Secret Scan job in %s', (workflow) => {
