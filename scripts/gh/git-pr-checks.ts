@@ -1,5 +1,5 @@
 import { package_name_schema } from '#scripts/git/git-schemas'
-import { poll } from '#scripts/lib/poll'
+import { poll, POLL_BACKOFF, type BackoffSchedule, type PollOptions } from '#scripts/lib/poll'
 import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
@@ -127,6 +127,8 @@ interface WaitForPrSuccessOptions {
 	fetcher: PrStateFetcher
 	interval_ms: number
 	max_attempts: number
+	// Lengthens the waits within the `(max_attempts - 1) × interval_ms` budget (`poll.ts`).
+	backoff?: BackoffSchedule
 	required_stable_reads: number
 	evaluator?: PrStateEvaluator
 	// Asked before every poll; a throw ends the wait with that error. `josh followup` stops here on a
@@ -270,6 +272,22 @@ async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptR
 	}
 }
 
+// A poll that read a different pull request state from the one before waits the shortest interval
+// again; an unreadable poll reads as a change, so the retry after it comes soon.
+function pr_poll_options(
+	options: WaitForPrSuccessOptions,
+	progress: { carried: PollAttemptResult },
+): PollOptions {
+	const cadence = { attempts: options.max_attempts, interval_ms: options.interval_ms }
+	if (options.backoff === undefined) return cadence
+
+	function seen(): string {
+		return JSON.stringify({ last: progress.carried.last_snapshot })
+	}
+
+	return { ...cadence, backoff: { schedule: options.backoff, seen } }
+}
+
 async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<PrStateSnapshot> {
 	// The whole carry-over of one poll into the next, in one value: the stable-read window, the
 	// consecutive-failure count, and what the last poll could not be read with.
@@ -292,7 +310,7 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 
 			return carried.snapshot
 		},
-		{ attempts: options.max_attempts, interval_ms: options.interval_ms },
+		pr_poll_options(options, progress),
 	)
 	if (snapshot !== undefined) return snapshot
 
@@ -355,6 +373,7 @@ async function wait_for_pr_success_default(
 		fetcher: observed_fetcher(observe),
 		interval_ms: CHECK_WAIT_INTERVAL_MS,
 		max_attempts: CHECK_MAX_ATTEMPTS,
+		backoff: POLL_BACKOFF,
 		required_stable_reads,
 		before_poll,
 	})
@@ -391,7 +410,8 @@ async function wait_for_pr_merged(branch_name: string): Promise<MergeProgress> {
 
 			return progress !== 'waiting'
 		},
-		{ attempts: CHECK_MAX_ATTEMPTS, interval_ms: CHECK_WAIT_INTERVAL_MS },
+		// Nothing it reads moves before the wait ends, so every tick lengthens the interval.
+		{ attempts: CHECK_MAX_ATTEMPTS, interval_ms: CHECK_WAIT_INTERVAL_MS, backoff: {} },
 	)
 
 	return progress

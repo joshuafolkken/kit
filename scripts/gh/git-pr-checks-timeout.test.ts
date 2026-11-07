@@ -1,4 +1,5 @@
 import { ci_yml_fixture, type WorkflowJob } from '#scripts/ci/ci-yml-fixture'
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import {
@@ -110,6 +111,23 @@ describe('poll cadence', () => {
 
 	it('polls every 20 seconds', () => {
 		expect(CHECK_WAIT_INTERVAL_MS).toBe(20_000)
+	})
+
+	// #6719: the backoff lengthens the waits, never the budget they add up to.
+	it('waits out the default budget under the backoff', async () => {
+		let waited_ms = 0
+
+		await poll.poll_for(() => undefined, {
+			attempts: DEFAULT_MAX_ATTEMPTS,
+			interval_ms: CHECK_WAIT_INTERVAL_MS,
+			sleeper: async (duration_ms) => {
+				waited_ms += duration_ms
+				await Promise.resolve()
+			},
+			backoff: {},
+		})
+
+		expect(waited_ms).toBe(DEFAULT_TIMEOUT_SECONDS * MS_PER_SECOND)
 	})
 
 	// `get_configured_max_attempts` derives a `JOSH_CI_TIMEOUT_SECONDS` budget through this same call
