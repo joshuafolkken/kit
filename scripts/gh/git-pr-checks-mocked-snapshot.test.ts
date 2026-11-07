@@ -1,7 +1,8 @@
+import { POLL_BACKOFF } from '#scripts/lib/poll'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
-import { CHECK_WAIT_INTERVAL_MS, git_pr_checks } from './git-pr-checks'
+import { git_pr_checks } from './git-pr-checks'
 import { REQUIRED_CHECKS } from './git-pr-checks-eval'
 import type { PrStateSnapshot } from './git-pr-checks-parse'
 import { CHECKS_FAILED_MESSAGE, git_pr_checks_watch } from './git-pr-checks-watch'
@@ -150,7 +151,7 @@ describe('git_pr_checks.wait_for_pr_merged', () => {
 
 		const progress = git_pr_checks.wait_for_pr_merged(BRANCH)
 
-		await vi.advanceTimersByTimeAsync(CHECK_WAIT_INTERVAL_MS)
+		await vi.advanceTimersByTimeAsync(POLL_BACKOFF.initial_ms)
 
 		await expect(progress).resolves.toBe('merged')
 		expect(read_merged).toHaveBeenCalledTimes(2)

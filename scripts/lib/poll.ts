@@ -17,26 +17,89 @@ async function sleep(duration_ms: number): Promise<void> {
 	})
 }
 
+interface BackoffSchedule {
+	initial_ms: number
+	factor: number
+	max_ms: number
+}
+
+// A CI run takes minutes, so most fixed-cadence reads of it only confirm that nothing moved, and each
+// one spends REST core (joshuafolkken/kit#6719). The wait therefore lengthens while nothing changes.
+const POLL_BACKOFF: BackoffSchedule = { initial_ms: 30_000, factor: 1.5, max_ms: 120_000 }
+
+interface PollBackoff {
+	// What the last read saw. A tick whose answer differs from the one before resets the interval;
+	// absent, every tick reads as unchanged.
+	seen?: () => string
+	schedule?: BackoffSchedule
+}
+
 interface PollOptions {
 	attempts: number
 	interval_ms: number
 	// A caller's existing wait, or an injected sleeper so tests cost no wall clock.
 	sleeper?: (duration_ms: number) => Promise<void>
+	// Lengthens the waits within the same budget the fixed cadence spends: `(attempts - 1) × interval_ms`.
+	backoff?: PollBackoff
 }
+
+// How long to wait after `attempt`, or `undefined` once the poll is over.
+type Cadence = (attempt: number) => number | undefined
 
 // **The wait goes between attempts, never after the last one**, so the budget a caller computes from
 // `attempts × interval_ms` bounds the wait. The merge gate uses this same loop to keep its
 // stable-read and read-failure counters while sharing the wait between attempts.
-async function wait_between(
-	wait: (duration_ms: number) => Promise<void>,
-	interval_ms: number,
-	attempt: number,
-	attempts: number,
-): Promise<void> {
-	if (attempt < attempts - 1) await wait(interval_ms)
+function fixed_cadence(options: PollOptions): Cadence {
+	return function next_wait(attempt: number): number | undefined {
+		return attempt < options.attempts - 1 ? options.interval_ms : undefined
+	}
+}
+
+interface BackoffStep {
+	interval_ms: number
+	seen: string | undefined
+}
+
+function next_backoff_interval(
+	schedule: BackoffSchedule,
+	previous: BackoffStep,
+	seen: string,
+): number {
+	if (seen !== previous.seen) return schedule.initial_ms
+
+	return Math.min(previous.interval_ms * schedule.factor, schedule.max_ms)
+}
+
+// The last wait is cut to what the budget has left, so the total wait stays the fixed cadence's.
+function backoff_cadence(options: PollOptions, backoff: PollBackoff): Cadence {
+	const schedule = backoff.schedule ?? POLL_BACKOFF
+	const budget_ms = (options.attempts - 1) * options.interval_ms
+	const state = { waited_ms: 0, step: { interval_ms: 0, seen: undefined } satisfies BackoffStep }
+
+	return function next_wait(): number | undefined {
+		if (state.waited_ms >= budget_ms) return undefined
+		const seen = backoff.seen?.() ?? ''
+		const interval_ms = next_backoff_interval(schedule, state.step, seen)
+		const wait_ms = Math.min(interval_ms, budget_ms - state.waited_ms)
+
+		Object.assign(state, { waited_ms: state.waited_ms + wait_ms, step: { interval_ms, seen } })
+
+		return wait_ms
+	}
+}
+
+function to_cadence(options: PollOptions): Cadence {
+	return options.backoff === undefined
+		? fixed_cadence(options)
+		: backoff_cadence(options, options.backoff)
 }
 
 type WaitOptions = Omit<PollOptions, 'attempts'>
+
+// A read that answered ends the poll, so there is nothing to wait for after it.
+function wait_after(value: unknown, next_wait: Cadence, attempt: number): number | undefined {
+	return value === undefined ? next_wait(attempt) : undefined
+}
 
 // **The first value `read` answers, `undefined` when the attempts run out.** `undefined` is "not yet",
 // so a read that reaches a verdict — success or failure — answers it and the loop ends there.
@@ -45,17 +108,17 @@ async function poll_for<T>(
 	options: PollOptions,
 ): Promise<T | undefined> {
 	const wait = options.sleeper ?? sleep
+	const next_wait = to_cadence(options)
 
-	for (let attempt = 0; attempt < options.attempts; attempt += 1) {
+	for (let attempt = 0; ; attempt += 1) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		const value = await read()
-		if (value !== undefined) return value
+		const wait_ms = wait_after(value, next_wait, attempt)
+		if (wait_ms === undefined) return value
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await wait_between(wait, options.interval_ms, attempt, options.attempts)
+		await wait(wait_ms)
 	}
-
-	return undefined
 }
 
 // **True as soon as `is_done` answers true, false when the attempts run out.** The first attempt runs
@@ -84,5 +147,5 @@ async function wait_for<T>(
 
 const poll = { poll_for, poll_until, sleep, wait_for }
 
-export { poll }
-export type { PollOptions, WaitOptions }
+export { poll, POLL_BACKOFF }
+export type { BackoffSchedule, PollBackoff, PollOptions, WaitOptions }
