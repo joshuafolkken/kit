@@ -905,23 +905,24 @@ A child whose open lane has had no child process for `lane:await`'s 15-second re
 
 A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 
-- `🚪` / `📥` / `📤` `<time>` — its lane is being opened, installed or dispatched, for that long.
-- `❓` — neither `run:lane` nor `run:solo`, and a blocker stands (the column names the first) or its start time is ahead; a person can judge it meanwhile.
-- `🔗 <N>` — a standing blocker; with more, `<N>+<rest>`, the rest after the title. A first blocker that overruns the column — another repository's `owner/repo#N` — leaves it blank, and every blocker follows the title.
-- `📅 <MM-DD HH:MM>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local time; `backlog:next` keeps the UTC spelling.
+- `🚪` / `📥` / `📤` `<time>` — how long its lane has been opening, installing or dispatching.
+- `❓` — neither `run:lane` nor `run:solo`, and a blocker stands (the column names the first) or its start is ahead; a person may judge it.
+- `🔗 <N>` — a standing blocker; with more, `<N>+<rest>`, the rest after the title. A first blocker too wide for the column (`owner/repo#N`) leaves it blank, and every blocker follows the title.
+- `🙋 <N>` — withheld for a person; the tail is `→ decide #<B>: <title>`, even with no blocker left.
+- `📅 <MM-DD HH:MM>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` (in UTC) withholds the issue; the board shows local time.
 - `📅 <n>/<K>` / `📅 <PR>` — the body's `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met: the lane ledger has recorded `n` of the `K` merges it waits on after `<PR>` merged, or `<PR>` has not merged (or its merge is unread).
   The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, shows `<issue>` and counts after the merged pull request that closed it.
 - `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
 - `✋` — neither `run:lane` nor `run:solo`, due, and nothing blocks it; `backlog:next` holds it alone for its judgment and offers the triaged rows.
-- `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and is running …" from.
-- `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and waits …" from.
+- `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and is running …".
+- `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. `epic_solo`'s reading, as `backlog:next`'s "carries `run:solo` and waits …".
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
 - `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
-- `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, even an earlier run's no row shows; an unread limit leaves the column blank.
+- `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, even an earlier run's; an unread limit leaves it blank.
 - `🧠 <n>%` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate, `💾 <n>M/s` after the title; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
 - `⏳` with a blank column — no wait is read.
 
-A `🙋` or stopped row outside those sections still ends with `🔗` and every standing blocker.
+A `🙋` or stopped row outside those sections still ends `🔗` and every standing blocker. A blocked `run:stalled` row ends `waiting on #<B>`.
 Above the legend, the terminal board thanks the people who helped review kit, read from a published roster.
 
 While the run is at its `planning` stage, the one row it launches next — a named run's next declared issue, else the plan's first waiting row — leads with `📝 <time>` in place of any wait above; no other row draws it.
