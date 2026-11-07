@@ -1,7 +1,7 @@
 {
-	"reason": "#6563 adds the backlog:drive rate-limit hold module (+15 code lines)",
+	"reason": "Wire the rate-limit hold into offer_for (absorbs #6632): an uncalled module fails the pack-boundary gate",
 	"date": "2026-11-07",
 	"growth": {
-		"scripts.code_lines": 15
+		"scripts.code_lines": 17
 	}
 }
