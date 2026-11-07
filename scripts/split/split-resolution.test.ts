@@ -8,6 +8,7 @@ import { split_assess } from './split-assess'
 import { split_early_notice } from './split-early-notice'
 import { split_measure } from './split-measure'
 import { split_resolution } from './split-resolution'
+import { split_verified_single } from './split-verified-single'
 
 const { REASON_PREFIX } = split_assess
 
@@ -42,6 +43,7 @@ const is_trusted = vi.spyOn(gh_author_association, 'is_trusted')
 const record_split_filed = vi.spyOn(lane_ledger_write, 'record_split_filed')
 const read_branch = vi.spyOn(split_measure, 'read_branch')
 const declared = vi.spyOn(split_early_notice, 'declared')
+const verified = vi.spyOn(split_verified_single, 'verified')
 
 function comments_json(body: string, association = OWNER): string {
 	return JSON.stringify([{ user: { login: 'someone' }, body, author_association: association }])
@@ -53,6 +55,7 @@ beforeEach(() => {
 	record_split_filed.mockResolvedValue()
 	read_branch.mockResolvedValue({ files: 11, lines: 550, verdict: 'split' })
 	declared.mockResolvedValue(undefined)
+	verified.mockResolvedValue(false)
 })
 
 describe('split_resolution.refusal for a noticed issue with no answer', () => {
@@ -143,7 +146,28 @@ describe('split_resolution.ledger_refusal', () => {
 
 		expect(await split_resolution.ledger_refusal(ISSUE)).toContain(NO_CHILD)
 	})
+})
 
+describe('split_resolution.ledger_refusal verified single deliverable', () => {
+	it('answers a notice over the bar with one verified deliverable (ac-8e54309c)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+		verified.mockResolvedValueOnce(true)
+
+		expect(await split_resolution.ledger_refusal(ISSUE)).toBeUndefined()
+		expect(verified).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('keeps the notice over the bar while work is unverified (ac-30747931)', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+
+		expect(await split_resolution.ledger_refusal(ISSUE)).toContain(NO_CHILD)
+		expect(verified).toHaveBeenCalledWith(ISSUE)
+	})
+})
+
+describe('split_resolution.ledger_refusal ledger reads', () => {
 	it('reads the repository ledger', async () => {
 		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
 		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
