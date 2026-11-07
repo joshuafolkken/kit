@@ -51,6 +51,11 @@ async function read_merge_state_status(listed: RestPull, detail_error: unknown):
 	return state
 }
 
-const git_gh_pr_graphql_state = { read_merge_state_status }
+// The state alone, `undefined` where GraphQL did not answer — for a caller with a fallback of its own.
+async function try_read_merge_state(node_id: string | undefined): Promise<string | undefined> {
+	return await try_query_merge_state(node_id)
+}
+
+const git_gh_pr_graphql_state = { read_merge_state_status, try_read_merge_state }
 
 export { git_gh_pr_graphql_state, GRAPHQL_PATH, MERGE_STATE_QUERY, NO_MERGE_STATE_MESSAGE }

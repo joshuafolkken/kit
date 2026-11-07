@@ -105,11 +105,20 @@ describe('git_pr_checks_watch.pr_checks_watch — observer', () => {
 })
 
 describe('git_pr_checks.read_merge_progress', () => {
-	it('answers merged once the pull request reads back merged, without reading the gate', async () => {
+	// joshuafolkken/kit#6721: one tick reads the pull request detail once, through the snapshot.
+	it('answers merged from the one snapshot read, without a second merged read', async () => {
+		stub_state({ ...PENDING_STATE, merged: true })
+
+		await expect(git_pr_checks.read_merge_progress(BRANCH)).resolves.toBe('merged')
+		expect(fetch_checks).toHaveBeenCalledTimes(1)
+		expect(read_merged).not.toHaveBeenCalled()
+	})
+
+	it('asks whether the pull request merged only where the snapshot read failed', async () => {
+		fetch_checks.mockRejectedValue(new Error(READ_FAILED))
 		read_merged.mockResolvedValue(true)
 
 		await expect(git_pr_checks.read_merge_progress(BRANCH)).resolves.toBe('merged')
-		expect(fetch_checks).not.toHaveBeenCalled()
 	})
 
 	it('answers failed when the merge gate fails the pull request', async () => {
@@ -147,20 +156,20 @@ describe('git_pr_checks.wait_for_pr_merged', () => {
 	it('keeps polling while waiting and answers merged once GitHub merges', async () => {
 		vi.useFakeTimers()
 		stub_state(PENDING_STATE)
-		read_merged.mockResolvedValueOnce(false).mockResolvedValue(true)
 
 		const progress = git_pr_checks.wait_for_pr_merged(BRANCH)
 
+		stub_state({ ...PENDING_STATE, merged: true })
 		await vi.advanceTimersByTimeAsync(POLL_BACKOFF.initial_ms)
 
 		await expect(progress).resolves.toBe('merged')
-		expect(read_merged).toHaveBeenCalledTimes(2)
+		expect(fetch_checks).toHaveBeenCalledTimes(2)
 	})
 
 	it('stops at the first failed verdict rather than running out the budget', async () => {
 		stub_state(CONFLICT_STATE)
 
 		await expect(git_pr_checks.wait_for_pr_merged(BRANCH)).resolves.toBe('failed')
-		expect(read_merged).toHaveBeenCalledTimes(1)
+		expect(fetch_checks).toHaveBeenCalledTimes(1)
 	})
 })
