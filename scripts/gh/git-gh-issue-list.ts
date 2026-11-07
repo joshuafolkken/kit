@@ -1,6 +1,6 @@
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { git_gh_api_path } from './git-gh-api-path'
-import { git_gh_exec } from './git-gh-exec'
+import { git_gh_etag_read } from './git-gh-etag-read'
 import { read_blocked_by } from './git-gh-issue-read'
 import {
 	BLOCKED_BY_FIELD,
@@ -108,14 +108,15 @@ function is_selected(rest: RestIssue, request: IssueListRequest): boolean {
 	return !git_gh_issue_rest.is_pull_request(rest) && matches_body(rest, request.body_term)
 }
 
-// One page, already filtered. `is_full` rides along because the page's *unfiltered* size is what
+// One page, already filtered, sent with the ETag of the previous process's read of the same page
+// (joshuafolkken/kit#6560). `is_full` rides along because the page's *unfiltered* size is what
 // says whether there is another page — a page emptied by the filter is still a full page.
 async function fetch_page(
 	request: IssueListRequest,
 	page: number,
 ): Promise<{ selected: Array<RestIssue>; is_full: boolean }> {
 	const path = listing_path(request, page)
-	const rows = git_gh_issue_rest.parse_rest_issues(await git_gh_exec.exec_gh_api({ path }))
+	const rows = git_gh_issue_rest.parse_rest_issues(await git_gh_etag_read.read(path))
 
 	return {
 		selected: rows.filter((row) => is_selected(row, request)),
