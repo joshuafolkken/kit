@@ -1382,7 +1382,7 @@ A missing record, or an Issue listing that cannot be read, leaves its cell blank
 
 <!-- usage: lane:plan -->
 
-Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue.
+Record a lane child's planned files; yield its lane, naming file and holder, when an earlier-planned running lane declares or plans one; `--size-approval` bounds lines/files.
 
 ```bash
 pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.ts
@@ -1417,7 +1417,7 @@ A plan over twice the files its `- 規模見積もり:` declares (tests excluded
 
 Hunks over twice declared files or declared lines × recent ratio over 200 also split. Sized re-plans skip lines checks unless approved. Splits log their reason; hunks exclude planned files.
 
-`--size-approval <json-file>`: `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` or `declared_files`/`max_files`. Records author/body; checks scope. Other gates remain.
+`--size-approval <json-file>`: `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain.
 
 `--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
 
