@@ -101,14 +101,15 @@ async function to_failure_result(failure: IssueReadFailure): Promise<NumberResul
 	return { kind: failure.kind, hint: await gh_rate_limit.failure_hint(failure.detail) }
 }
 
-// The comments are read beside the fields rather than after them: the two requests need nothing from
-// one another, and reading them in sequence would put back one of the two round trips this command
-// exists to remove.
+// The comments are read with the fields rather than after them — in one GraphQL query, or two REST
+// reads side by side when that query is refused — since reading them in sequence would put back one of
+// the round trips this command exists to remove.
 async function read_issue(issue_number: string, repo?: string): Promise<NumberResult> {
-	const [read, comments_json] = await Promise.all([
-		git_gh_command.issue_view_json_classified(issue_number, ISSUE_FIELDS, repo),
-		git_gh_command.issue_list_comments(issue_number, undefined, repo),
-	])
+	const { read, comments_json } = await git_gh_command.issue_read_with_comments(
+		issue_number,
+		ISSUE_FIELDS,
+		repo,
+	)
 
 	if (read.kind !== 'read') return await to_failure_result(read)
 
