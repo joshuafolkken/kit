@@ -75,6 +75,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-drive-cli.ts', 1],
 	['backlog/backlog-drive-epic.ts', 1],
 	['backlog/backlog-drive-named-offer.ts', 1],
+	['backlog/backlog-drive-retry.ts', 2],
 	['backlog/backlog-measure-close.ts', 1],
 	['backlog/backlog-wait-cause.ts', 1],
 	['lane/lane-overrun.ts', 1],

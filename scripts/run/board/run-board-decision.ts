@@ -1,14 +1,31 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
 import type { BoardPlan, RowRead, RowReason } from './run-board-layout'
 
-const QUESTION = /needs-decision\s*[:：—-]?\s*(.*)/u
+// The park's question, then after `;` a note on why it parked that is not the question
+// (`backlog-drive-retry.ts`: `needs-decision; blocker #M closed`).
+const QUESTION = /needs-decision\s*[:：—-]?\s*(?<question>[^;]*)(?:;\s*(?<note>.+))?/u
 const HEADING = /^#{1,6} (.+)$/u
 const HUMAN_DETAIL = /^ *- *人の判断: *要[（(]([^）)\n]+)[）)]/mu
 
-function question_of(reason = ''): string | undefined {
-	const question = QUESTION.exec(reason)?.[1]?.trim()
+interface ParkParts {
+	question: string | undefined
+	note: string | undefined
+}
 
-	return question === '' ? undefined : question
+function parts_of(reason = ''): ParkParts {
+	const { question, note } = QUESTION.exec(reason)?.groups ?? {}
+
+	return { question, note }
+}
+
+function question_of(question = ''): string | undefined {
+	const trimmed = question.trim()
+
+	return trimmed === '' ? undefined : trimmed
+}
+
+function note_of(note: string | undefined): string {
+	return note === undefined ? '' : ` (${note.trim()})`
 }
 
 function comment_question(bodies: ReadonlyArray<string>): string | undefined {
@@ -27,11 +44,12 @@ function reason_of(
 	reason: string | undefined,
 	read: RowRead,
 ): RowReason | undefined {
-	const question = question_of(reason) ?? read_question(number, read)
+	const parts = parts_of(reason)
+	const question = question_of(parts.question) ?? read_question(number, read)
 
 	if (question === '') return undefined
 
-	return { tail: `→ decide: ${question}` }
+	return { tail: `→ decide: ${question}${note_of(parts.note)}` }
 }
 
 function plan_reason(number: number, plan: BoardPlan): RowReason | undefined {

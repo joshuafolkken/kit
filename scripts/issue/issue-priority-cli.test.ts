@@ -27,9 +27,9 @@ describe('issue_priority_cli.run', () => {
 	})
 
 	it.each([
-		['raised', 'applied `priority:high`'],
+		['raised', 'applied the priority label its body declares'],
 		['labelled', 'already carries a priority label'],
-		['below', 'stays below the high floor'],
+		['below', 'stays at normal priority'],
 	] as const)('reports %s and exits 0', async (result, text) => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
@@ -42,7 +42,7 @@ describe('issue_priority_cli.run', () => {
 
 	it.each([
 		['unreadable', 'could not be read'],
-		['failed', 'applying `priority:high` failed'],
+		['failed', 'applying the priority label failed'],
 	] as const)('reports %s and exits 1', async (result, text) => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
