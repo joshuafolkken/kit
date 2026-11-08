@@ -12,10 +12,14 @@ const BACKLOG_KEYWORD = 'backlogrun'
 const NOT_FOUND = -1
 const FLAG_AND_VALUE = 2
 
-const WORKFLOW_KEYWORDS = ['kickoff', 'fullrun', 'halfrun', 'prrun'] as const
+// `retrospective` is started by a backlogrun at its end, never typed, so it takes no entry and no brief
+// file — its brief is generated (`run-handoff-retrospective.ts`).
+const RETROSPECTIVE_KEYWORD = 'retrospective'
+const TYPED_KEYWORDS = ['kickoff', 'fullrun', 'halfrun', 'prrun'] as const
+const WORKFLOW_KEYWORDS = [...TYPED_KEYWORDS, RETROSPECTIVE_KEYWORD] as const
 
-// Every keyword `run:handoff` takes — the one list the `session-lang` prompt hook matches too.
-const KEYWORDS: ReadonlyArray<string> = [...WORKFLOW_KEYWORDS, BACKLOG_KEYWORD]
+// Every keyword a person types to `run:handoff` — the one list the `session-lang` prompt hook matches too.
+const KEYWORDS: ReadonlyArray<string> = [...TYPED_KEYWORDS, BACKLOG_KEYWORD]
 
 type WorkflowKeyword = (typeof WORKFLOW_KEYWORDS)[number]
 
@@ -27,7 +31,8 @@ interface WorkflowHandoff {
 	keyword: WorkflowKeyword
 	// The keyword line the child is started with, as the person typed it.
 	line: string
-	brief_file: string
+	// `undefined` for `retrospective`, whose brief is generated rather than read.
+	brief_file: string | undefined
 }
 
 type HandoffArguments =
@@ -60,17 +65,29 @@ function workflow_of(keyword: WorkflowKeyword, rest: ReadonlyArray<string>): Han
 	return { kind: 'workflow', keyword, line, brief_file }
 }
 
+function retrospective_of(rest: ReadonlyArray<string>): HandoffArguments {
+	if (rest.length > 0) return refused(`${RETROSPECTIVE_KEYWORD} takes no other argument`)
+
+	const keyword = RETROSPECTIVE_KEYWORD
+
+	return { kind: 'workflow', keyword, line: keyword, brief_file: undefined }
+}
+
 function parse(argv: ReadonlyArray<string>): HandoffArguments {
 	const [keyword, ...rest] = argv
 
 	if (keyword === BACKLOG_KEYWORD) return { kind: 'backlogrun', rest }
 
-	if (!is_workflow_keyword(keyword)) return refused(`expected one of ${KEYWORDS.join(', ')}`)
+	if (keyword === RETROSPECTIVE_KEYWORD) return retrospective_of(rest)
+
+	if (!is_workflow_keyword(keyword)) {
+		return refused(`expected one of ${WORKFLOW_KEYWORDS.join(', ')}, ${BACKLOG_KEYWORD}`)
+	}
 
 	return workflow_of(keyword, rest)
 }
 
-const run_handoff_args = { BACKLOG_KEYWORD, KEYWORDS, parse }
+const run_handoff_args = { BACKLOG_KEYWORD, KEYWORDS, RETROSPECTIVE_KEYWORD, parse }
 
 export type { HandoffArguments, WorkflowHandoff, WorkflowKeyword }
 export { run_handoff_args }

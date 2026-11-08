@@ -132,7 +132,7 @@ run `run:carry --begin`; act on the row, then end the turn:
 | `launch #N` | Read the lane's log and park `#N` |
 | `merge [<token>] #N` | `environment` ends the run; the others re-read the child |
 | `epic #N` | A named epic's turn |
-| `watch` | The retrospective is owed (`run:step`) |
+| `watch` | The retrospective is owed (`run:step`): run `pnpm josh run:handoff retrospective` (`retrospective.md`) |
 | `window` | Hand the loop back as is |
 
 **A candidate only in another repository is never a token** — report it with its checkout.

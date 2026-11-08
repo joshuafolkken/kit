@@ -9,6 +9,7 @@ import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { durable_state } from '#scripts/josh/durable-state'
 import type { LaunchRequest } from '#scripts/run/detached-launch'
+import { run_headless } from '#scripts/run/run-headless'
 import type { WorkflowHandoff, WorkflowKeyword } from './run-handoff-args'
 
 // The child `josh run:handoff` starts: the role its keyword runs as, the prompt, the argv and the log.
@@ -36,12 +37,13 @@ const ROLES: Readonly<Record<WorkflowKeyword, AgentRole>> = {
 	fullrun: agent_role_profile.WORKER,
 	halfrun: agent_role_profile.WORKER,
 	prrun: agent_role_profile.WORKER,
+	retrospective: agent_role_profile.SCHEDULER,
 }
 
 // The child is started headless: no person answers it, so a stop that needs one ends its session, and
-// what it says last is all the consultation session reads back.
+// what it says last is all the session that handed it over reads back.
 const PREAMBLE = [
-	'Handed over by a consultation session through `josh run:handoff`; the brief below is what was agreed there.',
+	'Handed over by another session through `josh run:handoff`; the brief below is the work it hands over.',
 	'Nobody answers this session: a question for the person ends it, written as the final message.',
 	'End the final message with the URL of every Issue and pull request this run created.',
 ].join(' ')
@@ -74,9 +76,11 @@ function log_path(git_directory: string, keyword: WorkflowKeyword, now: number):
 }
 
 // The child's own `josh` commands resolve the provider it was handed, never a Codex session this was
-// typed in — the same environment `josh backlogrun` hands its parent.
+// typed in — the same environment `josh backlogrun` hands its parent. It is marked a hand-off child, so
+// a `backlogrun` parent that starts the retrospective unit is never driven or cut by the unit's hooks.
 function request_of(built: BuiltArgv, cwd: string, log: string): LaunchRequest {
 	const environment = {
+		...run_headless.handoff_child_environment(),
 		[agent_role_profile.CODEX_SESSION_KEY]: undefined,
 		[agent_role_profile.HANDED_PROVIDER_KEY]: built.profile.provider,
 	}
@@ -84,10 +88,11 @@ function request_of(built: BuiltArgv, cwd: string, log: string): LaunchRequest {
 	return { argv: built.argv, cwd, env: environment, log_path: log, profile: built.profile }
 }
 
-// `kickoff` ends at a filed Issue or a plan, so its result is waited for; a run that implements takes
-// long enough that the main session is handed the log and `run:progress` instead.
+// `kickoff` ends at a filed Issue or a plan, and `retrospective` at its carry mark, so their result is
+// waited for; a run that implements takes long enough that the main session is handed the log and
+// `run:progress` instead.
 function is_waited(keyword: WorkflowKeyword): boolean {
-	return keyword === 'kickoff'
+	return keyword === 'kickoff' || keyword === 'retrospective'
 }
 
 const run_handoff_launch = { argv_of, is_waited, log_path, prompt_of, request_of, role_of }
