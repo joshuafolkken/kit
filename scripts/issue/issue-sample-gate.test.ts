@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_not_before } from './issue-not-before'
@@ -52,13 +52,14 @@ function ports_of(merged_at: string | undefined, ledger: string | undefined): Pr
 	}
 }
 
+const make_directory = temporary_directory()
+
 beforeEach(() => {
-	state.directory = mkdtempSync(path.join(tmpdir(), 'sample-gate-'))
+	state.directory = make_directory('sample-gate-')
 })
 
 afterEach(() => {
 	issue_sample_gate.reset()
-	rmSync(state.directory, { recursive: true, force: true })
 })
 
 describe('issue_sample_gate.wait_of', () => {

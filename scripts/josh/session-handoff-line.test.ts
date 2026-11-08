@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { session_handoff_line } from './session-handoff-line'
 import { session_model_record } from './session-model-record'
 import { stamp_file } from './stamp-file'
@@ -14,11 +14,8 @@ const OPUS = 'claude-opus-5-5'
 const ASTRA = 'gpt-6.1-astra'
 const SOL = 'gpt-6.1-sol'
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'session-handoff-line-'))
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('session-handoff-line-')
 
 const FULLRUN = 'fullrun #1'
 

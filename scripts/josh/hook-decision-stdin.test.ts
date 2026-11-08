@@ -1,10 +1,11 @@
-import { mkdtempSync, readdirSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
+import { readdirSync } from 'node:fs'
 import { Readable } from 'node:stream'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hook_decision } from './hook-decision'
 import { hook_payload_capture } from './hook-payload-capture'
+
+const make_directory = temporary_directory()
 
 const { load_environment_file } = vi.hoisted(() => ({ load_environment_file: vi.fn() }))
 
@@ -90,7 +91,7 @@ describe('hook_decision.respond_from_stdin', () => {
 
 describe('hook_decision.respond_from_stdin — payload capture', () => {
 	it('captures the payload when JOSH_HOOK_CAPTURE_DIR names a directory', async () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'hook-decision-stdin-'))
+		const directory = make_directory('hook-decision-stdin-')
 
 		vi.stubEnv(hook_payload_capture.CAPTURE_DIR_KEY, directory)
 		vi.spyOn(process, 'stdin', 'get').mockReturnValue(stdin_of(false, PAYLOAD))

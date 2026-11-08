@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { repo_discovery } from './repo-discovery'
 
 const KIT = 'kit'
@@ -17,6 +17,7 @@ const KIT_WORKTREE = 'kit-worktree'
 const FAR_PATH = '/Users/example/elsewhere/far'
 
 const state = { workspace: '' }
+const make_directory = temporary_directory()
 
 // A directory holding a git work tree whose `.git/config` declares `origin_url`, or a work tree with
 // no remote at all when the remote is omitted.
@@ -71,11 +72,7 @@ function keys_of(map: ReadonlyMap<string, string>): Array<string> {
 }
 
 beforeEach(() => {
-	state.workspace = mkdtempSync(path.join(tmpdir(), 'repo-discovery-'))
-})
-
-afterEach(() => {
-	rmSync(state.workspace, { recursive: true, force: true })
+	state.workspace = make_directory('repo-discovery-')
 })
 
 describe('repo_discovery.read_origin_url', () => {

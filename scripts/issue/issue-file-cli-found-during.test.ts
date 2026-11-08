@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
@@ -8,7 +7,8 @@ import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_deferral } from './issue-file-deferral'
@@ -27,7 +27,8 @@ const BODY_FILE_FLAG = '--body-file'
 const ORIGIN = 4717
 const HELD_MESSAGE = 'duplicate candidate'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-found-during-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-cli-found-during-')
 const body_path = path.join(work, 'body.md')
 
 writeFileSync(
@@ -63,10 +64,6 @@ beforeEach(() => {
 	fold_clear.mockResolvedValue(true)
 	issue_list.mockResolvedValue({ json: undefined, is_capped: false })
 	scout.mockResolvedValue(undefined)
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_file_cli.run — the filing cap', () => {

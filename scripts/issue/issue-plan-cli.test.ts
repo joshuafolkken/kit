@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLANNED_LABEL } from './issue-labels'
 import { issue_plan_cli } from './issue-plan-cli'
 import { plan_consumers_section } from './plan-consumers-section'
@@ -67,7 +67,8 @@ function body_json(body: string): string {
 	return JSON.stringify({ body, author_association: 'OWNER' })
 }
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-plan-cli-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-plan-cli-')
 const PLAN_FILE = path.join(work, 'plan.md')
 const EMPTY_FILE = path.join(work, 'empty.md')
 const NO_CONSUMERS_FILE = path.join(work, 'no-consumers.md')
@@ -106,10 +107,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_plan_cli.run — the plan goes to a blank body, else a comment', () => {

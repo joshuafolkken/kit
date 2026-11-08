@@ -1,7 +1,7 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { Readable } from 'node:stream'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { usage_state_path } from './usage-state-path'
 import { usage_tee } from './usage-tee'
@@ -10,6 +10,7 @@ const FIVE_HOUR = { used_percentage: 23.5, resets_at: 1_738_425_600 }
 const SEVEN_DAY = { used_percentage: 41.2, resets_at: 1_738_857_600 }
 const AT = '2026-11-04T00:00:00.000Z'
 const context = { directory: '' }
+const make_directory = temporary_directory()
 
 function read_state(): unknown {
 	return JSON.parse(readFileSync(usage_state_path.claude(), 'utf8'))
@@ -23,7 +24,7 @@ async function feed(raw: string): Promise<void> {
 }
 
 beforeEach(() => {
-	context.directory = mkdtempSync(path.join(os.tmpdir(), 'usage-tee-'))
+	context.directory = make_directory('usage-tee-')
 	vi.stubEnv('CLAUDE_CONFIG_DIR', context.directory)
 	vi.useFakeTimers()
 	vi.setSystemTime(new Date(AT))
@@ -33,7 +34,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
 	vi.useRealTimers()
-	rmSync(context.directory, { recursive: true, force: true })
 })
 
 it('records both windows from stdin (ac-66991e10)', async () => {
