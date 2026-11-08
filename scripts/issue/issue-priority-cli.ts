@@ -2,43 +2,103 @@
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
+import { cli_flags } from '#scripts/lib/cli-flags'
+import { issue_priority_critical, type CriticalResult } from './issue-priority-critical'
 import { issue_priority_raise, type RaiseResult } from './issue-priority-raise'
 
 // `josh issue:priority <N>` — raise an open issue to the priority its body declares or reaches after
 // filing, as a recurrence's appended cause-loss line does (joshuafolkken/kit#4960, joshuafolkken/kit#6757).
+// `--critical --reason <text>` applies a person's instruction instead, whatever the body declares
+// (joshuafolkken/kit#6758).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh issue:priority <issue-number>'
+const USAGE = 'Usage: josh issue:priority <issue-number> [--critical --reason <text>]'
+
+const OPTIONS = {
+	critical: { type: 'boolean' },
+	reason: { type: 'string' },
+} as const
+
+const UNREADABLE_REPORT = 'could not be read — no label applied.'
 
 const REPORTS: Readonly<Record<RaiseResult, string>> = {
 	raised: 'applied the priority label its body declares or reaches.',
 	labelled: 'already carries a priority label at its level — left as it is.',
 	below: 'stays at normal priority — no label applied.',
-	unreadable: 'could not be read — no label applied.',
+	unreadable: UNREADABLE_REPORT,
 	failed: 'ranks above its labels, but applying the priority label failed.',
 }
 
-function parse_number(argv: ReadonlyArray<string>): string | undefined {
-	const [first] = argv
+const CRITICAL_REPORTS: Readonly<Record<CriticalResult, string>> = {
+	raised: 'applied priority:critical and commented the instruction behind it.',
+	labelled: 'already carries priority:critical — left as it is, no comment.',
+	unreadable: UNREADABLE_REPORT,
+	failed: 'applying priority:critical or commenting the instruction behind it failed.',
+}
 
-	if (first === undefined || argv.length !== 1) return undefined
+// The issue and, for `--critical`, the instruction's reason; `reason` is `undefined` for the
+// body-declared raise.
+interface PriorityRequest {
+	issue_number: string
+	reason: string | undefined
+}
+
+interface PriorityValues {
+	critical?: boolean
+	reason?: string
+}
+
+function parse_number(positionals: ReadonlyArray<string>): string | undefined {
+	const [first] = positionals
+
+	if (first === undefined || positionals.length !== 1) return undefined
 
 	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(first) ? first : undefined
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const issue_number = parse_number(argv)
+// `--critical` needs a non-blank `--reason`, and `--reason` means nothing without `--critical`.
+function is_consistent(values: PriorityValues): boolean {
+	if (values.critical !== true) return values.reason === undefined
 
-	if (issue_number === undefined) {
+	return (values.reason?.trim() ?? '') !== ''
+}
+
+function parse_request(argv: ReadonlyArray<string>): PriorityRequest | undefined {
+	const parsed = cli_flags.arguments_of(argv, OPTIONS)
+
+	if (parsed === undefined || !is_consistent(parsed.values)) return undefined
+	const issue_number = parse_number(parsed.positionals)
+
+	return issue_number === undefined ? undefined : { issue_number, reason: parsed.values.reason }
+}
+
+async function apply(request: PriorityRequest): Promise<{ result: RaiseResult; text: string }> {
+	const { issue_number, reason } = request
+
+	if (reason === undefined) {
+		const result = await issue_priority_raise.raise(issue_number)
+
+		return { result, text: REPORTS[result] }
+	}
+
+	const result = await issue_priority_critical.apply(issue_number, reason)
+
+	return { result, text: CRITICAL_REPORTS[result] }
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const request = parse_request(argv)
+
+	if (request === undefined) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const result = await issue_priority_raise.raise(issue_number)
-	const line = `Issue ${session_cite.issue(issue_number)} ${REPORTS[result]}`
+	const { result, text } = await apply(request)
+	const line = `Issue ${session_cite.issue(request.issue_number)} ${text}`
 	const is_failure = issue_priority_raise.is_failure(result)
 
 	if (is_failure) console.error(line)

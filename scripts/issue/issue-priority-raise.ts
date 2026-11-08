@@ -54,7 +54,7 @@ function is_failure(result: RaiseResult): boolean {
 	return FAILURES.has(result)
 }
 
-const issue_priority_raise = { raise, is_failure }
+const issue_priority_raise = { read_issue, raise, is_failure }
 
 export type { RaiseResult }
 export { issue_priority_raise }
