@@ -15,7 +15,10 @@ import { review_readers_scan } from './review-readers-scan'
 // could import** (joshuafolkken/kit#6130). **A renamed declaration is removed unless an added line declares it again**
 // (joshuafolkken/kit#5540): a hunk whose removed lines declare a name its added lines do not, beside
 // one they declare anew, renamed it, and the old name an added comment or a local still carries as a
-// token is stale all the same.
+// token is stale all the same. **A test file names nothing**: its declarations are its own
+// (joshuafolkken/kit#6737). **A plain name counts only where prose writes it as code** — in backticks, as
+// a call or a member, or with an identifier's `_`, digit or camelCase — so an English word that spells it
+// is not stale (joshuafolkken/kit#6737).
 
 type TermKind = 'name' | 'constant' | 'command' | 'heading'
 
@@ -37,6 +40,12 @@ interface Report {
 }
 
 const CODE_FILE = /\.(?:ts|js)$/u
+const TEST_FILE = /\.test\.(?:ts|js)$/u
+// A word no English prose spells: an `_`, a digit, or a lower-to-upper camelCase step.
+const IDENTIFIER_SHAPE = /[_\d]|[a-z][A-Z]/u
+const REGEXP_SPECIAL = /[$()*+.?[\\\]^{|}]/gu
+const BACKTICK = '`'
+const SPAN_PARITY = 2
 const MARKDOWN_EXTENSION = '.md'
 const MARKDOWN_FILE = /\.md$/u
 const COMMAND = /\bjosh\s+(?<command>[a-z][\w-]*:[\w:-]+)/gu
@@ -107,7 +116,7 @@ function renamed_terms(hunk: Hunk): Array<Term> {
 
 function hunk_terms(hunk: Hunk, deleted: ReadonlySet<string>): Array<Term> {
 	const lines = hunk.old_lines
-	const is_code = CODE_FILE.test(hunk.file)
+	const is_code = CODE_FILE.test(hunk.file) && !TEST_FILE.test(hunk.file)
 	const source = lines.join('\n')
 	const code = is_code
 		? [...code_terms(source, deleted.has(hunk.file)), ...renamed_terms(hunk)]
@@ -186,6 +195,34 @@ function is_prose(hit: Hit): boolean {
 	return hit.path.endsWith(MARKDOWN_EXTENSION) || COMMENT_LINE.test(hit.excerpt)
 }
 
+function code_spans(excerpt: string): Array<string> {
+	return excerpt.split(BACKTICK).filter((_span, index) => index % SPAN_PARITY === 1)
+}
+
+// The code shapes a plain name takes outside backticks — a fenced block's line included: `x.name`,
+// `name(`, an entry of a braced identifier list `{ a, name }`, and `import name from`. A bare comma
+// list is English (`name, status, and owner`), so the list needs its brace.
+function code_shape(word: string): RegExp {
+	const shapes = [
+		String.raw`\.${word}(?![\w$])`,
+		String.raw`(?<![\w$])${word}\(`,
+		String.raw`\{\s*(?:[\w$]+\s*,\s*)*${word}\s*[,}]`,
+		String.raw`\bimport\s+${word}\s+from\b`,
+	]
+
+	return new RegExp(shapes.join('|'), 'u')
+}
+
+// A plain name is written as code: inside a backtick span, or in one of `code_shape`'s shapes.
+function is_code_use(term: Term, excerpt: string): boolean {
+	if (term.kind !== 'name' || IDENTIFIER_SHAPE.test(term.word)) return true
+
+	const word = term.word.replaceAll(REGEXP_SPECIAL, String.raw`\$&`)
+	const whole = new RegExp(String.raw`(?<![\w$])${word}(?![\w$])`, 'u')
+
+	return code_spans(excerpt).some((span) => whole.test(span)) || code_shape(word).test(excerpt)
+}
+
 function reference_lines(reference: Reference): Array<string> {
 	const { kind, word, renamed_to } = reference.term
 	const label = renamed_to === undefined ? word : `${word} (renamed to ${renamed_to})`
@@ -193,7 +230,7 @@ function reference_lines(reference: Reference): Array<string> {
 	if (reference.has_failed) return [`search failed: ${kind} ${label}`]
 
 	return reference.hits
-		.filter((hit) => is_prose(hit))
+		.filter((hit) => is_prose(hit) && is_code_use(reference.term, hit.excerpt))
 		.map((hit) => `${hit.path}:${hit.line} ${kind} ${label}`)
 }
 
