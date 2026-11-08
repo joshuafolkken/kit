@@ -59,6 +59,15 @@ describe('prose_stale_scan.stale_terms — each kind a removed line names', () =
 		expect(terms([hunk(file, [line])])).toEqual([])
 	})
 
+	// joshuafolkken/kit#6737: `gh-usage-event.test.ts`'s own `Appended` and `text_of`.
+	it('takes no name from a test file, and keeps one another file removed too', () => {
+		const test_file = 'scripts/gh/x.test.ts'
+		const local = ['type Appended = string', 'function text_of(): string {', OLD_FUNCTION_LINE]
+
+		expect(terms([hunk(test_file, local)])).toEqual([])
+		expect(terms([hunk(test_file, local), hunk(CODE, [OLD_FUNCTION_LINE])])).toEqual([NAME])
+	})
+
 	it('names a word once however many removed lines carry it', () => {
 		const removed = [hunk(DOC, [`josh ${OLD_COMMAND}`]), hunk(CODE, [`// josh ${OLD_COMMAND}`])]
 
@@ -233,5 +242,28 @@ describe('prose_stale_scan.report', () => {
 			text: 'search failed: name old_name',
 			exit_code: prose_stale_scan.FAILED_EXIT,
 		})
+	})
+})
+
+// joshuafolkken/kit#6737: "Appended to git's own report" is English, not the removed type.
+describe('prose_stale_scan.report — a plain-word name', () => {
+	it('lists it only where prose writes it as code', () => {
+		const word: Term = { kind: 'name', word: 'Appended' }
+		const hits = [
+			hit('scripts/git/main-merge-guard.ts', "// Appended to git's own report"),
+			hit('docs/p.md', 'Appended lines'),
+			hit('docs/q.md', 'see `Appended` and `x`'),
+			hit('scripts/p.ts', '// reads event.Appended'),
+			hit('scripts/q.ts', '// calls Appended(x)'),
+			hit('docs/r.md', '`a` Appended `b`'),
+		]
+
+		expect(prose_stale_scan.report([{ term: word, hits, has_failed: false }]).text).toBe(
+			[
+				'docs/q.md:3 name Appended',
+				'scripts/p.ts:3 name Appended',
+				'scripts/q.ts:3 name Appended',
+			].join('\n'),
+		)
 	})
 })
