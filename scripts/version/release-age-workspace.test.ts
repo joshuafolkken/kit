@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { release_age } from './release-age'
 
@@ -13,21 +13,18 @@ const TEMP_PREFIX = 'release-age-'
 const WORKSPACE_PACKAGES_ONLY = 'packages:\n  - .\n'
 const DAY_MINUTES = 1440
 
-// Each case makes its own directory and removes it, so no mutable module-level state is needed.
+const make_directory = temporary_directory()
+
+// Each case makes its own directory, so no mutable module-level state is needed.
 function with_workspace(
 	content: string | undefined,
 	read: (workspace_path: string) => number,
 ): number {
-	const directory = mkdtempSync(path.join(tmpdir(), TEMP_PREFIX))
-	const workspace_path = path.join(directory, WORKSPACE_NAME)
+	const workspace_path = path.join(make_directory(TEMP_PREFIX), WORKSPACE_NAME)
 
-	try {
-		if (content !== undefined) writeFileSync(workspace_path, content)
+	if (content !== undefined) writeFileSync(workspace_path, content)
 
-		return read(workspace_path)
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	return read(workspace_path)
 }
 
 function age_of(content: string | undefined): number {
@@ -59,33 +56,25 @@ describe('read_minimum_release_age', () => {
 // `josh version` runs from subdirectories and from outside a project, so the policy is resolved by
 // walking up rather than from a fixed relative path (joshuafolkken/kit#808).
 function with_project(read: (root: string) => number): number {
-	const root = mkdtempSync(path.join(tmpdir(), TEMP_PREFIX))
+	const root = make_directory(TEMP_PREFIX)
 
-	try {
-		writeFileSync(path.join(root, WORKSPACE_NAME), WORKSPACE_WITH_WINDOW)
-		mkdirSync(path.join(root, 'scripts', 'version'), { recursive: true })
+	writeFileSync(path.join(root, WORKSPACE_NAME), WORKSPACE_WITH_WINDOW)
+	mkdirSync(path.join(root, 'scripts', 'version'), { recursive: true })
 
-		return read(root)
-	} finally {
-		rmSync(root, { recursive: true, force: true })
-	}
+	return read(root)
 }
 
 // A nested workspace file below a root that declares the window, for the precedence cases.
 function nearest_age_under_root(nested_content: string): number {
-	const root = mkdtempSync(path.join(tmpdir(), TEMP_PREFIX))
+	const root = make_directory(TEMP_PREFIX)
 
-	try {
-		writeFileSync(path.join(root, WORKSPACE_NAME), WORKSPACE_WITH_WINDOW)
-		const nested = path.join(root, 'project')
+	writeFileSync(path.join(root, WORKSPACE_NAME), WORKSPACE_WITH_WINDOW)
+	const nested = path.join(root, 'project')
 
-		mkdirSync(nested, { recursive: true })
-		writeFileSync(path.join(nested, WORKSPACE_NAME), nested_content)
+	mkdirSync(nested, { recursive: true })
+	writeFileSync(path.join(nested, WORKSPACE_NAME), nested_content)
 
-		return release_age.read_nearest_minimum_release_age(nested, root)
-	} finally {
-		rmSync(root, { recursive: true, force: true })
-	}
+	return release_age.read_nearest_minimum_release_age(nested, root)
 }
 
 describe('read_nearest_minimum_release_age', () => {
@@ -106,13 +95,9 @@ describe('read_nearest_minimum_release_age', () => {
 	// Outside any project the policy is absent, which means no quarantine rather than a failure. The
 	// search is bounded to the temp root so the result cannot depend on the machine's own files.
 	it('is no quarantine when no workspace file exists within the search boundary', () => {
-		const empty = mkdtempSync(path.join(tmpdir(), `${TEMP_PREFIX}empty-`))
+		const empty = make_directory(`${TEMP_PREFIX}empty-`)
 
-		try {
-			expect(release_age.read_nearest_minimum_release_age(empty, empty)).toBe(NO_QUARANTINE)
-		} finally {
-			rmSync(empty, { recursive: true, force: true })
-		}
+		expect(release_age.read_nearest_minimum_release_age(empty, empty)).toBe(NO_QUARANTINE)
 	})
 
 	it('looks past a nearer workspace file that does not declare the window', () => {
@@ -121,15 +106,11 @@ describe('read_nearest_minimum_release_age', () => {
 
 	// A `.npmrc` beside the workspace file is inert under pnpm 12, so it must not stand in for it.
 	it('ignores a legacy npmrc age line', () => {
-		const empty = mkdtempSync(path.join(tmpdir(), `${TEMP_PREFIX}npmrc-`))
+		const empty = make_directory(`${TEMP_PREFIX}npmrc-`)
 
-		try {
-			writeFileSync(path.join(empty, '.npmrc'), 'minimum-release-age=1440\n')
+		writeFileSync(path.join(empty, '.npmrc'), 'minimum-release-age=1440\n')
 
-			expect(release_age.read_nearest_minimum_release_age(empty, empty)).toBe(NO_QUARANTINE)
-		} finally {
-			rmSync(empty, { recursive: true, force: true })
-		}
+		expect(release_age.read_nearest_minimum_release_age(empty, empty)).toBe(NO_QUARANTINE)
 	})
 })
 

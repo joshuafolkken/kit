@@ -1,5 +1,6 @@
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { git_gh_api_path } from './git-gh-api-path'
+import { git_gh_blocked_by_graphql } from './git-gh-blocked-by-graphql'
 import { git_gh_etag_read } from './git-gh-etag-read'
 import { read_blocked_by } from './git-gh-issue-read'
 import {
@@ -190,13 +191,13 @@ async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> 
 	}
 }
 
-// `blockedBy` is not in a listing response — GraphQL selected it as a connection, REST serves it from
-// each issue's own dependencies endpoint. `read_blocked_by` is the single-issue read's, unchanged:
-// it consults the row's `issue_dependencies_summary` first, and every listing row carries one, so an
-// issue GitHub itself reports as unblocked costs no request. A backlog with no declared blockers
-// therefore costs exactly what `gh` cost — one listing — rather than one request per row.
+// `blockedBy` is not in a listing response. The rows declaring blockers are read in one GraphQL query
+// per hundred (`git-gh-blocked-by-graphql.ts`), so the scan's request count does not grow with them.
+// A row that query did not answer goes to `read_blocked_by`, the single-issue read's, unchanged: it
+// consults the row's `issue_dependencies_summary` first, so an issue GitHub itself reports as
+// unblocked costs no request.
 //
-// Bounded rather than sequential: the pass was paced one request at a time,
+// The REST reads are bounded rather than sequential: the pass was paced one request at a time,
 // which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a blocker. The width
 // is the one `epic:bundle` already reads the same endpoint at, so the burst stays bounded while a
 // rate-limited read still fails the whole listing rather than a row (`bounded-pool.ts`).
@@ -206,10 +207,12 @@ async function read_relations(
 	rows: ReadonlyArray<RestIssue>,
 	repo?: string,
 ): Promise<Array<BlockedBy>> {
+	const answered = await git_gh_blocked_by_graphql.read_answered(rows)
+
 	return await bounded_pool.bounded_map(
 		rows,
 		RELATION_CONCURRENCY,
-		async (row) => await read_blocked_by(String(row.number), row, repo),
+		async (row) => answered.get(row) ?? (await read_blocked_by(String(row.number), row, repo)),
 	)
 }
 

@@ -111,8 +111,8 @@ function split(plan: LanePlan, over: Oversize): number {
 }
 
 // The refusal goes on the ledger with its axis, so `lane:stats` counts the notices by reason; the
-// lines are the projection the lines axis measured, else none. Answers the files counted.
-async function note(plan: LanePlan, over: Oversize): Promise<number> {
+// lines are the projection the lines axis measured, else none.
+async function note(plan: LanePlan, over: Oversize): Promise<void> {
 	const files = plan.paths.filter((file) => !test_declared_logic.is_test_file(file)).length
 	const lines = over.reason === 'lines' ? over.measured : 0
 
@@ -122,18 +122,16 @@ async function note(plan: LanePlan, over: Oversize): Promise<number> {
 		lines,
 		reason: over.reason,
 	})
-
-	return files
 }
 
-// The split answer for `over`, else `undefined`. A files overrun of a plan declared one deliverable is
-// noted and passes: the notice makes the pre-gate `run:cut` verify it (joshuafolkken/kit#6647).
+// The split answer for `over`, else `undefined`. An overrun of a plan declared one deliverable, or of a
+// re-plan after the lane started, is noted and passes as a warning (joshuafolkken/kit#6602).
 async function refusal(plan: LanePlan, over: Oversize | undefined): Promise<number | undefined> {
 	if (over === undefined) return undefined
-	const files = await note(plan, over)
+	await note(plan, over)
 
 	if (!lane_plan_size.is_waived(plan, over)) return split(plan, over)
-	console.error(lane_plan_size.waiver_text(plan.issue, files, over.limit))
+	console.error(lane_plan_size.waiver_text(plan.issue, over))
 
 	return undefined
 }

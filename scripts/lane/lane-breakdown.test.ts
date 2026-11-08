@@ -14,6 +14,7 @@ const START = Date.parse('2026-10-26T05:43:00.000Z')
 const LANE = `#${String(ISSUE)}`
 const MERGE_MINUTE = 79.5
 const IMPLEMENT = 'implement'
+const LANE_PHASE = 'lane-phase'
 const REVIEW_START = 'review start'
 const START_TO_PLAN = 'start to plan'
 const SHIP_REVIEW = 'ship review'
@@ -53,7 +54,7 @@ function lane(merge_minute = MERGE_MINUTE): ReadonlyArray<LedgerEntry> {
 function events_4970(): Array<RunEvent> {
 	return [
 		event(10, 'plan', `${LANE} plan`),
-		event(10, 'lane-phase', `${LANE} implement`),
+		event(10, LANE_PHASE, `${LANE} implement`),
 		ship(61, 'preflight start'),
 		ship(62, 'preflight done'),
 		ship(63, REVIEW_START),
@@ -213,6 +214,22 @@ describe('lane_breakdown.of — a yield', () => {
 			gap_ms: 20 * MINUTE_MS,
 			unsplit_ms: 0,
 		})
+	})
+})
+
+describe('lane_breakdown.of — Codex resume events', () => {
+	it('uses plan and implement events after a Codex resume without a transcript', () => {
+		const events = [
+			event(1, 'note', `${LANE} run:cut --resume`),
+			event(10, 'plan', `planned ${LANE}`),
+			event(10, LANE_PHASE, `${LANE} ${IMPLEMENT}`),
+			...events_4970().slice(2),
+		]
+		const breakdown = lane_breakdown.of(lane(), events, ISSUE)
+
+		expect(stage_minutes(breakdown, START_TO_PLAN)).toBe(10)
+		expect(stage_minutes(breakdown, IMPLEMENT)).toBe(51)
+		expect(total_ms(breakdown)).toBe(lane_net_time.net_ms(lane(), events, ISSUE))
 	})
 })
 

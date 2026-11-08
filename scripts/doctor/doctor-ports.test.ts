@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { doctor_ports, type RepositoryPorts as RepoPorts } from './doctor-ports'
 
 // joshuafolkken/kit#1494: `doctor` reads each discovered repository's `PORT_SEED`, resolves its
@@ -16,11 +16,7 @@ const KIT_NAME = 'owner/kit'
 const BARE_NAME = 'owner/bare'
 const BROKEN_NAME = 'owner/broken'
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'doctor-ports-test-'))
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
+const scratch = temporary_directory('suite')('doctor-ports-test-')
 
 function repo_with_environment(name: string, content: string | undefined): string {
 	const directory = path.join(scratch, name)

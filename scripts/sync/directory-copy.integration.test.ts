@@ -1,18 +1,10 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	statSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it } from 'vitest'
 import { copy_directory_failure } from './directory-copy-guard'
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'sync-directory-'))
+const ROOT = temporary_directory('suite')('sync-directory-')
 const SOURCE = path.join(ROOT, 'source')
 const DESTINATION = path.join(ROOT, 'consumer')
 const OLD_DATE = new Date('2020-01-01T00:00:00Z')

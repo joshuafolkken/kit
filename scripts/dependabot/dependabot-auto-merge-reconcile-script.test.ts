@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { reconcile_script_fixture } from './dependabot-reconcile-script-fixture'
 
 const {
@@ -17,12 +17,9 @@ const {
 	call_count,
 	notice_marker,
 	posted_body,
-	remove_workspace,
 	run_reconcile,
 	withdraw_attempts,
 } = reconcile_script_fixture
-
-afterAll(remove_workspace)
 
 // The arm-versus-withdraw choice and the retry policy both live in the reconciling step's shell, not
 // in an expression, so these guards run the script rather than matching substrings in it: the step
