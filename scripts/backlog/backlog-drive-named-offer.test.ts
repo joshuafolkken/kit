@@ -1,4 +1,5 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
+import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
 import {
@@ -10,7 +11,7 @@ import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive, type LoopPorts } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_fixture, type Harness } from './backlog-drive-fixture'
@@ -30,6 +31,34 @@ const CARRY = {
 	outages: 0,
 }
 const CONTEXT = { is_only: false, forwarded: ['--max', '1'], owner: String(process.pid) }
+const CORE_LIMIT = 5000
+const RESET_MS = Date.parse('2026-11-08T12:00:00Z')
+
+// A launch reads the GitHub core allowance: unread here, so no case calls `gh api`.
+beforeEach(() => {
+	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
+// joshuafolkken/kit#6729: a named launch below the core floor waits for the reset unread.
+test('holds a named launch until the reset while the core allowance is below the floor', async () => {
+	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue({
+		remaining: 0,
+		limit: CORE_LIMIT,
+		reset_ms: RESET_MS,
+	})
+	const read = vi.spyOn(issue_state_cli, 'read_issue')
+	const state = backlog_drive.initial_state([], ACTIVE)
+	const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+
+	const offer = await backlog_drive_named_offer.read(CARRY, state, context)
+
+	expect(offer).toMatchObject({ verdict: 'wait', issues: [], not_before_ms: RESET_MS })
+	expect(read).not.toHaveBeenCalled()
+})
 
 test('honors the merged maximum before the second named issue', async () => {
 	const carry = { ...CARRY, done: [1], merged: 1 }
@@ -307,5 +336,6 @@ test('finishes an --only run whose named issues all merged', async () => {
 	const offer = await backlog_drive_named_offer.read(DONE_CARRY, state, ONLY_CONTEXT)
 
 	expect(offer).toMatchObject({ verdict: 'stop', is_finish: true, reason: 'only' })
+	expect(gh_core_rate_limit.read_core).not.toHaveBeenCalled()
 	vi.restoreAllMocks()
 })
