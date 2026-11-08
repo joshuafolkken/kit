@@ -117,6 +117,28 @@ describe('prose_stale_read.references — a name an unchanged line still declare
 	)
 })
 
+// joshuafolkken/kit#6737: a test file's own names removed, with English and another scope's
+// parameter that spell them left in prose.
+describe('prose_stale_read.references — a test file’s local names', () => {
+	it(
+		'answers ok for the English word and the other scope’s `text_of`',
+		async () => {
+			const test_file = 'scripts/x.test.ts'
+
+			await write(test_file, 'type Appended = string\nfunction text_of(): string {}\n')
+			await write('scripts/guard.ts', "// Appended to git's own report\n")
+			await write('scripts/fixture.ts', '// `count` lines, each reading `text_of(index)`\n')
+			await commit('test locals')
+			await write(test_file, '')
+
+			const found = await found_references()
+
+			expect(prose_stale_scan.report(found)).toEqual({ text: 'ok', exit_code: 0 })
+		},
+		TIMEOUT_MS,
+	)
+})
+
 // joshuafolkken/kit#6130: a deleted file's local name is not searched; its exported one is.
 describe('prose_stale_read.references — a deleted file', () => {
 	it(

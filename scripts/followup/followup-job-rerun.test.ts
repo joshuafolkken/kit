@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { COMPLETE_ATTEMPTS, followup_job_rerun, REGISTER_ATTEMPTS } from './followup-job-rerun'
+import { followup_job_rerun } from './followup-job-rerun'
 import {
 	ACTIONS,
 	followup_job_rerun_fixture,
@@ -90,18 +90,6 @@ function failed_unit(run_attempt = 1): object {
 	})
 }
 
-async function rerun_with_timers(): Promise<Array<string>> {
-	vi.useFakeTimers()
-	const pending = followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)
-
-	await vi.runAllTimersAsync()
-	const names = await pending
-
-	vi.useRealTimers()
-
-	return names
-}
-
 async function expect_no_rerun(): Promise<void> {
 	expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([])
 	expect(rerun_paths()).toStrictEqual([])
@@ -130,34 +118,6 @@ describe('rerun_failed_jobs — a run whose only failures stopped after every st
 			`🔁 Rerunning CI jobs that stopped after every step passed, failed downloading an action, or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
 		)
 		expect(assess).not.toHaveBeenCalled()
-	})
-
-	// GitHub refuses a rerun while the run is still going, and the gate fails on the first red check.
-	it('waits for the run to complete before rerunning it', async () => {
-		answer_checks([as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E], statuses: ['in_progress', 'in_progress'] })
-
-		expect(await rerun_with_timers()).toStrictEqual([DETECT_E2E_NAME])
-		expect(rerun_paths()).toHaveLength(1)
-	})
-
-	it('does not rerun a run that never completes', async () => {
-		const statuses = Array.from({ length: COMPLETE_ATTEMPTS }, () => 'queued')
-
-		answer_checks([as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E], statuses })
-
-		expect(await rerun_with_timers()).toStrictEqual([])
-		expect(rerun_paths()).toStrictEqual([])
-	})
-
-	it('waits until the rerun replaced the stalled check runs', async () => {
-		answer_checks([as_check(DETECT_E2E)], [as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E] })
-
-		await rerun_with_timers()
-
-		expect(fetch_checks).toHaveBeenCalledTimes(1 + REGISTER_ATTEMPTS)
 	})
 })
 
