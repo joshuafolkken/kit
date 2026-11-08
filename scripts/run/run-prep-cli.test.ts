@@ -62,7 +62,7 @@ const LOCATIONS = 'run:prep\n  scripts/josh/josh-commands-ai.ts:42  run:prep'
 const DELEGATE_STEP = 'Delegate before the first read'
 const RECORD_PATH = '/repo/.git/josh/run-state/josh-investigation-record-1978.md'
 const FINDINGS = '- `run:prep` builds its report in scripts/run/run-prep.ts:97'
-const CLASSIFICATION_PROBLEM = 'Add "- リリース分類: <label>" to the Issue body.'
+const CLASSIFICATION_PROBLEM = 'on a filed Issue, `pnpm josh issue:release-class <issue> <label>`'
 const REVIEW_STATE: IssueState = {
 	state: 'OPEN',
 	labels: ['needs-human-review'],

@@ -20,6 +20,16 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '6233 ac-a1f32a2f ac-8647b0dd' }],
 		},
 	},
+	'issue:release-class': {
+		script: 'scripts/issue/issue-release-class-cli.ts',
+		description:
+			"Write the issue body's one release classification line, replacing any earlier one",
+		category: 'AI tools',
+		reference: ['<issue> <enhancement|other-change>', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '6636 other-change' }],
+		},
+	},
 	'issue:comment': {
 		script: 'scripts/issue/issue-comment-main.ts',
 		description: 'Post one comment to an issue from a file, so no shell expands the body',
