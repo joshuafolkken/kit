@@ -10,7 +10,12 @@ const ACTIVE = '2026-09-24T00:00:00.000Z'
 const START_MS = Date.parse(ACTIVE)
 const POLL_MS = 5000
 const OFFER_MS = backlog_budget.OFFER_INTERVAL_MS
-const CONFIG = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: undefined }
+const CONFIG = {
+	poll_ms: POLL_MS,
+	offer_ms: OFFER_MS,
+	idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+	window_ms: undefined,
+}
 const FIRST_CHILD = '2400'
 const SECOND_CHILD = '2401'
 const OFFERED = '2500'
@@ -65,6 +70,10 @@ interface Script {
 	usage_limited?: ReadonlyArray<boolean>
 	// Whether the retrospective unit exited 0; unset reads as a unit that did.
 	retrospective?: boolean
+	// When `run:add` handed the run an issue, in ms from the start; unset reads as never.
+	added_at_ms?: number
+	// Whether a named issue is left to dispatch; unset reads as none.
+	is_named_left?: boolean
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -191,15 +200,37 @@ function retrospective_port(script: Script, calls: Array<string>): LoopPorts['re
 	}
 }
 
+// The run's own records: a `run:add` reads as added once the clock reaches it.
+function record_ports(
+	script: Script,
+	now: () => Date,
+): Pick<LoopPorts, 'added_since' | 'named_left'> {
+	return {
+		added_since: async (since_ms) => {
+			if (script.added_at_ms === undefined) return false
+			const added_ms = START_MS + script.added_at_ms
+
+			return added_ms >= since_ms && added_ms <= now().getTime()
+		},
+		named_left: async () => script.is_named_left === true,
+	}
+}
+
 // The loop-facing ports: a clock the sleeps advance, and the finish and state records.
 function loop_ports(
+	script: Script,
 	calls: Array<string>,
 	states: Array<DriveState>,
-): Pick<LoopPorts, 'now' | 'sleep' | 'finish' | 'on_state'> {
+): Pick<LoopPorts, 'now' | 'sleep' | 'finish' | 'on_state' | 'added_since' | 'named_left'> {
 	let now_ms = START_MS
 
+	function now(): Date {
+		return new Date(now_ms)
+	}
+
 	return {
-		now: () => new Date(now_ms),
+		now,
+		...record_ports(script, now),
 		sleep: async (milliseconds) => {
 			now_ms += milliseconds
 		},
@@ -251,7 +282,7 @@ function harness(script: Script): Harness {
 			...dispatch_ports(script, calls, offers),
 			...room_ports(script),
 			...memory_port(script),
-			...loop_ports(calls, states),
+			...loop_ports(script, calls, states),
 			...report_ports(holds, idles, pauses),
 			retrospective: retrospective_port(script, calls),
 		},

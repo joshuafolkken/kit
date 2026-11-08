@@ -367,8 +367,11 @@ async function run_pass(
 interface LoopConfig {
 	poll_ms: number
 	// The floor between two `backlog:offer` asks while nothing was collected, running or idle alike —
-	// `backlog_budget.OFFER_INTERVAL_MS`.
+	// `backlog_budget.OFFER_INTERVAL_MS`. A `run:add` since the last ask skips it.
 	offer_ms: number
+	// The floor instead while no lane runs and a named issue is left to dispatch —
+	// `backlog_budget.IDLE_OFFER_INTERVAL_MS`.
+	idle_offer_ms: number
 	// How long one invocation may wait before returning `window`, or `undefined` for no bound. A headless
 	// parent's foreground call is capped by its shell's timeout, so it passes one under that cap.
 	window_ms: number | undefined
@@ -376,6 +379,11 @@ interface LoopConfig {
 
 interface LoopPorts extends DrivePorts {
 	sleep: (milliseconds: number) => Promise<void>
+	// Whether `run:add` handed the run an issue at or after the given instant —
+	// `backlog_arrival_added.is_added_since` in production.
+	added_since: (since_ms: number) => Promise<boolean>
+	// Whether an issue the run names is still left to dispatch — the run record's remaining in production.
+	named_left: () => Promise<boolean>
 	finish: (end: DriveEnd) => Promise<void>
 	// Called after every pass, ended ones included, so the caller can keep the resume line current.
 	on_state: (state: DriveState) => void
@@ -385,16 +393,10 @@ const WINDOW_END: DriveEnd = { reason: 'window', token: undefined, issue: undefi
 
 type LoopStep = { kind: 'end'; end: DriveEnd } | { kind: 'next'; run: LoopRun }
 
-// A dated wait asks again at its deadline; other waits keep `offer_ms`. A collected child or cleared
-// memory hold can still ask immediately.
+// When a pass asks is `backlog_offer_timing.is_due`'s; a collected child can still ask immediately.
 async function loop_step(run: LoopRun, config: LoopConfig, ports: LoopPorts): Promise<LoopStep> {
 	const now_ms = ports.now().getTime()
-	const due_ms = backlog_offer_timing.due_ms(
-		backlog_offer_timing.deadline_of(run.state),
-		run.offered_ms,
-		config.offer_ms,
-	)
-	const is_due = now_ms >= due_ms || (await backlog_drive_memory.is_cleared(run.state, ports))
+	const is_due = await backlog_offer_timing.is_due(run, config, ports, now_ms)
 	const result = await run_pass(run.state, is_due, ports)
 
 	ports.on_state(result.state)
