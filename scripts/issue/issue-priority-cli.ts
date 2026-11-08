@@ -4,8 +4,8 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { issue_priority_raise, type RaiseResult } from './issue-priority-raise'
 
-// `josh issue:priority <N>` — apply `priority:high` to an open issue whose body reached the high
-// floor after filing, as a recurrence's appended cause-loss line does (joshuafolkken/kit#4960).
+// `josh issue:priority <N>` — raise an open issue to the priority its body declares or reaches after
+// filing, as a recurrence's appended cause-loss line does (joshuafolkken/kit#4960, joshuafolkken/kit#6757).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -13,11 +13,11 @@ const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh issue:priority <issue-number>'
 
 const REPORTS: Readonly<Record<RaiseResult, string>> = {
-	raised: 'applied `priority:high` — its body reaches the high floor.',
-	labelled: 'already carries a priority label — left as it is.',
-	below: 'stays below the high floor — no label applied.',
+	raised: 'applied the priority label its body declares or reaches.',
+	labelled: 'already carries a priority label at its level — left as it is.',
+	below: 'stays at normal priority — no label applied.',
 	unreadable: 'could not be read — no label applied.',
-	failed: 'reaches the high floor, but applying `priority:high` failed.',
+	failed: 'ranks above its labels, but applying the priority label failed.',
 }
 
 function parse_number(argv: ReadonlyArray<string>): string | undefined {
