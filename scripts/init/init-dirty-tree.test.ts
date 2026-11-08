@@ -4,7 +4,7 @@ import { self_run_guard_fixture } from '#scripts/self-sync-guard/self-run-guard-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { working_tree_fixture } from './working-tree-fixture'
 
-const { MANIFEST, committed_repository, git, remove_all, repository, write } = working_tree_fixture
+const { MANIFEST, committed_repository, git, repository, write } = working_tree_fixture
 const { PACKAGE_NAME, REFUSAL_PREFIX } = self_run_guard_fixture
 const DIRTY_REFUSAL = 'josh init refuses to run'
 const HANDOFF_ENV = 'JOSH_INIT_HANDED_OFF'
@@ -52,7 +52,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
 	process.exitCode = undefined
-	remove_all()
 })
 
 describe('josh init — a working tree with uncommitted changes', () => {

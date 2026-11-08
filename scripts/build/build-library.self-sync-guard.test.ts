@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { build_library, library_paths } from './build-library'
 
@@ -18,12 +18,14 @@ const BUILD_TIMEOUT = 60_000
 const DOWNSTREAM_NAME = '@example/downstream'
 const MANIFEST = 'package.json'
 
+const make_directory = temporary_directory('suite')
+
 beforeAll(async () => {
 	await build_library(LIBRARY)
 }, BUILD_TIMEOUT)
 
 function manifest_directory(name: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'guard-dist-'))
+	const directory = make_directory('guard-dist-')
 
 	writeFileSync(path.join(directory, MANIFEST), JSON.stringify({ name }))
 

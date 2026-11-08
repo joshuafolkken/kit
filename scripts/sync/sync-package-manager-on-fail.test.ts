@@ -1,9 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 
+const make_directory = temporary_directory()
 const ctx = { package_json_path: '', work_directory: '' }
 
 function write_manifest(on_fail: string): string {
@@ -27,13 +28,12 @@ function read_on_fail(): unknown {
 }
 
 beforeEach(() => {
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'sync-package-manager-on-fail-'))
+	ctx.work_directory = make_directory('sync-package-manager-on-fail-')
 	ctx.package_json_path = path.join(ctx.work_directory, 'package.json')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

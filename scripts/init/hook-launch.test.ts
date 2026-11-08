@@ -1,8 +1,7 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { claude_settings_fixture } from '#scripts/claude/claude-settings-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { hook_command_bootstrap } from './hook-command-bootstrap-fixture'
 import { hook_launch } from './hook-launch'
@@ -22,6 +21,8 @@ const AGENTS: ReadonlyArray<readonly [string, string, boolean]> = [
 
 // The four settings.json hooks, each named by its bundle under `dist/hooks`.
 const HOOKS = [PRETOOL_GUARD, 'format-edited', 'session-lang', 'stop-guard'] as const
+
+const make_directory = temporary_directory()
 
 function command_containing(fragment: string): string {
 	const { hooks } = claude_settings_fixture.load_settings()
@@ -92,24 +93,19 @@ describe('the root a hook command names', () => {
 
 describe('a Codex hook fired outside any checkout', () => {
 	it('fails without launching a hook when no root resolves', () => {
-		const outside = mkdtempSync(path.join(tmpdir(), 'kit-hook-outside-'))
+		const outside = make_directory('kit-hook-outside-')
 		const command = codex_command(hook_launch_command(PRETOOL_GUARD))
+		const result = spawnSync('sh', ['-c', command], {
+			cwd: outside,
+			encoding: 'utf8',
+			env: {
+				...hook_command_bootstrap.fresh_git_environment(),
+				GIT_CEILING_DIRECTORIES: path.dirname(outside),
+			},
+		})
 
-		try {
-			const result = spawnSync('sh', ['-c', command], {
-				cwd: outside,
-				encoding: 'utf8',
-				env: {
-					...hook_command_bootstrap.fresh_git_environment(),
-					GIT_CEILING_DIRECTORIES: tmpdir(),
-				},
-			})
-
-			expect(result.status).not.toBe(0)
-			expect(result.stdout).toBe('')
-		} finally {
-			rmSync(outside, { recursive: true, force: true })
-		}
+		expect(result.status).not.toBe(0)
+		expect(result.stdout).toBe('')
 	})
 })
 

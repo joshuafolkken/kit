@@ -1,10 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import os from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { fresh_machine_script } from './fresh-machine-script'
 import { fresh_machine_spec, type ScenarioInput } from './fresh-machine-spec'
+
+const make_directory = temporary_directory()
 
 const RUN_NAME = 'kit-test-lua-init-1'
 const MARKER = 'marker.txt'
@@ -32,11 +34,7 @@ function run_script(input: Omit<ScenarioInput, 'name'>): Outcome {
 }
 
 beforeEach(() => {
-	sandbox.home = mkdtempSync(path.join(os.tmpdir(), 'josh-fresh-machine-script-'))
-})
-
-afterEach(() => {
-	rmSync(sandbox.home, { recursive: true, force: true })
+	sandbox.home = make_directory('josh-fresh-machine-script-')
 })
 
 describe('fresh_machine_script.build', () => {

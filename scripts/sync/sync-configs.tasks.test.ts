@@ -1,11 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync_configs } from './sync-configs'
 
+const make_directory = temporary_directory()
 const VSCODE_DIRECTORY = '.vscode'
 const TASKS_FILENAME = 'tasks.json'
 const KIT_TASKS_PATH = path.join(PACKAGE_DIR, VSCODE_DIRECTORY, TASKS_FILENAME)
@@ -16,7 +17,7 @@ const FOLDER_OPEN = 'folderOpen'
 const ctx = { work_directory: '', destination: '' }
 
 beforeEach(() => {
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'sync-configs-tasks-'))
+	ctx.work_directory = make_directory('sync-configs-tasks-')
 	ctx.destination = path.join(ctx.work_directory, VSCODE_DIRECTORY, TASKS_FILENAME)
 	vi.spyOn(console, 'info').mockImplementation(() => {
 		/* suppress */
@@ -24,7 +25,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

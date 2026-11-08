@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { josh_in_process } from '#scripts/josh/josh-in-process'
 import { josh_logic } from '#scripts/josh/josh-logic'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { build_commands, bundled_scripts } from './build-commands'
 import { COMMANDS_TEST_PREFIX } from './distribution-scratch-fixture'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
@@ -21,15 +22,11 @@ const SECTION_HEADING = '## Communication'
 // its own `import.meta.url` resolves the same root, and a `pnpm build` running beside this suite never
 // empties the directory under it.
 mkdirSync(DIST_DIR, { recursive: true })
-const out_directory = mkdtempSync(path.join(DIST_DIR, COMMANDS_TEST_PREFIX))
+const out_directory = temporary_directory('suite')(path.join(DIST_DIR, COMMANDS_TEST_PREFIX))
 
 beforeAll(async () => {
 	await build_commands(out_directory)
 }, BUILD_TIMEOUT)
-
-afterAll(() => {
-	rmSync(out_directory, { recursive: true, force: true })
-})
 
 function bundle_of(script: string): string {
 	const name = path.basename(josh_in_process.bundled_script_path(PACKAGE_DIR, script))

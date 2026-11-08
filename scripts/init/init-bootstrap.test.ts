@@ -1,16 +1,8 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync,
-} from 'node:fs'
-import os from 'node:os'
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { file_content } from '#scripts/sync/file-content'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init_bootstrap } from './init-bootstrap'
@@ -26,6 +18,7 @@ const HANDOFF = 'pnpm exec josh init --profile static'
 const PROFILE_ARGS = ['--profile', 'basic']
 const PACKAGE_JSON = 'package.json'
 const fixture = { root: '' }
+const make_directory = temporary_directory()
 
 function result(exit_code: number): ReturnType<typeof execaSync> {
 	const value: unknown = { exitCode: exit_code }
@@ -73,14 +66,13 @@ function record_manifest_presence(project: string): Array<boolean> {
 }
 
 beforeEach(() => {
-	fixture.root = mkdtempSync(path.join(os.tmpdir(), 'josh-init-bootstrap-'))
+	fixture.root = make_directory('josh-init-bootstrap-')
 	mocked_execa.mockReset()
 	mocked_execa.mockReturnValue(result(0))
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(fixture.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
 })

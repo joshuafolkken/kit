@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { reconcile_script_fixture } from './dependabot-reconcile-script-fixture'
 
 const {
@@ -14,11 +14,7 @@ const {
 	run_reconcile,
 	withdraw_attempts,
 	ARMED_NOTICE_TEXT,
-	remove_workspace,
 } = reconcile_script_fixture
-
-// Each test file gets its own module instance, so each makes its own workspace and has to clear it.
-afterAll(remove_workspace)
 
 // What the notice says, and how often. The run does not always know which failure it hit, and a
 // degraded window produces a run per push.

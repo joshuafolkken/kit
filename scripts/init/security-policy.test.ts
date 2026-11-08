@@ -1,6 +1,6 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { package_path } from './init-paths'
 import { security_policy } from './security-policy'
@@ -117,6 +117,7 @@ describe('security_policy.did_skip_unresolved', () => {
 
 describe('security_policy.did_skip_unresolved over a policy already on disk', () => {
 	const warn_spy = vi.spyOn(console, 'warn')
+	const make_directory = temporary_directory()
 	let project_root = ''
 
 	function write_policy(content: string): void {
@@ -125,12 +126,11 @@ describe('security_policy.did_skip_unresolved over a policy already on disk', ()
 
 	beforeEach(() => {
 		warn_spy.mockReset().mockReturnValue()
-		project_root = mkdtempSync(path.join(tmpdir(), 'kit-security-policy-test-'))
+		project_root = make_directory('kit-security-policy-test-')
 	})
 
 	afterEach(() => {
 		warn_spy.mockReset()
-		rmSync(project_root, { recursive: true, force: true })
 	})
 
 	it("says kit's policy left by an earlier sync is stale, for an origin it cannot read", () => {
