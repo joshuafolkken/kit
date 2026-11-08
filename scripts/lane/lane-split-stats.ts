@@ -12,7 +12,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // two axes counts once in `all` and once under each.
 
 const COLUMNS = ['reason', 'noticed lanes', 'split'] as const
-const REASONS = ['files', 'hunks', 'lines', 'diff'] as const
+const REASONS = ['files', 'hunks', 'lines', 'hub', 'diff'] as const
 const ALL = 'all'
 
 function reason_of(entry: SplitNoticeEntry): string {

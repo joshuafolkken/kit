@@ -1,6 +1,6 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { edit_files_cli } from './edit-files-cli'
 
@@ -12,9 +12,10 @@ import { edit_files_cli } from './edit-files-cli'
 const PLAN = 'plan.txt'
 const DEPENDENT_REPORT = 'dependent a.ts'
 const NO_MATCH_REPORT = 'no match a.ts'
+const make_directory = temporary_directory()
 
 function root(): string {
-	return mkdtempSync(path.join(tmpdir(), 'edit-files-'))
+	return make_directory('edit-files-')
 }
 
 function write(directory: string, name: string, text: string): void {

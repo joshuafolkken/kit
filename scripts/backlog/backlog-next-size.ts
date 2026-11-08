@@ -17,8 +17,9 @@ import { backlog_pool } from './backlog-pool'
 // passes the guide at filing, yet is warned on here too: lanes land past the doubled declaration
 // (joshuafolkken/kit#5935).
 //
-// One over the cap is not offered at all: it waits on a person to split it, whatever reason it
-// declares (joshuafolkken/kit#5502). `size_estimate.over_cap` is the filing's own bar.
+// One over the cap with no declared reason is not offered at all: it waits on a person to split it or
+// declare it one deliverable (joshuafolkken/kit#5502, joshuafolkken/kit#6602). `size_estimate.over_cap`
+// is the filing's own bar.
 
 // What the note asks of the issue: a further split for a split child, else the reason it stays one.
 function remedy_of(route: string | undefined): string {
@@ -27,9 +28,9 @@ function remedy_of(route: string | undefined): string {
 		: `with no \`${split_assess.REASON_PREFIX}\``
 }
 
-// A reason declared does not excuse an estimate projected over the implement budget
-// (joshuafolkken/kit#6066).
-const BUDGET_REMEDY = `and is projected over the implement budget, which \`${split_assess.REASON_PREFIX}\` does not excuse — split it`
+// An estimate projected over the implement budget (joshuafolkken/kit#6066); a declared reason excuses
+// it, as it does the cap (joshuafolkken/kit#6602).
+const BUDGET_REMEDY = `and is projected over the implement budget with no \`${split_assess.REASON_PREFIX}\``
 
 interface Warning {
 	estimate: SizeMeasurement

@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { pnpm_installer } from './pnpm-installer'
 
 const INSTALLER = 'printf "%s" "$PNPM_VERSION" > "$EXECUTED"\n'
@@ -12,6 +12,7 @@ const EXECUTABLE = 0o755
 const CURL =
 	'#!/bin/sh\n[ "$FAIL_DOWNLOAD" = yes ] && exit 1\nwhile [ "$1" != -o ]; do shift; done\ncp "$PAYLOAD" "$2"\n'
 const ctx = { directory: '' }
+const make_directory = temporary_directory()
 
 function fixture_path(name: string): string {
 	return path.join(ctx.directory, name)
@@ -43,14 +44,10 @@ function run_installer(command: string, fail_download = 'no'): number | null {
 }
 
 beforeEach(() => {
-	ctx.directory = mkdtempSync(path.join(tmpdir(), 'pnpm-installer-'))
+	ctx.directory = make_directory('pnpm-installer-')
 	writeFileSync(fixture_path('curl'), CURL, { mode: EXECUTABLE })
 	writeFileSync(fixture_path('payload'), INSTALLER)
 	for (const tool of ['mktemp', 'rm', 'cp', 'sh', 'shasum']) link_tool(tool)
-})
-
-afterEach(() => {
-	rmSync(ctx.directory, { recursive: true, force: true })
 })
 
 describe('pnpm_installer.command', () => {

@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -22,7 +22,8 @@ import {
 // failed stat allows the call, that the guard fires once per accumulation and re-arms on a later read,
 // and that a dispatched lane child is nudged with a notice rather than killed with a refusal.
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'duplicate-read-guard-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('duplicate-read-guard-')
 // The directory vitest was launched from — a lane checkout carrying `JOSH_LANE_CHILD` — restored in
 // teardown. The main-line cases delete the mark so the guard reads as `refuse`; the lane case chdirs
 // into a lane checkout and sets it back, exactly as `investigation-guard.test.ts` does.
@@ -101,8 +102,6 @@ afterAll(() => {
 		rmSync(refusal_path(transcript), { force: true })
 		rmSync(notice_refusal_path(transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 describe('duplicate_read_refusal — the unchanged re-read', () => {

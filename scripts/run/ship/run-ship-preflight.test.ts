@@ -174,7 +174,7 @@ describe('run_ship_preflight.stage — the lane plan', () => {
 
 // joshuafolkken/kit#6056: the --body-file is read through `cli_body`, so one in the work tree is refused.
 const TREE_BODY = cli_body_repository
-	.create(TEMPORARY)
+	.create(make_directory('josh-ship-preflight-repository-'))
 	.write(cli_body_repository.UNIGNORED_DIRECTORY, EVIDENCE_BODY)
 
 describe('run_ship_preflight.stage — every pull-request precondition at once', () => {

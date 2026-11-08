@@ -5,6 +5,7 @@ import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { declared_growth } from '#scripts/split/declared-growth'
 import { split_assess, type SplitGuide } from '#scripts/split/split-assess'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
@@ -41,19 +42,25 @@ import { lane_stage_budget } from './lane-stage-budget'
 // lane's first cleared plan — has the files this lane's branch has committed stand in for that history
 // (joshuafolkken/kit#5684): only the ship commits, and its preflight held each commit to the plan of its time.
 //
-// **A plan declared one deliverable (`--single`) is not refused on the files axis** (joshuafolkken/kit#6647):
-// a split needs a separately-mergeable part as well as the size (split-assessment.md → "The question"), and
-// a short declaration alone would push the lane into a split child that takes every acceptance criterion.
-// The overrun still goes on the ledger, so the pre-gate `run:cut` verifies the deliverable
-// (`split-verified-single.ts`); the hunks and lines axes refuse as before.
+// **A plan declared one deliverable (`--single`) is not refused on any axis** (joshuafolkken/kit#6647,
+// joshuafolkken/kit#6602): a split needs a separately-mergeable part as well as the size
+// (split-assessment.md → "The question"), and a short declaration alone would push the lane into a split
+// child that takes every acceptance criterion. **Nor is a re-plan after the lane started**: an overrun
+// then is a warning, and only an independent added requirement or unverifiable scope growth re-splits.
+// Either overrun still goes on the ledger as a notice, which the later steps print and never stop on.
 //
 // **A new scripts module and its importer count and split as one file** (joshuafolkken/kit#6635), or
 // the kept lane ships a module `pack-boundary.test.ts` finds unreached. As in `epic-split-reach.ts`, a
 // planned scripts module the base holds is a candidate importer, here only one in the new module's
 // directory; with no `base_files`, every file stands alone. The grouping is the split notice's
 // (`split_assess.units_of`, joshuafolkken/kit#6724).
+//
+// **A plan that edits a `test:related` hub answers `split (hub)`** (joshuafolkken/kit#6543), naming it:
+// a file whose reach passes the test-file cap (`test-related-cap.ts`) runs past the cap on every check,
+// and lanes that edited one overran their budget among the most often. With no graph no file reads as a hub, so the
+// other axes decide as before. Splitting the hub itself is joshuafolkken/kit#6180.
 
-type SplitReason = 'files' | 'hunks' | 'lines'
+type SplitReason = 'files' | 'hunks' | 'lines' | 'hub'
 
 // What `lane:plan` measured beside the plan (`lane-plan-signals.ts`); one `hunk_files` entry per hunk,
 // one `committed_files` entry per file the branch changed between its base and `HEAD`, and the files
@@ -66,6 +73,7 @@ interface PlanSignals {
 	lines_ratio: number | undefined
 	implement_rate: ImplementRate | undefined
 	split_filed: boolean
+	hubs?: ReadonlyArray<string> | undefined
 }
 
 interface FilesOver {
@@ -84,7 +92,14 @@ interface MeasureOver {
 	measured: number
 }
 
-type Oversize = (FilesOver | MeasureOver) & { guide?: SplitGuide }
+// `limit` is the test-file cap the hubs' reach passes.
+interface HubOver {
+	reason: 'hub'
+	limit: number
+	hubs: ReadonlyArray<string>
+}
+
+type Oversize = (FilesOver | MeasureOver | HubOver) & { guide?: SplitGuide }
 
 interface Declared {
 	files: number
@@ -245,22 +260,32 @@ function measure_over(
 	)
 }
 
-// Whether `over` is a files-axis overrun of a plan declared one deliverable — noted, not refused.
+// Whether `over` is noted, not refused: a plan declared one deliverable, or one re-registered after its
+// lane started — a met bar recorded `sized` — warns on any axis (joshuafolkken/kit#6602). Only the first
+// plan of an Issue with no single-deliverable decision answers `split`, and only before work starts.
 function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
-	return plan.single === true && over?.reason === 'files'
+	return over !== undefined && (plan.single === true || plan.sized === true)
 }
 
-// Files first, then hunks, then lines; a waived files overrun stands only once the other axes pass.
+function hub_over(signals: PlanSignals): HubOver | undefined {
+	const hubs = signals.hubs ?? []
+
+	return hubs.length === 0
+		? undefined
+		: { reason: 'hub', limit: test_pinned_logic.MAX_TEST_FILES, hubs }
+}
+
+// Files first, then hubs, hunks and lines; a waived files overrun stands only once the other axes pass.
 function first_over(
 	plan: LanePlan,
 	declared: Declared,
 	recorded: LanePlan | undefined,
 	signals: PlanSignals,
-): FilesOver | MeasureOver | undefined {
+): FilesOver | MeasureOver | HubOver | undefined {
 	const files = files_over(plan, declared.files, recorded, signals)
 	if (files !== undefined && !is_waived(plan, files)) return files
 
-	return measure_over(declared, signals, plan, recorded) ?? files
+	return hub_over(signals) ?? measure_over(declared, signals, plan, recorded) ?? files
 }
 
 // `undefined` while every axis stays within its bar, or no size is declared.
@@ -290,8 +315,8 @@ function files_text(issue: number, over: FilesOver): string {
 	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
 }
 
-function waiver_text(issue: number, files: number, limit: number): string {
-	return `single (files): ${session_cite.issue(issue)}'s plan holds ${String(files)} files (tests excluded), over ${String(limit)}, recorded as one deliverable and noted on the ledger — the pre-gate \`run:cut\` answers \`split-unresolved\` unless every ship-draft acceptance row is met and \`lint:related\` and \`test:related\` are green (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
+function waiver_text(issue: number, over: Oversize): string {
+	return `size warning (${over.reason}): ${session_cite.issue(issue)}'s plan is past its ${String(over.limit)} bar, recorded and noted on the ledger — a warning, not a stop; re-split only on an independent added requirement or scope growth this Issue cannot verify (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
 }
 
 function measure_bar(over: MeasureOver): string {
@@ -306,8 +331,18 @@ function measure_text(issue: number, over: MeasureOver): string {
 	return `split (${over.reason}): ${session_cite.issue(issue)}'s ${measure_bar(over)}, so the plan is not recorded. Carve a separately-mergeable part off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. ${bar_tail()}`
 }
 
+function hub_text(issue: number, over: HubOver): string {
+	return `split (hub): ${session_cite.issue(issue)}'s plan edits ${over.hubs.join(', ')}, whose \`test:related\` reach passes the ${String(over.limit)}-test-file cap, so the plan is not recorded. Carve the hub edit off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. The hub edit is the one deliverable instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
+}
+
+function over_text(issue: number, over: Oversize): string {
+	if (over.reason === 'files') return files_text(issue, over)
+
+	return over.reason === 'hub' ? hub_text(issue, over) : measure_text(issue, over)
+}
+
 function refusal_text(issue: number, over: Oversize): string {
-	const text = over.reason === 'files' ? files_text(issue, over) : measure_text(issue, over)
+	const text = over_text(issue, over)
 	const guide = over.guide ?? split_assess.guide_for(lane_stage_budget.BUDGET_MINUTES.implement)
 
 	return `${text} ${split_assess.policy_text(guide)}`

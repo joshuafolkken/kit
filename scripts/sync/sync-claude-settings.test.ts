@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const paths_mock = vi.hoisted(() => ({ root: '' }))
+const make_directory = temporary_directory()
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
 vi.mock('#scripts/init/init-paths', () => ({
@@ -81,7 +82,7 @@ function write_own_settings(): void {
 }
 
 beforeEach(() => {
-	paths_mock.root = mkdtempSync(path.join(tmpdir(), 'sync-claude-settings-'))
+	paths_mock.root = make_directory('sync-claude-settings-')
 	writeFileSync(
 		path.join(paths_mock.root, 'package.json'),
 		JSON.stringify({ private: true, josh: { profile: 'full' } }),
@@ -91,7 +92,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

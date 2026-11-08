@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { codex_usage } from './codex-usage'
 
@@ -15,6 +15,7 @@ const SECOND_INPUT = TOTAL_INPUT - FIRST_INPUT
 const BILLED_PER_REQUEST = [FIRST_INPUT, SECOND_INPUT]
 const HOME_PREFIX = 'codex-usage-'
 const PREVIOUS_THREAD_ID = 'previous-generation'
+const make_directory = temporary_directory()
 
 function token_count(input_tokens: number, last_input_tokens: number): string {
 	return JSON.stringify({
@@ -58,7 +59,7 @@ function write_rollout(home: string, cwd: string): void {
 
 describe('codex_usage.measurement — active rollout', () => {
 	it('reads token counts before a terminal turn.completed event exists', () => {
-		const home = mkdtempSync(path.join(tmpdir(), HOME_PREFIX))
+		const home = make_directory(HOME_PREFIX)
 		const codex_home = path.join(home, '.codex')
 
 		write_rollout(codex_home, TARGET)
@@ -69,7 +70,7 @@ describe('codex_usage.measurement — active rollout', () => {
 	})
 
 	it('does not mix an earlier generation into the current thread measurement', () => {
-		const home = mkdtempSync(path.join(tmpdir(), HOME_PREFIX))
+		const home = make_directory(HOME_PREFIX)
 		const codex_home = path.join(home, '.codex')
 
 		write_rollout_for(codex_home, TARGET, PREVIOUS_THREAD_ID)
@@ -81,7 +82,7 @@ describe('codex_usage.measurement — active rollout', () => {
 	})
 
 	it('rejects a current filename carrying another generation metadata', () => {
-		const home = mkdtempSync(path.join(tmpdir(), HOME_PREFIX))
+		const home = make_directory(HOME_PREFIX)
 		const codex_home = path.join(home, '.codex')
 
 		write_rollout_for(codex_home, TARGET, THREAD_ID, PREVIOUS_THREAD_ID)
@@ -92,7 +93,7 @@ describe('codex_usage.measurement — active rollout', () => {
 
 describe('codex_usage.measurement — rollout matching', () => {
 	it('does not use a current thread that belongs to another project', () => {
-		const home = mkdtempSync(path.join(tmpdir(), HOME_PREFIX))
+		const home = make_directory(HOME_PREFIX)
 		const codex_home = path.join(home, '.codex')
 
 		write_rollout(codex_home, '/projects/other')
@@ -101,7 +102,7 @@ describe('codex_usage.measurement — rollout matching', () => {
 	})
 
 	it('prefers the native CODEX_HOME without changing it', () => {
-		const home = mkdtempSync(path.join(tmpdir(), HOME_PREFIX))
+		const home = make_directory(HOME_PREFIX)
 
 		write_rollout(home, TARGET)
 

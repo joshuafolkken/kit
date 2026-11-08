@@ -1,11 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
@@ -23,7 +23,8 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const CHECK_FLAG = '--check'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-one-pass-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-cli-one-pass-')
 const body_path = path.join(work, 'refused-thrice.md')
 
 // Opted into `auto-ok` with no run label named, and missing every section after the background; its
@@ -87,7 +88,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_file_cli.run — every refusal in one pass', () => {

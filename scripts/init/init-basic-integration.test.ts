@@ -1,17 +1,15 @@
 import {
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	readdirSync,
 	readFileSync,
-	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init_logic } from './init-logic'
@@ -30,6 +28,7 @@ vi.mock('./init-paths', () => ({
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:readline/promises', () => ({ createInterface: vi.fn() }))
 const mocked_execa = vi.mocked(execaSync)
+const make_directory = temporary_directory()
 const PACKAGE_JSON = 'package.json'
 const INDEX_HTML = 'index.html'
 const GITIGNORE = '.gitignore'
@@ -93,12 +92,11 @@ beforeEach(() => {
 	vi.resetModules()
 	mocked_execa.mockReset()
 	paths_mock.package_dir = fileURLToPath(new URL('../../', import.meta.url))
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'josh-basic-init-'))
+	paths_mock.root = make_directory('josh-basic-init-')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

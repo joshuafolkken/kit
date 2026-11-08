@@ -44,6 +44,7 @@ const KIT_ISSUE_URL = 'https://github.com/joshuafolkken/kit/issues/903'
 const NON_GITHUB_URL = 'https://example.com/x'
 const WORKING_DIRECTORY_REPO = 'my-repo'
 const SCRIPT_NAME = 'telegram-test.ts'
+const RATE_LIMIT = 'API rate limit exceeded'
 
 const { telegram_test } = await import('./telegram-test')
 
@@ -52,6 +53,10 @@ beforeEach(() => {
 	issue_get_title_mock.mockReset()
 	telegram_send_mock.mockReset()
 	error_handle_mock.mockReset()
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
 })
 
 // joshuafolkken/kit#1564: this command *is* the notification, so a send that reached nobody has to
@@ -101,6 +106,15 @@ describe('telegram_test.send_values', () => {
 		telegram_send_mock.mockRejectedValue(failure)
 
 		await expect(telegram_test.send_values({ body: 'paused' })).rejects.toBe(failure)
+	})
+
+	it('still sends when the repository lookup hits a rate limit', async () => {
+		repo_get_name_with_owner_mock.mockRejectedValue(new Error(RATE_LIMIT))
+		vi.spyOn(console, 'warn').mockReturnValue(undefined)
+
+		await telegram_test.send_values({ body: 'paused' })
+
+		expect(telegram_send_mock).toHaveBeenCalledOnce()
 	})
 })
 
@@ -171,6 +185,15 @@ describe('telegram_test.fetch_repo_name — the working directory lookup', () =>
 		repo_get_name_with_owner_mock.mockResolvedValue(undefined)
 
 		expect(await telegram_test.fetch_repo_name()).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#6766: the reader throws an exhausted rate limit, which dropped the Stop confirmation.
+	it('returns undefined with a warning when the lookup hits a rate limit', async () => {
+		repo_get_name_with_owner_mock.mockRejectedValue(new Error(RATE_LIMIT))
+		const warn = vi.spyOn(console, 'warn').mockReturnValue(undefined)
+
+		expect(await telegram_test.fetch_repo_name()).toBeUndefined()
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining(RATE_LIMIT))
 	})
 
 	// joshuafolkken/kit#1063: this was a `gh repo view` spawn, which goes through GraphQL and is

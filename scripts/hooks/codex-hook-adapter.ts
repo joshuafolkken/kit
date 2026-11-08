@@ -141,7 +141,7 @@ async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	const outcome = pretool_guard.pretool_outcome(judged)
 
 	hook_decision.emit_outcome(outcome)
-	await pretool_guard.mark_phase(outcome)
+	await pretool_guard.mark_phase(outcome, judged)
 	await pretool_guard.record_refusal(judged, outcome)
 }
 

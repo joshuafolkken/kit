@@ -44,6 +44,7 @@ import { backlog_drive_rate } from './backlog-drive-rate'
 import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
+import { backlog_drive_retrospective_unit } from './backlog-drive-retrospective-unit'
 import { backlog_drive_seats } from './backlog-drive-seats'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
@@ -267,10 +268,9 @@ function ports_of(
 		judgement_owed: judgement_reader(),
 		...reporters(holds),
 		now: () => new Date(),
-		sleep: async (milliseconds) => {
-			await sleep(milliseconds)
-		},
+		sleep,
 		finish: backlog_drive_finish.finish,
+		retrospective: async () => await backlog_drive_retrospective_unit.run(context.owner),
 		on_state: (state) => {
 			last.state = state
 		},

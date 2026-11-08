@@ -176,6 +176,12 @@ function auto_pick(body: string): number | undefined {
 	return option !== undefined && is_parents(option) ? option.number : undefined
 }
 
-const run_park_body = { FORMAT, auto_pick, problem_of, summary_of }
+const run_park_body = {
+	FORMAT,
+	HEADINGS: [OPTIONS_HEADING, PICK_HEADING],
+	auto_pick,
+	problem_of,
+	summary_of,
+}
 
 export { run_park_body }
