@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
 const EMPTY_PATH = ''
@@ -180,22 +180,15 @@ describe('prepare exit-code behavior', () => {
 // `|| true`, so an install leaving **zero** hooks in place exited 0 and said nothing. The stub is what
 // separates them: a `lefthook` on PATH that exits non-zero is exactly what `core.hooksPath` produces.
 describe('a lefthook that is present but cannot install', () => {
-	const stub_directories: Array<string> = []
+	const make_directory = temporary_directory()
 
 	function arrange_lefthook(): string {
-		const directory = mkdtempSync(path.join(tmpdir(), 'init-prepare-'))
+		const directory = make_directory('init-prepare-')
 
-		stub_directories.push(directory)
 		writeFileSync(path.join(directory, LEFTHOOK_BIN), FAILING_STUB, { mode: EXECUTABLE_MODE })
 
 		return directory
 	}
-
-	afterEach(() => {
-		for (const directory of stub_directories.splice(0)) {
-			rmSync(directory, { force: true, recursive: true })
-		}
-	})
 
 	it('names the failure on standard error instead of swallowing it', () => {
 		const { stderr } = run_fresh_prepare(arrange_lefthook())

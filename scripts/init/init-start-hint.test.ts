@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const make_directory = temporary_directory()
 
 // Same import-time paths as the other `init` integration tests, so the same getter mock
 // (joshuafolkken/kit#879).
@@ -30,7 +32,7 @@ function empty_git_result(): ReturnType<typeof execaSync> {
 beforeEach(() => {
 	vi.resetModules()
 	paths_mock.package_dir = fileURLToPath(new URL('../../', import.meta.url))
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), 'josh-init-start-hint-'))
+	paths_mock.root = make_directory('josh-init-start-hint-')
 	writeFileSync(path.join(paths_mock.root, 'index.html'), '<h1>Hello</h1>')
 	mkdirSync(path.join(paths_mock.root, '.git'))
 	vi.mocked(execaSync).mockReturnValue(empty_git_result())
@@ -38,7 +40,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

@@ -1,24 +1,24 @@
-import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { copyFileSync, existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { package_path } from '#scripts/init/init-paths'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 const GIT = 'git'
 const GITIGNORE = '.gitignore'
-const roots: Array<string> = []
+const make_directory = temporary_directory()
 // Under the pre-push hook git exports GIT_DIR / GIT_INDEX_FILE, which beat `cwd` — cleared so each
 // call answers about the scratch repository instead of the checkout the hook is firing in.
 const SCRATCH_ENVIRONMENT = git_location_environment.location_free_environment()
 const NO_GLOBAL_EXCLUDES = ['-c', `core.excludesFile=${os.devNull}`]
 
 function is_ignored_by(gitignore_source: string, relative_path: string): boolean {
-	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-gitignore-'))
+	const root = make_directory('josh-gitignore-')
 
-	roots.push(root)
 	execaSync(GIT, ['init', '--quiet'], { cwd: root, env: SCRATCH_ENVIRONMENT })
 	copyFileSync(package_path(gitignore_source), path.join(root, GITIGNORE))
 
@@ -31,10 +31,6 @@ function is_ignored_by(gitignore_source: string, relative_path: string): boolean
 		}).exitCode === 0
 	)
 }
-
-afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
-})
 
 // .josh/tmp/ holds any agent's throwaway drafts (Issue / PR bodies, plans, handoffs, logs), and
 // .claude/tmp/ the ones written before it; the distributed template carries the rule to every
