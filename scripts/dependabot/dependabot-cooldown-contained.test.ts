@@ -1,13 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#4666: `.github/dependabot.yml` goes through `write_contained` like every other
 // sync write, so one linked outside the project is refused rather than written through. The project
 // root is pinned to a scratch tree, as `file-content.test.ts` does.
 
-const SANDBOX = mkdtempSync(path.join(tmpdir(), 'dependabot-contained-'))
+const SANDBOX = temporary_directory('suite')('dependabot-contained-')
 const ROOT = path.join(SANDBOX, 'project')
 const OUTSIDE_FILE = path.join(SANDBOX, 'outside.yml')
 const DESTINATION = path.join(ROOT, '.github', 'dependabot.yml')
@@ -26,10 +26,6 @@ vi.doMock('#scripts/init/init-paths', async (import_original) => ({
 }))
 
 const { dependabot_cooldown } = await import('./dependabot-cooldown')
-
-afterAll(() => {
-	rmSync(SANDBOX, { recursive: true, force: true })
-})
 
 describe('dependabot_cooldown.sync_dependabot_cooldown — a config linked outside the project', () => {
 	it('refuses the write and leaves the outside file alone', () => {

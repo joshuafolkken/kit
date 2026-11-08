@@ -150,14 +150,14 @@ describe('issue_file_pass.labels_in_one_pass — the implement rate', () => {
 })
 
 describe('issue_file_pass.labels_in_one_pass — measured speed', () => {
-	it('refuses a reasoned estimate the ledger rate projects past the budget', async () => {
+	it('refuses an unreasoned estimate the ledger rate projects past the budget', async () => {
 		vi.mocked(lane_net_read.measurements).mockResolvedValue({
 			implement_rate: { median: 10, lanes: 4 },
 			growth: {},
 		})
 		const body = CLEAR_BODY.replace(
 			CLEAR_ESTIMATE,
-			'- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）\n- 分割しない理由: 一体で入れる',
+			'- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）',
 		)
 
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(body))).toBeUndefined()

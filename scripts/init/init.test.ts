@@ -1,7 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init } from './init'
@@ -18,7 +18,7 @@ function fake_lefthook_result(exit_code: number | undefined): ReturnType<typeof 
 }
 
 // Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'init-test-'))
+const TEST_DIR = temporary_directory('suite')('init-test-')
 const TEMPLATE_PATH = path.join(TEST_DIR, 'template.properties')
 const DEST_PATH = path.join(TEST_DIR, 'sonar-project.properties')
 

@@ -1,11 +1,13 @@
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { hook_command_rewrite } from './hook-command-rewrite'
 import { hook_launch } from './hook-launch'
+
+const make_directory = temporary_directory()
 
 const GIT_INIT_TIMEOUT_MS = 10_000
 // Where Claude Code names the project root for a hook command (`hook-launch.ts`).
@@ -108,23 +110,18 @@ function run_in_temporary_checkout(
 	is_nested = false,
 	options: CheckoutOptions = {},
 ): HookResult {
-	const temporary_root = mkdtempSync(path.join(tmpdir(), 'kit-hook-bootstrap-'))
+	const temporary_root = make_directory('kit-hook-bootstrap-')
+	const hook_environment = checkout_environment(temporary_root, options)
 
-	try {
-		const hook_environment = checkout_environment(temporary_root, options)
+	if (is_partial_install) create_partial_install(temporary_root)
 
-		if (is_partial_install) create_partial_install(temporary_root)
+	const { status, stdout, stderr } = spawnSync('sh', ['-c', command], {
+		cwd: execution_directory(temporary_root, is_nested),
+		encoding: 'utf8',
+		env: hook_environment,
+	})
 
-		const { status, stdout, stderr } = spawnSync('sh', ['-c', command], {
-			cwd: execution_directory(temporary_root, is_nested),
-			encoding: 'utf8',
-			env: hook_environment,
-		})
-
-		return { status, stdout, stderr }
-	} finally {
-		rmSync(temporary_root, { recursive: true, force: true })
-	}
+	return { status, stdout, stderr }
 }
 
 // The command a consumer's file carries once the rewrite has run over a file holding `command`.

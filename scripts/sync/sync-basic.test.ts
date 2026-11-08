@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const paths_mock = vi.hoisted(() => ({ root: '' }))
+const make_directory = temporary_directory()
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
 vi.mock('#scripts/init/init-paths', () => ({
@@ -80,7 +81,7 @@ async function run_sync(profile: string): Promise<void> {
 }
 
 beforeEach(() => {
-	paths_mock.root = mkdtempSync(path.join(tmpdir(), 'sync-basic-'))
+	paths_mock.root = make_directory('sync-basic-')
 	writeFileSync(project_file('index.html'), '<h1>Hello</h1>')
 	vi.spyOn(console, 'info').mockImplementation(() => {
 		/* suppress */
@@ -91,7 +92,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

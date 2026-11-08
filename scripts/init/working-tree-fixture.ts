@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { test_network_guard } from '#tools/test/test-network-guard'
 import { execaSync } from 'execa'
 
@@ -14,18 +14,10 @@ const TEMP_PREFIX = 'josh-working-tree-'
 const MANIFEST = 'package.json'
 const COMMITTED_MANIFEST = '{ "name": "fixture" }\n'
 
-const directories: Array<string> = []
+const make_directory = temporary_directory()
 
-function temporary_directory(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), TEMP_PREFIX))
-
-	directories.push(directory)
-
-	return directory
-}
-
-function remove_all(): void {
-	for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+function scratch_directory(): string {
+	return make_directory(TEMP_PREFIX)
 }
 
 function git(root: string, args: ReadonlyArray<string>): string {
@@ -43,7 +35,7 @@ function write(root: string, name: string, content: string): void {
 }
 
 function repository(): string {
-	const root = temporary_directory()
+	const root = scratch_directory()
 
 	git(root, ['init', '--initial-branch=main'])
 
@@ -64,8 +56,7 @@ function committed_repository(manifest = COMMITTED_MANIFEST): string {
 
 const working_tree_fixture = {
 	MANIFEST,
-	temporary_directory,
-	remove_all,
+	scratch_directory,
 	git,
 	write,
 	repository,

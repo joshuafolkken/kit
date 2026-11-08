@@ -1,4 +1,4 @@
-import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_phase } from './lane-phase'
@@ -7,11 +7,14 @@ import { lane_phase } from './lane-phase'
 // person's session or a leaked mark never draws a phase onto a lane the board shows.
 
 const order = vi.hoisted((): Array<string> => [])
+const events = vi.hoisted((): Array<RunEvent> => [])
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: {
-		emit: vi.fn(async (kind: string): Promise<void> => {
+		invocation_or_all_events: vi.fn(async () => events),
+		emit: vi.fn(async (kind: string, text: string): Promise<void> => {
 			order.push(kind)
+			events.push({ pos: events.length, at: '2026-11-04T00:00:00.000Z', kind, text })
 		}),
 	},
 }))
@@ -35,6 +38,39 @@ afterEach(() => {
 	emit.mockClear()
 	emit_plan.mockClear()
 	order.length = 0
+	events.length = 0
+})
+
+describe('mark_implement — launch scope', () => {
+	it('writes plan and implement once for concurrent runtime edits', async () => {
+		const source = { [lane_child_marker.KEY]: ISSUE }
+
+		await Promise.all([
+			lane_phase.mark_implement(LANE, source),
+			lane_phase.mark_implement(LANE, source),
+		])
+
+		expect(emit).toHaveBeenCalledOnce()
+		expect(emit_plan).toHaveBeenCalledOnce()
+	})
+
+	it('writes once per launch, then writes again for a re-dispatched child', async () => {
+		const source = { [lane_child_marker.KEY]: ISSUE }
+
+		await lane_phase.mark_implement(LANE, source)
+		await lane_phase.mark_implement(LANE, source)
+		expect(emit).toHaveBeenCalledOnce()
+		expect(emit_plan).toHaveBeenCalledOnce()
+		events.push({
+			pos: events.length,
+			at: '2026-11-04T00:01:00.000Z',
+			kind: 'child-launch',
+			text: `#${ISSUE} dispatched`,
+		})
+		await lane_phase.mark_implement(LANE, source)
+		expect(emit).toHaveBeenCalledTimes(2)
+		expect(emit_plan).toHaveBeenCalledTimes(2)
+	})
 })
 
 describe('mark_implement', () => {

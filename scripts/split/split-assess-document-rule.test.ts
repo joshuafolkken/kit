@@ -23,22 +23,25 @@ describe('split-assessment.md points to the split:assess command', () => {
 // joshuafolkken/kit#4302: the steps a run takes on the pre-gate notice live in one section, and the
 // notice points at exactly that heading.
 describe('split-assessment.md carries the pre-gate notice steps', () => {
-	it('requires stopping, splitting the rest and shipping the green part (ac-816d7c3f)', () => {
+	// joshuafolkken/kit#6602: size alone warns; only an independent requirement re-splits.
+	it('treats the notice as a warning and keeps the independent-requirement split', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
 		expect(document).toContain(`## ${split_assess.NOTICE_SECTION}`)
-		expect(document).toContain('Stop implementation before')
-		expect(document).toContain('Keep only the green part')
+		expect(document).toContain('The notice is a warning, not a stop')
+		expect(document).toContain('Split again only for an independent added requirement')
 		expect(document).toContain('pnpm josh issue:file --route split --found-during <N>')
-		expect(document).toContain('gate and ship the green part')
-		expect(document).toContain('`split-unresolved` even with a')
-		expect(document).not.toContain('Keep it one Issue')
+		expect(document).toContain(
+			'The quality gates, the clash and unread checks, and the review stay stops',
+		)
+		expect(document).not.toContain('split-unresolved')
+		expect(document).not.toContain('Stop implementation before')
 	})
 
 	it('lets one verified deliverable answer the notice without a child (ac-75da8719)', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
-		expect(document).toContain('One verified deliverable, nothing left to split')
+		expect(document).toContain('One verified deliverable (every ship-draft acceptance row')
 		expect(document).toContain('scripts/split/split-verified-single.ts')
 	})
 })
@@ -61,11 +64,11 @@ describe('split-assessment.md states the lane:plan growth bar', () => {
 		expect(document).toContain('`lane:plan` answers `split` past the declared files × files ratio')
 	})
 
-	// joshuafolkken/kit#6647: the single-deliverable rule names the flag `lane:plan` waives the files axis on.
-	it('points one deliverable past the files axis at --single', () => {
-		expect(read_repo_file(SPLIT_ASSESSMENT)).toContain(
-			'one deliverable past files → `--single` (`lane-plan-size.ts`)',
-		)
+	// joshuafolkken/kit#6647, joshuafolkken/kit#6602: `--single` waives every axis; a re-plan only warns.
+	it('points one deliverable past any axis at --single and a re-plan at a warning', () => {
+		const document = read_repo_file(SPLIT_ASSESSMENT)
+
+		expect(document).toContain('`--single` or a re-plan → `size warning` (`lane-plan-size.ts`)')
 	})
 })
 

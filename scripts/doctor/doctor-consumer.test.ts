@@ -1,10 +1,12 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { doctor } from './doctor'
 import { doctor_consumer } from './doctor-consumer'
+
+const make_directory = temporary_directory()
 
 const KIT = '@joshuafolkken/kit'
 const PLUGIN_ID = 'kit@kit'
@@ -13,7 +15,7 @@ const SETTINGS_JSON = '.claude/settings.json'
 const TARGET_MISSING = 'target-missing'
 
 function temporary_project(): string {
-	return mkdtempSync(path.join(tmpdir(), 'doctor-consumer-'))
+	return make_directory('doctor-consumer-')
 }
 
 function write_file(root: string, relative: string, content: string): void {
