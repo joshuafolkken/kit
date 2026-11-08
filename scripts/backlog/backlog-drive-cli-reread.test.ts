@@ -44,6 +44,8 @@ function ports_with(launch: DrivePorts['launch']): DrivePorts {
 		judgement_owed: async () => 0,
 		memory_held: async () => false,
 		usage_limited: async () => false,
+		yields: async () => [],
+		park: async () => undefined,
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,

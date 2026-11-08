@@ -102,16 +102,37 @@ function merge_outcome(script: Script, issue: string): MergeOutcome {
 	return scripted.find(([issues]) => issues?.includes(issue) === true)?.[1] ?? 'merged'
 }
 
-// The child-facing ports: a finished child is merged once and then reads as gone.
+// The yield notes on the stream: each `yielded` merge notes one at the clock's time, as the child's own
+// `lane:plan` does, and a park is recorded in `calls`.
+function yield_ports(
+	calls: Array<string>,
+	now: () => Date,
+): Pick<LoopPorts, 'yields' | 'park'> & { note: (issue: string) => void } {
+	const notes = new Map<string, Array<string>>()
+
+	return {
+		note: (issue) => {
+			notes.set(issue, [...(notes.get(issue) ?? []), now().toISOString()])
+		},
+		yields: async (issue) => notes.get(issue) ?? [],
+		park: async (issue) => {
+			calls.push(`park ${issue}`)
+		},
+	}
+}
+
+// The child-facing ports: a finished child is merged once and then reads as gone. A yielding child
+// gives its lane back as soon as it starts, so one launched again reads as finished at once.
 function child_ports(
 	script: Script,
 	calls: Array<string>,
+	note: (issue: string) => void,
 ): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'merge'> {
 	const finished = new Set(script.finished)
 	const adoptable = new Set(script.adoptable)
 
 	return {
-		is_finished: (issue) => finished.has(issue),
+		is_finished: (issue) => finished.has(issue) || script.yielded?.includes(issue) === true,
 		adoptable: async (in_flight) => {
 			const adopting = [...adoptable].filter((issue) => !in_flight.includes(issue))
 
@@ -122,8 +143,11 @@ function child_ports(
 		merge: async (issue) => {
 			calls.push(`merge ${issue}`)
 			finished.delete(issue)
+			const outcome = merge_outcome(script, issue)
 
-			return { ...merge_token(script, issue), outcome: merge_outcome(script, issue) }
+			if (outcome === 'yielded') note(issue)
+
+			return { ...merge_token(script, issue), outcome }
 		},
 	}
 }
@@ -262,6 +286,22 @@ function report_ports(
 	}
 }
 
+type ClockedPorts = ReturnType<typeof loop_ports> &
+	ReturnType<typeof child_ports> &
+	Pick<LoopPorts, 'yields' | 'park'>
+
+// The clock and the ports that read it: a yield note is stamped with the clock's time.
+function clocked_ports(
+	script: Script,
+	calls: Array<string>,
+	states: Array<DriveState>,
+): ClockedPorts {
+	const loop = loop_ports(script, calls, states)
+	const { note, ...yielding } = yield_ports(calls, loop.now)
+
+	return { ...loop, ...yielding, ...child_ports(script, calls, note) }
+}
+
 function harness(script: Script): Harness {
 	const calls: Array<string> = []
 	const offers: Array<DriveState> = []
@@ -278,11 +318,10 @@ function harness(script: Script): Harness {
 		idles,
 		pauses,
 		ports: {
-			...child_ports(script, calls),
+			...clocked_ports(script, calls, states),
 			...dispatch_ports(script, calls, offers),
 			...room_ports(script),
 			...memory_port(script),
-			...loop_ports(script, calls, states),
 			...report_ports(holds, idles, pauses),
 			retrospective: retrospective_port(script, calls),
 		},
