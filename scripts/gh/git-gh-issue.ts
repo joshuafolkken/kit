@@ -81,6 +81,13 @@ async function issue_list_open_bodies(limit: number): Promise<IssueListOutcome> 
 	return await issue_list({ json_fields: BACKLOG_SCAN_FIELDS, limit })
 }
 
+// The same listing with each row's blocker relations, for `epic:bundle`. The listing reads them in
+// one GraphQL query per hundred rows (`git-gh-issue-list.ts`), so the cost stays flat as the backlog
+// grows; read row by row they cost two requests per blocked issue (joshuafolkken/kit#6796).
+async function issue_list_open_relations(limit: number): Promise<IssueListOutcome> {
+	return await issue_list({ json_fields: `${BACKLOG_SCAN_FIELDS},blockedBy`, limit })
+}
+
 // The issues that closed most recently, for the duplicate half of `issue:scout`.
 // **The work most likely to be filed twice is the work that just
 // finished**, and a scan that reads only open issues cannot see any of it.
@@ -178,6 +185,7 @@ const git_gh_issue = {
 	issue_list_by_label_summary,
 	issue_search_body,
 	issue_list_open_bodies,
+	issue_list_open_relations,
 	issue_list_open_for_judgement,
 	issue_list_recently_closed,
 }
