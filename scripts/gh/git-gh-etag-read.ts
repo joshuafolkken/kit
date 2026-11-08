@@ -71,9 +71,14 @@ async function read(path: string): Promise<string> {
 
 // A listing whose first page holds `per_page` rows (joshuafolkken/kit#6699). The ETag covers one page
 // only, so a full first page — more may follow — is read unconditionally with `--paginate` instead;
-// an answer that is no array is handed back for the caller's own parser to reject.
-async function read_listing(path: string, per_page: number): Promise<string> {
-	const first = await read(path)
+// an answer that is no array is handed back for the caller's own parser to reject. `read_page` reads
+// the first page: the merge gate passes its in-process read (joshuafolkken/kit#6756).
+async function read_listing(
+	path: string,
+	per_page: number,
+	read_page: (page_path: string) => Promise<string> = read,
+): Promise<string> {
+	const first = await read_page(path)
 	const rows = parse_json_array_or_undefined(first, z.unknown())
 
 	if (rows === undefined || rows.length < per_page) return first

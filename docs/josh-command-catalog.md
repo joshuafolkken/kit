@@ -99,6 +99,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh ci:timing` · `josh cit` | `<pr\|branch\|run-id> [--json]` | developer | network | Print the job and step durations and conclusions of a run id's GitHub Actions run, or of every run on a pull request's or a branch's latest commit |
 | `josh command:derive` · `josh cdv` · **kit only** | — | maintainer | files | Write every artifact the command map derives — usage spans and catalog — and print page bytes against their ceilings |
 | `josh doctor` · `josh dr` | `[--fix]` | developer | files | Diagnose PATH shadowing of the global josh and show the discovered repository map (--fix reclaims a stale shim) |
+| `josh gh:usage` · `josh ghu` | `[--since <instant>]` | developer | none | Tally the josh processes' logged GitHub API usage per command — runs, calls, 304 answers and core used — most calls first, under the period the lines cover |
 | `josh latest` · `josh u` | — | developer | files, network, processes | Update dependencies, run security audit, then update pnpm |
 | `josh latest:corepack` · `josh lc` | — | developer | files, network | Update pnpm on the current major while preserving the integrity pin |
 | `josh latest:guard` | — | automation | files | Refuse josh latest inside a lane (the update stamp is keyed to the project root) |
