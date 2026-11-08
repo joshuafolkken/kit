@@ -32,6 +32,13 @@ describe('issue release classification declaration', () => {
 })
 
 describe('issue release classification', () => {
+	it('selects from label names and a body without the GitHub JSON', () => {
+		expect(pr_classification.select_classification(['bug'], '')).toBe(BUGFIX)
+		expect(() =>
+			pr_classification.select_classification(['bug'], `- リリース分類: ${ENHANCEMENT}`),
+		).toThrow(CHOOSE_ERROR)
+	})
+
 	it('maps an issue bug label to the PR bugfix classification', () => {
 		const issue = JSON.stringify({ labels: [{ name: 'bug' }], body: '' })
 

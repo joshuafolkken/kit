@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
@@ -134,10 +134,70 @@ describe('issue_file_cli.run — --check', () => {
 		expect(repository_labels.ensure_labels).not.toHaveBeenCalled()
 	})
 
+	// joshuafolkken/kit#6733: a body `josh pr` could not classify is refused before it is filed.
+	it('refuses a body that resolves to more than one release classification', async () => {
+		const several_path = path.join(work, 'several-classifications.md')
+
+		writeFileSync(several_path, `- リリース分類: enhancement\n${readFileSync(clear_path, 'utf8')}`)
+		scout_finds_none()
+
+		expect(await issue_file_cli.run([...argv_of(several_path), CHECK_FLAG])).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(
+			'Choose one release classification',
+		)
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+
 	it('answers no URL from file_issue', async () => {
 		scout_finds_none()
 
 		expect(await issue_file_cli.file_issue([...CLEAR_ARGV, CHECK_FLAG])).toBeUndefined()
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6733: a non-bug body with no aim is filed with the `other-change` line `josh pr`
+// reads, unless a `--label` already classifies it — and judged with that label.
+describe('issue_file_cli.run — the other-change completion', () => {
+	const non_bug_path = path.join(work, 'non-bug.md')
+	const OTHER_CHANGE_LINE = '- リリース分類: other-change'
+	const IGNORE_LABEL = ['--label', 'ignore-for-release']
+	const non_bug_body = readFileSync(clear_path, 'utf8').replace(
+		'- 種別: 不具合\n- 原因: #4201',
+		'- 種別: 非不具合',
+	)
+
+	writeFileSync(non_bug_path, non_bug_body)
+
+	// The create call is refused, so the run stops at the body it sent, before any post-filing read.
+	beforeEach(() => {
+		scout_finds_none()
+		exec_gh_api.mockRejectedValue(new Error('HTTP 502'))
+	})
+
+	it('writes the line into the filed body', async () => {
+		await issue_file_cli.file_issue(argv_of(non_bug_path))
+
+		expect(JSON.stringify(exec_gh_api.mock.calls)).toContain(OTHER_CHANGE_LINE)
+	})
+
+	it('leaves the body alone when a --label classifies it', async () => {
+		await issue_file_cli.file_issue([...argv_of(non_bug_path), ...IGNORE_LABEL])
+
+		expect(exec_gh_api).toHaveBeenCalled()
+		expect(JSON.stringify(exec_gh_api.mock.calls)).not.toContain(OTHER_CHANGE_LINE)
+	})
+
+	it('refuses a declaration a --label classification contradicts', async () => {
+		const labelled_path = path.join(work, 'labelled-non-bug.md')
+
+		writeFileSync(labelled_path, `${OTHER_CHANGE_LINE}\n${non_bug_body}`)
+		const argv = [...argv_of(labelled_path), ...IGNORE_LABEL, CHECK_FLAG]
+
+		expect(await issue_file_cli.run(argv)).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(
+			'ignore-for-release, other-change',
+		)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })
