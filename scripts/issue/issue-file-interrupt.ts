@@ -99,19 +99,20 @@ async function is_parked(pair: BlockedPair | undefined): Promise<boolean> {
 	return names?.includes(NEEDS_DECISION_LABEL) === true
 }
 
-// The decision is written before the label goes, so a failed removal still leaves the reason on the
-// finder; the removal is `run:park --clear`'s, which a failure names for the re-run.
+function kept_line(finder: string, decision: string): string {
+	return `⚠ ${session_cite.issue(finder)} kept ${NEEDS_DECISION_LABEL} — post "${decision}" if it is missing, then run \`pnpm josh run:park ${finder} --clear\`.`
+}
+
+// The label goes only after the decision is written, so the relaunched finder never reads its park
+// question unanswered; either failure keeps the park and names the re-run.
 async function convert_park(pair: BlockedPair): Promise<void> {
 	const finder = String(pair.blocked)
+	const decision = `${DECISION_PREFIX} ${issue_cite.plain(pair.blocker)} ${CONVERTED_NOTE}`
+	const is_cleared =
+		(await git_gh_issue_write.issue_try_comment(finder, decision)) &&
+		(await git_gh_issue_write.issue_clear_label(finder, NEEDS_DECISION_LABEL))
 
-	await git_gh_issue_write.issue_try_comment(
-		finder,
-		`${DECISION_PREFIX} ${issue_cite.plain(pair.blocker)} ${CONVERTED_NOTE}`,
-	)
-	if (await git_gh_issue_write.issue_clear_label(finder, NEEDS_DECISION_LABEL)) return
-	console.error(
-		`⚠ ${session_cite.issue(finder)} kept ${NEEDS_DECISION_LABEL} — run \`pnpm josh run:park ${finder} --clear\`.`,
-	)
+	if (!is_cleared) console.error(kept_line(finder, decision))
 }
 
 async function block_pair(

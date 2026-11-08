@@ -117,6 +117,17 @@ describe('issue_file_interrupt.block_finder — a parked finder left parked', ()
 		)
 	})
 
+	it('keeps the label and names the decision when the comment fails', async () => {
+		issue_try_comment.mockResolvedValue(false)
+
+		await issue_file_interrupt.block_finder(interrupt_filing())
+
+		expect(issue_clear_label).not.toHaveBeenCalled()
+		expect(error).toHaveBeenCalledExactlyOnceWith(
+			expect.stringContaining(`決定: #${String(BLOCKER)} の着地待ち（依存に変換）`),
+		)
+	})
+
 	it('reads no label for a filing in another repository', async () => {
 		await issue_file_interrupt.block_finder({
 			...interrupt_filing(),
