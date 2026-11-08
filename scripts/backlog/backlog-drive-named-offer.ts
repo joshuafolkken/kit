@@ -14,6 +14,7 @@ import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
+import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
 import { backlog_drive_unread } from './backlog-drive-unread'
 import type { Declared } from './backlog-overlap'
 import { backlog_plan_comment } from './backlog-plan-comment'
@@ -168,6 +169,22 @@ async function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Promi
 	return [...new Set([...in_flight, ...held.map(String)])]
 }
 
+// A named launch waits for the reset while the GitHub core allowance is below the floor, before it reads
+// the issue's state (joshuafolkken/kit#6729). Only a launch reads the allowance: a wait or the run's end
+// starts nothing.
+async function launch(
+	issue: string | undefined,
+	named: OfferRead,
+	state: DriveState,
+	owner: string,
+): Promise<OfferRead | undefined> {
+	if (issue === undefined) return undefined
+
+	const held = await backlog_drive_rate_limit.held(state)
+
+	return held ?? (await classify(issue, named, state, owner))
+}
+
 async function read(
 	carry: RunCarry,
 	state: DriveState,
@@ -180,7 +197,7 @@ async function read(
 	if (budget.verdict !== 'run') return budget
 	const [issue] = named.issues
 
-	return issue === undefined ? undefined : await classify(issue, named, state, context.owner)
+	return await launch(issue, named, state, context.owner)
 }
 
 export const backlog_drive_named_offer = { read }
