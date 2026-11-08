@@ -11,6 +11,7 @@ const mocked_read = vi.mocked(git_gh_etag_read.read)
 
 const REPO = 'joshuafolkken/kit'
 const REPO_BODY = JSON.stringify({ full_name: REPO })
+const REPO_API_PATH = 'repos/{owner}/{repo}'
 const HTTPS_ORIGIN = `https://github.com/${REPO}.git`
 const OVERRIDE_REPO = 'example-org/other-repo'
 const RATE_LIMITED = 'gh: API rate limit exceeded for user ID 1. (HTTP 403)'
@@ -64,7 +65,7 @@ describe('repo_get_name_with_owner — API fallback', () => {
 		mocked_read.mockResolvedValueOnce(REPO_BODY)
 
 		await expect(git_gh_repo.repo_get_name_with_owner()).resolves.toBe(REPO)
-		expect(mocked_read).toHaveBeenCalledWith('repos/{owner}/{repo}')
+		expect(mocked_read).toHaveBeenCalledWith(REPO_API_PATH)
 	})
 
 	it('surfaces an exhausted rate limit instead of answering undefined', async () => {
@@ -80,6 +81,18 @@ describe('repo_get_name_with_owner — API fallback', () => {
 
 		await expect(git_gh_repo.repo_get_name_with_owner()).resolves.toBeUndefined()
 	})
+
+	// A renamed repository's old remote still names the old slug, which a GitHub-returned name never matches.
+	it.each([HTTPS_ORIGIN.toUpperCase(), 'https://github.com/joshuafolkken/old-kit.git'])(
+		'reads the canonical name through the ETag layer for %s',
+		async (url) => {
+			use_remotes([url])
+			mocked_read.mockResolvedValueOnce(REPO_BODY)
+
+			await expect(git_gh_repo.repo_get_canonical_name_with_owner()).resolves.toBe(REPO)
+			expect(mocked_read).toHaveBeenCalledWith(REPO_API_PATH)
+		},
+	)
 
 	it('returns undefined when the response names no repository', async () => {
 		use_remotes([])
