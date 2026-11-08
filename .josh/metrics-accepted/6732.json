@@ -1,0 +1,7 @@
+{
+	"reason": "New josh issue:release-class command (CLI + body writer) so a lane declares the release classification instead of parking #6732",
+	"date": "2026-11-08",
+	"growth": {
+		"scripts.code_lines": 96
+	}
+}
