@@ -20,6 +20,8 @@ import { git_gh_exec } from './git-gh-exec'
 // **A listing is read one page at a time only while it fits in one.** A listing longer than a page is
 // read through `--paginate --slurp` as before; the conditional read cannot page, and a partial
 // listing would drop checks from the verdict.
+//
+// **A bare-array listing is still read unconditionally** (`read_array_pages`, the reviews listing).
 
 const UNREADABLE_POLL_MESSAGE = 'gh api could not read a merge-gate poll'
 const PAGE_SIZE = 100
