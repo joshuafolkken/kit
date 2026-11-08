@@ -2,6 +2,6 @@
 	"reason": "Record implementation once per lane launch independently of transcript-keyed notices; reuse the existing launch scope and preserve provider adapters.",
 	"date": "2026-11-08",
 	"growth": {
-		"scripts.code_lines": 16
+		"scripts.code_lines": 24
 	}
 }
