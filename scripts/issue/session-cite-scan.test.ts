@@ -44,6 +44,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['git/main-merge.ts', 1],
 	['hooks/check-commit-message.ts', 3],
 	['init/start-setup-pr.ts', 1],
+	['issue/issue-file-interrupt.ts', 1],
 	['observations/observations-flush-landing.ts', 1],
 	['propagate/propagate-steps.ts', 1],
 	['review/disposition-batch-filing.ts', 1],
