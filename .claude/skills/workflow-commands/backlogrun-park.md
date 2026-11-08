@@ -47,6 +47,10 @@ pnpm josh run:park <N> --clear   # succeeds when the label is already off
 **The released child goes back to a lane, never into the parent's own context** — `pnpm josh
 lane:launch <N>`.
 
+An interrupt filed for a parked child turns the park into a wait — `issue:file --route interrupt
+--found-during <N>` (`scripts/issue/issue-file-interrupt.ts`); its merge relaunches #N
+(`backlog_drive_retry.after_merge`).
+
 ## Only a person's judgement carries `needs-decision`
 
 **`needs-decision` means "a person has to choose", and nothing else.** It carries only:

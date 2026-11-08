@@ -1,6 +1,6 @@
 import type { WorkflowStep } from '#scripts/ci/ci-yml-fixture'
 import { workflow_expression_fixture } from '#scripts/ci/workflow-expression-fixture'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { reconcile_script_fixture, type Case } from './dependabot-reconcile-script-fixture'
 import { dependabot_workflow_fixture, type WorkflowRun } from './dependabot-workflow-fixture'
 
@@ -13,14 +13,12 @@ const { PATCH_UPDATE, runtime_job, find_step, step_condition, build_run_context 
 	dependabot_workflow_fixture
 const { ARMED_QUERY, FALSE, LASTING_OUTAGE, NOTHING, WITHDRAWN_MARKER, WITHDRAW_CALL } =
 	reconcile_script_fixture
-const { call_count, remove_workspace, run_step, withdraw_attempts } = reconcile_script_fixture
+const { call_count, run_step, withdraw_attempts } = reconcile_script_fixture
 
 const WITHDRAW_STEP_ID = 'withdraw'
 const WITHDRAW_LABEL = 'withdrawal'
 // Who the arming step's `github.token` enables auto-merge as.
 const WORKFLOW_ARMER = 'github-actions'
-
-afterAll(remove_workspace)
 
 function qualifying_run(actor: string): WorkflowRun {
 	return {

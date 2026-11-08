@@ -175,11 +175,8 @@ async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged
 		path: actions_api_path(`jobs/${String(job.id)}/logs`),
 		should_allow_escapes: true,
 	})
-	const download_log = stripVTControlCharacters(log)
-
-	if (DOWNLOAD_ERRORS.some((error) => error.test(download_log))) {
-		return { job, verdict: RERUN_VERDICT }
-	}
+	const plain_log = stripVTControlCharacters(log)
+	if (DOWNLOAD_ERRORS.some((error) => error.test(plain_log))) return { job, verdict: RERUN_VERDICT }
 
 	const tests = followup_failed_tests.read_failed_tests(log)
 

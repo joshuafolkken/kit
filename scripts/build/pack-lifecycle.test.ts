@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
-import os from 'node:os'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { SCRIPTS_DIR } from './import-closure-fixture'
 
 // joshuafolkken/kit#2693: kit's own `preinstall` (Safe Chain for kit's development installs) shipped
@@ -25,11 +25,7 @@ interface PnpmfileModule {
 
 const pnpmfile_url = pathToFileURL(path.join(REPO_ROOT, '.pnpmfile.mjs')).href
 const { is_safe_chain_preinstall } = (await import(pnpmfile_url)) as PnpmfileModule
-const out_directory = mkdtempSync(path.join(os.tmpdir(), 'josh-pack-lifecycle-'))
-
-afterAll(() => {
-	rmSync(out_directory, { recursive: true, force: true })
-})
+const out_directory = temporary_directory('suite')('josh-pack-lifecycle-')
 
 function repository_manifest(): Manifest {
 	return JSON.parse(readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8')) as Manifest

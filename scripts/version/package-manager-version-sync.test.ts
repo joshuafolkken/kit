@@ -1,10 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { sync } from '#scripts/sync/sync'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { latest_corepack } from './latest-corepack'
 import { build_package_manager_manifest } from './package-manager-manifest-fixture'
+
+const make_directory = temporary_directory()
 
 const RANGE_VERSION = '>=11.0.0-0'
 // The whole pin, integrity suffix included: pnpm only treats the two fields as
@@ -28,13 +30,12 @@ function read_manifest(): string {
 }
 
 beforeEach(() => {
-	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'pm-version-sync-'))
+	ctx.work_directory = make_directory('pm-version-sync-')
 	ctx.package_json_path = path.join(ctx.work_directory, 'package.json')
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
 afterEach(() => {
-	rmSync(ctx.work_directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

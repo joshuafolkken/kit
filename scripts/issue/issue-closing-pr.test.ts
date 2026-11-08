@@ -5,11 +5,11 @@ import { issue_closing_pr } from './issue-closing-pr'
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
 vi.mock('#scripts/gh/git-gh-repo', () => ({
-	git_gh_repo: { repo_get_name_with_owner: vi.fn() },
+	git_gh_repo: { repo_get_canonical_name_with_owner: vi.fn() },
 }))
 
 const exec_gh_api = vi.mocked(git_gh_exec.exec_gh_api)
-const repo_get_name_with_owner = vi.mocked(git_gh_repo.repo_get_name_with_owner)
+const canonical_name = vi.mocked(git_gh_repo.repo_get_canonical_name_with_owner)
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/other'
 const OTHER_URL = 'https://github.com/joshuafolkken/other/pull/45'
@@ -69,7 +69,7 @@ describe('issue_closing_pr.has_open_pr', () => {
 
 beforeEach(() => {
 	exec_gh_api.mockReset()
-	repo_get_name_with_owner.mockReset().mockResolvedValue(REPO)
+	canonical_name.mockReset().mockResolvedValue(REPO)
 })
 
 // joshuafolkken/kit#2769: only a merged pull request whose `closes #N` names the issue makes an OPEN
@@ -131,7 +131,7 @@ describe('issue_closing_pr.read_closing_number_result', () => {
 	})
 
 	it('reports an unavailable repository and preserves legacy failure behavior', async () => {
-		repo_get_name_with_owner.mockResolvedValue(undefined)
+		canonical_name.mockResolvedValue(undefined)
 		exec_gh_api.mockResolvedValue(line(CLOSING_URL, `closes #${ISSUE}`))
 
 		await expect(issue_closing_pr.read_closing_number_result(Number(ISSUE))).resolves.toEqual({
@@ -178,7 +178,7 @@ describe('issue_closing_pr.read_closing_pr — another repository', () => {
 	})
 
 	it('answers undefined when this repository cannot be named, so nothing is closed on a guess', async () => {
-		repo_get_name_with_owner.mockResolvedValue(undefined)
+		canonical_name.mockResolvedValue(undefined)
 		exec_gh_api.mockResolvedValue(line(CLOSING_URL, `closes #${ISSUE}`))
 
 		expect(await issue_closing_pr.read_closing_pr(ISSUE)).toBeUndefined()

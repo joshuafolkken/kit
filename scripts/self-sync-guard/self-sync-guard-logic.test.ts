@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { self_sync_guard } from './self-sync-guard-logic'
 
@@ -9,8 +9,10 @@ const CONSUMER_NAME = '@example/consumer'
 const MANIFEST = 'package.json'
 const PACKAGE_LABEL = 'package'
 
+const create_directory = temporary_directory()
+
 function make_directory(name: string): string {
-	return mkdtempSync(path.join(tmpdir(), `self-sync-${name}-`))
+	return create_directory(`self-sync-${name}-`)
 }
 
 function write_manifest(directory: string, content: string): string {

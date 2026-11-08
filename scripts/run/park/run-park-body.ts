@@ -154,6 +154,6 @@ function summary_of(body: string): string | undefined {
 	return `推奨: ${String(option.number)}（層 ${option.tier ?? ''}）`
 }
 
-const run_park_body = { FORMAT, problem_of, summary_of }
+const run_park_body = { FORMAT, HEADINGS: [OPTIONS_HEADING, PICK_HEADING], problem_of, summary_of }
 
 export { run_park_body }
