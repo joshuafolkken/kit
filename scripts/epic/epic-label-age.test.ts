@@ -22,8 +22,11 @@ const BAD_GATEWAY = 'HTTP 502'
 const TIMELINE_PATH = `repos/${REPO}/issues/${String(ISSUE)}/timeline?per_page=100`
 const FULL_PAGE = 100
 const COMMENTED = { event: 'commented', created_at: TWO_HOURS_AGO }
+const IN_PROGRESS = 'in-progress'
+// The label taken off is no application of it.
+const UNLABELED = { event: 'unlabeled', created_at: TEN_MINUTES_AGO, label: { name: IN_PROGRESS } }
 
-function labeled(at: string, name = 'in-progress'): Record<string, unknown> {
+function labeled(at: string, name = IN_PROGRESS): Record<string, unknown> {
 	return { event: 'labeled', created_at: at, label: { name } }
 }
 
@@ -68,7 +71,7 @@ describe('epic_label_age.read_labeled_at', () => {
 
 	it('answers absent when the timeline holds no such event', async () => {
 		vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(
-			JSON.stringify([COMMENTED, labeled(TEN_MINUTES_AGO, 'bug')]),
+			JSON.stringify([COMMENTED, labeled(TEN_MINUTES_AGO, 'bug'), UNLABELED]),
 		)
 
 		await expect(epic_label_age.read_labeled_at(ISSUE, REPO)).resolves.toStrictEqual({
