@@ -41,11 +41,12 @@ import { lane_stage_budget } from './lane-stage-budget'
 // lane's first cleared plan — has the files this lane's branch has committed stand in for that history
 // (joshuafolkken/kit#5684): only the ship commits, and its preflight held each commit to the plan of its time.
 //
-// **A plan declared one deliverable (`--single`) is not refused on the files axis** (joshuafolkken/kit#6647):
-// a split needs a separately-mergeable part as well as the size (split-assessment.md → "The question"), and
-// a short declaration alone would push the lane into a split child that takes every acceptance criterion.
-// The overrun still goes on the ledger, so the pre-gate `run:cut` verifies the deliverable
-// (`split-verified-single.ts`); the hunks and lines axes refuse as before.
+// **A plan declared one deliverable (`--single`) is not refused on any axis** (joshuafolkken/kit#6647,
+// joshuafolkken/kit#6602): a split needs a separately-mergeable part as well as the size
+// (split-assessment.md → "The question"), and a short declaration alone would push the lane into a split
+// child that takes every acceptance criterion. **Nor is a re-plan after the lane started**: an overrun
+// then is a warning, and only an independent added requirement or unverifiable scope growth re-splits.
+// Either overrun still goes on the ledger as a notice, which the later steps print and never stop on.
 //
 // **A new scripts module and its importer count and split as one file** (joshuafolkken/kit#6635), or
 // the kept lane ships a module `pack-boundary.test.ts` finds unreached. As in `epic-split-reach.ts`, a
@@ -245,9 +246,11 @@ function measure_over(
 	)
 }
 
-// Whether `over` is a files-axis overrun of a plan declared one deliverable — noted, not refused.
+// Whether `over` is noted, not refused: a plan declared one deliverable, or one re-registered after its
+// lane started — a met bar recorded `sized` — warns on any axis (joshuafolkken/kit#6602). Only the first
+// plan of an Issue with no single-deliverable decision answers `split`, and only before work starts.
 function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
-	return plan.single === true && over?.reason === 'files'
+	return over !== undefined && (plan.single === true || plan.sized === true)
 }
 
 // Files first, then hunks, then lines; a waived files overrun stands only once the other axes pass.
@@ -290,8 +293,8 @@ function files_text(issue: number, over: FilesOver): string {
 	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
 }
 
-function waiver_text(issue: number, files: number, limit: number): string {
-	return `single (files): ${session_cite.issue(issue)}'s plan holds ${String(files)} files (tests excluded), over ${String(limit)}, recorded as one deliverable and noted on the ledger — the pre-gate \`run:cut\` answers \`split-unresolved\` unless every ship-draft acceptance row is met and \`lint:related\` and \`test:related\` are green (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
+function waiver_text(issue: number, over: Oversize): string {
+	return `size warning (${over.reason}): ${session_cite.issue(issue)}'s plan is past its ${String(over.limit)} bar, recorded and noted on the ledger — a warning, not a stop; re-split only on an independent added requirement or scope growth this Issue cannot verify (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
 }
 
 function measure_bar(over: MeasureOver): string {

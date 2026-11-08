@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { resolve_effective_upstream_version } from './effective-upstream'
+
+const make_directory = temporary_directory()
 
 const PKG_NAME = '@fixture/pkg'
 const PKG_VERSION = '9.9.9'
@@ -46,13 +48,9 @@ describe('resolve_effective_upstream_version', () => {
 	let base_url = ''
 
 	beforeEach(() => {
-		root = mkdtempSync(path.join(tmpdir(), 'kit-eff-'))
+		root = make_directory('kit-eff-')
 		build_fixture(root)
 		base_url = pathToFileURL(path.join(root, CONSUMER_FILE)).href
-	})
-
-	afterEach(() => {
-		rmSync(root, { recursive: true, force: true })
 	})
 
 	it("resolves a package's root version relative to the base", () => {

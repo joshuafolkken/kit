@@ -47,7 +47,7 @@ function issue(value) {
     issue_dependencies_summary: { total_blocked_by: (state.blockers[value] ?? []).length } }
 }
 function answer() {
-  if (endpoint.split('/').length === 3) return 'joshuafolkken/kit'
+  if (endpoint.split('/').length === 3) return { full_name: 'joshuafolkken/kit' }
   if (method === 'DELETE') {
     const blocker = Number(endpoint.split('/').at(-1))
     fs.appendFileSync(journal, JSON.stringify([blocker, number]) + '\n')

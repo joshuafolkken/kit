@@ -72,9 +72,9 @@ const is_reviewer = vi.spyOn(agent_session_role, 'is_reviewer').mockReturnValue(
 // The stream append a cut makes is spied so the suite writes no event to the real repository; what it
 // pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
-// The split notice's answer is read off the repository's own lane ledger; a case that got the notice
-// says so (joshuafolkken/kit#4695).
-const split_refusal = vi.spyOn(split_resolution, 'ledger_refusal')
+// The split notice's warning is read off the repository's own lane ledger; a case that got the notice
+// says so (joshuafolkken/kit#4695, joshuafolkken/kit#6602).
+const split_warning = vi.spyOn(split_resolution, 'ledger_warning')
 // The implementation's budget is read off the repository's own ledger, events and Issue body; no case
 // is over it unless it says so (joshuafolkken/kit#6026).
 const budget_over = vi.spyOn(run_cut_budget, 'over_minutes')
@@ -137,7 +137,7 @@ function write_handoffs(): void {
 }
 
 function reset_review(): void {
-	split_refusal.mockResolvedValue(undefined)
+	split_warning.mockResolvedValue(undefined)
 	budget_over.mockResolvedValue(undefined)
 	is_attested_on.mockReturnValue(false)
 	record_check.mockResolvedValue({ status: 'not-required' })
@@ -193,7 +193,7 @@ const run_cut_cli_fixture = {
 	is_reviewer,
 	launch,
 	session_verdict,
-	split_refusal,
+	split_warning,
 	budget_over,
 	is_attested_on,
 	record_check,

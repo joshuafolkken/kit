@@ -41,7 +41,8 @@ const RUN_LANE_LABEL = 'run:lane'
 // Read by `issue-rank.ts`, the one place the ranking keys are decided.
 const PRIORITY_HIGH_LABEL = 'priority:high'
 // Ranks above `priority:high` — an urgent defect (one of the interrupt-filing conditions) or a lane
-// speed-up worth at least a tenth of a merge's median lane time. Applied from the urgent declaration;
+// speed-up worth at least a tenth of a merge's median lane time. Applied from the urgent declaration,
+// or on a person's instruction by `josh issue:priority --critical` (never an agent's own judgment);
 // it never interrupts a running lane, only takes the next free one. Only a person removes it.
 const PRIORITY_CRITICAL_LABEL = 'priority:critical'
 // Opts one issue outside any epic into unattended execution. **Only a

@@ -5,7 +5,7 @@ import { size_estimate } from './size-estimate'
 
 // joshuafolkken/kit#6025: an estimate over the guide whose projected implement time — the declared
 // lines grown by `DECLARED_GROWTH_FACTOR` at the ledger's implement minutes per 100 lines — exceeds the
-// implement stage budget is refused even with a reason declared; only a split filing passes it.
+// implement stage budget is refused; a split filing or a declared reason passes it (joshuafolkken/kit#6602).
 
 const SPLIT_ROUTE = 'route:split'
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
@@ -20,6 +20,13 @@ const FORMER_IMPLEMENT_BUDGET = 12
 // The over-guide estimate's declared lines grown by the fallback factor.
 const GROWN_OVER_GUIDE_LINES = 220
 const OVER_BUDGET = 'over the 9-minute implement budget'
+const BUDGET_REFUSAL_PARTS = [
+	'22 implement minute(s)',
+	'9-minute',
+	'10.0 implement min',
+	'4 lane(s)',
+	'or declare `- 分割しない理由: <理由>`',
+]
 
 function body_with(...lines: ReadonlyArray<string>): string {
 	return ['## 背景', '', '- 種別: 非不具合', ...lines, '', '## 現象', '', 'x'].join('\n')
@@ -42,15 +49,17 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 		expect(problem).not.toContain(EXCEEDS_GUIDE)
 	})
 
-	it('refuses a reasoned estimate over the guide projecting past the budget', () => {
-		const problem = size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, SLOW) ?? ''
+	it('refuses an unreasoned estimate over the guide projecting past the budget', () => {
+		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined, SLOW) ?? ''
 
-		for (const part of ['22 implement minute(s)', '9-minute', '10.0 implement min', '4 lane(s)']) {
+		for (const part of BUDGET_REFUSAL_PARTS) {
 			expect(problem).toContain(part)
 		}
 	})
 
-	it('passes a reasoned estimate projecting within the budget', () => {
+	// joshuafolkken/kit#6602: the declared reason is the pre-start decision, so it excuses the budget.
+	it('passes a reasoned estimate past or within the budget', () => {
+		expect(size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, SLOW)).toBeUndefined()
 		expect(size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, FAST)).toBeUndefined()
 	})
 
@@ -72,9 +81,11 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	it('passes an estimate under the measured guide within the budget', () => {
 		expect(size_estimate.guide_problem(UNDER_GUIDE, undefined, SLOW)).toBeUndefined()
 	})
+})
 
+describe('size_estimate.guide_problem — the cap and the projection', () => {
 	it('keeps the cap refusal ahead of the projection', () => {
-		const body = body_with(estimate(30, 900), REASON)
+		const body = body_with(estimate(30, 900))
 
 		expect(size_estimate.guide_problem(body, undefined, SLOW)).toContain('exceeds the cap')
 	})
@@ -83,7 +94,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 // joshuafolkken/kit#6066: the judgment `backlog:next` notes on, shared with the filing refusal.
 describe('size_estimate.over_budget', () => {
 	it('uses the measured lines growth at the budget boundary', () => {
-		const body = body_with(estimate(1, 60), REASON)
+		const body = body_with(estimate(1, 60))
 
 		expect(
 			size_estimate.over_budget(body, undefined, SLOW, { files: 9, lines: 1.5 }),
@@ -94,18 +105,19 @@ describe('size_estimate.over_budget', () => {
 		).toBeUndefined()
 	})
 
-	it('answers the estimate of a reasoned body projecting past the budget', () => {
-		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, SLOW)).toEqual({
+	it('answers the estimate of an unreasoned body projecting past the budget', () => {
+		expect(size_estimate.over_budget(OVER_GUIDE, undefined, SLOW)).toEqual({
 			files: 2,
 			lines: 110,
 			verdict: 'split',
 		})
 	})
 
-	it('answers nothing within the budget, with no rate, or for a split filing', () => {
-		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, FAST)).toBeUndefined()
-		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, undefined)).toBeUndefined()
-		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, SPLIT_ROUTE, SLOW)).toBeUndefined()
+	it('answers nothing within the budget, with no rate, for a split filing or a reasoned body', () => {
+		expect(size_estimate.over_budget(OVER_GUIDE, undefined, FAST)).toBeUndefined()
+		expect(size_estimate.over_budget(OVER_GUIDE, undefined, undefined)).toBeUndefined()
+		expect(size_estimate.over_budget(OVER_GUIDE, SPLIT_ROUTE, SLOW)).toBeUndefined()
+		expect(size_estimate.over_budget(OVER_GUIDE_EXCUSED, undefined, SLOW)).toBeUndefined()
 	})
 })
 
@@ -113,7 +125,7 @@ describe('size_estimate.over_budget', () => {
 describe('size_estimate.guide_problem — the rebalanced implement budget', () => {
 	it('refuses an estimate the former implement budget passed (ac-a815e182)', () => {
 		const projected = lane_implement_rate.minutes_for(GROWN_OVER_GUIDE_LINES, BETWEEN)
-		const problem = size_estimate.guide_problem(OVER_GUIDE_EXCUSED, undefined, BETWEEN)
+		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined, BETWEEN)
 
 		expect(projected).toBeLessThanOrEqual(FORMER_IMPLEMENT_BUDGET)
 		expect(projected).toBeGreaterThan(lane_stage_budget.BUDGET_MINUTES.implement)

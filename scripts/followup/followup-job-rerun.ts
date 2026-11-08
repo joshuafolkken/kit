@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from 'node:util'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
@@ -52,6 +53,7 @@ const FIRST_ATTEMPT = 1
 const DOWNLOAD_ERRORS = [
 	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu,
 	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d\r?\n\S+ ##\[error\]Process completed with exit code 22\.$/mu,
+	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d\r?\n\S+ \[ERROR\] Failed to download from https:\/\/\S+\r?\n\S+ ##\[error\]Process completed with exit code 1\.$/mu,
 	/^\S+ ##\[error\]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 5\d\d$/mu,
 ]
 
@@ -173,7 +175,8 @@ async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged
 		path: actions_api_path(`jobs/${String(job.id)}/logs`),
 		should_allow_escapes: true,
 	})
-	if (DOWNLOAD_ERRORS.some((error) => error.test(log))) return { job, verdict: RERUN_VERDICT }
+	const plain_log = stripVTControlCharacters(log)
+	if (DOWNLOAD_ERRORS.some((error) => error.test(plain_log))) return { job, verdict: RERUN_VERDICT }
 
 	const tests = followup_failed_tests.read_failed_tests(log)
 
