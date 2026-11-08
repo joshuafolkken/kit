@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+
+const make_directory = temporary_directory()
 
 const WORKFLOW_PATH = '.github/workflows/publish.yml'
 const PUBLISH_JOB_NAMES = ['publish-github', 'publish-npm'] as const
@@ -125,7 +127,7 @@ function read_lookup_lines(job_name: 'pack' | (typeof PUBLISH_JOB_NAMES)[number]
 // Runs a lookup line with `npm view` swapped for a config read, from a `$RUNNER_TEMP` holding the
 // scoped `.npmrc` setup-node writes, and prints the registry the scope resolved to.
 function resolve_scope_registry(line: string): string {
-	const runner_temporary = mkdtempSync(path.join(tmpdir(), 'publish-lookup-'))
+	const runner_temporary = make_directory('publish-lookup-')
 	const npmrc = path.join(runner_temporary, '.npmrc')
 
 	writeFileSync(npmrc, `${KIT_SCOPE}:registry=${GITHUB_PACKAGES_REGISTRY}\n`)
@@ -134,8 +136,6 @@ function resolve_scope_registry(line: string): string {
 		encoding: 'utf8',
 		env: { ...process.env, RUNNER_TEMP: runner_temporary, NPM_CONFIG_USERCONFIG: npmrc },
 	})
-
-	rmSync(runner_temporary, { recursive: true, force: true })
 
 	return result.stdout.trim()
 }

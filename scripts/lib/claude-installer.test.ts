@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { claude_installer } from './claude-installer'
 
 const VERSION = '2.1.318'
@@ -17,6 +17,7 @@ const EXECUTABLE = 0o755
 const ARM_ARCHITECTURE = 'aarch64'
 const ARM_PLATFORM = 'linux-arm64'
 const ctx = { directory: '' }
+const make_directory = temporary_directory()
 
 function fixture_path(name: string): string {
 	return path.join(ctx.directory, name)
@@ -49,14 +50,10 @@ function run_installer(architecture: string, fail_download = 'no'): number | nul
 }
 
 beforeEach(() => {
-	ctx.directory = mkdtempSync(path.join(tmpdir(), 'claude installer '))
+	ctx.directory = make_directory('claude installer ')
 	writeFileSync(fixture_path('curl'), CURL, { mode: EXECUTABLE })
 	writeFileSync(fixture_path('uname'), '#!/bin/sh\necho "$ARCHITECTURE"\n', { mode: EXECUTABLE })
 	writeFileSync(fixture_path('payload'), PAYLOAD)
-})
-
-afterEach(() => {
-	rmSync(ctx.directory, { recursive: true, force: true })
 })
 
 describe('claude_installer.command', () => {

@@ -284,10 +284,11 @@ const NOTICE_SECTION = 'Over the guide before the gate'
 const QUESTION_SECTION = 'The question'
 // The filing's reason line (`size_estimate`); it does not answer a later split notice.
 const REASON_PREFIX = '- 分割しない理由:'
-const NOTICE_ACTION = `stop implementation, keep only the green part and file the rest with \`pnpm josh issue:file --route split --found-during <N>\`, then ship the green part — split-assessment.md → "${NOTICE_SECTION}"`
+const NOTICE_ACTION = `go on; file a split child with \`pnpm josh issue:file --route split --found-during <N>\` only for an independent added requirement or scope growth this Issue cannot verify — split-assessment.md → "${NOTICE_SECTION}"`
 
 // The pre-gate notice `josh main:merge` prints for a diff past `notice_bar` on either axis — strictly
-// greater than, as the guide is — and a diff at or under it prints nothing.
+// greater than, as the guide is — and a diff at or under it prints nothing. It is a warning: size
+// alone never stops the run (joshuafolkken/kit#6602).
 function notice(
 	measurement: SizeMeasurement,
 	declared?: DeclaredSize,
@@ -297,7 +298,7 @@ function notice(
 
 	if (measurement.files <= bar.files && measurement.lines <= bar.lines) return undefined
 
-	return `split notice: ${counted(measurement)} (${bar.text}; ${policy_text(guide)}) — over the bar. Before the run:cut, ${NOTICE_ACTION}`
+	return `split notice: ${counted(measurement)} (${bar.text}; ${policy_text(guide)}) — over the bar, a warning, not a stop: ${NOTICE_ACTION}`
 }
 
 const split_assess = {

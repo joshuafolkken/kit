@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cases } from '#scripts/cases/cases-logic'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { report_labels } from './report-labels'
 import { report_lint } from './report-lint'
 import { report_template_cli } from './report-template-cli'
@@ -12,7 +12,8 @@ import { report_template_cli } from './report-template-cli'
 // shared-state and environment conditions lead "if it breaks", ahead of the I/O cases.
 
 const ENV_KEY = 'JOSH_SESSION_LANG'
-const directory = mkdtempSync(path.join(tmpdir(), 'report-template-cli-'))
+const make_directory = temporary_directory('suite')
+const directory = make_directory('report-template-cli-')
 const NETWORK_PATH = path.join(directory, 'net.ts')
 const ENVIRONMENT_PATH = path.join(directory, 'env.ts')
 const INERT_PATH = path.join(directory, 'pure.ts')
@@ -20,10 +21,6 @@ const INERT_PATH = path.join(directory, 'pure.ts')
 writeFileSync(NETWORK_PATH, 'await fetch(url)\n', 'utf8')
 writeFileSync(ENVIRONMENT_PATH, "await fetch(process.env['API_URL'])\n", 'utf8')
 writeFileSync(INERT_PATH, 'export const x = 1\n', 'utf8')
-
-afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
-})
 
 afterEach(() => {
 	vi.unstubAllEnvs()

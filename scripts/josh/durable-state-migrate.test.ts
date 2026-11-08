@@ -1,16 +1,8 @@
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { durable_state_migrate } from './durable-state-migrate'
-import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 
 // joshuafolkken/kit#4743: the records a run left in `/tmp` are copied into the durable directory once,
 // and a log the durable directory keeps forever is pruned once it has not been written for two weeks.
@@ -27,11 +19,8 @@ const DAY_MS = 86_400_000
 const NOW_MS = Date.parse('2026-10-25T00:00:00Z')
 const STALE_DAYS = durable_state_migrate.LOG_RETENTION_DAYS + 1
 
-const scratch = mkdtempSync(path.join(PLATFORM_TEMP_ROOT, TEST_PREFIX))
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const scratch = make_directory(TEST_PREFIX)
 
 function directory_of(name: string): string {
 	const directory = path.join(scratch, name)

@@ -21,9 +21,14 @@ interface SetupRead {
 
 const NO_SETUP: SetupRead = { setup: undefined, setup_ms: undefined }
 
-// The stages of a hand-back to a session. Only the supervisor's next hand-off ends one, whatever the
-// session writes to the stream meanwhile.
-const JUDGMENT_STAGES: ReadonlySet<string> = new Set([STAGE.JUDGING, STAGE.SESSION])
+// The stages of a hand-back to a session, and of the retrospective unit the driver waits on at a drain
+// (joshuafolkken/kit#6745). Only the run's next stage ends one, whatever the session or the unit writes
+// to the stream meanwhile.
+const SESSION_STAGES: ReadonlySet<string> = new Set([
+	STAGE.JUDGING,
+	STAGE.SESSION,
+	STAGE.RETROSPECTIVE,
+])
 
 function is_setup(event: RunEvent): boolean {
 	return event.kind === KIND.SETUP
@@ -60,7 +65,7 @@ function is_opening(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
 // Whether the run is at `stage` now: at any stage while it is starting; after that only at one it is
 // itself working through.
 function is_standing(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
-	if (!has_started(events) || JUDGMENT_STAGES.has(stage.text)) return true
+	if (!has_started(events) || SESSION_STAGES.has(stage.text)) return true
 
 	return is_opening(events, stage)
 }

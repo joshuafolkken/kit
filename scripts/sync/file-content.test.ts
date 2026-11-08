@@ -1,15 +1,14 @@
 import {
 	existsSync,
 	mkdirSync,
-	mkdtempSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
 	type readFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const read_file_sync_mock = vi.hoisted(() => vi.fn())
 
@@ -19,7 +18,7 @@ vi.mock('node:fs', async (import_original) => ({
 }))
 
 const actual_fs = await vi.importActual<{ readFileSync: typeof readFileSync }>('node:fs')
-const SANDBOX = mkdtempSync(path.join(tmpdir(), 'sync-content-'))
+const SANDBOX = temporary_directory('suite')('sync-content-')
 const ROOT = path.join(SANDBOX, 'project')
 const OUTSIDE = path.join(SANDBOX, 'outside')
 const DESTINATION = path.join(ROOT, 'file.txt')
@@ -35,10 +34,6 @@ afterEach(() => {
 	rmSync(DESTINATION, { force: true })
 	read_file_sync_mock.mockReset()
 	read_file_sync_mock.mockImplementation(actual_fs.readFileSync)
-})
-
-afterAll(() => {
-	rmSync(SANDBOX, { recursive: true, force: true })
 })
 
 it.each(['EACCES', 'EPERM'])('writes when reading the destination fails with %s', (code) => {

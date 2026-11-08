@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CloneGroup } from './clone-aggregate'
 import { clone_scan } from './clone-scan'
@@ -26,14 +26,14 @@ const CROSS_REPO = 'cross-repo'
 // A temporary directory with no `.git`, so repository discovery adds no siblings and only this tree
 // is scanned. Held on an object so the hooks assign a property rather than a top-level binding.
 const context = { workspace: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	context.workspace = mkdtempSync(path.join(tmpdir(), 'clone-scan-'))
+	context.workspace = make_directory('clone-scan-')
 	mkdirSync(path.join(context.workspace, 'src'), { recursive: true })
 })
 
 afterEach(() => {
-	rmSync(context.workspace, { recursive: true, force: true })
 	vi.unstubAllEnvs()
 })
 
