@@ -76,6 +76,11 @@ const FAILED_TEST = `${OUTSIDE_TEST} > frame budget > reads the budget`
 const UNIT_LOG = `2026-10-27T10:00:00.0000000Z  FAIL  ${FAILED_TEST}\n`
 const CHECKS_NAME = 'Checks'
 const CURL_ERROR = '2026-11-08T08:58:56.5220933Z curl: (22) The requested URL returned error:'
+const CURL_EXIT = '2026-11-08T08:59:02.6053812Z ##[error]Process completed with exit code 22.'
+
+function curl_failed(status: number): string {
+	return `${CURL_ERROR} ${String(status)}\n${CURL_EXIT}\n`
+}
 
 const DETECT_E2E = job({ id: DETECT_E2E_ID, name: DETECT_E2E_NAME, conclusion: CANCELLED })
 const PLAYWRIGHT = job({ id: 102, name: PLAYWRIGHT_NAME, conclusion: 'timed_out' })
@@ -209,9 +214,23 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 
 // joshuafolkken/kit#6673: the runner timed out fetching `pnpm/setup` and no test ran, yet `followup`
 // stopped the lane on the red job; joshuafolkken/kit#6748: the same for a setup `curl` answered 504.
-describe('rerun_failed_jobs — a job red because a download failed', () => {
-	const ARCHIVE = `'https://codeload.github.com/pnpm/setup/tar.gz/a0881977'`
+const ARCHIVE = `'https://codeload.github.com/pnpm/setup/tar.gz/a0881977'`
 
+// A repository step that prints the same words is still a failure of the change, and a client error
+// is not one a rerun helps.
+const NOT_DOWNLOAD_FAILURES = [
+	[
+		'whose own step printed the download failure',
+		`2026-11-07T13:52:11.1370349Z Error: Failed to download archive ${ARCHIVE}\n`,
+	],
+	['whose curl got a client error', curl_failed(404)],
+	[
+		'whose curl got through on a retry and a test of the change failed',
+		`${CURL_ERROR} 504\n${UNIT_LOG}`,
+	],
+]
+
+describe('rerun_failed_jobs — a job red because a download failed', () => {
 	it.each([
 		[
 			'the download timed out',
@@ -221,7 +240,7 @@ describe('rerun_failed_jobs — a job red because a download failed', () => {
 			'the download could not be resolved',
 			'2026-11-07T13:46:37.4787283Z ##[error]Failed to resolve action download info.\n',
 		],
-		['a setup curl got a server error', `${CURL_ERROR} 504\n`],
+		['a setup curl got a server error', curl_failed(504)],
 		[
 			'the CodeQL bundle got a server error',
 			'2026-11-08T10:12:01.0000000Z ##[error]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 504\n',
@@ -235,15 +254,8 @@ describe('rerun_failed_jobs — a job red because a download failed', () => {
 		expect(assess).not.toHaveBeenCalled()
 	})
 
-	// A repository step that prints the same words is still a failure of the change, and a client
-	// error is not one a rerun helps.
-	it.each([
-		[
-			'whose own step printed the download failure',
-			`2026-11-07T13:52:11.1370349Z Error: Failed to download archive ${ARCHIVE}\n`,
-		],
-		['whose curl got a client error', `${CURL_ERROR} 404\n`],
-	])('does not rerun a job %s', async (_label, log) => {
+	it.each(NOT_DOWNLOAD_FAILURES)('does not rerun a job %s', async (_label, log) => {
+		read_changed.mockResolvedValue([OUTSIDE_TEST])
 		answer_checks([as_check(failed_unit())])
 		answer_actions({ jobs: [failed_unit()], log })
 
@@ -293,7 +305,7 @@ describe('rerun_failed_jobs — a job red only for waiting on a job red outside 
 	}
 
 	it('reruns it with a job it waits on that failed on a download', async () => {
-		answer_waiting('unit', `${CURL_ERROR} 504\n`)
+		answer_waiting('unit', curl_failed(504))
 
 		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([
 			UNIT_NAME,

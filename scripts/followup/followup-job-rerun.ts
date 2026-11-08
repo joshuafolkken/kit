@@ -46,11 +46,12 @@ const RUN_COMPLETED = 'completed'
 const FIRST_ATTEMPT = 1
 
 // A download that failed before the change ran: the runner's last word after its action download
-// retries, or its failure to look the action up at all; a setup `curl` whose retries all got a server
-// error; the CodeQL bundle answered with a server error.
+// retries, or its failure to look the action up at all; a `curl` whose last retry got a server error
+// and so ended its step — a retry that got through leaves its earlier error lines behind; the CodeQL
+// bundle answered with a server error.
 const DOWNLOAD_ERRORS = [
 	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu,
-	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d$/mu,
+	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d\r?\n\S+ ##\[error\]Process completed with exit code 22\.$/mu,
 	/^\S+ ##\[error\]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 5\d\d$/mu,
 ]
 
