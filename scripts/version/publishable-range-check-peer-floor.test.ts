@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { KIT_PACKAGE_NAME } from './kit-descriptor'
 import {
@@ -16,6 +16,8 @@ import {
 	TIER_MANIFEST,
 } from './peer-floor-fixture'
 import { publishable_range_check } from './publishable-range-check'
+
+const make_directory = temporary_directory()
 
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
@@ -50,12 +52,11 @@ function make_project(): void {
 }
 
 beforeEach(() => {
-	state.project_root = mkdtempSync(path.join(tmpdir(), 'peer-floor-'))
+	state.project_root = make_directory('peer-floor-')
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(state.project_root, { recursive: true, force: true })
 })
 
 describe('check_peer_floors', () => {

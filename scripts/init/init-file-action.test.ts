@@ -1,9 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileAction } from './init-actions'
 import { init_file_action } from './init-file-action'
+
+const make_directory = temporary_directory()
 
 const DEST = 'playwright.config.ts'
 const SAMPLE = "export const config = 'kit'\n"
@@ -24,12 +26,11 @@ function read_existing(): string {
 }
 
 beforeEach(() => {
-	fixture.root = mkdtempSync(path.join(os.tmpdir(), 'init-file-action-'))
+	fixture.root = make_directory('init-file-action-')
 	vi.spyOn(console, 'info').mockImplementation(vi.fn())
 })
 
 afterEach(() => {
-	rmSync(fixture.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

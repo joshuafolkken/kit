@@ -4,21 +4,22 @@ import {
 	existsSync,
 	lstatSync,
 	mkdirSync,
-	mkdtempSync,
 	readFileSync,
 	readlinkSync,
-	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { HOOK_BUNDLES, STAGING_PREFIX } from './build-hooks'
 import { COMMANDS_TEST_PREFIX, DISPATCH_TEST_PREFIX } from './distribution-scratch-fixture'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
+
+const make_directory = temporary_directory()
+const make_suite_directory = temporary_directory('suite')
 
 // The pack boundary (joshuafolkken/kit#1997): the published npm package and the `kit` plugin must
 // carry what a consumer runs — every distributed command's entry script and its static import
@@ -172,15 +173,11 @@ function copy_sources(directory: string): void {
 }
 
 function packed_files(): Set<string> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pack-boundary-sources-'))
+	const directory = make_suite_directory('pack-boundary-sources-')
 
-	try {
-		copy_sources(directory)
+	copy_sources(directory)
 
-		return packed_paths(run_pack(directory))
-	} finally {
-		rmSync(directory, { recursive: true, force: true })
-	}
+	return packed_paths(run_pack(directory))
 }
 
 const PACKED = packed_files()
@@ -256,11 +253,7 @@ describe('the published package boundary', () => {
 
 describe('a failed pnpm pack', () => {
 	it('reports what pnpm printed rather than only that the command failed', () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'pack-boundary-'))
-
-		onTestFinished(() => {
-			rmSync(directory, { recursive: true, force: true })
-		})
+		const directory = make_directory('pack-boundary-')
 
 		expect(() => run_pack(directory)).toThrow(/stdout:\n\S[\s\S]*ERR_PNPM/u)
 	})
@@ -288,12 +281,9 @@ function write_hook_scratch(directory: string): void {
 }
 
 function pack_with_hook_scratch(): Set<string> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pack-boundary-scratch-'))
+	const directory = make_directory('pack-boundary-scratch-')
 	const package_json = { name: 'scratch', version: '0.0.0', files: read_manifest().files }
 
-	onTestFinished(() => {
-		rmSync(directory, { recursive: true, force: true })
-	})
 	writeFileSync(path.join(directory, MANIFEST_NAME), JSON.stringify(package_json))
 	write_hook_scratch(directory)
 

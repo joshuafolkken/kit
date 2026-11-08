@@ -1,12 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pnpm_installer } from '#scripts/lib/pnpm-installer'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 
-// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-deploy-vps-test-'))
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517). Each test
+// empties it, and `beforeEach` lays it out again.
+const TEST_DIR = temporary_directory('suite')('sync-deploy-vps-test-')
 const DEPLOY_VPS_DEST = path.join(TEST_DIR, 'dest', 'deploy-vps.yml')
 
 const OLD_DEPLOY_VPS_CONTENT = `    script: |

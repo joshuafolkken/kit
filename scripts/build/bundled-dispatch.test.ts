@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdirSync, readdirSync, symlinkSync } from 'node:fs'
 import path from 'node:path'
 import { josh_cli_fixture } from '#scripts/josh/josh-cli-fixture'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { BUNDLED_COMMAND_DIRECTORY } from '#scripts/josh/josh-in-process'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { build_bin } from './build-bin'
 import { build_commands } from './build-commands'
 import { DISPATCH_TEST_PREFIX } from './distribution-scratch-fixture'
@@ -41,7 +42,9 @@ interface Answer {
 }
 
 mkdirSync(path.join(PACKAGE_DIR, 'dist'), { recursive: true })
-const package_root = mkdtempSync(path.join(PACKAGE_DIR, 'dist', DISPATCH_TEST_PREFIX))
+const package_root = temporary_directory('suite')(
+	path.join(PACKAGE_DIR, 'dist', DISPATCH_TEST_PREFIX),
+)
 const built_josh = path.join(package_root, 'dist', 'josh.js')
 
 function link_package(): void {
@@ -57,10 +60,6 @@ beforeAll(async () => {
 	await build_bin(built_josh)
 	await build_commands(path.join(package_root, BUNDLED_COMMAND_DIRECTORY))
 }, BUILD_TIMEOUT)
-
-afterAll(() => {
-	rmSync(package_root, { recursive: true, force: true })
-})
 
 async function answer(command: string, arguments_: ReadonlyArray<string>): Promise<Answer> {
 	const result = await execa(command, [...arguments_], {
