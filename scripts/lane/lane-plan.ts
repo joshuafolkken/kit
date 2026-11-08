@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import { backlog_overlap, type Clash, type Declared } from '#scripts/backlog/backlog-overlap'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { durable_state } from '#scripts/josh/durable-state'
@@ -108,11 +109,47 @@ function release(issue: number, directory: string): void {
 	if (read(issue, directory)?.yielded !== true) remove(issue, directory)
 }
 
-// `declared` with each issue's recorded plan, if any, in place of what it declares (joshuafolkken/kit#4937).
-function with_plans(declared: Declared, directory: string): Declared {
+// When `issue`'s plan was last written, in epoch milliseconds — `NaN` with none. A re-plan keeps
+// `planned_at`, its place in line, so the file's time is the record's age.
+function recorded_ms(issue: number, directory: string): number {
+	const repository = git_common_directory.repository(directory)
+	const stats =
+		repository === undefined
+			? undefined
+			: fs.statSync(plan_path(repository, issue), { throwIfNoEntry: false })
+
+	return stats?.mtimeMs ?? NaN
+}
+
+function is_after(commented_at: string | undefined, recorded: number): boolean {
+	return commented_at !== undefined && Date.parse(commented_at) > recorded
+}
+
+// `issue`'s recorded paths, or `paths` when it has no record or its plan comment came after it.
+function plan_or(
+	issue: number,
+	paths: ReadonlySet<string>,
+	commented_at: string | undefined,
+	directory: string,
+): ReadonlySet<string> {
+	const recorded = read(issue, directory)
+
+	if (recorded === undefined || is_after(commented_at, recorded_ms(issue, directory))) return paths
+
+	return new Set(recorded.paths)
+}
+
+// `declared` with each issue's recorded plan, if any, in place of what it declares (joshuafolkken/kit#4937)
+// — unless the issue's plan comment, posted at its time in `commented`, came after the record: a yielded
+// plan outlives its lane, and a plan comment fixed since is the newer scope (joshuafolkken/kit#6798).
+function with_plans(
+	declared: Declared,
+	directory: string,
+	commented: ReadonlyMap<number, string> = new Map(),
+): Declared {
 	const replaced = [...declared].map(([issue, paths]): [number, ReadonlySet<string>] => [
 		issue,
-		new Set(read(issue, directory)?.paths ?? paths),
+		plan_or(issue, paths, commented.get(issue), directory),
 	])
 
 	return new Map(replaced)
@@ -153,10 +190,20 @@ function is_yielded(issue: number, directory: string): boolean {
 // Whether `issue` yielded on a plan that a lane in `declared` still holds one of its files ahead of —
 // what a named run holds the issue back on, as `backlog:next` does on the same kept plan
 // (joshuafolkken/kit#4926). Without it the run relaunches the issue at once, and the lane yields again.
-function is_yield_held(issue: number, declared: Declared, directory: string): boolean {
+// `scope`, the issue's own declaration read through `with_plans`, stands in for the kept paths, so a
+// plan comment fixed since the yield is what is held (joshuafolkken/kit#6798).
+function is_yield_held(
+	issue: number,
+	declared: Declared,
+	directory: string,
+	scope?: ReadonlySet<string>,
+): boolean {
 	const plan = read(issue, directory)
 
-	return plan?.yielded === true && clash_of(plan, declared, directory) !== undefined
+	if (plan?.yielded !== true) return false
+	const held = scope === undefined ? plan : { ...plan, paths: [...scope] }
+
+	return clash_of(held, declared, directory) !== undefined
 }
 
 const lane_plan = {

@@ -1,9 +1,11 @@
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { backlog_arrival_added } from './backlog-arrival-added'
 import type { LoopPorts } from './backlog-drive'
+import { backlog_yield_cap } from './backlog-yield-cap'
 
 // The run's own record the driver reads: the carry, and the two answers the ask interval takes from the
-// run (joshuafolkken/kit#6788) — an issue `run:add` handed it, and a named issue left to dispatch.
+// run (joshuafolkken/kit#6788) — an issue `run:add` handed it, and a named issue left to dispatch — and
+// the yield cap's (joshuafolkken/kit#6799): the stream's yields of an issue, and the park a trip writes.
 
 async function read_record(): Promise<RunCarry | undefined> {
 	const target = await run_carry.repository_directory()
@@ -21,10 +23,11 @@ async function is_named_left(): Promise<boolean> {
 	return remaining.length > 0
 }
 
-function record_ports(): Pick<LoopPorts, 'added_since' | 'named_left'> {
+function record_ports(): Pick<LoopPorts, 'added_since' | 'named_left' | 'yields' | 'park'> {
 	return {
 		added_since: async (since_ms) => await backlog_arrival_added.is_added_since(since_ms),
 		named_left: is_named_left,
+		...backlog_yield_cap.PORTS,
 	}
 }
 
