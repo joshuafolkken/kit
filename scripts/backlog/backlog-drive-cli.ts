@@ -11,7 +11,6 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
-import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
@@ -42,6 +41,7 @@ import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_rate } from './backlog-drive-rate'
 import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
+import { backlog_drive_record } from './backlog-drive-record'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_retrospective_unit } from './backlog-drive-retrospective-unit'
@@ -83,16 +83,6 @@ const offer_schema = z.object({ [backlog_offer_cli.JSON_KEY]: offer_read_schema 
 
 function to_offer(out: string): OfferRead | undefined {
 	return json_value.parse_with(out, offer_schema)?.[backlog_offer_cli.JSON_KEY]
-}
-
-async function read_record(): Promise<RunCarry | undefined> {
-	const target = await run_carry.repository_directory()
-
-	if (target === undefined) return undefined
-
-	const read = run_carry.read_carry(run_carry.carry_path(target))
-
-	return read.kind === 'carried' ? read.carry : undefined
 }
 
 async function read_offer(
@@ -269,6 +259,7 @@ function ports_of(
 		...reporters(holds),
 		now: () => new Date(),
 		sleep,
+		...backlog_drive_record.record_ports(),
 		finish: backlog_drive_finish.finish,
 		retrospective: async () => await backlog_drive_retrospective_unit.run(context.owner),
 		on_state: (state) => {
@@ -286,7 +277,7 @@ interface Seeded {
 }
 
 async function seeded_lanes(context: DriveContext): Promise<Seeded | undefined> {
-	const carry = await read_record()
+	const carry = await backlog_drive_record.read_record()
 
 	if (carry === undefined) return undefined
 
@@ -307,7 +298,12 @@ async function seeded_lanes(context: DriveContext): Promise<Seeded | undefined> 
 
 // The interval between two asks is `backlog:budget`'s own, so the driver keeps the one its reason prints.
 function loop_config(window_ms: number | undefined): LoopConfig {
-	return { poll_ms: POLL_MS, offer_ms: backlog_budget.OFFER_INTERVAL_MS, window_ms }
+	return {
+		poll_ms: POLL_MS,
+		offer_ms: backlog_budget.OFFER_INTERVAL_MS,
+		idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+		window_ms,
+	}
 }
 
 // The hand-back, the ledger's hold included — the lanes now wait on a session — and the resume line.

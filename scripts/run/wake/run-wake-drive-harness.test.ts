@@ -29,7 +29,7 @@ const HANDED_OFF: CarryRead = {
 		is_handed_off: true,
 	},
 }
-const NO_WINDOW = { poll_ms: 0, offer_ms: 0, window_ms: undefined }
+const NO_WINDOW = { poll_ms: 0, offer_ms: 0, idle_offer_ms: 0, window_ms: undefined }
 const FREE_LANES = 6
 
 interface World {
@@ -75,6 +75,8 @@ function drive_ports(world: World): DrivePorts {
 		retrospective: async () => true,
 		now: () => NOW,
 		sleep: async () => undefined,
+		added_since: async () => false,
+		named_left: async () => false,
 		on_state: () => undefined,
 		finish: async () => {
 			world.reports += 1

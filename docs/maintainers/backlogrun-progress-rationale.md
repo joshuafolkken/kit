@@ -132,6 +132,10 @@ because every ask billed the parent session's whole history; the loop is now a p
 
 The figure is 180, not 60, because each ask spends REST core budget (joshuafolkken/kit#6718).
 
+Two cases ask sooner (joshuafolkken/kit#6788). The poll after a `run:add` asks at once. While no lane
+runs and a named issue is left, the interval is 30 seconds: that stretch ends at the dispatch, and no
+lane spends the allowance beside it (`backlog-budget.ts` → `IDLE_OFFER_INTERVAL_SECONDS`).
+
 **Why a silent unit is measured by unchanged output.** A working unit rewrites its transcript
 continuously, so unchanged output — not the child's duration — is the signal.
 
