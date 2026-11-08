@@ -104,6 +104,21 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	// The reader of `gh-usage-log.ts`'s file (joshuafolkken/kit#6753).
+	'gh:usage': {
+		script: 'scripts/gh/gh-usage-cli.ts',
+		description:
+			"Tally the josh processes' logged GitHub API usage per command — runs, calls, 304 answers and core used — most calls first, under the period the lines cover",
+		category: 'Maintenance',
+		reference: ['[--since <instant>]', 'developer', ['none']],
+		is_read_only: true,
+		usage: {
+			examples: [
+				{ arguments: '', note: 'every line the log holds' },
+				{ arguments: '--since 2026-11-08T00:00Z', note: 'the lines at or after an instant' },
+			],
+		},
+	},
 	'command:derive': {
 		script: 'tools/document/command-derive.ts',
 		description:
