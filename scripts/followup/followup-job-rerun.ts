@@ -50,8 +50,8 @@ const ACTION_DOWNLOAD_ERROR =
 	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu
 
 // The longest `timeout-minutes` in `ci.yml` is 10; a run still going past that is not one a rerun helps.
-// Each poll here backs off while its reading stays the same (`poll.ts`): attempts × interval is its
-// wait budget, not its cadence.
+// Each poll here backs off while its reading stays the same (`poll.ts`): the attempts and interval
+// set its wait budget, not its cadence.
 const COMPLETE_ATTEMPTS = 40
 const COMPLETE_INTERVAL_MS = 15_000
 

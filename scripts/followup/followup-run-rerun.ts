@@ -90,7 +90,9 @@ async function await_latest_jobs(
 		{
 			attempts: LATEST_ATTEMPTS,
 			interval_ms: LATEST_INTERVAL_MS,
-			backoff: { seen: () => JSON.stringify(latest) },
+			backoff: {
+				seen: () => JSON.stringify(latest.map(({ name, conclusion }) => [name, conclusion])),
+			},
 		},
 	)
 }

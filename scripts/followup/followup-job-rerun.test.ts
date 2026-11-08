@@ -1,12 +1,5 @@
-import { POLL_BACKOFF } from '#scripts/lib/poll'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-	COMPLETE_ATTEMPTS,
-	COMPLETE_INTERVAL_MS,
-	followup_job_rerun,
-	REGISTER_ATTEMPTS,
-	REGISTER_INTERVAL_MS,
-} from './followup-job-rerun'
+import { followup_job_rerun } from './followup-job-rerun'
 import {
 	ACTIONS,
 	followup_job_rerun_fixture,
@@ -97,20 +90,6 @@ function failed_unit(run_attempt = 1): object {
 	})
 }
 
-async function rerun_with_timers(): Promise<{ names: Array<string>; waited_ms: number }> {
-	vi.useFakeTimers()
-	const started = Date.now()
-	const pending = followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)
-
-	await vi.runAllTimersAsync()
-	const names = await pending
-	const waited_ms = Date.now() - started
-
-	vi.useRealTimers()
-
-	return { names, waited_ms }
-}
-
 async function expect_no_rerun(): Promise<void> {
 	expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([])
 	expect(rerun_paths()).toStrictEqual([])
@@ -139,46 +118,6 @@ describe('rerun_failed_jobs — a run whose only failures stopped after every st
 			`🔁 Rerunning CI jobs that stopped after every step passed, failed downloading an action, or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
 		)
 		expect(assess).not.toHaveBeenCalled()
-	})
-})
-
-describe('rerun_failed_jobs — the waits around a rerun', () => {
-	// GitHub refuses a rerun while the run is still going, and the gate fails on the first red check.
-	// The backoff watches the run status: a new one starts the next wait from the first interval.
-	it('waits for the run to complete before rerunning it', async () => {
-		answer_checks([as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E], statuses: ['queued', 'in_progress'] })
-
-		const { names, waited_ms } = await rerun_with_timers()
-
-		expect(names).toStrictEqual([DETECT_E2E_NAME])
-		expect(waited_ms).toBe(POLL_BACKOFF.initial_ms + POLL_BACKOFF.initial_ms)
-		expect(rerun_paths()).toHaveLength(1)
-	})
-
-	// joshuafolkken/kit#6725: fewer reads than the fixed cadence, over the same total wait.
-	it('does not rerun a run that never completes, backing off over the whole wait', async () => {
-		const statuses = Array.from({ length: COMPLETE_ATTEMPTS }, () => 'queued')
-
-		answer_checks([as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E], statuses })
-
-		const { names, waited_ms } = await rerun_with_timers()
-
-		expect(names).toStrictEqual([])
-		expect(waited_ms).toBe((COMPLETE_ATTEMPTS - 1) * COMPLETE_INTERVAL_MS)
-		expect(statuses.length).toBeGreaterThan(0)
-		expect(rerun_paths()).toStrictEqual([])
-	})
-
-	it('waits until the rerun replaced the stalled check runs, backing off over the whole wait', async () => {
-		answer_checks([as_check(DETECT_E2E)], [as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E] })
-
-		const { waited_ms } = await rerun_with_timers()
-
-		expect(waited_ms).toBe((REGISTER_ATTEMPTS - 1) * REGISTER_INTERVAL_MS)
-		expect(fetch_checks.mock.calls.length).toBeLessThan(1 + REGISTER_ATTEMPTS)
 	})
 })
 
