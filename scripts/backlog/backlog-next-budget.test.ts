@@ -96,6 +96,11 @@ function stub(is_listed = true, child_row: ChildRow = owner_child): void {
 	vi.mocked(backlog_resume_reads.paused_issues).mockRestore()
 	vi.mocked(backlog_resume_reads.open_pr_issues).mockRestore()
 	vi.spyOn(git_gh_exec, 'exec_gh_api').mockImplementation(answer)
+	// A member's permission lookup goes through the ETag layer (joshuafolkken/kit#6754).
+	shared_cache_fixture.keep_in_memory()
+	vi.spyOn(git_gh_conditional, 'read_conditional').mockImplementation(
+		conditional_read_over(git_gh_exec.exec_gh_api),
+	)
 }
 
 function calls_of(value: unknown): number {
