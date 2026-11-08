@@ -4,7 +4,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_helpers } from '#scripts/gh/git-gh-helpers'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_branch } from '#scripts/git/git-branch'
-import { poll } from '#scripts/lib/poll'
+import { poll, POLL_BACKOFF } from '#scripts/lib/poll'
 import { z } from 'zod'
 import {
 	followup_failed_tests,
@@ -50,13 +50,17 @@ const ACTION_DOWNLOAD_ERROR =
 	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu
 
 // The longest `timeout-minutes` in `ci.yml` is 10; a run still going past that is not one a rerun helps.
+// Each poll here backs off while its reading stays the same (`poll.ts`): attempts × interval is its
+// wait budget, not its cadence.
 const COMPLETE_ATTEMPTS = 40
 const COMPLETE_INTERVAL_MS = 15_000
 
 // The rerun answers once the new attempt exists, but its check runs can trail it; a re-judge that read
-// the failed run again would fail on the very job just rerun.
+// the failed run again would fail on the very job just rerun. The backoff starts at the interval:
+// the shared first wait is longer than this whole budget.
 const REGISTER_ATTEMPTS = 10
 const REGISTER_INTERVAL_MS = 3000
+const REGISTER_BACKOFF = { ...POLL_BACKOFF, initial_ms: REGISTER_INTERVAL_MS }
 
 const failed_check_schema = z.looseObject({
 	id: z.number(),
@@ -123,17 +127,21 @@ async function read_failed_run_ids(branch_name: string): Promise<Array<number>> 
 	return [...new Set(jobs.map((job) => job.run_id))]
 }
 
-async function is_run_completed(run_id: number): Promise<boolean> {
-	const run = await read_actions(`runs/${String(run_id)}`, run_schema)
-
-	return run.status === RUN_COMPLETED
-}
-
 async function await_run_completed(run_id: number): Promise<boolean> {
-	return await poll.poll_until(async () => await is_run_completed(run_id), {
-		attempts: COMPLETE_ATTEMPTS,
-		interval_ms: COMPLETE_INTERVAL_MS,
-	})
+	let status = ''
+
+	return await poll.poll_until(
+		async () => {
+			;({ status } = await read_actions(`runs/${String(run_id)}`, run_schema))
+
+			return status === RUN_COMPLETED
+		},
+		{
+			attempts: COMPLETE_ATTEMPTS,
+			interval_ms: COMPLETE_INTERVAL_MS,
+			backoff: { seen: () => status },
+		},
+	)
 }
 
 function has_every_step_passed(job: Job): boolean {
@@ -233,14 +241,19 @@ async function await_rerun_registered(
 	jobs: ReadonlyArray<Job>,
 ): Promise<void> {
 	const rerun_ids = new Set(jobs.map((job) => job.id))
+	let failed: Array<number> = []
 
 	await poll.poll_until(
 		async () => {
-			const failed = await read_failed_check_ids(branch_name)
+			failed = await read_failed_check_ids(branch_name)
 
 			return failed.every((id) => !rerun_ids.has(id))
 		},
-		{ attempts: REGISTER_ATTEMPTS, interval_ms: REGISTER_INTERVAL_MS },
+		{
+			attempts: REGISTER_ATTEMPTS,
+			interval_ms: REGISTER_INTERVAL_MS,
+			backoff: { seen: () => failed.join(','), schedule: REGISTER_BACKOFF },
+		},
 	)
 }
 
@@ -312,4 +325,10 @@ const followup_job_rerun = {
 	rerun_failed_jobs,
 }
 
-export { followup_job_rerun, COMPLETE_ATTEMPTS, REGISTER_ATTEMPTS }
+export {
+	followup_job_rerun,
+	COMPLETE_ATTEMPTS,
+	COMPLETE_INTERVAL_MS,
+	REGISTER_ATTEMPTS,
+	REGISTER_INTERVAL_MS,
+}

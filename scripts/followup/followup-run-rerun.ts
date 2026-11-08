@@ -16,7 +16,7 @@ const PAGE = 'per_page=100'
 const FAILED_CONCLUSIONS: ReadonlySet<string> = new Set(['failure', 'cancelled', 'timed_out'])
 
 // A `needs:`-gated job appears only once its prerequisites finish, and the longest `timeout-minutes`
-// in `ci.yml` is 10.
+// in `ci.yml` is 10. The poll backs off while the latest jobs stay the same (`poll.ts`).
 const LATEST_ATTEMPTS = 40
 const LATEST_INTERVAL_MS = 15_000
 
@@ -75,15 +75,23 @@ async function await_latest_jobs(
 	runs: ReadonlyArray<RunJobs>,
 	lost: ReadonlyArray<string>,
 ): Promise<void> {
+	let latest: Array<Job> = []
+
 	await poll.poll_until(
 		async () => {
-			const latest = await Promise.all(
+			const per_run = await Promise.all(
 				runs.map(async ({ run_id }) => await read_jobs(run_id, 'latest')),
 			)
 
-			return holds_every(latest.flat(), lost)
+			latest = per_run.flat()
+
+			return holds_every(latest, lost)
 		},
-		{ attempts: LATEST_ATTEMPTS, interval_ms: LATEST_INTERVAL_MS },
+		{
+			attempts: LATEST_ATTEMPTS,
+			interval_ms: LATEST_INTERVAL_MS,
+			backoff: { seen: () => JSON.stringify(latest) },
+		},
 	)
 }
 
@@ -138,4 +146,4 @@ const followup_run_rerun = {
 	recover_missing,
 }
 
-export { followup_run_rerun }
+export { followup_run_rerun, LATEST_ATTEMPTS, LATEST_INTERVAL_MS }
