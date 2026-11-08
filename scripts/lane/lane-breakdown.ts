@@ -147,7 +147,7 @@ function opens_implement(opened: ReadonlyArray<Marker>, edit_ms: number): boolea
 }
 
 // The implementation's marker at the lane's first edit, where no event marked it — a docs-only lane
-// writes no runtime file, so its Step 0 notice, which writes the `plan` event, never fires
+// writes no runtime file, so its edits never write the `plan` / `lane-phase implement` events
 // (joshuafolkken/kit#5835).
 function edit_markers(
 	opened: ReadonlyArray<Marker>,
