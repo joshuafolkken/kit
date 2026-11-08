@@ -184,3 +184,24 @@ describe('issue_closing_pr.read_closing_pr — another repository', () => {
 		expect(await issue_closing_pr.read_closing_pr(ISSUE)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#6752: the slug is the remote URL as typed, the timeline GitHub's canonical name.
+describe('issue_closing_pr — a remote spelled in another case', () => {
+	beforeEach(() => {
+		repo_get_name_with_owner.mockResolvedValue(REPO.toUpperCase())
+	})
+
+	it('still answers the merged closing pull request', async () => {
+		exec_gh_api.mockResolvedValue(line(CLOSING_URL, `closes #${ISSUE}`))
+
+		expect(await issue_closing_pr.read_closing_pr(ISSUE)).toBe(CLOSING_URL)
+	})
+
+	it('still finds the linked open pull request', async () => {
+		exec_gh_api.mockResolvedValue(
+			JSON.stringify({ url: MENTION_URL, repo: REPO, body: MENTION_BODY, state: 'open' }),
+		)
+
+		expect(await issue_closing_pr.has_open_pr(ISSUE)).toBe(true)
+	})
+})

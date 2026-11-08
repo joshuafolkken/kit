@@ -71,6 +71,12 @@ function parse_references(raw: string, state: 'open' | 'merged'): Array<MergedRe
 	return rows.slice(last_reopen + 1).filter((row) => is_reference(row))
 }
 
+// The timeline names GitHub's canonical spelling, while the checkout's slug is the remote URL as typed
+// (joshuafolkken/kit#6752), so the two are compared as GitHub resolves them: case-insensitively.
+function is_own_repo(reference: MergedReference, repo: string): boolean {
+	return reference.repo.toLowerCase() === repo.toLowerCase()
+}
+
 function pick_closing_pr(
 	references: ReadonlyArray<MergedReference>,
 	issue: string,
@@ -78,7 +84,7 @@ function pick_closing_pr(
 ): string | undefined {
 	return references.find(
 		(reference) =>
-			reference.repo === repo &&
+			is_own_repo(reference, repo) &&
 			reference.state === 'merged' &&
 			git_closes_keyword.parse_closes_issue_number(reference.body) === issue,
 	)?.url
@@ -101,7 +107,8 @@ async function read_result(issue: string, state: 'open' | 'merged'): Promise<Clo
 		const url =
 			state === 'merged'
 				? pick_closing_pr(references, issue, repo)
-				: references.find((reference) => reference.repo === repo && reference.state === 'open')?.url
+				: references.find((reference) => is_own_repo(reference, repo) && reference.state === 'open')
+						?.url
 
 		return { kind: 'read', url }
 	} catch {

@@ -12,7 +12,9 @@ import { gh_rate_limit } from './git-gh-rate-limit'
 // remotes, so reading it back cost one REST call per process. `current_repository` answers nothing
 // where `gh`'s pick is ambiguous or unreadable; only then the REST read (not GraphQL, which a cloud
 // session is refused), through the ETag layer. A failed read is `undefined`, except an exhausted rate
-// limit, which is thrown rather than read as "no repository".
+// limit, which is thrown rather than read as "no repository". The local slug is the remote as typed:
+// compare it case-insensitively against an API-returned name; a renamed repository's old remote
+// still names the old slug.
 
 const repository_schema = z.object({ full_name: z.string() })
 
