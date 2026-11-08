@@ -199,7 +199,7 @@ async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> 
 //
 // The REST reads are bounded rather than sequential: the pass was paced one request at a time,
 // which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a blocker. The width
-// is the one `epic:bundle` already reads the same endpoint at, so the burst stays bounded while a
+// is the one `epic:bundle`'s referenced reads use, so the burst stays bounded while a
 // rate-limited read still fails the whole listing rather than a row (`bounded-pool.ts`).
 const RELATION_CONCURRENCY = 8
 
