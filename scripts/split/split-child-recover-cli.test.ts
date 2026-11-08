@@ -70,7 +70,7 @@ describe('split_child_recover_cli — recovery', () => {
 		const entries = lane_ledger.read_entries(ledger_path)
 
 		expect(entries).toMatchObject([{ issue: Number(ORIGIN), child: URL }])
-		expect(await split_resolution.refusal(Number(ORIGIN), [NOTICE, ...entries])).toBeUndefined()
+		expect(await split_resolution.warning(Number(ORIGIN), [NOTICE, ...entries])).toBeUndefined()
 		expect(comments).not.toHaveBeenCalled()
 		expect(create).not.toHaveBeenCalled()
 	})

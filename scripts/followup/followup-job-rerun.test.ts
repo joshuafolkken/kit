@@ -238,6 +238,10 @@ const NOT_DOWNLOAD_FAILURES = [
 		`${CURL_ERROR} 504\n${CURL_EXIT.replace('22.', '1.')}`,
 	],
 	[
+		'whose installer retried successfully before a test failed',
+		`${installer_failed(504).replace('exit code 1.', 'exit code 0.')}\n${UNIT_LOG}`,
+	],
+	[
 		'whose curl got through on a retry and a test of the change failed',
 		`${CURL_ERROR} 504\n${UNIT_LOG}`,
 	],
@@ -254,7 +258,7 @@ describe('rerun_failed_jobs — a job red because a download failed', () => {
 			'2026-11-07T13:46:37.4787283Z ##[error]Failed to resolve action download info.\n',
 		],
 		['a setup curl got a server error', curl_failed(504)],
-		['the safe-chain installer got a server error', installer_failed(504)],
+		['an installer reported a terminal server error', installer_failed(504)],
 		[
 			'the CodeQL bundle got a server error',
 			'2026-11-08T10:12:01.0000000Z ##[error]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 504\n',

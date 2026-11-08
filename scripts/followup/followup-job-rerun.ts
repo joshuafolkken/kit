@@ -53,7 +53,7 @@ const FIRST_ATTEMPT = 1
 const DOWNLOAD_ERRORS = [
 	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu,
 	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d\r?\n\S+ ##\[error\]Process completed with exit code 22\.$/mu,
-	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d\r?\n\S+ \[ERROR\] Failed to download from https:\/\/github\.com\/AikidoSec\/safe-chain\/releases\/download\/\S+\r?\n\S+ ##\[error\]Process completed with exit code 1\.$/mu,
+	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d\r?\n\S+ \[ERROR\] Failed to download from https:\/\/\S+\r?\n\S+ ##\[error\]Process completed with exit code 1\.$/mu,
 	/^\S+ ##\[error\]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 5\d\d$/mu,
 ]
 
