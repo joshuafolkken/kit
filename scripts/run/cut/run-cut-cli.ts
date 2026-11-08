@@ -56,7 +56,6 @@ const {
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	SPLIT_UNRESOLVED_VERDICT,
 	SUCCESS_EXIT_CODE,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,
@@ -69,7 +68,6 @@ const {
 	report_missing_supervisor,
 	report_relaunched_cut,
 	report_reviewer,
-	report_split_unresolved,
 	report_under_threshold,
 	report_unknown,
 } = run_cut_report
@@ -97,16 +95,15 @@ function verdict_answer(verdict: CostVerdict): number | undefined {
 // Only the pre-gate phase is checked here; the implementation-phase caller gates its own
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
 //
-// **A noticed Issue answers the split notice first** (joshuafolkken/kit#4695): the pre-gate cut is the
-// boundary the notice names, so a lane without a split child is refused whether or not
-// the cut itself would be taken. **An implementation past its budget with a green part ships it**
-// (joshuafolkken/kit#6026) rather than resuming into the rest. Returns the answer given without cutting,
-// or `undefined`.
+// **An unanswered split notice is printed as a warning and the cut goes on** (joshuafolkken/kit#6602):
+// size alone never stops a started Issue. **An implementation past its budget with a green part ships it**
+// (joshuafolkken/kit#6026) rather than resuming into the rest — elapsed time, not size. Returns the
+// answer given without cutting, or `undefined`.
 async function pre_gate_answer(issue: string, phase: string): Promise<number | undefined> {
 	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
-	const split_note = await split_resolution.ledger_refusal(Number(issue))
+	const split_note = await split_resolution.ledger_warning(Number(issue))
 
-	if (split_note !== undefined) return report_split_unresolved(split_note)
+	if (split_note !== undefined) console.error(split_note)
 	const over = await run_cut_budget.over_minutes(Number(issue))
 
 	if (over !== undefined) return run_cut_budget.report_over(issue, over)
@@ -420,7 +417,6 @@ const run_cut_cli = {
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	SPLIT_UNRESOLVED_VERDICT,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,
 	run,
