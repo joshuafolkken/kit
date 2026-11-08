@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { read_files_cli } from './read-files-cli'
 
@@ -11,9 +11,10 @@ import { read_files_cli } from './read-files-cli'
 const SUCCESS = 0
 const FAILURE = 1
 const TINY_CAP = 40
+const make_directory = temporary_directory()
 
 function make_root(): string {
-	return mkdtempSync(path.join(tmpdir(), 'read-files-'))
+	return make_directory('read-files-')
 }
 
 function write_file(root: string, name: string, text: string): void {

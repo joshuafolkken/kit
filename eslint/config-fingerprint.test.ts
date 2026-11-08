@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { create_base_config } from './base.js'
 import { config_fingerprint } from './config-fingerprint.js'
@@ -19,9 +19,10 @@ const RULE_SPECIFIER = './rules/naming-convention.js'
 const WIRING = "import { naming_convention_rules } from './rules/naming-convention.js'\n"
 const PRESET_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = path.dirname(PRESET_DIRECTORY)
+const make_directory = temporary_directory()
 
 function write_preset(files: Record<string, string>): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'kit-config-fingerprint-'))
+	const directory = make_directory('kit-config-fingerprint-')
 
 	for (const [relative_path, contents] of Object.entries(files)) {
 		const full_path = path.join(directory, relative_path)
