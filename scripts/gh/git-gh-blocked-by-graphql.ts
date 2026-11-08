@@ -36,7 +36,9 @@ type IssueNode = z.infer<typeof issue_node_schema>
 // The rows `read_blocked_by` would send a request for: GitHub's own summary does not already say
 // "none". A row with a zero summary is answered there without a request, so it is left to it.
 function needs_read(row: RestIssue): row is RestIssue & { node_id: string } {
-	return row.node_id !== undefined && git_gh_issue_rest.total_blocked_by(row) !== 0
+	if (row.node_id === undefined || git_gh_issue_rest.is_pull_request(row)) return false
+
+	return git_gh_issue_rest.total_blocked_by(row) !== 0
 }
 
 function chunks_of<T>(items: ReadonlyArray<T>): Array<Array<T>> {

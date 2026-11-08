@@ -119,11 +119,12 @@ describe('read_answered — rows left to REST', () => {
 		expect([answered.has(unresolved), answered.has(resolved)]).toEqual([false, true])
 	})
 
-	it('sends no query for rows without a node_id or with a zero summary', async () => {
+	it('sends no query for a row without a node_id, with a zero summary or a pull request', async () => {
 		serve_nodes()
 		const rows = [
 			row(FIRST_NUMBER, { node_id: undefined }),
 			row(2, { issue_dependencies_summary: { total_blocked_by: 0 } }),
+			row(3, { issue_dependencies_summary: undefined, pull_request: {} }),
 		]
 
 		const answered = await git_gh_blocked_by_graphql.read_answered(rows)
