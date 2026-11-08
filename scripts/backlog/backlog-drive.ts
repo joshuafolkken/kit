@@ -28,6 +28,7 @@ import { backlog_drive_judge } from './backlog-drive-judge'
 import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_paused } from './backlog-drive-paused'
+import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 import { backlog_offer_timing, type LoopRun, type OfferTiming } from './backlog-offer-timing'
 
@@ -46,12 +47,12 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 	'wait',
 ])
 const NO_RETRIES = 0
-const EXHAUSTED_ANSWER = 'exhausted'
 const JUDGE_REASON = 'judge'
 const TRIAGE_TOKEN = epic_triage.TRIAGE_VERDICT
 // The `hold` reason a pass held by a Claude usage limit records.
 const USAGE_LIMIT_REASON = 'usage-limit'
 const { launch_all } = backlog_drive_launch_pass
+const { is_drain_owed } = backlog_drive_retrospective
 
 interface OfferRead extends HeldWaiting, OfferTiming {
 	verdict: string
@@ -141,6 +142,9 @@ interface DrivePorts {
 	// A holding offer with nothing in flight — the paused-lane notice (`backlog-drive-paused.ts`), which
 	// reads the lane records itself and is deduplicated per pause episode by the port.
 	paused: () => Promise<void>
+	// A `stop` drain owing the retrospective: the unit run to its end, `true` once the run record's
+	// retrospective is marked (`backlog_drive_retrospective_unit.run` in production).
+	retrospective: () => Promise<boolean>
 	now: () => Date
 }
 
@@ -162,18 +166,6 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 		},
 		state,
 	}
-}
-
-// A drain owing the retrospective, read under a `watch` or a `stop` verdict. Only an empty backlog
-// drains: `backlog:offer` marks the drain on `exhausted` alone, so a watch over a parked or unreadable
-// backlog has no retrospective for `run:step` to fire and stays the driver's.
-function is_drain_owed(read: OfferRead, state: DriveState, verdict: string): boolean {
-	return (
-		read.verdict === verdict &&
-		read.answer === EXHAUSTED_ANSWER &&
-		state.in_flight.length === 0 &&
-		read.is_retrospective_owed === true
-	)
 }
 
 function initial_state(in_flight: ReadonlyArray<string>, active: string): DriveState {
@@ -261,13 +253,10 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 }
 
 // A watch with nothing in flight is the drain: `run:step` owes the retrospective there, so it is the
-// parent's. With children still running the watch is only waiting on them.
+// parent's. With children still running the watch is only waiting on them. A `stop` drain's
+// retrospective is the driver's own unit (`backlog_drive_retrospective.ran`).
 function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	if (!KNOWN_VERDICTS.has(read.verdict)) return ended(read.verdict, state, read.verdict)
-
-	if (is_drain_owed(read, state, STOP_VERDICT)) {
-		return ended('retrospective', state, 'retrospective')
-	}
 
 	if (read.verdict === STOP_VERDICT) {
 		return {
@@ -337,7 +326,8 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	if (read.verdict === RUN_VERDICT) return await run_then_judge(read, next, ports)
 	if (await backlog_drive_judge.is_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
-	const idle = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
+	const verdict = await backlog_drive_retrospective.ran(on_verdict(read, next), read, ports)
+	const idle = await backlog_drive_idle.noticed(verdict, read, ports)
 	const result = await backlog_drive_paused.noticed(idle, read, ports)
 
 	return await backlog_drive_hold.held(result, read, ports)

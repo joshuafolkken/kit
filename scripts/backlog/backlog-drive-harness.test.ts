@@ -90,6 +90,7 @@ function ports(world_state: World): LoopPorts {
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,
+		retrospective: async () => true,
 		now: () => new Date(world_state.clock),
 		sleep: async (milliseconds) => {
 			world_state.clock += milliseconds
