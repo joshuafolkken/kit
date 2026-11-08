@@ -1,9 +1,9 @@
 // One definition of "run these at most N at a time".
 //
 // Three callers need it and had it three times: `eval-run.ts` runs one real Claude session per
-// scenario and must not fan out to as many as the suite happens to hold, and `epic-bundle-cli.ts`
-// and `epic-bundle-referenced.ts` each read one issue per reference and must not turn a rate limit
-// into a wrong answer. The reads were written as waves — slice, `Promise.all`, next slice — which
+// scenario and must not fan out to as many as the suite happens to hold, and
+// `epic-bundle-referenced.ts` reads one issue per reference and must not turn a rate limit into a
+// wrong answer. The reads were written as waves — slice, `Promise.all`, next slice — which
 // idles the whole batch behind its slowest member, so the three were neither the same code nor the
 // same behavior.
 //

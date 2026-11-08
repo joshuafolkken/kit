@@ -14,9 +14,8 @@ const LABELLED_FIELDS = 'number,body,stateReason'
 //
 // `blocked_by_count` rides along for the same reason and is the one field here that `gh --json`
 // never had: it is read out of the `issue_dependencies_summary` the listing response already
-// carries, so it costs no request at all. It is what lets `epic:bundle`
-// tell a row with no blockers from one with some **before** deciding whether that row is worth a
-// per-issue read, which would otherwise be made for every open issue in the repository. Absent on a
+// carries, so it costs no request at all. `epic:bundle` no longer consults it: it reads the
+// relations themselves from `issue_list_open_relations` (joshuafolkken/kit#6796). Absent on a
 // row whose summary is missing, which must not be read as zero; `git-gh-issue-rest.ts` states why.
 //
 // `labels` rides along on the same response too: `epic:bundle` reads the release label off it,
