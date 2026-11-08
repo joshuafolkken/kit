@@ -92,8 +92,6 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/review/review-gate-mode.ts',
 	// #6564 stages the rate-limit classifier; remove this entry when #6614 or #6502 uses it.
 	'scripts/gh/git-gh-rate-limit.ts',
-	// #6695 stages the gh usage event writer; remove this entry when #6707 wires it into the josh entry.
-	'scripts/gh/gh-usage-event.ts',
 ])
 
 interface PackedEntry {
