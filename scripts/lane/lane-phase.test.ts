@@ -42,6 +42,18 @@ afterEach(() => {
 })
 
 describe('mark_implement — launch scope', () => {
+	it('writes plan and implement once for concurrent runtime edits', async () => {
+		const source = { [lane_child_marker.KEY]: ISSUE }
+
+		await Promise.all([
+			lane_phase.mark_implement(LANE, source),
+			lane_phase.mark_implement(LANE, source),
+		])
+
+		expect(emit).toHaveBeenCalledOnce()
+		expect(emit_plan).toHaveBeenCalledOnce()
+	})
+
 	it('writes once per launch, then writes again for a re-dispatched child', async () => {
 		const source = { [lane_child_marker.KEY]: ISSUE }
 

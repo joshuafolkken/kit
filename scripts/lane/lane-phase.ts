@@ -1,9 +1,12 @@
+import { repository_lock } from '#scripts/git/repository-lock'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_event_plan } from '#scripts/run/event/run-event-plan'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
+
+const LOCK_WAIT_MS = 5000
 
 // The `implement` phase a lane child reports to `run:board`. Every other phase
 // is read off an event the run already writes — the launch, the ship stages — but nothing marked the
@@ -44,7 +47,14 @@ async function mark_implement(
 	const issue = lane_child_marker.marked_issue(source)
 
 	if (issue === undefined || !lane_child_marker.is_child_of(directory, source)) return
-	await mark_once(issue)
+	// Serialize the read and both appends across parallel hook processes for this lane.
+	await repository_lock.with_lock(
+		async () => {
+			await mark_once(issue)
+		},
+		repository_lock.lock_path(`josh-lane-phase-${issue}-`, directory),
+		LOCK_WAIT_MS,
+	)
 }
 
 const lane_phase = { mark_implement }
