@@ -256,6 +256,9 @@ describe('prose_stale_scan.report — a plain-word name', () => {
 			hit('scripts/p.ts', '// reads event.Appended'),
 			hit('scripts/q.ts', '// calls Appended(x)'),
 			hit('docs/r.md', '`a` Appended `b`'),
+			// A fenced block's lines carry no backticks.
+			hit('docs/s.md', "import { x, Appended } from './a'"),
+			hit('docs/t.md', "import Appended from './a'"),
 		]
 
 		expect(prose_stale_scan.report([{ term: word, hits, has_failed: false }]).text).toBe(
@@ -263,6 +266,8 @@ describe('prose_stale_scan.report — a plain-word name', () => {
 				'docs/q.md:3 name Appended',
 				'scripts/p.ts:3 name Appended',
 				'scripts/q.ts:3 name Appended',
+				'docs/s.md:3 name Appended',
+				'docs/t.md:3 name Appended',
 			].join('\n'),
 		)
 	})

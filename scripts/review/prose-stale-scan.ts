@@ -199,15 +199,27 @@ function code_spans(excerpt: string): Array<string> {
 	return excerpt.split(BACKTICK).filter((_span, index) => index % SPAN_PARITY === 1)
 }
 
-// A plain name is written as code: inside a backtick span, as `x.name`, or as `name(`.
+// The code shapes a plain name takes outside backticks — a fenced block's line included: `x.name`,
+// `name(`, an `{ a, name }` list entry, and `import name`.
+function code_shape(word: string): RegExp {
+	const shapes = [
+		String.raw`\.${word}(?![\w$])`,
+		String.raw`(?<![\w$])${word}\(`,
+		String.raw`[{,]\s*${word}\s*[,}]`,
+		String.raw`\bimport\s+${word}(?![\w$])`,
+	]
+
+	return new RegExp(shapes.join('|'), 'u')
+}
+
+// A plain name is written as code: inside a backtick span, or in one of `code_shape`'s shapes.
 function is_code_use(term: Term, excerpt: string): boolean {
 	if (term.kind !== 'name' || IDENTIFIER_SHAPE.test(term.word)) return true
 
 	const word = term.word.replaceAll(REGEXP_SPECIAL, String.raw`\$&`)
 	const whole = new RegExp(String.raw`(?<![\w$])${word}(?![\w$])`, 'u')
-	const called = new RegExp(String.raw`\.${word}(?![\w$])|(?<![\w$])${word}\(`, 'u')
 
-	return code_spans(excerpt).some((span) => whole.test(span)) || called.test(excerpt)
+	return code_spans(excerpt).some((span) => whole.test(span)) || code_shape(word).test(excerpt)
 }
 
 function reference_lines(reference: Reference): Array<string> {
