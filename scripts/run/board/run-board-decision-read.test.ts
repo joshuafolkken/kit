@@ -71,6 +71,9 @@ describe('run_board_decision', () => {
 			`→ decide: ${QUESTION}`,
 		)
 		expect(
+			run_board_decision.reason_of(PERSON, 'needs-decision; blocker #6428 closed', read)?.tail,
+		).toBe(`→ decide: ${QUESTION} (blocker #6428 closed)`)
+		expect(
 			run_board_decision.reason_of(PERSON, undefined, { ...read, decision_questions: undefined })
 				?.tail,
 		).toBe(`→ decide: ${TITLE}`)

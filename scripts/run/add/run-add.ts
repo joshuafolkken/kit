@@ -92,14 +92,17 @@ function terminal_refusal(issue: number, context: AddContext): string | undefine
 	return context.settled?.has(issue) ? 'not a mechanical stop' : undefined
 }
 
+// The label a person must clear before any add, `--retry` included, takes the issue.
+function protected_label(labels: ReadonlyArray<string>): string | undefined {
+	return PROTECTED_LABELS.find((label) => has_label_name(labels, label))
+}
+
 // The label that bars the issue from a run, or why it is barred: an epic is tracked, never run, and
 // `in-progress` bars it only where the shared reader says a run holds it (`issue-run-hold.ts`).
 function label_refusal(labels: ReadonlyArray<string>): string | undefined {
 	if (has_label_name(labels, EPIC_LABEL)) return EPIC_REFUSAL
 
-	const protected_label = PROTECTED_LABELS.find((label) => has_label_name(labels, label))
-
-	return protected_label ?? (issue_run_hold.is_held(labels) ? IN_PROGRESS_LABEL : undefined)
+	return protected_label(labels) ?? (issue_run_hold.is_held(labels) ? IN_PROGRESS_LABEL : undefined)
 }
 
 function refusal(issue: number, view: IssueView, context: AddContext): string | undefined {
@@ -204,7 +207,7 @@ function is_all_queued(outcomes: ReadonlyArray<AddOutcome>): boolean {
 	return outcomes.every((outcome) => outcome.kind === 'queued')
 }
 
-const run_add = { add_all, additions_of, describe, is_all_queued, labels_for }
+const run_add = { add_all, additions_of, describe, is_all_queued, labels_for, protected_label }
 
 export type { AddContext, AddOutcome, AddPorts, IssueView }
 export { run_add }
