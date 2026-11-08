@@ -105,6 +105,16 @@ describe('run_board_setup.read after a drain that came before any launch', () =>
 
 		expect(run_board_setup.read(events)).toStrictEqual({ setup: OPENING_278, setup_ms: time_of(2) })
 	})
+
+	// joshuafolkken/kit#6745: the driver writes the unit's stage after the drain `backlog:offer` wrote.
+	it('reads the retrospective unit the driver runs at the drain as the stage', () => {
+		const events = stream(LAUNCH_278, MERGE_278, DRAIN, setup(STAGE.RETROSPECTIVE))
+
+		expect(run_board_setup.read(events)).toStrictEqual({
+			setup: STAGE.RETROSPECTIVE,
+			setup_ms: time_of(3),
+		})
+	})
 })
 
 describe('run_board_setup.read after the first launch', () => {

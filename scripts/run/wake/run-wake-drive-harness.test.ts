@@ -3,6 +3,7 @@ import {
 	backlog_drive,
 	type LoopPorts as DrivePorts,
 	type DriveState,
+	type OfferRead,
 } from '#scripts/backlog/backlog-drive'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -38,6 +39,15 @@ interface World {
 	reports: number
 }
 
+function offered(world: World, state: DriveState): OfferRead {
+	return {
+		verdict: world.merged ? 'stop' : 'run',
+		issues: world.merged || state.in_flight.length > 0 ? [] : [ISSUE],
+		retries: 0,
+		is_finish: true,
+	}
+}
+
 function drive_ports(world: World): DrivePorts {
 	return {
 		is_finished: () => world.started,
@@ -47,12 +57,7 @@ function drive_ports(world: World): DrivePorts {
 
 			return { token: 'none', outcome: 'merged', is_offer: true }
 		},
-		offer: async (state: DriveState) => ({
-			verdict: world.merged ? 'stop' : 'run',
-			issues: world.merged || state.in_flight.length > 0 ? [] : [ISSUE],
-			retries: 0,
-			is_finish: true,
-		}),
+		offer: async (state: DriveState) => offered(world, state),
 		launch: async () => {
 			world.started = true
 
@@ -67,6 +72,7 @@ function drive_ports(world: World): DrivePorts {
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,
+		retrospective: async () => true,
 		now: () => NOW,
 		sleep: async () => undefined,
 		on_state: () => undefined,

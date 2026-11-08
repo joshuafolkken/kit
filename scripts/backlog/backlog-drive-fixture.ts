@@ -63,6 +63,8 @@ interface Script {
 	memory_held?: ReadonlyArray<boolean>
 	// The usage-limit answers in order, the last repeating; unset reads as no limit in force.
 	usage_limited?: ReadonlyArray<boolean>
+	// Whether the retrospective unit exited 0; unset reads as a unit that did.
+	retrospective?: boolean
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -180,6 +182,15 @@ function memory_port(script: Script): Pick<LoopPorts, 'memory_held' | 'usage_lim
 	return { memory_held: queued(script.memory_held), usage_limited: queued(script.usage_limited) }
 }
 
+// The retrospective unit, its start recorded in `calls`.
+function retrospective_port(script: Script, calls: Array<string>): LoopPorts['retrospective'] {
+	return async () => {
+		calls.push('retrospective unit')
+
+		return script.retrospective ?? true
+	}
+}
+
 // The loop-facing ports: a clock the sleeps advance, and the finish and state records.
 function loop_ports(
 	calls: Array<string>,
@@ -242,6 +253,7 @@ function harness(script: Script): Harness {
 			...memory_port(script),
 			...loop_ports(calls, states),
 			...report_ports(holds, idles, pauses),
+			retrospective: retrospective_port(script, calls),
 		},
 	}
 }
