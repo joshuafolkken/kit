@@ -1,10 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { repository_lock } from './repository-lock'
 
 // Pins the current behavior of the shared repository lock directly, beside the stash-sweep wrapper's
@@ -22,6 +22,7 @@ const OTHER_PREFIX = 'josh-repository-lock-other-'
 const CORRUPT_RECORD = '{not json'
 
 const state = { scratch: '', lock: '' }
+const make_directory = temporary_directory()
 
 async function work(): Promise<string> {
 	return DONE
@@ -36,12 +37,8 @@ function live_record(): string {
 }
 
 beforeEach(() => {
-	state.scratch = mkdtempSync(path.join(tmpdir(), 'repository-lock-test-'))
+	state.scratch = make_directory('repository-lock-test-')
 	state.lock = path.join(state.scratch, 'lock.json')
-})
-
-afterEach(() => {
-	rmSync(state.scratch, { force: true, recursive: true })
 })
 
 describe('repository_lock.with_lock acquire and release', () => {

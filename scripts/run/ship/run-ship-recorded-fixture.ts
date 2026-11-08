@@ -1,11 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_step_section } from '#scripts/run/run-step-section'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { vi } from 'vitest'
 
 // joshuafolkken/kit#5003: a `josh ship --review` given no `--unpinned-ok` carries the reason recorded for
@@ -24,6 +23,7 @@ import { vi } from 'vitest'
 const RECORDED_REASON = 'a reason an earlier ship on this branch recorded'
 const SUCCESS_EXIT_CODE = 0
 const UNMEASURABLE_VERDICT = 'unmeasurable'
+const make_directory = temporary_directory()
 
 function isolate(): void {
 	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
@@ -36,7 +36,7 @@ async function with_record(
 	run: (argv: ReadonlyArray<string>) => Promise<number>,
 	argv: ReadonlyArray<string>,
 ): Promise<number> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-ship-recorded-'))
+	const directory = make_directory('josh-ship-recorded-')
 	const record = { branch: await git_command.branch(), reason: RECORDED_REASON, unpinned: [] }
 
 	stamp_file.replace_stamp(path.join(directory, run_review_pinned_accepted.RECORD_NAME), record)
@@ -46,7 +46,6 @@ async function with_record(
 		return await run(argv)
 	} finally {
 		directories.mockRestore()
-		rmSync(directory, { recursive: true, force: true })
 	}
 }
 

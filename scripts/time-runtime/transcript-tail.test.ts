@@ -1,10 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { transcript_tail } from './transcript-tail'
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'transcript-tail-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('transcript-tail-')
 const TAIL_SAMPLE_BYTES = 16
 // Longer than the window above, so a read that ignored the window would return something else.
 const LONG_TEXT = '0123456789'.repeat(3)
@@ -16,10 +17,6 @@ function write_transcript(name: string, text: string): string {
 
 	return target
 }
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
 
 describe('transcript_tail.read_tail', () => {
 	it('reads only the end of the file', () => {

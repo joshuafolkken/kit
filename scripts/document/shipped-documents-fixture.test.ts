@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { markdown_files_under } from './shipped-documents-fixture'
 
 function write_document(root: string, relative_path: string): void {
@@ -19,16 +19,13 @@ function write_document(root: string, relative_path: string): void {
 describe('the shipped-document walk — what it descends into', () => {
 	// The one file in the layout the package actually ships, so the assertion names it once.
 	const SHIPPED_DOCUMENT = 'skills/workflow-commands/followup.md'
+	const make_directory = temporary_directory()
 
 	it('reads the shipped documents and nothing a nested checkout brought with it', () => {
 		// Created inside the test, not in the describe body: a body runs at collection time, so a
 		// filtered run (`vitest run -t …`) would make the directory and then skip the hook that
-		// removes it. `onTestFinished` is bound to the test that owns the directory instead.
-		const workspace = mkdtempSync(path.join(tmpdir(), 'shipped-documents-'))
-
-		onTestFinished(() => {
-			rmSync(workspace, { recursive: true, force: true })
-		})
+		// removes it.
+		const workspace = make_directory('shipped-documents-')
 
 		write_document(workspace, SHIPPED_DOCUMENT)
 		write_document(workspace, 'worktrees/bridge/.git')

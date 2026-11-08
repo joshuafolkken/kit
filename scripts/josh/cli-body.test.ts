@@ -1,7 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { devNull, tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
+import { devNull } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { cli_body } from './cli-body'
 import { cli_body_repository } from './cli-body-repository-fixture'
 
@@ -32,7 +33,8 @@ vi.mock('node:fs', async (import_original) => {
 // text is what reaches GitHub. A PR comment posted that way had part of its own words run as git
 // commands. The file route exists so the shell never sees the body at all, and these cases pin that
 // a body full of exactly those characters survives it byte for byte.
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'cli-body-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('cli-body-')
 // The flag pair every case resolves under. Named so a case cannot silently test a different pairing
 // from the one the error message is asserted against.
 const INLINE_FLAG = '--body'
@@ -58,10 +60,6 @@ function write_body(name: string, text: string): string {
 
 	return target
 }
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
 
 describe('cli_body.resolve — the file route', () => {
 	it('carries a body of backticks and dollars through unchanged', () => {
@@ -215,12 +213,8 @@ describe('cli_body.resolve — a path that names no file', () => {
 
 // joshuafolkken/kit#6055: bodies kept landing in an untracked `scratchpad/` beside the code.
 // `WORK_DIRECTORY` above is the tree-outside case, since it sits in no repository.
-const repository = cli_body_repository.create()
+const repository = cli_body_repository.create(make_directory('cli-body-repository-'))
 const { IGNORED_DIRECTORY, UNIGNORED_DIRECTORY } = cli_body_repository
-
-afterAll(() => {
-	repository.remove()
-})
 
 describe('cli_body.read_file_or_stdin — where a body file may sit', () => {
 	it('opens a body under the ignored `.josh/tmp/`', () => {

@@ -1,10 +1,8 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_state, type LaneState } from '#scripts/lane/lane-state'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { temporary_directory } from '#tools/test/temporary-directory'
 
 // The world the lane lifecycle property test (joshuafolkken/kit#4274) drives: each operation writes
 // what the real command writes — the lane state record through `lane_state.record_change`, the carry
@@ -16,6 +14,7 @@ const ISSUES = ['9101', '9102'] as const
 const START_MS = Date.parse('2026-10-22T00:00:00.000Z')
 const TICK_MS = 60_000
 const INVOCATION = 'backlogrun'
+const make_directory = temporary_directory()
 
 interface LaneModel {
 	// The record state the commands so far should have left.
@@ -54,7 +53,7 @@ function create_world(): World {
 	const run = { id: 0, started_ms: START_MS, is_active: false, has_carry: false }
 
 	return {
-		directory: mkdtempSync(path.join(tmpdir(), 'lane-lifecycle-')),
+		directory: make_directory('lane-lifecycle-'),
 		clock_ms: START_MS,
 		events: [],
 		lanes,
@@ -66,8 +65,6 @@ function dispose_world(world: World): void {
 	stamp_file.remove_stamp(run_carry.carry_path(world.directory))
 
 	for (const issue of ISSUES) stamp_file.remove_stamp(lane_state.state_path(world.directory, issue))
-
-	rmSync(world.directory, { recursive: true, force: true })
 }
 
 function tick(world: World): Date {

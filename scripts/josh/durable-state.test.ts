@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { git_common_directory } from '#scripts/git/git-common-directory'
@@ -10,6 +10,7 @@ import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { run_wake } from '#scripts/run/wake/run-wake'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { durable_state } from './durable-state'
 import { PLATFORM_TEMP_ROOT, platform_temporary } from './platform-temporary'
@@ -26,11 +27,11 @@ const RECORD = { kept: 'across a reboot' }
 const ISSUE = '4743'
 const OVERRIDE_STATE_DIRECTORY = 'josh-state'
 
-const scratch = mkdtempSync(path.join(PLATFORM_TEMP_ROOT, TEST_PREFIX))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory(TEST_PREFIX)
 const written: Array<string> = []
 
 afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 	for (const target of written) rmSync(target, { force: true })
 })
 

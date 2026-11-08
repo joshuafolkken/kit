@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
@@ -7,6 +5,7 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { main_entry_fixture } from '#scripts/josh/main-entry-fixture'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { split_child_recover_cli } from './split-child-recover-cli'
 import { split_resolution } from './split-resolution'
@@ -18,7 +17,8 @@ const URL = `https://github.com/${REPO}/issues/${String(CHILD)}`
 const BODY = `## 受け入れ条件\n- [ ] #${ORIGIN}\n\nparent: #${ORIGIN}`
 const OTHER_PARENT = 'parent: #1'
 const LEDGER_NAME = 'ledger.jsonl'
-const scratch = mkdtempSync(path.join(tmpdir(), 'split-child-recover-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('split-child-recover-')
 const ledger_path = path.join(scratch, LEDGER_NAME)
 const NOTICE: LedgerEntry = {
 	kind: 'split-notice',
@@ -51,7 +51,6 @@ afterEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('split_child_recover_cli — recovery', () => {

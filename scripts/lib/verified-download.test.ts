@@ -1,14 +1,14 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { readdirSync } from 'node:fs'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { verified_download } from './verified-download'
 
 const PAYLOAD = 'verified bytes'
 const DIGEST = createHash('sha256').update(PAYLOAD).digest('hex')
 const ctx = { directory: '' }
+const make_directory = temporary_directory()
 
 function run_download(curl: string): { status: number | null; stdout: string } {
 	const command = verified_download.command(
@@ -24,11 +24,7 @@ function run_download(curl: string): { status: number | null; stdout: string } {
 }
 
 beforeEach(() => {
-	ctx.directory = mkdtempSync(path.join(tmpdir(), 'verified-download-'))
-})
-
-afterEach(() => {
-	rmSync(ctx.directory, { recursive: true, force: true })
+	ctx.directory = make_directory('verified-download-')
 })
 
 describe('verified_download.command', () => {

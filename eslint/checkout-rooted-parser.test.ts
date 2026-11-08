@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { ESLint, type Linter } from 'eslint'
 import ts from 'typescript-eslint'
-import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { create_base_config } from './base.js'
 import { checkout_rooted_parser } from './checkout-rooted-parser.js'
 import { config_fingerprint } from './config-fingerprint.js'
@@ -34,8 +35,10 @@ const PROBE_TSCONFIG = {
 	include: [PROBE_FILE],
 }
 
+const make_directory = temporary_directory()
+
 function create_probe_checkout(): string {
-	const checkout = mkdtempSync(path.join(tmpdir(), 'kit-probe-checkout-'))
+	const checkout = make_directory('kit-probe-checkout-')
 
 	mkdirSync(path.join(checkout, path.dirname(PROBE_FILE)))
 	writeFileSync(path.join(checkout, PROBE_FILE), SOURCE)
@@ -53,9 +56,6 @@ function create_matching_checkout(): string {
 		path.join(checkout, ESLINT_CONFIG),
 		`import '${config_entry.split(path.sep).join('/')}'\n`,
 	)
-	onTestFinished(() => {
-		rmSync(checkout, { recursive: true, force: true })
-	})
 
 	return checkout
 }
@@ -134,14 +134,9 @@ describe('create_base_config — the serialized config across checkouts', () => 
 	})
 
 	it('hits a cache warmed in one checkout from another without re-linting', async () => {
-		const cache_directory = mkdtempSync(path.join(tmpdir(), 'kit-lane-cache-'))
+		const cache_directory = make_directory('kit-lane-cache-')
 		const cache_location = path.join(cache_directory, '.eslintcache')
 		const checkout = create_probe_checkout()
-
-		onTestFinished(() => {
-			rmSync(cache_directory, { recursive: true, force: true })
-			rmSync(checkout, { recursive: true, force: true })
-		})
 		const warmed = await cached_hash(checkout, checkout, cache_location)
 		const reused = await cached_hash(OTHER_CHECKOUT, checkout, cache_location)
 

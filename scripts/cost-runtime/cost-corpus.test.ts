@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cost_corpus } from './cost-corpus'
 import { cost_transcript } from './cost-transcript'
@@ -28,9 +28,10 @@ function usage_line(request_id: string, branch: string): string {
 }
 
 const state = { home: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	state.home = mkdtempSync(path.join(tmpdir(), 'cost-corpus-'))
+	state.home = make_directory('cost-corpus-')
 	vi.spyOn(cost_transcript, 'transcript_directories').mockImplementation((cwd: string) => [
 		path.join(state.home, cost_transcript.project_slug(cwd)),
 	])

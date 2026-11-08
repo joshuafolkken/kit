@@ -1,16 +1,10 @@
-import {
-	lstatSync,
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { lane_instructions } from './lane-instructions'
+
+const make_directory = temporary_directory()
 
 const ROOT_CAUSE_ITEM = '- **Fix root causes.** Never a symptom.'
 const RULES_FILE = 'CLAUDE.md'
@@ -41,7 +35,7 @@ const AGENTS_FILE = 'AGENTS.md'
 const PLANTED_TEXT = 'Planted instructions.'
 
 function checkout_with(rules: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'lane-instructions-'))
+	const directory = make_directory('lane-instructions-')
 
 	writeFileSync(path.join(directory, RULES_FILE), rules)
 

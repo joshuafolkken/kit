@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { hook_decision, type TranscriptGuard } from './hook-decision'
@@ -9,7 +9,8 @@ import { hook_decision, type TranscriptGuard } from './hook-decision'
 // only through each hook, so a change to the plumbing fails once instead of twice — and so the
 // properties each hook's suite depends on are written down where the plumbing is.
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'hook-decision-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('hook-decision-')
 const SWITCH_KEY = 'JOSH_HOOK_DECISION_TEST_SWITCH'
 const OTHER_SWITCH_KEY = 'JOSH_HOOK_DECISION_TEST_OTHER'
 const STAMP_PREFIX = 'josh-hook-decision-test-'
@@ -58,8 +59,6 @@ afterAll(() => {
 	for (const prefix of [NOTIFY_STAMP_PREFIX, NOTIFY_BLOCK_PREFIX]) {
 		rmSync(hook_decision.create_refusal_stamp(prefix).path(NOTIFY_TRANSCRIPT), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 describe('hook_decision.parse_hook_payload', () => {
