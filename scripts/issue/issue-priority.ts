@@ -231,6 +231,22 @@ function is_typed(labels: ReadonlyArray<string>): boolean {
 	)
 }
 
+function labelled_level(labels: ReadonlyArray<string>): PriorityLevel {
+	if (has_label_name(labels, PRIORITY_CRITICAL_LABEL)) return 'critical'
+
+	return has_label_name(labels, PRIORITY_HIGH_LABEL) ? 'high' : 'normal'
+}
+
+// The label that raises an open Issue to its filed level, or `undefined` when its labels already rank
+// it there — `josh issue:priority` reads it (joshuafolkken/kit#6757).
+function raise_label(labels: ReadonlyArray<string>, body: string): string | undefined {
+	const level = filed_level(body) ?? 'normal'
+
+	if (LEVELS.indexOf(labelled_level(labels)) >= LEVELS.indexOf(level)) return undefined
+
+	return LABELS[level]
+}
+
 function floor_problem(body: string, level: PriorityLevel): string | undefined {
 	const floor = floor_of(body)
 
@@ -285,6 +301,7 @@ const issue_priority = {
 	order_problem,
 	parked_issues,
 	problem,
+	raise_label,
 	with_label,
 }
 
