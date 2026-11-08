@@ -56,9 +56,15 @@ Raise an issue to the priority its body declares or reaches after filing.
 
 ```bash
 pnpm josh issue:priority 4960
+pnpm josh issue:priority 6707 --critical --reason "asked in this turn"   # on a person's instruction only
 ```
 
 <!-- /usage -->
+
+`--critical --reason "<text>"` applies `priority:critical` whatever the body declares and comments the reason on the issue.
+
+- Use it **only on a person's current-turn instruction** ("make #N critical"), `--reason` giving its gist. Never on an agent's own judgment: the agent's route is the body's `- 優先度:` declaration.
+- No non-blank `--reason` → usage error, nothing written. Already `priority:critical` → `labelled`, no comment. A failed label or comment → `failed`, exit 1.
 
 ### `josh issue:state`
 
