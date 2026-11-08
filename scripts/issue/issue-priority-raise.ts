@@ -6,7 +6,7 @@ import { issue_priority } from './issue-priority'
 
 // joshuafolkken/kit#4960: an open Issue's body can rise after it was filed — a recurrence appends a
 // cause-loss line, an edit declares a priority — and the body edit applies no label. This re-reads the
-// body and applies the label of its filed level, as `josh issue:file` would have (joshuafolkken/kit#6757).
+// body and applies the label of its filed level or floor, as `josh issue:file` would have (joshuafolkken/kit#6757).
 
 type RaiseResult = 'raised' | 'labelled' | 'below' | 'unreadable' | 'failed'
 

@@ -95,6 +95,13 @@ describe('issue_priority_raise.raise on a declared priority', () => {
 		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, PRIORITY_CRITICAL_LABEL)
 	})
 
+	it('raises a normal declaration once appended losses reach the high floor', async () => {
+		serve(declared('- 優先度: 通常\n- 原因の損失: 20 分\n- 原因の損失: 15 分'), ENHANCEMENT)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('raised')
+		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, PRIORITY_HIGH_LABEL)
+	})
+
 	it.each([['- 優先度: 通常'], ['- 優先度: 緊急']])(
 		'applies nothing for the declaration %s',
 		async (line) => {
