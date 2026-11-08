@@ -82,6 +82,10 @@ function curl_failed(status: number): string {
 	return `${CURL_ERROR} ${String(status)}\n${CURL_EXIT}\n`
 }
 
+function installer_failed(status: number): string {
+	return `${CURL_ERROR} ${String(status)}\n2026-11-08T11:47:57.1089625Z \u{001B}[0;31m[ERROR]\u{001B}[0m Failed to download from https://github.com/AikidoSec/safe-chain/releases/download/1.5.27/safe-chain-linuxstatic-x64\n2026-11-08T11:47:57.1117104Z ##[error]Process completed with exit code 1.\n`
+}
+
 const DETECT_E2E = job({ id: DETECT_E2E_ID, name: DETECT_E2E_NAME, conclusion: CANCELLED })
 const PLAYWRIGHT = job({ id: 102, name: PLAYWRIGHT_NAME, conclusion: 'timed_out' })
 const UNIT_PASSED = job({ id: UNIT_ID, name: UNIT_NAME, conclusion: SUCCESS })
@@ -224,6 +228,11 @@ const NOT_DOWNLOAD_FAILURES = [
 		`2026-11-07T13:52:11.1370349Z Error: Failed to download archive ${ARCHIVE}\n`,
 	],
 	['whose curl got a client error', curl_failed(404)],
+	['whose installer got a client error', installer_failed(404)],
+	[
+		'whose installer retried successfully before a test failed',
+		`${installer_failed(504).replace('exit code 1.', 'exit code 0.')}\n${UNIT_LOG}`,
+	],
 	[
 		'whose curl got through on a retry and a test of the change failed',
 		`${CURL_ERROR} 504\n${UNIT_LOG}`,
@@ -241,6 +250,7 @@ describe('rerun_failed_jobs — a job red because a download failed', () => {
 			'2026-11-07T13:46:37.4787283Z ##[error]Failed to resolve action download info.\n',
 		],
 		['a setup curl got a server error', curl_failed(504)],
+		['an installer reported a terminal server error', installer_failed(504)],
 		[
 			'the CodeQL bundle got a server error',
 			'2026-11-08T10:12:01.0000000Z ##[error]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 504\n',
