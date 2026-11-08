@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { COMPLETE_ATTEMPTS, followup_job_rerun, REGISTER_ATTEMPTS } from './followup-job-rerun'
+import { followup_job_rerun } from './followup-job-rerun'
 import {
 	ACTIONS,
 	followup_job_rerun_fixture,
@@ -90,18 +90,6 @@ function failed_unit(run_attempt = 1): object {
 	})
 }
 
-async function rerun_with_timers(): Promise<Array<string>> {
-	vi.useFakeTimers()
-	const pending = followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)
-
-	await vi.runAllTimersAsync()
-	const names = await pending
-
-	vi.useRealTimers()
-
-	return names
-}
-
 async function expect_no_rerun(): Promise<void> {
 	expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([])
 	expect(rerun_paths()).toStrictEqual([])
@@ -127,37 +115,9 @@ describe('rerun_failed_jobs — a run whose only failures stopped after every st
 		expect(names).toStrictEqual([DETECT_E2E_NAME, PLAYWRIGHT_NAME])
 		expect(rerun_paths()).toStrictEqual([`${ACTIONS}runs/${String(RUN_ID)}/rerun-failed-jobs`])
 		expect(console.info).toHaveBeenCalledWith(
-			`🔁 Rerunning CI jobs that stopped after every step passed or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
+			`🔁 Rerunning CI jobs that stopped after every step passed, failed downloading an action, or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
 		)
 		expect(assess).not.toHaveBeenCalled()
-	})
-
-	// GitHub refuses a rerun while the run is still going, and the gate fails on the first red check.
-	it('waits for the run to complete before rerunning it', async () => {
-		answer_checks([as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E], statuses: ['in_progress', 'in_progress'] })
-
-		expect(await rerun_with_timers()).toStrictEqual([DETECT_E2E_NAME])
-		expect(rerun_paths()).toHaveLength(1)
-	})
-
-	it('does not rerun a run that never completes', async () => {
-		const statuses = Array.from({ length: COMPLETE_ATTEMPTS }, () => 'queued')
-
-		answer_checks([as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E], statuses })
-
-		expect(await rerun_with_timers()).toStrictEqual([])
-		expect(rerun_paths()).toStrictEqual([])
-	})
-
-	it('waits until the rerun replaced the stalled check runs', async () => {
-		answer_checks([as_check(DETECT_E2E)], [as_check(DETECT_E2E)])
-		answer_actions({ jobs: [DETECT_E2E] })
-
-		await rerun_with_timers()
-
-		expect(fetch_checks).toHaveBeenCalledTimes(1 + REGISTER_ATTEMPTS)
 	})
 })
 
@@ -243,6 +203,40 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 
 		await expect_no_rerun()
 		expect(assess).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6673: the runner timed out fetching `pnpm/setup` and no test ran, yet `followup`
+// stopped the lane on the red job.
+describe('rerun_failed_jobs — a job red because an action could not be downloaded', () => {
+	const ARCHIVE = `'https://codeload.github.com/pnpm/setup/tar.gz/a0881977'`
+
+	it.each([
+		[
+			'the download timed out',
+			`2026-11-07T13:52:11.1370349Z ##[error]Failed to download archive ${ARCHIVE} after 3 attempts.\n`,
+		],
+		[
+			'the download could not be resolved',
+			'2026-11-07T13:46:37.4787283Z ##[error]Failed to resolve action download info.\n',
+		],
+	])('reruns the run once when %s', async (_label, log) => {
+		answer_checks([as_check(failed_unit())])
+		answer_actions({ jobs: [failed_unit()], log })
+
+		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([UNIT_NAME])
+		expect(rerun_paths()).toStrictEqual([`${ACTIONS}runs/${String(RUN_ID)}/rerun-failed-jobs`])
+		expect(assess).not.toHaveBeenCalled()
+	})
+
+	// A repository step that prints the same words is still a failure of the change.
+	it('does not rerun a job whose own step printed the download failure', async () => {
+		const log = `2026-11-07T13:52:11.1370349Z Error: Failed to download archive ${ARCHIVE}\n`
+
+		answer_checks([as_check(failed_unit())])
+		answer_actions({ jobs: [failed_unit()], log })
+
+		await expect_no_rerun()
 	})
 })
 

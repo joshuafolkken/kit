@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { josh_command } from '#scripts/josh/josh-run'
 import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -16,6 +17,7 @@ import { backlog_drive_cli } from './backlog-drive-cli'
 const ACTIVE = new Date().toISOString()
 const OPTED_IN = '3696'
 const ROOMY_POOL = 6
+const CORE_LIMIT = 5000
 const CONTEXT: DriveContext = {
 	owner: String(process.pid),
 	active: undefined,
@@ -54,6 +56,8 @@ beforeEach(() => {
 	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-reread-'))
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(scratch.directory)
 	vi.spyOn(poll, 'sleep').mockResolvedValue()
+	vi.spyOn(gh_core_rate_limit, 'read_allowance').mockResolvedValue(undefined)
+	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())
 	run_carry.begin_carry(
 		run_carry.carry_path(scratch.directory),
@@ -81,4 +85,21 @@ it('starts an issue opted in during the idle watch after one failed read of the 
 
 	expect(launch).toHaveBeenCalledExactlyOnceWith(OPTED_IN)
 	expect(result.state.in_flight).toStrictEqual([OPTED_IN])
+})
+
+// joshuafolkken/kit#6563: the open offer checks the core allowance before reading `backlog:offer`.
+it('offers a wait until the reset instead of reading an offer while the core allowance is below the floor', async () => {
+	const reset_ms = Date.now()
+	const josh_run = vi.spyOn(josh_command, 'josh_run')
+
+	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue({
+		remaining: 0,
+		limit: CORE_LIMIT,
+		reset_ms,
+	})
+
+	const read = await backlog_drive_cli.read_offer(backlog_drive.initial_state([], ACTIVE), CONTEXT)
+
+	expect(read).toMatchObject({ verdict: 'wait', issues: [], not_before_ms: reset_ms })
+	expect(josh_run).not.toHaveBeenCalled()
 })

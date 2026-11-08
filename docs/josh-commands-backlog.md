@@ -426,6 +426,22 @@ pnpm josh issue:spill 5999 --estimate "3 ファイル / 80 行"
 
 <!-- /usage -->
 
+### `josh issue:release-class`
+
+<!-- usage: issue:release-class -->
+
+Write the issue body's one release classification line, replacing any earlier one.
+
+```bash
+pnpm josh issue:release-class 6636 other-change
+```
+
+<!-- /usage -->
+
+Writes `- リリース分類: <label>` at the end of the `## 背景` declaration block, or the body's end without that section. Earlier declaration lines are dropped, so a repeat changes nothing. Only `enhancement` and `other-change` are accepted; a bug, breaking change or ignored release is declared by its label.
+
+Run it when `josh ship` or `josh git` stops for a missing release classification. A lane with a non-defect Issue (`種別: 非不具合`) and no `enhancement`, `bug` or `breaking-change` label writes `other-change` as a Tier A choice and goes on without parking.
+
 ### `josh defect:origin`
 
 <!-- usage: defect:origin -->
@@ -923,7 +939,7 @@ pnpm josh backlog:budget --answer candidates --started "$started" --active "$act
 
 <!-- /usage -->
 
-Read-only. stdout is `run`, `watch`, `stop` or `triage`; empty with exit 1 if unreadable. An idle watch polls every 60 s.
+Read-only. stdout is `run`, `watch`, `stop` or `triage`; empty with exit 1 if unreadable. An idle watch polls every 180 s.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:budget` in detail".
 

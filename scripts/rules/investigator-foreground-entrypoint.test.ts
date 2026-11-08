@@ -1,17 +1,14 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { investigator_foreground } from './investigator-foreground'
 
-const DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigator-entrypoint-'))
+const make_directory = temporary_directory('suite')
+const DIRECTORY = make_directory('investigator-entrypoint-')
 const VS_CODE = 'claude-vscode'
 const REASON = investigator_foreground.ROW.reason
-
-afterAll(() => {
-	rmSync(DIRECTORY, { recursive: true, force: true })
-})
 
 afterEach(() => {
 	vi.unstubAllEnvs()

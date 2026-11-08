@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { poll } from './poll'
+import { poll, POLL_BACKOFF } from './poll'
 
 const ATTEMPTS = 5
 const INTERVAL_MS = 10
@@ -158,6 +158,52 @@ describe('poll.wait_for', () => {
 		)
 
 		expect(waits).toEqual([INTERVAL_MS, INTERVAL_MS])
+	})
+})
+
+// #6719: a CI wait reads mostly unchanged state, so the interval lengthens until something moves.
+describe('poll.poll_for backoff', () => {
+	const BACKOFF_ATTEMPTS = 20
+	const FIXED_INTERVAL_MS = 30_000
+	const BUDGET_MS = (BACKOFF_ATTEMPTS - 1) * FIXED_INTERVAL_MS
+
+	async function waits_over(seen_per_tick: ReadonlyArray<string>): Promise<Array<number>> {
+		const waits: Array<number> = []
+		let tick = 0
+
+		await poll.poll_for(never_answers, {
+			attempts: BACKOFF_ATTEMPTS,
+			interval_ms: FIXED_INTERVAL_MS,
+			sleeper: async (duration_ms) => {
+				waits.push(duration_ms)
+				tick += 1
+				await no_wait()
+			},
+			backoff: { seen: () => seen_per_tick[tick] ?? 'same' },
+		})
+
+		return waits
+	}
+
+	it('lengthens the wait by 1.5 per unchanged tick and stops at 120 seconds', async () => {
+		const waits = await waits_over([])
+
+		expect(POLL_BACKOFF).toEqual({ initial_ms: 30_000, factor: 1.5, max_ms: 120_000 })
+		expect(waits.slice(0, 6)).toEqual([30_000, 45_000, 67_500, 101_250, 120_000, 120_000])
+	})
+
+	it('goes back to the first interval after a tick that changed', async () => {
+		const waits = await waits_over(['a', 'a', 'a', 'b', 'b'])
+
+		expect(waits.slice(0, 5)).toEqual([30_000, 45_000, 67_500, 30_000, 45_000])
+	})
+
+	it('spends the same total wait as the fixed cadence, the last wait cut to what is left', async () => {
+		const waits = await waits_over([])
+		const total_ms = waits.reduce((sum, wait_ms) => sum + wait_ms, 0)
+
+		expect(total_ms).toBe(BUDGET_MS)
+		expect(waits.at(-1)).toBeLessThanOrEqual(POLL_BACKOFF.max_ms)
 	})
 })
 

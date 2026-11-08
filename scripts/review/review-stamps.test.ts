@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { verification_gate, type GateStepResult } from '#scripts/gate/verification-gate'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -43,15 +43,13 @@ function key_of(stamp_path: string, prefix: string): string {
 // Every suite below needs one throwaway directory to write records into, so the create-and-remove
 // dance is written once. A getter rather than the path itself: `beforeEach` assigns a fresh one per
 // case, and a value captured when the suite was defined would be the previous case's.
+const make_directory = temporary_directory()
+
 function use_temporary_directory(prefix: string): () => string {
 	let directory = ''
 
 	beforeEach(() => {
-		directory = mkdtempSync(path.join(tmpdir(), prefix))
-	})
-
-	afterEach(() => {
-		rmSync(directory, { recursive: true, force: true })
+		directory = make_directory(prefix)
 	})
 
 	return () => directory

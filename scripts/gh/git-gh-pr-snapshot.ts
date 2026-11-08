@@ -4,13 +4,13 @@ import { git_gh_exec } from './git-gh-exec'
 import { git_gh_poll_read } from './git-gh-poll-read'
 import { git_gh_pr_graphql_state } from './git-gh-pr-graphql-state'
 import { read_listed_pull, read_pull, require_pr_number } from './git-gh-pr-read'
-import type { RestPull } from './git-gh-pr-rest'
+import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 import { git_gh_pr_review } from './git-gh-pr-review'
 import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 import { to_gh_state } from './git-gh-rest-state'
 
 // The merge gate's pull request state snapshot, rebuilt from REST — GraphQL only for the merge state
-// of a pull request whose REST detail GitHub refuses as too large (`resolve_pull`).
+// of a pull request whose REST detail GitHub refuses as too large or answers 304 (`resolve_pull`).
 //
 // `gh pr view --json mergeStateStatus,reviewDecision,statusCheckRollup` is answered 403 in a cloud
 // session, and all three fields are GraphQL-only: one has no REST
@@ -69,6 +69,9 @@ async function pr_get_review_decision(pr_number: number): Promise<string> {
 //
 // **`requiredContexts` is the base branch's required checks** (`git-gh-branch-rules.ts`), which the
 // merge gate reads to accept an `UNSTABLE` pull request held only by an optional check.
+//
+// **`merged` is carried only once the pull request is in**, so the wait on an auto-merge reads it
+// from the same detail read rather than a second one (joshuafolkken/kit#6721).
 async function build_checks_fields(pull: RestPull): Promise<Record<string, unknown>> {
 	const head_sha = read_head_sha(pull)
 	const [rollup, required_contexts] = await Promise.all([
@@ -81,6 +84,7 @@ async function build_checks_fields(pull: RestPull): Promise<Record<string, unkno
 		mergeStateStatus: to_gh_state(pull.mergeable_state),
 		headRefOid: head_sha,
 		requiredContexts: required_contexts,
+		...(git_gh_pr_rest.is_merged(pull) && { merged: true }),
 	}
 }
 
@@ -92,16 +96,29 @@ interface ResolvedPull {
 // The resolution and the detail read, which every path below needs. The branch → number memo in
 // `git-gh-pr-read.ts` makes the first free after the first poll.
 //
-// **The detail is read without an ETag.** GitHub computes `mergeable_state` lazily and can change it
-// under an unchanged ETag, so a 304 answered from the poll cache kept the gate reading a stale
-// `blocked` on a pull request that had turned `clean` (joshuafolkken/kit#4589).
-//
+// **A detail answered 304 keeps its body but not its `mergeable_state`.** GitHub computes that state
+// lazily and can change it under an unchanged ETag, so a 304 alone kept the gate reading a stale
+// `blocked` on a pull request that had turned `clean` (joshuafolkken/kit#4589). The state is read from
+// GraphQL instead, which costs no REST core quota (joshuafolkken/kit#6721); where GraphQL does not
+// answer, or the conditional read fails, the detail is read unconditionally as before.
+async function read_polled_pull(pr_number: number): Promise<RestPull> {
+	const polled = await git_gh_poll_read.read_detail(
+		git_gh_api_path.pull_api_path(String(pr_number)),
+	)
+	if (polled === undefined) return await read_pull(pr_number)
+	const pull = git_gh_pr_rest.parse_rest_pull(polled.body)
+	if (!polled.is_unchanged) return pull
+	const state = await git_gh_pr_graphql_state.try_read_merge_state(pull.node_id)
+
+	return state === undefined ? await read_pull(pr_number) : { ...pull, mergeable_state: state }
+}
+
 // **A detail GitHub refuses as too many files changed** is stood in for by the listing row, whose
 // missing `mergeable_state` is read from GraphQL (`git-gh-pr-graphql-state.ts`) — or the snapshot
 // throws with the reason, since an unknown state would hold the gate pending until its budget ran out.
 async function read_detail_or_listed(branch_name: string, pr_number: number): Promise<RestPull> {
 	try {
-		return await read_pull(pr_number)
+		return await read_polled_pull(pr_number)
 	} catch (error) {
 		const listed = await read_listed_pull(error, branch_name, pr_number)
 		if (listed === undefined) throw error

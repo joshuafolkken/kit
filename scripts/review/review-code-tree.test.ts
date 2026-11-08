@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import ts from 'typescript'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { review_code_tree } from './review-code-tree'
 import { review_stamps } from './review-stamps'
 
@@ -11,7 +11,8 @@ import { review_stamps } from './review-stamps'
 // them through. Real files in a temp root; TypeScript is passed in, because the temp root has none to
 // resolve — which is itself the case of a consumer without it.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'josh-review-code-tree-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('josh-review-code-tree-')
 const RECORD_PATH = path.join(ROOT, 'round1-code.json')
 const SOURCE = 'src/thing.ts'
 const OTHER_SOURCE = 'src/other.ts'
@@ -50,10 +51,6 @@ function base_holds(files: Record<string, string>): void {
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(RECORD_PATH, { force: true })
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('review_code_tree.tree_of — which paths get a code digest', () => {

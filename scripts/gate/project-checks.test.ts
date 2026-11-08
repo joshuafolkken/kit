@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { project_checks } from './project-checks'
 
-const roots: Array<string> = []
+const make_directory = temporary_directory()
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
 const INDEX_HTML = 'index.html'
@@ -13,16 +13,8 @@ const TSCONFIG_JSON = 'tsconfig.json'
 const BASIC_MANIFEST = '{"josh":{"profile":"basic"}}'
 
 function fixture(): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'josh-project-checks-'))
-
-	roots.push(root)
-
-	return root
+	return make_directory('josh-project-checks-')
 }
-
-afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
-})
 
 describe('project_checks profile and files', () => {
 	it('uses only a recorded basic profile', () => {

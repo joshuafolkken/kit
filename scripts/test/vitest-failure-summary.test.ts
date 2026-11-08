@@ -1,9 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { gate_log } from '#scripts/gate/gate-log'
 import { gate_test_fixture } from '#scripts/gate/gate-test-fixture'
 import { status_icons } from '#scripts/lib/status-icons'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
@@ -30,13 +30,13 @@ const FAILED_OUTPUT = [
 ].join('\n')
 
 const ctx = { directory: '' }
+const make_directory = temporary_directory()
 
 beforeEach(() => {
-	ctx.directory = mkdtempSync(path.join(tmpdir(), 'vitest-failure-summary-'))
+	ctx.directory = make_directory('vitest-failure-summary-')
 })
 
 afterEach(() => {
-	rmSync(ctx.directory, { recursive: true, force: true })
 	vi.restoreAllMocks()
 })
 

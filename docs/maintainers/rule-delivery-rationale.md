@@ -103,8 +103,8 @@ The implementation reuse and verdict details taken out of the procedure's list.
   beside nothing but `echo` / `:` / `date`
 - **The idle run tail** — a call carrying `run_in_background` is not the trigger
 - **The implementation-phase cut** — the cost is measured with the same statistics and the same
-  model-priced threshold as `pnpm josh cost --cut`, and an unmeasurable cost fires on the safe side
-  through `!== UNDER`. It fires every time the threshold is crossed (`decide`,
+  model-priced threshold as `pnpm josh cost --cut`, and an unmeasurable cost does not fire
+  (`=== OVER`, #6575). It fires every time the threshold is crossed (`decide`,
   joshuafolkken/kit#2385), and it lets the
   immediate reissue of the same edit through, so `busy` / `failed` do not spin
 - **The test declaration** — reuses `run_tail_rule`'s commit-stage match rather than a new delivery

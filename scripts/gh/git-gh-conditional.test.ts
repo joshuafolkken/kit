@@ -1,5 +1,6 @@
 import { run_ship_infra_retry } from '#scripts/run/ship/run-ship-infra-retry'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { gh_request_tally } from './gh-request-tally'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
@@ -20,6 +21,8 @@ const TIMEOUT_MS = 5000
 const UNREADABLE: ConditionalRead = { kind: 'unreadable' }
 const CHECK_RUNS_PATH = 'repos/o/r/commits/head/check-runs?per_page=100'
 const OK = 'HTTP/2.0 200 OK\nETag: fresh\n\n{"total_count":0}'
+const NOT_MODIFIED = 'HTTP/2.0 304 Not Modified\n\n'
+const FORBIDDEN = 'HTTP/2.0 403 Forbidden\n\n{}'
 const STATUSES = [500, 502, 503] as const
 
 function mocked_command(): MockInstance<typeof git_gh_exec.exec_gh_command> {
@@ -106,13 +109,25 @@ describe('git_gh_conditional.read_conditional — a 200', () => {
 
 describe('git_gh_conditional.read_conditional — everything else', () => {
 	it('answers unchanged on a 304 carried by the failure', async () => {
-		mocked_command().mockRejectedValueOnce(failure_with_stdout('HTTP/2.0 304 Not Modified\n\n'))
+		mocked_command().mockRejectedValueOnce(failure_with_stdout(NOT_MODIFIED))
 
 		await expect(read()).resolves.toStrictEqual({ kind: 'unchanged' })
 	})
 
+	it('counts a 304 as not modified, and no other failure', async () => {
+		gh_request_tally.reset()
+		mocked_command()
+			.mockRejectedValueOnce(failure_with_stdout(NOT_MODIFIED))
+			.mockRejectedValueOnce(failure_with_stdout(FORBIDDEN))
+
+		await read()
+		await read()
+
+		expect(gh_request_tally.snapshot().not_modified).toBe(1)
+	})
+
 	it('answers unreadable on any other failure, carrying gh failure as the cause', async () => {
-		const forbidden = failure_with_stdout('HTTP/2.0 403 Forbidden\n\n{}')
+		const forbidden = failure_with_stdout(FORBIDDEN)
 		const network = new Error('network down')
 
 		mocked_command().mockRejectedValueOnce(forbidden).mockRejectedValueOnce(network)

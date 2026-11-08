@@ -1,5 +1,6 @@
 import { epic_graph, type EpicChild, type IssueReference } from '#scripts/epic/epic-graph'
 import { epic_issue } from '#scripts/epic/epic-issue'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_read } from '#scripts/issue/issue-read'
@@ -15,11 +16,15 @@ interface DecisionRead {
 	nodes: Map<string, Promise<DecisionNode | undefined>>
 }
 
+// The board re-reads these every two minutes, so the issue and its comments go with the previous
+// process's ETag (joshuafolkken/kit#6700): an unchanged answer costs no core request. A blocked
+// node's relations follow-up is still read unconditionally.
 async function read_node(reference: IssueReference): Promise<DecisionNode | undefined> {
 	const json = await git_gh_issue_read.issue_view_json(
 		String(reference.number),
 		'number,title,body,state,labels,blockedBy',
 		reference.repo,
+		git_gh_etag_read.read,
 	)
 	const issue = epic_issue.parse_epic_issue(json)
 
@@ -99,7 +104,12 @@ async function question_of(
 	number: number,
 	repo: string,
 ): Promise<readonly [number, string] | undefined> {
-	const json = await git_gh_issue_read.issue_list_comments(String(number), undefined, repo)
+	const json = await git_gh_issue_read.issue_list_comments(
+		String(number),
+		undefined,
+		repo,
+		git_gh_issue_read.read_comments_conditionally,
+	)
 	const comments = await issue_read.parse_comments(json, repo)
 	const question = run_board_decision.comment_question(issue_read.trusted_bodies(comments ?? []))
 

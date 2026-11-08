@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { disposition_cli } from './disposition-cli'
 
@@ -43,8 +43,10 @@ const FOUND_DURING_FLAG = '--found-during'
 const FILE_ROUTED_LINE = `confirmed bug-risks:medium:${CODE_FILE} — a null deref\n`
 const DRAFTED_BODY = `.josh/tmp/review-cap-${String(FOUND_DURING)}-1.md`
 
+const make_directory = temporary_directory()
+
 function findings_file(content: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'disposition-batch-'))
+	const directory = make_directory('disposition-batch-')
 	const file = path.join(directory, 'findings.txt')
 
 	writeFileSync(file, content)

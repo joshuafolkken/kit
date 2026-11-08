@@ -1,6 +1,6 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_pr_rest } from '#scripts/gh/git-gh-pr-rest'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { has_label_name, NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
@@ -25,10 +25,9 @@ function has_waiting(plan: BoardPlan): boolean {
 
 async function read_prs(plan: BoardPlan): Promise<ReadonlyMap<number, number>> {
 	if (!has_waiting(plan)) return new Map()
-	const json = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.pulls_api_path(plan.context.repo)}?state=open&per_page=100`,
-		should_paginate: true,
-	})
+	const per_page = git_gh_api_path.FULL_PAGE_SIZE
+	const path = `${git_gh_api_path.pulls_api_path(plan.context.repo)}?state=open&per_page=${String(per_page)}`
+	const json = await git_gh_etag_read.read_listing(path, per_page)
 	const pulls = git_gh_pr_rest.parse_rest_pulls(json)
 	const pairs = pulls.flatMap((pull) => {
 		const issue = Number(git_closes_keyword.parse_closes_issue_number(pull.body ?? undefined))

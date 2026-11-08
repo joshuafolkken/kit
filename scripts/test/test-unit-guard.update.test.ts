@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_recording } from './test-read-recording'
@@ -19,6 +19,7 @@ vi.mock('./vitest-failure-summary', () => ({ vitest_failure_summary: { report: v
 
 const FILTER = 'run-transcript'
 const ctx = { project_directory: '' }
+const make_directory = temporary_directory()
 
 function add_file(relative_path: string): void {
 	const file_path = path.join(ctx.project_directory, relative_path)
@@ -31,7 +32,7 @@ beforeEach(() => {
 	unit_share_fixture.stub_share(undefined)
 	unit_share_fixture.stub_free(undefined)
 	unit_share_fixture.stub_claim(undefined)
-	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-update-'))
+	ctx.project_directory = make_directory('unit-guard-update-')
 	add_file(path.join('node_modules', 'vitest', 'package.json'))
 	add_file(path.join('src', 'sample.test.ts'))
 	vi.mocked(changed_file_scope.repository_root_or_cwd).mockResolvedValue(ctx.project_directory)
@@ -45,7 +46,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(ctx.project_directory, { recursive: true, force: true })
 })
 
 // vitest's `-u [type]` would read the filter as the update type and run the whole suite (#5383).

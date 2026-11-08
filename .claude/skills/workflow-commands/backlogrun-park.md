@@ -28,7 +28,7 @@ When a child hits something only a person can decide (→ "Only a person's judge
 `needs-decision`"), **park the child and keep going**:
 
 ```bash
-pnpm josh run:park <N> --body-file .josh/tmp/park.md   # what needs deciding, and the options; applies needs-decision, then releases
+pnpm josh run:park <N> --body-file .josh/tmp/park.md   # body schema: docs/josh-commands-run.md → "josh run:park"; applies needs-decision, then releases
 ```
 
 Return to step 1.

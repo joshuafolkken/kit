@@ -1,14 +1,15 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, utimesSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rule_value_cache, type CachePorts } from './rule-value-cache'
 
 const NOW_MS = Date.parse('2026-10-02T06:00:00.000Z')
 const READING = 'issue-comments  reached 3  100% unaided  refused 0'
 
+const make_directory = temporary_directory()
 const context = { cwd: '', stderr: new Array<string>() }
 
 function ports(start_refresh: CachePorts['start_refresh'] = vi.fn()): CachePorts {
@@ -24,7 +25,7 @@ function file_aged(file: string, age_ms: number): void {
 }
 
 beforeEach(() => {
-	context.cwd = mkdtempSync(path.join(tmpdir(), 'rule-value-cache-'))
+	context.cwd = make_directory('rule-value-cache-')
 	context.stderr = []
 	vi.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
 		context.stderr.push(String(chunk))
@@ -35,7 +36,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(context.cwd, { recursive: true, force: true })
 })
 
 describe('rule_value_cache.emit — the loop head never measures', () => {

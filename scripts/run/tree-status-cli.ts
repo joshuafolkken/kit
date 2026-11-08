@@ -20,6 +20,8 @@ const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh tree:status'
 const LINE_SEPARATOR = '\n'
 const BRANCH_FLAG = '--branch'
+// Keeps git status from writing its refreshed stat cache back to the index.
+const NO_OPTIONAL_LOCKS_FLAG = '--no-optional-locks'
 const BRANCH_LINE_PREFIX = '## '
 const UNKNOWN_HOLD = 'unknown'
 const FREE_NOTE = 'no run holds this working tree'
@@ -37,7 +39,13 @@ interface TreeReads {
 // `--branch` adds the `## <branch>...<upstream>` line, so the report shows where the branch stands
 // against its upstream; `change_count` leaves that line out.
 async function read_status(): Promise<string> {
-	return await git_spawn.read(['status', PORCELAIN_FLAG, BRANCH_FLAG, UNTRACKED_FILES_FLAG])
+	return await git_spawn.read([
+		NO_OPTIONAL_LOCKS_FLAG,
+		'status',
+		PORCELAIN_FLAG,
+		BRANCH_FLAG,
+		UNTRACKED_FILES_FLAG,
+	])
 }
 
 async function read_stashes(): Promise<ReadonlyArray<string>> {

@@ -1,5 +1,4 @@
-import { closeSync, mkdtempSync, openSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { closeSync, openSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
@@ -7,6 +6,7 @@ import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { issue_comments } from '#scripts/rules/issue-comments'
 import { piped_verification } from '#scripts/rules/piped-verification'
 import { rule_rewrite } from '#scripts/rules/rule-rewrite'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pretool_guard, pretool_outcome, pretool_outcome_async } from './pretool-guard'
 import { shell_rules_notice } from './shell-rules-notice'
@@ -71,11 +71,12 @@ function outcome(
 }
 
 const CLEAR = outcome(undefined, undefined, undefined)
+const make_directory = temporary_directory()
 
 // A real transcript file so the composed guards run their normal disk path rather than failing open,
 // and a fresh one per case so the once-per-run stamp never dedupes one case against another.
 function fresh_transcript(): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'pretool-guard-'))
+	const directory = make_directory('pretool-guard-')
 	const transcript_path = path.join(directory, 'transcript.jsonl')
 
 	writeFileSync(transcript_path, '{"type":"user"}\n')

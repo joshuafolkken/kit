@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { busy_average } from './busy-average'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
@@ -26,8 +26,10 @@ const BLOCKER = `${core_budget.RESERVED_PREFIX}blocker.json`
 
 const probe = { directory: '' }
 
+const make_directory = temporary_directory()
+
 beforeEach(() => {
-	probe.directory = mkdtempSync(path.join(tmpdir(), 'josh-unit-narrow-wait-test-'))
+	probe.directory = make_directory('josh-unit-narrow-wait-test-')
 
 	const payload = {
 		...process_identity.own_fields(),
@@ -37,10 +39,6 @@ beforeEach(() => {
 	}
 
 	writeFileSync(path.join(probe.directory, BLOCKER), JSON.stringify(payload))
-})
-
-afterEach(() => {
-	rmSync(probe.directory, { recursive: true, force: true })
 })
 
 function reading(busy_cores: number): MachineReading {

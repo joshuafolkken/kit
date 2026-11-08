@@ -21,6 +21,11 @@ vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn(), exec_gh_api_status: vi.fn() },
 }))
 
+// The relations reads go through `exec_gh_api` here; the ETag is pinned in `git-gh-issue-read-etag.test.ts`.
+vi.mock('./git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (path: string) => await git_gh_exec.exec_gh_api({ path }) },
+}))
+
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const mocked_status = vi.mocked(git_gh_exec.exec_gh_api_status)
 const READ_NUMBER = String(ISSUE_NUMBER)
@@ -31,8 +36,10 @@ const READ_NUMBER = String(ISSUE_NUMBER)
 // must never report an issue that exists as missing.
 
 // The issue itself answers; the relations request behind it does not.
+const GH_WORDING = 'gh: some wording or other'
+
 function reject_relations(status: number | undefined): void {
-	const error = gh_failure.attach(new Error('gh: some wording or other'), { status })
+	const error = gh_failure.attach(new Error(GH_WORDING), { status })
 
 	mocked_api.mockImplementation(async (request) => {
 		await Promise.resolve()
@@ -48,7 +55,12 @@ describe('issue_view_json_classified — which of the two requests failed', () =
 
 		await expect(
 			git_gh_issue_read.issue_view_json_classified(READ_NUMBER, 'blockedBy'),
-		).resolves.toEqual({ kind: 'unreadable', reason: 'rejected', status: NOT_FOUND_STATUS })
+		).resolves.toEqual({
+			kind: 'unreadable',
+			reason: 'rejected',
+			status: NOT_FOUND_STATUS,
+			detail: GH_WORDING,
+		})
 	})
 
 	// The rest of the classification is untouched: a follow-up request that never reached GitHub is
@@ -58,7 +70,12 @@ describe('issue_view_json_classified — which of the two requests failed', () =
 
 		await expect(
 			git_gh_issue_read.issue_view_json_classified(READ_NUMBER, 'blockedBy'),
-		).resolves.toEqual({ kind: 'unreadable', reason: 'unreachable', status: undefined })
+		).resolves.toEqual({
+			kind: 'unreadable',
+			reason: 'unreachable',
+			status: undefined,
+			detail: GH_WORDING,
+		})
 	})
 })
 

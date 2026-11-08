@@ -7,24 +7,29 @@ import { lane_plan_imports } from './lane-plan-imports'
 
 // `josh lane:plan <issue> <path>... [--probe] [--imports <path>...]` — the command line over
 // `lane-plan-check.ts`, which holds the check and the yield so `run:entry` can import them without this
-// entry's main guard; `--imports` probes the modules the new code imports (`lane-plan-imports.ts`).
+// entry's main guard; `--imports` probes the modules the new code imports (`lane-plan-imports.ts`);
+// `--single` declares the plan one deliverable, past the files axis (`lane-plan-size.ts`).
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const PROBE_FLAG = '--probe'
+const SINGLE_FLAG = '--single'
+const FLAGS = new Set([PROBE_FLAG, SINGLE_FLAG])
 const USAGE =
-	'Usage: josh lane:plan <issue-number> <path> [<path> ...] [--probe] [--size-approval <json-file>] [--imports <path> ...]'
+	'Usage: josh lane:plan <issue-number> <path> [<path> ...] [--probe] [--single] [--size-approval <json-file>] [--imports <path> ...]'
 const { YIELD_EXIT_CODE } = lane_plan_check
 
 async function planned(
 	tokens: ReadonlyArray<string>,
 	directory: string,
+	is_single: boolean,
 ): Promise<LanePlan | undefined> {
 	const input = lane_plan_approval.split(tokens)
 	const plan = lane_plan_check.plan_of(input.tokens, new Date())
 	if (plan === undefined) return undefined
+	const declared = is_single ? { ...plan, single: true } : plan
 
-	return await lane_plan_approval.attach(lane_plan_check.placed(plan, directory), input.file)
+	return await lane_plan_approval.attach(lane_plan_check.placed(declared, directory), input.file)
 }
 
 async function run(
@@ -32,9 +37,9 @@ async function run(
 	directory: string = process.cwd(),
 ): Promise<number> {
 	const { plan: tokens, imports } = lane_plan_imports.split(
-		argv.filter((token) => token !== PROBE_FLAG),
+		argv.filter((token) => !FLAGS.has(token)),
 	)
-	const plan = await planned(tokens, directory)
+	const plan = await planned(tokens, directory, argv.includes(SINGLE_FLAG))
 
 	if (plan === undefined) {
 		console.error(USAGE)

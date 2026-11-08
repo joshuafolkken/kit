@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util'
 import type { EpicChild } from '#scripts/epic/epic-graph'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import {
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
@@ -44,7 +45,7 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('run_board_human_merge open pull requests', () => {
 	it('reads paginated open pulls and associates their closing issue', async () => {
-		const read = vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(
+		const read = vi.spyOn(git_gh_etag_read, 'read_listing').mockResolvedValue(
 			JSON.stringify([
 				{ number: PR, body: `closes #${String(ISSUE)}` },
 				{ number: 1, body: 'closes #1' },
@@ -52,21 +53,21 @@ describe('run_board_human_merge open pull requests', () => {
 		)
 
 		expect(await run_board_human_merge.read_prs(plan_of())).toEqual(new Map([[ISSUE, PR]]))
-		expect(read).toHaveBeenCalledWith({
-			path: `repos/${REPO}/pulls?state=open&per_page=100`,
-			should_paginate: true,
-		})
+		expect(read).toHaveBeenCalledWith(
+			`repos/${REPO}/pulls?state=open&per_page=100`,
+			git_gh_api_path.FULL_PAGE_SIZE,
+		)
 	})
 
 	it('does not read pulls when the label is removed', async () => {
-		const read = vi.spyOn(git_gh_exec, 'exec_gh_api')
+		const read = vi.spyOn(git_gh_etag_read, 'read_listing')
 
 		expect(await run_board_human_merge.read_prs(plan_of([]))).toEqual(new Map())
 		expect(read).not.toHaveBeenCalled()
 	})
 
 	it('propagates a failed pull read instead of caching an empty answer', async () => {
-		vi.spyOn(git_gh_exec, 'exec_gh_api').mockRejectedValue(new Error(READ_FAILED))
+		vi.spyOn(git_gh_etag_read, 'read_listing').mockRejectedValue(new Error(READ_FAILED))
 
 		await expect(run_board_human_merge.read_prs(plan_of())).rejects.toThrow(READ_FAILED)
 	})

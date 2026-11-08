@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
@@ -24,7 +24,8 @@ const REPORT = 'report'
 const ESLINT_HEAP = `--max-old-space-size=${String(ESLINT_HEAP_MIB)}`
 const COLD_OPTIONS = `${ESLINT_HEAP} --import=${new URL('eslint-memory.js', import.meta.url).href}`
 
-const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-state-'))
+const make_directory = temporary_directory('suite')
+const project_root = make_directory('eslint-daemon-state-')
 
 function answer(exit_code: number, stdout: string): ExecaResult {
 	return { exitCode: exit_code, stdout, all: stdout } as unknown as ExecaResult

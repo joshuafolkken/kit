@@ -4,7 +4,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_helpers } from '#scripts/gh/git-gh-helpers'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_branch } from '#scripts/git/git-branch'
-import { poll } from '#scripts/lib/poll'
+import { poll, POLL_BACKOFF } from '#scripts/lib/poll'
 import { z } from 'zod'
 import {
 	followup_failed_tests,
@@ -28,6 +28,10 @@ import { followup_main_move } from './followup-main-move'
 // stops `followup` as before, and each such rerun leaves an observation (`followup-failed-tests.ts`).
 // A job that failed only for waiting on such a job is rerun with it (`followup-job-needs.ts`).
 //
+// **A job red because the runner could not download an action is rerun too** (joshuafolkken/kit#6673):
+// the download fails before the action's own steps run, whether in "Set up job" or in a composite step,
+// so nothing in the change was exercised. The runner's own error line in the log tells it apart.
+//
 // The rerun endpoint reruns **every** failed job of a run, and GitHub refuses it while the run is still
 // going. So each run is waited out first, and it is rerun only when every job that failed in it
 // qualifies: a run holding a job that failed on the change itself is never rerun, or a test the change
@@ -41,14 +45,22 @@ const PASSING_STEP_CONCLUSIONS: ReadonlySet<string> = new Set(['success', 'skipp
 const RUN_COMPLETED = 'completed'
 const FIRST_ATTEMPT = 1
 
+// The runner's last word after its download retries, or its failure to look the action up at all.
+const ACTION_DOWNLOAD_ERROR =
+	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu
+
 // The longest `timeout-minutes` in `ci.yml` is 10; a run still going past that is not one a rerun helps.
+// Each poll here backs off while its reading stays the same (`poll.ts`): the attempts and interval
+// set its wait budget, not its cadence.
 const COMPLETE_ATTEMPTS = 40
 const COMPLETE_INTERVAL_MS = 15_000
 
 // The rerun answers once the new attempt exists, but its check runs can trail it; a re-judge that read
-// the failed run again would fail on the very job just rerun.
+// the failed run again would fail on the very job just rerun. The backoff starts at the interval:
+// the shared first wait is longer than this whole budget.
 const REGISTER_ATTEMPTS = 10
 const REGISTER_INTERVAL_MS = 3000
+const REGISTER_BACKOFF = { ...POLL_BACKOFF, initial_ms: REGISTER_INTERVAL_MS }
 
 const failed_check_schema = z.looseObject({
 	id: z.number(),
@@ -115,17 +127,21 @@ async function read_failed_run_ids(branch_name: string): Promise<Array<number>> 
 	return [...new Set(jobs.map((job) => job.run_id))]
 }
 
-async function is_run_completed(run_id: number): Promise<boolean> {
-	const run = await read_actions(`runs/${String(run_id)}`, run_schema)
-
-	return run.status === RUN_COMPLETED
-}
-
 async function await_run_completed(run_id: number): Promise<boolean> {
-	return await poll.poll_until(async () => await is_run_completed(run_id), {
-		attempts: COMPLETE_ATTEMPTS,
-		interval_ms: COMPLETE_INTERVAL_MS,
-	})
+	let status = ''
+
+	return await poll.poll_until(
+		async () => {
+			;({ status } = await read_actions(`runs/${String(run_id)}`, run_schema))
+
+			return status === RUN_COMPLETED
+		},
+		{
+			attempts: COMPLETE_ATTEMPTS,
+			interval_ms: COMPLETE_INTERVAL_MS,
+			backoff: { seen: () => status },
+		},
+	)
 }
 
 function has_every_step_passed(job: Job): boolean {
@@ -140,9 +156,9 @@ function is_first_failure(job: Job): boolean {
 	)
 }
 
-// A job whose every step passed stopped on the runner; one red on its first attempt is judged by the
-// failed tests its log names. The log endpoint redirects to the plain text, which `gh api` follows; a
-// vitest log is colored.
+// A job whose every step passed stopped on the runner; one red on its first attempt is rerun when its
+// log shows an action download failing, and otherwise judged by the failed tests its log names. The log
+// endpoint redirects to the plain text, which `gh api` follows; a vitest log is colored.
 async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged> {
 	if (has_every_step_passed(job)) return { job, verdict: RERUN_VERDICT }
 	if (!is_first_failure(job)) return { job, verdict: KEPT_VERDICT }
@@ -151,6 +167,8 @@ async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged
 		path: actions_api_path(`jobs/${String(job.id)}/logs`),
 		should_allow_escapes: true,
 	})
+	if (ACTION_DOWNLOAD_ERROR.test(log)) return { job, verdict: RERUN_VERDICT }
+
 	const tests = followup_failed_tests.read_failed_tests(log)
 
 	return { job, verdict: followup_failed_tests.verdict_of(tests, changed), tests }
@@ -223,14 +241,19 @@ async function await_rerun_registered(
 	jobs: ReadonlyArray<Job>,
 ): Promise<void> {
 	const rerun_ids = new Set(jobs.map((job) => job.id))
+	let failed: Array<number> = []
 
 	await poll.poll_until(
 		async () => {
-			const failed = await read_failed_check_ids(branch_name)
+			failed = await read_failed_check_ids(branch_name)
 
 			return failed.every((id) => !rerun_ids.has(id))
 		},
-		{ attempts: REGISTER_ATTEMPTS, interval_ms: REGISTER_INTERVAL_MS },
+		{
+			attempts: REGISTER_ATTEMPTS,
+			interval_ms: REGISTER_INTERVAL_MS,
+			backoff: { seen: () => failed.join(','), schedule: REGISTER_BACKOFF },
+		},
 	)
 }
 
@@ -254,7 +277,7 @@ async function rerun(branch_name: string, entries: ReadonlyArray<Judged>): Promi
 	const names = jobs.map((job) => job.name)
 
 	console.info(
-		`🔁 Rerunning CI jobs that stopped after every step passed or failed only outside the change: ${names.join(', ')}`,
+		`🔁 Rerunning CI jobs that stopped after every step passed, failed downloading an action, or failed only outside the change: ${names.join(', ')}`,
 	)
 	await followup_failed_tests.record(
 		entries.flatMap(({ job, tests }) => (tests === undefined ? [] : { job: job.name, tests })),
@@ -302,4 +325,10 @@ const followup_job_rerun = {
 	rerun_failed_jobs,
 }
 
-export { followup_job_rerun, COMPLETE_ATTEMPTS, REGISTER_ATTEMPTS }
+export {
+	followup_job_rerun,
+	COMPLETE_ATTEMPTS,
+	COMPLETE_INTERVAL_MS,
+	REGISTER_ATTEMPTS,
+	REGISTER_INTERVAL_MS,
+}

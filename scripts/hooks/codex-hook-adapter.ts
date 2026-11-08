@@ -2,6 +2,7 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { hook_payload_capture } from '#scripts/josh/hook-payload-capture'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { json_value } from '#scripts/lib/json-value'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
@@ -136,13 +137,19 @@ async function write_posttool_context(raw_payload: string): Promise<void> {
 // the phase mark reads is in place; the mark follows the written envelope.
 async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
-	const outcome = pretool_outcome(raw_payload)
+	const judged = pretool_payload(raw_payload)
+	const outcome = pretool_guard.pretool_outcome(judged)
 
 	hook_decision.emit_outcome(outcome)
-	await pretool_guard.mark_phase(outcome, pretool_payload(raw_payload))
+	await pretool_guard.mark_phase(outcome, judged)
+	await pretool_guard.record_refusal(judged, outcome)
 }
 
+// Codex's payload reaches this adapter, not `respond_from_stdin`, so it is captured here, untranslated.
 async function run(raw_payload: string, mode: string): Promise<void> {
+	hook_decision.load_environment_file()
+	hook_payload_capture.capture(`codex-${mode}`, raw_payload)
+
 	if (mode === PRETOOL_MODE) {
 		await write_pretool_outcome(raw_payload)
 
@@ -168,6 +175,7 @@ const codex_hook_adapter = {
 	posttool_payloads,
 	pretool_outcome,
 	pretool_payload,
+	run,
 	write_pretool_outcome,
 }
 

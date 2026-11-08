@@ -1,14 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_plan } from '#scripts/lane/lane-plan'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan_guard } from './lane-plan-guard'
 
 // joshuafolkken/kit#4864: a dispatched lane child's first runtime edit waits for its recorded plan.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-guard-'))
+const make_suite_directory = temporary_directory('suite')
+const make_directory = temporary_directory()
+const ROOT = make_suite_directory('lane-plan-guard-')
 const ISSUE = '4864'
 const LANE = path.join(ROOT, '.kit-lanes', ISSUE)
 const CHILD = { JOSH_LANE_CHILD: ISSUE }
@@ -23,13 +24,7 @@ function edit_of(file_path: string): string {
 }
 
 beforeEach(() => {
-	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
-		mkdtempSync(path.join(ROOT, 'repository-')),
-	)
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(make_directory('repository-'))
 })
 
 describe('lane_plan_guard.reason', () => {

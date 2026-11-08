@@ -168,6 +168,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:priority` | `<issue>` | automation | network | Apply priority:high to an issue whose body reached the high floor after filing |
 | `josh issue:read` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
+| `josh issue:release-class` | `<issue> <enhancement\|other-change>` | automation | network | Write the issue body's one release classification line, replacing any earlier one |
 | `josh issue:scout` | `<title> [--body <summary> \| --body-file <path>]` | automation | network | Before filing: say whether an issue like this exists and which epic it belongs to |
 | `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行"` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |
@@ -184,7 +185,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lane:open` | `<issue> [options]` | automation | files, git | Open a lane: a linked work tree with its own branch and its own port seed |
 | `josh lane:output` | `<issue> [path]` | automation | files | Record, or read back, where the unit running a lane’s child writes |
 | `josh lane:pause` · `josh lps` | `<issue> \| --all` | developer | processes | Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched, and record the pause in the lane’s state and the run’s event stream |
-| `josh lane:plan` | `<issue> <path>... [--probe] [--size-approval <json-file>] [--imports <path>...]` | automation | files, network | Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue |
+| `josh lane:plan` | `<issue> <path>... [--probe] [--single] [--size-approval <json-file>] [--imports <path>...]` | automation | files, network | Record a lane child's planned files; yield its lane, naming file and holder, when an earlier-planned running lane declares or plans one; `--size-approval` bounds lines/files |
 | `josh lane:prune` | — | automation | files, git | Close every lane an interruption left without its work tree and every spent lane, then sweep unregistered leftovers under the lanes root |
 | `josh lane:resolve` · `josh lrv` | `<issue> [--record [<path>...]]` | developer | git, network, files | Merge the default branch into a lane's branch and print one verdict — resolved, conflict <paths>, or step-back 2 (overlapping hunks, merge aborted) / 3 (a resolution already recorded on the issue); --record posts that resolution comment once the lane is pushed |
 | `josh lane:restart` · `josh lrs` | `<issue>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure |

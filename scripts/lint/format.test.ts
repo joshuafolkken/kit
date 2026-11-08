@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 import { eslint_heap } from './eslint-heap'
@@ -15,7 +15,7 @@ const mocked_execa = vi.mocked(execa_module.execa)
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 
 const PRETTIER_FAILURE_EXIT_CODE = 2
-const roots: Array<string> = []
+const make_directory = temporary_directory()
 
 // execa's resolved Result is a large interface; the command only reads `exitCode`.
 function fake_result(exit_code: number): ExecaResult {
@@ -31,9 +31,8 @@ const WEB_FILES: ProjectFiles = [
 const PYTHON_FILES: ProjectFiles = [['main.py', 'print(1)\n']]
 
 function write_project(manifest: Record<string, unknown>, files: ProjectFiles = WEB_FILES): string {
-	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-format-'))
+	const root = make_directory('josh-format-')
 
-	roots.push(root)
 	writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest))
 	for (const [name, content] of files) writeFileSync(path.join(root, name), content)
 
@@ -58,7 +57,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
 })

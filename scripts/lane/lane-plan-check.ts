@@ -41,7 +41,8 @@ import { lane_yield, type YieldAt } from './lane-yield'
 // **A plan grown past twice its Issue's declared size answers `split`** and is not recorded
 // (joshuafolkken/kit#5533, `lane-plan-size.ts`), ahead of the overlap check; so does one whose probed
 // hunks or projected lines outgrow it, the axis named in the refusal and noted on the ledger
-// (joshuafolkken/kit#5568).
+// (joshuafolkken/kit#5568). A plan declared one deliverable (`--single`) is recorded past the files axis,
+// its overrun noted on the ledger for the pre-gate `run:cut` (joshuafolkken/kit#6647).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -110,8 +111,8 @@ function split(plan: LanePlan, over: Oversize): number {
 }
 
 // The refusal goes on the ledger with its axis, so `lane:stats` counts the notices by reason; the
-// lines are the projection the lines axis measured, else none.
-async function noted_split(plan: LanePlan, over: Oversize): Promise<number> {
+// lines are the projection the lines axis measured, else none. Answers the files counted.
+async function note(plan: LanePlan, over: Oversize): Promise<number> {
 	const files = plan.paths.filter((file) => !test_declared_logic.is_test_file(file)).length
 	const lines = over.reason === 'lines' ? over.measured : 0
 
@@ -122,7 +123,19 @@ async function noted_split(plan: LanePlan, over: Oversize): Promise<number> {
 		reason: over.reason,
 	})
 
-	return split(plan, over)
+	return files
+}
+
+// The split answer for `over`, else `undefined`. A files overrun of a plan declared one deliverable is
+// noted and passes: the notice makes the pre-gate `run:cut` verify it (joshuafolkken/kit#6647).
+async function refusal(plan: LanePlan, over: Oversize | undefined): Promise<number | undefined> {
+	if (over === undefined) return undefined
+	const files = await note(plan, over)
+
+	if (!lane_plan_size.is_waived(plan, over)) return split(plan, over)
+	console.error(lane_plan_size.waiver_text(plan.issue, files, over.limit))
+
+	return undefined
 }
 
 async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
@@ -191,9 +204,9 @@ async function settle(plan: LanePlan, clash: Clash, directory: string): Promise<
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
 	const issues = await lane_plan_probe.opted_in()
-	const over = await lane_plan_probe.oversize_of(plan, issues, directory)
+	const refused = await refusal(plan, await lane_plan_probe.oversize_of(plan, issues, directory))
 
-	if (over !== undefined) return await noted_split(plan, over)
+	if (refused !== undefined) return refused
 	const sized = sized_of(plan, issues)
 
 	lane_plan.record(sized, directory)
@@ -209,7 +222,7 @@ async function probe_answer(plan: LanePlan, directory: string): Promise<number> 
 	const issues = await lane_plan_probe.opted_in()
 	const over = await lane_plan_probe.oversize_of(plan, issues, directory)
 
-	if (over !== undefined) return split(plan, over)
+	if (over !== undefined && !lane_plan_size.is_waived(plan, over)) return split(plan, over)
 	const found = lane_plan_probe.probe(plan, issues, directory)
 
 	if (lane_plan_probe.is_unread(found)) return unread()
@@ -232,6 +245,7 @@ function placed(plan: LanePlan, directory: string): LanePlan {
 	return {
 		...plan,
 		size_approval: recorded.size_approval,
+		single: plan.single ?? recorded.single,
 		planned_at: recorded.planned_at,
 		yielded: recorded.yielded,
 		waits_until: recorded.waits_until,
