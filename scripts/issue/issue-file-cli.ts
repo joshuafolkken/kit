@@ -17,6 +17,7 @@ import { run_hold_member } from '#scripts/run/hold/run-hold-member'
 import { split_direction } from '#scripts/split/split-direction'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { issue_cite } from './issue-cite'
+import { issue_classification } from './issue-classification'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_deferral } from './issue-file-deferral'
@@ -284,7 +285,7 @@ async function filing_of(args: FileArguments): Promise<Filing | string> {
 	const read = cli_body.read_result(args.body_file)
 
 	if ('problem' in read) return `Could not read the body file ${args.body_file}: ${read.problem}`
-	const body = read.text
+	const body = issue_classification.with_release_classification(read.text)
 	const current = await git_gh_command.repo_get_name_with_owner()
 
 	if (current === undefined) return UNKNOWN_REPO_MESSAGE

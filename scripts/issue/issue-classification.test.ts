@@ -160,6 +160,34 @@ describe('indented classification examples', () => {
 	})
 })
 
+describe('release classification at filing', () => {
+	const OTHER_CHANGE_LINE = '- リリース分類: other-change'
+	const RELEASE_REFUSAL = 'Choose one release classification'
+
+	it('files a body with an improvement aim unchanged', () => {
+		const body = `${BODY}${NON_BUG}\n${FEATURE_IMPROVEMENT}\n`
+
+		expect(issue_classification.with_release_classification(body)).toBe(body)
+		expect(issue_classification.problems(body)).toEqual([])
+	})
+
+	it('writes other-change under a non-bug body that declares nothing else', () => {
+		const body = `${BODY}${NON_BUG}\n- 人の判断: 不要\n`
+
+		expect(issue_classification.with_release_classification(body)).toBe(
+			`${BODY}${NON_BUG}\n${OTHER_CHANGE_LINE}\n- 人の判断: 不要\n`,
+		)
+		expect(issue_classification.problems(body)).toEqual([])
+	})
+
+	it('refuses a bug body that also declares enhancement', () => {
+		const body = `${BODY}${BUG}\n${ORIGIN}\n- リリース分類: enhancement\n`
+
+		expect(issue_classification.with_release_classification(body)).toBe(body)
+		expect(issue_classification.problems(body)).toEqual([expect.stringContaining(RELEASE_REFUSAL)])
+	})
+})
+
 describe('issue classification with existing labels', () => {
 	it('preserves route and depth while adding each missing classification once', () => {
 		const body = `${BODY}- 目的: 機能改善\n- 互換性: 破壊的変更\n`

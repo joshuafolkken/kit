@@ -60,12 +60,12 @@ function release_candidates(
 	return candidates.filter((candidate) => candidate !== ENHANCEMENT_LABEL)
 }
 
-function issue_candidates(issue_json: string): ReadonlyArray<ReleaseClassification> {
-	const issue = z
-		.object({ labels: z.array(LABEL), body: z.string().nullable() })
-		.parse(JSON.parse(issue_json))
-	const names = issue.labels.map((label) => label.name.toLowerCase())
-	const declared = [...(issue.body ?? '').matchAll(DECLARATION)].map((match) => match[1] ?? '')
+function issue_candidates(
+	labels: ReadonlyArray<string>,
+	body: string,
+): ReadonlyArray<ReleaseClassification> {
+	const names = labels.map((label) => label.toLowerCase())
+	const declared = [...body.matchAll(DECLARATION)].map((match) => match[1] ?? '')
 	const candidates = [...release_candidates([...names, ...declared].filter(is_classification))]
 	const unknown = declared.filter((value) => !is_classification(value))
 
@@ -78,9 +78,10 @@ function issue_candidates(issue_json: string): ReadonlyArray<ReleaseClassificati
 	return candidates
 }
 
-function select_issue_classification(issue_json: string): ReleaseClassification {
-	const candidates = issue_candidates(issue_json)
-	const selected = [...new Set(candidates)]
+// The one release classification an Issue's labels and body resolve to — `josh pr` reads the filed
+// Issue, `issue:file` the body it is about to file, so both refuse on the same judgement.
+function select_classification(labels: ReadonlyArray<string>, body: string): ReleaseClassification {
+	const selected = [...new Set(issue_candidates(labels, body))]
 	const [label] = selected
 
 	if (label === undefined || selected.length > 1) {
@@ -90,6 +91,17 @@ function select_issue_classification(issue_json: string): ReleaseClassification 
 	}
 
 	return label
+}
+
+function select_issue_classification(issue_json: string): ReleaseClassification {
+	const issue = z
+		.object({ labels: z.array(LABEL), body: z.string().nullable() })
+		.parse(JSON.parse(issue_json))
+
+	return select_classification(
+		issue.labels.map((label) => label.name),
+		issue.body ?? '',
+	)
 }
 
 // The labels as they stand when the check runs, not as the event carried them. `josh pr` opens the
@@ -130,6 +142,7 @@ const pr_classification = {
 	fetch_current_labels,
 	declaration,
 	is_classification,
+	select_classification,
 	select_issue_classification,
 }
 

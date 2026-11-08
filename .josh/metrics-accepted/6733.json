@@ -1,0 +1,8 @@
+{
+	"reason": "issue:file resolves the release classification at filing time (#6733): a labels+body selector shared with josh pr, the other-change completion, and its template note",
+	"date": "2026-11-08",
+	"growth": {
+		"scripts.code_lines": 41,
+		"ai_cost.on_demand_bytes": 21
+	}
+}

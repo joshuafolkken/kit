@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
@@ -132,6 +132,20 @@ describe('issue_file_cli.run — --check', () => {
 		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('nothing filed')
 		expect(exec_gh_api).not.toHaveBeenCalled()
 		expect(repository_labels.ensure_labels).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#6733: a body `josh pr` could not classify is refused before it is filed.
+	it('refuses a body that resolves to more than one release classification', async () => {
+		const several_path = path.join(work, 'several-classifications.md')
+
+		writeFileSync(several_path, `- リリース分類: enhancement\n${readFileSync(clear_path, 'utf8')}`)
+		scout_finds_none()
+
+		expect(await issue_file_cli.run([...argv_of(several_path), CHECK_FLAG])).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(
+			'Choose one release classification',
+		)
+		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
 	it('answers no URL from file_issue', async () => {
