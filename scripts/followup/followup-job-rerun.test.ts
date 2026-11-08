@@ -83,7 +83,11 @@ function curl_failed(status: number): string {
 }
 
 function installer_failed(status: number): string {
-	return `${CURL_ERROR} ${String(status)}\n2026-11-08T11:47:57.1089625Z \u{001B}[0;31m[ERROR]\u{001B}[0m Failed to download from https://github.com/AikidoSec/safe-chain/releases/download/1.5.27/safe-chain-linuxstatic-x64\n2026-11-08T11:47:57.1117104Z ##[error]Process completed with exit code 1.\n`
+	return [
+		`${CURL_ERROR} ${String(status)}`,
+		'2026-11-08T11:54:13.0207669Z \u{1B}[0;31m[ERROR]\u{1B}[0m Failed to download from https://github.com/AikidoSec/safe-chain/releases/download/1.5.27/safe-chain-linuxstatic-x64',
+		'2026-11-08T11:54:13.0242832Z ##[error]Process completed with exit code 1.',
+	].join('\n')
 }
 
 const DETECT_E2E = job({ id: DETECT_E2E_ID, name: DETECT_E2E_NAME, conclusion: CANCELLED })
@@ -229,6 +233,10 @@ const NOT_DOWNLOAD_FAILURES = [
 	],
 	['whose curl got a client error', curl_failed(404)],
 	['whose installer got a client error', installer_failed(404)],
+	[
+		'whose own step exited with code one after a server error',
+		`${CURL_ERROR} 504\n${CURL_EXIT.replace('22.', '1.')}`,
+	],
 	[
 		'whose installer retried successfully before a test failed',
 		`${installer_failed(504).replace('exit code 1.', 'exit code 0.')}\n${UNIT_LOG}`,
