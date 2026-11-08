@@ -7,8 +7,10 @@ import {
 	BUGFIX_LABEL as BUGFIX,
 	RELEASE_CLASSIFICATION_NAMES as CLASSIFICATION_LABELS,
 	ENHANCEMENT_LABEL,
+	OTHER_CHANGE_LABEL,
 	type ReleaseClassification,
 } from '#scripts/issue/issue-labels'
+import { markdown_section } from '#scripts/issue/markdown-section'
 import { error_text } from '#scripts/lib/error-message'
 import { z } from 'zod'
 
@@ -18,6 +20,13 @@ const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 // one format.
 const DECLARATION_PREFIX = '- リリース分類: '
 const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
+const DECLARATION_LINE = new RegExp(`^${DECLARATION_PREFIX}.*(?:\\n|$)`, 'gmu')
+const BACKGROUND_HEADING = '## 背景'
+const BULLET = '- '
+const NEWLINE = '\n'
+// The command a lane runs to write the declaration, since it cannot edit the Issue body by hand.
+const DECLARE_COMMAND = 'pnpm josh issue:release-class <issue> <label>'
+const DECIDING_LABELS = [ENHANCEMENT_LABEL, BUG_LABEL, BREAKING].join(', ')
 const LEGACY_LABELS: ReadonlySet<string> = new Set(['semver-major', 'semver-minor'])
 const LABEL_NAMES_FILTER = '.[].name'
 
@@ -46,6 +55,46 @@ function classification_error(labels: ReadonlyArray<string>, author: string): st
 
 function declaration(label: ReleaseClassification): string {
 	return `${DECLARATION_PREFIX}${label}`
+}
+
+// Where the declaration goes in the background section: after its first run of `- ` lines, else first.
+function block_end(lines: ReadonlyArray<string>): number {
+	const first = lines.findIndex((line) => line.startsWith(BULLET))
+
+	if (first === -1) return 0
+	const run = lines.slice(first).findIndex((line) => !line.startsWith(BULLET))
+
+	return run === -1 ? lines.length : first + run
+}
+
+function append_line(before: string, line: string): string {
+	const separator = before === '' || before.endsWith(NEWLINE) ? '' : NEWLINE
+
+	return `${before}${separator}${line}${NEWLINE}`
+}
+
+function insert_line(section: string, line: string): string {
+	const lines = section.split(/(?<=\n)/u)
+	const at = block_end(lines)
+
+	return `${append_line(lines.slice(0, at).join(''), line)}${lines.slice(at).join('')}`
+}
+
+// The body with exactly one declaration of `label`: every earlier declaration line is dropped and the
+// new one closes the background section's declaration block, or the body when it has no such section.
+// The body is newline-terminated first, so a heading on its last line keeps the line off its own.
+function with_declaration(body: string, label: ReleaseClassification): string {
+	const stripped = body.replaceAll(DECLARATION_LINE, '')
+
+	if (!markdown_section.has_line(stripped, BACKGROUND_HEADING)) {
+		return append_line(stripped, declaration(label))
+	}
+
+	return markdown_section.map_section(
+		stripped.endsWith(NEWLINE) ? stripped : `${stripped}${NEWLINE}`,
+		(line) => line.trim() === BACKGROUND_HEADING,
+		(section) => insert_line(section, declaration(label)),
+	)
 }
 
 function is_classification(value: string): value is ReleaseClassification {
@@ -78,6 +127,14 @@ function issue_candidates(
 	return candidates
 }
 
+// What resolves the refusal: a missing classification is declared with the command, while a conflict
+// needs one of the found labels or declarations removed.
+function selection_hint(selected: ReadonlyArray<ReleaseClassification>): string {
+	if (selected.length > 1) return `found: ${selected.join(', ')}. Keep one.`
+
+	return `found: none. Add "${DECLARATION_PREFIX}<label>" to the Issue body — on a filed Issue, \`${DECLARE_COMMAND}\` writes it; a non-defect Issue with none of ${DECIDING_LABELS} takes ${OTHER_CHANGE_LABEL} as a Tier A choice.`
+}
+
 // The one release classification an Issue's labels and body resolve to — `josh pr` reads the filed
 // Issue, `issue:file` the body it is about to file, so both refuse on the same judgement.
 function select_classification(labels: ReadonlyArray<string>, body: string): ReleaseClassification {
@@ -86,7 +143,7 @@ function select_classification(labels: ReadonlyArray<string>, body: string): Rel
 
 	if (label === undefined || selected.length > 1) {
 		throw new Error(
-			`Choose one release classification before opening the PR: ${CLASSIFICATION_LABELS.join(', ')}; found: ${selected.join(', ') || 'none'}. Add "${DECLARATION_PREFIX}<label>" to the Issue body.`,
+			`Choose one release classification before opening the PR: ${CLASSIFICATION_LABELS.join(', ')}; ${selection_hint(selected)}`,
 		)
 	}
 
@@ -141,6 +198,7 @@ const pr_classification = {
 	check_event,
 	fetch_current_labels,
 	declaration,
+	with_declaration,
 	is_classification,
 	select_classification,
 	select_issue_classification,
