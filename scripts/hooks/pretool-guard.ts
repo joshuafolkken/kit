@@ -12,6 +12,7 @@ import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_revert } from './bash-revert'
 import { batch_outcome } from './batch-guard'
+import { direct_gh_usage } from './direct-gh-usage'
 import { hook_ledger } from './hook-ledger'
 import { implementation_authority } from './implementation-authority'
 import { lane_plan_guard } from './lane-plan-guard'
@@ -227,9 +228,12 @@ function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite)
 	else process.stdout.write(`${envelope}\n`)
 }
 
-// The ledger line for a judged call — written by both harnesses' entries, after their verdict.
+// The ledger line for a judged call — written by both harnesses' entries, after their verdict. An
+// allowed call also counts the `gh` it launches (`direct-gh-usage.ts`); a refused one never runs.
 async function record_refusal(judged_payload: string, outcome: GuardOutcome): Promise<void> {
 	await hook_ledger.record_reason(HOOK_NAME, outcome.reason, judged_payload)
+
+	if (outcome.reason === undefined) await direct_gh_usage.record(judged_payload)
 }
 
 // **The guards judge the call that will run.** A rewritten call reaches every guard already made
