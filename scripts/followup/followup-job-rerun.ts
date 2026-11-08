@@ -45,9 +45,14 @@ const PASSING_STEP_CONCLUSIONS: ReadonlySet<string> = new Set(['success', 'skipp
 const RUN_COMPLETED = 'completed'
 const FIRST_ATTEMPT = 1
 
-// The runner's last word after its download retries, or its failure to look the action up at all.
-const ACTION_DOWNLOAD_ERROR =
-	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu
+// A download that failed before the change ran: the runner's last word after its action download
+// retries, or its failure to look the action up at all; a setup `curl` whose retries all got a server
+// error; the CodeQL bundle answered with a server error.
+const DOWNLOAD_ERRORS = [
+	/^\S+ ##\[error\]Failed to (?:download archive|resolve action download info)/mu,
+	/^\S+ curl: \(22\) The requested URL returned error: 5\d\d$/mu,
+	/^\S+ ##\[error\]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 5\d\d$/mu,
+]
 
 // The longest `timeout-minutes` in `ci.yml` is 10; a run still going past that is not one a rerun helps.
 // Each poll here backs off while its reading stays the same (`poll.ts`): the attempts and interval
@@ -157,7 +162,7 @@ function is_first_failure(job: Job): boolean {
 }
 
 // A job whose every step passed stopped on the runner; one red on its first attempt is rerun when its
-// log shows an action download failing, and otherwise judged by the failed tests its log names. The log
+// log shows a download failing, and otherwise judged by the failed tests its log names. The log
 // endpoint redirects to the plain text, which `gh api` follows; a vitest log is colored.
 async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged> {
 	if (has_every_step_passed(job)) return { job, verdict: RERUN_VERDICT }
@@ -167,25 +172,23 @@ async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged
 		path: actions_api_path(`jobs/${String(job.id)}/logs`),
 		should_allow_escapes: true,
 	})
-	if (ACTION_DOWNLOAD_ERROR.test(log)) return { job, verdict: RERUN_VERDICT }
+	if (DOWNLOAD_ERRORS.some((error) => error.test(log))) return { job, verdict: RERUN_VERDICT }
 
 	const tests = followup_failed_tests.read_failed_tests(log)
 
 	return { job, verdict: followup_failed_tests.verdict_of(tests, changed), tests }
 }
 
-function is_red_on_tests({ verdict, tests }: Judged): boolean {
-	return verdict === RERUN_VERDICT && tests !== undefined
-}
-
-// A job red with no test named qualifies only as one waiting on a job red on tests outside the change.
+// A job red with no test named qualifies only as one waiting on a job that is itself rerun.
 function settle_unnamed(judged: ReadonlyArray<Judged>, graph: NeedsGraph): Array<Judged> {
-	const red_on_tests = judged.filter((entry) => is_red_on_tests(entry)).map(({ job }) => job.name)
+	const reruns = judged
+		.filter(({ verdict }) => verdict === RERUN_VERDICT)
+		.map(({ job }) => job.name)
 
 	return judged.map((entry) => {
 		if (entry.verdict !== UNNAMED_VERDICT) return entry
 
-		const is_waiting = followup_job_needs.is_waiting_on(graph, entry.job.name, red_on_tests)
+		const is_waiting = followup_job_needs.is_waiting_on(graph, entry.job.name, reruns)
 
 		return is_waiting ? { job: entry.job, verdict: RERUN_VERDICT } : entry
 	})
@@ -277,7 +280,7 @@ async function rerun(branch_name: string, entries: ReadonlyArray<Judged>): Promi
 	const names = jobs.map((job) => job.name)
 
 	console.info(
-		`🔁 Rerunning CI jobs that stopped after every step passed, failed downloading an action, or failed only outside the change: ${names.join(', ')}`,
+		`🔁 Rerunning CI jobs that stopped after every step passed, failed on a download, or failed only outside the change: ${names.join(', ')}`,
 	)
 	await followup_failed_tests.record(
 		entries.flatMap(({ job, tests }) => (tests === undefined ? [] : { job: job.name, tests })),

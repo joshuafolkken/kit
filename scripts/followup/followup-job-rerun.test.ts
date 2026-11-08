@@ -75,6 +75,7 @@ const OUTSIDE_TEST = 'scripts/run/board/run-board-frame-budget.test.ts'
 const FAILED_TEST = `${OUTSIDE_TEST} > frame budget > reads the budget`
 const UNIT_LOG = `2026-10-27T10:00:00.0000000Z  FAIL  ${FAILED_TEST}\n`
 const CHECKS_NAME = 'Checks'
+const CURL_ERROR = '2026-11-08T08:58:56.5220933Z curl: (22) The requested URL returned error:'
 
 const DETECT_E2E = job({ id: DETECT_E2E_ID, name: DETECT_E2E_NAME, conclusion: CANCELLED })
 const PLAYWRIGHT = job({ id: 102, name: PLAYWRIGHT_NAME, conclusion: 'timed_out' })
@@ -115,7 +116,7 @@ describe('rerun_failed_jobs — a run whose only failures stopped after every st
 		expect(names).toStrictEqual([DETECT_E2E_NAME, PLAYWRIGHT_NAME])
 		expect(rerun_paths()).toStrictEqual([`${ACTIONS}runs/${String(RUN_ID)}/rerun-failed-jobs`])
 		expect(console.info).toHaveBeenCalledWith(
-			`🔁 Rerunning CI jobs that stopped after every step passed, failed downloading an action, or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
+			`🔁 Rerunning CI jobs that stopped after every step passed, failed on a download, or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
 		)
 		expect(assess).not.toHaveBeenCalled()
 	})
@@ -207,8 +208,8 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 })
 
 // joshuafolkken/kit#6673: the runner timed out fetching `pnpm/setup` and no test ran, yet `followup`
-// stopped the lane on the red job.
-describe('rerun_failed_jobs — a job red because an action could not be downloaded', () => {
+// stopped the lane on the red job; joshuafolkken/kit#6748: the same for a setup `curl` answered 504.
+describe('rerun_failed_jobs — a job red because a download failed', () => {
 	const ARCHIVE = `'https://codeload.github.com/pnpm/setup/tar.gz/a0881977'`
 
 	it.each([
@@ -220,6 +221,11 @@ describe('rerun_failed_jobs — a job red because an action could not be downloa
 			'the download could not be resolved',
 			'2026-11-07T13:46:37.4787283Z ##[error]Failed to resolve action download info.\n',
 		],
+		['a setup curl got a server error', `${CURL_ERROR} 504\n`],
+		[
+			'the CodeQL bundle got a server error',
+			'2026-11-08T10:12:01.0000000Z ##[error]Unable to download and extract CodeQL CLI: Unexpected HTTP response: 504\n',
+		],
 	])('reruns the run once when %s', async (_label, log) => {
 		answer_checks([as_check(failed_unit())])
 		answer_actions({ jobs: [failed_unit()], log })
@@ -229,10 +235,15 @@ describe('rerun_failed_jobs — a job red because an action could not be downloa
 		expect(assess).not.toHaveBeenCalled()
 	})
 
-	// A repository step that prints the same words is still a failure of the change.
-	it('does not rerun a job whose own step printed the download failure', async () => {
-		const log = `2026-11-07T13:52:11.1370349Z Error: Failed to download archive ${ARCHIVE}\n`
-
+	// A repository step that prints the same words is still a failure of the change, and a client
+	// error is not one a rerun helps.
+	it.each([
+		[
+			'whose own step printed the download failure',
+			`2026-11-07T13:52:11.1370349Z Error: Failed to download archive ${ARCHIVE}\n`,
+		],
+		['whose curl got a client error', `${CURL_ERROR} 404\n`],
+	])('does not rerun a job %s', async (_label, log) => {
 		answer_checks([as_check(failed_unit())])
 		answer_actions({ jobs: [failed_unit()], log })
 
@@ -273,13 +284,23 @@ describe('rerun_failed_jobs — an observation that cannot be posted', () => {
 describe('rerun_failed_jobs — a job red only for waiting on a job red outside the change', () => {
 	const checks = job({ id: 104, name: CHECKS_NAME, conclusion: FAILURE, steps: FAILED_STEPS })
 
-	function answer_waiting(needs: string): void {
+	function answer_waiting(needs: string, log = UNIT_LOG): void {
 		const workflow = `jobs:\n  unit:\n    name: ${UNIT_NAME}\n  lint:\n    name: Lint\n  checks:\n    name: ${CHECKS_NAME}\n    needs: [${needs}]\n`
 
 		read_graph.mockResolvedValue(followup_job_needs.parse_graph(workflow))
 		answer_checks([as_check(failed_unit()), as_check(checks)])
-		answer_actions({ jobs: [failed_unit(), checks], log: UNIT_LOG })
+		answer_actions({ jobs: [failed_unit(), checks], log })
 	}
+
+	it('reruns it with a job it waits on that failed on a download', async () => {
+		answer_waiting('unit', `${CURL_ERROR} 504\n`)
+
+		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([
+			UNIT_NAME,
+			CHECKS_NAME,
+		])
+		expect(assess).not.toHaveBeenCalled()
+	})
 
 	it('reruns it with the job it waits on, reading the run workflow', async () => {
 		answer_waiting('lint, unit')
