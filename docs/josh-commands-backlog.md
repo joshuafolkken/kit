@@ -898,6 +898,7 @@ pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
 pnpm josh backlog:triage --apply 913 --solo --defect yes --verification yes --every-run yes --reason "<why>" --clear
 pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"
 pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
+pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 ```
 
 **Options:**
@@ -908,6 +909,7 @@ pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
 - `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
 - `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
+- `--adopt <k>` — takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.
 
 <!-- /usage -->
 
