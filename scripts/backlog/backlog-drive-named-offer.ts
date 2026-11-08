@@ -9,6 +9,7 @@ import {
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_plan } from '#scripts/lane/lane-plan'
+import { lane_plan_probe } from '#scripts/lane/lane-plan-probe'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
@@ -143,27 +144,31 @@ async function not_run(
 	return named?.is_finish === true ? await only_end(carry, named) : named
 }
 
-// What the lanes in flight declare — recorded plan, else plan comment, else body, the scope `lane:plan` and
-// `backlog:next` read. A lane the listing does not carry, or an unread listing, declares its plan alone.
-async function in_flight_declared(in_flight: ReadonlyArray<string>): Promise<Declared> {
+// What the running lanes declare — recorded plan, else plan comment, else body, the scope `lane:plan` and
+// `backlog:next` read. A running lane is one in flight or one the listing carries `in-progress`, the
+// holders `lane:plan`'s probe yields to (`lane-plan-probe.ts`), so a lane outside this run holds too
+// (joshuafolkken/kit#6800). A lane the listing does not carry, or an unread listing, declares its plan alone.
+async function holders_declared(in_flight: ReadonlyArray<string>): Promise<Declared> {
 	const listing = await auto_ok_cli.fetch_opted_in()
 	const listed = listing.kind === 'read' ? listing.issues : []
-	const pool = in_flight
-		.map(Number)
-		.map((number) => listed.find((issue) => issue.number === number) ?? { number })
+	const running = lane_plan_probe.running_of(listed).map((issue) => issue.number)
+	const pool = [...new Set([...in_flight.map(Number), ...running])].map(
+		(number) => listed.find((issue) => issue.number === number) ?? { number },
+	)
 
 	return await backlog_plan_comment.declared_of(pool, process.cwd())
 }
 
-// The issues in flight, with each named one whose yielded plan a running lane still holds: the offer
-// waits on it as on a lane, so the run does not relaunch it into the same yield (joshuafolkken/kit#4926).
-// The listing is read only when a named issue yielded and a lane runs.
+// The issues in flight, with each named one whose yielded plan a running lane — in this run or outside
+// it — still holds: the offer waits on it as on a lane, so the run does not relaunch it into the same
+// yield (joshuafolkken/kit#4926), and offers it again once the holder's lane ends and drops its
+// `in-progress`. The listing is read only when a named issue yielded.
 async function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Promise<Array<string>> {
 	const yielded = backlog_drive_named
 		.named_issues(carry)
 		.filter((issue) => lane_plan.is_yielded(issue, process.cwd()))
-	if (yielded.length === 0 || in_flight.length === 0) return [...in_flight]
-	const declared = await in_flight_declared(in_flight)
+	if (yielded.length === 0) return [...in_flight]
+	const declared = await holders_declared(in_flight)
 	const held = yielded.filter((issue) => lane_plan.is_yield_held(issue, declared, process.cwd()))
 
 	return [...new Set([...in_flight, ...held.map(String)])]
