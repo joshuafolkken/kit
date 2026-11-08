@@ -41,10 +41,9 @@ describe('issue_priority_critical.apply', () => {
 
 		await expect(issue_priority_critical.apply(ISSUE_NUMBER, REASON)).resolves.toBe('raised')
 		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, PRIORITY_CRITICAL_LABEL)
-		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, expect.stringContaining(REASON))
 		expect(mocked_comment).toHaveBeenCalledWith(
 			ISSUE_NUMBER,
-			expect.stringContaining("a person's instruction"),
+			expect.stringMatching(/a person's instruction[\s\S]*Reason: the person asked/u),
 		)
 	})
 
@@ -56,19 +55,20 @@ describe('issue_priority_critical.apply', () => {
 		expect(mocked_comment).not.toHaveBeenCalled()
 	})
 
-	it('answers failed without commenting when the label fails', async () => {
+	it('answers failed when the label fails after the comment', async () => {
 		serve('bug')
 		mocked_add.mockResolvedValue(false)
 
 		await expect(issue_priority_critical.apply(ISSUE_NUMBER, REASON)).resolves.toBe('failed')
-		expect(mocked_comment).not.toHaveBeenCalled()
+		expect(mocked_comment).toHaveBeenCalled()
 	})
 
-	it('answers failed when the comment fails', async () => {
+	it('answers failed without labelling when the comment fails, so a retry still comments', async () => {
 		serve('bug')
 		mocked_comment.mockResolvedValue(false)
 
 		await expect(issue_priority_critical.apply(ISSUE_NUMBER, REASON)).resolves.toBe('failed')
+		expect(mocked_add).not.toHaveBeenCalled()
 	})
 
 	it('answers unreadable and writes nothing when the issue cannot be read', async () => {

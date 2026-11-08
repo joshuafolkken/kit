@@ -12,13 +12,15 @@ function comment_of(reason: string): string {
 	return `Applied \`${PRIORITY_CRITICAL_LABEL}\` on a person's instruction (\`josh issue:priority --critical\`).\n\nReason: ${reason}`
 }
 
-async function label_and_comment(issue_number: string, reason: string): Promise<CriticalResult> {
-	const is_labelled = await git_gh_command.issue_add_label(issue_number, PRIORITY_CRITICAL_LABEL)
-
-	if (!is_labelled) return 'failed'
+// The comment goes first: a label without it would answer `labelled` on the retry and never record
+// the instruction, while a comment whose label failed is only repeated by the retry.
+async function comment_and_label(issue_number: string, reason: string): Promise<CriticalResult> {
 	const is_commented = await git_gh_command.issue_try_comment(issue_number, comment_of(reason))
 
-	return is_commented ? 'raised' : 'failed'
+	if (!is_commented) return 'failed'
+	const is_labelled = await git_gh_command.issue_add_label(issue_number, PRIORITY_CRITICAL_LABEL)
+
+	return is_labelled ? 'raised' : 'failed'
 }
 
 async function apply(issue_number: string, reason: string): Promise<CriticalResult> {
@@ -27,7 +29,7 @@ async function apply(issue_number: string, reason: string): Promise<CriticalResu
 	if (read === undefined) return 'unreadable'
 	if (has_label_name(read.labels, PRIORITY_CRITICAL_LABEL)) return 'labelled'
 
-	return await label_and_comment(issue_number, reason)
+	return await comment_and_label(issue_number, reason)
 }
 
 const issue_priority_critical = { apply }

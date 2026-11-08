@@ -21,20 +21,18 @@ const OPTIONS = {
 	reason: { type: 'string' },
 } as const
 
-const UNREADABLE_REPORT = 'could not be read — no label applied.'
-
 const REPORTS: Readonly<Record<RaiseResult, string>> = {
 	raised: 'applied the priority label its body declares or reaches.',
 	labelled: 'already carries a priority label at its level — left as it is.',
 	below: 'stays at normal priority — no label applied.',
-	unreadable: UNREADABLE_REPORT,
+	unreadable: 'could not be read — no label applied.',
 	failed: 'ranks above its labels, but applying the priority label failed.',
 }
 
 const CRITICAL_REPORTS: Readonly<Record<CriticalResult, string>> = {
 	raised: 'applied priority:critical and commented the instruction behind it.',
 	labelled: 'already carries priority:critical — left as it is, no comment.',
-	unreadable: UNREADABLE_REPORT,
+	unreadable: 'could not be read — priority:critical not applied.',
 	failed: 'applying priority:critical or commenting the instruction behind it failed.',
 }
 

@@ -17,7 +17,6 @@ const ISSUE_NUMBER = '4960'
 const CRITICAL = '--critical'
 const REASON_FLAG = '--reason'
 const REASON = 'the person asked to make it critical'
-const UNREADABLE = 'could not be read'
 const mocked_raise = vi.mocked(issue_priority_raise.raise)
 const mocked_critical = vi.mocked(issue_priority_critical.apply)
 
@@ -50,7 +49,7 @@ describe('issue_priority_cli.run --critical', () => {
 	it.each([
 		['raised', 'info', 0, 'applied priority:critical'],
 		['labelled', 'info', 0, 'already carries priority:critical'],
-		['unreadable', 'error', 1, UNREADABLE],
+		['unreadable', 'error', 1, 'priority:critical not applied'],
 		['failed', 'error', 1, 'applying priority:critical'],
 	] as const)('reports %s on console.%s and exits %d', async (result, stream, code, text) => {
 		const print = vi.spyOn(console, stream).mockImplementation(() => undefined)
@@ -82,7 +81,7 @@ describe('issue_priority_cli.run', () => {
 	})
 
 	it.each([
-		['unreadable', UNREADABLE],
+		['unreadable', 'could not be read'],
 		['failed', 'applying the priority label failed'],
 	] as const)('reports %s and exits 1', async (result, text) => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
