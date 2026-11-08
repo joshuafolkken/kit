@@ -20,6 +20,8 @@ import { git_gh_exec } from './git-gh-exec'
 // **A listing is read one page at a time only while it fits in one.** A listing longer than a page is
 // read through `--paginate --slurp` as before; the conditional read cannot page, and a partial
 // listing would drop checks from the verdict.
+//
+// **A bare-array listing is still read unconditionally** (`read_array_pages`, the reviews listing).
 
 const UNREADABLE_POLL_MESSAGE = 'gh api could not read a merge-gate poll'
 const PAGE_SIZE = 100
@@ -96,6 +98,15 @@ async function read_object_pages(path: string): Promise<string> {
 	})
 }
 
+// A bare-array listing (the reviews endpoint), whose pages `gh` merges into one array on its own —
+// slurping it would produce `[[…],[…]]`, which the listing schema then rejects.
+async function read_array_pages(path: string): Promise<string> {
+	return await git_gh_exec.exec_gh_api({
+		path: `${path}${FULL_PAGE_QUERY}`,
+		should_paginate: true,
+	})
+}
+
 function forget_poll_reads(): void {
 	kept_by_path.clear()
 }
@@ -104,6 +115,7 @@ const git_gh_poll_read = {
 	UNREADABLE_POLL_MESSAGE,
 	forget_poll_reads,
 	read,
+	read_array_pages,
 	read_detail,
 	read_object_pages,
 }

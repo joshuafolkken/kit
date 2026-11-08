@@ -1,6 +1,5 @@
-import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_branch_rules } from './git-gh-branch-rules'
-import { git_gh_exec } from './git-gh-exec'
 import { git_gh_poll_read } from './git-gh-poll-read'
 import { git_gh_pr_graphql_state } from './git-gh-pr-graphql-state'
 import { read_listed_pull, read_pull, require_pr_number } from './git-gh-pr-read'
@@ -22,15 +21,6 @@ import { to_gh_state } from './git-gh-rest-state'
 // `git-pr-checks-parse.ts`, `git-pr-checks-eval.ts`, `git-pr-followup.ts` — changes.
 
 const NO_HEAD_SHA_MESSAGE = 'gh api answered a pull request with no head commit'
-
-// The reviews endpoint answers a bare array, whose pages `gh` merges into one array on its own —
-// slurping it would produce `[[…],[…]]`, which the listing schema then rejects.
-async function read_array_pages(path: string): Promise<string> {
-	return await git_gh_exec.exec_gh_api({
-		path: `${path}${FULL_PAGE_QUERY}`,
-		should_paginate: true,
-	})
-}
 
 function read_head_sha(pull: RestPull): string {
 	const sha = pull.head?.sha
@@ -56,7 +46,7 @@ async function read_status_check_rollup(commit_sha: string): Promise<Array<objec
 async function pr_get_review_decision(pr_number: number): Promise<string> {
 	const path = git_gh_api_path.pull_reviews_api_path(String(pr_number))
 
-	return git_gh_pr_review.to_review_decision(await read_array_pages(path))
+	return git_gh_pr_review.to_review_decision(await git_gh_poll_read.read_array_pages(path))
 }
 
 // `mergeStateStatus` is upper-cased because that is the spelling `gh` uses and the spelling
