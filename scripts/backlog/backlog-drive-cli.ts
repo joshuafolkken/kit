@@ -27,6 +27,7 @@ import {
 	type OfferRead,
 } from './backlog-drive'
 import { backlog_drive_adopt } from './backlog-drive-adopt'
+import { backlog_drive_after_merge } from './backlog-drive-after-merge'
 import { backlog_drive_args, type DriveContext } from './backlog-drive-args'
 import { backlog_drive_carried } from './backlog-drive-carried'
 import { backlog_drive_finish } from './backlog-drive-finish'
@@ -43,7 +44,6 @@ import { backlog_drive_rate } from './backlog-drive-rate'
 import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
-import { backlog_drive_retry } from './backlog-drive-retry'
 import { backlog_drive_seats } from './backlog-drive-seats'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
@@ -140,8 +140,7 @@ async function merge(issue: string, owner: string): Promise<MergeResult> {
 	const ran = await josh_command.josh_run(argv, should_forward_stderr)
 	const result = run_merge_driver.read(ran.out) ?? unprinted(ran.code)
 
-	await backlog_drive_named.mark_done(issue, result, owner)
-	if (result.outcome === 'merged') await backlog_drive_retry.after_merge(Number(issue))
+	await backlog_drive_after_merge.after_merge(issue, result, owner)
 
 	return result
 }

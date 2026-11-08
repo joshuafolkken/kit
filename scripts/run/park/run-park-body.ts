@@ -33,13 +33,16 @@ const TIER = /^- 層: ?([ABC])$/u
 const PERMISSION = /^- 必要な権限: ?(\S.*)$/u
 const PICK = /^(\d+)[\s:：.、]+\S/u
 const NO_PICK = /^推奨なし[\s:：—-]+\S/u
+const AUTO_TIER = 'A'
+// The permissions a parent holds without a person: none at all, or the parent's own.
+const AUTO_PERMISSIONS: ReadonlySet<string> = new Set(['なし', '親'])
 
 const FORMAT = [
 	'Park body schema:',
 	OPTIONS_HEADING,
 	'1. <option>',
 	TIER_LINE,
-	'   - 必要な権限: owner コメント | epic 編集 | 信頼設定 | 人',
+	'   - 必要な権限: なし | 親 | owner コメント | epic 編集 | 信頼設定 | 人',
 	'2. <option>',
 	TIER_LINE,
 	'   - 必要な権限: …',
@@ -142,18 +145,37 @@ function problem_of(body: string): string | undefined {
 	return park.options.map((option) => option_problem(option)).find(Boolean) ?? pick_problem(park)
 }
 
+// The option the recommendation names; `undefined` for no recommendation or a body off the schema.
+function picked_option(body: string): ParkOption | undefined {
+	const park = parse(body)
+	const number = park.pick?.number
+
+	return park.options.find((candidate) => candidate.number === number)
+}
+
 // The recommended option and its tier, or no recommendation; `undefined` for a body off the schema.
 function summary_of(body: string): string | undefined {
 	if (problem_of(body) !== undefined) return undefined
-	const park = parse(body)
-	const number = park.pick?.number
-	const option = park.options.find((candidate) => candidate.number === number)
+	const option = picked_option(body)
 
 	if (option === undefined) return NO_PICK_WORD
 
 	return `推奨: ${String(option.number)}（層 ${option.tier ?? ''}）`
 }
 
-const run_park_body = { FORMAT, problem_of, summary_of }
+function is_parents(option: ParkOption): boolean {
+	return option.tier === AUTO_TIER && AUTO_PERMISSIONS.has(option.permission ?? '')
+}
+
+// The recommended option a parent with no person takes itself (joshuafolkken/kit#6738): tier A, needing
+// no permission beyond the parent's. `undefined` for any other park, which stays a person's.
+function auto_pick(body: string): number | undefined {
+	if (problem_of(body) !== undefined) return undefined
+	const option = picked_option(body)
+
+	return option !== undefined && is_parents(option) ? option.number : undefined
+}
+
+const run_park_body = { FORMAT, auto_pick, problem_of, summary_of }
 
 export { run_park_body }
