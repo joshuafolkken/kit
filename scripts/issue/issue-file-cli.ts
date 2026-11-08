@@ -285,7 +285,10 @@ async function filing_of(args: FileArguments): Promise<Filing | string> {
 	const read = cli_body.read_result(args.body_file)
 
 	if ('problem' in read) return `Could not read the body file ${args.body_file}: ${read.problem}`
-	const body = issue_classification.with_release_classification(read.text)
+	const body = issue_classification.with_release_classification(
+		read.text,
+		issue_file.labels_of(args, read.text),
+	)
 	const current = await git_gh_command.repo_get_name_with_owner()
 
 	if (current === undefined) return UNKNOWN_REPO_MESSAGE

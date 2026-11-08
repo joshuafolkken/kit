@@ -14,7 +14,7 @@ import { markdown_section } from './markdown-section'
 const FEATURE_DECLARATIONS = ['- 目的: 機能追加', '- 目的: 機能改善', '- 目的: 時間短縮']
 const BREAKING_DECLARATION = '- 互換性: 破壊的変更'
 const NON_BUG_DECLARATION = '- 種別: 非不具合'
-const NON_BUG_LINE = new RegExp(`^${NON_BUG_DECLARATION}$`, 'mu')
+const NON_BUG_LINE = new RegExp(`^ {0,3}${NON_BUG_DECLARATION}[ \\t]*$`, 'mu')
 const CLASSIFICATION_LABELS = [BUG_LABEL, ENHANCEMENT_LABEL, BREAKING_CHANGE_LABEL]
 const CONFLICT = 'bug and enhancement declarations cannot be combined'
 const MISSING_BUG_CLASSIFICATION = 'missing bug classification'
@@ -60,10 +60,11 @@ function label_conflict(body: string): string | undefined {
 	return labels.includes(BUG_LABEL) && labels.includes(ENHANCEMENT_LABEL) ? CONFLICT : undefined
 }
 
-// The refusal `josh pr` would give this body once filed, so a body that cannot ship is refused here.
-function selection_problem(body: string): string | undefined {
+// The refusal `josh pr` would give this body filed with `labels`, so a body that cannot ship is
+// refused here.
+function selection_problem(body: string, labels: ReadonlyArray<string>): string | undefined {
 	try {
-		pr_classification.select_classification(required_labels(body), body)
+		pr_classification.select_classification(labels, body)
 
 		return undefined
 	} catch (error) {
@@ -71,31 +72,37 @@ function selection_problem(body: string): string | undefined {
 	}
 }
 
-// A non-bug body declaring neither an aim nor a breaking change resolves to no release
-// classification; `other-change` is the only one it can mean, so it is written in under the
-// non-bug line. Any other body is returned unchanged.
-function with_release_classification(body: string): string {
+// A non-bug body whose declarations and `labels` (the ones it is filed with; the body's own when
+// left out) resolve to no release classification can only mean `other-change`, so it is written in
+// under the non-bug line. Any other body is returned unchanged.
+function with_release_classification(
+	body: string,
+	labels: ReadonlyArray<string> = required_labels(body),
+): string {
 	const line = pr_classification.declaration(OTHER_CHANGE_LABEL)
 	const amended = body.replace(NON_BUG_LINE, (non_bug) => `${non_bug}\n${line}`)
 
-	if (selection_problem(body) === undefined || selection_problem(amended) !== undefined) return body
+	if (selection_problem(body, labels) === undefined) return body
 
-	return amended
+	return selection_problem(amended, labels) === undefined ? amended : body
 }
 
-function release_problem(body: string): string | undefined {
+function release_problem(body: string, labels: ReadonlyArray<string>): string | undefined {
 	if (bug_classification_problem(body) !== undefined || label_conflict(body) !== undefined) {
 		return undefined
 	}
 
-	return selection_problem(with_release_classification(body))
+	return selection_problem(with_release_classification(body, labels), labels)
 }
 
-function problems(body: string): ReadonlyArray<string> {
+function problems(
+	body: string,
+	labels: ReadonlyArray<string> = required_labels(body),
+): ReadonlyArray<string> {
 	const found = [
 		bug_classification_problem(body),
 		label_conflict(body),
-		release_problem(body),
+		release_problem(body, labels),
 		defect_origin_line.problem(body),
 		defect_origin_line.reproduction_problem(body),
 	]
