@@ -56,11 +56,11 @@ function unreadable(path: string, answer: ConditionalRead): unknown {
 }
 
 // The answer for `path`, or the previous process's where GitHub says it has not changed. A failure
-// throws, the contract `exec_gh_api` has.
-async function read(path: string): Promise<string> {
+// throws, the contract `exec_gh_api` has. `timeout_ms` bounds the request as `exec_gh_api`'s does.
+async function read(path: string, timeout_ms?: number): Promise<string> {
 	const slot = slot_of(path)
 	const previous = shared_cache.read(slot, path, kept_schema, Date.now())
-	const answer = await git_gh_conditional.read_conditional(path, previous?.etag)
+	const answer = await git_gh_conditional.read_conditional(path, previous?.etag, timeout_ms)
 	const settled = settle(previous, answer)
 
 	if (settled === undefined) throw unreadable(path, answer)

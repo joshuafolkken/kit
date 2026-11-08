@@ -1,6 +1,6 @@
 import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { author_fields_schema } from '#scripts/git/git-schemas'
 import { parse_json } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
@@ -69,7 +69,7 @@ function has_write_role(raw: string): boolean {
 async function read_permission(asked: AskedAuthor): Promise<boolean | undefined> {
 	try {
 		const path = permission_path(asked.login, asked.repo)
-		const raw = await git_gh_exec.exec_gh_api({ path, timeout_ms: asked.timeout_ms })
+		const raw = await git_gh_etag_read.read(path, asked.timeout_ms)
 
 		return has_write_role(raw)
 	} catch {

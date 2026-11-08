@@ -20,6 +20,10 @@ vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 const api_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+// The permission lookup goes through the ETag layer (joshuafolkken/kit#6754); here it reaches the mock.
+vi.mock('#scripts/gh/git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (api_path: string) => await api_mock({ path: api_path }) },
+}))
 
 vi.mock('node:child_process', async (original) => {
 	const actual = await original<{ execSync: typeof execSync }>()
