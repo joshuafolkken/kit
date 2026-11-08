@@ -1,6 +1,7 @@
+import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import type { AttachedLaunchResult, LaunchRequest } from '#scripts/run/detached-launch'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	backlog_drive_retrospective_unit,
 	type UnitPorts,
@@ -11,6 +12,15 @@ const CWD = '/repo'
 const NOW = 1_700_000_000_000
 const OWNER = '4242'
 const FAILED_EXIT = 1
+
+// The agent CLI is absent where CI runs, so its installed check is answered here.
+beforeEach(() => {
+	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
 
 interface Fake {
 	ports: UnitPorts
