@@ -34,6 +34,8 @@ const PERMISSION = /^- 必要な権限: ?(\S.*)$/u
 const PICK = /^(\d+)[\s:：.、]+\S/u
 const NO_PICK = /^推奨なし[\s:：—-]+\S/u
 const AUTO_TIER = 'A'
+// The tier no parent takes, even on a person's behalf: trust settings, third parties, destructive acts.
+const PERSON_TIER = 'C'
 // The permissions a parent holds without a person: none at all, or the parent's own.
 const AUTO_PERMISSIONS: ReadonlySet<string> = new Set(['なし', '親'])
 
@@ -176,9 +178,26 @@ function auto_pick(body: string): number | undefined {
 	return option !== undefined && is_parents(option) ? option.number : undefined
 }
 
+// Why a parent may not adopt option `number` of a schema-conforming park (joshuafolkken/kit#6670):
+// a park with no recommendation stays a person's, an unlisted option is no answer, and a tier C option
+// stays a person's. `undefined` when the parent may adopt it.
+function adopt_problem(body: string, number: number): string | undefined {
+	const park = parse(body)
+
+	if (park.pick?.number === undefined) return `the park says ${NO_PICK_WORD}, so a person decides`
+	const option = park.options.find((candidate) => candidate.number === number)
+
+	if (option === undefined) return `${OPTIONS_HEADING} lists no option ${String(number)}`
+
+	return option.tier === PERSON_TIER
+		? `option ${String(number)} is tier C, a person's to take`
+		: undefined
+}
+
 const run_park_body = {
 	FORMAT,
 	HEADINGS: [OPTIONS_HEADING, PICK_HEADING],
+	adopt_problem,
 	auto_pick,
 	problem_of,
 	summary_of,
