@@ -81,7 +81,9 @@ describe('repo_get_name_with_owner — API fallback', () => {
 
 		await expect(git_gh_repo.repo_get_name_with_owner()).resolves.toBeUndefined()
 	})
+})
 
+describe('repo_get_name_with_owner — API response normalization', () => {
 	// A renamed repository's old remote still names the old slug, which a GitHub-returned name never matches.
 	it.each([HTTPS_ORIGIN.toUpperCase(), 'https://github.com/joshuafolkken/old-kit.git'])(
 		'reads the canonical name through the ETag layer for %s',
@@ -99,5 +101,16 @@ describe('repo_get_name_with_owner — API fallback', () => {
 		mocked_read.mockResolvedValueOnce(JSON.stringify({ full_name: '  ' }))
 
 		await expect(git_gh_repo.repo_get_name_with_owner()).resolves.toBeUndefined()
+	})
+
+	it.each([
+		['fallback', git_gh_repo.repo_get_name_with_owner],
+		['canonical', git_gh_repo.repo_get_canonical_name_with_owner],
+	])('trims whitespace off the name through the %s read', async (_label, read_name) => {
+		use_remotes([])
+		mocked_read.mockResolvedValueOnce(JSON.stringify({ full_name: `  ${REPO}\n` }))
+
+		await expect(read_name()).resolves.toBe(REPO)
+		expect(mocked_read).toHaveBeenCalledWith(REPO_API_PATH)
 	})
 })
