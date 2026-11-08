@@ -256,6 +256,8 @@ describe('prose_stale_scan.report — a plain-word name', () => {
 			hit('scripts/p.ts', '// reads event.Appended'),
 			hit('scripts/q.ts', '// calls Appended(x)'),
 			hit('docs/r.md', '`a` Appended `b`'),
+			hit('docs/u.md', 'name, Appended, and owner'),
+			hit('docs/v.md', 'we import Appended lines'),
 			// A fenced block's lines carry no backticks.
 			hit('docs/s.md', "import { x, Appended } from './a'"),
 			hit('docs/t.md', "import Appended from './a'"),

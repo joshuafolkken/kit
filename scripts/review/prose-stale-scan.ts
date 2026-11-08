@@ -200,13 +200,14 @@ function code_spans(excerpt: string): Array<string> {
 }
 
 // The code shapes a plain name takes outside backticks — a fenced block's line included: `x.name`,
-// `name(`, an `{ a, name }` list entry, and `import name`.
+// `name(`, an entry of a braced identifier list `{ a, name }`, and `import name from`. A bare comma
+// list is English (`name, status, and owner`), so the list needs its brace.
 function code_shape(word: string): RegExp {
 	const shapes = [
 		String.raw`\.${word}(?![\w$])`,
 		String.raw`(?<![\w$])${word}\(`,
-		String.raw`[{,]\s*${word}\s*[,}]`,
-		String.raw`\bimport\s+${word}(?![\w$])`,
+		String.raw`\{\s*(?:[\w$]+\s*,\s*)*${word}\s*[,}]`,
+		String.raw`\bimport\s+${word}\s+from\b`,
 	]
 
 	return new RegExp(shapes.join('|'), 'u')
