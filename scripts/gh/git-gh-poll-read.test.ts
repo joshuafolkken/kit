@@ -11,6 +11,8 @@ import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 
 const PATH = `${REPO_NAME_PATH}/pulls/972`
 const LISTING_PATH = `${REPO_NAME_PATH}/commits/${PR_HEAD_SHA}/check-runs`
+const REVIEWS_PATH = `${PATH}/reviews`
+const REVIEWS = JSON.stringify([{ state: 'APPROVED' }, { state: 'COMMENTED' }])
 const ETAG = 'W/"abc"'
 const RUNNING = { name: 'SonarQube', status: 'in_progress' }
 const PAGE = JSON.stringify({ total_count: 1, check_runs: [RUNNING] })
@@ -110,5 +112,22 @@ describe('git_gh_poll_read.read_object_pages', () => {
 		const second = await git_gh_poll_read.read_object_pages(LISTING_PATH)
 
 		expect(rollup(second)).toStrictEqual(rollup(first))
+	})
+})
+
+describe('git_gh_poll_read.read_array_pages', () => {
+	it('pages through a bare-array listing without slurping it', async () => {
+		await git_gh_poll_read.read_array_pages(REVIEWS_PATH)
+
+		expect(git_gh_exec.exec_gh_api).toHaveBeenCalledExactlyOnceWith({
+			path: `${REVIEWS_PATH}${FULL_PAGE_QUERY}`,
+			should_paginate: true,
+		})
+	})
+
+	it('answers the one array gh merged the pages into', async () => {
+		vi.mocked(git_gh_exec.exec_gh_api).mockResolvedValue(REVIEWS)
+
+		expect(await git_gh_poll_read.read_array_pages(REVIEWS_PATH)).toBe(REVIEWS)
 	})
 })
