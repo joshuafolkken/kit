@@ -52,7 +52,7 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:a
 
 <!-- usage: issue:priority -->
 
-Apply priority:high to an issue whose body reached the high floor after filing.
+Raise an issue to the priority its body declares or reaches after filing.
 
 ```bash
 pnpm josh issue:priority 4960

@@ -231,6 +231,24 @@ function is_typed(labels: ReadonlyArray<string>): boolean {
 	)
 }
 
+function labelled_level(labels: ReadonlyArray<string>): PriorityLevel {
+	if (has_label_name(labels, PRIORITY_CRITICAL_LABEL)) return 'critical'
+
+	return has_label_name(labels, PRIORITY_HIGH_LABEL) ? 'high' : 'normal'
+}
+
+// The label that raises an open Issue to its filed level or its floor, whichever ranks higher — a
+// cause-loss line appended after filing can lift the floor past the declaration — or `undefined` when
+// its labels already rank it there. `josh issue:priority` reads it (joshuafolkken/kit#6757).
+function raise_label(labels: ReadonlyArray<string>, body: string): string | undefined {
+	const filed = LEVELS.indexOf(filed_level(body) ?? 'normal')
+	const rank = Math.max(filed, LEVELS.indexOf(floor_of(body)))
+
+	if (LEVELS.indexOf(labelled_level(labels)) >= rank) return undefined
+
+	return LABELS[LEVELS[rank] ?? 'normal']
+}
+
 function floor_problem(body: string, level: PriorityLevel): string | undefined {
 	const floor = floor_of(body)
 
@@ -285,6 +303,7 @@ const issue_priority = {
 	order_problem,
 	parked_issues,
 	problem,
+	raise_label,
 	with_label,
 }
 
