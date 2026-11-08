@@ -1,5 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { josh_command } from '#scripts/josh/josh-run'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { backlog_drive_retry } from './backlog-drive-retry'
@@ -7,6 +9,8 @@ import { backlog_drive_retry } from './backlog-drive-retry'
 const CAUSE = 6428
 const PARKED = 6429
 const OTHER = 6400
+const SIBLING = 6430
+const LATER = '2026-11-05T00:01Z'
 const REPO = 'joshuafolkken/kit'
 const HISTORY_ERROR = 'history failed'
 const DEPENDENCY_ERROR = 'all dependencies'
@@ -102,7 +106,7 @@ it('ignores a park from an earlier attempt', async () => {
 
 	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([
 		...events,
-		{ pos: 2, kind: 'add', text: `retry #${String(PARKED)}`, at: '2026-11-05T00:01Z' },
+		{ pos: 2, kind: 'add', text: `retry #${String(PARKED)}`, at: LATER },
 	])
 	await backlog_drive_retry.after_merge(CAUSE)
 
@@ -131,6 +135,53 @@ it('refuses truncated native dependencies (ac-e6cfefaf)', async () => {
 
 	await expect(backlog_drive_retry.after_merge(CAUSE)).rejects.toThrow(DEPENDENCY_ERROR)
 	expect(josh_command.josh_run).not.toHaveBeenCalled()
+})
+
+function issue_json(number: number, labels: ReadonlyArray<string>): string {
+	return JSON.stringify({
+		number,
+		state: 'OPEN',
+		labels: labels.map((name) => ({ name })),
+		blockedBy: { nodes: [relation()], totalCount: 1 },
+	})
+}
+
+function mock_by_issue(labels_of: ReadonlyMap<number, ReadonlyArray<string>>): void {
+	vi.mocked(git_gh_command.issue_get_state_and_relations_classified).mockImplementation(
+		async (issue) => {
+			const number = Number(issue)
+
+			return { kind: 'read', json: issue_json(number, labels_of.get(number) ?? []) }
+		},
+	)
+}
+
+it('re-parks a needs-decision dependent with the reason instead of throwing (ac-ef909ee8)', async () => {
+	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
+	mock_by_issue(new Map([[PARKED, [NEEDS_DECISION_LABEL]]]))
+
+	await expect(backlog_drive_retry.after_merge(CAUSE)).resolves.toBeUndefined()
+
+	expect(josh_command.josh_run).not.toHaveBeenCalled()
+	expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(
+		run_event_stream.EVENT_KIND.PARK,
+		`#${String(PARKED)} parked (${NEEDS_DECISION_LABEL}; blocker #${String(CAUSE)} closed)`,
+	)
+})
+
+it('goes on retrying the round after a protected dependent (ac-a55c13d2)', async () => {
+	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
+	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([
+		...(await run_event_stream_emit.current_events(true)),
+		{ pos: 2, kind: 'park', text: `#${String(SIBLING)} stopped`, at: LATER },
+	])
+	mock_by_issue(new Map([[PARKED, [NEEDS_DECISION_LABEL]]]))
+	await backlog_drive_retry.after_merge(CAUSE)
+
+	expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(
+		['run:add', String(SIBLING), '--retry'],
+		true,
+	)
 })
 
 it('propagates retry command failure (ac-e6cfefaf)', async () => {
