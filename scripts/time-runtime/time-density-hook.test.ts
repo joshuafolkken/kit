@@ -1,13 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { time_density } from './time-density'
 import { time_density_hook } from './time-density-hook'
 import { time_hook_transcript } from './time-hook-transcript'
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'density-hook-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('density-hook-')
 const ENOUGH_TURNS = time_transcript_fixture.DENSITY_TURNS
 const ONE_CALL = 1
 const THREE_CALLS = 3
@@ -48,8 +49,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(time_density_hook.notice_path(transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('time_density_hook.density_notice', () => {

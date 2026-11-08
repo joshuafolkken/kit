@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
@@ -8,6 +7,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
@@ -49,7 +49,7 @@ function body_of(...declarations: ReadonlyArray<string>): string {
 const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
 const VALID_BODY = body_of(JUDGEMENT_NEEDED)
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-'))
+const work = temporary_directory('suite')('issue-file-cli-')
 const valid_path = path.join(work, 'valid.md')
 const invalid_path = path.join(work, 'invalid.md')
 const origin_path = path.join(work, 'origin.md')
@@ -118,7 +118,6 @@ afterEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_file_cli.run — a filing that clears every step', () => {

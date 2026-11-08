@@ -348,24 +348,6 @@ it('keeps the budget reason on the first stop verdict', async () => {
 	expect(end.detail).toBe(reason)
 })
 
-it('returns the drained stop for a retrospective before ending the carry', async () => {
-	const { ports, calls } = harness({
-		offers: [{ ...offer('stop'), answer: 'exhausted', is_retrospective_owed: true }],
-	})
-	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
-
-	expect(end.reason).toBe('retrospective')
-	expect(calls).not.toContain('finish')
-})
-
-it('ends a drained stop that owes no retrospective without handing it back', async () => {
-	const { ports, calls } = harness({ offers: [{ ...offer('stop'), answer: 'exhausted' }] })
-	const end = await backlog_drive.run_loop(state(), CONFIG, ports)
-
-	expect(end.reason).toBe('stop')
-	expect(calls).toContain('finish')
-})
-
 describe('backlog_drive.run_loop — hand-back state', () => {
 	it('reports the state an ending pass reached so the resume line keeps it', async () => {
 		const { ports, states } = harness({

@@ -141,13 +141,13 @@ describe('lane:plan approval scope', () => {
 		).toBe(lane_plan_check.SPLIT_EXIT_CODE)
 	})
 
-	it('checks increased projected lines again after an approved clear', async () => {
+	// joshuafolkken/kit#6602: past the approved clear the lane has started, so the overrun only warns.
+	it('checks increased projected lines again after an approved clear, as a warning', async () => {
 		await lane_plan_cli.run([String(ISSUE), ...PATHS, ...FLAGS], DIRECTORY)
 		signals.mockResolvedValue({ ...QUIET, lines_ratio: 1.3 })
 
-		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS], DIRECTORY)).toBe(
-			lane_plan_check.SPLIT_EXIT_CODE,
-		)
+		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS], DIRECTORY)).toBe(SUCCESS)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('size warning (lines)'))
 	})
 
 	it('refuses a changed declaration even with the same projected lines', async () => {
@@ -230,12 +230,12 @@ describe('lane:plan approval on a later registration', () => {
 		expect(lane_plan.read(ISSUE, DIRECTORY)?.size_approval).toEqual(APPROVAL)
 	})
 
-	it('does not let a cleared approval authorize an added file', async () => {
+	it('records an added file past a cleared approval as a warning, not inside the approval', async () => {
 		await lane_plan_cli.run([String(ISSUE), ...PATHS, ...FLAGS], DIRECTORY)
 
-		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS, 'extra.ts'], DIRECTORY)).toBe(
-			lane_plan_check.SPLIT_EXIT_CODE,
-		)
+		expect(await lane_plan_cli.run([String(ISSUE), ...PATHS, 'extra.ts'], DIRECTORY)).toBe(SUCCESS)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('size warning'))
+		expect(lane_plan.read(ISSUE, DIRECTORY)?.size_approval).toEqual(APPROVAL)
 	})
 
 	it('refuses an unreadable explicit approval without recording a plan', async () => {

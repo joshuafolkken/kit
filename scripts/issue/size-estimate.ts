@@ -198,8 +198,9 @@ function split_over_guide(
 	return route === SPLIT_ROUTE_LABEL ? guide_exceeded(body, rate, growth) : undefined
 }
 
-// The declared estimate when it is over the cap; a declared reason does not excuse it, only a split
-// filing does (joshuafolkken/kit#5502). `issue:file` and `backlog:next` both judge through it.
+// The declared estimate when it is over the cap (joshuafolkken/kit#5502); a split filing, or a declared
+// reason it stays one deliverable — the pre-start split decision — excuses it, as numbers alone never
+// force a split (joshuafolkken/kit#6602). `issue:file` and `backlog:next` both judge through it.
 function over_cap(
 	body: string,
 	route: string | undefined,
@@ -208,7 +209,7 @@ function over_cap(
 ): SizeMeasurement | undefined {
 	const estimate = parse(body, rate, growth)
 
-	if (estimate === undefined || route === SPLIT_ROUTE_LABEL) return undefined
+	if (estimate === undefined || is_excused(body, route)) return undefined
 
 	return split_assess.is_over_cap(
 		grown(estimate.files, 'files', growth),
@@ -240,11 +241,11 @@ function is_issue_over_cap(
 function capped(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
 	const { cap } = guide_for(rate)
 
-	return `${projected(estimate, growth)} exceeds the cap (more than ${String(cap.files)} files or ${String(cap.lines)} lines), which \`${REASON_PREFIX}\` does not excuse`
+	return `${projected(estimate, growth)} exceeds the cap (more than ${String(cap.files)} files or ${String(cap.lines)} lines) with no \`${REASON_PREFIX}\``
 }
 
 function cap_refusal(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
-	return `${capped(estimate, rate, growth)} — file an ordered epic of \`--route split\` children instead (the mechanical changes first, the child that switches the setting on last); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${capped(estimate, rate, growth)} — with separately-mergeable parts, file an ordered epic of \`--route split\` children (the mechanical changes first, the child that switches the setting on last); one deliverable, declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // The implement minutes the grown declared lines take at the measured rate.
@@ -264,20 +265,20 @@ function budget_refusal(
 	const minutes = Math.round(projected_minutes(estimate, rate, growth))
 	const measured = `${rate.median.toFixed(1)} implement min / 100 lines over ${String(rate.lanes)} lane(s)`
 
-	return `${exceeded(estimate, rate, growth)} and projects ${String(minutes)} implement minute(s) at ${measured}, over the ${String(IMPLEMENT_BUDGET)}-minute implement budget, which \`${REASON_PREFIX}\` does not excuse — file it split (\`--route split\`); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${exceeded(estimate, rate, growth)} and projects ${String(minutes)} implement minute(s) at ${measured}, over the ${String(IMPLEMENT_BUDGET)}-minute implement budget — file it split (\`--route split\`) or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // joshuafolkken/kit#6025: an estimate whose projected implement time exceeds the stage
-// budget, reason declared or not — the filing refuses it and `backlog:next` notes it
-// (joshuafolkken/kit#6066); `undefined` for a split filing, with no measured rate, or
-// within the budget.
+// budget — the filing refuses it and `backlog:next` notes it (joshuafolkken/kit#6066);
+// `undefined` for a split filing, one declaring why it stays one deliverable (joshuafolkken/kit#6602),
+// with no measured rate, or within the budget.
 function over_budget(
 	body: string,
 	route: string | undefined,
 	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	const estimate = route === SPLIT_ROUTE_LABEL ? undefined : parse(body, rate, growth)
+	const estimate = is_excused(body, route) ? undefined : parse(body, rate, growth)
 
 	if (estimate === undefined || rate === undefined) return undefined
 

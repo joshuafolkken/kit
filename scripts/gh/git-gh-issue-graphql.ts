@@ -82,6 +82,8 @@ const response_schema = z.looseObject({
 
 type GraphqlIssue = z.infer<typeof issue_schema>
 type GraphqlAuthor = z.infer<typeof author_schema>
+type BlockerNode = z.infer<typeof blocker_node_schema>
+type BlockingIssue = BlockedBy['nodes'][number]
 
 interface IssueWithComments {
 	rest: RestIssue
@@ -127,14 +129,21 @@ function to_rest_comments(issue: GraphqlIssue): string {
 	return JSON.stringify(rows)
 }
 
-function to_blocked_by(issue: GraphqlIssue): BlockedBy {
-	const nodes = issue.blockedBy.nodes.map((blocker) => ({
+// One blocker node in the shape REST's blocker rows map to — shared with the listing's batched read
+// (`git-gh-blocked-by-graphql.ts`), so both GraphQL reads answer what `to_blocked_by` in REST does.
+function to_blocking_issue(blocker: BlockerNode): BlockingIssue {
+	return {
 		number: blocker.number,
 		state: blocker.state,
 		repository_url: `${REPOSITORY_API_URL}${blocker.repository.nameWithOwner}`,
-	}))
+	}
+}
 
-	return { nodes, totalCount: issue.blockedBy.totalCount }
+function to_blocked_by(issue: GraphqlIssue): BlockedBy {
+	return {
+		nodes: issue.blockedBy.nodes.map((blocker) => to_blocking_issue(blocker)),
+		totalCount: issue.blockedBy.totalCount,
+	}
 }
 
 function to_rest_issue(issue: GraphqlIssue): RestIssue {
@@ -183,7 +192,7 @@ async function read_issue(
 	}
 }
 
-const git_gh_issue_graphql = { read_issue }
+const git_gh_issue_graphql = { read_issue, to_blocking_issue }
 
 export type { IssueWithComments }
-export { git_gh_issue_graphql }
+export { git_gh_issue_graphql, BLOCKER, PAGE, blocker_node_schema }

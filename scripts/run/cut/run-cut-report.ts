@@ -39,7 +39,6 @@ const UNKNOWN_VERDICT = 'unknown'
 // The asking session is over the shared context-cut threshold, so an implementation cut was not
 // resumed into it — the same refusal `run:carry` answers `over` with.
 const OVER_VERDICT = 'over'
-const SPLIT_UNRESOLVED_VERDICT = 'split-unresolved'
 
 // The token this process printed last — what decides whether `run:cut` prints its section after it.
 const printed = { verdict: '' }
@@ -193,14 +192,6 @@ function report_missing_supervisor(issue: string): number {
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 }
 
-// The lane got the split notice without filing a split child, so nothing was cut and the run does
-// not go on to the gate until it files one (joshuafolkken/kit#6212). `note` names the stop procedure.
-function report_split_unresolved(note: string): number {
-	console.error(note)
-
-	return report(SPLIT_UNRESOLVED_VERDICT, FAILURE_EXIT_CODE)
-}
-
 const run_cut_report = {
 	BAD_HANDOFF_VERDICT,
 	BUSY_VERDICT,
@@ -218,7 +209,6 @@ const run_cut_report = {
 	RELAUNCHED_CUT_MARKER,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	SPLIT_UNRESOLVED_VERDICT,
 	STALE_VERDICT,
 	SUCCESS_EXIT_CODE,
 	UNDER_THRESHOLD_VERDICT,
@@ -238,7 +228,6 @@ const run_cut_report = {
 	report_over,
 	report_relaunched_cut,
 	report_reviewer,
-	report_split_unresolved,
 	report_stale,
 	report_under_threshold,
 	report_unknown,

@@ -1,8 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { adopt_toolkits } from './adopt-toolkits'
+
+const make_directory = temporary_directory()
 
 const KIT = '@joshuafolkken/kit'
 const APP_KIT = '@joshuafolkken/app-kit'
@@ -46,11 +48,7 @@ function install_library(package_name: string): void {
 }
 
 beforeEach(() => {
-	state.project = mkdtempSync(path.join(tmpdir(), 'adopt-toolkits-'))
-})
-
-afterEach(() => {
-	rmSync(state.project, { recursive: true, force: true })
+	state.project = make_directory('adopt-toolkits-')
 })
 
 describe('adopt_toolkits.declared_toolkits', () => {

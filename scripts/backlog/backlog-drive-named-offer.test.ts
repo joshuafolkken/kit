@@ -1,6 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
@@ -13,6 +10,7 @@ import {
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { backlog_drive, type LoopPorts } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
@@ -22,6 +20,7 @@ import { backlog_offer } from './backlog-offer'
 import { backlog_plan_comment } from './backlog-plan-comment'
 
 const ACTIVE = new Date().toISOString()
+const make_directory = temporary_directory()
 const CARRY = {
 	invocation: 'backlogrun #1 #2 --max 1',
 	started_at: ACTIVE,
@@ -156,7 +155,7 @@ function begin_named(target: string, directory: string): RunCarry | undefined {
 async function offer_labelled(
 	labels: ReadonlyArray<string>,
 ): Promise<{ offer: unknown; done: unknown }> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-settled-'))
+	const directory = make_directory('josh-drive-settled-')
 	const target = run_carry.carry_path(directory)
 	const carry = begin_named(target, directory)
 
@@ -169,7 +168,6 @@ async function offer_labelled(
 	const read = run_carry.read_carry(target)
 
 	vi.restoreAllMocks()
-	rmSync(directory, { recursive: true, force: true })
 
 	return { offer, done: read.kind === 'carried' ? read.carry.done : undefined }
 }

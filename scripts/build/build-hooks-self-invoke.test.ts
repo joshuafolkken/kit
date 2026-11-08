@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { lane_background } from '#scripts/rules/lane-background'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { build_hooks, HOOK_BUNDLES, OUT_DIR, outfile_for } from './build-hooks'
 
 const { STAMP_NAME } = hook_bundle_stamp
@@ -18,8 +18,7 @@ const BACKGROUND_ID = 'bxj18z032'
 
 // A lane child's directory (`<root>/.kit-lanes/<N>`), its own empty repository outside this checkout,
 // so no hold, carry record or git state of this checkout reaches the stop decision.
-const created = mkdtempSync(path.join(tmpdir(), 'build-hooks-self-invoke-'))
-const root = realpathSync(created)
+const root = realpathSync(temporary_directory('suite')('build-hooks-self-invoke-'))
 const lane = path.join(root, '.kit-lanes', LANE_ISSUE)
 
 function launch_line(id: string): string {
@@ -68,10 +67,6 @@ beforeAll(async () => {
 	})
 	await build_hooks()
 }, BUILD_TIMEOUT_MS)
-
-afterAll(() => {
-	rmSync(root, { recursive: true, force: true })
-})
 
 // joshuafolkken/kit#4123: a module inlined into a hook bundle shares the entry's `import.meta.url`, so
 // its self-invoke ran its main on every launch and wrote ahead of the decision envelope.

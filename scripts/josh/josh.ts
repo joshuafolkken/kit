@@ -1,5 +1,6 @@
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { command_usage } from './command-usage'
+import { josh_gh_usage } from './josh-gh-usage'
 import { find_package_directory, josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
 import { josh_read_only } from './josh-read-only'
 
@@ -52,7 +53,11 @@ async function main(): Promise<void> {
 	}
 
 	const subcommand_arguments = process.argv.slice(ARGV_OFFSET + 1)
-	const exit_code = await josh_logic.run_command(cmd, subcommand_arguments, is_consumer)
+	const exit_code = await josh_gh_usage.recorded(
+		cmd,
+		subcommand_arguments,
+		async () => await josh_logic.run_command(cmd, subcommand_arguments, is_consumer),
+	)
 
 	if (exit_code === UNKNOWN_COMMAND_EXIT_CODE) handle_unknown(cmd)
 

@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_registry } from '#scripts/lane/lane-registry'
@@ -8,6 +7,7 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_carry_stash } from '#scripts/run/carry/run-carry-stash'
 import { run_merge_collect } from '#scripts/run/merge/run-merge-collect'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlogrun_stop } from './backlogrun-stop'
 
@@ -15,7 +15,8 @@ import { backlogrun_stop } from './backlogrun-stop'
 // replaces with ports — a record a person ended is kept as a stopped run, and pushes no confirmation
 // to the person who typed it.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'backlogrun-stop-live-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('backlogrun-stop-live-test-')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
 const NOW = new Date('2026-10-12T09:00:00.000Z')
@@ -36,7 +37,6 @@ beforeEach(() => {
 afterAll(() => {
 	run_carry.end_carry(carry_target())
 	rmSync(run_carry_ended.ended_path(REPOSITORY), { force: true })
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 describe('backlogrun_stop.stop — wired to the real stops', () => {

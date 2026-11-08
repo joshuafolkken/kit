@@ -1,7 +1,6 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, vi } from 'vitest'
 
 // The console capture and the temporary transcript home the `josh time` CLI suite reads
@@ -25,8 +24,10 @@ function capture_error(message: unknown): void {
 }
 
 function capture_console(): void {
+	const make_directory = temporary_directory()
+
 	beforeEach(() => {
-		state.home = mkdtempSync(path.join(tmpdir(), 'time-cli-'))
+		state.home = make_directory('time-cli-')
 		state.printed = []
 		state.errors = []
 		vi.spyOn(console, 'info').mockImplementation(capture)

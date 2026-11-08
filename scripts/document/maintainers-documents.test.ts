@@ -51,6 +51,14 @@ const INSTALLER_PIN_KEYS: ReadonlyArray<string> = [
 	'SAFE_CHAIN_INSTALLER_VERSION',
 	'SAFE_CHAIN_INSTALLER_SHA256',
 ]
+const SECRETS_SECTION = /^## Secrets$([\s\S]*?)^## /mu
+const GH_WRITE_ROUTES: ReadonlyArray<string> = [
+	'issue:file',
+	'issue:comment',
+	'issue:priority',
+	'git',
+	'pr',
+]
 // A verbatim quote of a Japanese prompt heading or literal sits in a code span, a fence or double
 // quotes (`docs/maintainers/README.md` → "Language"); everything else is English.
 const QUOTED_SPANS = /```[\s\S]*?```|`[^`\n]*`|"[^"\n]*"/gu
@@ -61,6 +69,10 @@ function heading_anchors(text: string): Array<string> {
 	return [...text.matchAll(HEADING_LINE)].map((match) =>
 		(match[1] ?? '').toLowerCase().replaceAll(' ', '-'),
 	)
+}
+
+function secrets_section(): string {
+	return SECRETS_SECTION.exec(read_document(SECURITY))?.[1] ?? ''
 }
 
 interface Manifest {
@@ -174,6 +186,19 @@ describe('the security policy', () => {
 
 	it.each(INSTALLER_PIN_KEYS)('verifies the installer against the pinned %s', (key) => {
 		expect(read_document(SECURITY)).toContain(`\`${key}\``)
+	})
+
+	// joshuafolkken/kit#6759: the egress refusal points here, so the section says what it refuses.
+	it('refuses a direct gh write in the Secrets section', () => {
+		const section = secrets_section()
+
+		expect(section).toContain('refuses a direct `gh` write')
+		expect(section).toContain('`is_gh_write`')
+		expect(section).not.toContain('`gh` against github.com, `git` and `pnpm` stay allowed')
+	})
+
+	it.each(GH_WRITE_ROUTES)('names the josh write route %s in the Secrets section', (route) => {
+		expect(secrets_section()).toContain(`\`${route}\``)
 	})
 })
 

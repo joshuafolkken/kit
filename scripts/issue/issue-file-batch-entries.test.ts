@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { issue_file_batch_entries } from './issue-file-batch-entries'
 
 // joshuafolkken/kit#5660: `josh issue:file --batch <dir>` reads each body file's title from its front
@@ -12,11 +12,8 @@ const SOURCE = 'one.md'
 const TITLE = 'Add a batch filing'
 const BODY = '## 背景\n\nx\n'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-batch-entries-'))
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-batch-entries-')
 
 describe('issue_file_batch_entries.entry_of — the title, body and distinct of one body file', () => {
 	it('reads the title and distinct from the front matter', () => {
@@ -104,10 +101,9 @@ describe('issue_file_batch_entries.entries_of — one file split at %%% lines', 
 // work tree is refused as one `--body-file` would be.
 describe('issue_file_batch_entries.entries_of — where the batch sits', () => {
 	it('refuses a batch file in the work tree that git does not ignore', async () => {
-		const repository = cli_body_repository.create()
+		const repository = cli_body_repository.create(make_directory('issue-file-batch-repository-'))
 		const file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, `${TITLE}\n${BODY}`)
 
 		await expect(issue_file_batch_entries.entries_of(file)).rejects.toThrow('not git-ignored')
-		repository.remove()
 	})
 })

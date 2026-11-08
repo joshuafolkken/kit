@@ -34,6 +34,7 @@ const GROWN = ['scripts/lane/one.ts', 'scripts/lane/two.ts', 'scripts/lane/three
 const PLAN = [String(ISSUE), ...GROWN]
 const QUIET = lane_plan_signals.signals_from(ISSUE, { hunk_files: [], committed_files: [] }, [], 0)
 const PROBED = 'scripts/lane/probed.ts'
+const FILES_WARNING = 'size warning (files)'
 
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
 const error = vi.spyOn(console, 'error')
@@ -82,7 +83,7 @@ describe('lane:plan --single on the files axis', () => {
 			lines: 0,
 			reason: 'files',
 		})
-		expect(error).toHaveBeenCalledWith(expect.stringContaining('single (files)'))
+		expect(error).toHaveBeenCalledWith(expect.stringContaining(FILES_WARNING))
 	})
 
 	it('answers `clear` to `--probe --single`, noting and recording nothing', async () => {
@@ -114,14 +115,33 @@ describe('lane:plan size bar without a waiver', () => {
 		expect(lane_plan.read(ISSUE, directory)).toBeUndefined()
 	})
 
-	it('answers `split (hunks)` to a `--single` plan whose probed hunks outgrow it', async () => {
+	it('answers `split (hunks)` to a first plan without `--single` whose probed hunks outgrow it', async () => {
 		signals_of.mockResolvedValue({ ...QUIET, hunk_files: [PROBED, PROBED, PROBED] })
 
-		expect(await lane_plan_cli.run([...PLAN, SINGLE], directory)).toBe(
+		expect(await lane_plan_cli.run([String(ISSUE), GROWN[0] ?? ''], directory)).toBe(
 			lane_plan_check.SPLIT_EXIT_CODE,
 		)
 		expect(last_error()).toContain('split (hunks)')
 		expect(lane_plan.read(ISSUE, directory)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6602: past the first registration, or for one deliverable, size alone only warns.
+describe('lane:plan size warning', () => {
+	it('records a `--single` plan whose probed hunks outgrow it, with a size warning', async () => {
+		signals_of.mockResolvedValue({ ...QUIET, hunk_files: [PROBED, PROBED, PROBED] })
+
+		expect(await lane_plan_cli.run([...PLAN, SINGLE], directory)).toBe(SUCCESS)
+		expect(last_error()).toContain('size warning (hunks)')
+		expect(lane_plan.read(ISSUE, directory)).toMatchObject({ paths: GROWN, single: true })
+	})
+
+	it('records a re-plan of a sized plan past the files bar, with a size warning', async () => {
+		await lane_plan_cli.run([String(ISSUE), GROWN[0] ?? ''], directory)
+
+		expect(await lane_plan_cli.run(PLAN, directory)).toBe(SUCCESS)
+		expect(last_error()).toContain(FILES_WARNING)
+		expect(lane_plan.read(ISSUE, directory)).toMatchObject({ paths: GROWN, sized: true })
 	})
 
 	it('names `--single` in the usage', () => {
