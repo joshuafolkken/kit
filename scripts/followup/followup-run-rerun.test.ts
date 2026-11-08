@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { followup_run_rerun } from './followup-run-rerun'
+import { POLL_BACKOFF } from '#scripts/lib/poll'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { followup_run_rerun, LATEST_ATTEMPTS, LATEST_INTERVAL_MS } from './followup-run-rerun'
 
 // joshuafolkken/kit#5778: a partial rerun dropped the required `Checks` job from its run's latest
 // attempt, and no failed job was left for `rerun-failed-jobs` to retry.
@@ -9,10 +10,6 @@ vi.mock(import('#scripts/gh/git-gh-exec'), async (import_original) => {
 
 	return { ...actual, git_gh_exec: { ...actual.git_gh_exec, exec_gh_api: vi.fn() } }
 })
-
-vi.mock('#scripts/lib/poll', () => ({
-	poll: { poll_until: vi.fn(async (check: () => Promise<boolean>) => await check()) },
-}))
 
 const { git_gh_exec } = await import('#scripts/gh/git-gh-exec')
 
@@ -26,10 +23,19 @@ const UNIT = { name: 'Unit Tests', conclusion: 'success' }
 const CHECKS_JOB = { name: CHECKS, conclusion: 'success' }
 const RERUN_PATH = `${ACTIONS}runs/${String(RUN_ID)}/rerun`
 const MISSING = { contexts: [CHECKS], head_sha: HEAD_SHA }
+const LATEST_FILTER = 'filter=latest'
 
 interface World {
 	latest: Array<{ name: string; conclusion: string }>
 	is_rerun?: boolean
+	after_rerun?: Array<World['latest']>
+}
+
+// After the rerun, each read takes the next of `after_rerun`; the lost job is back once they run out.
+function latest_of(world: World): World['latest'] {
+	if (world.is_rerun !== true) return world.latest
+
+	return world.after_rerun?.shift() ?? [UNIT, CHECKS_JOB]
 }
 
 function answer_actions(world: World): void {
@@ -37,9 +43,9 @@ function answer_actions(world: World): void {
 		if (method === 'POST') world.is_rerun = true
 		if (path.includes('runs?head_sha=')) return JSON.stringify({ workflow_runs: [{ id: RUN_ID }] })
 		if (path.includes('filter=all')) return JSON.stringify({ jobs: [UNIT, CHECKS_JOB] })
-		const latest = world.is_rerun === true ? [UNIT, CHECKS_JOB] : world.latest
+		if (path.includes(LATEST_FILTER)) return JSON.stringify({ jobs: latest_of(world) })
 
-		return JSON.stringify({ jobs: latest })
+		return ''
 	})
 }
 
@@ -54,13 +60,32 @@ beforeEach(() => {
 	vi.spyOn(console, 'info').mockReturnValue()
 })
 
+afterEach(() => {
+	vi.useRealTimers()
+})
+
+async function recover_waited_ms(): Promise<number> {
+	vi.useFakeTimers()
+	const started = Date.now()
+	const outcome = followup_run_rerun.recover_missing(MISSING)
+
+	await vi.runAllTimersAsync()
+	expect(await outcome).toBe('rerun')
+
+	return Date.now() - started
+}
+
+function latest_reads(): number {
+	return api.mock.calls.filter(([request]) => request.path.includes(LATEST_FILTER)).length
+}
+
 describe('recover_missing — the whole run that lost a required job', () => {
 	it('reruns the whole run once and confirms the job is back in its latest attempt', async () => {
 		answer_actions({ latest: [UNIT] })
 
 		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('rerun')
 		expect(posts()).toStrictEqual([RERUN_PATH])
-		expect(api.mock.calls.at(-1)?.[0].path).toContain('filter=latest')
+		expect(api.mock.calls.at(-1)?.[0].path).toContain(LATEST_FILTER)
 	})
 
 	it('waits again without a rerun when the job is already in the latest attempt', async () => {
@@ -68,6 +93,26 @@ describe('recover_missing — the whole run that lost a required job', () => {
 
 		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('present')
 		expect(posts()).toStrictEqual([])
+	})
+
+	// joshuafolkken/kit#6725: fewer reads than the fixed cadence, over the same total wait.
+	it('backs off over the whole wait when the job never comes back', async () => {
+		const after_rerun = Array.from({ length: LATEST_ATTEMPTS }, () => [UNIT])
+
+		answer_actions({ latest: [UNIT], after_rerun })
+
+		await expect(recover_waited_ms()).resolves.toBe((LATEST_ATTEMPTS - 1) * LATEST_INTERVAL_MS)
+		expect(after_rerun.length).toBeGreaterThan(0)
+		expect(latest_reads()).toBeLessThan(1 + LATEST_ATTEMPTS)
+	})
+
+	// The backoff watches the latest jobs: a job whose conclusion moved starts the next wait over.
+	it('waits from the first interval again once a latest job moved', async () => {
+		answer_actions({ latest: [UNIT], after_rerun: [[{ ...UNIT, conclusion: 'neutral' }], [UNIT]] })
+
+		await expect(recover_waited_ms()).resolves.toBe(
+			POLL_BACKOFF.initial_ms + POLL_BACKOFF.initial_ms,
+		)
 	})
 })
 
