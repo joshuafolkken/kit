@@ -6,6 +6,10 @@ import { gh_permission_cache } from './gh-permission-cache'
 const api_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+// The permission lookup goes through the ETag layer (joshuafolkken/kit#6754); here it reaches the mock.
+vi.mock('#scripts/gh/git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (api_path: string) => await api_mock({ path: api_path }) },
+}))
 
 const REPO = 'owner/repo'
 const READ_AT = 1_000_000
