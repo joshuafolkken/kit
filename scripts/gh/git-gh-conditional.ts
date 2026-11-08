@@ -78,15 +78,17 @@ async function request_conditional(
 	}
 }
 
+// A caller's `timeout_ms` bounds the whole read, so its timeout is final rather than retried: three
+// attempts and their waits would outlast the per-tool-call hook that bounds it (joshuafolkken/kit#6754).
 async function read_conditional(
 	path: string,
 	etag: string | undefined,
 	timeout_ms?: number,
 ): Promise<ConditionalRead> {
+	const retry = timeout_ms === undefined ? gh_retry.with_read_retry : gh_retry.with_retry
+
 	try {
-		return await gh_retry.with_read_retry(
-			async () => await request_conditional(path, etag, timeout_ms),
-		)
+		return await retry(async () => await request_conditional(path, etag, timeout_ms))
 	} catch (error) {
 		return { kind: 'unreadable', cause: error }
 	}

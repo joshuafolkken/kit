@@ -168,6 +168,15 @@ describe('conditional merge-gate reads — #5473', () => {
 			expect(gh_retry.is_transient(error)).toBe(false)
 		},
 	)
+
+	it('stops at the first timeout of a read the caller bounds', async () => {
+		const error = timeout('')
+		const command = mocked_command().mockRejectedValue(error)
+		const result = git_gh_conditional.read_conditional(CHECK_RUNS_PATH, undefined, TIMEOUT_MS)
+
+		await expect(result).resolves.toStrictEqual({ kind: 'unreadable', cause: error })
+		expect(command).toHaveBeenCalledTimes(1)
+	})
 })
 
 describe('conditional merge-gate reads — final failures', () => {
