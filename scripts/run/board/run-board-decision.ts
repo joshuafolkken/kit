@@ -1,4 +1,5 @@
 import { markdown_section } from '#scripts/issue/markdown-section'
+import { run_park_body } from '#scripts/run/park/run-park-body'
 import type { BoardPlan, RowRead, RowReason } from './run-board-layout'
 
 // The park's question, then after `;` a note on why it parked that is not the question
@@ -28,11 +29,24 @@ function note_of(note: string | undefined): string {
 	return note === undefined ? '' : ` (${note.trim()})`
 }
 
-function comment_question(bodies: ReadonlyArray<string>): string | undefined {
-	const body = bodies.at(-1)
-	const heading = markdown_section.unfenced_lines(body ?? '').find((line) => HEADING.test(line))
+// A schema heading of the park body (`run-park-body.ts`) is not the question.
+function is_question(line: string): boolean {
+	return HEADING.test(line) && !run_park_body.HEADINGS.includes(line.trim())
+}
+
+function heading_of(body: string): string | undefined {
+	const heading = markdown_section.unfenced_lines(body).find((line) => is_question(line))
 
 	return HEADING.exec(heading ?? '')?.[1]?.trim()
+}
+
+// The park's question, then its recommendation and tier on the same line (joshuafolkken/kit#6688).
+function comment_question(bodies: ReadonlyArray<string>): string | undefined {
+	const body = bodies.at(-1) ?? ''
+	const parts = [heading_of(body), run_park_body.summary_of(body)]
+	const present = parts.filter((part) => part !== undefined)
+
+	return present.length === 0 ? undefined : present.join(' — ')
 }
 
 function read_question(number: number, read: RowRead): string {

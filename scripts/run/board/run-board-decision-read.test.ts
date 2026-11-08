@@ -89,6 +89,30 @@ describe('run_board_decision', () => {
 	})
 })
 
+const PARK_OPTIONS = [
+	'### 選択肢',
+	'1. Keep the account',
+	'   - 層: A',
+	'   - 必要な権限: owner コメント',
+	'2. Rotate the account',
+	'   - 層: C',
+	'   - 必要な権限: 人',
+].join('\n')
+
+function park_body(heading: string, pick: string): string {
+	return `${heading}${PARK_OPTIONS}\n\n### 推奨\n${pick}\n`
+}
+
+describe('run_board_decision park summary (ac-0be6b188)', () => {
+	it.each([
+		[park_body(`## ${QUESTION}\n\n`, '2 the key leaked'), `${QUESTION} — 推奨: 2（層 C）`],
+		[park_body(`## ${QUESTION}\n\n`, '推奨なし both need the owner'), `${QUESTION} — 推奨なし`],
+		[park_body('', '1 cheaper'), '推奨: 1（層 A）'],
+	])('shows the recommendation and tier on the park row: %s', (body, expected) => {
+		expect(run_board_decision.comment_question([body])).toBe(expected)
+	})
+})
+
 describe('run_board_decision waiting detail', () => {
 	it.each(['', '- 人の判断: 不要'])(
 		'omits the detail when the body has no human detail: %s',
