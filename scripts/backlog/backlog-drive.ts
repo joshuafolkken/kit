@@ -31,6 +31,7 @@ import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 import { backlog_offer_timing, type LoopRun, type OfferTiming } from './backlog-offer-timing'
+import { backlog_yield_cap, type YieldCapPorts } from './backlog-yield-cap'
 
 const { MERGE_TOKEN } = run_merge_token
 const { HANDOFF_TOKENS, IMMEDIATE_TOKENS, TOKEN_HANDLING } = backlog_drive_token_handling
@@ -75,7 +76,8 @@ interface DriveState extends OfferTiming {
 	// The children this run has in flight — seeded from the open lanes, so a restarted loop resumes them.
 	in_flight: Array<string>
 	// Every child merged, fed back to `backlog:offer` because GitHub closes a merged issue late. A parked
-	// child is left out: its labels classify it, so one a person released is offered again.
+	// child is left out: its labels classify it, so one a person released is offered again — except one
+	// the yield cap parked (`backlog-yield-cap.ts`), which stays out whether or not its park went through.
 	exclude: Array<string>
 	// When the run last did something, handed to `backlog:budget` as `--active`.
 	active: string
@@ -103,7 +105,8 @@ interface DriveEnd {
 
 type Collected = Pick<MergeResult, 'token' | 'outcome' | 'is_offer'>
 
-interface DrivePorts {
+// The yield cap's ports (`backlog-yield-cap.ts`): the issue's yields, and its park.
+interface DrivePorts extends YieldCapPorts {
 	// Whether a child's process has confirmed-ended — `lane:await`'s re-confirmed check in production.
 	is_finished: (issue: string) => boolean
 	// `run:merge <N>`'s first stdout token and the outcome it handled the child as.
@@ -226,7 +229,13 @@ async function collect(issue: string, state: DriveState, ports: DrivePorts): Pro
 	if (token === '') return ended('merge', state, undefined, issue)
 	if (!is_offer && IMMEDIATE_TOKENS.has(token)) return ended('merge', state, token, issue)
 
-	const next = collected_state(issue, collected, state, ports.now().toISOString())
+	const active = ports.now().toISOString()
+	const next = await backlog_yield_cap.capped(
+		issue,
+		collected.outcome,
+		collected_state(issue, collected, state, active),
+		ports,
+	)
 
 	return {
 		kind: 'continue',
