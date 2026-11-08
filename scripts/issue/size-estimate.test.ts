@@ -193,7 +193,7 @@ describe('size_estimate.over_guide', () => {
 	})
 })
 
-// joshuafolkken/kit#5502: past the cap a declared reason no longer excuses a filing.
+// joshuafolkken/kit#5502: past the cap a filing with no declared reason is refused.
 // joshuafolkken/kit#5654: the doubled declaration is what meets the cap, so 6 / 150 sits at it
 // (joshuafolkken/kit#6066 lowered it to one and a half times the guide).
 describe('size_estimate cap', () => {
@@ -204,17 +204,17 @@ describe('size_estimate cap', () => {
 		expect(size_estimate.over_cap(body, undefined)).toBeUndefined()
 	})
 
-	it('refuses 7 files with a reason declared', () => {
-		const body = body_with(estimate(7, 150), REASON)
-		const problem = size_estimate.guide_problem(body, undefined)
+	it('refuses 7 files with no reason declared', () => {
+		const problem = size_estimate.guide_problem(body_with(estimate(7, 150)), undefined)
 
 		expect(problem).toContain('7 file(s) / 150 line(s) × 2 = 14 file(s) / 300 line(s)')
-		expect(problem).toContain('exceeds the cap (more than 12 files or 300 lines)')
+		expect(problem).toContain('exceeds the cap (more than 12 files or 300 lines) with no')
 		expect(problem).toContain('--route split')
+		expect(problem).toContain('- 分割しない理由: <理由>')
 	})
 
-	it('refuses 151 lines with a reason declared', () => {
-		const body = body_with(estimate(6, 151), REASON)
+	it('refuses 151 lines with no reason declared', () => {
+		const body = body_with(estimate(6, 151))
 
 		expect(size_estimate.over_cap(body, undefined)).toEqual({
 			files: 6,
@@ -223,11 +223,12 @@ describe('size_estimate cap', () => {
 		})
 	})
 
-	// The lane that prompted the factor: declared 9 / 400, it passed with a reason and landed at 13 / 450.
-	it('refuses 9 files / 400 lines with a reason declared', () => {
+	// joshuafolkken/kit#6602: the declared reason is the pre-start decision, so it excuses the cap.
+	it('passes 9 files / 400 lines with a reason declared', () => {
 		const body = body_with(estimate(9, 400), REASON)
 
-		expect(size_estimate.guide_problem(body, undefined)).toContain('exceeds the cap')
+		expect(size_estimate.guide_problem(body, undefined)).toBeUndefined()
+		expect(size_estimate.over_cap(body, undefined)).toBeUndefined()
 	})
 
 	it('passes a split child over the cap', () => {

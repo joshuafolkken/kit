@@ -135,7 +135,9 @@ describe('backlog_drive_idle.describe — an estimate over the size cap', () => 
 		const over = issue(OVER_CAP, { body })
 		const text = backlog_drive_idle.describe({ merged: 0, issues: [...POOL, over], now_ms: NOW_MS })
 
-		expect(text).toContain(`(over the size cap):\n- #${String(OVER_CAP)} Issue ${String(OVER_CAP)}`)
+		expect(text).toContain(
+			`(over the size cap, no reason declared):\n- #${String(OVER_CAP)} Issue ${String(OVER_CAP)}`,
+		)
 		expect(text).not.toContain(`- #${String(READY)}`)
 	})
 })

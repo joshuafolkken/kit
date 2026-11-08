@@ -15,8 +15,9 @@ import { split_measure } from './split-measure'
 import { split_verified_single } from './split-verified-single'
 
 // A split child answers a notice, or a fresh measurement falls under its bar. The child is recorded
-// as the filing lands (joshuafolkken/kit#6212). A reason comment cannot answer the notice; one
-// verified deliverable with nothing left to split can (`split-verified-single.ts`).
+// as the filing lands (joshuafolkken/kit#6212); one verified deliverable with nothing left to split
+// answers it too (`split-verified-single.ts`). An unanswered notice is a warning the later steps print,
+// never a stop: size alone does not re-split a started Issue (joshuafolkken/kit#6602).
 
 const NOTICE_SECTION = `split-assessment.md → "${split_assess.NOTICE_SECTION}"`
 
@@ -38,15 +39,15 @@ function split_issues(entries: ReadonlyArray<LedgerEntry>): ReadonlySet<number> 
 	return new Set(entries.filter((entry) => is_split_child(entry)).map((entry) => entry.issue))
 }
 
-function refusal_text(notice: SplitNoticeEntry): string {
+function warning_text(notice: SplitNoticeEntry): string {
 	const counted = `${String(notice.files)} file(s), ${String(notice.lines)} line(s), tests excluded`
-	const action = `stop implementation, keep only the green part and file the rest with \`pnpm josh issue:file --route split --found-during ${String(notice.issue)}\``
+	const action = `go on; file a split child with \`pnpm josh issue:file --route split --found-during ${String(notice.issue)}\` only for an independent added requirement or scope growth this Issue cannot verify`
 
-	return `${session_cite.issue(notice.issue)} got the split notice (${counted}) and has no split child. ${action}, then run \`pnpm josh run:cut ${String(notice.issue)}\` again and ship the green part — ${NOTICE_SECTION}`
+	return `size warning: ${session_cite.issue(notice.issue)} got the split notice (${counted}) — not a stop. ${action} — ${NOTICE_SECTION}`
 }
 
-// The refusal for a noticed Issue without a split child, else `undefined`; no GitHub read is needed.
-async function refusal(
+// The warning for a noticed Issue without a split child, else `undefined`; no GitHub read is needed.
+async function warning(
 	issue: number,
 	entries: ReadonlyArray<LedgerEntry>,
 ): Promise<string | undefined> {
@@ -54,7 +55,7 @@ async function refusal(
 
 	if (notice === undefined || split_issues(entries).has(issue)) return undefined
 
-	return refusal_text(notice)
+	return warning_text(notice)
 }
 
 // Whether the branch still passes the notice bar; a failed measurement keeps the notice.
@@ -68,12 +69,12 @@ async function is_still_over(): Promise<boolean> {
 	}
 }
 
-// The refusal against this repository's lane ledger; outside a repository there is none to read. A
+// The warning against this repository's lane ledger; outside a repository there is none to read. A
 // notice still over its bar stands unless the work is one verified deliverable (joshuafolkken/kit#6572).
-async function ledger_refusal(issue: number): Promise<string | undefined> {
+async function ledger_warning(issue: number): Promise<string | undefined> {
 	const ledger = await lane_ledger.target()
 	const note =
-		ledger === undefined ? undefined : await refusal(issue, lane_ledger.read_entries(ledger))
+		ledger === undefined ? undefined : await warning(issue, lane_ledger.read_entries(ledger))
 
 	if (note === undefined || !(await is_still_over())) return undefined
 
@@ -123,12 +124,12 @@ async function record_fold({ origin, target }: Fold): Promise<void> {
 }
 
 const split_resolution = {
-	ledger_refusal,
+	ledger_warning,
 	notices,
 	record_child,
 	record_fold,
-	refusal,
 	split_issues,
+	warning,
 }
 
 export { split_resolution }

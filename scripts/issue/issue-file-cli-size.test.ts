@@ -23,6 +23,8 @@ const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-size-'))
 const over_path = path.join(work, 'over.md')
 const reasoned_path = path.join(work, 'reasoned.md')
 const capped_path = path.join(work, 'capped.md')
+const unreasoned_cap_path = path.join(work, 'capped-unreasoned.md')
+const CAP_TEXT = 'exceeds the cap'
 
 function body_of(...declarations: ReadonlyArray<string>): string {
 	const sections = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
@@ -41,6 +43,7 @@ function body_of(...declarations: ReadonlyArray<string>): string {
 writeFileSync(over_path, body_of(OVER_GUIDE))
 writeFileSync(reasoned_path, body_of(OVER_GUIDE, REASON))
 writeFileSync(capped_path, body_of(OVER_CAP, REASON))
+writeFileSync(unreasoned_cap_path, body_of(OVER_CAP))
 
 function argv_of(body_file: string, ...extra: ReadonlyArray<string>): Array<string> {
 	return ['A title', '--body-file', body_file, ...extra]
@@ -86,17 +89,25 @@ describe('issue_file_cli.run — a size estimate over the split guide', () => {
 	})
 })
 
-// joshuafolkken/kit#5502: over the cap the declared reason no longer lets it through; a split does.
+// joshuafolkken/kit#5502: over the cap a filing with no reason is refused; a split or a declared
+// reason — the pre-start single-deliverable decision (joshuafolkken/kit#6602) — lets it through.
 describe('issue_file_cli.run — a size estimate over the cap', () => {
-	it('refuses the filing despite a reason declared', async () => {
-		expect(await issue_file_cli.run(argv_of(capped_path))).toBe(FAILURE_EXIT_CODE)
+	it('refuses the filing with no reason declared', async () => {
+		expect(await issue_file_cli.run(argv_of(unreasoned_cap_path))).toBe(FAILURE_EXIT_CODE)
 		expect(refusals()).toContain('exceeds the cap (more than 12 files or 300 lines)')
 	})
 
-	it('lets it through filed as a split', async () => {
-		await issue_file_cli.run(argv_of(capped_path, '--route', 'split'))
+	it('lets it through with a reason declared', async () => {
+		await issue_file_cli.run(argv_of(capped_path))
 
-		expect(refusals()).not.toContain('exceeds the cap')
+		expect(refusals()).not.toContain(CAP_TEXT)
+		expect(scout).toHaveBeenCalledTimes(1)
+	})
+
+	it('lets it through filed as a split', async () => {
+		await issue_file_cli.run(argv_of(unreasoned_cap_path, '--route', 'split'))
+
+		expect(refusals()).not.toContain(CAP_TEXT)
 		expect(scout).toHaveBeenCalledTimes(1)
 	})
 })

@@ -1,5 +1,4 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
-import { split_resolution } from '#scripts/split/split-resolution'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
 // review in one call, not one model round trip per command. Each stage runs as its own `josh` command,
@@ -54,27 +53,13 @@ function rerun(issue: string, from?: string, mode: ReadonlyArray<string> = []): 
 	return `then rerun \`${[COMMAND, issue, ...mode, ...resume].join(' ')}\``
 }
 
-// `main:merge` exits 0 on its split notice, which is answered before the cut (`split-assessment.md` →
-// "Over the guide before the gate"), so the chain holds on the check the cut refuses with
-// (`split-unresolved`): a notice on record without a split child.
-async function split_hold(issue: string): Promise<HoldStop | undefined> {
-	const notice = await split_resolution.ledger_refusal(Number(issue))
-
-	if (notice === undefined) return undefined
-
-	return {
-		notice,
-		next: (target) =>
-			`stop implementation, file the rest as a split child, issue \`pnpm josh run:cut ${target}\` alone again, ${rerun(target, SELFCHECK)}`,
-	}
-}
-
+// `main:merge` exits 0 on its split notice and prints it: a size notice is a warning, so the chain goes
+// on to the review stages without a split child (joshuafolkken/kit#6602).
 const MERGE_STAGE: ChainStage = {
 	name: MAIN_MERGE,
 	argv: [MAIN_MERGE],
 	next: (issue) =>
 		`settle what \`${MAIN_MERGE}\` refused (\`chain-rule.md\` → "Orchestration facts single-sourced here"), ${rerun(issue)}`,
-	hold: split_hold,
 }
 
 // `--unpinned-ok "<reason>"` as given, forwarded to `run:review` alone; empty when absent.
