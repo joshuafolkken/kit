@@ -120,7 +120,31 @@ test('waits on a declared issue whose yielded plan a lane in flight still holds'
 
 	expect(offer?.verdict).toBe('wait')
 	expect(declared).toHaveBeenCalledWith([RUNNING], process.cwd())
-	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd())
+	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd(), undefined)
+	vi.restoreAllMocks()
+})
+
+// joshuafolkken/kit#6798: the yielded issue is held on its own declaration — its plan comment when that
+// came after the kept plan — not on the kept paths alone.
+test('holds a yielded issue on its own declared scope', async () => {
+	const scope = new Set(['scripts/issue/issue-read.ts'])
+
+	vi.spyOn(lane_plan, 'is_yielded').mockImplementation((issue) => issue === 1)
+	vi.spyOn(auto_ok_cli, 'fetch_opted_in').mockResolvedValue({
+		kind: 'read',
+		issues: [RUNNING],
+		cutoff: cutoff_of(1, LISTING_LIMIT, false),
+	})
+	const declared = vi
+		.spyOn(backlog_plan_comment, 'declared_of')
+		.mockResolvedValueOnce(DECLARED)
+		.mockResolvedValueOnce(new Map([[1, scope]]))
+	const held = vi.spyOn(lane_plan, 'is_yield_held').mockImplementation((issue) => issue === 1)
+
+	await backlog_drive_named_offer.read(CARRY, backlog_drive.initial_state(['3'], ACTIVE), CONTEXT)
+
+	expect(declared).toHaveBeenLastCalledWith([{ number: 1 }], process.cwd())
+	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd(), scope)
 	vi.restoreAllMocks()
 })
 
