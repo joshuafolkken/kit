@@ -204,7 +204,10 @@ describe('Codex pre-tool adaptation', () => {
 		await codex_hook_adapter.write_pretool_outcome(codex_payload([TYPESCRIPT_FILE]))
 
 		expect(emit).toHaveBeenCalledWith(outcome)
-		expect(mark).toHaveBeenCalledWith(outcome)
+		expect(mark).toHaveBeenCalledWith(
+			outcome,
+			codex_hook_adapter.pretool_payload(codex_payload([TYPESCRIPT_FILE])),
+		)
 	})
 })
 

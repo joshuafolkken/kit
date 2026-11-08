@@ -223,7 +223,7 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 	})
 
 	// joshuafolkken/kit#3444: the reminder's edit is the lane child's move from plan to code.
-	it('marks the implement phase beside the reminder, and only then', async () => {
+	it('marks each allowed runtime edit even after the reminder was spent', async () => {
 		mark_implement.mockClear()
 		const payload = edit_payload_with_transcript()
 
@@ -231,7 +231,7 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 		await pretool_outcome_async(payload)
 		await pretool_outcome_async(payload_with_transcript(BENIGN_COMMAND))
 
-		expect(mark_implement).toHaveBeenCalledOnce()
+		expect(mark_implement).toHaveBeenCalledTimes(2)
 	})
 
 	it('lets an asynchronous refusal win over the reminder', async () => {
@@ -259,13 +259,16 @@ describe('pretool_outcome — the shell rules at the first Bash call', () => {
 
 // joshuafolkken/kit#3444: the Codex adapter marks the phase through the same helper.
 describe('pretool_guard.mark_phase', () => {
-	it('marks the implement phase from the reminder alone', async () => {
+	it('marks allowed runtime edits independently of the reminder', async () => {
 		mark_implement.mockClear()
+		const payload = edit_payload_with_transcript()
 
-		await pretool_guard.mark_phase(outcome(undefined, 'another notice', undefined))
-		await pretool_guard.mark_phase(outcome(undefined, step_zero_notice.NOTICE, undefined))
+		await pretool_guard.mark_phase(CLEAR, payload)
+		await pretool_guard.mark_phase(outcome(undefined, 'another notice', undefined), payload)
+		await pretool_guard.mark_phase(outcome('refused', undefined, undefined), payload)
+		await pretool_guard.mark_phase(CLEAR, payload_with_transcript(BENIGN_COMMAND))
 
-		expect(mark_implement).toHaveBeenCalledOnce()
+		expect(mark_implement).toHaveBeenCalledTimes(2)
 	})
 })
 

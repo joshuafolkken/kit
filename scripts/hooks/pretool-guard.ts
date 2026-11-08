@@ -123,11 +123,12 @@ function pretool_outcome(raw_payload: string): GuardOutcome {
 	return with_session_notice(guard_outcome(raw_payload), raw_payload)
 }
 
-// The Step 0 notice fires once, on the first runtime-file edit: the moment a lane child's plan turns
-// into code, which `run:board` draws as its `implement` phase. Both the Claude
-// path and the Codex adapter call this on their final outcome, so neither runtime skips the phase.
-async function mark_phase(outcome: GuardOutcome): Promise<void> {
-	if (outcome.notice === step_zero_notice.NOTICE) await lane_phase.mark_implement()
+// Both providers mark allowed runtime edits independently of the transcript-keyed Step 0 notice.
+// The lane event writer deduplicates them within the child's launch.
+async function mark_phase(outcome: GuardOutcome, raw_payload: string): Promise<void> {
+	if (outcome.reason !== undefined || !step_zero_notice.is_runtime_edit(raw_payload)) return
+
+	await lane_phase.mark_implement()
 }
 
 // The watcher guard is the one composed rule that cannot answer synchronously — it reads the lane
@@ -161,7 +162,7 @@ async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome>
 
 	const outcome = with_session_notice(base, raw_payload)
 
-	await mark_phase(outcome)
+	await mark_phase(outcome, raw_payload)
 
 	return outcome
 }

@@ -139,7 +139,7 @@ async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	const outcome = pretool_outcome(raw_payload)
 
 	hook_decision.emit_outcome(outcome)
-	await pretool_guard.mark_phase(outcome)
+	await pretool_guard.mark_phase(outcome, pretool_payload(raw_payload))
 }
 
 async function run(raw_payload: string, mode: string): Promise<void> {
