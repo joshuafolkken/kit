@@ -14,7 +14,7 @@ import { markdown_section } from './markdown-section'
 const FEATURE_DECLARATIONS = ['- 目的: 機能追加', '- 目的: 機能改善', '- 目的: 時間短縮']
 const BREAKING_DECLARATION = '- 互換性: 破壊的変更'
 const NON_BUG_DECLARATION = '- 種別: 非不具合'
-const NON_BUG_LINE = new RegExp(`^ {0,3}${NON_BUG_DECLARATION}[ \\t]*$`, 'mu')
+const NON_BUG_LINE = new RegExp(String.raw`^ {0,3}${NON_BUG_DECLARATION}[ \t]*$`, 'mu')
 const CLASSIFICATION_LABELS = [BUG_LABEL, ENHANCEMENT_LABEL, BREAKING_CHANGE_LABEL]
 const CONFLICT = 'bug and enhancement declarations cannot be combined'
 const MISSING_BUG_CLASSIFICATION = 'missing bug classification'
