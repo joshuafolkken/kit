@@ -20,7 +20,7 @@ const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 // one format.
 const DECLARATION_PREFIX = '- リリース分類: '
 const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
-const DECLARATION_LINE = new RegExp(`^${DECLARATION_PREFIX}.*(?:\\n|$)`, 'gmu')
+const DECLARATION_LINE = new RegExp(String.raw`^${DECLARATION_PREFIX}.*(?:\n|$)`, 'gmu')
 const BACKGROUND_HEADING = '## 背景'
 const BULLET = '- '
 const NEWLINE = '\n'
