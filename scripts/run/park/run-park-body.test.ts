@@ -108,3 +108,21 @@ describe('run_park_body.auto_pick', () => {
 		expect(run_park_body.auto_pick(body)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#6670: the option `backlog:triage --adopt` may take, refused before any write.
+describe('run_park_body.adopt_problem', () => {
+	it.each([
+		['the recommended tier A option', PICK_ONE, 1],
+		['another tier A option beside a recommendation', PICK_TWO, 1],
+	])('lets a parent adopt %s', (_case, pick, option) => {
+		expect(run_park_body.adopt_problem(body_with(pick), option)).toBeUndefined()
+	})
+
+	it.each([
+		['a park with no recommendation (ac-77bc914f)', NO_PICK, 1, 'the park says 推奨なし'],
+		['an unlisted option (ac-77bc914f)', PICK_ONE, 3, '### 選択肢 lists no option 3'],
+		['a tier C option (ac-77bc914f)', PICK_TWO, 2, 'option 2 is tier C'],
+	])('refuses %s', (_case, pick, option, problem) => {
+		expect(run_park_body.adopt_problem(body_with(pick), option)).toContain(problem)
+	})
+})
