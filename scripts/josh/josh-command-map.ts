@@ -22,12 +22,19 @@ const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = [
 const COMMAND_MAP: Record<string, CommandEntry> = {
 	completion: {
 		script: 'scripts/josh/josh-completion.ts',
-		description: 'Print command names and aliases for shell completion',
+		description: 'Print command names and aliases, or a shell completion script',
 		category: 'Development',
-		reference: ['--names', 'automation', ['none']],
+		reference: ['--names | <zsh|bash|fish>', 'automation', ['none']],
 		is_bundled: true,
 		is_read_only: true,
-		usage: { examples: [{ arguments: '--names' }] },
+		usage: {
+			examples: [
+				{ arguments: '--names' },
+				{ arguments: 'zsh' },
+				{ arguments: 'bash' },
+				{ arguments: 'fish' },
+			],
+		},
 	},
 	...DEV_COMMANDS,
 	...PROJECT_COMMANDS,
