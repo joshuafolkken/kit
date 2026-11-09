@@ -35,6 +35,7 @@ describe('cost_audit_kind.kind_of — the kind is read off the opening prompt', 
 		['kickoff #123', false, 'kickoff'],
 		[HANDOFF_PROMPT, false, 'handoff'],
 		[EARLIER_HANDOFF_PROMPT, false, 'handoff'],
+		[`${HANDOFF_PROMPT}\nTighten the /code-review round cap.`, false, 'handoff'],
 		['Why is the CPU at 100%?', false, cost_audit_kind.CONVERSATION],
 		['', false, cost_audit_kind.CONVERSATION],
 	])('reads %j (delegated: %s) as %s', (prompt, is_delegated, kind) => {

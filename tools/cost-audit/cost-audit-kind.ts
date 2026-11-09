@@ -10,7 +10,8 @@
 //
 // A `josh run:handoff` child opens with its keyword too, so it is read off the origin its preamble names
 // before the keyword: counted as the keyword, a session handed over from a consultation reads as a
-// typed run's regression (joshuafolkken/kit#6898).
+// typed run's regression (joshuafolkken/kit#6898). Its free-text brief can name `/code-review`, so the
+// origin is read before the review rule.
 
 import { run_handoff_launch } from '#scripts/run/handoff/run-handoff-launch'
 
@@ -30,10 +31,10 @@ interface KindRule {
 
 const RULES: ReadonlyArray<KindRule> = [
 	{ kind: 'wake', matches: (prompt) => prompt.includes(WAKE_MARKER) },
+	{ kind: 'handoff', matches: (prompt) => prompt.includes(run_handoff_launch.ORIGIN_MARKER) },
 	{ kind: REVIEW, matches: (prompt) => prompt.includes(REVIEW_MARKER) },
 	{ kind: 'subagent', matches: (_prompt, is_delegated) => is_delegated },
 	{ kind: 'resume', matches: (prompt) => prompt.trimStart().startsWith(RESUME_PREFIX) },
-	{ kind: 'handoff', matches: (prompt) => prompt.includes(run_handoff_launch.ORIGIN_MARKER) },
 ]
 
 function run_keyword(prompt: string): string | undefined {
