@@ -1,6 +1,6 @@
-import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { chmodSync, existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { auth_setup_cli } from './auth-setup-cli'
 import { claude_token } from './claude-token'
@@ -25,6 +25,7 @@ printf '%s\n' 'Token created.' "$FAKE_PRINTED" 'Store this token securely.'
 exit "$FAKE_EXIT"
 `
 const scratch = { directory: '' }
+const make_directory = temporary_directory()
 
 function printed(stream: typeof console.info): string {
 	return vi.mocked(stream).mock.calls.flat().join('\n')
@@ -42,7 +43,7 @@ function everything_printed(): string {
 }
 
 function install_claude(): void {
-	scratch.directory = mkdtempSync(path.join(os.tmpdir(), 'auth-setup-cli-test-'))
+	scratch.directory = make_directory('auth-setup-cli-test-')
 	writeFileSync(path.join(scratch.directory, 'claude'), CLAUDE)
 	chmodSync(path.join(scratch.directory, 'claude'), EXECUTABLE_MODE)
 	vi.stubEnv('PATH', `${scratch.directory}:${SYSTEM_PATH}`)
@@ -64,7 +65,6 @@ afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.resetAllMocks()
 	vi.restoreAllMocks()
-	rmSync(scratch.directory, { force: true, recursive: true })
 })
 
 describe('auth_setup_cli.run — saving the token', () => {

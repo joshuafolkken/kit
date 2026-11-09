@@ -1,10 +1,9 @@
 import { repo_party } from '#scripts/discovery/repo-party'
-import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { git_gh_api_path } from './git-gh-api-path'
-import { git_gh_exec } from './git-gh-exec'
 import type { BlockedBy, RestIssue } from './git-gh-issue-rest'
-import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
+import { git_gh_transport } from './git-gh-transport'
 
 // One issue's body, labels, blocker relations and comments in **one** GraphQL query
 // (joshuafolkken/kit#6722). REST serves them from three endpoints, each a request against the
@@ -16,7 +15,7 @@ import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
 // `gh issue view --json` spelling and no caller downstream changes.
 //
 // **`undefined` hands the read back to REST**, never a partial answer: a repository the checkout
-// cannot name, a cloud session's 403, a number that is a pull request or nothing (GraphQL answers
+// cannot name, a session on REST (`git-gh-transport.ts`), a number that is a pull request or nothing (GraphQL answers
 // `null` with an `errors` document, which fails the schema), or more comments than one page. REST
 // keeps telling a missing number from a failed read, which a GraphQL error document does not.
 
@@ -33,12 +32,16 @@ const AUTHOR = 'author { login type: __typename }'
 const BLOCKER = 'number state repository { nameWithOwner }'
 const COMMENT = `url body createdAt authorAssociation ${AUTHOR}`
 
+// The fields `to_rest_issue` maps — shared with the epic children's batched read
+// (`git-gh-issue-batch-graphql.ts`), so both answer the same REST shape.
+const ISSUE_FIELDS = `number title state body url createdAt authorAssociation ${AUTHOR}
+	labels(${PAGE}) { nodes { name } }
+	blockedBy(${PAGE}) { totalCount nodes { ${BLOCKER} } }`
+
 const ISSUE_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
 	repository(owner: $owner, name: $name) {
 		issue(number: $number) {
-			number title state body url createdAt authorAssociation ${AUTHOR}
-			labels(${PAGE}) { nodes { name } }
-			blockedBy(${PAGE}) { totalCount nodes { ${BLOCKER} } }
+			${ISSUE_FIELDS}
 			comments(${PAGE}) { pageInfo { hasNextPage } nodes { ${COMMENT} } }
 		}
 	}
@@ -62,7 +65,7 @@ const blocker_node_schema = z.object({
 	repository: z.object({ nameWithOwner: z.string() }),
 })
 
-const issue_schema = z.object({
+const issue_fields_schema = z.object({
 	number: z.number(),
 	title: z.string(),
 	state: z.string(),
@@ -73,6 +76,9 @@ const issue_schema = z.object({
 	author: author_schema,
 	labels: z.object({ nodes: z.array(label_schema) }),
 	blockedBy: z.object({ totalCount: z.number(), nodes: z.array(blocker_node_schema) }),
+})
+
+const issue_schema = issue_fields_schema.extend({
 	comments: z.object({ pageInfo: page_info_schema, nodes: z.array(comment_node_schema) }),
 })
 
@@ -81,7 +87,10 @@ const response_schema = z.looseObject({
 })
 
 type GraphqlIssue = z.infer<typeof issue_schema>
+type GraphqlIssueFields = z.infer<typeof issue_fields_schema>
 type GraphqlAuthor = z.infer<typeof author_schema>
+type BlockerNode = z.infer<typeof blocker_node_schema>
+type BlockingIssue = BlockedBy['nodes'][number]
 
 interface IssueWithComments {
 	rest: RestIssue
@@ -89,21 +98,31 @@ interface IssueWithComments {
 	comments_json: string
 }
 
-interface IssueVariables {
+interface RepositoryVariables {
 	owner: string
 	name: string
+}
+
+interface IssueVariables extends RepositoryVariables {
 	number: number
 }
 
 // The repository a REST path would leave to `gh`'s `{owner}/{repo}` expansion has to be spelled out
 // here, and it is read from the checkout's remotes rather than asked of the REST API.
-function variables_of(issue_number: string, repo?: string): IssueVariables | undefined {
+function repository_variables_of(repo?: string): RepositoryVariables | undefined {
 	const identity =
 		repo === undefined ? repo_party.current_repository() : repo_party.parse_owner_repo(repo)
 
 	if (identity === undefined) return undefined
 
-	return { owner: identity.owner, name: identity.repo, number: Number(issue_number) }
+	return { owner: identity.owner, name: identity.repo }
+}
+
+function variables_of(issue_number: string, repo?: string): IssueVariables | undefined {
+	const repository = repository_variables_of(repo)
+	if (repository === undefined) return undefined
+
+	return { ...repository, number: Number(issue_number) }
 }
 
 // A deleted account answers `null`, which REST's own schema reads as no author.
@@ -127,17 +146,24 @@ function to_rest_comments(issue: GraphqlIssue): string {
 	return JSON.stringify(rows)
 }
 
-function to_blocked_by(issue: GraphqlIssue): BlockedBy {
-	const nodes = issue.blockedBy.nodes.map((blocker) => ({
+// One blocker node in the shape REST's blocker rows map to — shared with the listing's batched read
+// (`git-gh-blocked-by-graphql.ts`), so both GraphQL reads answer what `to_blocked_by` in REST does.
+function to_blocking_issue(blocker: BlockerNode): BlockingIssue {
+	return {
 		number: blocker.number,
 		state: blocker.state,
 		repository_url: `${REPOSITORY_API_URL}${blocker.repository.nameWithOwner}`,
-	}))
-
-	return { nodes, totalCount: issue.blockedBy.totalCount }
+	}
 }
 
-function to_rest_issue(issue: GraphqlIssue): RestIssue {
+function to_blocked_by(issue: GraphqlIssueFields): BlockedBy {
+	return {
+		nodes: issue.blockedBy.nodes.map((blocker) => to_blocking_issue(blocker)),
+		totalCount: issue.blockedBy.totalCount,
+	}
+}
+
+function to_rest_issue(issue: GraphqlIssueFields): RestIssue {
 	return {
 		number: issue.number,
 		title: issue.title,
@@ -169,21 +195,26 @@ async function read_issue(
 	const variables = variables_of(issue_number, repo)
 	if (variables === undefined) return undefined
 
-	try {
-		const json = await git_gh_exec.exec_gh_api({
-			path: GRAPHQL_PATH,
-			body: JSON.stringify({ query: ISSUE_QUERY, variables }),
-		})
+	const json = await git_gh_transport.query({ query: ISSUE_QUERY, variables })
+	if (json === undefined) return undefined
 
-		return to_issue_with_comments(
-			parse_json_object_or_undefined(json, response_schema)?.data.repository.issue,
-		)
-	} catch {
-		return undefined
-	}
+	return to_issue_with_comments(json_value.parse_with(json, response_schema)?.data.repository.issue)
 }
 
-const git_gh_issue_graphql = { read_issue }
+const git_gh_issue_graphql = {
+	read_issue,
+	repository_variables_of,
+	to_blocked_by,
+	to_blocking_issue,
+	to_rest_issue,
+}
 
-export type { IssueWithComments }
-export { git_gh_issue_graphql }
+export type { GraphqlIssueFields, IssueWithComments, RepositoryVariables }
+export {
+	git_gh_issue_graphql,
+	BLOCKER,
+	ISSUE_FIELDS,
+	PAGE,
+	blocker_node_schema,
+	issue_fields_schema,
+}

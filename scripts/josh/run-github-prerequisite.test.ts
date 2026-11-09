@@ -1,17 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { run_github_prerequisite } from './run-github-prerequisite'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 const mocked_execa = vi.mocked(execaSync)
-const root = mkdtempSync(path.join(os.tmpdir(), 'josh-run-precondition-'))
-
-afterAll(() => {
-	rmSync(root, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const root = make_directory('josh-run-precondition-')
 
 describe('GitHub run prerequisites', () => {
 	it('explains a missing Git repository without running git', () => {

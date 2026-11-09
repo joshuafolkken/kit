@@ -76,6 +76,11 @@ describe('the startup decision under --only', () => {
 		})
 	})
 
+	// joshuafolkken/kit#6817 — the suggested command runs as pasted into a terminal.
+	it('suggests the terminal-runnable command', () => {
+		expect(backlog_named.NOTHING_TO_RUN).toContain('`pnpm josh backlogrun N1 N2 … --only`')
+	})
+
 	it('is the named-only plan when --only names issues', () => {
 		expect(backlog_named.startup(NAMED, true)).toStrictEqual({
 			kind: 'plan',

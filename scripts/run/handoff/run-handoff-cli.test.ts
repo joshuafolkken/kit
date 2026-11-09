@@ -277,12 +277,11 @@ describe('run_handoff_cli.run refusals', () => {
 
 	// joshuafolkken/kit#6056: the brief read is `cli_body`'s, so a brief in the work tree is refused.
 	it('refuses a brief in the work tree that git does not ignore, naming why', async () => {
-		const repository = cli_body_repository.create()
+		const repository = cli_body_repository.create(make_directory('josh-run-handoff-repository-'))
 		const brief_file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, BRIEF_TEXT)
 		const { ports, lines, requests } = fake()
 		const code = await run_handoff_cli.run(['kickoff', 'new', BRIEF_FLAG, brief_file], ports)
 
-		repository.remove()
 		expect(code).toBe(1)
 		expect(lines.at(-1)).toContain('not git-ignored')
 		expect(requests).toEqual([])

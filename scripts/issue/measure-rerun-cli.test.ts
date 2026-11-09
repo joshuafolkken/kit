@@ -1,19 +1,10 @@
 import { execSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import {
-	afterAll,
-	afterEach,
-	beforeEach,
-	describe,
-	expect,
-	it,
-	vi,
-	type MockInstance,
-} from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { measure_rerun_cli } from './measure-rerun-cli'
 
 vi.mock('#scripts/observations/observation-ledger-home', async (original) => {
@@ -29,6 +20,10 @@ vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 const api_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+// The permission lookup goes through the ETag layer (joshuafolkken/kit#6754); here it reaches the mock.
+vi.mock('#scripts/gh/git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (api_path: string) => await api_mock({ path: api_path }) },
+}))
 
 vi.mock('node:child_process', async (original) => {
 	const actual = await original<{ execSync: typeof execSync }>()
@@ -36,7 +31,8 @@ vi.mock('node:child_process', async (original) => {
 	return { ...actual, execSync: vi.fn(actual.execSync) }
 })
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'measure-rerun-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('measure-rerun-')
 const NOW = new Date('2026-09-23T00:00:00Z')
 const ISSUE = '2212'
 const HEADING = '## ベースライン'
@@ -104,10 +100,6 @@ afterEach(() => {
 	mocked_exec_sync.mockClear()
 	mocked_issue_view.mockReset()
 	api_mock.mockReset()
-})
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
 })
 
 // joshuafolkken/kit#2919: a refuted premise lands in the running tree's file for the checked-out issue,

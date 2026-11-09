@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import type { IssueReadFailure } from '#scripts/gh/git-gh-issue-read'
+import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
+import type { IssueRead, IssueReadFailure } from '#scripts/gh/git-gh-issue-read'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { epic_child_source, type ChildSource } from './epic-child-source'
 import { epic_cross_repo } from './epic-cross-repo'
@@ -122,15 +123,19 @@ interface ChildRead {
 	is_unreachable: boolean
 }
 
+const NOT_READ: ChildRead = { child: undefined, is_unreachable: false }
+
+// `answered` is the batch's read of this child (`read_children`); without one, the child is read
+// through REST.
 async function fetch_child_read(
 	issue_number: number,
 	repo: string,
 	scope?: string,
+	answered?: IssueRead,
 ): Promise<ChildRead> {
-	const read = await git_gh_command.issue_get_state_and_relations_classified(
-		String(issue_number),
-		scope,
-	)
+	const read =
+		answered ??
+		(await git_gh_command.issue_get_state_and_relations_classified(String(issue_number), scope))
 
 	if (read.kind !== 'read') {
 		return { child: undefined, is_unreachable: git_gh_command.is_unreachable_read(read) }
@@ -141,6 +146,25 @@ async function fetch_child_read(
 	await issue_sample_prime.prime([parsed?.body])
 
 	return { child: parsed === undefined ? undefined : to_child(parsed, repo), is_unreachable: false }
+}
+
+// Children of one repository read together: one GraphQL query per hundred answers what it can
+// (`git-gh-issue-batch-graphql.ts`, joshuafolkken/kit#6792), and every child it left unanswered — all
+// of them in a session on REST — is read through REST one by one, as before.
+async function read_children(
+	issue_numbers: ReadonlyArray<number>,
+	repo: string,
+	scope?: string,
+): Promise<Map<number, ChildRead>> {
+	const { reads } = await git_gh_issue_batch_graphql.read_many(issue_numbers, scope)
+	const entries = await Promise.all(
+		issue_numbers.map(async (issue_number): Promise<[number, ChildRead]> => [
+			issue_number,
+			await fetch_child_read(issue_number, repo, scope, reads.get(issue_number)),
+		]),
+	)
+
+	return new Map(entries)
 }
 
 // One child's state, labels and native relations. A child that cannot be read is reported as
@@ -196,15 +220,29 @@ function is_body_unreachable(failure: IssueReadFailure | undefined): boolean {
 async function known_or_read(
 	issue_number: number,
 	known: ReadonlyMap<number, EpicChild>,
-	repo: string,
-	scope?: string,
+	fresh: ReadonlyMap<number, ChildRead>,
 ): Promise<ChildRead> {
 	const child = known.get(issue_number)
-	if (child === undefined) return await fetch_child_read(issue_number, repo, scope)
+	if (child === undefined) return fresh.get(issue_number) ?? NOT_READ
 
 	await issue_sample_prime.prime([child.body])
 
 	return { child, is_unreachable: false }
+}
+
+// Every child, in the order given: the ones the source knows from it, the rest read together.
+async function answer_children(
+	issue_numbers: ReadonlyArray<number>,
+	known: ReadonlyMap<number, EpicChild>,
+	repo: string,
+	scope?: string,
+): Promise<ReadonlyArray<ChildRead>> {
+	const unknown = issue_numbers.filter((issue_number) => !known.has(issue_number))
+	const fresh = await read_children(unknown, repo, scope)
+
+	return await Promise.all(
+		issue_numbers.map(async (issue_number) => await known_or_read(issue_number, known, fresh)),
+	)
 }
 
 // A closed child answered without a read that an open sibling waits on is read again: reopened, it
@@ -218,13 +256,9 @@ async function recheck_blockers(
 	const waited = epic_child_source.waited_closed(to_children(reads), known, repo)
 	if (waited.size === 0) return reads
 
-	return await Promise.all(
-		reads.map(async (read, index) => {
-			const issue_number = child_numbers[index] ?? 0
+	const fresh = await read_children([...waited], repo)
 
-			return waited.has(issue_number) ? await fetch_child_read(issue_number, repo) : read
-		}),
-	)
+	return reads.map((read, index) => fresh.get(child_numbers[index] ?? 0) ?? read)
 }
 
 // Every child the epic's task list tracks, in the order the body lists them. Given a `source`, a
@@ -238,9 +272,7 @@ async function fetch_children(
 	const limited = child_numbers.slice(0, CHILD_LIMIT)
 	const now_ms = Date.now()
 	const known = epic_child_source.known(source, repo, now_ms)
-	const answered = await Promise.all(
-		limited.map(async (issue_number) => await known_or_read(issue_number, known, repo, scope)),
-	)
+	const answered = await answer_children(limited, known, repo, scope)
 	const reads = await recheck_blockers(answered, limited, known, repo)
 
 	epic_child_source.remember_closed(source, repo, to_children(reads), now_ms)
@@ -256,8 +288,27 @@ async function fetch_children(
 	}
 }
 
-// The children that live in other repositories, read by naming that repository in the read's REST
-// path (`repos/<owner>/<repo>/issues/<n>`). No local checkout is needed: their state is a GitHub
+// Each repository's children in one batch of their own, answered in the order given.
+async function read_external(
+	allowed: ReadonlyArray<ExternalChild>,
+): Promise<ReadonlyArray<ChildRead>> {
+	const repos = [...new Set(allowed.map((child) => child.repo))]
+	const batches = await Promise.all(
+		repos.map(async (repo) => {
+			const issue_numbers = allowed
+				.filter((child) => child.repo === repo)
+				.map((child) => child.number)
+
+			return await read_children(issue_numbers, repo, repo)
+		}),
+	)
+
+	return allowed.map((child) => batches[repos.indexOf(child.repo)]?.get(child.number) ?? NOT_READ)
+}
+
+// The children that live in other repositories, read by naming that repository — in one GraphQL
+// batch per repository, and in the REST path (`repos/<owner>/<repo>/issues/<n>`) for a child the
+// batch left unanswered. No local checkout is needed: their state is a GitHub
 // fact, and requiring a clone to learn it is what kept the auto-close from ever running on such an
 // epic.
 //
@@ -269,9 +320,7 @@ async function fetch_external_children(
 	const allowed = external.filter((child) =>
 		epic_cross_repo.is_same_owner_repo(child.repo, current_owner),
 	)
-	const reads = await Promise.all(
-		allowed.map(async (child) => await fetch_child_read(child.number, child.repo, child.repo)),
-	)
+	const reads = await read_external(allowed)
 
 	// A repository the owner restriction refused is reported as unreadable rather than dropped: an
 	// epic must not read as complete while a child nobody may look at is still open.
@@ -408,6 +457,7 @@ const epic_fetch = {
 	missing_children,
 	fetch_child,
 	fetch_children,
+	fetch_external_children,
 	fetch_epic,
 }
 

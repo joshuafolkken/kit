@@ -130,7 +130,14 @@ because every ask billed the parent session's whole history; the loop is now a p
 (`backlogrun-driver.md`), an ask spends no AI turn, and one interval is one number to keep true
 (joshuafolkken/kit#3691). A child collected inside the interval is still asked about at once.
 
-The figure is 180, not 60, because each ask spends REST core budget (joshuafolkken/kit#6718).
+The figure is 180, not 60, because each ask spends REST core budget (joshuafolkken/kit#6718). The
+issue reads that moved to GraphQL through the transport switch spend no REST core where GraphQL is
+answered, but a session it refuses reads through REST, so the interval is sized for that one
+(`prompts/collaboration-workflow/gh-rest.md` → "API コールを減らす").
+
+Two cases ask sooner (joshuafolkken/kit#6788). The poll after a `run:add` asks at once. While no lane
+runs and a named issue is left, the interval is 30 seconds: that stretch ends at the dispatch, and no
+lane spends the allowance beside it (`backlog-budget.ts` → `IDLE_OFFER_INTERVAL_SECONDS`).
 
 **Why a silent unit is measured by unchanged output.** A working unit rewrites its transcript
 continuously, so unchanged output — not the child's duration — is the signal.

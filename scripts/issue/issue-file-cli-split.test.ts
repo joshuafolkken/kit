@@ -1,12 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { UNORDERED_DEPENDENCIES } from '#scripts/epic/epic-parse'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
@@ -26,7 +26,8 @@ const FINDER_FLAG = '--found-during'
 const KEPT_BODY = '## 受け入れ条件\n\n- [ ] `run-entry-cli.ts` が中継する\n'
 const FILING_PASSED = 'every filing step passed'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-split-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-cli-split-')
 const body_path = path.join(work, 'body.md')
 
 writeFileSync(
@@ -60,10 +61,6 @@ beforeEach(() => {
 	vi.spyOn(git_gh_command, 'issue_get_labels_and_body').mockResolvedValue(
 		JSON.stringify({ number: Number(KEPT), labels: [], body: KEPT_BODY }),
 	)
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 })
 
 async function prerequisite_flags(argv: ReadonlyArray<string>): Promise<Array<string>> {

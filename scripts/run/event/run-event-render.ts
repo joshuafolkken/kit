@@ -57,7 +57,6 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	sleep: { ja: 'ホストのスリープ', en: 'host sleep' },
 	'plan-wait': { ja: '計画の重なり待ち', en: 'plan wait' },
 	'rate-limit': { ja: 'GitHub API の消費', en: 'GitHub rate limit' },
-	'gh-usage': { ja: 'GitHub 使用量', en: 'GitHub usage' },
 }
 
 const LABELS_BY_KIND: ReadonlyMap<string, KindLabel> = new Map(Object.entries(KIND_LABELS))

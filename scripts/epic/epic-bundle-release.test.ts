@@ -16,7 +16,6 @@ const REPO = 'joshuafolkken/kit'
 const RELEASE = 3709
 const SUBJECT = 3810
 const RELATED = 3811
-const NO_BLOCKERS = 0
 
 function issue(number: number, overrides: Partial<BacklogIssue> = {}): BacklogIssue {
 	return { number, repo: REPO, body: '', blocked_by: [], is_epic: false, ...overrides }
@@ -67,9 +66,9 @@ describe('epic_bundle.decide_bundle — the release issue is never a candidate',
 
 describe('epic_bundle — reading the release label', () => {
 	it('marks a listing row carrying the release label', async () => {
-		const row = { number: RELEASE, title: '', body: '', blocked_by_count: NO_BLOCKERS }
+		const row = { number: RELEASE, title: '', body: '' }
 
-		vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(
+		vi.spyOn(git_gh_command, 'issue_list_open_relations').mockResolvedValue(
 			listing_of([
 				{ ...row, labels: [{ name: RELEASE_LABEL }] },
 				{ ...row, number: SUBJECT, labels: [{ name: 'bug' }] },

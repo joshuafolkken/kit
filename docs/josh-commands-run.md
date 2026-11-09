@@ -1419,11 +1419,15 @@ A lane dispatched before its holder, with commits, waits instead, keeping its se
 
 A `run:planned` candidate's plan comment (the latest trusted one carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body: one naming a running lane's file is held back before dispatch; a path its body only cites holds nothing.
 
-A plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does.
+A first plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does.
 
-Hunks over twice declared files or declared lines × recent ratio over 200 also split. Sized re-plans skip lines checks unless approved. Splits log their reason; hunks exclude planned files.
+Hunks over twice declared files or declared lines × recent ratio over 200 also split. Splits log their reason; hunks exclude planned files.
 
-`--size-approval <json-file>`: `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain.
+A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-related-cap.ts`) also splits, as `split (hub)` naming it; with no dependency graph none reads as a hub. Related: [#6180](https://github.com/joshuafolkken/kit/issues/6180) splits the hubs themselves.
+
+A `--single` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply.
+
+`--size-approval <json-file>` (optional; a re-plan never needs one): `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain.
 
 `--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
 

@@ -99,6 +99,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh ci:timing` · `josh cit` | `<pr\|branch\|run-id> [--json]` | developer | network | Print the job and step durations and conclusions of a run id's GitHub Actions run, or of every run on a pull request's or a branch's latest commit |
 | `josh command:derive` · `josh cdv` · **kit only** | — | maintainer | files | Write every artifact the command map derives — usage spans and catalog — and print page bytes against their ceilings |
 | `josh doctor` · `josh dr` | `[--fix]` | developer | files | Diagnose PATH shadowing of the global josh and show the discovered repository map (--fix reclaims a stale shim) |
+| `josh gh:usage` · `josh ghu` | `[--since <instant>]` | developer | none | Tally the josh processes' logged GitHub API usage per command — runs, calls, 304 answers and core used — most calls first, under the period the lines cover |
 | `josh latest` · `josh u` | — | developer | files, network, processes | Update dependencies, run security audit, then update pnpm |
 | `josh latest:corepack` · `josh lc` | — | developer | files, network | Update pnpm on the current major while preserving the integrity pin |
 | `josh latest:guard` | — | automation | files | Refuse josh latest inside a lane (the update stamp is keyed to the project root) |
@@ -133,7 +134,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh backlog:next` | `[--exclude <n>[,<n>...]] [--repo <owner/repo>]` | automation | network | Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics |
 | `josh backlog:offer` | `[options]` | automation | files, git, network, processes | Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start |
 | `josh backlog:plan` | `[issue...] [--only] [--waves] [--exclude <n>[,<n>...]]` | automation | network | Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope |
-| `josh backlog:triage` | `--pass [--exclude <n>] \| --decide --defect yes\|no\|unknown --verification yes\|no\|unknown --every-run yes\|no\|unknown \| --apply <n> [--lane \| --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> \| --unblock <m>] --reason <text> [--clear]` | automation | files, network | Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict |
+| `josh backlog:triage` | `--pass [--exclude <n>] \| --decide --defect yes\|no\|unknown --verification yes\|no\|unknown --every-run yes\|no\|unknown \| --apply <n> [--lane \| --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> \| --unblock <m>] --reason <text> [--clear] \| --apply <n> --adopt <k> --reason <text>` | automation | files, network | Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict |
 | `josh backlogrun` · `josh blr` | `[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude\|codex] \| --stop \| --restart` | developer | files, network, processes | Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it; --restart replaces its processes and keeps its record |
 | `josh cases` | `<path...>` | automation | files | Read changed paths and print the boundaries crossed and their mandatory abnormal cases: network \| process \| fs \| time \| state \| env \| none |
 | `josh clone:scan` | — | automation | files | Count code duplication across files and first-party repositories, printing each clone as file:line pairs |
@@ -165,7 +166,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
 | `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
 | `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |
-| `josh issue:priority` | `<issue>` | automation | network | Apply priority:high to an issue whose body reached the high floor after filing |
+| `josh issue:priority` | `<issue> [--critical --reason <text>]` | automation | network | Raise an issue to the priority its body declares or reaches after filing |
 | `josh issue:read` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
 | `josh issue:release-class` | `<issue> <enhancement\|other-change>` | automation | network | Write the issue body's one release classification line, replacing any earlier one |

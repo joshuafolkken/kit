@@ -13,7 +13,7 @@ const { epic_notify } = await import('./epic-notify')
 
 const SLUG = 'joshuafolkken/kit'
 const NOTICE = { epic_number: 900, children: [901, 902], title: 'Epic: split the parser work' }
-const RUN_LINE = 'Next: backlogrun #900 --only'
+const RUN_LINE = 'Next: pnpm josh backlogrun 900 --only'
 
 beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(vi.fn())

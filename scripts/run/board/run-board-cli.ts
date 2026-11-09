@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { styleText } from 'node:util'
 import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
+import { git_gh_transport } from '#scripts/gh/git-gh-transport'
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
@@ -16,6 +17,7 @@ import { run_board_gather_thread } from './run-board-gather-thread'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan_shared } from './run-board-plan-shared'
+import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_spin } from './run-board-spin'
@@ -50,12 +52,22 @@ function on_exit(leave: () => void): void {
 	process.once('SIGTERM', () => process.exit(SIGTERM_EXIT_CODE))
 }
 
+// The allowances with the session's transport, which the github row marks with ▶. The transport is
+// read without a probe, so the board spends none of the GraphQL allowance it draws; one not known
+// yet (or an invalid setting) leaves the allowances unmarked.
+async function read_rate_limit_with_transport(): Promise<GithubRateLimit | undefined> {
+	const resources = await gh_core_rate_limit.read_resources()
+	if (resources === undefined) return undefined
+
+	return { ...resources, transport: await git_gh_transport.known() }
+}
+
 const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	read_plan: async (scope) => await run_board_plan_shared.read(scope),
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
 	snapshot: run_board_snapshot.file_store(),
 	read_thanks: async () => await run_board_thanks_read.read_thanks(),
-	read_rate_limit: async () => await gh_core_rate_limit.read_core(),
+	read_rate_limit: read_rate_limit_with_transport,
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.

@@ -1,9 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, test, vi, type MockInstance } from 'vitest'
 import { backlog_budget } from './backlog-budget'
 import { backlog_drive_owner } from './backlog-drive-owner'
@@ -12,6 +10,7 @@ const INVOCATION = 'backlogrun --idle 0'
 const LOST_OWNER = 'no longer owns'
 const OWNER = String(process.pid)
 const scratch = { directory: '', target: '' }
+const make_directory = temporary_directory()
 
 function begin(): void {
 	run_carry.begin_carry(scratch.target, INVOCATION, run_carry.owner_of(process.pid))
@@ -22,14 +21,13 @@ function quiet_sleep(): MockInstance<typeof poll.sleep> {
 }
 
 beforeEach(() => {
-	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-owner-'))
+	scratch.directory = make_directory('josh-drive-owner-')
 	scratch.target = run_carry.carry_path(scratch.directory)
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(scratch.directory)
 })
 
 afterEach(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch.directory, { recursive: true, force: true })
 })
 
 test('allows the live supervisor that owns the carry record', async () => {

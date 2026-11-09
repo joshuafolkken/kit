@@ -1,15 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_preflight } from './backlog-preflight'
 import { backlogrun_launch } from './backlogrun-launch'
 
 // joshuafolkken/kit#5516: `josh backlogrun` begins and hands off the carry record itself, so the
 // supervisor drives the first offer while the parent plans, and the launched parent takes nothing.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'backlog-preflight-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('backlog-preflight-test-')
 const GIT_DIRECTORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --max 5'
 const LAUNCHED_AT = '2026-10-31T11:49:16.000Z'
@@ -42,10 +43,6 @@ function launched(): void {
 afterEach(() => {
 	vi.restoreAllMocks()
 	rmSync(target(), { force: true })
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('backlog_preflight.preflight', () => {

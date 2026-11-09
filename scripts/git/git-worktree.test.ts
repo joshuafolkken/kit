@@ -1,7 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { INSTALL_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_command } from './git-command'
 import { git_common_directory } from './git-common-directory'
@@ -68,7 +66,8 @@ const RELEASE_BRANCH_REF = 'refs/heads/release/v1.2.0'
 
 // The lock record is keyed on the git common directory; pointing that at a scratch directory keeps
 // this suite's lock apart from any real lane opening on the same machine.
-const scratch = mkdtempSync(path.join(tmpdir(), 'git-worktree-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('git-worktree-test-')
 
 beforeEach(() => {
 	spawn_mock.state.last_arguments = []
@@ -80,7 +79,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('git_worktree.is_linked', () => {

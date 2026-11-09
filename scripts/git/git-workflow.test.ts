@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const ISSUE_INPUT = vi.hoisted(() => 'feat: add login #42')
@@ -237,15 +237,16 @@ describe('get_workflow_confirmations — body flag is separate from confirmation
 
 // joshuafolkken/kit#2446. The PR body carries commands and their output, so it can come from a file.
 describe('resolve_pr_body', () => {
+	const make_directory = temporary_directory()
+
 	it('reads the body from --body-file verbatim, backticks included', () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'git-workflow-body-'))
+		const directory = make_directory('git-workflow-body-')
 		const file = path.join(directory, 'body.md')
 		const body = '## 実機証跡\n\n- `pnpm josh followup`\n\n```\nok\n```\n'
 
 		writeFileSync(file, body)
 
 		expect(git_workflow.resolve_pr_body({ 'body-file': file })).toBe(body)
-		rmSync(directory, { recursive: true, force: true })
 	})
 
 	it('keeps the inline --body form', () => {
