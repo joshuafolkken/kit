@@ -207,7 +207,7 @@ async function relaunched_or_brokered(lane: LaneInfo, stop: ShipStop): Promise<R
 	return server === undefined ? await relaunched(lane, stop) : await brokered(lane, stop, server)
 }
 
-// A child past the cap, or on a timed-out merge wait, is parked instead of relaunched
+// A child past the cap, or on a stop no relaunch clears, is parked instead of relaunched
 // (`run-ship-relaunch-cap.ts`); a park the label refused leaves the stop recorded, as before.
 // A timed-out merge wait's block, named in the stage output, becomes the park's cause.
 // The park records the stop's stage and cause class (joshuafolkken/kit#6864).
@@ -215,11 +215,11 @@ async function parked(
 	issue: string,
 	parking: Omit<ParkedStop, 'blocked'>,
 	output: StageOutput,
-	is_timed_out: boolean,
+	is_at_once: boolean,
 ): Promise<ReturnOutcome> {
 	const blocked = run_ship_stop_cause.blocked_cause_of(output.body)
-	const { park, park_timed_out } = run_ship_relaunch_cap
-	const is_parked = await (is_timed_out ? park_timed_out : park)(issue, { ...parking, blocked })
+	const { park, park_at_once } = run_ship_relaunch_cap
+	const is_parked = await (is_at_once ? park_at_once : park)(issue, { ...parking, blocked })
 
 	if (is_parked) return 'parked'
 
@@ -237,12 +237,12 @@ async function park_outcome(
 ): Promise<ReturnOutcome | undefined> {
 	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
 	const failed = { ...resume, ...output }
-	const is_timed_out = run_ship_stop_cause.parks_at_once(stage, failed)
+	const is_at_once = run_ship_stop_cause.parks_at_once(stage, failed)
 
-	if (is_timed_out || (await run_ship_relaunch_cap.is_over(issue, reason))) {
+	if (is_at_once || (await run_ship_relaunch_cap.is_over(issue, reason))) {
 		const stop = { stage, cause: run_ship_stop_cause.cause_of(stage, failed) }
 
-		return await parked(issue, { reason, stop }, output, is_timed_out)
+		return await parked(issue, { reason, stop }, output, is_at_once)
 	}
 
 	return undefined

@@ -24,6 +24,9 @@ const { run_ship_relaunch_cap } = await import('./run-ship-relaunch-cap')
 const ISSUE = '3999'
 const OTHER = '4001'
 const BLOCKED = 'BLOCKED: Checks missing'
+const RUN_STALLED = 'run:stalled'
+const CAP_EXCEEDED = 'stop cap was exceeded'
+const TIMEOUT_CAUSE = 'merge-wait timeout'
 const { MAX_SHIP_STOP_RELAUNCHES, STOP_KIND } = run_ship_relaunch_cap
 const { MECHANICAL, REVIEW } = STOP_KIND
 
@@ -35,9 +38,9 @@ function dispatched(issue: string): RunEvent {
 	return event('child-launch', `#${issue} dispatched`)
 }
 
-function stops(issue: string, count: number, reason = 'gate'): Array<RunEvent> {
+function stops(issue: string, count: number, reason = 'gate', cause = 'check'): Array<RunEvent> {
 	return Array.from({ length: count }, () =>
-		event('ship-stop', `#${issue} ${reason} failed (check) — pnpm josh ship --log ${issue}`),
+		event('ship-stop', `#${issue} ${reason} failed (${cause}) — pnpm josh ship --log ${issue}`),
 	)
 }
 
@@ -149,7 +152,7 @@ describe('run_ship_relaunch_cap.park', () => {
 	it('labels, comments, records the park and warns', async () => {
 		expect(await run_ship_relaunch_cap.park(ISSUE, parked('round-2', 'finding'))).toBe(true)
 
-		expect(add_label_mock).toHaveBeenCalledWith(ISSUE, 'run:stalled')
+		expect(add_label_mock).toHaveBeenCalledWith(ISSUE, RUN_STALLED)
 		expect(String(comment_mock.mock.calls[0]?.[1])).toContain(`pnpm josh ship --log ${ISSUE}`)
 		expect(String(comment_mock.mock.calls[0]?.[1])).toContain('the review stop cap was exceeded')
 		expect_park_event('ship-stop cap', { stage: 'round-2', cause: 'finding' })
@@ -189,8 +192,8 @@ describe('run_ship_relaunch_cap.park_timed_out', () => {
 		const comment = String(comment_mock.mock.calls[0]?.[1])
 
 		expect(comment).toContain('the merge wait at `followup` timed out')
-		expect(comment).not.toContain('stop cap was exceeded')
-		expect_park_event('merge-wait timeout', { stage: 'followup', cause: 'timeout' })
+		expect(comment).not.toContain(CAP_EXCEEDED)
+		expect_park_event(TIMEOUT_CAUSE, { stage: 'followup', cause: 'timeout' })
 		expect(warn_mock).toHaveBeenCalledWith(
 			expect.objectContaining({ issue_title: `Merge wait timed out #${ISSUE}` }),
 		)
@@ -211,5 +214,42 @@ describe('run_ship_relaunch_cap.park_timed_out', () => {
 		)
 		expect(emit_mock).not.toHaveBeenCalled()
 		expect(warn_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6848: a CI outage that outlasted every followup rerun spent the stop cap before it
+// parked, and the park named no CI cause.
+describe('run_ship_relaunch_cap — CI-infrastructure reruns spent', () => {
+	it('leaves its stops out of the count', () => {
+		const events = [
+			dispatched(ISSUE),
+			...stops(ISSUE, 6, 'followup', 'ci-infra'),
+			...stops(ISSUE, 1),
+		]
+
+		expect(run_ship_relaunch_cap.stops_since_dispatch(events, ISSUE, MECHANICAL)).toBe(1)
+	})
+
+	it('parks it run:stalled on the CI infrastructure, naming no cap or timeout', async () => {
+		const stop = { stage: 'followup', cause: 'ci-infra' }
+
+		expect(await run_ship_relaunch_cap.park_at_once(ISSUE, parked('followup', 'ci-infra'))).toBe(
+			true,
+		)
+
+		const comment = String(comment_mock.mock.calls[0]?.[1])
+
+		expect(add_label_mock).toHaveBeenCalledWith(ISSUE, RUN_STALLED)
+		expect(add_label_mock).not.toHaveBeenCalledWith(ISSUE, 'needs-decision')
+		expect(comment).toContain('CI infrastructure failures outlasted every rerun at `followup`')
+		expect(comment).not.toContain(CAP_EXCEEDED)
+		expect(comment).not.toContain('timed out')
+		expect_park_event('CI infrastructure failure', stop)
+	})
+
+	it('parks a timed-out merge wait as one', async () => {
+		await run_ship_relaunch_cap.park_at_once(ISSUE, parked('followup', 'timeout'))
+
+		expect_park_event(TIMEOUT_CAUSE, { stage: 'followup', cause: 'timeout' })
 	})
 })
