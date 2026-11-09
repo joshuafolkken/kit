@@ -13,7 +13,7 @@ import type { LedgerEntry } from './lane-ledger'
 import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 
 // A lane's breakdown in words (joshuafolkken/kit#4995): the stages longest first, the implementation's
-// tool-call kinds beside it, and the waits taken out last. `josh lane:breakdown` prints it, the overrun
+// tool-call kinds beside it, the waits taken out, and the driver's followup outside the net time last. `josh lane:breakdown` prints it, the overrun
 // investigation comments it on the lane's Issue and leads its prompt with it (`lane-overrun.ts`).
 
 const HEADING = 'Net time by stage, longest first'
@@ -24,6 +24,7 @@ const HOLDER = 'yield wait: holder remaining'
 const GAP = 'yield wait: redispatch gap (offer + launch)'
 const UNSPLIT = 'yield wait: no holder named, unsplit'
 const OUTSIDE = 'outside calls'
+const DRIVER = '(outside lane net)'
 
 interface Report {
 	breakdown: Breakdown
@@ -62,7 +63,7 @@ function budget_of(name: string): BudgetStage | undefined {
 	const stages: Record<string, BudgetStage | undefined> = {
 		[lane_breakdown.PLAN_STAGE]: 'plan',
 		[lane_breakdown.IMPLEMENT_STAGE]: 'implement',
-		[lane_breakdown.FOLLOWUP_STAGE]: 'followup',
+		[lane_breakdown.DRIVER_FOLLOWUP_STAGE]: 'followup',
 	}
 	const ship = lane_breakdown.is_ship_stage(name) ? 'ship' : undefined
 
@@ -117,7 +118,6 @@ function suffix_of(name: string, report: Report): string {
 		[lane_breakdown.PLAN_STAGE]: outside_text(report.plan_outside),
 		[lane_breakdown.IMPLEMENT_STAGE]: detail_text(report.detail),
 		[lane_breakdown.PRE_DETACH_STAGE]: report.pinned,
-		[lane_breakdown.FOLLOWUP_STAGE]: report.critical,
 	}
 
 	return suffixes[name] ?? reason_text(report.breakdown.reasons?.get(name))
@@ -177,6 +177,18 @@ function excluded_entry(breakdown: Breakdown): Entry {
 	return { text: excluded, laps: yield_lines(breakdown), calls: [] }
 }
 
+// The driver's followup, outside the net time, with the followup's laps and last check
+// (joshuafolkken/kit#6541).
+function driver_entry(stage: Stage, report: Report): Entry {
+	const laps = report.laps?.get(lane_breakdown.FOLLOWUP_STAGE) ?? []
+
+	return {
+		text: `${part_text(stage)} ${DRIVER}${over_text(stage)}${report.critical ?? ''}`,
+		laps: laps.map((lap) => part_text(lap)),
+		calls: [],
+	}
+}
+
 function entries_of(report: Report): Array<Entry> {
 	const { breakdown } = report
 	const notes = [report.discarded, report.related]
@@ -187,6 +199,7 @@ function entries_of(report: Report): Array<Entry> {
 		...breakdown.stages.map((stage) => stage_entry(stage, report)),
 		...notes,
 		excluded_entry(breakdown),
+		...(breakdown.driver ?? []).map((stage) => driver_entry(stage, report)),
 	]
 }
 

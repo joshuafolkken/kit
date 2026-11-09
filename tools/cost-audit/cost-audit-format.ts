@@ -3,6 +3,7 @@ import type { Audit, AuditRow } from './cost-audit'
 import { cost_audit_density, type Density } from './cost-audit-density'
 import type { PhaseRow } from './cost-audit-phase'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
+import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 
 // The printed form of a `josh cost:audit` result: the full report the command prints, and the one
 // summary line `josh retrospective` carries so a run's digest shows the trend it ran in.
@@ -15,10 +16,11 @@ const NO_PREVIOUS = 'new'
 const FILING_PREFIX = 'File a cost regression: '
 const FILING_ROW_SEPARATOR = ', '
 const FILING_SUFFIX = ' — reproduce with `pnpm josh cost:audit`'
+// Each row's model lines follow it, indented: the same four token types in dollars.
 const PHASE_TITLE =
-	'Lane children by phase (this period: cost — billed input / cache read / cache write / output tokens)'
+	'Lane children by phase (this period: cost — billed input / cache read / cache write / output tokens; per model in dollars)'
 const AGENT_TITLE =
-	'Lane subagents by agent type (this period: cost — billed input / cache read / cache write / output tokens)'
+	'Lane subagents by agent type (this period: cost — billed input / cache read / cache write / output tokens; per model in dollars)'
 
 interface AuditSection {
 	name: string
@@ -114,8 +116,22 @@ function phase_line(row: PhaseRow): string {
 	return `  ${row.key}: ${figure_format.format_usd(row.usd)} — ${tokens.join(' / ')}`
 }
 
+// One model's share of a row, its dollars by token type in the order the row's tokens are printed.
+function spend_line(spend: ModelSpend): string {
+	const terms = [spend.input, spend.cache_read, spend.cache_write, spend.output].map((usd) =>
+		figure_format.format_usd(usd),
+	)
+	const total = figure_format.format_usd(cost_audit_spend.total_of(spend))
+
+	return `    ${spend.model}: ${total} — ${terms.join(' / ')}`
+}
+
+function phase_row_lines(row: PhaseRow): Array<string> {
+	return [phase_line(row), ...row.models.map((spend) => spend_line(spend))]
+}
+
 function token_table_lines(title: string, rows: ReadonlyArray<PhaseRow>): Array<string> {
-	const body = rows.length === 0 ? ['  none'] : rows.map((row) => phase_line(row))
+	const body = rows.length === 0 ? ['  none'] : rows.flatMap((row) => phase_row_lines(row))
 
 	return ['', title, ...body]
 }

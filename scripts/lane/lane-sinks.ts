@@ -52,7 +52,8 @@ function base_name(name: string): string {
 	return note_at === -1 ? name : name.slice(0, note_at)
 }
 
-// One lane's stages and laps, one row per name. The laps read no transcript calls: a call names no
+// One lane's stages and their laps, one row per name — the driver's followup and its laps, outside
+// the net time, left out (joshuafolkken/kit#6541). The laps read no transcript calls: a call names no
 // lane, so another lane's calls would fall into this one's time between ship stages.
 function lane_parts(records: SinkRecords, issue: number): Array<Stage> {
 	const breakdown = lane_breakdown.of(records.entries, records.events, issue)
@@ -60,7 +61,10 @@ function lane_parts(records: SinkRecords, issue: number): Array<Stage> {
 	if (breakdown === undefined) return []
 
 	const laps = lane_breakdown_laps.of(records.entries, issue, breakdown, [])
-	const parts = [...breakdown.stages, ...[...laps.values()].flat()]
+	const parts = [
+		...breakdown.stages,
+		...breakdown.stages.flatMap((stage) => laps.get(stage.name) ?? []),
+	]
 
 	return lane_breakdown.ranked(parts.map((part) => ({ name: base_name(part.name), ms: part.ms })))
 }

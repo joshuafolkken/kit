@@ -71,8 +71,11 @@ function records_of(overrides: Partial<WhyRecords> = {}): WhyRecords {
 	}
 }
 
-function with_stages(names: ReadonlyArray<string>): Breakdown {
-	return { ...breakdown_of(), stages: names.map((name) => ({ name, ms: 40 * MINUTE_MS })) }
+function with_stages(names: ReadonlyArray<string>, followup_ms = 0): Breakdown {
+	const driver =
+		followup_ms > 0 ? [{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: followup_ms }] : []
+
+	return { ...breakdown_of(), stages: names.map((name) => ({ name, ms: 40 * MINUTE_MS })), driver }
 }
 
 describe('lane_why.table', () => {
@@ -87,13 +90,15 @@ describe('lane_why.table', () => {
 		)
 	})
 
-	it('fills the followup row with the last check and a ship row with its stops', () => {
+	// joshuafolkken/kit#6541: the driver's followup, outside the net time, follows the lane's stages.
+	it('fills the driver followup row with the last check and a ship row with its stops', () => {
 		const entries = [...LANE, ...SHIP_ROWS]
-		const breakdown = with_stages([lane_breakdown.FOLLOWUP_STAGE, SHIP_STAGE])
+		const breakdown = with_stages([SHIP_STAGE], 40 * MINUTE_MS)
 		const rows = lane_why.table(records_of({ entries, breakdown }))?.split('\n')
 
-		expect(rows?.[2]).toContain('| (last check: e2e 150.0s) |  |')
-		expect(rows?.[3]).toContain('|  | gate; test:related 2 over cap, in 1 of 1 runs |')
+		expect(rows?.[2]).toContain('|  | gate; test:related 2 over cap, in 1 of 1 runs |')
+		expect(rows?.[3]).toContain('| driver followup | 40.0 min |')
+		expect(rows?.[3]).toContain('| (last check: e2e 150.0s) |  |')
 	})
 
 	it('leaves the cells of missing records blank', () => {
@@ -118,7 +123,7 @@ describe('lane_why.table followup CI cell', () => {
 			runs: [{ run: RUN, jobs: [{ ...TIMED_ROW, steps: [{ ...TIMED_ROW, name: 'playwright' }] }] }],
 		}
 		const entries = [...LANE, ...SHIP_ROWS]
-		const breakdown = with_stages([lane_breakdown.FOLLOWUP_STAGE])
+		const breakdown = with_stages([], 40 * MINUTE_MS)
 		const rows = lane_why.table(records_of({ entries, breakdown, timing }))?.split('\n')
 
 		expect(rows?.[2]).toContain(

@@ -170,6 +170,22 @@ describe('lane_breakdown_text — ship stage laps', () => {
 	})
 })
 
+// joshuafolkken/kit#6541: the driver followup, outside the net time, keeps the followup's laps.
+describe('lane_breakdown_text — driver followup laps', () => {
+	const driver = [{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: 4 * MINUTE_MS }]
+	const laps = new Map([
+		[lane_breakdown.FOLLOWUP_STAGE, [{ name: 'followup CI', ms: 3 * MINUTE_MS }]],
+	])
+	const report = { ...REPORT, breakdown: { ...REPORT.breakdown, driver }, laps }
+
+	it('prints the followup laps under the driver followup line', () => {
+		expect(lane_breakdown_text.comment(ISSUE, 6, report).split('\n').slice(-2)).toStrictEqual([
+			'- driver followup 4.0 min (outside lane net)',
+			'  - followup CI 3.0 min',
+		])
+	})
+})
+
 // joshuafolkken/kit#5297: a backgrounded subagent call is counted beside its type, at no time.
 describe('lane_breakdown_text.line — subagent types', () => {
 	it('counts the backgrounded subagent calls beside their type', () => {
@@ -246,13 +262,13 @@ describe('lane_breakdown_text — the followup critical path', () => {
 		}
 		const breakdown = {
 			...REPORT.breakdown,
-			stages: [{ name: 'ship followup', ms: 4 * MINUTE_MS }],
+			driver: [{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: 4 * MINUTE_MS }],
 		}
 
 		const report = lane_breakdown_text.report_of(ISSUE, breakdown, [ci_wait])
 
 		expect(lane_breakdown_text.line(report)).toContain(
-			'ship followup 4.0 min (last check: e2e 150.0s)',
+			'driver followup 4.0 min (outside lane net) (last check: e2e 150.0s)',
 		)
 		read.mockRestore()
 	})
@@ -303,17 +319,17 @@ describe('lane_breakdown_text — stage budget', () => {
 		const report = report_with([
 			{ name: lane_breakdown.PLAN_STAGE, ms: 3 * MINUTE_MS },
 			{ name: 'ship gate', ms: 8 * MINUTE_MS },
-			{ name: lane_breakdown.FOLLOWUP_STAGE, ms: 5 * MINUTE_MS },
 		])
 
 		expect(lane_breakdown_text.line(report)).not.toContain('over budget')
 	})
 
-	it('checks the ship followup against its own budget, not the ship one', () => {
-		const report = report_with([{ name: lane_breakdown.FOLLOWUP_STAGE, ms: 6 * MINUTE_MS }])
+	it('checks the driver followup against its own budget, not the ship one', () => {
+		const driver = [{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: 6 * MINUTE_MS }]
+		const report = { ...REPORT, breakdown: { ...REPORT.breakdown, driver } }
 
 		expect(lane_breakdown_text.line(report)).toContain(
-			': ship followup 6.0 min, over budget +1 min',
+			'driver followup 6.0 min (outside lane net), over budget +1 min',
 		)
 	})
 

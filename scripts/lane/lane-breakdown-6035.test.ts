@@ -106,8 +106,10 @@ describe('lane_breakdown.of — #6035', () => {
 		expect(minutes_of(breakdown, WAIT_ROW)).toBe((ASKS.length * ASK_SECONDS) / 60)
 	})
 
-	it('still adds the stages up to the lane', () => {
-		const total_ms = breakdown.stages.reduce((sum, stage) => sum + stage.ms, 0)
+	// The driver's followup is outside the net time, so it joins the stages to make up the lane (#6541).
+	it('still adds the stages and the driver followup up to the lane', () => {
+		const parts = [...breakdown.stages, ...(breakdown.driver ?? [])]
+		const total_ms = parts.reduce((sum, stage) => sum + stage.ms, 0)
 
 		expect(total_ms).toBe(3410 * MS_PER_SECOND)
 	})
