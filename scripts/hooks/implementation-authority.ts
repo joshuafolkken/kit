@@ -1,6 +1,7 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_tool_payload } from '#scripts/josh/hook-tool-payload'
 import { time_shell } from '#scripts/time-runtime/time-shell'
+import { hook_context, type HookContext } from './hook-context'
 import { implementation_shell } from './implementation-shell'
 import { step_zero_notice } from './step-zero-notice'
 
@@ -26,17 +27,20 @@ function unverified_write(raw_payload: string): string | undefined {
 	return implementation_shell.refusal(time_shell.bash_command(payload.tool_input))
 }
 
-function reason(raw_payload: string): string | undefined {
-	if (agent_session_role.can_implement()) return undefined
+function reason(
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): string | undefined {
+	if (agent_session_role.can_implement(context.env)) return undefined
 
-	if (step_zero_notice.is_runtime_edit(raw_payload, process.cwd(), true)) {
-		return agent_session_role.scope_line() + HANDOFF
-	}
+	const scope = agent_session_role.scope_line(context.env)
+
+	if (step_zero_notice.is_runtime_edit(raw_payload, context.cwd, true)) return scope + HANDOFF
 
 	const rule = unverified_write(raw_payload)
 	if (rule === undefined) return undefined
 
-	return `${agent_session_role.scope_line()}${HANDOFF}${UNKNOWN}${MATCHED}${rule}.`
+	return `${scope}${HANDOFF}${UNKNOWN}${MATCHED}${rule}.`
 }
 
 const implementation_authority = { reason }

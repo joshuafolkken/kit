@@ -13,6 +13,7 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_revert } from './bash-revert'
 import { batch_outcome } from './batch-guard'
 import { direct_gh_usage } from './direct-gh-usage'
+import { hook_context, type HookContext } from './hook-context'
 import { hook_demoted } from './hook-demoted'
 import { hook_ledger } from './hook-ledger'
 import { implementation_authority } from './implementation-authority'
@@ -69,10 +70,15 @@ function combine_outcomes(
 // The once-per-session reminders are the last word: asked only where every guard stayed clear, so a
 // refusal or another notice never spends their stamps unseen. Step 0 answers an edit and the shell
 // rules a Bash call, so at most one of them speaks on a call.
-function with_session_notice(outcome: GuardOutcome, raw_payload: string): GuardOutcome {
+function with_session_notice(
+	outcome: GuardOutcome,
+	raw_payload: string,
+	context: HookContext,
+): GuardOutcome {
 	if (!is_clear(outcome)) return outcome
 
-	const notice = step_zero_notice.notice(raw_payload) ?? shell_rules_notice.notice(raw_payload)
+	const notice =
+		step_zero_notice.notice(raw_payload, context.cwd) ?? shell_rules_notice.notice(raw_payload)
 
 	return notice === undefined ? outcome : { reason: undefined, notice, fault: undefined }
 }
@@ -89,16 +95,18 @@ function guarded_call(raw_payload: string): GuardedCall | undefined {
 	}
 }
 
-function authority_outcome(raw_payload: string): GuardOutcome {
+function authority_outcome(raw_payload: string, context: HookContext): GuardOutcome {
 	return {
-		reason: implementation_authority.reason(raw_payload),
+		reason: implementation_authority.reason(raw_payload, context),
 		notice: undefined,
 		fault: undefined,
 	}
 }
 
-function lane_plan_outcome(raw_payload: string): GuardOutcome {
-	return { reason: lane_plan_guard.reason(raw_payload), notice: undefined, fault: undefined }
+function lane_plan_outcome(raw_payload: string, context: HookContext): GuardOutcome {
+	const reason = lane_plan_guard.reason(raw_payload, context.cwd, context.env)
+
+	return { reason, notice: undefined, fault: undefined }
 }
 
 // The most frequent calls of a session, which only the guards marked `reads` act on.
@@ -110,38 +118,48 @@ const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['Read', 'Glob', 'Grep'])
 // on a read. The rule rows stay on every
 // call: their `consultation-investigation` row is triggered by `Glob` / `Grep`.
 const SYNC_GUARDS: ReadonlyArray<{
-	outcome: (raw_payload: string) => GuardOutcome
+	outcome: (raw_payload: string, context: HookContext) => GuardOutcome
 	reads: boolean
 }> = [
 	{ outcome: authority_outcome, reads: false },
-	{ outcome: batch_outcome, reads: true },
-	{ outcome: investigation_outcome, reads: true },
-	{ outcome: duplicate_read_outcome, reads: true },
+	// These three take a clock as their second argument, so the context is not passed to them.
+	{ outcome: (raw_payload) => batch_outcome(raw_payload), reads: true },
+	{ outcome: (raw_payload) => investigation_outcome(raw_payload), reads: true },
+	{ outcome: (raw_payload) => duplicate_read_outcome(raw_payload), reads: true },
 	{ outcome: lane_plan_outcome, reads: false },
 ]
 
 // Every guard that acts on the call runs, never short-circuited on the first refusal: each records
 // its own once-per-run stamp, so stopping early would change which guard may fire on a later call.
-function guard_outcome(raw_payload: string): GuardOutcome {
+function guard_outcome(raw_payload: string, context: HookContext): GuardOutcome {
 	const is_read = READ_ONLY_TOOLS.has(guarded_call(raw_payload)?.name ?? '')
 	const outcomes = SYNC_GUARDS.filter((guard) => guard.reads || !is_read).map((guard) =>
-		guard.outcome(raw_payload),
+		guard.outcome(raw_payload, context),
 	)
 
 	return combine_outcomes(outcomes, delivered_rules.delivery(raw_payload))
 }
 
 // The synchronous verdict the Codex adapter asks for, with the session reminders as its last layer.
-function pretool_outcome(raw_payload: string): GuardOutcome {
-	return with_session_notice(guard_outcome(raw_payload), raw_payload)
+// The guards read the call's cwd and environment from `context`, never off the process.
+function pretool_outcome(
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): GuardOutcome {
+	return with_session_notice(guard_outcome(raw_payload, context), raw_payload, context)
 }
 
 // Both providers mark allowed runtime edits independently of the transcript-keyed Step 0 notice.
 // The lane event writer deduplicates them within the child's launch.
-async function mark_phase(outcome: GuardOutcome, raw_payload: string): Promise<void> {
-	if (outcome.reason !== undefined || !step_zero_notice.is_runtime_edit(raw_payload)) return
+async function mark_phase(
+	outcome: GuardOutcome,
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): Promise<void> {
+	const is_allowed_edit =
+		outcome.reason === undefined && step_zero_notice.is_runtime_edit(raw_payload, context.cwd)
 
-	await lane_phase.mark_implement()
+	if (is_allowed_edit) await lane_phase.mark_implement(context.cwd, context.env)
 }
 
 // The watcher guard is the one composed rule that cannot answer synchronously — it reads the lane
@@ -164,8 +182,11 @@ async function async_reason(raw_payload: string): Promise<string | undefined> {
 	return poll ?? (await issue_watch_hook.watch_reason())
 }
 
-async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome> {
-	const base = guard_outcome(raw_payload)
+async function pretool_outcome_async(
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): Promise<GuardOutcome> {
+	const base = guard_outcome(raw_payload, context)
 
 	if (base.reason !== undefined) return base
 
@@ -173,9 +194,9 @@ async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome>
 
 	if (reason !== undefined) return { reason, notice: undefined, fault: undefined }
 
-	const outcome = with_session_notice(base, raw_payload)
+	const outcome = with_session_notice(base, raw_payload, context)
 
-	await mark_phase(outcome, raw_payload)
+	await mark_phase(outcome, raw_payload, context)
 
 	return outcome
 }
@@ -255,12 +276,15 @@ async function record_refusal(
 // right, so the rewriting row stays quiet on it while any other guard's refusal still wins over the
 // rewrite. The Codex adapter cannot rewrite a call, so it goes on judging the call as typed.
 // A consultation session's shell is stamped here for the `PostToolUse` revert (`bash-revert.ts`).
-async function respond(raw_payload: string): Promise<void> {
+async function respond(
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): Promise<void> {
 	const rewrite = rule_rewrite.rewrite(raw_payload)
 	const judged = rewrite?.payload ?? raw_payload
 
-	bash_revert.stamp(judged)
-	const outcome = await pretool_outcome_async(judged)
+	bash_revert.stamp(judged, context.cwd)
+	const outcome = await pretool_outcome_async(judged, context)
 
 	emit(judged, outcome, rewrite)
 	await record_refusal(judged, outcome)
