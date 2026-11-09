@@ -13,6 +13,7 @@ const QUOTAS: Quotas = {
 	claude: { windows: [{ minutes: 300, used_percent: 42, resets_ms: 0 }], taken_ms: 0 },
 	codex: undefined,
 }
+const DRAWN_NAMES = { claude: 'Claude', codex: 'Codex' } as const
 
 describe('run_board_tick.tick quotas', () => {
 	it.each(['claude', 'codex'] as const)(
@@ -22,13 +23,15 @@ describe('run_board_tick.tick quotas', () => {
 				plan_titled('a'),
 			])
 
+			const name = DRAWN_NAMES[scheduler_provider]
+
 			gathering.read_quotas = vi.fn(async () => QUOTAS)
 			await tick(FRESH_STATE, ports)
-			expect(frames.join('\n')).toContain(`🤖 ${scheduler_provider}`)
+			expect(frames.join('\n')).toContain(`🤖 ${name}`)
 			ports.folded = () => new Set(['usage'])
 			await tick(FRESH_STATE, ports)
 			expect(frames.at(-1)).toContain(`▸ ⛽ usage`)
-			expect(frames.at(-1)).toContain(`🤖 ${scheduler_provider}`)
+			expect(frames.at(-1)).toContain(`🤖 ${name}`)
 			expect(frames.join('\n')).toContain('🤖 scheduler')
 		},
 	)
