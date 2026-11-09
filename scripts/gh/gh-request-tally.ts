@@ -15,9 +15,14 @@
 // include that call's cost. The difference is an upper bound for this process: the account's other
 // processes spend the same allowance.
 
-interface GhRequestTally {
+interface CallCount {
 	calls: number
 	not_modified: number
+}
+
+// The same counts again per call kind (`gh-call-kind.ts`), keyed by the kind.
+interface GhRequestTally extends CallCount {
+	endpoints: Record<string, CallCount>
 }
 
 interface CoreUsage {
@@ -33,7 +38,8 @@ interface CoreWatch {
 	start: Promise<CoreUsage | undefined> | undefined
 }
 
-const tally: GhRequestTally = { calls: 0, not_modified: 0 }
+const tally: CallCount = { calls: 0, not_modified: 0 }
+const endpoints = new Map<string, CallCount>()
 const core: CoreWatch = { read: undefined, start: undefined }
 
 // A reading that throws reads as none: the start reading is held unawaited, so a rejection would
@@ -48,17 +54,30 @@ function watch_core(read: CoreUsageReader): void {
 	}
 }
 
-function count_call(): void {
-	if (core.read !== undefined) core.start ??= core.read()
-	tally.calls += 1
+function endpoint_of(kind: string): CallCount {
+	const count = endpoints.get(kind) ?? { calls: 0, not_modified: 0 }
+
+	endpoints.set(kind, count)
+
+	return count
 }
 
-function count_not_modified(): void {
+// `kind` is the call's `gh_call_kind` key.
+function count_call(kind: string): void {
+	if (core.read !== undefined) core.start ??= core.read()
+	tally.calls += 1
+	endpoint_of(kind).calls += 1
+}
+
+function count_not_modified(kind: string): void {
 	tally.not_modified += 1
+	endpoint_of(kind).not_modified += 1
 }
 
 function snapshot(): GhRequestTally {
-	return { ...tally }
+	const entries = [...endpoints].map(([kind, count]) => [kind, { ...count }] as const)
+
+	return { ...tally, endpoints: Object.fromEntries(entries) }
 }
 
 // A window that refilled between the readings makes the difference meaningless, so it is none.
@@ -79,6 +98,7 @@ async function core_delta(): Promise<number | undefined> {
 function reset(): void {
 	tally.calls = 0
 	tally.not_modified = 0
+	endpoints.clear()
 	core.read = undefined
 	core.start = undefined
 }
@@ -92,5 +112,5 @@ const gh_request_tally = {
 	reset,
 }
 
-export type { CoreUsage, CoreUsageReader, GhRequestTally }
+export type { CallCount, CoreUsage, CoreUsageReader, GhRequestTally }
 export { gh_request_tally }

@@ -33,6 +33,7 @@ const TRANSCRIPT = path.join(WORK_DIRECTORY, 'session.jsonl')
 const LANE_ISSUE = 6781
 const PR_CHECKS = 'gh pr checks 1'
 const PR_VIEW = 'direct:pr view'
+const DIRECT_API = 'direct:api'
 
 writeFileSync(TRANSCRIPT, '')
 
@@ -76,6 +77,18 @@ describe('direct_gh_usage.record', () => {
 				calls: 1,
 				not_modified: 0,
 				elapsed_ms: 0,
+				endpoints: { 'gh pr checks': { calls: 1, not_modified: 0 } },
+			},
+		])
+	})
+
+	it('records a direct `gh api` call under its normalized endpoint', async () => {
+		const lines = await written_lines('gh api repos/o/r/issues/5 --jq .title')
+
+		expect(lines).toMatchObject([
+			{
+				command: DIRECT_API,
+				endpoints: { 'GET repos/{o}/{r}/issues/{n}': { calls: 1, not_modified: 0 } },
 			},
 		])
 	})
@@ -99,7 +112,7 @@ describe('direct_gh_usage.record — the calls a command line launches', () => {
 	it('writes one line per `gh` on an `&&` line', async () => {
 		expect(await written_commands('gh pr view 1 && gh api repos/o/r/pulls')).toEqual([
 			PR_VIEW,
-			'direct:api',
+			DIRECT_API,
 		])
 	})
 

@@ -1,3 +1,4 @@
+import { gh_call_kind } from './gh-call-kind'
 import { gh_request_tally } from './gh-request-tally'
 import { git_gh_exec, has_stdout_field } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
@@ -53,15 +54,15 @@ function failure_status(error: unknown): number | undefined {
 }
 
 // A 304 is a call the exec layer already counted, and one that cost no REST core quota.
-function not_modified(): ConditionalRead {
-	gh_request_tally.count_not_modified()
+function not_modified(path: string): ConditionalRead {
+	gh_request_tally.count_not_modified(gh_call_kind.of_api(path))
 
 	return UNCHANGED
 }
 
-function rethrow_failure(error: unknown): ConditionalRead {
+function rethrow_failure(error: unknown, path: string): ConditionalRead {
 	const status = failure_status(error)
-	if (status === NOT_MODIFIED_STATUS) return not_modified()
+	if (status === NOT_MODIFIED_STATUS) return not_modified(path)
 	if (status !== undefined && error instanceof Error) gh_failure.attach(error, { status })
 	throw error
 }
@@ -74,7 +75,7 @@ async function request_conditional(
 	try {
 		return to_read(await git_gh_exec.exec_gh_command(to_args(path, etag), timeout_ms))
 	} catch (error) {
-		return rethrow_failure(error)
+		return rethrow_failure(error, path)
 	}
 }
 
