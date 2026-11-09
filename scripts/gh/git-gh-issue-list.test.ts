@@ -1,6 +1,6 @@
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import {
 	git_gh_issue_list,
@@ -21,6 +21,7 @@ import {
 	rest_issue_page,
 	rest_pull_request,
 } from './git-gh-issue-rest-fixture'
+import { TRANSPORT_ENV_VAR } from './git-gh-transport'
 
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
@@ -35,7 +36,11 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 // joshuafolkken/kit#1025: `gh issue list` goes through GraphQL, which a cloud session is answered
 // 403 for, so every open-issue listing moves to `repos/{owner}/{repo}/issues`. The six callers keep
-// the JSON shape `gh issue list --json` answered with, which is what these tests pin.
+// the JSON shape `gh issue list --json` answered with, which is what these tests pin — on a REST
+// session, since one on GraphQL reads a listing one page holds in one query (joshuafolkken/kit#6785).
+beforeEach(() => {
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+})
 
 const SUMMARY_FIELDS = 'number,title,labels,createdAt'
 const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy`
