@@ -362,6 +362,7 @@ function active_sections(
 		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared })),
 		cells,
 		frame.header,
+		frame.columns,
 	)
 
 	const plan = [...lanes, ...rows_section(decision, people, frame)]
