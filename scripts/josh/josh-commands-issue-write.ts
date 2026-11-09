@@ -2,6 +2,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 
 const REPO = '--repo <owner/repo>'
 const BODY_FILE = '--body-file <path>'
+const TITLE = '--title <title>'
 const EVIDENCE_FILE = '--evidence-file <path>'
 const BLOCKS_FINDER = '--blocks-finder'
 const EVIDENCE_REFERENCE = `<issue> ${EVIDENCE_FILE}`
@@ -18,6 +19,33 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<issue> <ac-id>...', 'automation', ['network']],
 		usage: {
 			examples: [{ arguments: '6233 ac-a1f32a2f ac-8647b0dd' }],
+		},
+	},
+	'issue:consolidate': {
+		script: 'scripts/issue/issue-consolidate-cli.ts',
+		description:
+			'Fold duplicates into a target: untrack, close as not planned; a failed write lists the writes done',
+		category: 'AI tools',
+		reference: [
+			'<target> <duplicate>... [--title <title>] [--body-file <path>] [--demote]',
+			'automation',
+			['network'],
+		],
+		usage: {
+			examples: [{ arguments: '6559 6567 6568 --body-file .josh/tmp/body.md --demote' }],
+			flags: [
+				{ names: [TITLE], description: "replace the target's title." },
+				{
+					names: [BODY_FILE],
+					description:
+						"replace the target's body, from a file or stdin (`-`). Its author must have write access.",
+				},
+				{
+					names: ['--demote'],
+					description:
+						'remove the `epic` label and the `## Split into children` sections from the body.',
+				},
+			],
 		},
 	},
 	'issue:release-class': {
@@ -84,7 +112,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					description:
 						'the plan, from a file or stdin (`-`): a blank body takes it, else a comment.',
 				},
-				{ names: ['--title <title>'], description: 'replace the issue title first.' },
+				{ names: [TITLE], description: 'replace the issue title first.' },
 				{
 					names: ['--planned'],
 					description:
