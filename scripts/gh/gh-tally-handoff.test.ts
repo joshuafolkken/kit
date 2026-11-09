@@ -20,15 +20,18 @@ function target(): string {
 	return path.join(scratch.directory, 'tally.jsonl')
 }
 
+// The exit listen seam, collecting each listener into `listeners` instead of the process.
+function collecting(listeners: Array<() => void>): (listener: () => void) => void {
+	return function listen(listener: () => void): void {
+		listeners.push(listener)
+	}
+}
+
 // Arms against `environment` and answers the exit listener it registered, if any.
 function armed_exit(environment: NodeJS.ProcessEnv): (() => void) | undefined {
 	const listeners: Array<() => void> = []
 
-	gh_tally_handoff.arm(
-		() => HANDED,
-		environment,
-		(listener) => listeners.push(listener),
-	)
+	gh_tally_handoff.arm(() => HANDED, environment, collecting(listeners))
 
 	return listeners[0]
 }
@@ -51,16 +54,8 @@ describe('gh_tally_handoff.arm — the child side', () => {
 		const listeners: Array<() => void> = []
 		const environment = { [gh_tally_handoff.HANDOFF_ENV]: target() }
 
-		gh_tally_handoff.arm(
-			() => HANDED,
-			environment,
-			(listener) => listeners.push(listener),
-		)
-		gh_tally_handoff.arm(
-			() => HANDED,
-			environment,
-			(listener) => listeners.push(listener),
-		)
+		gh_tally_handoff.arm(() => HANDED, environment, collecting(listeners))
+		gh_tally_handoff.arm(() => HANDED, environment, collecting(listeners))
 
 		expect(listeners).toHaveLength(1)
 	})
