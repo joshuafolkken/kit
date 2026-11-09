@@ -6,6 +6,7 @@ import { git_gh_exec } from './git-gh-exec'
 import { git_gh_issue } from './git-gh-issue'
 import { ISSUE_NUMBER, rest_issue_page } from './git-gh-issue-rest-fixture'
 import { conditional_read_over } from './git-gh-pr-fixture'
+import { TRANSPORT_ENV_VAR } from './git-gh-transport'
 
 // joshuafolkken/kit#6560: `backlog:next` reads the `auto-ok` listing every scan, each scan a fresh
 // process, so every page is sent with the ETag the previous scan kept. A page that has not changed is
@@ -41,8 +42,11 @@ async function listed_numbers(): Promise<Array<unknown>> {
 	return json_value.parse_array(json) ?? []
 }
 
+// The ETag belongs to the REST listing; a session on GraphQL reads it in one query instead
+// (joshuafolkken/kit#6785).
 beforeEach(() => {
 	vi.restoreAllMocks()
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
 	shared_cache_fixture.keep_in_memory()
 })
 

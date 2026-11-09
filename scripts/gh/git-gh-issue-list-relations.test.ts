@@ -3,6 +3,7 @@ import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_issue_list } from './git-gh-issue-list'
+import { is_listing_query } from './git-gh-issue-list-graphql-fixture'
 import {
 	BLOCKED_BY_SEGMENT,
 	BLOCKER_NUMBER,
@@ -101,11 +102,13 @@ function rest_blocker_answer(): string {
 	return JSON.stringify([{ number: BLOCKER_NUMBER, state: REST_BLOCKER_STATE, repository_url }])
 }
 
-// `is_graphql_up` false answers the query the way `gh` does on a failure: a non-zero exit.
+// `is_graphql_up` false answers the query the way `gh` does on a failure: a non-zero exit. The
+// listing query always fails here, so the listing is REST's — as for a backlog one GraphQL page
+// cannot hold (joshuafolkken/kit#6785) — and what these pin is the blocker reads that follow it.
 function serve_listing(rows: ReadonlyArray<Record<string, unknown>>, is_graphql_up: boolean): void {
 	mocked_api.mockImplementation(async (request) => {
 		if (request.path === GRAPHQL_PATH) {
-			if (!is_graphql_up) throw new Error('gh exited 1')
+			if (!is_graphql_up || is_listing_query(request.body)) throw new Error('gh exited 1')
 
 			return graphql_answer(request.body)
 		}
@@ -122,7 +125,9 @@ function blocked_by_reads(): number {
 }
 
 function graphql_reads(): number {
-	return mocked_api.mock.calls.filter(([request]) => request.path === GRAPHQL_PATH).length
+	return mocked_api.mock.calls.filter(
+		([request]) => request.path === GRAPHQL_PATH && !is_listing_query(request.body),
+	).length
 }
 
 async function listing_json(): Promise<string | undefined> {
