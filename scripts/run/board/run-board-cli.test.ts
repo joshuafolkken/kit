@@ -272,3 +272,25 @@ describe('run_board_cli.run footer in a short pane', () => {
 		expect(await live_lines(tall.length - 1)).toEqual(tall.slice(0, -2))
 	})
 })
+
+// joshuafolkken/kit#6597: a single run held in this checkout is drawn under its own name, its issue's
+// row carrying the phase its events reached.
+describe('run_board_cli.run for a single run', () => {
+	const PLANNED = { pos: 2, at: '2026-10-08T08:01:00.000Z', kind: 'plan', text: '#1 plan' }
+
+	it.each([
+		{ run_name: 'fullrun', argv: ['--once'] },
+		{ run_name: 'halfrun', argv: ['--once'] },
+		{ run_name: 'fullrun', argv: ['--chat'] },
+	])('draws $run_name and its row with $argv', async ({ run_name, argv }) => {
+		const single = { run_name, scope: { issues: [1], only: true }, events: [LAUNCH, PLANNED] }
+		const { ports, frames } = harness({ ...LOCAL, ...single }, [plan_titled('a')])
+
+		await expect(run_board_cli.run(argv, ports)).resolves.toBe(0)
+
+		const frame = stripVTControlCharacters(frames[0] ?? '')
+
+		expect(frame).toMatch(new RegExp(`^. ${run_name}`, 'u'))
+		expect(frame).toContain('📝')
+	})
+})
