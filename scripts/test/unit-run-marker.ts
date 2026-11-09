@@ -1,11 +1,14 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
+import { git_directory } from '#scripts/discovery/git-directory'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { durable_state_root } from '#scripts/josh/durable-state-root'
+import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_paths, type LaneEnvironment } from '#scripts/lane/lane-paths'
+import { lane_state_record } from '#scripts/lane/lane-state-record'
 import { json_value } from '#scripts/lib/json-value'
 
 // The run markers that count the unit runs in flight, and the division of the machine by that count —
@@ -136,19 +139,37 @@ function resolve_unit_workers(available_cores: number, runs: number): number | u
 	return Math.max(MIN_WORKERS, Math.floor(available_cores / runs))
 }
 
+// A lane whose lane-state record says it opens no suite — paused, human-review or ended — read from the
+// common git directory its `.git` file names, without asking git (joshuafolkken/kit#6916). A directory
+// with no work tree or no readable record is not idle, so it keeps the place the directory gave it —
+// as does a common directory spelled otherwise than `git rev-parse` spells it (a symlinked path), whose
+// record key then names no file.
+function is_idle_lane(lanes_root: string, issue: string, environment: LaneEnvironment): boolean {
+	const common = git_directory.resolve_git_directory(path.join(lanes_root, issue))
+
+	if (common === undefined) return false
+
+	const override = environment[platform_temporary.TEMP_ROOT_KEY]
+	const state_root = durable_state_root.state_root(override, () => common)
+
+	return lane_state_record.is_idle(state_root, common, issue)
+}
+
 // The lanes open on this machine: the issue-number directories under the lanes root `checkout`
-// belongs to (joshuafolkken/kit#6682). **An upper bound**: a paused, human-review, ended-but-uncollected
-// or stray lane directory is counted too, since the directory alone cannot tell an idle lane from one
-// about to start a suite. **Unreadable counts none**, which leaves
-// the division to the run count as it was — a lanes root that does not exist, as on CI, among them.
+// belongs to (joshuafolkken/kit#6682), less those whose lane-state record says they are idle. A stray
+// directory or one with no record is still counted, an upper bound. **Unreadable counts none**, which
+// leaves the division to the run count as it was — a lanes root that does not exist, as on CI, among them.
 function live_lane_count(
 	checkout: string = process.cwd(),
 	environment: LaneEnvironment = process.env,
 ): number {
 	try {
-		return readdirSync(lane_paths.lanes_root_of(checkout, environment)).filter((name) =>
+		const lanes_root = lane_paths.lanes_root_of(checkout, environment)
+		const issues = readdirSync(lanes_root).filter((name) =>
 			issue_number_shape.ISSUE_NUMBER_PATTERN.test(name),
-		).length
+		)
+
+		return issues.filter((issue) => !is_idle_lane(lanes_root, issue, environment)).length
 	} catch {
 		return 0
 	}
