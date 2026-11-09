@@ -195,21 +195,15 @@ function wait_line(command: string | undefined, reason: WaitReason): string {
 	return `⏳ ${command ?? 'a step'} waits for the core budget — ${REASON_TEXT[reason]}`
 }
 
-// The lanes root a checkout belongs to: a lane's parent, or the root beside a main checkout. Two
-// checkouts of one repository share it; the ledger is machine-wide, so another repository's do not.
-// A Claude Code worktree under a checkout reads as that checkout (`lane_paths.checkout_of`).
-function lanes_root_of(checkout: string): string {
-	const resolved = lane_paths.checkout_of(path.resolve(checkout))
-
-	if (lane_paths.lane_issue_of(resolved) === undefined) return lane_paths.lane_root(resolved)
-
-	return path.dirname(resolved)
-}
-
 // Where a claim runs, read by the claimer under its own environment: `JOSH_LANE_ROOT` is a
-// per-project setting, so a board cannot derive another repository's lanes root from its own.
+// per-project setting, so a board cannot derive another repository's lanes root from its own. The
+// ledger is machine-wide, so another repository's checkouts carry a lanes root of their own.
 function where_of(checkout: string): Required<WhereFields> {
-	return { checkout, lane: lane_paths.lane_issue_of(checkout), lanes_root: lanes_root_of(checkout) }
+	return {
+		checkout,
+		lane: lane_paths.lane_issue_of(checkout),
+		lanes_root: lane_paths.lanes_root_of(checkout),
+	}
 }
 
 // Another repository's checkout is named by its lanes root and lane, or its directory, so its lane
@@ -240,7 +234,7 @@ function waits_of(
 	now: number,
 	home: string,
 ): Array<BudgetWait> {
-	const home_root = lanes_root_of(home)
+	const home_root = lane_paths.lanes_root_of(home)
 
 	return entries
 		.flatMap((entry) => wait_of(entry.reservation, now, home_root))

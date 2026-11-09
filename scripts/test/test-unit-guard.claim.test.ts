@@ -95,6 +95,7 @@ describe('test_unit_guard.vitest_share — the free memory', () => {
 
 	beforeEach(() => {
 		vi.spyOn(unit_worker_share, 'live_run_count').mockReturnValue(0)
+		vi.spyOn(unit_worker_share, 'live_lane_count').mockReturnValue(0)
 		stub_claim(undefined)
 	})
 
