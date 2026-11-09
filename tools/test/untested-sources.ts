@@ -34,7 +34,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/adopt/adopt-logic.ts',
 	'scripts/agent/codex-home-source.ts',
 	'scripts/backlog/backlog-drive-args.ts',
-	'scripts/backlog/backlog-drive-offer-argv.ts',
 	'scripts/backlog/backlog-plan-cli.ts',
 	'scripts/backlog/backlog-rank.ts',
 	'scripts/backlog/backlog-scope.ts',
