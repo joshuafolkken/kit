@@ -83,6 +83,33 @@ test('offers a named epic child from the epic instead of launching the root', as
 	epic.mockRestore()
 })
 
+// joshuafolkken/kit#6839: a pool run names no issue, yet the epic `run:add` made its root is offered
+// from the epic, and once it is done nothing is named, so `read_offer` asks the pool.
+test('offers a pool run its added epic from the epic, then names nothing once it is done', async () => {
+	const carry = {
+		...CARRY,
+		invocation: 'backlogrun --max 1',
+		added: [{ issue: 5, is_priority: false }],
+	}
+	const state = backlog_drive.initial_state([], ACTIVE)
+
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: ['epic'], is_human_review: false },
+	})
+	const epic = vi
+		.spyOn(backlog_drive_epic, 'offer')
+		.mockResolvedValue({ verdict: 'run', issues: ['7'], retries: 0 })
+
+	const { offer } = await backlog_drive_named_offer.read(carry, state, CONTEXT)
+	const drained = await backlog_drive_named_offer.read({ ...carry, done: [5] }, state, CONTEXT)
+
+	expect(offer).toMatchObject({ verdict: 'run', issues: ['7'] })
+	expect(epic).toHaveBeenCalledWith('5', state, CONTEXT.owner)
+	expect(drained.offer).toBeUndefined()
+	vi.restoreAllMocks()
+})
+
 function begin_named(target: string, directory: string): RunCarry | undefined {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
 
