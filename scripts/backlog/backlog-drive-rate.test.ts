@@ -150,3 +150,47 @@ describe('backlog_drive_rate.offer_run', () => {
 		expect(emit).toHaveBeenCalledTimes(1)
 	})
 })
+
+describe('backlog_drive_rate.offer_run lane:prune', () => {
+	it('runs lane:prune with its stderr forwarded before the offer (ac-da10216f)', async () => {
+		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '', err: '' })
+
+		stub_reads(rate_json(1, RESET_SECONDS), rate_json(1, RESET_SECONDS))
+		stub_emit()
+
+		await backlog_drive_rate.offer_run(OFFER_ARGV)
+		expect(run.mock.calls).toEqual([
+			[['lane:prune'], true],
+			[OFFER_ARGV, true],
+		])
+	})
+
+	it('counts the lane:prune spend in the measured cycle', async () => {
+		const api = vi
+			.spyOn(git_gh_exec, 'exec_gh_api_uncounted')
+			.mockResolvedValue(rate_json(1, RESET_SECONDS))
+		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '', err: '' })
+
+		stub_emit()
+
+		await backlog_drive_rate.offer_run(OFFER_ARGV)
+		const [first_read, last_read] = api.mock.invocationCallOrder
+		const [prune_call] = run.mock.invocationCallOrder
+
+		expect(prune_call).toBeGreaterThan(first_read ?? Infinity)
+		expect(prune_call).toBeLessThan(last_read ?? -Infinity)
+	})
+
+	it('still reads the offer when lane:prune fails', async () => {
+		const result = { code: 0, out: 'run', err: '' }
+
+		vi.spyOn(josh_command, 'josh_run')
+			.mockResolvedValueOnce({ code: 1, out: '', err: 'These lanes could not be closed' })
+			.mockResolvedValueOnce(result)
+
+		stub_reads(rate_json(1, RESET_SECONDS), rate_json(1, RESET_SECONDS))
+		stub_emit()
+
+		await expect(backlog_drive_rate.offer_run(OFFER_ARGV)).resolves.toBe(result)
+	})
+})
