@@ -1,4 +1,9 @@
-import { IN_PROGRESS_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	PRIORITY_CRITICAL_LABEL,
+	PRIORITY_HIGH_LABEL,
+	RUN_STALLED_LABEL,
+} from '#scripts/issue/issue-labels'
 import { describe, expect, it, vi } from 'vitest'
 import { run_add, type AddContext, type AddPorts } from './run-add'
 
@@ -39,6 +44,27 @@ it('preserves remaining dependencies when explicitly retrying (ac-505a5dfa)', as
 	expect(await run_add.add_all([ISSUE], true, ports, CONTEXT)).toMatchObject([
 		{ kind: 'queued', blockers: [6400] },
 	])
+})
+
+describe('retry of an issue that already has a priority label', () => {
+	it('does not stack priority:high on priority:critical', async () => {
+		const ports = ports_for([RUN_STALLED_LABEL, PRIORITY_CRITICAL_LABEL])
+
+		expect(await run_add.add_all([ISSUE], true, ports, CONTEXT)).toMatchObject([{ kind: 'queued' }])
+		expect(ports.apply_label).not.toHaveBeenCalledWith(ISSUE, PRIORITY_HIGH_LABEL)
+	})
+
+	it('still puts it at the next free lane', async () => {
+		const ports = ports_for([RUN_STALLED_LABEL, PRIORITY_CRITICAL_LABEL])
+		const outcomes = await run_add.add_all([ISSUE], true, ports, CONTEXT)
+
+		expect(run_add.additions_of(outcomes, true)).toStrictEqual([
+			{ issue: ISSUE, is_priority: true },
+		])
+		expect(outcomes.map((outcome) => run_add.describe(outcome, true))).toStrictEqual([
+			`queued #${String(ISSUE)} · next free lane`,
+		])
+	})
 })
 
 describe('retry and the shared in-progress reader', () => {
