@@ -249,6 +249,7 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 	[STAGE.HANDING_OFF]: '🤝',
 	[STAGE.JUDGING]: '🤔',
 	[STAGE.SESSION]: '💭',
+	[STAGE.RETROSPECTIVE]: PHASE_ICONS.investigate,
 	[STAGE.NO_CHILD]: '🚫',
 	[LANE_STAGE.OPENING]: LANE_STAGE_ICONS.opening,
 	[LANE_STAGE.INSTALLING]: LANE_STAGE_ICONS.installing,

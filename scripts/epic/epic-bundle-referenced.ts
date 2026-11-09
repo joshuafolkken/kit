@@ -184,8 +184,26 @@ async function referenced_candidates(
 	return { ...found, unreadable: [...found.unreadable, ...dropped] }
 }
 
+function is_open_issue(read: EpicIssue): boolean {
+	return !epic_issue.is_pull_request(read) && epic_issue.is_open(read.state)
+}
+
+// The subject itself, read on its own when the open listing does not show it yet — a just-filed
+// issue trails the listing. `undefined` unless it is an open issue: a closed one or a pull request
+// has nothing to bundle, and a failed read is reported by the caller as "not an open issue".
+async function read_subject(
+	number: number,
+	context: ReferencedContext,
+): Promise<BacklogIssue | undefined> {
+	const { result } = await read_one(number)
+	if (is_failed_read(result) || !is_open_issue(result)) return undefined
+
+	return { ...to_backlog_issue(result, context), title: result.title }
+}
+
 const epic_bundle_referenced = {
 	REFERENCED_LOOKUP_LIMIT,
+	read_subject,
 	referenced_lookups,
 	collect_referenced,
 	fetch_referenced,

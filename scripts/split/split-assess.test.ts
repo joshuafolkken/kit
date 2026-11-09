@@ -28,6 +28,34 @@ function runtime_numstat(count: number, lines: number): string {
 	).join('\n')
 }
 
+// joshuafolkken/kit#6724: the split notice counted a new scripts module and its importer as two files
+// while `lane:plan` cleared them as one, so `run:cut` asked to split off the importer.
+describe('split notice on lane:plan units', () => {
+	const new_module = 'scripts/x/new.ts'
+	const plan_diff = [
+		add_row(1, new_module),
+		add_row(1, 'scripts/x/cli.ts'),
+		add_row(1, 'docs/a.md'),
+		add_row(1, 'scripts/x/b.ts'),
+	].join('\n')
+	const guide = split_assess.guide_for(12, undefined, { files: 1.5 })
+	const declared = { files: 2, lines: 20 }
+
+	it('prints no notice when the new module and its importer count as one', () => {
+		const measurement = split_assess.assess(plan_diff, guide, new Set([new_module]))
+
+		expect(measurement.files).toBe(3)
+		expect(split_assess.notice(measurement, declared)).toBeUndefined()
+	})
+
+	it('still counts each file alone when no file is added', () => {
+		const measurement = split_assess.assess(plan_diff, guide)
+
+		expect(measurement.files).toBe(4)
+		expect(split_assess.notice(measurement, declared)).toContain('split notice')
+	})
+})
+
 describe('parse_numstat', () => {
 	it('sums added and deleted into changed lines', () => {
 		const [change] = split_assess.parse_numstat(row('12', '5', A_TS))
@@ -153,14 +181,16 @@ describe('reason', () => {
 
 // joshuafolkken/kit#4302: the pre-gate notice fires past the guide when the Issue declares no size.
 describe('notice', () => {
-	it('names the measurement and stops implementation until the rest is split', () => {
+	// joshuafolkken/kit#6602: size alone is a warning; a split child is only for an independent requirement.
+	it('names the measurement as a warning and keeps the split for an independent requirement', () => {
 		const notice = split_assess.notice({ files: 12, lines: 500, verdict: 'split' })
 
 		expect(notice).toContain('12 changed file(s), 500 changed line(s)')
-		expect(notice).toContain('stop implementation, keep only the green part')
+		expect(notice).toContain('a warning, not a stop: go on')
+		expect(notice).not.toContain('stop implementation')
 		expect(notice).not.toContain(split_assess.REASON_PREFIX)
 		expect(notice).toContain('pnpm josh issue:file --route split --found-during <N>')
-		expect(notice).toContain('then ship the green part')
+		expect(notice).toContain('only for an independent added requirement')
 		expect(notice).toContain('Over the guide before the gate')
 	})
 

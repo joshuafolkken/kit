@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
-import { cost_cli } from '#scripts/cost-runtime/cost-cli'
+import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { issue_cite } from '#scripts/issue/issue-cite'
@@ -56,7 +56,6 @@ const {
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	SPLIT_UNRESOLVED_VERDICT,
 	SUCCESS_EXIT_CODE,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,
@@ -69,34 +68,47 @@ const {
 	report_missing_supervisor,
 	report_relaunched_cut,
 	report_reviewer,
-	report_split_unresolved,
 	report_under_threshold,
 	report_unknown,
 } = run_cut_report
 
+// An unmeasurable session was never priced, so it is not told it is under the threshold; it reaches the
+// gate under the same verdict, since a relaunch could not price it either (joshuafolkken/kit#6576).
+function report_unmeasurable(): number {
+	console.error(
+		'The current context cannot be measured, so nothing was cut; a resume could not measure it either. Continue to the gate.',
+	)
+
+	return report(UNDER_THRESHOLD_VERDICT, SUCCESS_EXIT_CODE)
+}
+
+// Only a measured `over` takes the cut; `under` and an unmeasurable session both continue uncut.
+function verdict_answer(verdict: CostVerdict): number | undefined {
+	if (verdict === cost_verdict.OVER_VERDICT) return undefined
+
+	return verdict === cost_verdict.UNDER_VERDICT ? report_under_threshold() : report_unmeasurable()
+}
+
 // **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**.
 // `cost_cli.session_verdict` prices the newest request against the `--cut` break-even, so no second
-// threshold is introduced — an `under` session skips the cut, and an unmeasurable one still cuts as
-// the safety net. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
+// threshold is introduced — only an `over` session is cut, an unmeasurable one skips it (joshuafolkken/kit#6576).
+// Only the pre-gate phase is checked here; the implementation-phase caller gates its own
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
 //
-// **A noticed Issue answers the split notice first** (joshuafolkken/kit#4695): the pre-gate cut is the
-// boundary the notice names, so a lane without a split child is refused whether or not
-// the cut itself would be taken. **An implementation past its budget with a green part ships it**
-// (joshuafolkken/kit#6026) rather than resuming into the rest. Returns the answer given without cutting,
-// or `undefined`.
+// **An unanswered split notice is printed as a warning and the cut goes on** (joshuafolkken/kit#6602):
+// size alone never stops a started Issue. **An implementation past its budget with a green part ships it**
+// (joshuafolkken/kit#6026) rather than resuming into the rest — elapsed time, not size. Returns the
+// answer given without cutting, or `undefined`.
 async function pre_gate_answer(issue: string, phase: string): Promise<number | undefined> {
 	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
-	const split_note = await split_resolution.ledger_refusal(Number(issue))
+	const split_note = await split_resolution.ledger_warning(Number(issue))
 
-	if (split_note !== undefined) return report_split_unresolved(split_note)
+	if (split_note !== undefined) console.error(split_note)
 	const over = await run_cut_budget.over_minutes(Number(issue))
 
 	if (over !== undefined) return run_cut_budget.report_over(issue, over)
 
-	return cost_cli.session_verdict() === cost_verdict.UNDER_VERDICT
-		? report_under_threshold()
-		: undefined
+	return verdict_answer(cost_cli.session_verdict())
 }
 
 // The exclusive create lost, so a cut is already in flight for this tree — the double-cut guard. The
@@ -405,7 +417,6 @@ const run_cut_cli = {
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	SPLIT_UNRESOLVED_VERDICT,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,
 	run,

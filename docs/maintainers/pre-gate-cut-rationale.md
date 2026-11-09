@@ -116,8 +116,8 @@ relaunches a fresh process that re-reads the plan and decisions off GitHub befor
 of ~12 requests per session. That ramp was **$81.01 of $435.09 (19%)** across the 32 lanes of
 2026-09-21, falling hardest on the short lanes with the least to drop: #2282 spent 58% of its billing on
 it at 60k median context, #2295 39% at 74k, #2289 37% at 81k — each with 0% of its requests over 200k.
-A lane like #2298 (31% of requests over 200k) still cuts. An unmeasurable session keeps the old
-unconditional cut so it is never left uncut.
+A lane like #2298 (31% of requests over 200k) still cuts. An unmeasurable session is not cut;
+a relaunch cannot measure it either (#6576).
 
 ## Why the resume carries what it carries
 

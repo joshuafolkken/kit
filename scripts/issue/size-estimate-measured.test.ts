@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { size_estimate } from './size-estimate'
 
-const RATE = { median: 4, lanes: 4 }
+const RATE = { median: 3, lanes: 4 }
 const SPLIT = 'route:split'
 
 function body_of(files: number, lines: number): string {

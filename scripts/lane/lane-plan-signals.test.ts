@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import type { LedgerEntry } from './lane-ledger'
+import { change_base } from '#scripts/git/change-base'
+import { git_spawn } from '#scripts/git/git-spawn'
+import { test_related_cap } from '#scripts/test/test-related-cap'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_plan_signals } from './lane-plan-signals'
 
 // joshuafolkken/kit#5568: what `lane:plan` measures beside the plan — the tree's hunks, tests excluded,
@@ -109,5 +112,70 @@ describe('lane_plan_signals.signals_from', () => {
 			implement_rate: undefined,
 			split_filed: true,
 		})
+	})
+})
+
+// joshuafolkken/kit#6652: the change base's file listing, so `lane:plan` can tell a new file from an existing one.
+const BASE = 'base-sha'
+const HUB = 'scripts/split/split-assess.ts'
+
+async function listing(arguments_: ReadonlyArray<string>): Promise<string> {
+	return await (arguments_[0] === 'ls-tree' ? 'a.ts\nscripts/b.ts\n' : '')
+}
+
+describe('lane_plan_signals.signals_of base_files', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('lists the files the change base holds (ac-36d58f44)', async () => {
+		vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(BASE)
+		const read = vi.spyOn(git_spawn, 'read').mockImplementation(listing)
+
+		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
+
+		const signals = await lane_plan_signals.signals_of(ISSUE)
+
+		expect(signals.base_files).toStrictEqual(new Set(['a.ts', 'scripts/b.ts']))
+		expect(read).toHaveBeenCalledWith(['ls-tree', '-r', '--name-only', BASE])
+	})
+
+	it('answers no listing when the change base does not resolve (ac-98beb1b4)', async () => {
+		vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(undefined)
+		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
+
+		const signals = await lane_plan_signals.signals_of(ISSUE)
+
+		expect(signals.base_files).toBeUndefined()
+	})
+
+	it('answers no listing, not an empty one, when the listing cannot be read', async () => {
+		vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(BASE)
+		vi.spyOn(git_spawn, 'read').mockRejectedValue(new Error('ls-tree failed'))
+		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
+
+		const signals = await lane_plan_signals.signals_of(ISSUE)
+
+		expect(signals.base_files).toBeUndefined()
+	})
+})
+
+describe('lane_plan_signals.signals_of hubs', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads the hubs among the planned files, and none for no plan (joshuafolkken/kit#6543)', async () => {
+		vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(undefined)
+		vi.spyOn(lane_ledger, 'target').mockResolvedValue(undefined)
+		const hubs_of = vi.spyOn(test_related_cap, 'hubs_of').mockResolvedValue([HUB])
+
+		const planned = await lane_plan_signals.signals_of(ISSUE, [HUB, SOURCE])
+		const unplanned = await lane_plan_signals.signals_of(ISSUE)
+
+		expect(planned.hubs).toStrictEqual([HUB])
+		expect(hubs_of).toHaveBeenCalledWith(process.cwd(), [HUB, SOURCE])
+		expect(unplanned.hubs).toStrictEqual([])
+		expect(hubs_of).toHaveBeenCalledOnce()
 	})
 })

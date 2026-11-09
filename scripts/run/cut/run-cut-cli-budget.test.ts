@@ -10,16 +10,15 @@ const {
 	launch,
 	printed_errors,
 	session_verdict,
-	split_refusal,
+	split_warning,
 	target,
 	verdict,
 } = run_cut_cli_fixture
 
 run_cut_cli_fixture.install()
 
-const FAILURE_EXIT_CODE = 1
 const OVER_MINUTES = 31
-const NOTE = 'got the split notice and has no split child'
+const NOTE = 'size warning: got the split notice — not a stop'
 
 // joshuafolkken/kit#6026: an implementation past its stage budget with a green part checked ships that
 // part and spills the rest, rather than being cut and resumed into it.
@@ -50,12 +49,13 @@ describe('the pre-gate cut of an implementation over its budget', () => {
 		expect(verdict()).toBe(run_cut_cli.UNDER_THRESHOLD_VERDICT)
 	})
 
-	it('refuses an unanswered split notice before the budget is read', async () => {
-		split_refusal.mockResolvedValue(NOTE)
+	it('reads the budget past an unanswered split notice, which only warns', async () => {
+		split_warning.mockResolvedValue(NOTE)
 		over_minutes.mockResolvedValue(OVER_MINUTES)
 
-		expect(await run_cut_cli.run([ISSUE])).toBe(FAILURE_EXIT_CODE)
-		expect(verdict()).toBe(run_cut_cli.SPLIT_UNRESOLVED_VERDICT)
-		expect(over_minutes).not.toHaveBeenCalled()
+		await run_cut_cli.run([ISSUE])
+
+		expect(over_minutes).toHaveBeenCalledWith(Number(ISSUE))
+		expect(verdict()).not.toBe('split-unresolved')
 	})
 })

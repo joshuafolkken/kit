@@ -37,7 +37,7 @@ function running(number: number): BoardRow {
 		state: 'running' as const,
 		started_ms: NOW - 15 * MINUTE,
 		track: ['implement' as const],
-		phase_ms: NOW - 11 * MINUTE,
+		phase_ms: NOW - 8 * MINUTE,
 	}
 
 	return {
@@ -107,13 +107,13 @@ describe('run_board_render_waits.held_time', () => {
 
 describe('run_board_render.render — a held lane on its row', () => {
 	it('leads the row with 🚧, keeps the phase’s icon, holds the elapsed column and ends on the check', () => {
-		expect(lane_line([wait()])).toMatch(/^ {2}🚧 🔨 +11′00″ 🧠 +9″ 4039 {7}Issue 4039 +lint$/u)
+		expect(lane_line([wait()])).toMatch(/^ {2}🚧 🔨 +8′00″ 🧠 +9″ 4039 {7}Issue 4039 +lint$/u)
 	})
 
 	it('draws the phase icon and the run’s time again once the wait is gone', () => {
 		const line = lane_line([])
 
-		expect(line).toMatch(/^ {5}🔨 +11′00″ +15′00″ 4039 /u)
+		expect(line).toMatch(/^ {5}🔨 +8′00″ +15′00″ 4039 /u)
 		expect(line).not.toContain(BUDGET_ICON)
 	})
 

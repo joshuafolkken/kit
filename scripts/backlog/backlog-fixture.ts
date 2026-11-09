@@ -6,6 +6,7 @@ import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
@@ -214,6 +215,10 @@ function stub_environment(): void {
 	)
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
 	vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(REACHABLE_STATUS)
+	// The children's batched GraphQL read answers nothing, so every child comes from the REST stub.
+	vi.spyOn(git_gh_issue_batch_graphql, 'read_many').mockResolvedValue(
+		git_gh_issue_batch_graphql.empty_batch(),
+	)
 	// The closed children and the write roles a scan keeps for the next one, held per test so no case
 	// answers from another's record or the machine's own.
 	onTestFinished(

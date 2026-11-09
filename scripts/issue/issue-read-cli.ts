@@ -1,5 +1,7 @@
 import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { IssueReadFailure } from '#scripts/gh/git-gh-issue-read'
+import { gh_rate_limit } from '#scripts/gh/git-gh-rate-limit'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -39,7 +41,8 @@ interface IssueContent {
 	comments: ReadonlyArray<IssueComment> | undefined
 }
 
-type NumberResult = { kind: 'issue'; content: IssueContent } | { kind: ReadFailureKind }
+type NumberResult =
+	{ kind: 'issue'; content: IssueContent } | { kind: ReadFailureKind; hint?: string }
 
 // The formatted block for one issue, or the failure kind — what `run:prep` bundles beside the state
 // and the dependency-update scope. It reuses this file's read and the shared
@@ -90,16 +93,25 @@ function parse_request(argv: ReadonlyArray<string>): ReadRequest | undefined {
 	return { issue_numbers, ...repo }
 }
 
-// The comments are read beside the fields rather than after them: the two requests need nothing from
-// one another, and reading them in sequence would put back one of the two round trips this command
-// exists to remove.
-async function read_issue(issue_number: string, repo?: string): Promise<NumberResult> {
-	const [read, comments_json] = await Promise.all([
-		git_gh_command.issue_view_json_classified(issue_number, ISSUE_FIELDS, repo),
-		git_gh_command.issue_list_comments(issue_number, undefined, repo),
-	])
+// A failed request's error text tells an exhausted rate limit — with its reset time — from expired
+// auth or the network, so the report does not send a rate-limited run to refresh its token (#6614).
+async function to_failure_result(failure: IssueReadFailure): Promise<NumberResult> {
+	if (failure.kind === 'missing' || failure.detail === undefined) return { kind: failure.kind }
 
-	if (read.kind !== 'read') return { kind: read.kind }
+	return { kind: failure.kind, hint: await gh_rate_limit.failure_hint(failure.detail) }
+}
+
+// The comments are read with the fields rather than after them — in one GraphQL query, or two REST
+// reads side by side when that query is refused — since reading them in sequence would put back one of
+// the round trips this command exists to remove.
+async function read_issue(issue_number: string, repo?: string): Promise<NumberResult> {
+	const { read, comments_json } = await git_gh_command.issue_read_with_comments(
+		issue_number,
+		ISSUE_FIELDS,
+		repo,
+	)
+
+	if (read.kind !== 'read') return await to_failure_result(read)
 
 	const fields = await issue_read.parse_issue_fields(read.json, repo)
 

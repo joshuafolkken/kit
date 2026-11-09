@@ -1,14 +1,6 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
@@ -48,7 +40,8 @@ const NEW_MODULE = 'src/new-module.ts'
 const FILES_BEFORE = TARGET
 const FILES_AFTER = `${TARGET}\n${NEW_MODULE}`
 
-const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-'))
+const make_directory = temporary_directory('suite')
+const project_root = make_directory('eslint-daemon-')
 
 function answer(exit_code: number, stdout: string): ExecaResult {
 	return { exitCode: exit_code, stdout, all: stdout } as unknown as ExecaResult
@@ -316,17 +309,13 @@ describe('eslint_daemon.run — nothing to reach', () => {
 	})
 
 	it('reaches no daemon for a project that borrows its node_modules through a symlink', async () => {
-		const lender = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-lender-'))
+		const lender = make_directory('eslint-daemon-lender-')
 
-		try {
-			symlinkSync(lender, path.join(project_root, 'node_modules'), 'dir')
+		symlinkSync(lender, path.join(project_root, 'node_modules'), 'dir')
 
-			expect(eslint_daemon.resolve_daemon_cli(project_root)).toBeUndefined()
-			expect(await eslint_daemon.run(PNPM_ESLINT, { project_root })).toBeUndefined()
-			expect(mocked_execa).not.toHaveBeenCalled()
-		} finally {
-			rmSync(lender, { recursive: true, force: true })
-		}
+		expect(eslint_daemon.resolve_daemon_cli(project_root)).toBeUndefined()
+		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root })).toBeUndefined()
+		expect(mocked_execa).not.toHaveBeenCalled()
 	})
 
 	it('reaches the daemon for a project with a node_modules of its own', () => {

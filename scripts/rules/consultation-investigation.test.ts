@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agent_model } from './agent-model'
 import { consultation_investigation } from './consultation-investigation'
 import { delivered_rules } from './delivered-rules'
@@ -23,11 +23,8 @@ const ONE_FILE = 'package.json'
 const TREE_GREP = 'grep -rn guard scripts'
 const PROMPT = 'Find where the guard reads the transcript'
 const { ROW, CODEX_ROW } = consultation_investigation
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'consultation-investigation-'))
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('consultation-investigation-')
 
 afterEach(() => {
 	vi.unstubAllEnvs()

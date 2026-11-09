@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { HistoryReader } from '#scripts/release/release-history'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 
 const DEFAULT_BRANCH = 'main'
 const fetched = vi.hoisted(() => ({ branches: [] as Array<string> }))
@@ -37,12 +37,10 @@ const NO_MERGES = 0
 // range the reader is handed.
 const TIP = 'origin/main'
 
-const work_directories: Array<string> = []
+const make_directory = temporary_directory()
 
 function project_at(version: string | undefined): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-followup-pending-'))
-
-	work_directories.push(directory)
+	const directory = make_directory('josh-followup-pending-')
 
 	if (version !== undefined) {
 		writeFileSync(
@@ -91,10 +89,6 @@ function failing_reader(): HistoryReader {
 		count_merges: async (): Promise<number> => NO_MERGES,
 	}
 }
-
-afterAll(() => {
-	for (const directory of work_directories) rmSync(directory, { force: true, recursive: true })
-})
 
 describe('git_followup_pending.pending_release_line', () => {
 	it('reports the unreleased merge count rather than a project version', async () => {

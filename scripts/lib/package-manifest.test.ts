@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { PACKAGE_JSON, package_manifest } from './package-manifest'
 
@@ -13,17 +13,14 @@ const UNREADABLE_CASES: ReadonlyArray<[string, string | undefined]> = [
 	['a shape the schema rejects', '{"version":"1.0.0"}'],
 ]
 const fixture = { directory: '' }
+const make_directory = temporary_directory()
 
 function write_manifest(text: string | undefined): void {
 	if (text !== undefined) writeFileSync(path.join(fixture.directory, PACKAGE_JSON), text)
 }
 
 beforeEach(() => {
-	fixture.directory = mkdtempSync(path.join(os.tmpdir(), 'package-manifest-'))
-})
-
-afterEach(() => {
-	rmSync(fixture.directory, { recursive: true, force: true })
+	fixture.directory = make_directory('package-manifest-')
 })
 
 describe('package_manifest.manifest_path', () => {

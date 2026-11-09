@@ -81,7 +81,7 @@ describe('lane_why.table', () => {
 			[
 				'| stage | min | budget | projected | CI | ship | open issues |',
 				'| --- | --- | --- | --- | --- | --- | --- |',
-				'| implement | 51.0 min | 12 min | 20.3 min |  |  | #6124 |',
+				'| implement | 51.0 min | 9 min | 20.3 min |  |  | #6124 |',
 				'| start to plan | 10.0 min | 3 min |  |  |  | none |',
 			].join('\n'),
 		)
@@ -100,7 +100,7 @@ describe('lane_why.table', () => {
 		const records = records_of({ projected: undefined, issues: undefined })
 
 		expect(lane_why.table(records)?.split('\n', 3)[2]).toBe(
-			'| implement | 51.0 min | 12 min |  |  |  |  |',
+			'| implement | 51.0 min | 9 min |  |  |  |  |',
 		)
 	})
 

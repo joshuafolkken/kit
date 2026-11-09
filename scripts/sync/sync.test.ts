@@ -1,17 +1,18 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 import { sync_hook_safety } from './sync-hook-safety'
 import { workflow_pin_logic } from './workflow-pin-logic'
 
-// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-test-'))
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517). Each test
+// empties it, and `beforeEach` lays it out again.
+const TEST_DIR = temporary_directory('suite')('sync-test-')
 const SRC_PATH = path.join(TEST_DIR, 'src', 'gitignore')
 const GITIGNORE_DEST_NAME = '.gitignore'
 const DEST_PATH = path.join(TEST_DIR, 'dest', GITIGNORE_DEST_NAME)

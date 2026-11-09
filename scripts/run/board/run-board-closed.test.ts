@@ -1,4 +1,6 @@
+import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_closed } from './run-board-closed'
@@ -27,6 +29,8 @@ function view(state: string, state_reason?: string): string {
 beforeEach(() => {
 	vi.mocked(git_gh_issue_read.issue_view_json).mockReset()
 	vi.mocked(issue_merged.read_merge_state).mockReset()
+	// The REST reads; the GraphQL read is `run-board-closed-graphql.test.ts`'s.
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
 })
 
 describe('run_board_closed.read_closed', () => {
@@ -44,6 +48,8 @@ describe('run_board_closed.read_closed', () => {
 		expect(git_gh_issue_read.issue_view_json).toHaveBeenCalledWith(
 			'3439',
 			'title,state,stateReason,closedAt,labels',
+			undefined,
+			git_gh_etag_read.read,
 		)
 	})
 })

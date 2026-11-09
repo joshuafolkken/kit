@@ -29,13 +29,23 @@ const IDLE_WAIT_HOURS = 8
 const DEFAULT_IDLE_MINUTES = IDLE_WAIT_HOURS * MINUTES_PER_HOUR
 const DEFAULT_IDLE_MS = DEFAULT_IDLE_MINUTES * MS_PER_MINUTE
 
-// **The one interval between two asks for work, whether lanes are running or nothing is.** The driver
-// and the wake supervisor both read it from here. The loop is a process, so an ask spends no AI turn,
-// and a watch is polled as often as a running batch; a child collected in between is asked about at
+// **The interval between two asks for work, whether lanes are running or a watch has nothing named
+// left.** The loop is a process, so an ask spends no AI turn, and a watch is polled as often as a
+// running batch; a child collected in between, or an issue `run:add` hands the run, is asked about at
 // once, without waiting it out. `backlogrun-progress.md` → "Waiting, and never waiting forever" holds
-// the row; the figure is here because `idle_watch_reason` below has to say it.
-const OFFER_INTERVAL_SECONDS = 60
+// the row; the figure is here because `idle_watch_reason` below has to say it. Three minutes keeps the
+// asks within the REST core budget while lanes run (joshuafolkken/kit#6718); the wake supervisor's
+// pause is its own (`run-wake-window.ts`).
+const OFFER_INTERVAL_SECONDS = 180
 const OFFER_INTERVAL_MS = OFFER_INTERVAL_SECONDS * MS_PER_SECOND
+
+// **The interval while no lane runs and an issue the run names is still left to dispatch**
+// (joshuafolkken/kit#6788). That stretch ends at the named issue's dispatch, and no lane spends the
+// REST core allowance beside it. At the empty-seat ask's measured cost (joshuafolkken/kit#6718) a
+// half-minute keeps the warm asks of an hour under half the hourly core allowance, and only the first
+// ask after a gap is cold. A dry allowance is waited out by `backlog-drive-rate-limit.ts` either way.
+const IDLE_OFFER_INTERVAL_SECONDS = 30
+const IDLE_OFFER_INTERVAL_MS = IDLE_OFFER_INTERVAL_SECONDS * MS_PER_SECOND
 
 const RUN_VERDICT = 'run'
 const WATCH_VERDICT = 'watch'
@@ -236,6 +246,7 @@ const backlog_budget = {
 	BLOCKED_REASON,
 	DEFAULT_IDLE_MINUTES,
 	DEFAULT_IDLE_MS,
+	IDLE_OFFER_INTERVAL_MS,
 	IDLE_WAIT_HOURS,
 	OFFER_INTERVAL_MS,
 	RUN_VERDICT,

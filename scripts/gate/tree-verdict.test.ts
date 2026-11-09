@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GateTree } from './gate-tree'
 import { tree_verdict } from './tree-verdict'
 
@@ -12,7 +12,8 @@ const TREE: GateTree = { files: { [SOURCE]: 'digest-a' }, base: 'base-a' }
 const CHANGED: GateTree = { ...TREE, files: { [SOURCE]: 'digest-b' } }
 const GREEN = { before: TREE, exit_code: 0, tail: '\n✔ josh lint:related passed\n' }
 const RED = { before: TREE, exit_code: 1, tail: '\n✘ josh lint:related failed: lint\n' }
-const SCRATCH = mkdtempSync(path.join(tmpdir(), 'tree-verdict-'))
+const make_directory = temporary_directory('suite')
+const SCRATCH = make_directory('tree-verdict-')
 const target = path.join(SCRATCH, 'record.json')
 
 async function same_tree(): Promise<GateTree> {
@@ -30,10 +31,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.restoreAllMocks()
 	vi.unstubAllEnvs()
-})
-
-afterAll(() => {
-	rmSync(SCRATCH, { recursive: true, force: true })
 })
 
 describe('tree_verdict.read', () => {

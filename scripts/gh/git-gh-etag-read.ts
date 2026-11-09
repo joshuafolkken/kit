@@ -1,7 +1,9 @@
+import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { shared_cache, type CacheSlot } from '#scripts/josh/shared-cache'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
+import { git_gh_exec } from './git-gh-exec'
 
 // A `gh api` GET sent with the ETag of the answer the previous josh process read, kept on disk
 // (joshuafolkken/kit#6560). `backlog:next` and `issue:scout` each run as a fresh process a minute or
@@ -54,11 +56,11 @@ function unreadable(path: string, answer: ConditionalRead): unknown {
 }
 
 // The answer for `path`, or the previous process's where GitHub says it has not changed. A failure
-// throws, the contract `exec_gh_api` has.
-async function read(path: string): Promise<string> {
+// throws, the contract `exec_gh_api` has. `timeout_ms` bounds the request as `exec_gh_api`'s does.
+async function read(path: string, timeout_ms?: number): Promise<string> {
 	const slot = slot_of(path)
 	const previous = shared_cache.read(slot, path, kept_schema, Date.now())
-	const answer = await git_gh_conditional.read_conditional(path, previous?.etag)
+	const answer = await git_gh_conditional.read_conditional(path, previous?.etag, timeout_ms)
 	const settled = settle(previous, answer)
 
 	if (settled === undefined) throw unreadable(path, answer)
@@ -67,7 +69,24 @@ async function read(path: string): Promise<string> {
 	return settled.body
 }
 
-const git_gh_etag_read = { read, settle, slot_of }
+// A listing whose first page holds `per_page` rows (joshuafolkken/kit#6699). The ETag covers one page
+// only, so a full first page — more may follow — is read unconditionally with `--paginate` instead;
+// an answer that is no array is handed back for the caller's own parser to reject. `read_page` reads
+// the first page: the merge gate passes its in-process read (joshuafolkken/kit#6756).
+async function read_listing(
+	path: string,
+	per_page: number,
+	read_page: (page_path: string) => Promise<string> = read,
+): Promise<string> {
+	const first = await read_page(path)
+	const rows = parse_json_array_or_undefined(first, z.unknown())
+
+	if (rows === undefined || rows.length < per_page) return first
+
+	return await git_gh_exec.exec_gh_api({ path, should_paginate: true })
+}
+
+const git_gh_etag_read = { read, read_listing, settle, slot_of }
 
 export type { KeptAnswer }
 export { git_gh_etag_read }

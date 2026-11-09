@@ -69,10 +69,10 @@ describe('test_red_logic.ran_file_count', () => {
 	})
 })
 
-describe('test_red_logic.failed_files', () => {
-	const TREE = '/var/folders/tree'
-	const REAL_TREE = '/private/var/folders/tree'
+const TREE = '/var/folders/tree'
+const REAL_TREE = '/private/var/folders/tree'
 
+describe('test_red_logic.failed_files', () => {
 	it('lists each failed file relative to the root it sits under, the real path included', () => {
 		const report = JSON.stringify({
 			testResults: [
@@ -96,6 +96,38 @@ describe('test_red_logic.failed_files', () => {
 		expect(test_red_logic.failed_files(outside, [TREE])).toEqual([])
 		expect(test_red_logic.failed_files('', [TREE])).toEqual([])
 		expect(test_red_logic.failed_files(JSON.stringify({ testResults: [{}] }), [TREE])).toEqual([])
+	})
+})
+
+describe('test_red_logic.unfinished_files', () => {
+	it('lists each queued file that never ended, once, relative to its root', () => {
+		const progress = [
+			`queued ${TREE}/spins.test.ts`,
+			`queued ${REAL_TREE}/sub/done.test.ts`,
+			`queued ${REAL_TREE}/sub/hangs.test.ts`,
+			`end ${REAL_TREE}/sub/done.test.ts`,
+			`queued ${TREE}/spins.test.ts`,
+			'',
+		].join('\n')
+
+		expect(test_red_logic.unfinished_files(progress, [TREE, REAL_TREE])).toEqual([
+			'spins.test.ts',
+			'sub/hangs.test.ts',
+		])
+	})
+
+	it('names none when nothing was queued', () => {
+		expect(test_red_logic.unfinished_files('', [TREE])).toEqual([])
+	})
+})
+
+describe('test_red_logic.progress_reporter', () => {
+	it('appends to the progress file it is given on each queued and ended test file', () => {
+		const source = test_red_logic.progress_reporter(`${TREE}/progress.log`)
+
+		expect(source).toContain(`("${TREE}/progress.log", \`queued `)
+		expect(source).toContain('onTestModuleQueued(module)')
+		expect(source).toContain('onTestModuleEnd(module)')
 	})
 })
 

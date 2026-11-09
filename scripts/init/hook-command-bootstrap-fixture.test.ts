@@ -1,20 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { hook_command_bootstrap } from './hook-command-bootstrap-fixture'
 
 const UNKNOWN_GIT_OPTION = '--no-such-option'
 
 describe('hook_command_bootstrap.initialize_repository', () => {
+	const make_directory = temporary_directory()
 	let temporary_root = ''
 
 	beforeEach(() => {
-		temporary_root = mkdtempSync(path.join(tmpdir(), 'kit-hook-bootstrap-test-'))
-	})
-
-	afterEach(() => {
-		rmSync(temporary_root, { recursive: true, force: true })
+		temporary_root = make_directory('kit-hook-bootstrap-test-')
 	})
 
 	it('initializes a repository when git init succeeds', () => {

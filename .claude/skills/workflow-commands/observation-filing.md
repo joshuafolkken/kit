@@ -65,6 +65,9 @@ added.** `route:tier-a` and `route:interrupt` carry over unchanged.
 
 ### A delegated child does not take this route
 
+A `backlogrun` child's parent is a driver with no person, so it files an interrupt itself —
+`pnpm josh issue:file --route interrupt --found-during <N>`, then `pnpm josh run:add <M>`.
+
 **A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary observations
 go in the summary's "Observations that could bite later" line (`backlogrun-child.md` → "What the
 summary carries, and how long it may be"); the parent files what survives the depth test, inside the

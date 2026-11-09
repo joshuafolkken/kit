@@ -1,6 +1,5 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { josh_command } from '#scripts/josh/josh-run'
-import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
@@ -11,6 +10,7 @@ import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_args } from './backlog-drive-args'
 import { backlog_drive_cli } from './backlog-drive-cli'
+import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_drive_retry } from './backlog-drive-retry'
@@ -18,22 +18,6 @@ import { backlog_drive_retry } from './backlog-drive-retry'
 const ACTIVE = '2026-09-24T00:00:00.000Z'
 const WINDOW_MINUTES = 9
 const RETRY_ERROR = 'retry failed'
-
-it.each([false, true])(
-	'clears pending admission on driver exit, throwing=%s',
-	async (should_throw) => {
-		const keep = vi.spyOn(lane_launch_cli, 'keep_pending')
-		const read = vi.spyOn(run_carry, 'repository_directory')
-
-		vi.spyOn(lane_sampler, 'start').mockReturnValue(vi.fn())
-		vi.spyOn(console, 'info').mockImplementation(vi.fn())
-		if (should_throw) read.mockRejectedValue(new Error('git died'))
-		else read.mockResolvedValue(undefined)
-		await backlog_drive_cli.run(['--owner', '4242'])
-
-		expect(keep).toHaveBeenCalledWith([])
-	},
-)
 
 const CARRY: RunCarry = {
 	invocation: 'backlogrun',
@@ -350,7 +334,7 @@ it('reports before ending the carry record', async () => {
 	const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: 'report' })
 	const error = vi.spyOn(console, 'error').mockImplementation(vi.fn())
 
-	await backlog_drive_cli.finish({
+	await backlog_drive_finish.finish({
 		reason: 'stop',
 		token: 'stop',
 		issue: undefined,

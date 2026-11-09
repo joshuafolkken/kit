@@ -1,6 +1,11 @@
+import { readdirSync } from 'node:fs'
 import { Readable } from 'node:stream'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hook_decision } from './hook-decision'
+import { hook_payload_capture } from './hook-payload-capture'
+
+const make_directory = temporary_directory()
 
 const { load_environment_file } = vi.hoisted(() => ({ load_environment_file: vi.fn() }))
 
@@ -30,8 +35,14 @@ function capture(stream: NodeJS.WriteStream): Array<string> {
 	return written
 }
 
+// A capture directory in the shell running the suite would otherwise collect these synthetic payloads.
+beforeEach(() => {
+	vi.stubEnv(hook_payload_capture.CAPTURE_DIR_KEY, '')
+})
+
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 describe('hook_decision.respond_from_stdin', () => {
@@ -75,5 +86,18 @@ describe('hook_decision.respond_from_stdin', () => {
 		})
 
 		expect(order).toEqual(['env', 'respond'])
+	})
+})
+
+describe('hook_decision.respond_from_stdin — payload capture', () => {
+	it('captures the payload when JOSH_HOOK_CAPTURE_DIR names a directory', async () => {
+		const directory = make_directory('hook-decision-stdin-')
+
+		vi.stubEnv(hook_payload_capture.CAPTURE_DIR_KEY, directory)
+		vi.spyOn(process, 'stdin', 'get').mockReturnValue(stdin_of(false, PAYLOAD))
+
+		await hook_decision.respond_from_stdin(COMMAND, vi.fn())
+
+		expect(readdirSync(directory)).toStrictEqual(['pretool-guard-Read-1.json'])
 	})
 })

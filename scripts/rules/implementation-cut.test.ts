@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
@@ -7,7 +5,8 @@ import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/cut/run-cut'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { implementation_cut, type LaneCostState } from './implementation-cut'
 
@@ -20,7 +19,8 @@ import { implementation_cut, type LaneCostState } from './implementation-cut'
 
 const ISSUE = '2310'
 const EDIT = 'Edit'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'implementation-cut-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('implementation-cut-')
 const LANE_ROOT = path.join(WORK_DIRECTORY, '.kit-lanes')
 const LANE_DIRECTORY = path.join(LANE_ROOT, ISSUE)
 const OVER: CostVerdict = 'over'
@@ -445,8 +445,4 @@ describe('decide — fires per crossing, lets a reissue through', () => {
 	])('reads an age of %j ms as reissued=%j', (age, reissued) => {
 		expect(implementation_cut.is_reissued_refusal(NOW_MS, NOW_MS - age)).toBe(reissued)
 	})
-})
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })

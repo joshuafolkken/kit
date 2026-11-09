@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { ESLint } from 'eslint'
 import ts from 'typescript-eslint'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { create_base_config } from './base.js'
 
 // joshuafolkken/kit#3599: the TypeScript resolver sat under `import/resolver`, a key
@@ -100,7 +100,8 @@ function create_linter(root: string): ESLint {
 
 // `realpathSync`: macOS hands back `/var/…`, a symlink to `/private/var/…`, and the resolver
 // answers with the real path — the two have to agree for a cycle to close.
-const created_root = mkdtempSync(path.join(tmpdir(), 'kit-import-resolver-'))
+const make_directory = temporary_directory('suite')
+const created_root = make_directory('kit-import-resolver-')
 const root = realpathSync(created_root)
 
 // Written before the linter exists: the resolver reads the fixture's tsconfig when it is created.
@@ -126,10 +127,6 @@ async function rule_config(entry: string): Promise<unknown> {
 
 	return config
 }
-
-afterAll(() => {
-	rmSync(root, { recursive: true, force: true })
-})
 
 describe('create_base_config — the import resolver follows TypeScript (issue #3599)', () => {
 	it('reports a cycle through an extensionless .ts import', async () => {

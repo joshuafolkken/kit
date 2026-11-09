@@ -9,9 +9,9 @@ import { backlog_wait_cause } from './backlog-wait-cause'
 // One `josh backlog:next` answer shared by every reader that asks it within a minute
 // (joshuafolkken/kit#4550).
 //
-// **The drive's assignment and the arrival probe each ask every minute, and since a lane waiting on its
-// merge frees its slot (joshuafolkken/kit#4483) a free slot is the usual state** — so both read the
-// whole pool from GitHub every minute, for the same answer.
+// **The drive's assignment asks every offer interval and the arrival probe every minute, and since a
+// lane waiting on its merge frees its slot (joshuafolkken/kit#4483) a free slot is the usual state** —
+// so both read the whole pool from GitHub, for the same answer.
 //
 // **The key carries the newest event on the run's stream**, so a launch, a merge or a park — anything
 // that can change what may start — is never answered from before it: the first ask after it reads

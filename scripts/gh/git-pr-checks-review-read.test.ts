@@ -13,6 +13,7 @@ import {
 	pr_routes,
 	status_pages,
 } from './git-gh-pr-fixture'
+import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
 import { forget_pr_numbers } from './git-gh-pr-read'
 import {
 	default_fetch_pr_state,
@@ -54,6 +55,7 @@ const PENDING_RUN = { name: SONAR_QUBE, status: 'queued' }
 const FAILING_RUN = { name: SONAR_QUBE, status: 'completed', conclusion: 'failure' }
 const CHANGES_REQUESTED_REVIEW = { state: 'CHANGES_REQUESTED', user: { login: 'alice' } }
 const NO_REVIEWS = '[]'
+const NODE_ID = 'PR_kwDOnode'
 
 // The steady-state cost of one poll, and the cost of the poll that can conclude a merge.
 const CHECKS_ONLY_REQUESTS = 3
@@ -70,11 +72,13 @@ function pick_run(input: { is_green: boolean; failing_check?: boolean }): Record
 function arrange(input: { is_green: boolean; reviews?: string; failing_check?: boolean }): void {
 	const check_runs = check_runs_pages([pick_run(input)])
 	const statuses = status_pages([])
-	const pull = { mergeable_state: input.is_green ? 'clean' : 'unknown' }
+	const state = input.is_green ? 'clean' : 'unknown'
+	const pull = { mergeable_state: state, node_id: NODE_ID }
 	const listings = {
 		[commit_check_runs_path()]: check_runs,
 		[commit_status_path()]: statuses,
 		[pr_reviews_path()]: input.reviews ?? NO_REVIEWS,
+		[GRAPHQL_PATH]: JSON.stringify({ data: { node: { mergeStateStatus: state.toUpperCase() } } }),
 	}
 
 	mocked_api.mockImplementation(gh_api_routes(pr_routes(pull, listings)))
@@ -82,6 +86,12 @@ function arrange(input: { is_green: boolean; reviews?: string; failing_check?: b
 
 function review_reads(): number {
 	return mocked_api.mock.calls.filter(([request]) => request.path === pr_reviews_path()).length
+}
+
+// The REST requests one poll sent. The state a 304 detail leaves stale is read from GraphQL, whose
+// quota is not REST core's (joshuafolkken/kit#6721).
+function rest_requests(): number {
+	return mocked_api.mock.calls.filter(([request]) => request.path !== GRAPHQL_PATH).length
 }
 
 // The predicate the poll loop hands the fetcher, taken off the evaluator rather than restated — the
@@ -145,17 +155,18 @@ describe('default_fetch_pr_state — requests per poll', () => {
 		mocked_api.mockClear()
 		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
 
-		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS)
+		expect(rest_requests()).toBe(CHECKS_ONLY_REQUESTS)
 		expect(review_reads()).toBe(0)
 	})
 
 	// The branch lookup is the one extra request of the first poll; the memo absorbs it after that.
+	// The snapshot query this fixture cannot answer (joshuafolkken/kit#6786) is GraphQL's, not REST core's.
 	it('adds only the branch lookup on the first poll', async () => {
 		arrange({ is_green: false })
 
 		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
 
-		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS + FIRST_POLL_LOOKUP)
+		expect(rest_requests()).toBe(CHECKS_ONLY_REQUESTS + FIRST_POLL_LOOKUP)
 	})
 
 	it('costs the fourth request on the poll that could conclude a merge', async () => {
@@ -165,7 +176,7 @@ describe('default_fetch_pr_state — requests per poll', () => {
 		mocked_api.mockClear()
 		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
 
-		expect(mocked_api).toHaveBeenCalledTimes(WITH_REVIEW_REQUESTS)
+		expect(rest_requests()).toBe(WITH_REVIEW_REQUESTS)
 		expect(review_reads()).toBe(1)
 	})
 
@@ -177,24 +188,25 @@ describe('default_fetch_pr_state — requests per poll', () => {
 		mocked_api.mockClear()
 		await default_fetch_pr_state(PR_BRANCH, should_never_read_review_decision)
 
-		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS)
+		expect(rest_requests()).toBe(CHECKS_ONLY_REQUESTS)
 		expect(review_reads()).toBe(0)
 	})
 })
 
 // joshuafolkken/kit#4550: a poll that finds nothing changed sends the same three requests, and GitHub
-// answers the two commit listings 304, so they cost nothing against the rate limit. The pull detail is
-// read fresh: its `mergeable_state` can move under an unchanged ETag (joshuafolkken/kit#4589).
+// answers each 304, so they cost nothing against the rate limit. The pull detail's
+// `mergeable_state` can move under an unchanged ETag (joshuafolkken/kit#4589), so it alone is read
+// from GraphQL (joshuafolkken/kit#6721).
 describe('default_fetch_pr_state — a poll that finds nothing changed', () => {
-	it('is answered 304 on every request but the pull detail', async () => {
+	it('is answered 304 on every request, the pull detail included', async () => {
 		arrange({ is_green: false })
 
 		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
 		vi.clearAllMocks()
 		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
 
-		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS)
-		expect(unchanged_reads()).toBe(CHECKS_ONLY_REQUESTS - 1)
+		expect(rest_requests()).toBe(CHECKS_ONLY_REQUESTS)
+		expect(unchanged_reads()).toBe(CHECKS_ONLY_REQUESTS)
 	})
 })
 
@@ -220,7 +232,7 @@ describe('default_fetch_pr_state — the poll that fails the pull request', () =
 		mocked_api.mockClear()
 		const snapshot = await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
 
-		expect(mocked_api).toHaveBeenCalledTimes(WITH_REVIEW_REQUESTS)
+		expect(rest_requests()).toBe(WITH_REVIEW_REQUESTS)
 		expect(evaluate_pr_state(snapshot)).toBe('failure')
 	})
 })

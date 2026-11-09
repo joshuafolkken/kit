@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {
 	LINT_RULE_CACHE_FILE,
@@ -10,6 +9,7 @@ import {
 	LINT_RULE_WORKERS,
 } from '#scripts/josh/josh-command-types'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./lint-parallel', () => ({ lint_parallel: { run_eslint: vi.fn() } }))
@@ -18,6 +18,7 @@ const { lint_parallel } = await import('./lint-parallel')
 const { lint_rule } = await import('./lint-rule')
 const mocked_run_eslint = vi.mocked(lint_parallel.run_eslint)
 
+const make_directory = temporary_directory()
 const RULE = 'kit/no-measurement-comment'
 const OTHER_RULE = 'max-len'
 const TEMPORARY_CONFIG = 'tmp.config.js'
@@ -75,13 +76,12 @@ function default_report(): string {
 }
 
 beforeEach(() => {
-	fixture.root = mkdtempSync(path.join(tmpdir(), 'lint-rule-'))
+	fixture.root = make_directory('lint-rule-')
 	vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 	vi.spyOn(process.stderr, 'write').mockReturnValue(true)
 })
 
 afterEach(() => {
-	rmSync(fixture.root, { recursive: true, force: true })
 	vi.restoreAllMocks()
 	mocked_run_eslint.mockReset()
 })

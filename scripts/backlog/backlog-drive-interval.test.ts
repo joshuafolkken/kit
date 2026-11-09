@@ -158,9 +158,12 @@ describe('backlog_drive.run_loop — the ask interval', () => {
 		expect(asks(calls)).toBe(WATCHED_INTERVALS + 1)
 	})
 
+	// joshuafolkken/kit#6718: stretching the interval must not delay the re-offer after a merge.
 	it('asks at once after a child is collected inside the interval', async () => {
 		const { ports, calls } = harness({})
 		const finishes_at_ms = ports.now().getTime() + POLL_MS * FINISH_AFTER_POLLS
+
+		expect(POLL_MS * WINDOW_POLLS).toBeLessThan(backlog_budget.OFFER_INTERVAL_MS)
 
 		function is_finished(): boolean {
 			return ports.now().getTime() >= finishes_at_ms && !calls.includes(`merge ${FIRST_CHILD}`)
@@ -173,5 +176,61 @@ describe('backlog_drive.run_loop — the ask interval', () => {
 		)
 
 		expect(calls).toStrictEqual(['offer', `merge ${FIRST_CHILD}`, 'offer'])
+	})
+})
+
+// joshuafolkken/kit#6788: an issue `run:add` hands the run, and a named issue with no lane running,
+// are asked about without waiting out the three minutes.
+describe('backlog_drive.run_loop — a run:add', () => {
+	it('asks at the next poll after run:add, not after the interval', async () => {
+		// The #6707 timeline: the first ask waits, and `run:add` writes between two polls.
+		const next_poll_ms = POLL_MS * FINISH_AFTER_POLLS
+		const { ports, calls } = harness({ added_at_ms: next_poll_ms - 1 })
+		const start_ms = ports.now().getTime()
+		const asked_ms: Array<number> = []
+		const window_ms = POLL_MS * WINDOW_POLLS
+
+		await backlog_drive.run_loop(
+			state(),
+			{ ...CONFIG, window_ms },
+			{
+				...ports,
+				offer: async (asked) => {
+					asked_ms.push(ports.now().getTime() - start_ms)
+
+					return await ports.offer(asked)
+				},
+			},
+		)
+
+		expect(asks(calls)).toBe(2)
+		expect(asked_ms).toStrictEqual([0, next_poll_ms])
+	})
+})
+
+describe('backlog_drive.run_loop — a named issue with no lane', () => {
+	it('asks at the short interval while no lane runs and a named issue is left', async () => {
+		const { ports, calls } = harness({ is_named_left: true })
+		const window_ms = CONFIG.idle_offer_ms * WATCHED_INTERVALS
+
+		await backlog_drive.run_loop(state(), { ...CONFIG, window_ms }, ports)
+
+		expect(asks(calls)).toBe(WATCHED_INTERVALS + 1)
+	})
+
+	it('keeps the full interval while a lane runs, a named issue left or not', async () => {
+		const { ports, calls } = harness({ is_named_left: true })
+		const window_ms = CONFIG.offer_ms * WATCHED_INTERVALS
+
+		await backlog_drive.run_loop(state([FIRST_CHILD]), { ...CONFIG, window_ms }, ports)
+
+		expect(asks(calls)).toBe(WATCHED_INTERVALS + 1)
+	})
+
+	it('hands the loop the short interval the budget names', () => {
+		const config = backlog_drive_cli.loop_config(undefined)
+
+		expect(config.idle_offer_ms).toBe(backlog_budget.IDLE_OFFER_INTERVAL_MS)
+		expect(config.idle_offer_ms).toBeLessThan(config.offer_ms)
 	})
 })

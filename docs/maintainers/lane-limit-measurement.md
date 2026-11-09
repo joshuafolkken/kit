@@ -277,7 +277,7 @@ records a `released` entry instead, once per hold. This ends a hold that a lane 
 driver filled, such as an epic run or a person's `lane:open`.
 
 The time is derived, not recorded. A hold runs until the next `held`, `released` or `dispatch` entry.
-The driver offers once a minute while it waits, so consecutive entries cover the wait and the last one
+The driver offers every offer interval (180 s) while it waits, so consecutive entries cover the wait and the last one
 ends at the dispatch or the release. A hold past an hour is a driver nobody restarted, and it reads as
 ended at the hour.
 

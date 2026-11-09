@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { disposition_cli } from './disposition-cli'
 
@@ -43,8 +43,10 @@ const FOUND_DURING_FLAG = '--found-during'
 const FILE_ROUTED_LINE = `confirmed bug-risks:medium:${CODE_FILE} — a null deref\n`
 const DRAFTED_BODY = `.josh/tmp/review-cap-${String(FOUND_DURING)}-1.md`
 
+const make_directory = temporary_directory()
+
 function findings_file(content: string): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'disposition-batch-'))
+	const directory = make_directory('disposition-batch-')
 	const file = path.join(directory, 'findings.txt')
 
 	writeFileSync(file, content)
@@ -55,11 +57,10 @@ function findings_file(content: string): string {
 describe('disposition_cli.run --batch', () => {
 	// joshuafolkken/kit#6056: the findings file is read through `cli_body`.
 	it('refuses a findings file in the work tree that git does not ignore', () => {
-		const repository = cli_body_repository.create()
+		const repository = cli_body_repository.create(make_directory('disposition-repository-'))
 		const file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, FILE_ROUTED_LINE)
 
 		expect(() => disposition_cli.run([BATCH_FLAG, file])).toThrow('not git-ignored')
-		repository.remove()
 	})
 
 	it('prints the routing table for a findings file', () => {

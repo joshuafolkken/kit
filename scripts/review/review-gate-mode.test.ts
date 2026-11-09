@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_gate_mode } from './review-gate-mode'
 
@@ -18,13 +18,14 @@ const INVALID_MANIFESTS = [
 	'{"josh":{"review_gate":1}}',
 ]
 const fixture = { root: '', nested: '' }
+const make_directory = temporary_directory()
 
 function write_manifest(directory: string, contents: string): void {
 	writeFileSync(path.join(directory, PACKAGE_JSON), contents)
 }
 
 beforeEach(() => {
-	fixture.root = mkdtempSync(path.join(tmpdir(), 'review-gate-mode-'))
+	fixture.root = make_directory('review-gate-mode-')
 	fixture.nested = path.join(fixture.root, 'nested')
 	mkdirSync(fixture.nested)
 	vi.stubEnv(ENV_KEY, '')
@@ -33,7 +34,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	rmSync(fixture.root, { recursive: true, force: true })
 })
 
 describe('review_gate_mode.read', () => {

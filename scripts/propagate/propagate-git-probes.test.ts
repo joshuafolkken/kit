@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { propagate_git } from './propagate-git'
 
 // What each probe asks git, asserted without letting any of it run: two of the three talk to a
@@ -11,6 +11,7 @@ import { propagate_git } from './propagate-git'
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 
 const mocked_git = vi.mocked(execaSync)
+const make_directory = temporary_directory()
 
 const CONSUMER = '/Users/example/Development/mnemecha'
 const BRANCH = '295-upgrade-joshuafolkken-kit-to-1-312-0'
@@ -63,15 +64,11 @@ const state = { workspace: '', repository: '' }
 
 beforeEach(() => {
 	vi.resetAllMocks()
-	state.workspace = mkdtempSync(path.join(tmpdir(), 'propagate-git-probes-'))
+	state.workspace = make_directory('propagate-git-probes-')
 	state.repository = path.join(state.workspace, 'consumer')
 	mkdirSync(path.join(state.repository, HOOKS_DIRECTORY), { recursive: true })
 	mkdirSync(path.join(state.repository, EMPTY_HOOKS_DIRECTORY), { recursive: true })
 	writeFileSync(path.join(state.repository, HOOKS_DIRECTORY, 'pre-push'), '#!/bin/sh\n')
-})
-
-afterEach(() => {
-	rmSync(state.workspace, { recursive: true, force: true })
 })
 
 describe('propagate_git.commit_ahead', () => {

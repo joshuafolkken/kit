@@ -292,7 +292,7 @@ describe('run_board_render_quota gauge colors', () => {
 		},
 	)
 
-	it('names ⛽, ┊ and ↻ in the legend', () => {
-		expect(LEGEND).toEqual(['⛽ usage', '🤖 scheduler', '┊ pace', '↻ reset', '≈ tasks left'])
+	it('names ⛽, ┊, ↻ and ▶ in the legend', () => {
+		expect(LEGEND.join(' ')).toBe('⛽ usage 🤖 scheduler ┊ pace ↻ reset ≈ tasks left ▶ transport')
 	})
 })

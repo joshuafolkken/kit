@@ -2,8 +2,8 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 
-// The synchronous twin of `git_gh_repo.repo_get_name_with_owner`: same fact, read the same way, but
-// synchronously because `josh init` / `josh sync` / `josh doctor` decide before they can await.
+// The synchronous twin of `git_gh_repo.repo_get_canonical_name_with_owner`: same fact, read the same
+// way, but synchronously because `josh init` / `josh sync` / `josh doctor` decide before they can await.
 // It asks REST for the same reason — `gh repo view` goes through GraphQL, which a cloud session is
 // refused (403), and a repository that reads as unresolved makes `init` / `sync` skip
 // `sonar-project.properties` outright. The path comes from the shared

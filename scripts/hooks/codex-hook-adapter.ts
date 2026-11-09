@@ -2,10 +2,12 @@
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { hook_payload_capture } from '#scripts/josh/hook-payload-capture'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { json_value } from '#scripts/lib/json-value'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { z } from 'zod'
+import { bash_revert } from './bash-revert'
 import { build_envelope, compose_context, format_edited_payload } from './format-edited-file'
 import { pretool_guard } from './pretool-guard'
 
@@ -34,6 +36,7 @@ const codex_payload_schema = z.looseObject({
 	tool_input: z.unknown(),
 })
 const patch_input_schema = z.object({ command: z.string().min(1) })
+const envelope_schema = z.record(z.string(), z.unknown())
 
 type PayloadFormatter = (raw_payload: string, project_root: string) => Promise<string | undefined>
 
@@ -121,28 +124,53 @@ async function format_posttool_payloads(
 	return blocks.length === 0 ? undefined : blocks.join(DIAGNOSTIC_SEPARATOR)
 }
 
+// Codex reads one JSON object per hook, so the shell revert's `decision`/`reason` and the context's
+// `hookSpecificOutput` become fields of that one object. A single envelope is written as it is.
+function merged_envelope(envelopes: Array<string | undefined>): string | undefined {
+	const fields = envelopes
+		.filter((envelope): envelope is string => envelope !== undefined)
+		.map((envelope) => json_value.parse_with(envelope, envelope_schema) ?? {})
+
+	return fields.length === 0 ? undefined : JSON.stringify(Object.assign({}, ...fields))
+}
+
 // The density line and the unfixed-lint blocks reach the model the same way — as additionalContext on
 // this one hook — so they are joined into the single envelope a `PostToolUse` payload can carry rather
-// than written as two objects the harness could not parse.
+// than written as two objects the harness could not parse. The `exec_command` revert reads the
+// payload translated as its pretool stamp did (`bash-revert.ts`).
 async function write_posttool_context(raw_payload: string): Promise<void> {
+	const reverted = bash_revert.revert(pretool_payload(raw_payload))
 	const notice = time_density_hook.density_notice(raw_payload)
 	const diagnostics = await format_posttool_payloads(raw_payload, process.cwd())
 	const context = compose_context(notice, diagnostics)
+	const envelope = merged_envelope([
+		reverted,
+		context === undefined ? undefined : build_envelope(context),
+	])
 
-	if (context !== undefined) process.stdout.write(`${build_envelope(context)}\n`)
+	if (envelope !== undefined) process.stdout.write(`${envelope}\n`)
 }
 
 // The environment file is loaded before the verdict, as `write_outcome` does, so the lane-child marker
-// the phase mark reads is in place; the mark follows the written envelope.
+// the phase mark reads is in place; the mark follows the written envelope. A consultation session's
+// shell is stamped here for the `PostToolUse` revert, as `pretool_guard.respond` does on Claude.
 async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
-	const outcome = pretool_outcome(raw_payload)
+	const judged = pretool_payload(raw_payload)
+
+	bash_revert.stamp(judged)
+	const outcome = pretool_guard.pretool_outcome(judged)
 
 	hook_decision.emit_outcome(outcome)
-	await pretool_guard.mark_phase(outcome)
+	await pretool_guard.mark_phase(outcome, judged)
+	await pretool_guard.record_refusal(judged, outcome)
 }
 
+// Codex's payload reaches this adapter, not `respond_from_stdin`, so it is captured here, untranslated.
 async function run(raw_payload: string, mode: string): Promise<void> {
+	hook_decision.load_environment_file()
+	hook_payload_capture.capture(`codex-${mode}`, raw_payload)
+
 	if (mode === PRETOOL_MODE) {
 		await write_pretool_outcome(raw_payload)
 
@@ -168,6 +196,7 @@ const codex_hook_adapter = {
 	posttool_payloads,
 	pretool_outcome,
 	pretool_payload,
+	run,
 	write_pretool_outcome,
 }
 

@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { core_weights } from '#scripts/gate/core-weights'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_direct_tool } from './lane-direct-tool'
@@ -27,7 +27,8 @@ const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
 const REASON = lane_direct_tool.LANE_DIRECT_TOOL_REASON
 const CORES = 8
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-direct-tool-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('lane-direct-tool-')
 // The suite pins its working directory to the non-lane WORK_DIRECTORY per test: the trigger reads the
 // live process.cwd(), so a run started inside a lane worktree would otherwise fire on every silence case.
 const ENTRY_DIRECTORY = process.cwd()
@@ -67,8 +68,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('runs_heavy_tool', () => {

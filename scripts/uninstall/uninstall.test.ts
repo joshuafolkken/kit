@@ -1,12 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const paths_mock = vi.hoisted(() => ({ root: '', package_dir: '' }))
+const make_directory = temporary_directory()
 const KIT = '@joshuafolkken/kit'
 const KIT_CONTENT = `extends: node_modules/${KIT}/preset\n`
 const AGENTS_MD = 'AGENTS.md'
@@ -94,7 +95,7 @@ beforeEach(() => {
 	mocked_execa.mockReset()
 	mocked_execa.mockReturnValue(fake_result(0))
 	paths_mock.package_dir = fileURLToPath(new URL('../../', import.meta.url))
-	paths_mock.root = mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX))
+	paths_mock.root = make_directory(TEMP_PREFIX)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	write_project_file(AGENTS_MD)
 	write_project_file(NESTED_FILE)
@@ -102,7 +103,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-	rmSync(paths_mock.root, { recursive: true, force: true })
 	process.stdin.isTTY = false
 	process.exitCode = undefined
 	vi.restoreAllMocks()

@@ -45,3 +45,16 @@ describe('backlog_offer_timing', () => {
 		},
 	)
 })
+
+describe('backlog_offer_timing.interval_of', () => {
+	const { CONFIG, FIRST_CHILD, state } = backlog_drive_fixture
+
+	it.each([
+		['no lane and a named issue left', [], true, CONFIG.idle_offer_ms],
+		['no lane and nothing named left', [], false, CONFIG.offer_ms],
+		['a lane and a named issue left', [FIRST_CHILD], true, CONFIG.offer_ms],
+		['a lane and nothing named left', [FIRST_CHILD], false, CONFIG.offer_ms],
+	])('asks at the matching interval with %s', (_label, in_flight, is_named_left, expected) => {
+		expect(backlog_offer_timing.interval_of(state(in_flight), CONFIG, is_named_left)).toBe(expected)
+	})
+})

@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ui_shot_cli } from './ui-shot-cli'
 
 const COMMAND = 'ui:shot'
@@ -16,10 +16,10 @@ const FAILED_SHOT_STATUS = 3
 // judged on running the resolved command with the routes and passing its status through.
 const RECORDING_SCRIPT = `node -e "require('fs').writeFileSync('${CAPTURE_FILE}', process.argv.slice(1).join(' '))"`
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'ui-shot-cli-test-'))
+const make_directory = temporary_directory()
 
 function project_with(scripts: Record<string, string>): string {
-	const directory = mkdtempSync(path.join(scratch, 'project-'))
+	const directory = make_directory('ui-shot-cli-project-')
 
 	writeFileSync(path.join(directory, 'package.json'), JSON.stringify({ name: 'fixture', scripts }))
 
@@ -43,10 +43,6 @@ function install_toolkit(directory: string): void {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 describe('josh ui:shot — registration', () => {

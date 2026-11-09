@@ -7,11 +7,17 @@ import { gh_permission_cache } from '#scripts/gh/gh-permission-cache'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_conditional } from '#scripts/gh/git-gh-conditional'
 import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
+import {
+	graphql_issue_node,
+	graphql_labels,
+	graphql_listing,
+	is_listing_query,
+} from '#scripts/gh/git-gh-issue-list-graphql-fixture'
 import { rest_issue, rest_issue_page } from '#scripts/gh/git-gh-issue-rest-fixture'
 import { conditional_read_over } from '#scripts/gh/git-gh-pr-fixture'
 import { GRAPHQL_PATH } from '#scripts/gh/git-gh-pr-graphql-state'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
-import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/issue/issue-labels'
+import { AUTO_OK_LABEL, EPIC_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
@@ -96,6 +102,11 @@ function stub(is_listed = true, child_row: ChildRow = owner_child): void {
 	vi.mocked(backlog_resume_reads.paused_issues).mockRestore()
 	vi.mocked(backlog_resume_reads.open_pr_issues).mockRestore()
 	vi.spyOn(git_gh_exec, 'exec_gh_api').mockImplementation(answer)
+	// A member's permission lookup goes through the ETag layer (joshuafolkken/kit#6754).
+	shared_cache_fixture.keep_in_memory()
+	vi.spyOn(git_gh_conditional, 'read_conditional').mockImplementation(
+		conditional_read_over(git_gh_exec.exec_gh_api),
+	)
 }
 
 function calls_of(value: unknown): number {
@@ -264,6 +275,64 @@ it('picks the same as an owner-authored backlog once the write role is kept', as
 	await backlog_next.run([])
 
 	expect(streams.stdout()).toBe(by_owner)
+})
+
+// joshuafolkken/kit#6785: the same backlog with the pool read for real, in one GraphQL query — the
+// listing spends no REST core request, and the scan picks what the stubbed listing made it pick.
+function pool_node(number: number, labels: ReadonlyArray<string>): Record<string, unknown> {
+	return graphql_issue_node({
+		number,
+		title: `issue ${String(number)}`,
+		body: '',
+		url: `https://github.com/joshuafolkken/kit/issues/${String(number)}`,
+		createdAt: CREATED_EARLIER,
+		labels: graphql_labels(labels),
+	})
+}
+
+function pool_listing(): string {
+	const epics = EPICS.map((epic) => pool_node(epic.number, [AUTO_OK_LABEL, EPIC_LABEL]))
+	// Triaged, as `backlog_fixture` lists them, so the scan does not label them first.
+	const children = CHILDREN.map((child) => pool_node(child, [AUTO_OK_LABEL, RUN_LANE_LABEL]))
+
+	return graphql_listing([...epics, ...children])
+}
+
+async function pool_answer(request: GhApiRequest): Promise<string> {
+	return is_listing_query(request.body) ? pool_listing() : await answer(request)
+}
+
+function serve_pool_query(): void {
+	vi.mocked(git_gh_command.issue_list_by_label_summary).mockRestore()
+	vi.mocked(git_gh_exec.exec_gh_api).mockImplementation(pool_answer)
+}
+
+function pool_reads(): Array<string> {
+	return vi
+		.mocked(git_gh_exec.exec_gh_api)
+		.mock.calls.filter(
+			([request]) =>
+				is_listing_query(request.body) || request.path.includes(`labels=${AUTO_OK_LABEL}`),
+		)
+		.map(([request]) => request.path)
+}
+
+it('reads the pool in one GraphQL query and no REST core request', async () => {
+	serve_pool_query()
+
+	expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+	expect(pool_reads()).toStrictEqual([GRAPHQL_PATH])
+	expect(scan_calls()).toBeLessThanOrEqual(SCAN_CALL_CAP)
+})
+
+it('picks the same through the GraphQL pool as through the listed rows', async () => {
+	const listed = await scan_output(true)
+
+	reset_scan()
+	serve_pool_query()
+	await backlog_next.run([])
+
+	expect(streams.stdout()).toBe(listed)
 })
 
 it('answers the same as when every listed child is read on its own', async () => {

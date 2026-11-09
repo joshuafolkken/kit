@@ -1,6 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_child_invocation, type ShipStop } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -52,7 +51,7 @@ const SERVING_POLLS = 60
 // successor's first lane scan. A driver that reruns a busy merge holds the pass longer still, and a ship
 // past the wait is re-dispatched with the version mismatch named.
 const RELOAD_POLLS =
-	(run_wake_window.WINDOW_MS + backlog_budget.OFFER_INTERVAL_MS) / SERVING_POLL_MS + SERVING_POLLS
+	(run_wake_window.WINDOW_MS + run_wake_window.PASS_INTERVAL_MS) / SERVING_POLL_MS + SERVING_POLLS
 const VERSION_MISMATCH_NOTE =
 	'the lane broker runs older code than this ship (a version mismatch), and no broker on the current code read the request within the wait'
 

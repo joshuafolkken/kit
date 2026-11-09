@@ -1,4 +1,4 @@
-import { rename, writeFile } from 'node:fs/promises'
+import { mkdir, rename, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -130,5 +130,36 @@ describe('relocation boundaries with real git', () => {
 		const measured = await split_measure.read_branch()
 
 		expect(measured.lines).toBe(ORIGINAL_LINES * 2)
+	})
+})
+
+// joshuafolkken/kit#6724: by `run:cut` the new module is committed, so the tracked half of the added
+// files has to reach the measure for the module and its importer to count as one file.
+async function commit_all(message: string): Promise<void> {
+	await git(fixture.workspace, STAGE_ALL)
+	await git(fixture.workspace, ['commit', NO_VERIFY, '-m', message])
+}
+
+// The importer on the default branch, so the base holds it, then a branch to add the module on.
+async function commit_base_importer(importer: string): Promise<void> {
+	await git(fixture.workspace, ['switch', 'main'])
+	await mkdir(path.dirname(importer), { recursive: true })
+	await writeFile(importer, CONTENT)
+	await commit_all('importer')
+	await git(fixture.workspace, ['switch', '-c', 'module'])
+}
+
+describe('added files with real git', () => {
+	it('counts a committed new module and its edited importer as one file', async () => {
+		const importer = 'scripts/x/cli.ts'
+
+		await commit_base_importer(importer)
+		await writeFile('scripts/x/new.ts', 'export {}\n')
+		await writeFile(importer, `${CONTENT}import './new'\n`)
+		await commit_all('module')
+
+		const measured = await split_measure.read_branch()
+
+		expect(measured.files).toBe(1)
 	})
 })

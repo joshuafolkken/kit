@@ -1,10 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { FILE_VERDICT, observation_record } from '#scripts/observations/observation-record'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
 
@@ -22,11 +22,16 @@ vi.mock('#scripts/issue/session-cite', async (original) => {
 	return { session_cite: { ...actual.session_cite, session_repo: repo_mock } }
 })
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+// The permission lookup goes through the ETag layer (joshuafolkken/kit#6754); here it reaches the mock.
+vi.mock('#scripts/gh/git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (api_path: string) => await api_mock({ path: api_path }) },
+}))
 vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_list_comments: comments_mock },
 }))
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-comment-round-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-comment-round-')
 const ISSUE = 3769
 const ROUND = [
 	'- rf:assumptions | low | scripts/run/board/run-board-usual.ts:17 | 2026-10-14 | #3769',
@@ -42,10 +47,6 @@ const ENTRY = {
 }
 const SIGHTING = `- k:${ENTRY.slug} | d1 | 2026-10-27 | ${ENTRY.where} | ${ENTRY.what}`
 const QUOTING = `See ${review_comment_round.body_of(['- rf:tests | low | a.ts | 2026-10-14 | #3769'])}`
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
 
 beforeEach(() => {
 	repo_mock.mockReset().mockReturnValue('joshuafolkken/kit')

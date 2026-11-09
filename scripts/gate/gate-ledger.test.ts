@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import type { ProcessOwner } from '#scripts/josh/process-owner'
@@ -7,7 +5,8 @@ import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { related_scope } from '#scripts/test/test-related-scope'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type LiveReservation } from './core-budget'
 import { gate_labels } from './gate-labels'
 import { gate_ledger } from './gate-ledger'
@@ -16,7 +15,8 @@ import { machine_capacity } from './machine-capacity'
 // joshuafolkken/kit#3501: a gate records the load it ran beside, read where none of its own checks
 // runs, so `josh metrics` can leave out the gates another lane's work slowed.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'gate-ledger-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('gate-ledger-test-')
 const read_machine = vi.spyOn(machine_capacity, 'read_machine')
 const QUIET_BUSY = gate_ledger.BACKGROUND_CORES
 const BUSY_EXTERNAL = 3
@@ -66,10 +66,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.useRealTimers()
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 describe('gate_ledger — the external load a gate ran beside', () => {

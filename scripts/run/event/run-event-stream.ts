@@ -179,6 +179,10 @@ const EVENT_KIND = {
 	// as one ask begins to wait, `#<N> end #<M>` as it ends, so `lane:breakdown` counts
 	// the wait under its own row rather than the stage it fell in (`lane-plan-wait-event.ts`). A trace.
 	PLAN_WAIT: 'plan-wait',
+	// GitHub's REST core rate limit read around one `backlog:drive` offer cycle (joshuafolkken/kit#6558):
+	// JSON text with the cycle's `used_delta`, `remaining` and `reset`, or `is_missing` when a read failed
+	// (`backlog-drive-rate.ts`). A trace written every cycle, so the bound rolls it off with the heartbeats.
+	RATE_LIMIT: 'rate-limit',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -205,6 +209,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.RELAUNCH_FAILED,
 	EVENT_KIND.SLEEP,
 	EVENT_KIND.PLAN_WAIT,
+	EVENT_KIND.RATE_LIMIT,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
@@ -217,6 +222,7 @@ const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.HEARTBEAT,
 	EVENT_KIND.SETUP,
 	EVENT_KIND.PR_CHECKS,
+	EVENT_KIND.RATE_LIMIT,
 ])
 
 const event_schema = z.object({

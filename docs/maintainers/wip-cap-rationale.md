@@ -9,8 +9,8 @@ Rationale behind `prompts/collaboration-workflow/wip-cap.md`.
 command counts and holds on the first call, so a refusal ahead of it was a pure round trip.
 
 `scripts/gh/gh-document-guard.test.ts` pins why `gh issue list` is not used: the only `gh` a
-distributed document may put in an executable block is REST, and `gh issue list` goes through GraphQL,
-which answers 403 in a cloud session.
+distributed document may put in an executable block is `gh api`, and `gh issue list` is a subcommand
+(`prompts/collaboration-workflow/gh-rest.md`).
 
 ## Why a cap is needed — the measurement
 

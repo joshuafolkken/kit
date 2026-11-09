@@ -137,6 +137,7 @@ const repo_party = {
 	current_owner,
 	current_repository,
 	is_own_repository,
+	parse_owner_repo,
 	placeholder_owners,
 	selector_owner,
 	sole_repository,

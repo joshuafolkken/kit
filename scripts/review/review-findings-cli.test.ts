@@ -1,19 +1,16 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { review_findings_cli } from './review-findings-cli'
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-findings-'))
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-findings-')
 
 // A checkout whose ledger directory holds one file per given content.
 function root_with(...contents: ReadonlyArray<string>): string {
-	const root = mkdtempSync(path.join(TEST_DIR, 'root-'))
+	const root = make_directory('review-findings-root-')
 
 	for (const [index, content] of contents.entries()) {
 		const file = path.join(root, observation_ledger.ledger_file(index + 1))

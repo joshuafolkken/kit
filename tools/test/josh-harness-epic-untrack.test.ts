@@ -36,7 +36,8 @@ state.deleted.sort((left, right) => left[1] - right[1])
 for (const [blocker, blocked] of state.deleted) {
   state.blockers[blocked] = state.blockers[blocked].filter(value => value !== blocker)
 }
-const endpoint = args[1].split('?')[0]
+const included = args.includes('--include')
+const endpoint = (included ? args.at(-1) : args[1]).split('?')[0]
 const method = args[args.indexOf('--method') + 1]
 const number = Number(endpoint.split('/')[4])
 function issue(value) {
@@ -46,7 +47,7 @@ function issue(value) {
     issue_dependencies_summary: { total_blocked_by: (state.blockers[value] ?? []).length } }
 }
 function answer() {
-  if (endpoint.split('/').length === 3) return 'joshuafolkken/kit'
+  if (endpoint.split('/').length === 3) return { full_name: 'joshuafolkken/kit' }
   if (method === 'DELETE') {
     const blocker = Number(endpoint.split('/').at(-1))
     fs.appendFileSync(journal, JSON.stringify([blocker, number]) + '\n')
@@ -65,6 +66,8 @@ function answer() {
   throw new Error('Unexpected gh call: ' + args.join(' '))
 }
 const result = answer()
+// A conditional read (--include) carries a status line and headers before the body.
+if (included) console.log('HTTP/2.0 200 OK\n')
 console.log(typeof result === 'string' ? result : JSON.stringify(result))
 `
 

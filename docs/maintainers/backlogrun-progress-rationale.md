@@ -125,10 +125,19 @@ child — waits that cost no AI turns.
 to be stopped for, and the 8 hours a run promises is the wait after its hands became free
 (`backlogrun-steps-rationale.md` → "Why the idle watch lasts 8 hours from when the hands became free").
 
-**Why a watch is polled at the same 60 seconds as a running batch.** The slower idle poll existed
+**Why a watch is polled at the same 180 seconds as a running batch.** The slower idle poll existed
 because every ask billed the parent session's whole history; the loop is now a process
 (`backlogrun-driver.md`), an ask spends no AI turn, and one interval is one number to keep true
 (joshuafolkken/kit#3691). A child collected inside the interval is still asked about at once.
+
+The figure is 180, not 60, because each ask spends REST core budget (joshuafolkken/kit#6718). The
+issue reads that moved to GraphQL through the transport switch spend no REST core where GraphQL is
+answered, but a session it refuses reads through REST, so the interval is sized for that one
+(`prompts/collaboration-workflow/gh-rest.md` → "API コールを減らす").
+
+Two cases ask sooner (joshuafolkken/kit#6788). The poll after a `run:add` asks at once. While no lane
+runs and a named issue is left, the interval is 30 seconds: that stretch ends at the dispatch, and no
+lane spends the allowance beside it (`backlog-budget.ts` → `IDLE_OFFER_INTERVAL_SECONDS`).
 
 **Why a silent unit is measured by unchanged output.** A working unit rewrites its transcript
 continuously, so unchanged output — not the child's duration — is the signal.

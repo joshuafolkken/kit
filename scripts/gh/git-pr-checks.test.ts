@@ -303,7 +303,8 @@ describe('wait_for_pr_success — heartbeat logging', () => {
 		vi.restoreAllMocks()
 	})
 
-	it('includes the attempt number and max in the log message', async () => {
+	// #6719: no `/max`, since under the backoff `max_attempts` is the budget rather than the read count.
+	it('includes the read number and not the attempt budget in the log message', async () => {
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})
@@ -317,7 +318,8 @@ describe('wait_for_pr_success — heartbeat logging', () => {
 			required_stable_reads: DEFAULT_STABLE_READS,
 		})
 
-		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('1/5'))
+		expect(info_spy).toHaveBeenCalledWith('Checking PR status… (read 1)')
+		expect(info_spy).not.toHaveBeenCalledWith(expect.stringContaining('/5'))
 		vi.restoreAllMocks()
 	})
 })
@@ -335,7 +337,7 @@ describe('get_configured_max_attempts', () => {
 	// the poll following the final sleep.
 	it('returns computed value when env var is a valid positive number', () => {
 		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '60')
-		expect(get_configured_max_attempts()).toBe(7)
+		expect(get_configured_max_attempts()).toBe(4)
 	})
 
 	// The override has to work in both directions: shortening it is how a fast project opts out of

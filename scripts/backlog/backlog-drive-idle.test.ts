@@ -135,7 +135,9 @@ describe('backlog_drive_idle.describe — an estimate over the size cap', () => 
 		const over = issue(OVER_CAP, { body })
 		const text = backlog_drive_idle.describe({ merged: 0, issues: [...POOL, over], now_ms: NOW_MS })
 
-		expect(text).toContain(`(over the size cap):\n- #${String(OVER_CAP)} Issue ${String(OVER_CAP)}`)
+		expect(text).toContain(
+			`(over the size cap, no reason declared):\n- #${String(OVER_CAP)} Issue ${String(OVER_CAP)}`,
+		)
 		expect(text).not.toContain(`- #${String(READY)}`)
 	})
 })
@@ -193,7 +195,7 @@ describe('backlog idle measured size classification', () => {
 	it('uses the measured guide for the same cap as the offer (ac-54136377)', () => {
 		const measured = backlog_drive_idle.describe({
 			...reading,
-			implement_rate: { median: 4, lanes: 1 },
+			implement_rate: { median: 3, lanes: 1 },
 			growth: { files: 2, lines: 2 },
 		})
 

@@ -14,9 +14,8 @@ const LABELLED_FIELDS = 'number,body,stateReason'
 //
 // `blocked_by_count` rides along for the same reason and is the one field here that `gh --json`
 // never had: it is read out of the `issue_dependencies_summary` the listing response already
-// carries, so it costs no request at all. It is what lets `epic:bundle`
-// tell a row with no blockers from one with some **before** deciding whether that row is worth a
-// per-issue read, which would otherwise be made for every open issue in the repository. Absent on a
+// carries, so it costs no request at all. `epic:bundle` no longer consults it: it reads the
+// relations themselves from `issue_list_open_relations` (joshuafolkken/kit#6796). Absent on a
 // row whose summary is missing, which must not be read as zero; `git-gh-issue-rest.ts` states why.
 //
 // `labels` rides along on the same response too: `epic:bundle` reads the release label off it,
@@ -79,6 +78,13 @@ async function issue_list_recent(limit: number): Promise<IssueListOutcome> {
 // and asking `gh` for one produced a partial and arbitrary answer.
 async function issue_list_open_bodies(limit: number): Promise<IssueListOutcome> {
 	return await issue_list({ json_fields: BACKLOG_SCAN_FIELDS, limit })
+}
+
+// The same listing with each row's blocker relations, for `epic:bundle`. The listing reads them in
+// one GraphQL query per hundred rows (`git-gh-issue-list.ts`), so the cost stays flat as the backlog
+// grows; read row by row they cost two requests per blocked issue (joshuafolkken/kit#6796).
+async function issue_list_open_relations(limit: number): Promise<IssueListOutcome> {
+	return await issue_list({ json_fields: `${BACKLOG_SCAN_FIELDS},blockedBy`, limit })
 }
 
 // The issues that closed most recently, for the duplicate half of `issue:scout`.
@@ -178,6 +184,7 @@ const git_gh_issue = {
 	issue_list_by_label_summary,
 	issue_search_body,
 	issue_list_open_bodies,
+	issue_list_open_relations,
 	issue_list_open_for_judgement,
 	issue_list_recently_closed,
 }

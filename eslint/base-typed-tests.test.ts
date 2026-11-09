@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { ESLint, type Linter } from 'eslint'
 import ts from 'typescript-eslint'
-import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { create_base_config } from './base.js'
 import { code_quality_rules } from './rules/code-quality.js'
 import { naming_convention_rules } from './rules/naming-convention.js'
@@ -29,13 +29,14 @@ const SOURCE = [
 
 vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })
 
+const make_directory = temporary_directory()
+
 function create_linter(): ESLint {
-	const root = mkdtempSync(path.join(tmpdir(), 'kit-typed-tests-'))
+	const root = make_directory('kit-typed-tests-')
 	const config = { compilerOptions: { strict: true, types: [], lib: ['es2022'] } }
 
 	writeFileSync(path.join(root, 'tsconfig.json'), JSON.stringify(config))
 	for (const file of [SOURCE_FILE, ...TEST_FILES]) writeFileSync(path.join(root, file), SOURCE)
-	onTestFinished(() => rmSync(root, { recursive: true, force: true }))
 	const gitignore_path = pathToFileURL(path.join(root, '.gitignore'))
 
 	return new ESLint({
