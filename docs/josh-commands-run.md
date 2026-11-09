@@ -585,7 +585,9 @@ merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`,
 and the investigation's (its launch's `JOSH_LANE_OVERRUN` mark, on the `filed` event), groups two spaces apart
 (`47′  4847  🔍 implement 31′ · 4856`), and while `JOSH_LANE_INVESTIGATION` stays off every merged row ends on its filed numbers alone, whatever its note (no `M′`, no outcome); a 🏁 row keeps all the numbers; a failed sync logs nothing; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
-reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;
+reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record — or its log's last 20 lines show a GitHub
+rate limit or an expired `gh` login, `run-merge-github-limit.ts`) has it dropped, unparked and uncounted: re-dispatchable;
+a rate limit adds to no streak, and a `usage-limit` event names the exhausted resource's `gh api rate_limit` reset (none or unread: 30 minutes on);
 a **usage-limit** child (OPEN, unparked, exit record shows a Claude usage limit stopped it) has it dropped, unparked and counted
 against no streak, and a `usage-limit` event names the reset (unreadable or past: 30 minutes on); `backlog:drive` launches nothing before it;
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
