@@ -164,7 +164,9 @@ describe('issue_list — the pool in one GraphQL query', () => {
 		expect(await pool_json()).toBe(through_rest)
 	})
 
+	// A next page left unread: the rows already selected fill the limit, so REST is not asked.
 	it('cuts the listing off at limit without reading REST', async () => {
+		serve_backlog(true, true)
 		const json = await pool_json('number', LIMIT_ONE)
 
 		expect(json).toBe(JSON.stringify([{ number: BLOCKED_NUMBER }]))
@@ -194,8 +196,9 @@ describe('issue_list — the pool handed back to REST', () => {
 		expect(rest_reads()).toBeGreaterThan(0)
 	})
 
+	// Each case moves one of the two off the open, newest-first listing the query answers.
 	it.each([
-		['closed', 'updated'],
+		['closed', 'created'],
 		['open', 'updated'],
 	] as const)('keeps a %s listing sorted by %s on REST', async (state, sort) => {
 		await git_gh_issue_list.issue_list({
