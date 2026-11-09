@@ -1,0 +1,7 @@
+{
+	"reason": "The eslint heap cap moves into core-weights.ts with its byte conversion so the lint reservation derives from it (#6684)",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

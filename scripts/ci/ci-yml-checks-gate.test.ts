@@ -1,5 +1,6 @@
 import { gate_static_group } from '#scripts/gate/gate-static-group'
 import { GATE_TARGETS, verification_gate } from '#scripts/gate/verification-gate'
+import { lint_gate_scope } from '#scripts/lint/lint-gate-scope'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
@@ -73,6 +74,15 @@ describe('the static-checks job runs the verification gate', () => {
 		expect(checks_scripts()).toContain(
 			`${GATE_STEP} ${verification_gate.VERBOSE_FLAG} ${verification_gate.NO_UNIT_FLAG} "${gate_static_group.STATIC_GROUP_FLAG_PREFIX}\${STATIC_GROUP}"`,
 		)
+	})
+
+	// joshuafolkken/kit#6684: a lane's gate lints only its changed files, so the whole-tree lint is
+	// the one GitHub's own `CI` variable selects on this job — overriding it would drop the last one.
+	it('leaves GitHub’s CI variable alone, so its lint leg lints the whole tree', () => {
+		const overrides = checks_steps().filter((step) => step.env?.['CI'] !== undefined)
+
+		expect(overrides).toStrictEqual([])
+		expect(lint_gate_scope.resolve_gate_scope([], process.cwd(), { CI: 'true' }).mode).toBe('all')
 	})
 })
 
