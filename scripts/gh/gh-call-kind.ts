@@ -1,3 +1,5 @@
+import { gh_api } from '#scripts/rules/gh-api'
+
 // The kind of one `gh` call, the key `gh:usage` counts endpoints by (joshuafolkken/kit#6867): a REST
 // call is its method and normalized path (`GET repos/{o}/{r}/issues/{n}`), GraphQL is the one kind
 // `graphql`, and any other subcommand is its name (`gh issue view`). Normalizing folds the owner,
@@ -18,22 +20,7 @@ const BODY_METHOD = 'POST'
 const OWNER_REPO = ['repos', '{o}', '{r}'] as const
 const NUMBER = /^\d+$/u
 const SHA = /^[\da-f]{7,40}$/u
-const METHOD_FLAGS = new Set(['--method', '-X'])
-const BODY_FLAGS = new Set(['--input', '-f', '-F', '--field', '--raw-field'])
-const VALUE_FLAGS = new Set([
-	...METHOD_FLAGS,
-	...BODY_FLAGS,
-	'-H',
-	'--header',
-	'-q',
-	'--jq',
-	'-t',
-	'--template',
-	'-p',
-	'--preview',
-	'--hostname',
-	'--cache',
-])
+const { METHOD_FLAGS, FIELD_FLAGS: BODY_FLAGS, API_VALUE_TAKING_FLAGS: VALUE_FLAGS } = gh_api
 const NAME_AFTER = new Map([
 	['commits', '{ref}'],
 	['branches', '{branch}'],
