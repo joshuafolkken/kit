@@ -22,9 +22,12 @@ const PRESENTING: ReadonlyArray<string> = [
 	'docs/maintainers/epic-commands-rationale.md',
 ]
 
-// Checked for the quoted command only: its `--notify` option line is generated from
-// `josh-commands-epic.ts`, which joshuafolkken/kit#6823 updates.
+// The `--notify` option line is generated from `josh-commands-epic.ts` (joshuafolkken/kit#6823),
+// so both carry the `Next:` line the Telegram sends.
 const GENERATED = 'docs/josh-commands-backlog.md'
+const NOTIFY_SOURCE = 'scripts/josh/josh-commands-epic.ts'
+const NOTIFY_PRESENTING: ReadonlyArray<string> = [GENERATED, NOTIFY_SOURCE]
+const SHELL_COMMENT_FORM = 'backlogrun #'
 
 // Presents a terminal command but no epic run command, and also names the keyword a child brief
 // carries, which no person types.
@@ -48,6 +51,13 @@ describe('the documents present the terminal-runnable epic run command', () => {
 
 	it.each(PRESENTING)('%s presents no backlogrun #', (file) => {
 		expect(unwrapped(file)).not.toContain(CHAT_FORM)
+	})
+
+	it.each(NOTIFY_PRESENTING)('%s describes the --notify Next: line as the run command', (file) => {
+		const text = unwrapped(file)
+
+		expect(text).toContain(`Next: ${run_command()}`)
+		expect(text).not.toContain(SHELL_COMMENT_FORM)
 	})
 
 	// `backlogrun-args.ts` reads a bare number as `#N` only before the first flag, so a number after
