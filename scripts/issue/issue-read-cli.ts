@@ -103,7 +103,8 @@ async function to_failure_result(failure: IssueReadFailure): Promise<NumberResul
 
 // The comments are read with the fields rather than after them — in one GraphQL query, or two REST
 // reads side by side when that query is refused — since reading them in sequence would put back one of
-// the round trips this command exists to remove.
+// the round trips this command exists to remove. Exported for `issue-sources.ts`, which keeps each
+// trusted text with its origin rather than the printed block.
 async function read_issue(issue_number: string, repo?: string): Promise<NumberResult> {
 	const { read, comments_json } = await git_gh_command.issue_read_with_comments(
 		issue_number,
@@ -198,8 +199,9 @@ const issue_read_cli = {
 	parse_numbers,
 	parse_request,
 	read_block,
+	read_issue,
 	run,
 }
 
-export type { BlockRead, BlockTrust }
+export type { BlockRead, BlockTrust, IssueContent, NumberResult }
 export { issue_read_cli }
