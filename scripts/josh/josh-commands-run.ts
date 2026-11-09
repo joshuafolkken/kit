@@ -136,7 +136,8 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:add': {
 		script: 'scripts/run/add/run-add-cli.ts',
-		description: 'Add issues to a live backlogrun, ahead of the queue unless --no-priority',
+		description:
+			'Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots',
 		category: 'AI tools',
 		reference: ['<issue...> [--no-priority] [--retry]', 'automation', ['network', 'files']],
 		usage: {

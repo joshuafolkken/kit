@@ -197,7 +197,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:carry` 
 
 <!-- usage: run:add -->
 
-Add issues to a live backlogrun, ahead of the queue unless --no-priority.
+Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots.
 
 ```bash
 pnpm josh run:add 101 102             # ahead of the rest of the queue (`#N` works too)
@@ -209,13 +209,13 @@ pnpm josh run:add 101 --retry         # retry a mechanically stopped issue in th
 
 Adds to this repository's live `backlogrun` at the next free lane, without interrupting running children.
 
-- Epic children are read on every driver pass and need no `run:add`.
+- An open epic becomes an unlabelled root of any run, recorded once.
 - Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`; an issue already labelled `priority:critical` or `priority:high` keeps that label alone, still ahead of the queue. Named runs also record additions beside their unchanged invocation.
-- Refuses closed/unreadable issues, epics, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
+- Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
 - Each `add` event wakes `run:progress --wait`.
 - `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
 
-**Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
+**Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, `tracking #E · <where>`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
 
 ### `josh run:wake`
 
