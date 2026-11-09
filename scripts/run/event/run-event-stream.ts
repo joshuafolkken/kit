@@ -133,8 +133,10 @@ const EVENT_KIND = {
 	// same section.
 	NOTE: 'note',
 	// A lane child reached a phase no other event marks — its first implementation edit, written by the
-	// PreToolUse hook — so `run:board` draws how far the child has got. A trace,
-	// like `SHIP_STAGE`: it says where the child's work is, not where the run is.
+	// PreToolUse hook — so `run:board` draws how far the child has got. The backlog driver writes its own
+	// `collect` / `launch` steps on a child as this kind too, which no reader draws as a phase
+	// (`backlog-drive-trace.ts`). A trace, like `SHIP_STAGE`: it says where the child's work is, not where
+	// the run is.
 	LANE_PHASE: 'lane-phase',
 	// An issue `run:add` put into the live run. The parent's `--wait` watcher
 	// ends on it, so the issue takes the next free lane without waiting out the arrival probe's minute. A
