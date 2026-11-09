@@ -66,9 +66,10 @@ function check_run_node(name: string, status: string, conclusion?: string): Grap
 }
 
 const ACTIONS_APP = 15_368
+const ACTIONS_SLUG = 'github-actions'
 
 function suite_run_node(conclusion: string, suite: number, run: number): GraphqlNode {
-	const check_suite = { databaseId: suite, app: { databaseId: ACTIONS_APP } }
+	const check_suite = { databaseId: suite, app: { databaseId: ACTIONS_APP, slug: ACTIONS_SLUG } }
 
 	return {
 		...check_run_node(E2E, 'COMPLETED', conclusion),
@@ -258,16 +259,18 @@ describe('pr_get_state_snapshot — one GraphQL query', () => {
 })
 
 describe('pr_get_state_snapshot — check runs of more than one check suite', () => {
+	// The app's slug is what `followup-job-rerun.ts` reads to rerun a GitHub Actions job a 5xx
+	// download failed: without it no failed job qualifies.
 	it("keeps only the newest check suite's run of a name, as the REST rollup does", async () => {
 		stub_graphql({ [SNAPSHOT_QUERY]: TWO_SUITE_ANSWER })
 
 		const read = await git_gh_pr_graphql_snapshot.read_snapshot(PR_BRANCH)
 
-		expect(read?.fields['statusCheckRollup']).toEqual([
+		expect(read?.fields['statusCheckRollup']).toStrictEqual([
 			{
 				id: NEWER_SUITE.run,
 				check_suite: { id: NEWER_SUITE.suite },
-				app: { id: ACTIONS_APP },
+				app: { id: ACTIONS_APP, slug: ACTIONS_SLUG },
 				name: E2E,
 				status: 'completed',
 				conclusion: 'success',

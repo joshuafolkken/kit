@@ -32,7 +32,7 @@ const CONTEXTS = `contexts(${PAGE}, after: $after) {
 	nodes {
 		__typename
 		... on ${CHECK_RUN} {
-			databaseId name status conclusion checkSuite { databaseId app { databaseId } }
+			databaseId name status conclusion checkSuite { databaseId app { databaseId slug } }
 		}
 		... on ${STATUS_CONTEXT} { context state description }
 	}
@@ -66,7 +66,9 @@ const REVIEW_DECISION_QUERY = `query($owner: String!, $name: String!, $number: I
 
 const rate_limit_schema = z.object({ cost: z.number(), remaining: z.number() })
 const database_id_schema = z.number().nullish()
-const app_schema = z.looseObject({ databaseId: database_id_schema }).nullish()
+const app_schema = z
+	.looseObject({ databaseId: database_id_schema, slug: z.string().nullish() })
+	.nullish()
 const check_suite_schema = z.looseObject({ databaseId: database_id_schema, app: app_schema })
 const check_run_schema = z.looseObject({
 	[TYPE_NAME_KEY]: z.literal(CHECK_RUN),
@@ -137,6 +139,7 @@ const decision_data_schema = z.looseObject({
 
 type RateLimit = z.infer<typeof rate_limit_schema>
 type RollupContext = z.infer<typeof context_schema>
+type CheckApp = z.infer<typeof app_schema>
 type ContextsPage = z.infer<typeof contexts_page_schema>
 type GraphqlPull = z.infer<typeof pull_schema>
 
@@ -243,6 +246,17 @@ function id_holder_of(database_id: number | null | undefined): { id: number } | 
 	return database_id === null || database_id === undefined ? undefined : { id: database_id }
 }
 
+// The app as REST nests it: its id, which `newest_check_runs` ranks by, and its slug, which
+// `followup-job-rerun.ts` reads to tell a GitHub Actions job it may rerun.
+function to_rest_app(app: CheckApp): Record<string, unknown> | undefined {
+	if (app === null || app === undefined) return undefined
+
+	const holder = id_holder_of(app.databaseId)
+	if (holder === undefined) return undefined
+
+	return { ...holder, slug: app.slug ?? undefined }
+}
+
 // The ids `newest_check_runs` ranks a run by, spelled as REST nests them.
 function to_rest_ids(context: RollupContext): Record<string, unknown> {
 	if (context.__typename === STATUS_CONTEXT) return {}
@@ -252,7 +266,7 @@ function to_rest_ids(context: RollupContext): Record<string, unknown> {
 	return {
 		...id_holder_of(context.databaseId),
 		check_suite: id_holder_of(suite?.databaseId),
-		app: id_holder_of(suite?.app?.databaseId),
+		app: to_rest_app(suite?.app),
 	}
 }
 

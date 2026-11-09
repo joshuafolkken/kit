@@ -2,6 +2,6 @@
 	"reason": "New GraphQL snapshot module and its colocated test (#6786): one query replaces the merge gate's six REST reads; it reuses the REST suite ranking and falls back to the REST review fold",
 	"date": "2026-11-09",
 	"growth": {
-		"scripts.code_lines": 290
+		"scripts.code_lines": 299
 	}
 }
