@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forget_branch_rules } from './git-gh-branch-rules'
 import { git_gh_conditional } from './git-gh-conditional'
-import { git_gh_exec } from './git-gh-exec'
+import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { git_gh_poll_read } from './git-gh-poll-read'
 import {
 	check_runs_pages,
@@ -79,6 +79,17 @@ function asked_graphql(): boolean {
 	return mocked_api.mock.calls.some(([request]) => request.path === GRAPHQL_PATH)
 }
 
+// The snapshot query (joshuafolkken/kit#6786) goes first on a GraphQL-capable session, so the
+// merge-state request is picked out by its query rather than by the path they share.
+function merge_state_requests(): Array<GhApiRequest> {
+	return mocked_api.mock.calls
+		.map(([request]) => request)
+		.filter(
+			(request) =>
+				request.path === GRAPHQL_PATH && request_body(request)['query'] === MERGE_STATE_QUERY,
+		)
+}
+
 beforeEach(() => {
 	mocked_conditional.mockImplementation(conditional_read_over(mocked_api))
 	forget_pr_numbers()
@@ -103,10 +114,10 @@ describe('pr_get_state_snapshot — a detail refused as too many files changed',
 	it('asks GraphQL for the listing row node', async () => {
 		stub_too_large({ graphql: CLEAN_ANSWER })
 		await pr_get_state_snapshot(PR_BRANCH)
-		const requests = mocked_api.mock.calls.map(([request]) => request)
-		const graphql_request = find_request(requests, GRAPHQL_PATH)
+		const requests = merge_state_requests()
 
-		expect(request_body(graphql_request)).toStrictEqual({
+		expect(requests).toHaveLength(1)
+		expect(request_body(find_request(requests, GRAPHQL_PATH))).toStrictEqual({
 			query: MERGE_STATE_QUERY,
 			variables: { id: NODE_ID },
 		})
@@ -138,6 +149,6 @@ describe('pr_get_state_snapshot — no merge state to judge from', () => {
 		stub_too_large({ graphql: CLEAN_ANSWER, detail_failure: failure })
 
 		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toBe(failure)
-		expect(asked_graphql()).toBe(false)
+		expect(merge_state_requests()).toEqual([])
 	})
 })
