@@ -191,6 +191,7 @@ describe('run_merge_cli.merge_child — a park that gave no cause', () => {
 		const result = await run_merge_cli.merge_child({ ...context(), output: '/stub/question.log' })
 
 		expect(result.token).toBe('2039')
+		expect(result.is_parked).toBe(true)
 		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
 	})
 

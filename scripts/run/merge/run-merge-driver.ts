@@ -25,12 +25,14 @@ const control_schema = z.object({
 	code: z.number(),
 	is_offer: z.literal(false),
 	outcome: z.enum(run_merge_outcome.CHILD_OUTCOMES),
+	is_parked: z.boolean().optional(),
 })
 const offer_schema = z.object({
 	token: z.string(),
 	code: z.number(),
 	is_offer: z.literal(true),
 	outcome: z.enum(run_merge_outcome.CHILD_OUTCOMES),
+	is_parked: z.boolean().optional(),
 })
 const printed_schema = z.object({
 	[JSON_KEY]: z.discriminatedUnion('is_offer', [control_schema, offer_schema]),

@@ -63,6 +63,14 @@ test('starts the pass after a hand-back from the state the last driver run left'
 	expect(args_of(subprocess, 1)).toContain('--only')
 })
 
+test('re-drives a busy verdict with the parked-child triage still owed', async () => {
+	const subprocess = driver_returns('merge busy #2509\nresume: --owner 1 --triage-owed', SETTLED)
+
+	await run_wake_driver.drive(scratch.target, no_pause)
+
+	expect(args_of(subprocess, 1)).toContain('--triage-owed')
+})
+
 test('restarts the idle watch rather than carrying the last activity into the next pass', async () => {
 	const subprocess = driver_returns(
 		'merge over #2509\nresume: --owner 1 --active 2026-11-07T00:00:00.000Z --exclude 2508',

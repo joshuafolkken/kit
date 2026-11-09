@@ -17,7 +17,6 @@
 // without a process, a network or a clock.
 
 import { epic_triage } from '#scripts/epic/epic-triage'
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { poll } from '#scripts/lib/poll'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token } from '#scripts/run/merge/run-merge-token'
@@ -29,6 +28,7 @@ import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-lau
 import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
+import { backlog_drive_state } from './backlog-drive-state'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 import { backlog_offer_timing, type LoopRun, type OfferTiming } from './backlog-offer-timing'
 import { backlog_yield_cap, type YieldCapPorts } from './backlog-yield-cap'
@@ -47,13 +47,13 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 	WATCH_VERDICT,
 	'wait',
 ])
-const NO_RETRIES = 0
 const JUDGE_REASON = 'judge'
 const TRIAGE_TOKEN = epic_triage.TRIAGE_VERDICT
 // The `hold` reason a pass held by a Claude usage limit records.
 const USAGE_LIMIT_REASON = 'usage-limit'
 const { launch_all } = backlog_drive_launch_pass
 const { is_drain_owed } = backlog_drive_retrospective
+const { initial_state, merge_stopped } = backlog_drive_state
 
 interface OfferRead extends HeldWaiting, OfferTiming {
 	verdict: string
@@ -90,6 +90,8 @@ interface DriveState extends OfferTiming {
 	stopped_by?: string | undefined
 	// The last offer answered `run` on a machine with no memory to spare (`backlog-drive-memory.ts`).
 	is_memory_held?: boolean | undefined
+	// A collected park still owes the parent triage after an interrupted collection resumes.
+	is_triage_owed?: boolean | undefined
 }
 
 interface DriveEnd {
@@ -103,7 +105,7 @@ interface DriveEnd {
 	is_finish?: boolean | undefined
 }
 
-type Collected = Pick<MergeResult, 'token' | 'outcome' | 'is_offer'>
+type Collected = Pick<MergeResult, 'token' | 'outcome' | 'is_offer' | 'is_parked'>
 
 // The yield cap's ports (`backlog-yield-cap.ts`): the issue's yields, and its park.
 interface DrivePorts extends YieldCapPorts {
@@ -171,28 +173,6 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 	}
 }
 
-function initial_state(in_flight: ReadonlyArray<string>, active: string): DriveState {
-	return {
-		in_flight: [...in_flight],
-		exclude: [],
-		active,
-		retries: NO_RETRIES,
-		is_stopping: false,
-	}
-}
-
-// The stop a merge reached: kept as the first stop's reason when an offer already stopped the run.
-function merge_stopped(issue: string, state: DriveState): DriveState {
-	if (state.is_stopping) return state
-
-	return {
-		...state,
-		is_stopping: true,
-		stop_reason: `run:merge ${issue_cite.plain(issue)} answered stop`,
-		stopped_by: issue,
-	}
-}
-
 // A merged child is excluded because `backlog:next` may still read it OPEN, and a withdrawn one because
 // `lane:withdraw` leaves it OPEN for the next run, not this one (joshuafolkken/kit#4365). Any other is
 // classified by its labels, so excluding it would hide a child a person released for the rest of the
@@ -201,6 +181,10 @@ function excluded(issue: string, outcome: Collected['outcome'], state: DriveStat
 	if (!EXCLUDED_OUTCOMES.has(outcome) || state.exclude.includes(issue)) return state.exclude
 
 	return [...state.exclude, issue]
+}
+
+function was_parked(collected: Collected): boolean {
+	return collected.outcome === 'parked' || collected.is_parked === true
 }
 
 // The child collected, and — unless its cut was resumed in place — out of flight.
@@ -216,7 +200,9 @@ function collected_state(
 			: state.in_flight.filter((item) => item !== issue)
 	const exclude = excluded(issue, collected.outcome, state)
 
-	return { ...state, in_flight, exclude, active }
+	const is_triage_owed = state.is_triage_owed === true || was_parked(collected)
+
+	return { ...state, in_flight, exclude, active, is_triage_owed }
 }
 
 // One finished child: handed back on an immediate token, otherwise collected.
@@ -243,6 +229,14 @@ async function collect(issue: string, state: DriveState, ports: DrivePorts): Pro
 	}
 }
 
+function after_collection(state: DriveState): PassResult {
+	if (state.is_triage_owed && !state.is_stopping) {
+		return ended(TRIAGE_TOKEN, { ...state, is_triage_owed: false }, TRIAGE_TOKEN)
+	}
+
+	return { kind: 'continue', state }
+}
+
 async function collect_finished(state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const finished = state.in_flight.filter((item) => ports.is_finished(item))
 	let current = state
@@ -258,7 +252,7 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 
 	await backlog_drive_hold.stopped(state, current, ports)
 
-	return { kind: 'continue', state: current }
+	return after_collection(current)
 }
 
 // A watch with nothing in flight is the drain: `run:step` owes the retrospective there, so it is the

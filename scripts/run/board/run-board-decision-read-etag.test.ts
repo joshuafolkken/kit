@@ -2,6 +2,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { git_gh_conditional, type ConditionalRead } from '#scripts/gh/git-gh-conditional'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { rest_issue } from '#scripts/gh/git-gh-issue-rest-fixture'
+import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
 import { NEEDS_DECISION_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
 import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
@@ -93,6 +94,7 @@ function sent_etags(): Array<string | undefined> {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
 	shared_cache_fixture.keep_in_memory()
 	vi.spyOn(issue_read, 'parse_comments').mockImplementation(trusted_comments)
 })
