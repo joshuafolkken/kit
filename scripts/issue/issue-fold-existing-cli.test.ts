@@ -141,6 +141,18 @@ describe('issue_fold_existing_cli.run --apply --found-during', () => {
 		).toBe(1)
 		expect(error.mock.calls.join('\n')).toContain(RELATION_FAILURE)
 	})
+
+	// joshuafolkken/kit#6643: the rerun takes the written fold as applied and records it.
+	it('names the rerun that records the split child', async () => {
+		applied().mockRejectedValue(new Error(RELATION_FAILURE))
+		const error = vi.mocked(console.error)
+
+		await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12', FOUND_DURING_FLAG, '34'])
+
+		expect(error.mock.calls.join('\n')).toContain(
+			`josh issue:fold-existing ${PATH} ${APPLY_FLAG} 12 ${FOUND_DURING_FLAG} 34`,
+		)
+	})
 })
 
 describe('issue_fold_existing_cli.run --fingerprint', () => {

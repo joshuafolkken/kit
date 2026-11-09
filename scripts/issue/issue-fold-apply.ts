@@ -58,6 +58,12 @@ async function check_unchanged(
 	return checks[0] === true && checks[1] === fold.comment_fingerprint ? undefined : 'changed'
 }
 
+async function raise_floor(issue_number: string): Promise<ApplyResult | undefined> {
+	const raised = await issue_priority_raise.raise(issue_number)
+
+	return issue_priority_raise.is_failure(raised) ? 'priority-failed' : undefined
+}
+
 async function write(fold: FoldWrite): Promise<ApplyResult | undefined> {
 	try {
 		await git_gh_command.issue_edit_body(fold.issue_number, fold.body)
@@ -65,15 +71,26 @@ async function write(fold: FoldWrite): Promise<ApplyResult | undefined> {
 		return 'write-failed'
 	}
 
-	const raised = await issue_priority_raise.raise(fold.issue_number)
+	return await raise_floor(fold.issue_number)
+}
 
-	return issue_priority_raise.is_failure(raised) ? 'priority-failed' : undefined
+// joshuafolkken/kit#6643: a body that already reads as the fold is this fold's own earlier write — a
+// rerun after the split-child record failed — so only the priority floor is left to apply.
+async function finish_prior_write(
+	fold: FoldWrite,
+	unchanged: ApplyResult | undefined,
+): Promise<ApplyResult | undefined> {
+	if (unchanged !== 'changed') return undefined
+	if ((await reads_as(fold.issue_number, fold.body)) !== true) return undefined
+
+	return (await raise_floor(fold.issue_number)) ?? 'applied'
 }
 
 async function apply(fold: FoldWrite): Promise<ApplyResult> {
-	const refusal = (await check_unchanged(fold)) ?? (await write(fold))
+	const unchanged = await check_unchanged(fold)
+	const settled = (await finish_prior_write(fold, unchanged)) ?? unchanged ?? (await write(fold))
 
-	if (refusal !== undefined) return refusal
+	if (settled !== undefined) return settled
 
 	return (await reads_as(fold.issue_number, fold.body)) === true ? 'applied' : 'unverified'
 }
