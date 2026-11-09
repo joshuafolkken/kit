@@ -45,3 +45,15 @@ describe('existing issue fold procedure', () => {
 		expect(REFERENCE).toContain('`separate` returns to the ordinary filing path')
 	})
 })
+
+describe('split fold procedure', () => {
+	it('documents the split fold that answers a split notice', () => {
+		expect(PROCEDURE).toContain(
+			'pnpm josh issue:fold-existing assessment.json --apply <N> --found-during <M>',
+		)
+		expect(REFERENCE).toContain('With `--found-during <M>` on `fold`')
+		expect(REFERENCE).toContain(
+			'pnpm josh issue:fold-existing assessment.json --apply 5848 --found-during 5849',
+		)
+	})
+})

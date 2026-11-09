@@ -88,8 +88,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
 	// (joshuafolkken/kit#5547) crossed the 65536 block; solo evidence in `backlog:triage`
 	// (joshuafolkken/kit#6463) crossed the 73728 block; the drive's sample wait (joshuafolkken/kit#6503)
-	// crossed the 77824 block.
-	{ path: 'docs/josh-commands-backlog.md', bytes: 77_824 },
+	// crossed the 77824 block; `issue:fold-existing --found-during` (joshuafolkken/kit#6641) crossed the 81920 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 81_920 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub
