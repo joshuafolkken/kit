@@ -124,6 +124,49 @@ describe('backlog_drive_launch.launch setup stage', () => {
 	})
 })
 
+// joshuafolkken/kit#6551: the refusal's stage keeps why, on the event's one line.
+describe('backlog_drive_launch.launch refusal detail', () => {
+	it.each(['unopened', 'failed'] as const)('records an %s launch’s detail', async (kind) => {
+		vi.spyOn(git_stash, 'list').mockResolvedValue([])
+		const detail = 'lane:open refused:\n  pool  is full'
+
+		vi.mocked(lane_launch_cli.launch_ready_lane).mockResolvedValue({ kind, detail })
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe(kind)
+		expect(run_event_setup.emit).toHaveBeenLastCalledWith(
+			`no child launched #${FIRST}: lane:open refused: pool is full`,
+		)
+	})
+
+	it('caps a long detail so the board header stays one short line', async () => {
+		vi.spyOn(git_stash, 'list').mockResolvedValue([])
+		const limit = 200
+
+		vi.mocked(lane_launch_cli.launch_ready_lane).mockResolvedValue({
+			kind: 'failed',
+			detail: 'x'.repeat(limit + 1),
+		})
+
+		await backlog_drive_launch.launch(FIRST, OWNER)
+
+		expect(run_event_setup.emit).toHaveBeenLastCalledWith(
+			`no child launched #${FIRST}: ${'x'.repeat(limit)}…`,
+		)
+	})
+
+	it.each([{ kind: 'launched', pid: '1' }, { kind: 'waiting' }] as const)(
+		'records no refusal for a $kind launch',
+		async (outcome) => {
+			vi.spyOn(git_stash, 'list').mockResolvedValue([])
+			vi.mocked(lane_launch_cli.launch_ready_lane).mockResolvedValue(outcome)
+
+			await backlog_drive_launch.launch(FIRST, OWNER)
+
+			expect(run_event_setup.emit).toHaveBeenLastCalledWith(`opening lane #${FIRST}`)
+		},
+	)
+})
+
 describe('backlog_drive_launch.launch with two stashes under the message', () => {
 	it('does not guess between them and says so', async () => {
 		vi.spyOn(git_stash, 'list').mockResolvedValue([LATEST, DUPLICATE])
