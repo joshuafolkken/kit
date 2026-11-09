@@ -240,6 +240,17 @@ The adapter normalizes patch and shell calls into the same authority check. Opaq
 refused for non-workers. Hosts that skip PreToolUse, including nested tool calls, have no verified
 enforcement; generated settings alone do not establish host coverage.
 
+A consultation scope's shell runs unless it is irreversible: a git, GitHub, dependency or josh
+shared-state write, a visible write to a runtime path, or a command that runs what an expansion or
+standard input spells, or a `case` arm or function body it cannot read. The refusal names that
+operation. The check reads nested commands too:
+substitutions, compound bodies, `xargs`, `timeout`, `find -exec`, `sh -c` and `eval`
+(`scripts/hooks/implementation-shell-nested.ts`); the deny-list is
+`scripts/hooks/implementation-shell-deny.ts`. A runtime file any other call changes in the session's
+own checkout is restored after the call (`scripts/hooks/bash-revert.ts`); a file-writing program
+(`cp`, `mv`, `rsync`, `tar`, `dd`, `sed -i`, …) aimed at a runtime path outside it is refused, as the
+restore does not reach another checkout.
+
 ### `josh stop:guard`
 
 <!-- usage: stop:guard -->
@@ -257,6 +268,20 @@ A failed step of its own blocks too. The rows are in `prompts/collaboration-work
 `backlogrun`'s parent loop and next-issue fetch belong to the supervisor, so `stop:guard` does not count that fetch toward a block. A named epic handed to a headless session for a decision keeps the lane-child wait protection. Stall and leftover detection runs at the `Stop` event.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh stop:guard` in detail".
+
+### `josh hook:ledger`
+
+<!-- usage: hook:ledger -->
+
+Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule.
+
+```bash
+pnpm josh hook:ledger --period 7   # a 7-day period's refusals per rule
+```
+
+<!-- /usage -->
+
+Reads the hook ledger, `<git common dir>/josh/hook-ledger/<date>.jsonl`. The ledger keeps no tool-use id, so `passed later` matches a refused call by its tool and command head. It counts a later call in the same transcript that came back without `is_error`. `interrupts` prints `unknown` when the Issue listing cannot be read.
 
 ### `josh session:lang`
 

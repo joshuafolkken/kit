@@ -60,6 +60,7 @@ const ALIASES: Record<string, string> = {
 	rvf: 'review:findings',
 	rvs: 'review:stops',
 	ruv: 'rule:value',
+	hkl: 'hook:ledger',
 	ev: 'eval',
 	fr: 'fresh:run',
 	as: 'auth:setup',
