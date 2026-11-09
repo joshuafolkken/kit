@@ -210,7 +210,7 @@ describe('package.json exports', () => {
 		expect(existsSync(package_path(TEST_FILENAME_EXPORT_TARGET))).toBe(true)
 	})
 
-	it.each(BARREL_EXPORTS)('exposes ./%s at %s/%s/index', (name: string, root: string) => {
+	it.each(BARREL_EXPORTS)('exposes ./%s from %s', (name: string, root: string) => {
 		expect(exports_map[`./${name}`]).toEqual({
 			types: `${root}/${name}/index.d.ts`,
 			default: `${root}/${name}/index.js`,
