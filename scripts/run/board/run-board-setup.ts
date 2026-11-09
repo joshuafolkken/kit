@@ -119,7 +119,7 @@ function lane_stage(events: ReadonlyArray<RunEvent>, issue: number): LaneStage |
 	return { text: step.text, at_ms: Date.parse(step.at) }
 }
 
-const run_board_setup = { lane_stage, read }
+const run_board_setup = { is_refusal, lane_stage, read }
 
 export { run_board_setup }
 export type { LaneStage, SetupRead }

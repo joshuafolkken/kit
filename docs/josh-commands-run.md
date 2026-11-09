@@ -701,7 +701,9 @@ The first positional is the `"<title> #<N>"` string `git -y` and `followup` take
 
 A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate.
 
-A detached re-ship (`--detach`, or any lane child's) whose last ship mark was a review failure (`check` / `finding`) on an unmoved base hands off without the pre-detach preflight and fast checks, printing `pre-detach: skipped (re-ship after review failure)` (`run-ship-reship.ts`). A `--review` ship still runs its `test:pinned` there; the supervised preflight and the review stage's gate still run.
+A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped (re-ship after review or followup failure)` (`run-ship-reship.ts`). A `--review` ship still runs its `test:pinned` there; the supervised preflight and gate still run.
+
+A followup red after a main move is merged, gated and pushed inside the followup stage, printing `followup: the default branch moved under the failed checks — …`; only a red there stops.
 
 One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
 
@@ -923,6 +925,8 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
 - `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
 - `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, an earlier run's too; an unread limit leaves it blank.
+  An empty seat draws a `💺` line under the lanes rule: the first `blocked: #<N>: <cause>` while the newest launch was refused, the rest `no runnable candidate` when no waiting row is free to start, `held: <hold>` while the ledger's open hold stops one that is.
+  A held seat with no candidate ends `(<hold>)`. No seat line is drawn while a free row is about to take the seat, before the plan is read, once the run stopped, or for a single run; none counts as a lane row.
 - `🧠 <n>%` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate, `💾 <n>M/s` after the title; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
 - `⏳` with a blank column — no wait is read.
 

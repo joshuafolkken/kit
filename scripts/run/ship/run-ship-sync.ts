@@ -45,6 +45,8 @@ const PUSH_FAILED_NOTE =
 	'the push ahead of the gate failed; the commit stage pushes after the gate:'
 const PAIR_RED_NOTE =
 	'the scoped pair is red on the merged tree; the commit stage pushes after the gate'
+const MERGED_AGAIN_NOTE =
+	'followup: the default branch moved under the failed checks — merged it again; gating and pushing the merged tree, no re-ship'
 
 // A stage's result, plus the paths a stopped merge left unmerged — carried to the stop prompt.
 // `is_skipped` marks a stage that found nothing to do — a review round with nothing to review, a gate
@@ -279,7 +281,8 @@ async function own_alerts_stop(failed: JoshResult): Promise<StepResult | undefin
 // A followup that failed on the checks merges again whenever the default branch moved since the push,
 // conflicting or not: a red CI on the merge ref is then reproduced by the local gate or cleared by the
 // new push. An unmoved default branch, an alert in the pull request's own files, or any other failure
-// stands.
+// stands. The merge is said on the ship log (joshuafolkken/kit#6675), so a stop its gate raises reads
+// as the in-ship short path, not as a ship that never caught up.
 async function merge_again(title: string, failed: JoshResult): Promise<StepResult | undefined> {
 	if (!is_checks_failure(failed)) return failed
 
@@ -291,6 +294,7 @@ async function merge_again(title: string, failed: JoshResult): Promise<StepResul
 
 	if (outcome.kind === 'conflict') return conflict_result(outcome.files, failed.out)
 	if (outcome.kind !== 'merged') return failed
+	console.error(MERGED_AGAIN_NOTE)
 
 	return await push_merged(title)
 }
@@ -350,6 +354,7 @@ async function followup_stage(
 const run_ship_sync = {
 	CONFLICT_NOTE,
 	MAX_MERGE_RETRIES,
+	MERGED_AGAIN_NOTE,
 	MERGED_GATE_NOTE,
 	PAIR_RED_NOTE,
 	PUSHED_NOTE,

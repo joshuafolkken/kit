@@ -229,14 +229,15 @@ const test_pinned_schema = z.object({
 // The split notice shown to the lane of `issue`, with the measured diff it fired on — the diff notice
 // written once per Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it
 // first (joshuafolkken/kit#4695). Each `split` from `josh lane:plan` writes one more, `reason` naming its
-// axis; a diff notice has none (joshuafolkken/kit#5568).
+// axis; a diff notice has none (joshuafolkken/kit#5568), and the implement-budget notice is `budget`
+// (joshuafolkken/kit#6544).
 const split_notice_schema = z.object({
 	kind: z.literal(KIND.SPLIT_NOTICE),
 	at: z.string(),
 	issue: z.number(),
 	files: z.number(),
 	lines: z.number(),
-	reason: z.enum(['files', 'hunks', 'lines', 'hub']).optional(),
+	reason: z.enum(['files', 'hunks', 'lines', 'hub', 'budget']).optional(),
 })
 // One `josh issue:file --route split` filed from the lane of `issue`; `child` is its reference.
 const split_filed_schema = z.object({

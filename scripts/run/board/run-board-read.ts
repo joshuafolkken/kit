@@ -83,6 +83,9 @@ interface LocalRead {
 	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
 	// open hold is `backlog-drive-memory.ts`'s.
 	is_memory_held?: boolean | undefined
+	// The ledger's open hold the driver launches nothing under, in its own words; `undefined` once it
+	// is released (joshuafolkken/kit#6538).
+	launch_hold?: string | undefined
 	// The run's supervisor and parent session, named in the 💻 section (`run-board-roots.ts`).
 	roots?: ProcessRoots | undefined
 	// The processes a lane's close could not end, by pid, each with why (`lane-reap-settle.ts`).
@@ -246,14 +249,17 @@ async function lane_room_of(
 }
 
 // The repository's lane ledger, read once for the usual times and the driver's open hold.
-function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_held'> {
+function ledger_here(
+	repository: string,
+): Pick<LocalRead, 'usual' | 'is_memory_held' | 'launch_hold'> {
 	const entries = lane_ledger.read_entries(lane_ledger.target_of(repository))
 	const now_ms = Date.now()
+	const launch_hold = lane_held_stats.open_reason(entries, now_ms)
 
 	return {
 		usual: run_board_usual.usual_of(entries, now_ms),
-		is_memory_held:
-			lane_held_stats.open_reason(entries, now_ms) === backlog_drive_memory.HOLD_REASON,
+		is_memory_held: launch_hold === backlog_drive_memory.HOLD_REASON,
+		launch_hold,
 	}
 }
 
