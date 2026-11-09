@@ -324,7 +324,11 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 	})
 
 	// joshuafolkken/kit#3945: the share is bounded by the cores free of load outside the ledger.
-	it('hands the free cores to the share', async () => {
+	// joshuafolkken/kit#6682: and the live lanes, read rather than assumed.
+	it('hands the free cores and the live lanes to the share', async () => {
+		const lanes = 3
+
+		vi.spyOn(unit_worker_share, 'live_lane_count').mockReturnValue(lanes)
 		stub_free(FREE_CORES)
 		mocked_execa.mockResolvedValue(fake_result(0))
 
@@ -334,6 +338,7 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 			expect.any(Number),
 			expect.any(Number),
 			{ cores: FREE_CORES, memory_workers: undefined },
+			lanes,
 		)
 	})
 

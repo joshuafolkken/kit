@@ -1,7 +1,6 @@
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { run_event_filed, type Filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -114,17 +113,14 @@ async function is_open(filed: Filed, prefix: string): Promise<boolean> {
 	return read.kind !== 'state' || read.state.state !== CLOSED_STATE
 }
 
-// Through the shared pool at `issue:state`'s bound rather than a raw `Promise.all`, so a finder's
-// filings never draw the secondary rate limiting that reads back as `unreadable`.
+// Every read requested at once: the `gh` layer's shared spawn limit (`GH_SPAWN_CONCURRENCY`,
+// `git-gh-exec.ts`) keeps a finder's filings from drawing the secondary rate limiting that reads
+// back as `unreadable`.
 async function open_filings(
 	priors: ReadonlyArray<Filed>,
 	prefix: string,
 ): Promise<ReadonlyArray<Filed>> {
-	const verdicts = await bounded_pool.bounded_map(
-		priors,
-		issue_state_cli.READ_CONCURRENCY,
-		async (filed) => await is_open(filed, prefix),
-	)
+	const verdicts = await Promise.all(priors.map(async (filed) => await is_open(filed, prefix)))
 
 	return priors.filter((_filed, index) => verdicts[index])
 }

@@ -1,9 +1,11 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_paths, type LaneEnvironment } from '#scripts/lane/lane-paths'
 import { json_value } from '#scripts/lib/json-value'
 
 // The run markers that count the unit runs in flight, and the division of the machine by that count —
@@ -134,6 +136,32 @@ function resolve_unit_workers(available_cores: number, runs: number): number | u
 	return Math.max(MIN_WORKERS, Math.floor(available_cores / runs))
 }
 
+// The lanes open on this machine: the issue-number directories under the lanes root `checkout`
+// belongs to (joshuafolkken/kit#6682). **An upper bound**: a paused, human-review, ended-but-uncollected
+// or stray lane directory is counted too, since the directory alone cannot tell an idle lane from one
+// about to start a suite. **Unreadable counts none**, which leaves
+// the division to the run count as it was — a lanes root that does not exist, as on CI, among them.
+function live_lane_count(
+	checkout: string = process.cwd(),
+	environment: LaneEnvironment = process.env,
+): number {
+	try {
+		return readdirSync(lane_paths.lanes_root_of(checkout, environment)).filter((name) =>
+			issue_number_shape.ISSUE_NUMBER_PATTERN.test(name),
+		).length
+	} catch {
+		return 0
+	}
+}
+
+// **Each live lane is held a share before its suite starts** (joshuafolkken/kit#6682). The run count
+// sees a lane only once its suite is in flight, so the first of several lanes took the whole machine
+// and the next ones divided what it left; dividing by the lanes as well keeps every lane's workers —
+// and their memory — to its share from the start. The wider of the two counts divides.
+function sharing_runs(runs: number, lanes: number): number {
+	return Math.max(runs, lanes)
+}
+
 // **The write failing is not a reason to fail the run.** A marker that could not be written costs the
 // next run a wider share than it should have — the behavior that was there before — while a thrown
 // error here would fail a unit suite over bookkeeping.
@@ -152,11 +180,13 @@ const unit_run_marker = {
 	RUN_PREFIX,
 	SOLO_RUNS,
 	is_nested_run,
+	live_lane_count,
 	live_run_count,
 	mark_run_started,
 	marker_path,
 	read_marker,
 	resolve_unit_workers,
+	sharing_runs,
 }
 
 export { unit_run_marker }

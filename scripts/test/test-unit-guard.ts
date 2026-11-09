@@ -197,6 +197,7 @@ async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<nu
 		available_cores,
 		unit_worker_share.live_run_count(),
 		free,
+		unit_worker_share.live_lane_count(),
 	)
 
 	return unit_worker_share.cap_to_claim(share, core_budget.held_unit_claim())
