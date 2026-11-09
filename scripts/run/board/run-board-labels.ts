@@ -33,8 +33,8 @@ const DEFAULT_FOREGROUND = `${ESC}[39m`
 
 // The words the board draws, English whatever the session language: one set of words reads the same
 // on every board. The board draws most of what it says as a symbol; the words left are the ones a
-// symbol cannot carry, and the legend that names the symbols. **How the board spells a word, decided
-// here alone:**
+// symbol cannot carry, and the legend that names the symbols. **How the board spells a word — here
+// or in a render module's own constant — decided here alone:**
 // - a proper noun or an acronym in its own spelling — `Claude`, `Codex`, `GitHub`, `REST`, `GraphQL`,
 //   `PR`, `CPU`, `CodeRabbit`;
 // - a column heading in capitals — `ACTIVE`, `DONE`, `PEAK`, `NOW`, `CPU`, `MEM`, `CMPRS` — so the
