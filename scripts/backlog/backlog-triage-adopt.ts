@@ -1,9 +1,8 @@
 import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { epic_decide } from '#scripts/epic/epic-decide'
-import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
+import type { IssueComment } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -12,6 +11,7 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_park } from '#scripts/run/park/run-park'
 import { run_park_body, type ApprovalRange } from '#scripts/run/park/run-park-body'
 import { backlog_triage_approval } from './backlog-triage-approval'
+import { backlog_triage_park } from './backlog-triage-park'
 
 // `josh backlog:triage --apply <N> --adopt <k> --reason <text>` — a parent takes option `<k>` of a
 // parked child's park in one call (joshuafolkken/kit#6670): the decision recorded in the tracking
@@ -84,26 +84,15 @@ function refused(issue: string, problem: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-// The latest trusted comment that meets the park body schema — what the child parked with.
-function park_body(comments: ReadonlyArray<IssueComment>): string | undefined {
-	return issue_read
-		.trusted_bodies(comments)
-		.findLast((body) => run_park_body.problem_of(body) === undefined)
-}
-
 async function park_of(request: AdoptRequest): Promise<ParkFound | { problem: string }> {
-	const json = await git_gh_issue_read.issue_list_comments(request.issue)
-	const comments = await issue_read.parse_comments(json)
+	const park = await backlog_triage_park.read(request.issue)
 
-	if (comments === undefined) return { problem: 'could not read its comments' }
-	const body = park_body(comments)
-
-	if (body === undefined) return { problem: 'no trusted comment follows the park body schema' }
-	const problem = run_park_body.adopt_problem(body, request.option)
+	if ('problem' in park) return park
+	const problem = run_park_body.adopt_problem(park.body, request.option)
 
 	if (problem !== undefined) return { problem }
 
-	return { comments, range: run_park_body.approval_range(body, request.option) }
+	return { comments: park.comments, range: run_park_body.approval_range(park.body, request.option) }
 }
 
 function epics_problem(count: number): string {

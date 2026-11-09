@@ -99,7 +99,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--pass [--exclude <N>]'],
 					description:
-						'settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Failed or incomplete reads exit 1.',
+						"settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Each park's recommendation and tier go to stderr, with its `--adopt` command unless no pick or a tier C pick. Failed or incomplete reads exit 1.",
 				},
 				{
 					names: ['--decide --defect <answer> --verification <answer> --every-run <answer>'],

@@ -72,6 +72,20 @@ describe('run_park_body.summary_of', () => {
 	})
 })
 
+// joshuafolkken/kit#6777: the pick `backlog:triage --pass` prints an `--adopt` line for.
+describe('run_park_body.adoptable_pick', () => {
+	it('answers a tier A recommendation', () => {
+		expect(run_park_body.adoptable_pick(body_with(PICK_ONE))).toBe(1)
+	})
+
+	it.each([
+		['a tier C recommendation', PICK_TWO],
+		['a park saying none', NO_PICK],
+	])('answers no pick for %s', (_case, pick) => {
+		expect(run_park_body.adoptable_pick(body_with(pick))).toBeUndefined()
+	})
+})
+
 function single_option(tier: string, permission: string): string {
 	return body_with(
 		PICK_ONE,
