@@ -1,5 +1,4 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { epic_audit_logic } from './epic-audit'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_issue, type EpicIssue } from './epic-issue'
@@ -144,11 +143,6 @@ function collect_referenced(
 	}
 }
 
-// One `gh api` read per reference, a few at a time. Bounded for the same reason the relation reads
-// are: spawning every request at once is what turns a rate limit into a wrong answer, because a
-// refused read arrives as an absence rather than as an error.
-const LOOKUP_CONCURRENCY = 8
-
 // A read that came back shaped wrong counts as unreadable, not as missing: the number resolved to
 // something, so the gap is in what arrived rather than in whether there was anything to arrive.
 async function read_one(number: number): Promise<ReferencedRead> {
@@ -159,15 +153,11 @@ async function read_one(number: number): Promise<ReferencedRead> {
 	return { number, result: epic_issue.parse_epic_issue(read.json) ?? 'unreadable' }
 }
 
-// The pool is shared with the eval suite rather than spelled out again here: this was written as
-// waves — slice, `Promise.all`, next slice — which holds every finished read's slot until the whole
-// slice returns.
+// One `gh api` read per reference, all requested at once: the `gh` layer's shared spawn limit
+// (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`) bounds how many run, so the burst never turns a rate
+// limit into a refused read that arrives as an absence.
 async function fetch_referenced(numbers: ReadonlyArray<number>): Promise<Array<ReferencedRead>> {
-	return await bounded_pool.bounded_map(
-		numbers,
-		LOOKUP_CONCURRENCY,
-		async (number) => await read_one(number),
-	)
+	return await Promise.all(numbers.map(async (number) => await read_one(number)))
 }
 
 // What the subject's body names, read and filtered. `undefined` when there was nothing new to read,
