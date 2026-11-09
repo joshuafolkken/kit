@@ -92,10 +92,15 @@ describe.each(WORKFLOWS)('safe-chain download in %s', (relative_path) => {
 	it('fetches the release through the authenticated API, never anonymous releases/download', () => {
 		const runs = all_steps(relative_path).map((step) => ci_yml_fixture.step_run(step))
 
-		expect(runs.filter((run) => /releases\/download|curl /u.test(run))).toEqual([])
+		expect(runs.filter((run) => run.includes('releases/download'))).toEqual([])
 		expect(fetch_step(relative_path)?.run).toContain(
-			'gh release download "$SAFE_CHAIN_INSTALLER_VERSION" --repo AikidoSec/safe-chain',
+			`curl --proto '=https' -fsSL "https://api.github.com/repos/AikidoSec/safe-chain/releases/tags/$SAFE_CHAIN_INSTALLER_VERSION"`,
 		)
+	})
+
+	// The Playwright container some jobs set pnpm up in carries no `gh`.
+	it('fetches without the gh CLI', () => {
+		expect(fetch_step(relative_path)?.run).not.toMatch(/(?:^|\s)gh\s/mu)
 	})
 
 	it('hands the job token to the fetch step alone, never to a step that runs safe-chain', () => {

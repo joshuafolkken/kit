@@ -95,9 +95,11 @@ runs:
         path: ~/.safe-chain-download
         key: safe-chain-${{ runner.os }}-${{ runner.arch }}-${{ steps.safe-chain-pin.outputs.version }}-${{ steps.safe-chain-pin.outputs.sha256 }}
 
-    # Through the API's asset path with the job token: anonymous `releases/download` returned 504
-    # throughout a GitHub outage that authenticated requests passed (joshuafolkken/kit#6849). The
-    # token stays in this step, which runs nothing but `gh`; no third-party code sees it.
+    # Through the REST API's asset path with the job token: anonymous `releases/download` returned
+    # 504 throughout a GitHub outage that authenticated requests passed (joshuafolkken/kit#6849).
+    # curl and node rather than `gh`, which the Playwright container some jobs run in does not carry.
+    # The token stays in this step, which runs no third-party code, and in a curl config it removes;
+    # curl sends it to api.github.com alone, not across the redirect to the asset's signed URL.
     - name: Fetch safe-chain
       if: inputs.install == 'true' && steps.safe-chain-cache.outputs.cache-hit != 'true'
       shell: bash
@@ -106,12 +108,17 @@ runs:
         SAFE_CHAIN_INSTALLER_VERSION: ${{ steps.safe-chain-pin.outputs.version }}
         SAFE_CHAIN_BINARY: ${{ steps.safe-chain-pin.outputs.binary }}
       run: |
-        for attempt in 1 2 3; do
-          gh release download "$SAFE_CHAIN_INSTALLER_VERSION" --repo AikidoSec/safe-chain --pattern install-safe-chain.sh --pattern "$SAFE_CHAIN_BINARY" --dir "$HOME/.safe-chain-download" --clobber && exit 0
-          echo "::warning::safe-chain download attempt $attempt failed"
-          sleep 2
+        export CURL_HOME
+        CURL_HOME=$(mktemp -d "$RUNNER_TEMP/safe-chain-curl.XXXXXX")
+        trap 'rm -r "$CURL_HOME"' EXIT
+        printf '%s\n' 'retry = 3' 'retry-delay = 2' 'retry-max-time = 60' "header = \"Authorization: Bearer $GH_TOKEN\"" > "$CURL_HOME/.curlrc"
+        downloads="$HOME/.safe-chain-download"
+        mkdir -p "$downloads"
+        release=$(curl --proto '=https' -fsSL "https://api.github.com/repos/AikidoSec/safe-chain/releases/tags/$SAFE_CHAIN_INSTALLER_VERSION")
+        for asset in install-safe-chain.sh "$SAFE_CHAIN_BINARY"; do
+          url=$(printf '%s' "$release" | node -e 'const { assets } = JSON.parse(require("node:fs").readFileSync(0, "utf8")); const asset = assets.find((candidate) => candidate.name === process.argv[1]); if (asset === undefined) process.exit(1); console.log(asset.url)' "$asset")
+          curl --proto '=https' -fsSL -H 'Accept: application/octet-stream' "$url" -o "$downloads/$asset"
         done
-        exit 1
 
     # The installer is checked against the pin, then the binary against the digest the release
     # pipeline baked into that verified installer, so neither is used unverified. The installer is
