@@ -71,7 +71,7 @@ When tests leave persistent state behind:
 
 1. Add or extend a guard and confirm it fails (e.g. `dash_leak_guard.scrub_then_assert_clean` in `src/routes/dash/dash-leak-check.e2e.ts` scrubs `E2E_`-prefixed tasks, then asserts none remain).
 2. Fix production code or teardown — prefer `data-testid` over locale-specific `aria-label`; do not swallow cleanup errors unless intended.
-3. Confirm green with full `pnpm test:e2e` (or a targeted Playwright run).
+3. Confirm green with full `pnpm josh test:e2e` (or a targeted Playwright run).
 4. Document any new invariant here or in the E2E helper module.
 
 ### Error Messages

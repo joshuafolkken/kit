@@ -867,7 +867,7 @@ jobs:
         run: pnpm build
 
       - name: Run E2E tests
-        run: pnpm test:e2e
+        run: pnpm exec playwright test
 
       # continue-on-error because the step exists to collect evidence, and collecting evidence must
       # not be what decides the release: it runs on always(), so a transient artifact-service error
