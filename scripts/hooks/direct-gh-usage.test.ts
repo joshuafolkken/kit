@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { gh_usage_log } from '#scripts/gh/gh-usage-log'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { direct_gh_usage } from './direct-gh-usage'
 import { hook_ledger } from './hook-ledger'
 
@@ -28,7 +28,7 @@ vi.mock('#scripts/issue/issue-watch-hook', () => ({
 
 const { pretool_guard } = await import('./pretool-guard')
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'direct-gh-usage-'))
+const WORK_DIRECTORY = temporary_directory('suite')('direct-gh-usage-')
 const TRANSCRIPT = path.join(WORK_DIRECTORY, 'session.jsonl')
 const LANE_ISSUE = 6781
 const PR_CHECKS = 'gh pr checks 1'
@@ -46,10 +46,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 function bash_payload(command: string): string {
