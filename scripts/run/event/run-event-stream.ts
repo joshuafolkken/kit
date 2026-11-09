@@ -221,7 +221,8 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
-// it rolls off only with the positions. A ship-stage `start` is disposable but goes last of them:
+// it rolls off only with the positions; so does a `lane-phase` line, the driver's `collect` / `launch`
+// steps included. A ship-stage `start` is disposable but goes last of them:
 // `run:board` draws from that line. Only the newest `setup` line is the stage the run stands at,
 // so every one but the newest goes; likewise only each child's newest `pr-checks` is drawn.
 const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
