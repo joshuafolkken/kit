@@ -343,9 +343,9 @@ function is_offering(before: DriveState, after: DriveState, should_offer: boolea
 	return !after.is_stopping && (should_offer || is_collected || after.is_triage_owed === true)
 }
 
-// No free lane, or a park that left nothing in flight, hands any owed triage back unasked.
+// No free lane hands any owed triage back unasked.
 async function offered(state: DriveState, ports: DrivePorts): Promise<PassResult> {
-	if (park_triage.is_drain_park(state) || (await ports.free_lanes()) === 0) {
+	if ((await ports.free_lanes()) === 0) {
 		return park_triage.hand_back(state) ?? { kind: 'continue', state }
 	}
 

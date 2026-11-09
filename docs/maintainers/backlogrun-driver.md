@@ -170,8 +170,9 @@ through `run_then_judge`, the path of a `run` that held an untriaged candidate b
 `triage`.
 
 Any other answer, a failed offer, or no free lane ends it with `triage` at once, before the judge,
-the drain or the retrospective reads that answer. A park that left nothing in flight is not offered
-past: that offer would read as the drain and owe the run's retrospective before the triage.
+the drain or the retrospective reads that answer. That offer counts the parked child as still running
+(`--running`), so a pool with nothing runnable reads as `blocked`, never as the drain that would owe
+the run's retrospective before the triage.
 
 The parked child is not relaunched in that pass: `run:merge` writes its park label before it returns,
 so `backlog:next` no longer offers it. The judgment session runs after the driver ends, never beside

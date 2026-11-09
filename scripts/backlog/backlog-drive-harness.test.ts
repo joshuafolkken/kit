@@ -133,14 +133,13 @@ it('dispatches and merges every child, then reports and ends', async () => {
 	])
 })
 
-// joshuafolkken/kit#6871: a park that left nothing in flight is not offered past — that offer would read
-// as the drain before the parent's triage.
-it('hands a parked child back for parent triage before starting the next child', async () => {
+// joshuafolkken/kit#6871: the free lane is filled before the parent's triage, not left empty through it.
+it('starts the next child before handing a parked child back for parent triage', async () => {
 	const fixture = world([FIRST, SECOND], [FIRST])
 	const end = await backlog_drive.run_loop(initial(), NO_WINDOW, ports(fixture))
 
 	expect(end.reason).toBe('triage')
-	expect(fixture.calls).not.toContain(`launch ${SECOND}`)
+	expect(fixture.calls).toStrictEqual([`launch ${FIRST}`, `merge ${FIRST}`, `launch ${SECOND}`])
 	expect(fixture.merged).toBe(0)
 })
 

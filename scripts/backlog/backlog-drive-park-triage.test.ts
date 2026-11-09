@@ -40,11 +40,3 @@ describe('backlog_drive_park_triage.triaged', () => {
 		expect(backlog_drive_park_triage.triaged(ended, true)).toBe(ended)
 	})
 })
-
-describe('backlog_drive_park_triage.is_drain_park', () => {
-	it('is a drain park only when the park left nothing in flight', () => {
-		expect(backlog_drive_park_triage.is_drain_park(owed([]))).toBe(true)
-		expect(backlog_drive_park_triage.is_drain_park(owed([FIRST_CHILD]))).toBe(false)
-		expect(backlog_drive_park_triage.is_drain_park(state([]))).toBe(false)
-	})
-})

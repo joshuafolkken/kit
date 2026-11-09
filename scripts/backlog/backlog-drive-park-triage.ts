@@ -27,12 +27,6 @@ function hand_back(state: DriveState): PassResult | undefined {
 	return is_owed(state) ? triaged({ kind: 'continue', state }, true) : undefined
 }
 
-// A park that left nothing in flight is not offered past: an offer with nothing in flight reads as the
-// drain and would owe the run's retrospective before the triage.
-function is_drain_park(state: DriveState): boolean {
-	return is_owed(state) && state.in_flight.length === 0
-}
-
-const backlog_drive_park_triage = { is_owed, triaged, hand_back, is_drain_park }
+const backlog_drive_park_triage = { is_owed, triaged, hand_back }
 
 export { backlog_drive_park_triage }
