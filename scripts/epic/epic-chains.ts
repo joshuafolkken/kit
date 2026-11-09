@@ -36,8 +36,12 @@ function render_chains(chains: Chains): Array<string> {
 		.map((chain) => chain.map((number) => to_issue_reference(number)).join(DEPENDENCY_ARROW))
 }
 
+// Each relation once: a fan-out spliced in front of its hub names `#N -> #M` on every line through it,
+// and that is one relation, not one per line.
 function links_of(chains: Chains): Array<DependencyLink> {
-	return chains.flatMap((chain) => chain_links(chain))
+	const links = chains.flatMap((chain) => chain_links(chain))
+
+	return [...new Map(links.map((link) => [format_dependency_link(link), link])).values()]
 }
 
 // The relations to record and the relations to drop, as the difference between two declarations.
@@ -58,8 +62,9 @@ function diff_links(before: Chains, after: Chains): LinkDiff {
 	}
 }
 
-// The indices of the chains naming `target`. More than one is ambiguous rather than wrong: the
-// declaration is readable, but "immediately before #M" does not identify a single place.
+// The indices of the chains naming `target`. More than one can be ambiguous rather than wrong: the
+// declaration is readable, but "immediately before #M" identifies a single place only when every
+// chain gives `#M` the same predecessor (`is_single_place`).
 function chains_containing(chains: Chains, target: number): Array<number> {
 	return chains
 		.map((chain, index) => (chain.includes(target) ? index : -1))
@@ -76,14 +81,6 @@ function find_repeated_reference(chains: Chains): number | undefined {
 	}
 
 	return undefined
-}
-
-function replace_chain(
-	chains: Chains,
-	index: number,
-	updated: ReadonlyArray<number>,
-): Array<Array<number>> {
-	return chains.map((chain, position) => (position === index ? [...updated] : [...chain]))
 }
 
 // The chain a position declares, on its own: `#P -> #N` for `before`, `#N -> #P` for `after`.
@@ -166,6 +163,36 @@ function is_branching_after(
 	return indices.every((index) => has_successor(chains[index] ?? [], position.target))
 }
 
+// `--before <M>` where several chains name `#M`, every one of them with the same predecessor — none, at
+// a fan-out point like `#A -> #B` beside `#A -> #C`. "Immediately before `#M`" is then one place
+// whichever chain a reader picks, so the additions go in front of `#M` on every line. A target the
+// chains reach from different predecessors (after a merge) still has no single place.
+function is_shared_before(
+	chains: Chains,
+	indices: ReadonlyArray<number>,
+	position: InsertPosition,
+): boolean {
+	if (position.kind !== 'before') return false
+
+	const predecessors = indices.map((index) => {
+		const chain = chains[index] ?? []
+
+		return chain[chain.indexOf(position.target) - 1]
+	})
+
+	return predecessors.every((predecessor) => predecessor === predecessors[0])
+}
+
+// Whether a splice at the position lands in one place: one chain names the target, or every chain
+// naming it gives a `before` the same spot.
+function is_single_place(
+	chains: Chains,
+	indices: ReadonlyArray<number>,
+	position: InsertPosition,
+): boolean {
+	return indices.length < AMBIGUOUS_MATCH_COUNT || is_shared_before(chains, indices, position)
+}
+
 function to_ambiguous_position_error(position: InsertPosition): string {
 	return `${to_issue_reference(position.target)} appears in more than one declared chain, so "${position.kind}" does not identify one place; edit the declaration by hand.`
 }
@@ -192,7 +219,7 @@ function find_position_ambiguity(
 ): string | undefined {
 	if (
 		position?.kind !== 'before' ||
-		chains_containing(chains, position.target).length < AMBIGUOUS_MATCH_COUNT
+		is_single_place(chains, chains_containing(chains, position.target), position)
 	) {
 		return undefined
 	}
@@ -200,20 +227,30 @@ function find_position_ambiguity(
 	return to_ambiguous_position_error(position)
 }
 
+function splice_chain(
+	chain: Chain,
+	additions: ReadonlyArray<number>,
+	position: InsertPosition,
+): Array<number> {
+	const at = chain.indexOf(position.target) + (position.kind === 'after' ? 1 : 0)
+
+	return [...chain.slice(0, at), ...additions, ...chain.slice(at)]
+}
+
 // Where a position that is not a branch lands: `--before` always, and `--after` at a chain's tail.
 // Inserting between two references re-points the pair, which is what keeps `--before` from leaving
-// the chain broken.
-function splice_into_chain(
+// the chain broken. Every chain the indices name gets the same splice — more than one only for a
+// shared `--before`.
+function splice_into_chains(
 	chains: Chains,
-	index: number,
+	indices: ReadonlyArray<number>,
 	additions: ReadonlyArray<number>,
 	position: InsertPosition,
 ): InsertOutcome {
-	const chain = chains[index] ?? []
-	const at = chain.indexOf(position.target) + (position.kind === 'after' ? 1 : 0)
-
 	return {
-		chains: replace_chain(chains, index, [...chain.slice(0, at), ...additions, ...chain.slice(at)]),
+		chains: chains.map((chain, index) =>
+			indices.includes(index) ? splice_chain(chain, additions, position) : [...chain],
+		),
 	}
 }
 
@@ -224,16 +261,15 @@ function insert_at_position(
 	tracked: ReadonlyArray<number>,
 ): InsertOutcome {
 	const indices = chains_containing(chains, position.target)
-	const [index] = indices
 
-	if (index === undefined) return insert_outside_chains(chains, additions, position, tracked)
+	if (indices.length === 0) return insert_outside_chains(chains, additions, position, tracked)
 	if (is_branching_after(chains, indices, position)) return add_chain(chains, additions, position)
 
-	if (indices.length >= AMBIGUOUS_MATCH_COUNT) {
+	if (!is_single_place(chains, indices, position)) {
 		return { error: to_ambiguous_position_error(position) }
 	}
 
-	return splice_into_chain(chains, index, additions, position)
+	return splice_into_chains(chains, indices, additions, position)
 }
 
 // No position given: nothing was declared about the additions, so the declaration is copied through

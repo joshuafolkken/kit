@@ -19,7 +19,12 @@ vi.mock('#scripts/git/change-base', () => ({
 }))
 vi.mock('#scripts/split/split-relocations', () => ({
 	split_relocations: {
-		without_relocations: vi.fn(async (_root: string, _base: string, numstat: string) => numstat),
+		without_relocations: vi.fn(
+			async (_root: string, _base: string, numstat: string, added: Array<string>) => ({
+				numstat,
+				added,
+			}),
+		),
 	},
 }))
 

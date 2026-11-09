@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/cut/run-cut'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { pre_gate_cut, type LaneCutState } from './pre-gate-cut'
@@ -31,7 +31,8 @@ const END_THE_CUT = 'pnpm josh run:cut --end'
 const CLAIM_THE_HOLD = `pnpm josh run:hold ${ISSUE}`
 const NOW_MS = 1_700_000_000_000
 const SAYS_NOTHING = 'says nothing about %j'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'pre-gate-cut-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('pre-gate-cut-')
 // The directory vitest was launched from, restored before WORK_DIRECTORY is removed. The suite pins its
 // working directory to the non-lane WORK_DIRECTORY per test to stay hermetic wherever it was launched: the delivery
 // and measurement paths read the live process.cwd() to decide whether a checkout is a lane, so a run
@@ -131,8 +132,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(RULE_ID, transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('cwd isolation', () => {
@@ -314,11 +313,11 @@ describe('is_uncut_gate', () => {
 		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(false)
 	})
 
-	// An unmeasurable session keeps the old unconditional cut as the safety net.
-	it('fires on an uncut lane gate when the recent context cannot be measured', () => {
+	// joshuafolkken/kit#6576: unmeasurable is undetermined, not over — a relaunch could not measure it either.
+	it('says nothing about an uncut lane gate when the recent context cannot be measured', () => {
 		const state = state_of(LANE_DIRECTORY, undefined, CONTEXT_UNMEASURABLE)
 
-		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(true)
+		expect(pre_gate_cut.is_uncut_gate(GATE, state)).toBe(false)
 	})
 })
 
@@ -363,8 +362,8 @@ describe('delivered_rules.delivery — inside a lane checkout', () => {
 		process.env[lane_child_marker.KEY] = ISSUE
 		// `current_state` prices the live session, which read the machine's whole transcript corpus —
 		// timing out against a large home and passing in CI, where there is none (joshuafolkken/kit#2772).
-		// Held at the CI answer, which keeps the unconditional cut.
-		vi.spyOn(cost_cli, 'session_verdict').mockReturnValue(CONTEXT_UNMEASURABLE)
+		// Held at `over`, the one verdict that takes the cut.
+		vi.spyOn(cost_cli, 'session_verdict').mockReturnValue(CONTEXT_OVER)
 	})
 
 	afterAll(() => {
@@ -459,8 +458,6 @@ describe('PRE_GATE_CUT_REASON', () => {
 		// Two of the verdicts that leave this process holding the run.
 		['not-a-lane'],
 		['busy'],
-		// joshuafolkken/kit#4695: the one refusal the reissued gate, past this once-per-run row, must not skip.
-		['split-unresolved'],
 		// The pointer, and the reissue sentence every delivery needs.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		['once per run'],

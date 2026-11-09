@@ -7,5 +7,9 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 // (joshuafolkken/kit#5987).
 const WINDOW_MINUTES = 5
 const WINDOW_MS = WINDOW_MINUTES * MS_PER_MINUTE
+// **The supervisor's pause between passes is its own, not the driver's offer interval**
+// (joshuafolkken/kit#6718): a pass reads local records, and the backlog only through the driver, so
+// stretching the offer interval for the REST budget must not slow how soon a judgment hand-off is seen.
+const PASS_INTERVAL_MS = MS_PER_MINUTE
 
-export const run_wake_window = { WINDOW_MINUTES, WINDOW_MS }
+export const run_wake_window = { WINDOW_MINUTES, WINDOW_MS, PASS_INTERVAL_MS }

@@ -28,7 +28,7 @@ When a child hits something only a person can decide (→ "Only a person's judge
 `needs-decision`"), **park the child and keep going**:
 
 ```bash
-pnpm josh run:park <N> --body-file .josh/tmp/park.md   # what needs deciding, and the options; applies needs-decision, then releases
+pnpm josh run:park <N> --body-file .josh/tmp/park.md   # body schema: docs/josh-commands-run.md → "josh run:park"; applies needs-decision, then releases
 ```
 
 Return to step 1.
@@ -47,6 +47,10 @@ pnpm josh run:park <N> --clear   # succeeds when the label is already off
 **The released child goes back to a lane, never into the parent's own context** — `pnpm josh
 lane:launch <N>`.
 
+An interrupt filed for a parked child turns the park into a wait — `issue:file --route interrupt
+--found-during <N>` (`scripts/issue/issue-file-interrupt.ts`); its merge relaunches #N
+(`backlog_drive_retry.after_merge`).
+
 ## Only a person's judgement carries `needs-decision`
 
 **`needs-decision` means "a person has to choose", and nothing else.** It carries only:
@@ -58,8 +62,8 @@ lane:launch <N>`.
 
 It never carries:
 
-- a recommended, reversible choice — Tier A: adopt it, record it in the epic's Decisions and child
-  comment with `pnpm josh epic --decide <E> <N...> --decision-file .josh/tmp/decision.md`, and continue
+- a recommended, reversible choice — Tier A: adopt it with
+  `pnpm josh backlog:triage --apply <N> --adopt <k> --reason <text>`, and continue
   (`prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy", the single source);
 - whether to run something already planned and opted in with `auto-ok` — the opt-in is that decision;
 - a wait for the next published release — a dependency, `pnpm josh issue:release <N> --wait`

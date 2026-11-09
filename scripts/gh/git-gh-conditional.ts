@@ -1,3 +1,4 @@
+import { gh_request_tally } from './gh-request-tally'
 import { git_gh_exec, has_stdout_field } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
 import { gh_retry } from './git-gh-retry'
@@ -51,9 +52,16 @@ function failure_status(error: unknown): number | undefined {
 	return has_stdout_field(cause) ? git_gh_exec.parse_status_line(cause.stdout) : undefined
 }
 
+// A 304 is a call the exec layer already counted, and one that cost no REST core quota.
+function not_modified(): ConditionalRead {
+	gh_request_tally.count_not_modified()
+
+	return UNCHANGED
+}
+
 function rethrow_failure(error: unknown): ConditionalRead {
 	const status = failure_status(error)
-	if (status === NOT_MODIFIED_STATUS) return UNCHANGED
+	if (status === NOT_MODIFIED_STATUS) return not_modified()
 	if (status !== undefined && error instanceof Error) gh_failure.attach(error, { status })
 	throw error
 }
@@ -70,15 +78,17 @@ async function request_conditional(
 	}
 }
 
+// A caller's `timeout_ms` bounds the whole read, so its timeout is final rather than retried: three
+// attempts and their waits would outlast the per-tool-call hook that bounds it (joshuafolkken/kit#6754).
 async function read_conditional(
 	path: string,
 	etag: string | undefined,
 	timeout_ms?: number,
 ): Promise<ConditionalRead> {
+	const retry = timeout_ms === undefined ? gh_retry.with_read_retry : gh_retry.with_retry
+
 	try {
-		return await gh_retry.with_read_retry(
-			async () => await request_conditional(path, etag, timeout_ms),
-		)
+		return await retry(async () => await request_conditional(path, etag, timeout_ms))
 	} catch (error) {
 		return { kind: 'unreadable', cause: error }
 	}

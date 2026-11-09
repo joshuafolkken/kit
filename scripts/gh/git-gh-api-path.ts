@@ -8,8 +8,10 @@
 
 // One full page of a listing. REST answers 30 rows by default, and every listing this tooling reads
 // is paged through with `--paginate`, so asking for the largest page turns a long listing into fewer
-// round trips. Named once because three readers append it.
-const FULL_PAGE_QUERY = '?per_page=100'
+// round trips. Named once because three readers append it; the size alone is what an ETag read of the
+// first page compares a page against (joshuafolkken/kit#6700).
+const FULL_PAGE_SIZE = 100
+const FULL_PAGE_QUERY = `?per_page=${String(FULL_PAGE_SIZE)}`
 
 // `gh api` expands `{owner}` and `{repo}` from the current repository, so the unqualified form needs
 // no extra lookup to name a path. An explicit `repo` names another repository — the form a
@@ -134,6 +136,7 @@ function release_by_tag_api_path(tag: string, repo?: string): string {
 }
 
 const git_gh_api_path = {
+	FULL_PAGE_SIZE,
 	FULL_PAGE_QUERY,
 	repo_api_path,
 	tag_ref_api_path: tag_reference_api_path,

@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { broad_investigation_shell } from './broad-investigation-shell'
 
@@ -10,7 +10,8 @@ import { broad_investigation_shell } from './broad-investigation-shell'
 
 const { READ_LINE_CAP, is_broad_command } = broad_investigation_shell
 const SHORT_LINES = 10
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'broad-investigation-shell-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('broad-investigation-shell-')
 
 function lines(count: number): string {
 	return Array.from({ length: count }, (_line, index) => `line ${String(index)}`).join('\n')
@@ -27,7 +28,6 @@ beforeAll(() => {
 
 afterAll(() => {
 	vi.unstubAllEnvs()
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('broad_investigation_shell.is_broad_command — the broad', () => {

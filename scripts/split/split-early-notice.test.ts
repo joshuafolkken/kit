@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#4642: the first scoped check past the split guide shows the notice `josh
 // main:merge` shows, once per Issue, and stays silent under the guide.
@@ -25,7 +25,12 @@ vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
 
 vi.mock('./split-relocations', () => ({
 	split_relocations: {
-		without_relocations: vi.fn(async (_root: string, _base: string, numstat: string) => numstat),
+		without_relocations: vi.fn(
+			async (_root: string, _base: string, numstat: string, added: Array<string>) => ({
+				numstat,
+				added,
+			}),
+		),
 	},
 }))
 
@@ -58,7 +63,8 @@ const OVER_GUIDE_NUMSTAT = numstat_of(split_assess.FILE_GUIDE + 1)
 // Exactly at the file guide: the notice's bar is strictly greater than, as `main:merge`'s is.
 const AT_GUIDE_NUMSTAT = numstat_of(split_assess.FILE_GUIDE)
 
-const GIT_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'split-early-notice-'))
+const make_directory = temporary_directory('suite')
+const GIT_DIRECTORY = make_directory('split-early-notice-')
 
 function marker(): string {
 	return path.join(GIT_DIRECTORY, `${split_early_notice.MARKER_PREFIX}${String(ISSUE_NUMBER)}`)
@@ -86,10 +92,6 @@ afterEach(async () => {
 			force: true,
 		},
 	)
-})
-
-afterAll(async () => {
-	await rm(GIT_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('split_early_notice.surface over the guide', () => {

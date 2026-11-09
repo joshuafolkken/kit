@@ -36,7 +36,7 @@ const QUIET = {
 
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
 
-vi.spyOn(lane_plan_signals, 'signals_of').mockResolvedValue(QUIET)
+const signals_of = vi.spyOn(lane_plan_signals, 'signals_of').mockResolvedValue(QUIET)
 
 function running(number: number, body = ''): OpenIssueData {
 	const labels = [{ name: 'in-progress' }, { name: 'auto-ok' }]
@@ -102,5 +102,16 @@ describe('lane_plan_probe.extend', () => {
 
 		expect(lane_plan_probe.is_oversize(found)).toBe(true)
 		expect(lane_plan.read(LANE, directory)?.paths).toEqual([PLANNED])
+	})
+})
+
+describe('lane_plan_probe.extend size signals', () => {
+	it('reads the size signals off the widened paths, so a planned hub splits (joshuafolkken/kit#6543)', async () => {
+		fetch_opted_in.mockResolvedValue(listing(DECLARED))
+		const paths = [PLANNED, FREE_FILE]
+
+		await lane_plan_probe.extend({ ...LANE_PLAN, paths }, directory)
+
+		expect(signals_of).toHaveBeenCalledWith(LANE, paths)
 	})
 })

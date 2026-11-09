@@ -37,8 +37,9 @@ function with_template(problem: string): string {
 }
 
 // Every problem a body has: the four base template headings it lacks, then the behavior-change and
-// expected-effect problems (each empty for an Issue that does not declare itself one).
-function problems(body: string): ReadonlyArray<string> {
+// expected-effect problems (each empty for an Issue that does not declare itself one). `labels` are
+// the ones `issue:file` files it with; left out, the body's own.
+function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<string> {
 	const missing = issue_lint
 		.missing_headings(body)
 		.map((heading) => `${MISSING_HEADING_PREFIX}${heading}`)
@@ -48,7 +49,7 @@ function problems(body: string): ReadonlyArray<string> {
 		...behavior_change_lint.problems(body),
 		...enforcement_lint.problems(body),
 		...expected_effect_lint.problems(body),
-		...issue_classification.problems(body),
+		...issue_classification.problems(body, labels),
 		...issue_not_before.problems(body),
 		...measure_declaration.problems(body),
 		...size_estimate.problems(body),

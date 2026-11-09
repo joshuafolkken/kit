@@ -10,10 +10,6 @@ function print_next(verdict: string, issue: string): void {
 		['failed', gate],
 		['unknown', gate],
 		[
-			'split-unresolved',
-			'Follow split-assessment.md → "Over the guide before the gate", then reissue the cut.',
-		],
-		[
 			'budget-over',
 			`pnpm josh issue:spill ${issue} --estimate "<files> ファイル / <lines> 行", then ${gate}`,
 		],

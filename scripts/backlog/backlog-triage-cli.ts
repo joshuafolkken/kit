@@ -10,6 +10,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_park } from '#scripts/run/park/run-park'
+import { backlog_triage_adopt } from './backlog-triage-adopt'
 import { backlog_triage_decision } from './backlog-triage-decision'
 import { backlog_triage_pass } from './backlog-triage-pass'
 import { backlog_triage_unblock } from './backlog-triage-unblock'
@@ -21,7 +22,8 @@ import { backlog_triage_unblock } from './backlog-triage-unblock'
 // run label — at least one of the relation and the label. The flags and the label write are
 // `auto-ok:judge --apply`'s (`issue_run_verdict`); the clear is `run:park --clear`'s; the relation is
 // `run:pause`'s (`epic_blocked_by`), so an epic tracking `#N` declares it too, and its removal drops
-// that declaration (`backlog_triage_unblock`).
+// that declaration (`backlog_triage_unblock`). `--adopt <k>` takes a park's option instead
+// (`backlog_triage_adopt`, joshuafolkken/kit#6670).
 //
 // **The park comes off only on `--clear`**: an issue left for a person's judgement keeps
 // `needs-decision`, so labelling it never lets `backlog:next` offer an unanswered question.
@@ -35,7 +37,7 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh backlog:triage --pass [--exclude <N>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <N> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear]'
+	'Usage: josh backlog:triage --pass [--exclude <N>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <N> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear] | --apply <N> --adopt <k> --reason <text>'
 
 const OPTIONS = {
 	apply: { type: 'string' },
@@ -227,12 +229,11 @@ async function triage(request: TriageRequest, directory: string): Promise<number
 	return SUCCESS_EXIT_CODE
 }
 
-async function run(
-	argv: ReadonlyArray<string>,
-	directory: string = process.cwd(),
-): Promise<number> {
-	if (argv[0] === '--pass') return await backlog_triage_pass.run(argv.slice(1))
-	if (argv[0] === '--decide') return backlog_triage_decision.run(argv.slice(1))
+// One issue's verdict, or with `--adopt` the park option a parent takes.
+async function apply(argv: ReadonlyArray<string>, directory: string): Promise<number> {
+	if (argv.includes(backlog_triage_adopt.FLAG)) {
+		return await backlog_triage_adopt.run(argv, directory)
+	}
 
 	const request = parse_request(argv)
 
@@ -241,6 +242,16 @@ async function run(
 	console.error(USAGE)
 
 	return FAILURE_EXIT_CODE
+}
+
+async function run(
+	argv: ReadonlyArray<string>,
+	directory: string = process.cwd(),
+): Promise<number> {
+	if (argv[0] === '--pass') return await backlog_triage_pass.run(argv.slice(1))
+	if (argv[0] === '--decide') return backlog_triage_decision.run(argv.slice(1))
+
+	return await apply(argv, directory)
 }
 
 // `process.exitCode` rather than `process.exit()`, so the report on standard output drains first.

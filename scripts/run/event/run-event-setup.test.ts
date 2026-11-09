@@ -69,6 +69,7 @@ describe('run_event_setup stages', () => {
 			HANDING_OFF: 'handing off',
 			JUDGING: 'waiting on judgment',
 			SESSION: 'judgment session running',
+			RETROSPECTIVE: 'retrospective',
 			NO_CHILD: 'no child launched',
 		})
 		expect(LANE_STAGES).toStrictEqual([

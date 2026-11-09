@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { consultation_handoff } from './consultation-handoff'
 import { delivered_rules } from './delivered-rules'
 
@@ -19,11 +19,8 @@ const SOL = 'gpt-6.1-sol'
 const ENTRY = 'pnpm josh run:entry 12'
 const HANDOFF = 'pnpm josh run:handoff fullrun 12 --brief-file brief.md'
 const { ROW, is_entry_call, is_handoff_call } = consultation_handoff
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'consultation-handoff-'))
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('consultation-handoff-')
 
 // Claude Code's placeholder model stands for a transcript that names none.
 function transcript_on(model = '<synthetic>'): string {

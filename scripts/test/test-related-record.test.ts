@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_paths } from '#scripts/lane/lane-paths'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_related_cap } from './test-related-cap'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope } from './test-related-scope'
@@ -20,14 +20,11 @@ const TEST_FILES = 7
 const ELAPSED_MS = 1234.6
 const LANE_ISSUE = 5532
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'test-related-record-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('test-related-record-test-')
 
 afterEach(() => {
 	vi.unstubAllEnvs()
-})
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
 })
 
 function related_input(): RunInput {

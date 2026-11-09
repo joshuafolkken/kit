@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
@@ -16,13 +15,10 @@ const BODY_NAME = 'body.md'
 interface BodyRepository {
 	root: string
 	write: (directory: string, text: string) => string
-	remove: () => void
 }
 
-// `parent` lets a suite that already removes a temporary directory keep the repository inside it.
-function create(parent: string = tmpdir()): BodyRepository {
-	const root = mkdtempSync(path.join(parent, 'cli-body-repository-'))
-
+// `root` is an empty directory the suite's `temporary_directory` creator made, so it removes it too.
+function create(root: string): BodyRepository {
 	git_spawn_sync.run(['init', '--quiet'], {
 		cwd: root,
 		env: git_location_environment.location_free_environment(),
@@ -39,9 +35,6 @@ function create(parent: string = tmpdir()): BodyRepository {
 			writeFileSync(target, text)
 
 			return target
-		},
-		remove: () => {
-			rmSync(root, { recursive: true, force: true })
 		},
 	}
 }

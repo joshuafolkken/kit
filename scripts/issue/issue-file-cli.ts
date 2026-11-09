@@ -8,7 +8,6 @@ import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { cli_body } from '#scripts/josh/cli-body'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
-import type { PollOptions } from '#scripts/lib/poll'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -17,6 +16,7 @@ import { run_hold_member } from '#scripts/run/hold/run-hold-member'
 import { split_direction } from '#scripts/split/split-direction'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { issue_cite } from './issue-cite'
+import { issue_classification } from './issue-classification'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_deferral } from './issue-file-deferral'
@@ -57,9 +57,6 @@ const THIRD_PARTY_MESSAGE =
 const UNKNOWN_PARTY_MESSAGE =
 	'✖ unknown party: the owner of this session or of the target could not be read (`git remote` / `--repo`), so the target is not known to be ours — check `pnpm josh repo:party`.'
 const { GH_REPO_VARIABLE } = issue_file_pass
-// The open listing `epic:bundle` reads trails the create call, so the issue just filed is looked for
-// again for up to ten seconds before the placement is given up.
-const FRESH_ISSUE_POLL: PollOptions = { attempts: 6, interval_ms: 2000 }
 
 // An owner that cannot be read is refused like a third party — stricter than the `third-party-write`
 // hook, which stays silent on `unknown`: a filing is admitted only when the target is known to be ours.
@@ -116,10 +113,12 @@ async function link_release(url: string, filing: Filing): Promise<void> {
 
 // The Issue exists once `create` returns, so a failed placement is reported rather than failed: a
 // non-zero exit would read as "not filed" and invite the second filing the scout exists to stop.
+// The open listing trails the create call; `report_for` reads the new issue on its own when the
+// listing does not show it yet.
 async function place(url: string, target: string): Promise<void> {
 	const issue_number = issue_number_of(url)
 	const exit_code = Number.isSafeInteger(issue_number)
-		? await epic_bundle_cli.report_for(issue_number, target, FRESH_ISSUE_POLL)
+		? await epic_bundle_cli.report_for(issue_number, target)
 		: FAILURE_EXIT_CODE
 
 	if (exit_code !== SUCCESS_EXIT_CODE) {
@@ -284,7 +283,10 @@ async function filing_of(args: FileArguments): Promise<Filing | string> {
 	const read = cli_body.read_result(args.body_file)
 
 	if ('problem' in read) return `Could not read the body file ${args.body_file}: ${read.problem}`
-	const body = read.text
+	const body = issue_classification.with_release_classification(
+		read.text,
+		issue_file.labels_of(args, read.text),
+	)
 	const current = await git_gh_command.repo_get_name_with_owner()
 
 	if (current === undefined) return UNKNOWN_REPO_MESSAGE
@@ -339,7 +341,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 const issue_file_cli = {
-	FRESH_ISSUE_POLL,
 	THIRD_PARTY_MESSAGE,
 	UNKNOWN_PARTY_MESSAGE,
 	file_issue,

@@ -1,13 +1,14 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { prettier_format_json } from '#scripts/config-merge/prettier-json-fixture'
 import { init_logic } from '#scripts/init/init-logic'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync_configs } from './sync-configs'
 
-// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-configs-tsconfig-test-'))
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517). Each test
+// empties it, and `beforeEach` lays it out again.
+const TEST_DIR = temporary_directory('suite')('sync-configs-tsconfig-test-')
 const TSCONFIG_DEST = path.join(TEST_DIR, 'tsconfig.json')
 const ENTRY = init_logic.get_tsconfig_extends_entry()
 const NO_EMIT_ON_ERROR = 'noEmitOnError'

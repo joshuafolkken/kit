@@ -17,7 +17,7 @@ import type { DrivePorts, DriveState, OfferRead, PassResult } from './backlog-dr
 // to start. A stall was notified instead and reached nobody with anything to do, since the next dispatch
 // resolved it; this fires only once nothing is left for the loop itself to do.
 //
-// **Once per idle episode**: the loop asks once a minute while it watches, so the marker on the stream
+// **Once per idle episode**: the loop asks every offer interval while it watches, so the marker on the stream
 // (`emit_once_since_with`, reset by a `child-launch`) holds every repeat back, and the pool is read only
 // for an episode that is new.
 
@@ -26,7 +26,8 @@ const BLOCKED_ANSWER = 'blocked'
 const DECISION_HEADING = `Waiting on a decision (${NEEDS_DECISION_LABEL}):`
 const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
 const UNTRUSTED_HEADING = 'Waiting on a person to vouch for the body (author without write access):'
-const OVER_CAP_HEADING = 'Waiting on a person to split it (over the size cap):'
+const OVER_CAP_HEADING =
+	'Waiting on a person to split it or declare it one deliverable (over the size cap, no reason declared):'
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
 const IDLE_RECOVERY =
 	'Decide the parked issues, fix and release the stalled ones, or start the next run with `backlogrun`.'
@@ -84,7 +85,8 @@ function untrusted_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 		.map((issue) => cited(issue))
 }
 
-// `backlog:next` holds one declared over the size cap until a person splits it (joshuafolkken/kit#5502).
+// `backlog:next` holds one declared over the size cap until a person splits it or declares it one
+// deliverable (joshuafolkken/kit#5502, joshuafolkken/kit#6602).
 function over_cap_lines(issues: ReadonlyArray<OpenIssueData>, reading: IdleReading): Array<string> {
 	return issues
 		.filter((issue) =>

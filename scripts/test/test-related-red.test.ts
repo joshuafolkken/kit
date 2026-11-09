@@ -1,12 +1,12 @@
-import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { since_green } from '#scripts/gate/since-green'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_related_red, type RedRun, type RelatedInput } from './test-related-red'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
@@ -26,7 +26,8 @@ const STARTED_MS = 1_000_000
 const LOG_WRITTEN_S = 2000
 const LOG_STALE_S = 500
 
-const directory = mkdtempSync(path.join(tmpdir(), 'test-related-red-'))
+const make_directory = temporary_directory('suite')
+const directory = make_directory('test-related-red-')
 const log_path = path.join(directory, 'unit.log')
 
 function red_run(overrides: Partial<RedRun> = {}): RedRun {
@@ -68,10 +69,6 @@ beforeEach(() => {
 	vi.spyOn(since_green, 'read_verdict').mockResolvedValue({
 		parts: { changed: [MOVED_SOURCE], synced: [] },
 	})
-})
-
-afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
 })
 
 const CLEARS_WHEN = 'clears the record when %s'

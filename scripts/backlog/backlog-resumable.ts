@@ -2,41 +2,62 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { stash_orphans } from '#scripts/git/stash/stash-orphans'
-import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
-import { run_pause_comment } from '#scripts/run/pause/run-pause-comment'
+import { backlog_resume_reads } from './backlog-resume-reads'
 
-async function is_resumable(issue: string, stashed: ReadonlySet<string>): Promise<boolean> {
-	if (stashed.has(issue) || (await run_pause_comment.is_paused(issue))) return true
-
-	return await issue_closing_pr.has_open_pr(issue)
+interface ResumeSignals {
+	stashed: ReadonlySet<string>
+	paused: ReadonlySet<string>
+	open_pr: ReadonlySet<string>
 }
 
-async function enrich_children(
+const NO_ISSUES: ReadonlySet<string> = new Set()
+
+function is_resumable(issue: string, signals: ResumeSignals): boolean {
+	return signals.stashed.has(issue) || signals.paused.has(issue) || signals.open_pr.has(issue)
+}
+
+function enrich_children(
 	children: ReadonlyArray<EpicChild>,
 	repo: string,
-	stashed: ReadonlySet<string>,
-): Promise<Array<EpicChild>> {
-	return await Promise.all(
-		children.map(async (child) =>
-			child.repo === repo
-				? { ...child, is_resumable: await is_resumable(String(child.number), stashed) }
-				: child,
-		),
+	signals: ResumeSignals,
+): Array<EpicChild> {
+	return children.map((child) =>
+		child.repo === repo
+			? { ...child, is_resumable: is_resumable(String(child.number), signals) }
+			: child,
 	)
+}
+
+function local_issues(result: EpicNextResult, repo: string): Array<string> {
+	const children = [...result.candidates.flatMap((bundle) => bundle.children), ...result.waiting]
+	const local = children.filter((child) => child.repo === repo)
+
+	return [...new Set(local.map((child) => String(child.number)))]
+}
+
+// One read per signal for the whole scan (`backlog-resume-reads.ts`); a stashed child needs neither.
+async function read_signals(result: EpicNextResult, repo: string): Promise<ResumeSignals> {
+	const stashed = new Set(stash_orphans.issues_of(await git_stash.list()))
+	const unstashed = local_issues(result, repo).filter((issue) => !stashed.has(issue))
+	if (unstashed.length === 0) return { stashed, paused: NO_ISSUES, open_pr: NO_ISSUES }
+	const [paused, open_pr] = await Promise.all([
+		backlog_resume_reads.paused_issues(unstashed, repo),
+		backlog_resume_reads.open_pr_issues(repo),
+	])
+
+	return { stashed, paused, open_pr }
 }
 
 // Stashes are shared by this repository's lanes, never by another repository with the same issue number.
 async function read(result: EpicNextResult, repo: string): Promise<EpicNextResult> {
 	if (result.verdict !== 'run') return result
-	const stashed = new Set(stash_orphans.issues_of(await git_stash.list()))
-	const candidates = await Promise.all(
-		result.candidates.map(async (bundle) => ({
-			...bundle,
-			children: await enrich_children(bundle.children, repo, stashed),
-		})),
-	)
+	const signals = await read_signals(result, repo)
+	const candidates = result.candidates.map((bundle) => ({
+		...bundle,
+		children: enrich_children(bundle.children, repo, signals),
+	}))
 
-	return { ...result, candidates, waiting: await enrich_children(result.waiting, repo, stashed) }
+	return { ...result, candidates, waiting: enrich_children(result.waiting, repo, signals) }
 }
 
 const backlog_resumable = { read }

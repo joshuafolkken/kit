@@ -4,6 +4,7 @@ import type { Classification } from '#scripts/epic/epic-classify'
 import { epic_graph, type EpicChild, type GraphAnomaly } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
+import { epic_next_read, type SnapshotReads } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
@@ -71,7 +72,8 @@ function waits_outside(issue: OpenIssueData, running: ReadonlySet<string>, repo:
 }
 
 // An issue whose author lacks write access waits on a person too: only they can vouch for its body.
-// So does one declared over the size cap: only a person splits it (joshuafolkken/kit#5502).
+// So does one declared over the size cap with no declared reason: only a person splits it or declares
+// it one deliverable (joshuafolkken/kit#5502, joshuafolkken/kit#6602).
 function is_stuck(
 	issue: OpenIssueData,
 	running: ReadonlySet<string>,
@@ -156,6 +158,7 @@ function settle_standalone(
 //
 // The body rides along as an epic child's does, so a declared start time (`issue-not-before.ts`)
 // reaches the classification and the board's waiting row for a standalone row too (#4014).
+// The author rides along too, so an epic child taken from this row (`read_epics`) is judged as read.
 function to_child(issue: OpenIssueData, repo: string): EpicChild {
 	return {
 		number: issue.number,
@@ -164,6 +167,8 @@ function to_child(issue: OpenIssueData, repo: string): EpicChild {
 		labels: (issue.labels ?? []).map((label) => label.name),
 		blocked_by: epic_issue.blocker_references_of(issue, repo),
 		body: issue.body,
+		author_association: issue.author_association,
+		user: issue.user,
 	}
 }
 
@@ -184,6 +189,22 @@ function opted_in_epics(
 	tracking: ReadonlyMap<number, ReadonlyArray<number>>,
 ): ReadonlyArray<number> {
 	return [...epic_index.reachable_epic_numbers(tracking, issues)]
+}
+
+interface ListedPool {
+	opted_in: { issues: ReadonlyArray<OpenIssueData> }
+	tracking: { index: TrackingIndex }
+	repo: string
+}
+
+// The opted-in epics, each child the listing returned taken from its row rather than read again — the
+// listing asks the child read's fields (joshuafolkken/kit#6611).
+async function read_epics(pool: ListedPool): Promise<SnapshotReads> {
+	const { issues } = pool.opted_in
+	const references = opted_in_epics(issues, pool.tracking.index).map((number) => ({ number }))
+	const listed = new Map(to_children(issues, pool.repo).map((child) => [child.number, child]))
+
+	return await epic_next_read.read_snapshots(references, pool.repo, { repo: pool.repo, listed })
 }
 
 // The rows that stand for themselves. An epic root is a container rather than work, so it is never a
@@ -428,6 +449,7 @@ const backlog_pool = {
 	epic_classification,
 	merge_classifications,
 	opted_in_epics,
+	read_epics,
 	standalone_rows,
 	to_child,
 	to_children,

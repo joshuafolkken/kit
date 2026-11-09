@@ -294,16 +294,18 @@ function blocker_icon(child: EpicChild, pool: Pool): string {
 	return pool.withheld.has(child.number) ? STATE_ICONS.human : WAIT_ICONS.blocker
 }
 
+// The decision a withheld row waits on, followed through its blockers as the plan was read — kept even
+// where no blocker still stands at this frame, so the row itself says what a person decides.
+function decision_tail(child: EpicChild, read: ReasonRead, pool: Pool): string | undefined {
+	return pool.withheld.has(child.number) ? read.plan.decision_waits?.get(child.number) : undefined
+}
+
 function blocker_reason(
 	child: EpicChild,
 	waits: ReadonlyArray<string>,
-	read: ReasonRead,
+	tail: string | undefined,
 	pool: Pool,
 ): RowReason {
-	const tail = pool.withheld.has(child.number)
-		? read.plan.decision_waits?.get(child.number)
-		: undefined
-
 	return { icon: blocker_icon(child, pool), issues: waits, ...(tail !== undefined && { tail }) }
 }
 
@@ -323,7 +325,9 @@ function wait_of(
 	pool: Pool,
 ): RowReason | undefined {
 	if (!epic_triage.is_triaged(child)) return untriaged_of(child, waits, read)
-	if (waits.length > 0) return blocker_reason(child, waits, read, pool)
+	const tail = decision_tail(child, read, pool)
+
+	if (tail !== undefined || waits.length > 0) return blocker_reason(child, waits, tail, pool)
 
 	return not_before_of(child, read.now_ms) ?? offer_wait(child, read, pool)
 }

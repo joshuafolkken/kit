@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
@@ -8,8 +6,9 @@ import type { FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { test_read_map, type ReadMap } from '#scripts/test/test-read-map'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import fc from 'fast-check'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { check_reuse } from './check-reuse'
 import { gate_labels } from './gate-labels'
 import type { GateStepResult } from './gate-report'
@@ -28,7 +27,8 @@ import { since_green } from './since-green'
 
 const MAX_STEPS = 30
 const NUM_RUNS = 60
-const scratch = mkdtempSync(path.join(tmpdir(), 'reuse-verdicts-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('reuse-verdicts-')
 const gate_record = path.join(scratch, 'gate.json')
 const lint_record = path.join(scratch, 'lint-related.json')
 const unit_record = path.join(scratch, 'test-related.json')
@@ -105,10 +105,6 @@ vi.spyOn(test_read_map, 'read_map').mockReturnValue(READ_MAP)
 vi.spyOn(changed_paths, 'read_changed_since').mockResolvedValue([])
 vi.spyOn(changed_paths, 'read_held_at').mockImplementation(async (_commit, files) => [...files])
 const read_changed_tree = vi.spyOn(review_tree, 'read_changed_tree')
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
-})
 
 function passed(label: string): GateStepResult {
 	return { label, command: `josh ${label}`, exit_code: 0, output: '', elapsed_ms: 1 }

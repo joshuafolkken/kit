@@ -173,6 +173,29 @@ describe('acceptance_map.compare — row shapes', () => {
 	})
 })
 
+describe('acceptance_map.rows_of — code fences', () => {
+	const deferred = `- \`${id(SECOND)}\` 見送り: ${SPLIT_OFF} split off`
+
+	it.each(['```', '~~~'])(
+		'ignores met and deferral rows inside a %s fence, keeping rows outside it (ac-556065d1)',
+		(fence) => {
+			const rows = acceptance_map.rows_of(
+				pr_with([met(FIRST), fence, met(SECOND), deferred, fence]),
+			)
+
+			expect(rows.ids).toEqual(new Set([id(FIRST)]))
+			expect(rows.deferrals).toEqual([])
+		},
+	)
+
+	it('keeps a deferral row after a closed fence (ac-556065d1)', () => {
+		const rows = acceptance_map.rows_of(pr_with(['~~~md', met(FIRST), '~~~', deferred]))
+
+		expect(rows.met.size).toBe(0)
+		expect(rows.deferrals).toEqual([{ id: id(SECOND), issue: SPLIT_OFF }])
+	})
+})
+
 describe('acceptance_map.compare — deferrals', () => {
 	it('maps a criterion deferred to a named issue and returns the issue to check', () => {
 		const row = `- \`${id(SECOND)}\` 見送り: ${SPLIT_OFF} split off`

@@ -1,20 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { project_profile } from './project-profile'
 
-const roots: Array<string> = []
+const make_directory = temporary_directory('suite')
 const INDEX_HTML = 'index.html'
 const INDEX_CONTENT = '<h1>hello</h1>'
 const NO_INSTALL = '--no-install'
 const PROFILE_FLAG = '--profile'
 
 function fixture(manifest?: Record<string, unknown>): string {
-	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-profile-'))
-
-	roots.push(root)
+	const root = make_directory('josh-profile-')
 
 	if (manifest !== undefined) {
 		writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest))
@@ -22,10 +20,6 @@ function fixture(manifest?: Record<string, unknown>): string {
 
 	return root
 }
-
-afterAll(() => {
-	for (const root of roots) rmSync(root, { recursive: true, force: true })
-})
 
 describe('project profile', () => {
 	it('uses an explicit profile before a recorded profile', () => {

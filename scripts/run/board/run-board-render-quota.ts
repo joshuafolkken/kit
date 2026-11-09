@@ -1,4 +1,5 @@
 import { styleText } from 'node:util'
+import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import { figure_format } from '#scripts/lib/figure-format'
 import { run_board_fit, type DetailPart } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
@@ -7,11 +8,12 @@ import type { QuotaProvider, QuotaReading, Quotas, QuotaWindow } from './run-boa
 import { run_board_render_section } from './run-board-render-section'
 
 // The `⛽ usage` section (joshuafolkken/kit#5395): Claude's and Codex's usage-limit windows, one row
-// each, under fixed `5h` and `7d` columns. A window of another length stands in the nearer column and
-// its length ends the row. Each bar carries ┊, how far through its window the clock is, so a bar past
-// it is spending faster than the window refills; ↻ is when the window resets. ≈ after it is how many
-// more tasks like the recent ones fit in what is left (joshuafolkken/kit#5508), its column kept blank
-// where none could be told so the 7d column stays put.
+// each, drawing only the windows the provider reported, shortest first, straight after the name
+// (joshuafolkken/kit#6629). A window other than 7d ends the row on its length. Each bar carries ┊, how
+// far through its window the clock is, so a bar past it is spending faster than the window refills; ↻
+// is when the window resets. ≈ after it is how many more tasks like the recent ones fit in what is
+// left (joshuafolkken/kit#5508), kept blank where none could be told so the next window stays put.
+// GitHub's core REST allowance follows on its own row (joshuafolkken/kit#6559).
 
 const { GAUGE_SHADES, bar_of } = run_board_labels
 const { minute_of, two_digits } = figure_format
@@ -19,7 +21,8 @@ const MS_PER_MINUTE = 60_000
 const MINUTES_PER_HOUR = 60
 const MINUTES_PER_DAY = 1440
 const DAYS_PER_WEEK = 7
-const WEEK_MS = DAYS_PER_WEEK * MINUTES_PER_DAY * MS_PER_MINUTE
+const WEEK_MINUTES = DAYS_PER_WEEK * MINUTES_PER_DAY
+const WEEK_MS = WEEK_MINUTES * MS_PER_MINUTE
 const STALE_MINUTES = 10
 const BAR_WIDTH = 20
 const PERCENT = 100
@@ -30,15 +33,12 @@ const NAME_WIDTH = 13
 const CELL_WIDTH = 45
 // `↻ Sun 12:00`, the widest reset.
 const RESET_WIDTH = 11
-const FIRST_COLUMN = INDENT.length + NAME_WIDTH
 const COUNT_MARK = '≈'
 // The widest count the column holds.
 const MAX_COUNT = 999
 // A mean spend is a fraction (`7 / 3`), so a whole count can divide to just under itself.
 const COUNT_EPSILON = 1e-9
 const NONE = '—'
-// `—` under a percent's last digit.
-const NONE_CELL = `  ${NONE}`
 const PACE_MARK = '┊'
 const RESET_MARK = '↻'
 const LABEL = '⛽ usage'
@@ -46,12 +46,11 @@ const LIMIT_MARK = '🛑'
 const SEPARATOR = ' · '
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const LEVELS = ['normal', 'yellow', 'red'] as const
-const COLUMNS = [
-	{ label: '5h', minutes: 300 },
-	{ label: '7d', minutes: 10_080 },
-]
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
 const SCHEDULER_MARK = '🤖'
+const GITHUB = 'github'
+// GitHub's core REST allowance refills hourly.
+const CORE_WINDOW_MINUTES = 60
 const LEGEND = [
 	LABEL,
 	`${SCHEDULER_MARK} scheduler`,
@@ -68,18 +67,26 @@ interface QuotaHold {
 
 type Shade = (typeof GAUGE_SHADES)[(typeof LEVELS)[number]]
 
+// GitHub's core REST allowance as a gauge: the percent spent, ┊, the reset and `used/limit`.
+interface Allowance {
+	used_percent: number
+	pace: number
+	reset: string
+	spent: string
+}
+
 interface QuotaView {
 	quotas?: Quotas | undefined
 	scheduler_provider?: QuotaProvider | undefined
 	now_ms: number
 	hold?: QuotaHold | undefined
+	// GitHub's core REST allowance, drawn after the usage-limit rows; none where it could not be read.
+	rate_limit?: CoreRateLimit | undefined
 }
 
-// The column nearer `minutes` by ratio: 30 days stands under `7d`, an hour under `5h`.
-function column_of(minutes: number): number {
-	const distances = COLUMNS.map((column) => Math.abs(Math.log(minutes / column.minutes)))
-
-	return distances.indexOf(Math.min(...distances))
+// The windows the provider reported, shortest first — the order its row and its summary both read.
+function windows_of(reading: QuotaReading | undefined): Array<QuotaWindow> {
+	return (reading?.windows ?? []).toSorted((first, second) => first.minutes - second.minutes)
 }
 
 function length_text(minutes: number): string {
@@ -156,26 +163,27 @@ function count_text(count: number | undefined): string {
 	return count === undefined ? '' : `${COUNT_MARK}${String(count)}`
 }
 
+// Percent, bar with ┊ at `pace`, then the caller's `reset` and `count` (either may be empty).
+function gauge_text(used_percent: number, pace: number, reset: string, count: string): string {
+	const shade = GAUGE_SHADES[level_of(used_percent, pace)]
+	const percent = run_board_machine.percent_text(used_percent)
+	const bar = bar_text(used_percent, pace, shade)
+
+	return padded(`${percent} ${bar}  ${padded(reset, RESET_WIDTH)}  ${count}`)
+}
+
 function cell_of(window: QuotaWindow, now_ms: number, per_task?: number): string {
 	const shown = current(window, now_ms)
-	const pace = pace_of(shown, now_ms)
-	const shade = GAUGE_SHADES[level_of(shown.used_percent, pace)]
-	const percent = run_board_machine.percent_text(shown.used_percent)
-	const reset = padded(`${RESET_MARK} ${reset_text(shown.resets_ms, now_ms)}`, RESET_WIDTH)
+	const reset = `${RESET_MARK} ${reset_text(shown.resets_ms, now_ms)}`
 	const count = count_text(count_of(window, now_ms, per_task))
 
-	return padded(`${percent} ${bar_text(shown.used_percent, pace, shade)}  ${reset}  ${count}`)
+	return gauge_text(shown.used_percent, pace_of(shown, now_ms), reset, count)
 }
 
-// Each column's window, `undefined` where the provider reported none that stands in it.
-function placed(windows: ReadonlyArray<QuotaWindow>): Array<QuotaWindow | undefined> {
-	return COLUMNS.map((_, index) => windows.find((window) => column_of(window.minutes) === index))
-}
-
-// The lengths of the windows not as long as the column they stand in, `30d`.
+// The lengths of the windows other than 7d, `5h` or `30d`; a 7d-only row gains nothing.
 function lengths_of(windows: ReadonlyArray<QuotaWindow>): Array<string> {
 	return windows
-		.filter((window) => COLUMNS[column_of(window.minutes)]?.minutes !== window.minutes)
+		.filter((window) => window.minutes !== WEEK_MINUTES)
 		.map((window) => length_text(window.minutes))
 }
 
@@ -187,15 +195,15 @@ function stale_text(reading: QuotaReading, now_ms: number): string | undefined {
 	return minutes > STALE_MINUTES ? `(${String(minutes)}′ ago)` : undefined
 }
 
+// A single `—` where the provider reported no window, so none read stays apart from 0%.
 function cells_text(reading: QuotaReading | undefined, now_ms: number): string {
-	const windows = placed(reading?.windows ?? [])
-	const cells = windows.map((window) =>
-		window === undefined
-			? padded(NONE_CELL)
-			: cell_of(window, now_ms, per_task_in(reading, window)),
-	)
+	const windows = windows_of(reading)
 
-	return [...cells, ...lengths_of(reading?.windows ?? [])].join('').trimEnd()
+	if (windows.length === 0) return NONE
+
+	const cells = windows.map((window) => cell_of(window, now_ms, per_task_in(reading, window)))
+
+	return [...cells, ...lengths_of(windows)].join('').trimEnd()
 }
 
 // Age annotates the observation; values and warning colors remain readable as it ages.
@@ -221,7 +229,7 @@ function providers_of(view: QuotaView): ReadonlyArray<QuotaProvider> {
 		: [first, ...PROVIDERS.filter((provider) => provider !== first)]
 }
 
-function name_of(provider: QuotaProvider, view: QuotaView): string {
+function name_of(provider: QuotaProvider | typeof GITHUB, view: QuotaView): string {
 	if (view.scheduler_provider === undefined) return provider
 
 	const mark = provider === view.scheduler_provider ? SCHEDULER_MARK : '  '
@@ -229,10 +237,8 @@ function name_of(provider: QuotaProvider, view: QuotaView): string {
 	return `${mark} ${provider}`
 }
 
-function name_cell(provider: QuotaProvider, view: QuotaView): string {
-	const name = name_of(provider, view)
-
-	return `${name}${' '.repeat(NAME_WIDTH - run_board_fit.width_of(name))}`
+function name_cell(name: string): string {
+	return padded(name, NAME_WIDTH)
 }
 
 // Claude's row reads its hold while a usage limit stops the run's launches.
@@ -243,21 +249,22 @@ function row_of(provider: QuotaProvider, view: QuotaView): string {
 			? hold_text(hold, now_ms)
 			: reading_text(view.quotas?.[provider], now_ms)
 
-	return `${INDENT}${name_cell(provider, view)}${body}`
+	return `${INDENT}${name_cell(name_of(provider, view))}${body}`
 }
 
+// `42/68`: each drawn window's percent; a single `—` where none was reported.
 function percents_text(reading: QuotaReading | undefined, now_ms: number): string {
-	const percents = placed(reading?.windows ?? []).map((window) =>
-		window === undefined ? NONE : String(Math.round(current(window, now_ms).used_percent)),
-	)
+	const windows = windows_of(reading)
 
-	return percents.join('/')
+	if (windows.length === 0) return NONE
+
+	return windows.map((window) => String(Math.round(current(window, now_ms).used_percent))).join('/')
 }
 
-// ` ≈9/5`: each column's count, `—` where none is told; nothing where no column tells one.
+// ` ≈9/5`: each drawn window's count, `—` where one is untold beside a told one; nothing where none is.
 function counts_text(reading: QuotaReading | undefined, now_ms: number): string {
-	const counts = placed(reading?.windows ?? []).map((window) =>
-		window === undefined ? undefined : count_of(window, now_ms, per_task_in(reading, window)),
+	const counts = windows_of(reading).map((window) =>
+		count_of(window, now_ms, per_task_in(reading, window)),
 	)
 
 	if (counts.every((count) => count === undefined)) return ''
@@ -267,7 +274,47 @@ function counts_text(reading: QuotaReading | undefined, now_ms: number): string 
 	return ` ${COUNT_MARK}${texts.join('/')}`
 }
 
-// `claude 42/68 ≈9/5`: each column's percent, `—` where none stands, then its count.
+// GitHub's core REST calls spent this hour-long window (`1877/5000`) and when it refills
+// (joshuafolkken/kit#6621). A reading whose reset has passed has spent none and has no reset: the
+// next window starts at the next call.
+function allowance_of(rate_limit: CoreRateLimit, now_ms: number): Allowance {
+	const { limit, remaining, reset_ms } = rate_limit
+	const is_open = reset_ms > now_ms
+	const used = is_open ? limit - remaining : 0
+	const used_percent = (used / limit) * PERCENT
+	const window = { minutes: CORE_WINDOW_MINUTES, used_percent, resets_ms: reset_ms }
+
+	return {
+		used_percent,
+		pace: is_open ? pace_of(window, now_ms) : 0,
+		reset: is_open ? `${RESET_MARK} ${reset_text(reset_ms, now_ms)}` : '',
+		spent: `${String(used)}/${String(limit)}`,
+	}
+}
+
+// Nothing where the allowance could not be read.
+function allowances_of(view: QuotaView): Array<Allowance> {
+	const { rate_limit, now_ms } = view
+
+	return rate_limit === undefined ? [] : [allowance_of(rate_limit, now_ms)]
+}
+
+function rate_limit_rows(view: QuotaView): Array<string> {
+	return allowances_of(view).map(({ used_percent, pace, reset, spent }) => {
+		const gauge = gauge_text(used_percent, pace, reset, spent)
+
+		return `${INDENT}${name_cell(name_of(GITHUB, view))}${gauge}`.trimEnd()
+	})
+}
+
+// `github 38% 1877/5000 ↻ 15:23`.
+function rate_limit_summary({ used_percent, reset, spent }: Allowance): string {
+	const percent = run_board_machine.percent_text(used_percent).trimStart()
+
+	return `${GITHUB} ${percent} ${spent} ${reset}`.trimEnd()
+}
+
+// `claude 42/68 ≈9/5`: each drawn window's percent, then its count.
 function summary_of(view: QuotaView): string {
 	const parts = providers_of(view).map((provider) => {
 		const reading = view.quotas?.[provider]
@@ -276,30 +323,26 @@ function summary_of(view: QuotaView): string {
 		return `${name} ${percents_text(reading, view.now_ms)}${counts_text(reading, view.now_ms)}`
 	})
 
-	return parts.join(SEPARATOR)
-}
+	const rate_limit = allowances_of(view).map((allowance) => rate_limit_summary(allowance))
 
-function rule_columns(): Array<{ label: string; start: number }> {
-	return COLUMNS.map((column, index) => ({
-		label: column.label,
-		start: FIRST_COLUMN + index * CELL_WIDTH,
-	}))
+	return [...parts, ...rate_limit].join(SEPARATOR)
 }
 
 // None where no reader is open — a frame drawn with no usage read.
 function usage_part(view: QuotaView): DetailPart | undefined {
 	if (view.quotas === undefined) return undefined
 
-	const lines = providers_of(view).map((provider) => ({
-		text: row_of(provider, view),
-		is_detail: false,
-	}))
-	const rule = run_board_render_section.columns_rule(LABEL, rule_columns())
+	const rows = [
+		...providers_of(view).map((provider) => row_of(provider, view)),
+		...rate_limit_rows(view),
+	]
+	const lines = rows.map((text) => ({ text, is_detail: false }))
+	const rule = run_board_render_section.columns_rule(LABEL, [])
 
 	return { head: ['', rule], lines, label: LABEL, summary: summary_of(view) }
 }
 
-const run_board_render_quota = { LEGEND, usage_part }
+const run_board_render_quota = { LEGEND, gauge_text, usage_part }
 
 export { run_board_render_quota }
 export type { QuotaHold, QuotaView }

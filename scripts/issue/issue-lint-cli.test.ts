@@ -1,24 +1,18 @@
-import { mkdtempSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_template_section } from './issue-template-section'
 
-const TEMP_PATHS: Array<string> = []
+const make_directory = temporary_directory()
 const VALID_BODY = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n'
 const REQUIRED_SECTIONS = '## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
 const ENHANCEMENT_OUTPUT = 'labels: enhancement'
 
-afterEach(async () => {
+afterEach(() => {
 	vi.restoreAllMocks()
-	await Promise.all(
-		TEMP_PATHS.splice(0).map(async (directory) => {
-			await rm(directory, { recursive: true })
-		}),
-	)
 })
 
 describe('issue:lint label output', () => {
@@ -36,9 +30,7 @@ describe('issue:lint label output', () => {
 		},
 		{ body: `${VALID_BODY}- 種別: 非不具合\n`, expected: 'labels: none' },
 	])('prints $expected for the issue body', async ({ body, expected }) => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-label-'))
-
-		TEMP_PATHS.push(directory)
+		const directory = make_directory('issue-lint-label-')
 		const body_path = path.join(directory, 'issue.md')
 
 		await writeFile(body_path, `${body}${REQUIRED_SECTIONS}`)
@@ -52,9 +44,7 @@ describe('issue:lint label output', () => {
 // joshuafolkken/kit#6056: the body is read through `cli_body`, so one left in the work tree is refused.
 describe('issue_lint_cli.run — where the body sits', () => {
 	it('refuses a body in the work tree that git does not ignore', async () => {
-		const repository = cli_body_repository.create()
-
-		TEMP_PATHS.push(repository.root)
+		const repository = cli_body_repository.create(make_directory('issue-lint-repository-'))
 		const body_path = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, VALID_BODY)
 
 		await expect(issue_lint_cli.run(body_path)).rejects.toThrow('not git-ignored')
@@ -87,9 +77,7 @@ describe('issue:lint enforcement declaration', () => {
 
 describe('issue:lint fenced headings', () => {
 	it('rejects required headings that appear only inside a fenced example', async () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-fenced-heading-'))
-
-		TEMP_PATHS.push(directory)
+		const directory = make_directory('issue-lint-fenced-heading-')
 		const body_path = path.join(directory, 'issue.md')
 
 		await writeFile(body_path, `\`\`\`md\n## 背景\n- 種別: 不具合\n\`\`\`\n${REQUIRED_SECTIONS}`)
@@ -106,9 +94,7 @@ describe('issue:lint fenced headings', () => {
 
 describe('issue:lint classification failures', () => {
 	it('rejects an unclassified failure report', async () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-unclassified-'))
-
-		TEMP_PATHS.push(directory)
+		const directory = make_directory('issue-lint-unclassified-')
 		const body_path = path.join(directory, 'issue.md')
 
 		await writeFile(
@@ -122,9 +108,7 @@ describe('issue:lint classification failures', () => {
 	})
 
 	it('rejects conflicting bug and enhancement declarations', async () => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-conflict-'))
-
-		TEMP_PATHS.push(directory)
+		const directory = make_directory('issue-lint-conflict-')
 		const body_path = path.join(directory, 'issue.md')
 
 		await writeFile(
@@ -143,9 +127,7 @@ const EXPECTED_EFFECT_SECTION =
 	'## 期待効果\n\n- 効く率: 19%\n- 1 回あたりの得: 2.0 分\n- 外れたときの損: CI 1 回\n- 出典: `pnpm josh lane:stats` → 2.0\n'
 
 async function lint_body(body: string): Promise<number> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-expected-effect-'))
-
-	TEMP_PATHS.push(directory)
+	const directory = make_directory('issue-lint-expected-effect-')
 	const body_path = path.join(directory, 'issue.md')
 
 	await writeFile(body_path, body)

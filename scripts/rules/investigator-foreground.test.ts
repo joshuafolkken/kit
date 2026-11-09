@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { implementation_cut } from './implementation-cut'
 import { investigator_foreground } from './investigator-foreground'
@@ -73,11 +73,8 @@ describe('investigator_foreground.is_background_investigator — the refusal', (
 // from the parsed input, and the model writes it as a string there. The stand-down reads that string off
 // the call or the tail; a boolean spelling that ran is a build that declares it, so the refusal holds.
 const TIMESTAMP = '2026-10-25T08:50:55.976Z'
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigator-foreground-'))
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('investigator-foreground-')
 
 const TIMESTAMP_MS = Date.parse(TIMESTAMP)
 

@@ -1,9 +1,9 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { review_prior_findings } from './review-prior-findings'
 import { review_record_cli } from './review-record-cli'
 import type { review_stop_log } from './review-stop-log'
@@ -27,7 +27,8 @@ vi.mock('./review-stop-log', async (original) => {
 	}
 })
 
-const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-reasons-'))
+const make_directory = temporary_directory('suite')
+const TEST_DIR = make_directory('review-record-reasons-')
 const LOG = path.join(TEST_DIR, 'review-stops.jsonl')
 
 log_target.path = LOG
@@ -61,10 +62,6 @@ const EPERM_SPEC = 'bug-risks:medium:tick.ts:187'
 const EPERM_REASON = 'is_live_pid reads EPERM as dead. A second sentence is not kept.'
 const EPERM_ENTRY =
 	'tick.ts:187 — is_live_pid reads EPERM as dead. (bug-risks:medium, fixed in place in the review:record stage)'
-
-afterAll(() => {
-	rmSync(TEST_DIR, { recursive: true, force: true })
-})
 
 async function quietly(run: () => Promise<number>): Promise<number> {
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)

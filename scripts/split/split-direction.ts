@@ -9,6 +9,7 @@ import { markdown_section } from '#scripts/issue/markdown-section'
 import { session_cite } from '#scripts/issue/session-cite'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { file_reader } from '#scripts/lib/read-file'
+import { test_related_pins } from '#scripts/test/test-related-pins'
 
 // **A split whose kept Issue depends on what it splits off** (joshuafolkken/kit#5985) — the reverse of
 // `epic-split-reach.ts`. joshuafolkken/kit#5953 filed the `run:entry` relay off as an independent
@@ -79,12 +80,13 @@ function kept_names(body: string): ReadonlySet<string> {
 	return new Set([...stems, ...spans.flatMap((span) => commands_of(span))])
 }
 
-// Registered commands still count; documentation mentions do not implement commands (#6417).
+// Registered commands still count; documentation mentions do not implement commands (#6417), and
+// neither does a command registry, which lists every command's name (#6639).
 function commands_for(path: string): Array<string> {
 	const registered = Object.entries(COMMAND_MAP)
 		.filter(([, entry]) => entry.script === path)
 		.map(([command]) => command)
-	if (MARKDOWN.test(path)) return registered
+	if (MARKDOWN.test(path) || test_related_pins.is_registry_source(path)) return registered
 	const source = file_reader.read_if_readable(path) ?? ''
 	const named = [...source.matchAll(COMMAND_WORD)].map((match) => match[0])
 

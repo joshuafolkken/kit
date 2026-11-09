@@ -1,15 +1,16 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import ts from 'typescript'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rename_cli } from './rename-cli'
 
 const TOUCHED = "import { old } from './old'\n\nold()\n"
 const UNTOUCHED = 'const other = 1\n'
 const FAILURE_EXIT_CODE = 1
 
-const directory = mkdtempSync(path.join(tmpdir(), 'rename-cli-'))
+const make_directory = temporary_directory('suite')
+const directory = make_directory('rename-cli-')
 
 function file_with(name: string, text: string): string {
 	const file = path.join(directory, name)
@@ -30,10 +31,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
 })
 
 describe('rename_cli.run — writes', () => {

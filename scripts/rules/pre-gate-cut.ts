@@ -140,12 +140,13 @@ function uncut_lane_issue(state: LaneCutState): string | undefined {
 
 // **The cut is taken only when the current context is worth its resume**.
 // Below the model-priced `pnpm josh cost --cut` threshold a short lane has no accumulation a cut would drop, so the
-// gate runs uncut rather than paying for a relaunch; an unmeasurable session keeps the old
-// unconditional cut as the safety net. The verdict is
+// gate runs uncut rather than paying for a relaunch. An unmeasurable session is undetermined, not over:
+// a relaunch cannot measure it either, so cutting it would refuse every gate of a transcript-less
+// provider (joshuafolkken/kit#6576, as the implementation-phase cut since #6575). The verdict is
 // `cost_cli.session_verdict`'s, the same statistic and threshold `run:cut` and the implementation-phase
 // cut read, so the guard and the command can never disagree about whether a cut was due.
 function warrants_the_cut(verdict: CostVerdict): boolean {
-	return verdict !== cost_verdict.UNDER_VERDICT
+	return verdict === cost_verdict.OVER_VERDICT
 }
 
 // **The command test comes first and the world is consulted second.** This predicate is asked of
@@ -163,7 +164,7 @@ function is_uncut_gate(command: string, state: LaneCutState = current_state()): 
 const PRE_GATE_CUT_REASON =
 	'⛔ pre-gate cut: this checkout is a lane dispatched for this issue and the gate is the boundary to ' +
 	'cut at. Issue `pnpm josh run:cut <N>`: on `cut`, end the turn immediately — no Telegram is owed; ' +
-	'on `split-unresolved`, answer its notice and rerun it; on any other verdict (`not-a-lane`, `busy`, …), ' +
+	'on any other verdict (`not-a-lane`, `busy`, …), ' +
 	'reissue the gate — this fires once per run (`.claude/skills/workflow-commands/pre-gate-cut.md`).'
 
 // **The pre-gate cut is two acts, one call apart**, so its `rule:value`

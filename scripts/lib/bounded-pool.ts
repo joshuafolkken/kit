@@ -1,9 +1,9 @@
 // One definition of "run these at most N at a time".
 //
 // Three callers need it and had it three times: `eval-run.ts` runs one real Claude session per
-// scenario and must not fan out to as many as the suite happens to hold, and `epic-bundle-cli.ts`
-// and `epic-bundle-referenced.ts` each read one issue per reference and must not turn a rate limit
-// into a wrong answer. The reads were written as waves — slice, `Promise.all`, next slice — which
+// scenario and must not fan out to as many as the suite happens to hold, and
+// `epic-bundle-referenced.ts` reads one issue per reference and must not turn a rate limit into a
+// wrong answer. The reads were written as waves — slice, `Promise.all`, next slice — which
 // idles the whole batch behind its slowest member, so the three were neither the same code nor the
 // same behavior.
 //
@@ -105,6 +105,38 @@ async function bounded_map<Item, Result>(
 		.map((result) => result.value)
 }
 
-const bounded_pool = { bounded_map, pool_width }
+// The same width for tasks that arrive one at a time from independent callers sharing it
+// (`git-gh-exec.ts`'s `gh` spawns). A finished or failed task hands its slot to the oldest waiter.
+function limiter(limit: number): Limiter {
+	const width = pool_width(limit, Infinity)
+	const waiting: Array<() => void> = []
+	let active = 0
+
+	return {
+		async run<Result>(task: () => Promise<Result>): Promise<Result> {
+			if (active < width) active += 1
+			else {
+				await new Promise<void>((resolve) => {
+					waiting.push(resolve)
+				})
+			}
+
+			try {
+				return await task()
+			} finally {
+				const next = waiting.shift()
+
+				if (next === undefined) active -= 1
+				else next()
+			}
+		},
+	}
+}
+
+interface Limiter {
+	run: <Result>(task: () => Promise<Result>) => Promise<Result>
+}
+
+const bounded_pool = { bounded_map, limiter, pool_width }
 
 export { bounded_pool }

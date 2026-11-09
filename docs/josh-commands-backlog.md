@@ -52,13 +52,19 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:a
 
 <!-- usage: issue:priority -->
 
-Apply priority:high to an issue whose body reached the high floor after filing.
+Raise an issue to the priority its body declares or reaches after filing.
 
 ```bash
 pnpm josh issue:priority 4960
+pnpm josh issue:priority 6707 --critical --reason "asked in this turn"   # on a person's instruction only
 ```
 
 <!-- /usage -->
+
+`--critical --reason "<text>"` applies `priority:critical` whatever the body declares and comments the reason on the issue.
+
+- Use it **only on a person's current-turn instruction** ("make #N critical"), `--reason` giving its gist. Never on an agent's own judgment: the agent's route is the body's `- 優先度:` declaration.
+- No non-blank `--reason` → usage error, nothing written. Already `priority:critical` → `labelled`, no comment. A failed label or comment → `failed`, exit 1.
 
 ### `josh issue:state`
 
@@ -173,7 +179,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets that floor, and so do `- 原因の損失:` lines summing to 30 minutes or more (`josh issue:priority <N>` re-applies it after a recurrence); `- 原因のレーン:` only ranks, and no reduction percentage is asked for or judged. A malformed one is refused; a body with no declaration is filed at the floor.
    A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-run.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
-   A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>` and projects within the implement stage budget at the measured rate; over the cap (one and a half times the guide) only `--route split` passes.
+   A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) or projected past the implement stage budget at the measured rate is refused the same way.
 4. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件: #<PR> のマージ後 <K> マージ` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
    The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, is not read: it waits on the pull request that closes the issue, for a follow-up filed before that pull request exists.
 5. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
@@ -425,6 +431,22 @@ pnpm josh issue:spill 5999 --estimate "3 ファイル / 80 行"
 - `--estimate "<F> ファイル / <L> 行"` — the follow-up's size estimate, never apportioned from the issue's. Required.
 
 <!-- /usage -->
+
+### `josh issue:release-class`
+
+<!-- usage: issue:release-class -->
+
+Write the issue body's one release classification line, replacing any earlier one.
+
+```bash
+pnpm josh issue:release-class 6636 other-change
+```
+
+<!-- /usage -->
+
+Writes `- リリース分類: <label>` at the end of the `## 背景` declaration block, or the body's end without that section. Earlier declaration lines are dropped, so a repeat changes nothing. Only `enhancement` and `other-change` are accepted; a bug, breaking change or ignored release is declared by its label.
+
+Run it when `josh ship` or `josh git` stops for a missing release classification. A lane with a non-defect Issue (`種別: 非不具合`) and no `enhancement`, `bug` or `breaking-change` label writes `other-change` as a Tier A choice and goes on without parking.
 
 ### `josh defect:origin`
 
@@ -876,6 +898,7 @@ pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
 pnpm josh backlog:triage --apply 913 --solo --defect yes --verification yes --every-run yes --reason "<why>" --clear
 pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"
 pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
+pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 ```
 
 **Options:**
@@ -886,6 +909,7 @@ pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
 - `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
 - `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
+- `--adopt <k>` — takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.
 
 <!-- /usage -->
 
@@ -923,7 +947,7 @@ pnpm josh backlog:budget --answer candidates --started "$started" --active "$act
 
 <!-- /usage -->
 
-Read-only. stdout is `run`, `watch`, `stop` or `triage`; empty with exit 1 if unreadable. An idle watch polls every 60 s.
+Read-only. stdout is `run`, `watch`, `stop` or `triage`; empty with exit 1 if unreadable. An idle watch polls every 180 s.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:budget` in detail".
 
@@ -967,6 +991,10 @@ pnpm josh backlog:drive [--max <n>] [--idle <minutes>] [--only]
 <!-- /usage -->
 
 An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags. A `run` that owes a judgment opens its lanes first, then hands `triage` back in the same pass.
+
+A drained `stop` that owes the retrospective starts one retrospective unit, a headless model child, and waits for it to exit; the board's now line reads `🔍 retrospective` meanwhile. The unit closes under the driver's `--owner`.
+
+A record the unit marked done lets the `stop` end the run; an unmarked record, at any exit code, hands `retrospective` back.
 
 The supervisor claims the record for the session it wakes; the session acts and ends its turn; its `Stop` hook writes the cut that hands the loop back.
 

@@ -1,4 +1,5 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
+import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
@@ -45,6 +46,8 @@ interface BoardPorts {
 	mark: () => Promise<void>
 	// The reviewers' roster (`run-board-thanks-read.ts`); none where the frame thanks nobody — the chat.
 	read_thanks?: (() => Promise<Thanks>) | undefined
+	// GitHub's core REST allowance (`gh-core-rate-limit.ts`); none where the frame shows none.
+	read_rate_limit?: (() => Promise<CoreRateLimit | undefined>) | undefined
 	// Sends one chat frame off-screen, for `--every` alone.
 	push: (frame: string) => Promise<void>
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
@@ -83,6 +86,11 @@ interface BoardState extends GatherRead {
 	thanks: Thanks
 	thanks_fetch: Fetch<Thanks> | undefined
 	thanks_attempted_ms: number | undefined
+	// The core allowance drawn on the usage row — none once a read fails — the read in flight, and when
+	// it was last launched.
+	rate_limit: CoreRateLimit | undefined
+	rate_limit_fetch: Fetch<CoreRateLimit | undefined> | undefined
+	rate_limit_attempted_ms: number | undefined
 }
 
 const FRESH_STATE: BoardState = {
@@ -109,6 +117,9 @@ const FRESH_STATE: BoardState = {
 	thanks: [],
 	thanks_fetch: undefined,
 	thanks_attempted_ms: undefined,
+	rate_limit: undefined,
+	rate_limit_fetch: undefined,
+	rate_limit_attempted_ms: undefined,
 }
 
 function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {

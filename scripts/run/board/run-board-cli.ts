@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { styleText } from 'node:util'
+import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
@@ -54,6 +55,7 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	read_closed: async (issues) => await run_board_closed.read_all(issues),
 	snapshot: run_board_snapshot.file_store(),
 	read_thanks: async () => await run_board_thanks_read.read_thanks(),
+	read_rate_limit: async () => await gh_core_rate_limit.read_core(),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.
@@ -246,6 +248,6 @@ async function run(argv: ReadonlyArray<string>, ports?: BoardPorts): Promise<num
 	return SUCCESS_EXIT_CODE
 }
 
-const run_board_cli = { DISABLED_NOTICE, USAGE, run }
+const run_board_cli = { DISABLED_NOTICE, LIVE_PORTS, USAGE, run }
 
 export { run_board_cli }
