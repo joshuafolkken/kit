@@ -155,23 +155,25 @@ async function outcome_of(
 	return await record(issue, request, verdict)
 }
 
-// A re-run reads its own earlier record as trusted evidence, so an Issue already carrying this scout's
-// Auto-decided comment is settled by it — no second judgment and no second comment.
+function is_record_of(source: ReadSources[number], keywords: string): boolean {
+	return source.text.startsWith(AUTO_DECIDED_REUSE) && source.text.includes(scout_mark(keywords))
+}
+
+// A re-run reads its own earlier record as trusted evidence, so an Issue whose latest source is this
+// scout's Auto-decided comment is settled by it — no second judgment and no second comment. Any source
+// after the record may reverse the decision, so the Issue is judged again.
 function recorded_before(
 	issue: string,
 	request: ReuseRequest,
 	sources: ReadSources,
 ): ReuseOutcome | undefined {
-	const mark = scout_mark(request.keywords)
-	const prior = sources.find(
-		(source) => source.text.startsWith(AUTO_DECIDED_REUSE) && source.text.includes(mark),
-	)
-	if (prior === undefined) return undefined
+	const latest = sources.at(-1)
+	if (latest === undefined || !is_record_of(latest, request.keywords)) return undefined
 
 	return {
 		kind: 'recorded',
 		note: `${session_cite.issue(issue)} already records this reuse decision`,
-		url: prior.id,
+		url: latest.id,
 	}
 }
 

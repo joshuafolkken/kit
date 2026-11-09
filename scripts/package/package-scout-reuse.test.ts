@@ -138,6 +138,24 @@ describe('package_scout_reuse.check — a re-run on an Issue it already recorded
 		expect(comment_mock).not.toHaveBeenCalled()
 	})
 
+	it('judges again when a later comment follows the record, so a reversal reads as undecided', async () => {
+		const reversal: IssueSource = {
+			...COMMENT,
+			order: 2,
+			text: '再利用しない。パッケージを追加する。',
+		}
+		const sources = [BODY, prior_record(REQUEST.keywords), reversal]
+
+		read_mock.mockResolvedValue({ kind: 'sources', sources, untrusted_count: 0 })
+		judge_mock.mockResolvedValue({ kind: 'unanswered', reason: 'reversed' })
+
+		const outcome = await package_scout_reuse.check(REQUEST)
+
+		expect(judge_mock).toHaveBeenCalledOnce()
+		expect(outcome.kind).toBe('undecided')
+		expect(comment_mock).not.toHaveBeenCalled()
+	})
+
 	it('judges again when the earlier Auto-decided comment names other keywords', async () => {
 		const sources = [BODY, prior_record('other')]
 
