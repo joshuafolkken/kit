@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_blocked_by_graphql, IDS_PER_QUERY } from './git-gh-blocked-by-graphql'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
+import { gh_failure } from './git-gh-failure'
 import { git_gh_issue_rest, type RestIssue } from './git-gh-issue-rest'
+import { REFUSED_MESSAGE, TRANSPORT_ENV_VAR } from './git-gh-transport'
 
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
@@ -13,6 +15,7 @@ const BLOCKER_NUMBER = 1023
 const BLOCKER_REPO = 'joshuafolkken/kit'
 const SUMMARY_TOTAL = 3
 const FIRST_NUMBER = 1
+const FORBIDDEN_STATUS = 403
 
 function row(number: number, overrides: Partial<RestIssue> = {}): RestIssue {
 	return {
@@ -58,6 +61,10 @@ function serve_nodes(unresolved: ReadonlyArray<string> = []): void {
 
 beforeEach(() => {
 	mocked_api.mockReset()
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 describe('read_answered — one GraphQL query per hundred rows', () => {
@@ -108,7 +115,31 @@ describe('read_answered — rows left to REST', () => {
 
 		expect(answered.size).toBe(0)
 	})
+})
 
+describe('read_answered — the session transport', () => {
+	it('sends no query and answers no row on a REST session', async () => {
+		serve_nodes()
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+
+		const answered = await git_gh_blocked_by_graphql.read_answered(rows_of(2))
+
+		expect([mocked_api.mock.calls.length, answered.size]).toEqual([0, 0])
+	})
+
+	it('stops with its reason when a GraphQL session is refused', async () => {
+		mocked_api.mockRejectedValue(
+			gh_failure.attach(new Error('forbidden'), { status: FORBIDDEN_STATUS }),
+		)
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'graphql')
+
+		await expect(git_gh_blocked_by_graphql.read_answered(rows_of(2))).rejects.toThrow(
+			REFUSED_MESSAGE,
+		)
+	})
+})
+
+describe('read_answered — rows left unresolved', () => {
 	it('leaves an unresolved node unanswered and answers the rest', async () => {
 		const unresolved = row(FIRST_NUMBER)
 		const resolved = row(2)

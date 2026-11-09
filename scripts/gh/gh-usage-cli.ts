@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { gh_usage_log } from './gh-usage-log'
 import { gh_usage_tally } from './gh-usage-tally'
+import { git_gh_transport } from './git-gh-transport'
 
 // `josh gh:usage [--since <instant>]` — the GitHub usage log's lines tallied per command
 // (joshuafolkken/kit#6753), read from the one file `gh-usage-log.ts` writes.
@@ -15,9 +16,13 @@ const USAGE = 'Usage: josh gh:usage [--since <instant>]'
 
 interface UsageContext {
 	repository_directory: () => Promise<string | undefined>
+	transport: () => Promise<string>
 }
 
-const DEFAULT_CONTEXT: UsageContext = { repository_directory: run_carry.repository_directory }
+const DEFAULT_CONTEXT: UsageContext = {
+	repository_directory: run_carry.repository_directory,
+	transport: git_gh_transport.label,
+}
 
 // An unknown flag, a stray positional or an instant `Date.parse` cannot read is not valid.
 function since_of(argv: ReadonlyArray<string>): { is_valid: boolean; since_ms?: number } {
@@ -47,8 +52,9 @@ async function run(
 	}
 
 	const lines = gh_usage_log.read_lines(gh_usage_log.target_of(repository))
+	const tally = gh_usage_tally.tally(lines, since_ms)
 
-	process.stdout.write(`${gh_usage_tally.render(gh_usage_tally.tally(lines, since_ms))}\n`)
+	process.stdout.write(`${gh_usage_tally.render(tally, await context.transport())}\n`)
 
 	return SUCCESS_EXIT_CODE
 }

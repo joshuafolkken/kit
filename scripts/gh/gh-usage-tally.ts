@@ -110,8 +110,10 @@ function widths_of(table: ReadonlyArray<ReadonlyArray<string>>): Array<number> {
 	return HEADER.map((_, index) => Math.max(...table.map((cells) => cells[index]?.length ?? 0)))
 }
 
-function render(result: UsageTally): string {
-	const heading = heading_of(result)
+// `transport` is the session's (`git-gh-transport.ts`), named after the heading's period.
+function render(result: UsageTally, transport?: string): string {
+	const named = transport === undefined ? '' : ` · transport: ${transport}`
+	const heading = `${heading_of(result)}${named}`
 
 	if (result.rows.length === 0) return heading
 

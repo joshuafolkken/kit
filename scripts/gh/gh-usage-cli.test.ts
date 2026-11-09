@@ -7,6 +7,7 @@ const make_directory = temporary_directory()
 
 const EARLY = '2026-11-01T00:00:00.000Z'
 const LATE = '2026-11-08T00:00:00.000Z'
+const TRANSPORT = 'graphql (auto)'
 
 function capture(): { out: () => string; err: () => string } {
 	const stdout = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
@@ -36,7 +37,10 @@ function seeded_repository(): string {
 }
 
 function context_of(repository?: string): UsageContext {
-	return { repository_directory: () => Promise.resolve(repository) }
+	return {
+		repository_directory: () => Promise.resolve(repository),
+		transport: () => Promise.resolve(TRANSPORT),
+	}
 }
 
 afterEach(() => {
@@ -49,7 +53,9 @@ describe('gh_usage_cli.run', () => {
 		const output = capture()
 
 		await expect(gh_usage_cli.run([], context)).resolves.toBe(0)
-		expect(output.out()).toContain(`gh:usage — ${EARLY} … ${LATE} · 2 lines\n`)
+		expect(output.out()).toContain(
+			`gh:usage — ${EARLY} … ${LATE} · 2 lines · transport: ${TRANSPORT}\n`,
+		)
 		expect(output.out()).toContain('run:step     2      6    0       —\n')
 	})
 
@@ -58,7 +64,9 @@ describe('gh_usage_cli.run', () => {
 		const output = capture()
 
 		await expect(gh_usage_cli.run(['--since', LATE], context)).resolves.toBe(0)
-		expect(output.out()).toContain(`gh:usage — ${LATE} … ${LATE} · 1 lines\n`)
+		expect(output.out()).toContain(
+			`gh:usage — ${LATE} … ${LATE} · 1 lines · transport: ${TRANSPORT}\n`,
+		)
 	})
 
 	it.each([[['--since', 'soon']], [['--until', LATE]], [['stray']]])(

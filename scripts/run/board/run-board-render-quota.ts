@@ -41,6 +41,7 @@ const COUNT_EPSILON = 1e-9
 const NONE = '—'
 const PACE_MARK = '┊'
 const RESET_MARK = '↻'
+const TRANSPORT_MARK = '·'
 const LABEL = '⛽ usage'
 const LIMIT_MARK = '🛑'
 const SEPARATOR = ' · '
@@ -299,19 +300,27 @@ function allowances_of(view: QuotaView): Array<Allowance> {
 	return rate_limit === undefined ? [] : [allowance_of(rate_limit, now_ms)]
 }
 
+// ` · graphql (auto)`: the session's transport after the allowance; nothing where it was not read.
+function transport_text(view: QuotaView): string {
+	const transport = view.rate_limit?.transport
+
+	return transport === undefined ? '' : ` ${TRANSPORT_MARK} ${transport}`
+}
+
 function rate_limit_rows(view: QuotaView): Array<string> {
 	return allowances_of(view).map(({ used_percent, pace, reset, spent }) => {
 		const gauge = gauge_text(used_percent, pace, reset, spent)
 
-		return `${INDENT}${name_cell(name_of(GITHUB, view))}${gauge}`.trimEnd()
+		return `${INDENT}${name_cell(name_of(GITHUB, view))}${gauge}${transport_text(view)}`.trimEnd()
 	})
 }
 
-// `github 38% 1877/5000 ↻ 15:23`.
-function rate_limit_summary({ used_percent, reset, spent }: Allowance): string {
+// `github 38% 1877/5000 ↻ 15:23 · graphql (auto)`.
+function rate_limit_summary({ used_percent, reset, spent }: Allowance, view: QuotaView): string {
 	const percent = run_board_machine.percent_text(used_percent).trimStart()
+	const allowance = `${GITHUB} ${percent} ${spent} ${reset}`.trimEnd()
 
-	return `${GITHUB} ${percent} ${spent} ${reset}`.trimEnd()
+	return `${allowance}${transport_text(view)}`
 }
 
 // `claude 42/68 ≈9/5`: each drawn window's percent, then its count.
@@ -323,7 +332,7 @@ function summary_of(view: QuotaView): string {
 		return `${name} ${percents_text(reading, view.now_ms)}${counts_text(reading, view.now_ms)}`
 	})
 
-	const rate_limit = allowances_of(view).map((allowance) => rate_limit_summary(allowance))
+	const rate_limit = allowances_of(view).map((allowance) => rate_limit_summary(allowance, view))
 
 	return [...parts, ...rate_limit].join(SEPARATOR)
 }

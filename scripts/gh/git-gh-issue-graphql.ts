@@ -1,10 +1,9 @@
 import { repo_party } from '#scripts/discovery/repo-party'
-import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { git_gh_api_path } from './git-gh-api-path'
-import { git_gh_exec } from './git-gh-exec'
 import type { BlockedBy, RestIssue } from './git-gh-issue-rest'
-import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
+import { git_gh_transport } from './git-gh-transport'
 
 // One issue's body, labels, blocker relations and comments in **one** GraphQL query
 // (joshuafolkken/kit#6722). REST serves them from three endpoints, each a request against the
@@ -16,7 +15,7 @@ import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
 // `gh issue view --json` spelling and no caller downstream changes.
 //
 // **`undefined` hands the read back to REST**, never a partial answer: a repository the checkout
-// cannot name, a cloud session's 403, a number that is a pull request or nothing (GraphQL answers
+// cannot name, a session on REST (`git-gh-transport.ts`), a number that is a pull request or nothing (GraphQL answers
 // `null` with an `errors` document, which fails the schema), or more comments than one page. REST
 // keeps telling a missing number from a failed read, which a GraphQL error document does not.
 
@@ -178,18 +177,10 @@ async function read_issue(
 	const variables = variables_of(issue_number, repo)
 	if (variables === undefined) return undefined
 
-	try {
-		const json = await git_gh_exec.exec_gh_api({
-			path: GRAPHQL_PATH,
-			body: JSON.stringify({ query: ISSUE_QUERY, variables }),
-		})
+	const json = await git_gh_transport.query({ query: ISSUE_QUERY, variables })
+	if (json === undefined) return undefined
 
-		return to_issue_with_comments(
-			parse_json_object_or_undefined(json, response_schema)?.data.repository.issue,
-		)
-	} catch {
-		return undefined
-	}
+	return to_issue_with_comments(json_value.parse_with(json, response_schema)?.data.repository.issue)
 }
 
 const git_gh_issue_graphql = { read_issue, to_blocking_issue }
