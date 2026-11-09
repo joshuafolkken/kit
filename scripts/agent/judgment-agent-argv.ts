@@ -3,8 +3,9 @@ import { agent_diagnostics } from './agent-diagnostics'
 import type { AgentProfile } from './agent-role-profile'
 import { claude_agent_argv } from './claude-agent-argv'
 
-// **A judgment child reads and answers; it can do nothing else.** `--tools ''` launches no built-in
-// tool, `--strict-mcp-config` with no `--mcp-config` loads no MCP server, `--restricted` ignores the
+// **A judgment child reads and answers; it can do nothing else.** `--tools=` launches no built-in
+// tool — one element, because `detached_launch` refuses an empty argv element (`--tools ''`),
+// `--strict-mcp-config` with no `--mcp-config` loads no MCP server, `--restricted` ignores the
 // user, project and local settings files (their hooks and permissions included) and refuses
 // `bypassPermissions`, and `--disable-slash-commands` drops every skill and command. No permission
 // mode and no lane instruction set ride along, so nothing the worker launch grants carries over.
@@ -13,8 +14,7 @@ const JUDGMENT_FLAGS: ReadonlyArray<string> = [
 	'--verbose',
 	'--output-format',
 	'stream-json',
-	'--tools',
-	'',
+	'--tools=',
 	'--strict-mcp-config',
 	'--restricted',
 	'--disable-slash-commands',
