@@ -169,6 +169,8 @@ describe.each(AI_DOCS)('%s — keeps the routing and pointers resident', (docume
 		'`dependency-update` skill',
 		'`prompts/collaboration-workflow/operating-rules.md` → "git-rules"',
 		'`prompts/collaboration-workflow/rule-delivery.md` → "stop-notify"',
+		// The `overrides` protection entry of the resident-rule list in `residency-rationale.md`.
+		'`devEngines` / overrides edits): explicit user instruction only',
 	])('keeps %j resident', (marker) => {
 		expect(content).toContain(marker)
 	})
