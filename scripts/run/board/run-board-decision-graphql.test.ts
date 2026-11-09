@@ -10,7 +10,8 @@ import { run_board_decision_read } from './run-board-decision-read'
 import type { BoardPlan } from './run-board-layout'
 
 // joshuafolkken/kit#6819: the decision walk's nodes outside the plan in one GraphQL query, answered
-// as the REST reads answer them — the REST path is the oracle.
+// as the REST reads answer them — the REST path is the oracle. joshuafolkken/kit#6857 moves the
+// `needs-decision` children's comment read the same way.
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
 
@@ -65,8 +66,13 @@ function child(number: number, blockers: ReadonlyArray<number>): EpicChild {
 	}
 }
 
-function plan_of(): BoardPlan {
-	const children = [child(WAITING, [MIDDLE]), child(MIDDLE, [PERSON]), child(STALLED, [OUTSIDE])]
+function plan_of(deciding: ReadonlyArray<EpicChild> = []): BoardPlan {
+	const children = [
+		child(WAITING, [MIDDLE]),
+		child(MIDDLE, [PERSON]),
+		child(STALLED, [OUTSIDE]),
+		...deciding,
+	]
 
 	return {
 		waves: { waves: [], unreached: children },
@@ -134,6 +140,54 @@ function serve_rest(): void {
 	vi.spyOn(git_gh_etag_read, 'read').mockImplementation(async (path) => await rest_answer(path))
 }
 
+// joshuafolkken/kit#6857: a `needs-decision` child of the plan, whose comments carry its question.
+const DECIDING = 6130
+const QUESTION = 'Which account pays for the credits?'
+const COMMENT_URL = `https://github.com/${REPO}/issues/${String(DECIDING)}#issuecomment-1`
+const COMMENT_BODY = `## ${QUESTION}\n\nneeds-decision`
+const COMMENT_TIME = '2026-11-09T09:00:00Z'
+const COMMENT_FIELDS = 'comments('
+
+function deciding_plan(): BoardPlan {
+	return plan_of([{ ...child(DECIDING, []), labels: [NEEDS_DECISION_LABEL] }])
+}
+
+function graphql_comments(has_next_page: boolean): string {
+	const comment = {
+		url: COMMENT_URL,
+		body: COMMENT_BODY,
+		createdAt: COMMENT_TIME,
+		authorAssociation: 'OWNER',
+		author: { login: 'joshuafolkken', type: 'User' },
+	}
+	const comments = { pageInfo: { hasNextPage: has_next_page }, nodes: [comment] }
+	const repository = { [`issue${String(DECIDING)}`]: { comments } }
+
+	return JSON.stringify({ data: { rateLimit: { cost: 1, remaining: 4999 }, repository } })
+}
+
+// The REST listing's spelling of the same comment — the oracle the GraphQL mapping answers.
+const REST_COMMENTS = JSON.stringify([
+	{
+		html_url: COMMENT_URL,
+		body: COMMENT_BODY,
+		created_at: COMMENT_TIME,
+		author_association: 'OWNER',
+		user: { login: 'joshuafolkken' },
+	},
+])
+
+// The node query and the comment query, told apart by the comment connection the latter asks for.
+function serve_graphql(has_next_page = false): void {
+	mocked_api.mockImplementation(async ({ body }) => {
+		const answer = body?.includes(COMMENT_FIELDS)
+			? graphql_comments(has_next_page)
+			: graphql_answer([PERSON, OUTSIDE])
+
+		return await answer
+	})
+}
+
 beforeEach(() => {
 	vi.restoreAllMocks()
 	mocked_api.mockReset()
@@ -182,5 +236,61 @@ describe('run_board_decision_read.with_decisions — the GraphQL read', () => {
 		await run_board_decision_read.with_decisions(plan_of())
 
 		expect(mocked_api).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_board_decision_read.with_decisions — the GraphQL comment read', () => {
+	it('reads the nodes and the decision comments with no REST core (ac-c6f8921e)', async () => {
+		serve_graphql()
+		const view = vi.spyOn(git_gh_issue_read, 'issue_view_json')
+		const comments = vi.spyOn(git_gh_issue_read, 'issue_list_comments')
+		const read = vi.spyOn(git_gh_etag_read, 'read')
+
+		const plan = await run_board_decision_read.with_decisions(deciding_plan())
+
+		expect(plan?.decision_questions?.get(DECIDING)).toBe(QUESTION)
+		expect(mocked_api).toHaveBeenCalledTimes(2)
+		expect(view).not.toHaveBeenCalled()
+		expect(comments).not.toHaveBeenCalled()
+		expect(read).not.toHaveBeenCalled()
+	})
+
+	it('answers the comment question the REST listing answers (ac-ce447068)', async () => {
+		serve_graphql()
+		const graphql = await run_board_decision_read.with_decisions(deciding_plan())
+
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+		serve_rest()
+		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue(REST_COMMENTS)
+		const rest = await run_board_decision_read.with_decisions(deciding_plan())
+
+		expect(graphql?.decision_questions).toStrictEqual(rest?.decision_questions)
+		expect(graphql?.decision_questions?.size).toBe(1)
+	})
+})
+
+describe('run_board_decision_read.with_decisions — the REST comment read', () => {
+	it('reads a listing GraphQL cut at the page through REST', async () => {
+		serve_graphql(true)
+		const comments = vi
+			.spyOn(git_gh_issue_read, 'issue_list_comments')
+			.mockResolvedValue(REST_COMMENTS)
+
+		await run_board_decision_read.with_decisions(deciding_plan())
+
+		expect(comments.mock.calls.map(([number]) => number)).toStrictEqual([String(DECIDING)])
+	})
+
+	it('sends no comment query in a REST session (ac-f5d6bd56)', async () => {
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+		serve_rest()
+		const comments = vi
+			.spyOn(git_gh_issue_read, 'issue_list_comments')
+			.mockResolvedValue(REST_COMMENTS)
+
+		await run_board_decision_read.with_decisions(deciding_plan())
+
+		expect(mocked_api).not.toHaveBeenCalled()
+		expect(comments).toHaveBeenCalledOnce()
 	})
 })
