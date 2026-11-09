@@ -744,6 +744,24 @@ Related: [`josh review:findings`](josh-commands.md#josh-reviewfindings), [`josh 
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh review:record` in detail".
 
+### `josh review:pair`
+
+<!-- usage: review:pair -->
+
+Record a paired comparison under JOSH_REVIEWER_PAIRED=1: the Opus and Sonnet round-1 findings with severity and each agent cost; never gates.
+
+```bash
+pnpm josh review:pair --issue 6902 --opus-agent a1b2 --sonnet-agent c3d4   # after both round-1 reviewers return, before review:record
+```
+
+**Options:**
+
+- `--opus-agent <id>` / `--sonnet-agent <id>` — each reviewer's agentId, whose transcript prices its cost.
+
+<!-- /usage -->
+
+Appends one line to `review-pairs.jsonl` in the git common directory. Neither `review:attest` nor the merge gate reads it.
+
 ## Versioning
 
 ### `josh bump`

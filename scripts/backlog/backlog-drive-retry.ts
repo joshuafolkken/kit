@@ -34,6 +34,13 @@ async function park_protected(issue: number, cause: number, label: string): Prom
 	)
 }
 
+// Every automatic re-offer goes through `run:add --retry`, which records the `retry #N` attempt.
+async function add_retry(issue: number, what: string): Promise<void> {
+	const result = await josh_command.josh_run(['run:add', String(issue), '--retry'], true)
+
+	if (result.code !== 0) throw new Error(`Could not retry ${what}.`)
+}
+
 async function retry_one(issue: number, cause: number, repo: string): Promise<void> {
 	const read = await run_add_issue.read(issue)
 	const citation = issue_cite.reference(repo, String(issue), undefined)
@@ -49,9 +56,7 @@ async function retry_one(issue: number, cause: number, repo: string): Promise<vo
 		return
 	}
 
-	const result = await josh_command.josh_run(['run:add', String(issue), '--retry'], true)
-
-	if (result.code !== 0) throw new Error(`Could not retry ${citation} after its cause merged.`)
+	await add_retry(issue, `${citation} after its cause merged`)
 }
 
 async function retry_all(
@@ -77,4 +82,4 @@ async function after_merge(cause: number): Promise<void> {
 	await retry_all([...parked], cause, repo)
 }
 
-export const backlog_drive_retry = { after_merge }
+export const backlog_drive_retry = { add_retry, after_merge }

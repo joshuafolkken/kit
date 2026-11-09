@@ -24,4 +24,11 @@ function current_attempts(events: ReadonlyArray<RunEvent>): ReadonlyArray<RunEve
 	)
 }
 
-export const run_event_retry = { current_attempts, is_retry, text_of }
+// How many times the stream has retried one issue, across every invocation it holds.
+function count_of(events: ReadonlyArray<RunEvent>, issue: number): number {
+	return events.filter(
+		(event) => is_retry(event) && run_event_scope.issue_named(event) === String(issue),
+	).length
+}
+
+export const run_event_retry = { count_of, current_attempts, is_retry, text_of }
