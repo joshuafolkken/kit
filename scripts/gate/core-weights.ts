@@ -53,17 +53,29 @@ const CORE_WEIGHTS = {
 	e2e: 2,
 } as const
 
+// joshuafolkken/kit#6331: whole-tree typed lint holds the root TypeScript program and every
+// module's import/export metadata, and ran out of V8's default heap — in CI and locally alike.
+// `eslint-heap.ts` launches eslint under this heap; the lint reservations below are read off it too
+// (joshuafolkken/kit#6684), so the ledger cannot reserve less than the heap eslint may grow to.
+const ESLINT_HEAP_MIB = 8192
+const BYTES_PER_MIB = 1_048_576
+const BYTES_PER_MB = 1_000_000
+
+// The heap cap in the ledger's megabytes, rounded up — the eslint peak `josh lane:stats` recorded
+// (joshuafolkken/kit#6684) sits under it.
+const ESLINT_PEAK_MB = Math.ceil((ESLINT_HEAP_MIB * BYTES_PER_MIB) / BYTES_PER_MB)
+
 // **Memory reservations cover peak resident size, rounded up.** Lint and the whole-tree scan share
-// the whole-tree peak. Unit workers use a whole-suite reading because a small subset misses their
+// the whole-tree peak, the eslint heap cap. Unit workers use a whole-suite reading because a small subset misses their
 // later growth (joshuafolkken/kit#4528). Metrics uses the cache-miss peak because its parent retains
 // its heap beside the merge-base child (joshuafolkken/kit#4595). E2E reserves the full Playwright
 // process tree, including the dev server, once per run rather than per worker (joshuafolkken/kit#5413).
 const MEMORY_MB = {
-	lint: 2400,
+	lint: ESLINT_PEAK_MB,
 	metrics: 1900,
 	type_check: 1300,
 	spell_check: 350,
-	eslint_scan: 2400,
+	eslint_scan: ESLINT_PEAK_MB,
 	unit_worker: 400,
 	format: 300,
 	retrospective: 900,
@@ -84,6 +96,6 @@ const TOOL_MEMORY: Readonly<Partial<Record<string, keyof typeof MEMORY_MB>>> = {
 	playwright: 'e2e',
 }
 
-const core_weights = { CORE_WEIGHTS, MEASURED, MEMORY_MB, TOOL_MEMORY }
+const core_weights = { CORE_WEIGHTS, ESLINT_HEAP_MIB, MEASURED, MEMORY_MB, TOOL_MEMORY }
 
 export { core_weights }
