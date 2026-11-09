@@ -1,4 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
+import { git_gh_issue_batch_read } from '#scripts/gh/git-gh-issue-batch-read'
+import { PLAN_FIELDS, type IssueRead } from '#scripts/gh/git-gh-issue-read'
 import { epic_audit_logic } from './epic-audit'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_issue, type EpicIssue } from './epic-issue'
@@ -145,19 +148,33 @@ function collect_referenced(
 
 // A read that came back shaped wrong counts as unreadable, not as missing: the number resolved to
 // something, so the gap is in what arrived rather than in whether there was anything to arrive.
-async function read_one(number: number): Promise<ReferencedRead> {
-	const read = await git_gh_command.issue_get_plan_fields_classified(String(number))
-
+function to_referenced(number: number, read: IssueRead): ReferencedRead {
 	if (read.kind !== 'read') return { number, result: read.kind }
 
 	return { number, result: epic_issue.parse_epic_issue(read.json) ?? 'unreadable' }
 }
 
-// One `gh api` read per reference, all requested at once: the `gh` layer's shared spawn limit
-// (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`) bounds how many run, so the burst never turns a rate
-// limit into a refused read that arrives as an absence.
+async function read_plan_fields(number: number): Promise<IssueRead> {
+	return await git_gh_command.issue_get_plan_fields_classified(String(number))
+}
+
+async function read_one(number: number): Promise<ReferencedRead> {
+	return to_referenced(number, await read_plan_fields(number))
+}
+
+// The references read the batched way (`git-gh-issue-batch-read.ts`), in the plan fields — the title
+// and URL included, which is what tells a pull request apart. A pull request is left to REST rather
+// than failing the batch. Every reference the batch left unanswered is a `gh api` read, all requested
+// at once: the `gh` layer's shared spawn limit (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`) bounds how
+// many run, so the burst never turns a rate limit into a refused read that arrives as an absence.
 async function fetch_referenced(numbers: ReadonlyArray<number>): Promise<Array<ReferencedRead>> {
-	return await Promise.all(numbers.map(async (number) => await read_one(number)))
+	const reads = await git_gh_issue_batch_read.read_each(numbers, {
+		fields: PLAN_FIELDS,
+		from_json: git_gh_issue_batch_graphql.answered,
+		read_rest: read_plan_fields,
+	})
+
+	return reads.map(([number, read]) => to_referenced(number, read))
 }
 
 // What the subject's body names, read and filtered. `undefined` when there was nothing new to read,

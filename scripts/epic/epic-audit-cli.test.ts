@@ -1,4 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
+import { stub_unanswered_batch } from '#scripts/gh/git-gh-issue-batch-graphql-fixture'
 import type { ScanCutoff } from '#scripts/git/listing-cutoff'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuditFinding, ReferenceState } from './epic-audit'
@@ -53,8 +55,10 @@ function audit_input(overrides: Partial<AuditInput> = {}): AuditInput {
 	}
 }
 
+// No child is answered by the batch unless a case says so: the body reads below are REST's.
 beforeEach(() => {
 	vi.restoreAllMocks()
+	stub_unanswered_batch()
 })
 
 describe('epic_audit_cli.parse_epic_number', () => {
@@ -240,6 +244,28 @@ describe('epic_audit_cli.audit — the orphan search itself', () => {
 
 		expect(result.findings.map((finding) => finding.level)).toEqual(['warning'])
 		expect(result.exit_code).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#6869: the body is in the batch's answer, so only an unanswered child costs a
+// REST read.
+describe('epic_audit_cli.attach_bodies — the batch first', () => {
+	it('takes the body from the batch answer and reads the rest through REST', async () => {
+		const batch = git_gh_issue_batch_graphql.empty_batch()
+
+		batch.reads.set(
+			1,
+			git_gh_issue_batch_graphql.answered(JSON.stringify({ number: 1, body: LOCAL_BODY })),
+		)
+		vi.spyOn(git_gh_issue_batch_graphql, 'read_many').mockResolvedValue(batch)
+		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(REMOTE_BODY)
+		const attached = await epic_audit_cli.attach_bodies(
+			[child_in(1, REPO), child_in(2, REPO)],
+			REPO,
+		)
+
+		expect(attached.map((entry) => entry.body)).toEqual([LOCAL_BODY, REMOTE_BODY])
+		expect(get_body.mock.calls).toEqual([['2', undefined]])
 	})
 })
 
