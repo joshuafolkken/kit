@@ -83,15 +83,18 @@ runs:
     - name: Restore safe-chain
       id: safe-chain-cache
       if: inputs.install == 'true' && inputs.cache == 'true'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ~/.safe-chain/bin
           ~/.safe-chain-installer
         key: safe-chain-${{ runner.os }}-${{ runner.arch }}-${{ steps.safe-chain-pin.outputs.version }}-${{ steps.safe-chain-pin.outputs.sha256 }}
 
-    # A restored installer is verified like a downloaded one; the binary's own `setup-ci` then does
-    # the shims and PATH the installer's `--ci` does after its download.
+    # The hash check covers the installer only; the release has no digest for the binary. The binary
+    # is therefore saved straight after the installer wrote it, before any step runs project code
+    # that could replace it. Its own `setup-ci` does the shims and PATH the installer's `--ci` does
+    # after its download; the binary directory is added as well, since shims without a reachable
+    # binary let every install through without a scan (joshuafolkken/kit#2711).
     - name: Setup safe-chain
       if: inputs.install == 'true'
       shell: bash
@@ -104,6 +107,7 @@ runs:
         if [ "$SAFE_CHAIN_CACHE_HIT" = true ]; then
           echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
           "$HOME/.safe-chain/bin/safe-chain" setup-ci
+          echo "$HOME/.safe-chain/bin" >> "$GITHUB_PATH"
           exit 0
         fi
         export CURL_HOME
@@ -114,6 +118,15 @@ runs:
         curl --proto '=https' -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/$SAFE_CHAIN_INSTALLER_VERSION/install-safe-chain.sh" -o "$installer"
         echo "$SAFE_CHAIN_INSTALLER_SHA256  $installer" | sha256sum -c -
         sh "$installer" --ci
+
+    - name: Save safe-chain
+      if: inputs.install == 'true' && inputs.cache == 'true' && steps.safe-chain-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.safe-chain/bin
+          ~/.safe-chain-installer
+        key: ${{ steps.safe-chain-cache.outputs.cache-primary-key }}
 
     - name: Install dependencies
       if: inputs.install == 'true'

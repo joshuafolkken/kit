@@ -20,6 +20,8 @@ cp "$RUNNER_TEMP/source" "$2"
 const BINARY_CALLS = 'binary-calls'
 const BINARY = `#!/bin/sh\necho "$1" >> "$RUNNER_TEMP/${BINARY_CALLS}"\n`
 const FOREIGN_INSTALLER = 'different installer'
+const GITHUB_PATH_FILE = 'github-path'
+const BINARY_DIRECTORY = path.join('.safe-chain', 'bin')
 const RETRY_SETTINGS = 'retry = 3\nretry-delay = 2\nretry-max-time = 60\n'
 const EXECUTABLE = 0o755
 
@@ -35,7 +37,7 @@ function setup(): string {
 // What `actions/cache` restores into HOME: the installer and the binary it fetched.
 function restore_cache(directory: string): void {
 	const installer_directory = path.join(directory, '.safe-chain-installer')
-	const binary_directory = path.join(directory, '.safe-chain', 'bin')
+	const binary_directory = path.join(directory, BINARY_DIRECTORY)
 
 	mkdirSync(installer_directory, { recursive: true })
 	mkdirSync(binary_directory, { recursive: true })
@@ -58,6 +60,7 @@ function run_setup(
 			...process.env,
 			PATH: `${directory}:${process.env['PATH'] ?? ''}`,
 			HOME: directory,
+			GITHUB_PATH: path.join(directory, GITHUB_PATH_FILE),
 			RUNNER_TEMP: directory,
 			SAFE_CHAIN_CACHE_HIT: cache_hit,
 			SAFE_CHAIN_INSTALLER_VERSION: 'test',
@@ -101,9 +104,12 @@ it('sets the restored binary up for CI without reaching GitHub Releases', () => 
 	expect(run_setup(directory, digest, '22', 'true')).toBe(0)
 	expect(existsSync(path.join(directory, 'settings'))).toBe(false)
 	expect(readFileSync(path.join(directory, BINARY_CALLS), 'utf8')).toBe('setup-ci\n')
+	expect(readFileSync(path.join(directory, GITHUB_PATH_FILE), 'utf8')).toBe(
+		`${path.join(directory, BINARY_DIRECTORY)}\n`,
+	)
 })
 
-it('stops before setting up a restored binary whose installer hash does not match', () => {
+it('stops before setup-ci when the restored installer’s hash does not match', () => {
 	const directory = setup()
 	const digest = createHash('sha256').update(FOREIGN_INSTALLER).digest('hex')
 
