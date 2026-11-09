@@ -28,7 +28,7 @@ relays none. **It exits only on one of three, and the command computes which:**
 `--hours` exit says so on standard error.
 
 **`--mark` at every real report** — `pnpm josh run:progress --mark` in the same turn restarts the
-silence clock; the interval and its overrides are the person's (`docs/josh-commands-run.md` →
+silence clock; the interval and its overrides are the person's (`docs/josh-commands-board.md` →
 "`josh run:progress`"). **Do not keep a progress clock of your own** — the hook refuses the arm.
 
 ### What a report says
@@ -46,7 +46,7 @@ person's own; **no session relays the stream** — name the board command once, 
 asked; the person starts it, or the `josh: run board` task in `.vscode/tasks.json`, by hand.
 `pnpm josh run:event --watch` stays for following the raw events one by one. `pnpm josh run:wake --list` is the one-line read for a person who types for it.
 **A request for periodic progress is never a CronCreate job** — on screen, name `pnpm josh run:board`;
-off-screen, start `pnpm josh run:board --every <minutes>` in the background (`docs/josh-commands-run.md`).
+off-screen, start `pnpm josh run:board --every <minutes>` in the background (`docs/josh-commands-board.md`).
 
 **A stop is the only interrupt**: a `backlogrun` that has stopped ends with
 `pnpm josh run:report --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends

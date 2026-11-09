@@ -208,7 +208,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 			'Whether each in-progress issue holds a live lane, and the two-directional difference',
 		args: '',
 		vocabulary: [LIVE, STOPPED, UNKNOWN],
-		single_source: 'docs/josh-commands-run.md → The `in-progress` / lane difference',
+		single_source: 'docs/josh-commands-lane.md → The `in-progress` / lane difference',
 	},
 	RUN_ENTRY_ORACLE,
 ]

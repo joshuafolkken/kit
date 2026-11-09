@@ -1,6 +1,8 @@
 # josh run, lane and session command reference — rationale and history
 
-History behind [josh-commands-run.md](../josh-commands-run.md), kept here so the reference states
+History behind [josh-commands-run.md](../josh-commands-run.md) and its split-off pages
+([board](../josh-commands-board.md), [lane](../josh-commands-lane.md),
+[session](../josh-commands-session.md)), kept here so the reference states
 only each command's contract — what it does, its arguments, output, exit codes and side effects.
 
 ## Codex batch permissions

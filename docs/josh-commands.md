@@ -985,7 +985,7 @@ pnpm josh backlogrun --restart       # replace the run's processes, keeping its 
 
 <!-- /usage -->
 
-The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the main checkout, its output going to a log file.
+The board is [`josh run:board`](./josh-commands-board.md#josh-runboard). The agent runs in the main checkout, its output going to a log file.
 
 The launch begins the run's carry record and hands it to the supervisor before the agent plans, so the first lane opens without waiting for the plan; the agent's own `run:carry --begin` answers `driving`, and it reports the plan and settles `needs-decision` beside the lanes.
 
@@ -1079,7 +1079,7 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 
 - In order: records a `withdraw` event, stops the child's process tree, stashes the lane's uncommitted work as `<N>: uncommitted work at lane withdraw`, comments on the Issue that it stays open with a `- Why: <reason>` line, comments the `stash:pop` line, removes the `in-progress` marker and closes the lane. A child that had already ended is still withdrawn.
 - A closed issue's lane is withdrawn by `run:wake`, or by `run:merge` when it closed without a merge.
-- `run:merge` also closes the lane of a child whose `lane:plan` yielded (`josh lane:plan` in `docs/josh-commands-run.md`), booked `yielded`, not `withdrawn`; that issue stays in the run and is offered again once the holding lane ends.
+- `run:merge` also closes the lane of a child whose `lane:plan` yielded (`josh lane:plan` in `docs/josh-commands-lane.md`), booked `yielded`, not `withdrawn`; that issue stays in the run and is offered again once the holding lane ends.
 - The Issue stays open, its state reason unchanged: the withdrawal ends this run's attempt, not the work. This run's `backlog:next` / `backlog:offer` exclude it (read off the `withdraw` event); a later run offers it again.
 - The event comes first: `run:merge` and `run:board` book the child `withdrawn` from the stream before reading GitHub, so it is never resumed as an outage, parked `needs-decision` or counted as a failure, and the run moves on.
 

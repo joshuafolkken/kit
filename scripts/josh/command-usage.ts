@@ -10,6 +10,9 @@ import type { CommandUsage } from './josh-command-types'
 const USAGE_PAGES: ReadonlyArray<string> = [
 	'docs/josh-commands.md',
 	'docs/josh-commands-run.md',
+	'docs/josh-commands-board.md',
+	'docs/josh-commands-lane.md',
+	'docs/josh-commands-session.md',
 	'docs/josh-commands-backlog.md',
 	'docs/josh-commands-automation.md',
 ]

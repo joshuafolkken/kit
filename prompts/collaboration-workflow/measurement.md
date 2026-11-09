@@ -8,14 +8,14 @@
 
 - CI のジョブとステップ: `pnpm josh ci:timing <pr|branch|run-id>`（最新コミットの各 run の job・step ごとの秒と結論、`--json` も可、`docs/josh-commands.md`）。
 
-- 手元の gate とチェックごとの所要時間: `pnpm josh lane:stats --period <days>`（gate の記録、`docs/josh-commands-run.md`）。
+- 手元の gate とチェックごとの所要時間: `pnpm josh lane:stats --period <days>`（gate の記録、`docs/josh-commands-lane.md`）。
 
 ## 効果を測る後続 Issue
 
 PR の効果を測る後続 Issue の起票:
 
 - 開始条件は日数でなく標本数で書く: `## 背景` に `- 実施可能条件: #<PR> のマージ後 <K> マージ`（`issue-template.md`）。`#<PR>` は元の PR の番号で、Issue の番号は `issue:file` が refuse する。元の PR がまだ無い → `- 実施可能条件: #<Issue> を閉じる PR のマージ後 <K> マージ` と書く。`#<Issue>` を閉じたマージ済み PR から数える。`- 計測宣言:` のある Issue と、見積もりが 0 ファイルで受け入れ条件が `#<N>` の後・以降か記録（`lane:stats` 等）を読む Issue に条件が無いときも、`issue:file` が refuse する。
-- 判定は既定で `## 背景` の `- 計測宣言:` に書く（`issue-template.md`）。`lane:stats` の表の 1 セル → `pnpm josh lane:value cell`（`docs/josh-commands-run.md` → "`josh lane:value`"）。1 コマンドで出せない値 → `- 計測宣言なし: <理由>`。どちらも無いか同じ宣言の open Issue があれば `issue:file` が refuse する（後者は `issue:comment <N>` で合流）。
+- 判定は既定で `## 背景` の `- 計測宣言:` に書く（`issue-template.md`）。`lane:stats` の表の 1 セル → `pnpm josh lane:value cell`（`docs/josh-commands-lane.md` → "`josh lane:value`"）。1 コマンドで出せない値 → `- 計測宣言なし: <理由>`。どちらも無いか同じ宣言の open Issue があれば `issue:file` が refuse する（後者は `issue:comment <N>` で合流）。
 - K は値の種類で決め、迷ったら 10（30 超は `issue:file` が refuse）:
   - 事象の回数の率（停止・再利用など）: K ≥ 10 ÷ 変更前の率、30 まで。超える見込み → 率でなく件数を宣言するか `- 計測宣言なし: <理由>`。
   - 連続値の平均・差（所要時間など）: 5〜10。

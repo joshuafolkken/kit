@@ -306,7 +306,7 @@ pnpm josh session:lang   # run by the UserPromptSubmit hook; `ja` prints nothing
 
 - Timeout 10. Read via `process.loadEnvFile` (environment wins). Unset / empty / no-`.env` resolve to `ja`; `JOSH_SESSION_LANG=en` opts into English.
 - While a `backlogrun` is live in the repository, it prints one line telling the session to answer a progress question with `pnpm josh run:board --chat`, even a session not driving the run.
-- On a consultation model (Fable, Codex Astra), a prompt carrying a `run:handoff` keyword gets one line pointing at [`josh run:handoff`](./josh-commands-run.md#josh-runhandoff). It reads the stdin payload (`prompt`, `transcript_path`, `model`); Codex wires the same hook in `.codex/hooks.json`.
+- On a consultation model (Fable, Codex Astra), a prompt carrying a `run:handoff` keyword gets one line pointing at [`josh run:handoff`](./josh-commands-board.md#josh-runhandoff). It reads the stdin payload (`prompt`, `transcript_path`, `model`); Codex wires the same hook in `.codex/hooks.json`.
 - Claude Code's payload names no model, so the transcript's last assistant turn does: a session's first prompt gets no line, and only the `run:entry` refusal catches it.
 
 ### `josh e2e:retry-check`
@@ -605,7 +605,7 @@ Rows match by an identifier built from the criterion's text, so a reworded crite
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
-Related: [`josh git`](josh-commands.md#josh-git), [`josh observations:flush`](#josh-observationsflush), [`josh time`](josh-commands-run.md#josh-time).
+Related: [`josh git`](josh-commands.md#josh-git), [`josh observations:flush`](#josh-observationsflush), [`josh time`](josh-commands-session.md#josh-time).
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh followup` in detail".
 

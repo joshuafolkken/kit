@@ -255,7 +255,7 @@ interface LineTiming {
  * that already holds the inputs, as for `run:hold`, `delegate`, `review:level` and `latest:scope`.
  *
  * **It is a schedule rather than an observation, and the two conditions on it are said in prose**
- * (`docs/josh-commands-run.md` → `josh run:progress`): it holds only while the silence continues, and a
+ * (`docs/josh-commands-board.md` → `josh run:progress`): it holds only while the silence continues, and a
  * real report arriving first restarts the clock through `--mark` and supersedes it. The line printing
  * it is itself a report, so the clock starts at this observation.
  */

@@ -23,7 +23,8 @@ const CITATION_PATTERN = /#\d{3,}\b/gu
 
 const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: 'docs/josh-commands-backlog.md', citations: 13 },
-	{ path: 'docs/josh-commands-run.md', citations: 5 },
+	{ path: 'docs/josh-commands-lane.md', citations: 1 },
+	{ path: 'docs/josh-commands-run.md', citations: 4 },
 	{ path: 'docs/josh-commands.md', citations: 2 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', citations: 1 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', citations: 1 },

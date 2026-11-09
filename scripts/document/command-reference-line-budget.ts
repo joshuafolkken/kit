@@ -5,13 +5,16 @@
 // ceiling is a ratchet at the long lines left after condensing them, so lowering it is the only way
 // it moves.
 
-// The only files under `docs/` an agent is routed to read — the four command references; the rest of
+// The only files under `docs/` an agent is routed to read — the command references; the rest of
 // `docs/` is reference a human browses, so the byte budget (`document/document-byte-budget.ts`)
 // covers these alone.
 const COMMAND_REFERENCE_DOCS: ReadonlyArray<string> = [
 	'docs/josh-commands.md',
 	'docs/josh-commands-automation.md',
 	'docs/josh-commands-run.md',
+	'docs/josh-commands-board.md',
+	'docs/josh-commands-lane.md',
+	'docs/josh-commands-session.md',
 	'docs/josh-commands-backlog.md',
 ]
 const LONG_LINE_CHARACTERS = 400
