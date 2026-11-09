@@ -9,6 +9,7 @@ import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { z } from 'zod'
 import { bash_revert } from './bash-revert'
 import { build_envelope, compose_context, format_edited_payload } from './format-edited-file'
+import { hook_context } from './hook-context'
 import { pretool_guard } from './pretool-guard'
 
 const APPLY_PATCH_TOOL = 'apply_patch'
@@ -156,13 +157,14 @@ async function write_posttool_context(raw_payload: string): Promise<void> {
 // shell is stamped here for the `PostToolUse` revert, as `pretool_guard.respond` does on Claude.
 async function write_pretool_outcome(raw_payload: string): Promise<void> {
 	hook_decision.load_environment_file()
+	const context = hook_context.from_process()
 	const judged = pretool_payload(raw_payload)
 
-	bash_revert.stamp(judged)
-	const outcome = pretool_guard.pretool_outcome(judged)
+	bash_revert.stamp(judged, context.cwd)
+	const outcome = pretool_guard.pretool_outcome(judged, context)
 
 	hook_decision.emit_outcome(outcome)
-	await pretool_guard.mark_phase(outcome, judged)
+	await pretool_guard.mark_phase(outcome, judged, context)
 	await pretool_guard.record_refusal(judged, outcome)
 }
 

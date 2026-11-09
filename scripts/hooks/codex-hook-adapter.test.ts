@@ -11,6 +11,7 @@ import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { codex_hook_adapter } from './codex-hook-adapter'
 import { format_edited_file, parse_edited_path, type CommandRunner } from './format-edited-file'
+import { hook_context } from './hook-context'
 import { pretool_guard } from './pretool-guard'
 
 const make_directory = temporary_directory('suite')
@@ -201,10 +202,9 @@ describe('Codex pre-tool adaptation', () => {
 		await codex_hook_adapter.write_pretool_outcome(codex_payload([TYPESCRIPT_FILE]))
 
 		expect(emit).toHaveBeenCalledWith(outcome)
-		expect(mark).toHaveBeenCalledWith(
-			outcome,
-			codex_hook_adapter.pretool_payload(codex_payload([TYPESCRIPT_FILE])),
-		)
+		const judged = codex_hook_adapter.pretool_payload(codex_payload([TYPESCRIPT_FILE]))
+
+		expect(mark).toHaveBeenCalledWith(outcome, judged, hook_context.from_process())
 	})
 })
 
