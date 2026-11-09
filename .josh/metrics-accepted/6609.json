@@ -1,5 +1,5 @@
 {
-	"reason": "New josh issue:consolidate write command (#6609): CLI, consolidate module and state_reason on issue_close",
+	"reason": "New issue:consolidate command (#6609): consolidate core, CLI, close state_reason",
 	"date": "2026-11-09",
 	"growth": {
 		"scripts.code_lines": 240

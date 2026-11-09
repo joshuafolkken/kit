@@ -19,8 +19,19 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	process.exitCode = undefined
 	vi.restoreAllMocks()
 	vi.resetAllMocks()
+})
+
+describe('issue_consolidate_cli.main', () => {
+	it('sets the exit code consolidate answers', async () => {
+		consolidate.mockResolvedValue(1)
+
+		await issue_consolidate_cli.main([TARGET, DUPLICATE])
+
+		expect(process.exitCode).toBe(1)
+	})
 })
 
 describe('issue_consolidate_cli.run', () => {
