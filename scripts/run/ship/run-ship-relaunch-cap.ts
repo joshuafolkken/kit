@@ -1,11 +1,11 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
-import { issue_park } from '#scripts/issue/issue-park'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_stalled, type ParkStop } from '#scripts/run/park/run-stalled'
+import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 import { run_ship_stage } from './run-ship-stage'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
 import { run_ship_stop_text } from './run-ship-stop-text'
@@ -34,7 +34,7 @@ const PARK_CAUSE = 'ship-stop cap'
 const TIMEOUT_PARK_CAUSE = 'merge-wait timeout'
 const CI_INFRA_PARK_CAUSE = 'CI infrastructure failure'
 const { CI_INFRA } = run_ship_stop_cause.CAUSE
-const { CHILD_LAUNCH, PARK, SHIP_STOP } = run_event_stream.EVENT_KIND
+const { CHILD_LAUNCH, SHIP_STOP } = run_event_stream.EVENT_KIND
 const STOP_KIND = { REVIEW: 'review', MECHANICAL: 'mechanical' } as const
 const REVIEW_REASONS: ReadonlySet<string> = new Set([
 	run_ship_stage.STAGE.REVIEW,
@@ -113,13 +113,10 @@ function park_comment(issue: string, lead: string, blocked: string | undefined):
 async function park_with(issue: string, notice: ParkNotice, parked: ParkedStop): Promise<boolean> {
 	const { blocked, stop } = parked
 	const comment = park_comment(issue, notice.lead, blocked)
-	const park_write = await issue_park.apply(issue, RUN_STALLED_LABEL, comment)
+	const is_parked = await run_stalled_park.apply(issue, comment, blocked ?? notice.cause, { stop })
 
-	if (!park_write.is_labelled) return false
+	if (!is_parked) return false
 
-	const text = run_stalled.park_event(issue, blocked ?? notice.cause)
-
-	await run_event_stream_emit.emit(PARK, text, new Date(), { stop })
 	await telegram_notify.warn({
 		issue_title: `${notice.title} ${issue_cite.plain_for('telegram', issue)}`,
 		body: notice.body,

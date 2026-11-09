@@ -40,6 +40,7 @@ const PARK_AND_CONTINUE = reference('backlogrun-park.md', 'park and continue')
 // Rows both tables carry — the step's and the driver's.
 const STEPS = 'backlogrun-steps.md'
 const LOOP = reference(STEPS, 'The loop')
+const RESOLVE = reference(STEPS, 'Resolve what the plan can resolve')
 const RETROSPECTIVE_KEY = 'retrospective'
 const RETROSPECTIVE = reference('retrospective.md', 'The end-of-run retrospective')
 const HUMAN_REVIEW = reference('needs-human-review.md', '`needs-human-review`')
@@ -85,9 +86,11 @@ const LANE_CHILD_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 const DRIVER_SECTIONS: ReadonlyArray<readonly [string, ReadonlyArray<SectionReference>]> = [
 	[RETROSPECTIVE_KEY, [RETROSPECTIVE]],
 	['merge human-review', [HUMAN_REVIEW]],
-	['triage', [LOOP, reference(STEPS, 'Resolve what the plan can resolve')]],
+	['triage', [LOOP, RESOLVE]],
 	['judge', [LOOP, reference('docs/josh-commands-backlog.md', '`josh auto-ok:judge`')]],
-	['launch #', [LOOP, PARK_AND_CONTINUE]],
+	// A refused launch is parked `run:stalled` by the driver (joshuafolkken/kit#6878): its section is the
+	// retry of a recovered mechanical failure, never "park and continue".
+	['launch #', [LOOP, RESOLVE]],
 	['merge', [LOOP, EPIC_CHILDREN]],
 	[
 		'epic #',

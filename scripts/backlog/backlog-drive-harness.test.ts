@@ -75,8 +75,22 @@ function merge(world_state: World, issue: string): Awaited<ReturnType<LoopPorts[
 	return { token: 'none', is_offer: true, outcome: is_parked ? 'parked' : 'merged' }
 }
 
+// The run's own records and parks: nothing added, raised, named, yielded or parked.
+const NO_RECORD: Pick<
+	LoopPorts,
+	'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park' | 'stall'
+> = {
+	added_since: async () => false,
+	raised_since: async () => false,
+	named_left: async () => false,
+	yields: async () => [],
+	park: async () => undefined,
+	stall: async () => undefined,
+}
+
 function ports(world_state: World): LoopPorts {
 	return {
+		...NO_RECORD,
 		is_finished: () => true,
 		adoptable: async () => [],
 		merge: async (issue) => merge(world_state, issue),
@@ -92,8 +106,6 @@ function ports(world_state: World): LoopPorts {
 		judgement_owed: async () => 0,
 		memory_held: async () => false,
 		usage_limited: async () => false,
-		yields: async () => [],
-		park: async () => undefined,
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,
@@ -102,9 +114,6 @@ function ports(world_state: World): LoopPorts {
 		sleep: async (milliseconds) => {
 			world_state.clock += milliseconds
 		},
-		added_since: async () => false,
-		raised_since: async () => false,
-		named_left: async () => false,
 		on_state: () => undefined,
 		finish: async (end) => {
 			world_state.calls.push(end.is_finish === true ? REPORT_END : REPORT_STOP)
