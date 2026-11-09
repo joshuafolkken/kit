@@ -201,6 +201,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_AGENT_ROLE`           | every kit agent launch         | The role this agent session was launched in; a reviewer takes no cut.                                                                    |
 | `JOSH_HOOK_CWD`             | the kit hook launcher          | The directory the hook was launched in; a hook resolves a call's relative path against it.                                               |
 | `JOSH_RUN_HEADLESS`         | the run supervisor             | This session was launched headless by the supervisor.                                                                                    |
+| `JOSH_HANDOFF_CHILD`        | `josh run:handoff`             | This session was started by `run:handoff`, so it is never the `backlogrun` parent whose carry its launcher owns.                         |
 | `JOSH_SHIP_SUPERVISED`      | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                     |
 | `JOSH_SHIP_LAUNCH_ID`       | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                       |
 | `JOSH_SHIP_FOLLOWUP`        | `josh ship`                    | This `josh followup` is the one a `josh ship` runs, so it prints no section of its own.                                                  |

@@ -180,6 +180,16 @@ describe('run_headless.driving_carry', () => {
 		read_carry.mockReturnValue({ kind: 'carried', carry: carry({ owner_pid: SUCCESSOR_PID }) })
 		expect(await run_headless.driving_carry(ATTACHED, own_ancestry)).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#6743: the retrospective unit runs under the parent that owns the carry, so the
+	// owner is in its ancestry; its launch environment must still keep it from driving or cutting it.
+	it('returns nothing for a run:handoff child of a headless parent, whose owner is its ancestor', async () => {
+		read_carry.mockReturnValue(OWNED)
+		const unit = { ...HEADLESS, ...run_headless.handoff_child_environment() }
+
+		expect(await run_headless.driving_carry(unit, own_ancestry)).toBeUndefined()
+		expect(await run_headless.hand_back_at_turn_end(unit, own_ancestry)).toBe(false)
+	})
 })
 
 // joshuafolkken/kit#2472: after a cut the successor owns the record, and the session that cut —

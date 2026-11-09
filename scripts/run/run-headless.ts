@@ -16,6 +16,10 @@ import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run
 
 const HEADLESS_ENV_KEY = 'JOSH_RUN_HEADLESS'
 const HEADLESS_VALUE = '1'
+// A session `josh run:handoff` started. It runs under its launcher's process, so the launcher's carry
+// owner is its ancestor too; the mark keeps it from reading as the `backlogrun` parent the way a lane
+// child's own mark does (`driving_carry`).
+const HANDOFF_CHILD_KEY = 'JOSH_HANDOFF_CHILD'
 const SESSION_CUT = { cuts: 1 }
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
@@ -23,6 +27,20 @@ type EnvironmentSource = Readonly<Record<string, string | undefined>>
 // The environment fragment the supervisor launches a successor with.
 function environment(): Record<string, string> {
 	return { [HEADLESS_ENV_KEY]: HEADLESS_VALUE }
+}
+
+// The fragment a `run:handoff` child starts with: never the headless parent its launcher may be, and
+// marked as the hand-off it is.
+function handoff_child_environment(): Record<string, string | undefined> {
+	return { [HEADLESS_ENV_KEY]: undefined, [HANDOFF_CHILD_KEY]: HEADLESS_VALUE }
+}
+
+// A lane child or a hand-off child: a session started under the parent that is never the parent.
+function is_started_child(source: EnvironmentSource): boolean {
+	return (
+		lane_child_marker.marked_issue(source) !== undefined ||
+		source[HANDOFF_CHILD_KEY] === HEADLESS_VALUE
+	)
 }
 
 function is_headless(source: EnvironmentSource = process.env): boolean {
@@ -99,7 +117,7 @@ async function driving_carry(
 	source: EnvironmentSource = process.env,
 	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
 ): Promise<RunCarry | undefined> {
-	if (lane_child_marker.marked_issue(source) !== undefined) return undefined
+	if (is_started_child(source)) return undefined
 
 	return driven_here(await read_carry_here(), ancestry)
 }
@@ -166,6 +184,7 @@ const run_headless = {
 	driven_here,
 	driving_carry,
 	environment,
+	handoff_child_environment,
 	is_backlog_parent,
 	is_cut_capped,
 	is_headless,
