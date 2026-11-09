@@ -49,7 +49,7 @@ interface StopText {
 function stash_message({ command, issue_number, is_adopt }: SyncEntry): string {
 	const entry = is_adopt ? `${command} new` : command
 
-	return `${entry} ${issue_cite.plain(issue_number)}: pre-existing changes`
+	return `${entry} ${issue_cite.plain_for('program', issue_number)}: pre-existing changes`
 }
 
 function verdict_of(result: JoshResult): string {

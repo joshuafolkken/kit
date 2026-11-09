@@ -54,7 +54,7 @@ async function settle(lane: LaneInfo, records: LaneRecords): Promise<Adoption> {
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.NOTE,
-		`${issue_cite.plain(lane.issue)} adopted by ${ADOPT_COMMAND}`,
+		`${issue_cite.plain_for('program', lane.issue)} adopted by ${ADOPT_COMMAND}`,
 	)
 
 	return adoption

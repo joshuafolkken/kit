@@ -18,7 +18,7 @@ async function has_comment(request: { issue: string; marker: string }): Promise<
 }
 
 function marker_of(issue: string): string {
-	return `<!-- josh:run-pause ${issue_cite.plain(issue)} for `
+	return `<!-- josh:run-pause ${issue_cite.plain_for('program', issue)} for `
 }
 
 async function is_paused(issue: string): Promise<boolean> {

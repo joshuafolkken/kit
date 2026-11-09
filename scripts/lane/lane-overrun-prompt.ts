@@ -117,7 +117,7 @@ function cause_handling(rules: CauseHandling): string {
 // The lines backlog ranking reads (joshuafolkken/kit#4861): the cause's own minutes, else the lane's
 // `minutes`, cited to lane `issue`.
 function loss_lines_of(issue: number, minutes: string): string {
-	const cite = issue_cite.plain(issue)
+	const cite = issue_cite.plain_for('program', issue)
 
 	return `\`- 原因のレーン: ${minutes} 分（${cite}）\` and \`${issue_priority.CAUSE_PREFIX} <分> 分\``
 }

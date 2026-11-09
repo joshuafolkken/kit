@@ -13,7 +13,7 @@ const RECOVERY =
 	'If this did not arrive, `pnpm josh run:wake --list` relays the last progress line.'
 
 async function stop(child: string): Promise<void> {
-	const cite = issue_cite.plain(child)
+	const cite = issue_cite.plain_for('telegram', child)
 	const text = `${cite} could not authenticate — run /login, then resume it`
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.OUTAGE, text)

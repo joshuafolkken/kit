@@ -107,7 +107,7 @@ function split_disposition(positional: string): DisposedSpec {
 }
 
 function issue_field(issue: number): string {
-	return issue_cite.plain(issue)
+	return issue_cite.plain_for('github', issue)
 }
 
 function line_of(fields: ReadonlyArray<string>, kind: LineKind): string {

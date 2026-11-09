@@ -54,7 +54,7 @@ function parse_issue_input(input: string): IssueInfo {
 	const issue_number = extract_issue_number(trimmed_input)
 	const title = extract_issue_title(trimmed_input)
 	const branch_name = create_branch_name(issue_number, title)
-	const commit_message = `${title} ${issue_cite.plain(issue_number)}`
+	const commit_message = `${title} ${issue_cite.plain_for('github', issue_number)}`
 
 	return {
 		title,
@@ -77,7 +77,7 @@ function is_lane_branch(branch_name: string, issue_number: string): boolean {
 const EXAMPLE_ISSUE_NUMBER = '42'
 
 function argument_hint(issue_number: string): string {
-	return `Provide an issue argument like "title ${issue_cite.plain(issue_number)}".`
+	return `Provide an issue argument like "title ${issue_cite.plain_for('github', issue_number)}".`
 }
 
 // Never falls back to the branch's own word: `lane` is not a title, and a commit message cannot be
@@ -112,7 +112,7 @@ async function derive_issue_input_from_branch(branch_name: string): Promise<stri
 		? await lane_issue_title(branch_name, number)
 		: slug.replaceAll('-', ' ').trim()
 
-	return `${title} ${issue_cite.plain(number)}`
+	return `${title} ${issue_cite.plain_for('github', number)}`
 }
 
 async function derive_from_branch(branch_name: string): Promise<IssueInfo> {

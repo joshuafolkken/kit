@@ -112,7 +112,7 @@ async function unmerged_reason(
 }
 
 function cite(issue: number, reason: string | undefined): string | undefined {
-	return reason === undefined ? undefined : `${issue_cite.plain(issue)} (${reason})`
+	return reason === undefined ? undefined : `${issue_cite.plain_for('program', issue)} (${reason})`
 }
 
 // Each named issue that did not merge, with its reason. The issues `run:add` put in count too: one that

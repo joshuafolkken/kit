@@ -19,10 +19,10 @@ interface PrerequisiteRequest {
 }
 
 function park_body(request: PrerequisiteRequest, reason: string): string {
-	const issue = issue_cite.plain(request.issue)
+	const issue = issue_cite.plain_for('github', request.issue)
 	const rerun = `pnpm josh run:split ${request.issue} --prerequisite ${request.prerequisite}`
 
-	return `${NEEDS_DECISION_LABEL}: could not tell whether an epic already tracks ${issue} (${reason}), so ${issue_cite.plain(request.prerequisite)} was neither placed ahead of it nor recorded as its blocker. Rerun \`${rerun}\` once the epic listing reads in full, then clear this park with \`pnpm josh run:park ${request.issue} --clear\`.`
+	return `${NEEDS_DECISION_LABEL}: could not tell whether an epic already tracks ${issue} (${reason}), so ${issue_cite.plain_for('github', request.prerequisite)} was neither placed ahead of it nor recorded as its blocker. Rerun \`${rerun}\` once the epic listing reads in full, then clear this park with \`pnpm josh run:park ${request.issue} --clear\`.`
 }
 
 function create_argv(request: PrerequisiteRequest, title: string): Array<string> {

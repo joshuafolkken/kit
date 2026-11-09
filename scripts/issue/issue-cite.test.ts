@@ -18,19 +18,8 @@ describe('issue_cite.citation_line', () => {
 	})
 })
 
-// joshuafolkken/kit#3424: the single place the bare form is assembled, for text GitHub renders or a
-// program reads.
-describe('issue_cite.plain', () => {
-	it('prints the bare number', () => {
-		expect(issue_cite.plain(Number(NUMBER))).toBe(`#${NUMBER}`)
-	})
-
-	it('qualifies the number with a repository when one is named', () => {
-		expect(issue_cite.plain(NUMBER, OTHER_REPO)).toBe(`${OTHER_REPO}#${NUMBER}`)
-	})
-})
-
-// joshuafolkken/kit#6807: the reason a bare `#N` is right is declared at the call, not in a central list.
+// joshuafolkken/kit#3424, joshuafolkken/kit#6807: the single place the bare form is assembled, for text
+// GitHub renders or a program reads; the reason it is right is declared at the call.
 describe('issue_cite.plain_for', () => {
 	it('prints the bare number, qualified when a repository is named', () => {
 		expect(issue_cite.plain_for('github', Number(NUMBER))).toBe(`#${NUMBER}`)
@@ -40,6 +29,12 @@ describe('issue_cite.plain_for', () => {
 	it('does not compile without a reason', () => {
 		// @ts-expect-error -- a call that does not say why its text stays plain is refused
 		expect(issue_cite.plain_for(Number(NUMBER))).toBeDefined()
+	})
+
+	// joshuafolkken/kit#6810: the reasonless form is not reachable, so no caller can skip the reason.
+	it('does not expose the reasonless plain form', () => {
+		// @ts-expect-error -- `plain` is internal; a caller goes through `plain_for`
+		expect(issue_cite.plain).toBeUndefined()
 	})
 })
 

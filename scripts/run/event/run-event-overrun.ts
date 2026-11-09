@@ -61,15 +61,15 @@ function started_text(issue: number, minutes: number, outcome: string, longest?:
 	const stage =
 		longest === undefined ? '' : `, longest ${longest.name} ${String(longest.minutes)} min`
 
-	return `${issue_cite.plain(issue)} overran: ${String(minutes)} min net${stage} — ${outcome}`
+	return `${issue_cite.plain_for('program', issue)} overran: ${String(minutes)} min net${stage} — ${outcome}`
 }
 
 function within_text(issue: number, minutes: number): string {
-	return `${issue_cite.plain(issue)} net: ${String(minutes)} min`
+	return `${issue_cite.plain_for('program', issue)} net: ${String(minutes)} min`
 }
 
 function skipped_text(issue: number, reason: string): string {
-	return `${issue_cite.plain(issue)} overrun skipped: ${reason}`
+	return `${issue_cite.plain_for('program', issue)} overrun skipped: ${reason}`
 }
 
 // The start note's outcome for a launched session.
@@ -80,11 +80,11 @@ function investigating(pid: number, start: string | undefined): string {
 }
 
 function ended_text(issue: number, result: string): string {
-	return `${issue_cite.plain(issue)} overrun: ${result}`
+	return `${issue_cite.plain_for('program', issue)} overrun: ${result}`
 }
 
 function failed_text(issue: number, note: string): string {
-	return `${issue_cite.plain(issue)} overrun investigation failed: ${note}`
+	return `${issue_cite.plain_for('program', issue)} overrun investigation failed: ${note}`
 }
 
 function none_result(reason: string): string {
@@ -92,7 +92,7 @@ function none_result(reason: string): string {
 }
 
 function recurred_result(issue: number | string): string {
-	return `recurred ${issue_cite.plain(issue)}`
+	return `recurred ${issue_cite.plain_for('program', issue)}`
 }
 
 // The issue a `recurred #N` result commented on.
@@ -103,7 +103,7 @@ function recurred_of(result: string): number | undefined {
 }
 
 function folded_result(issues: ReadonlyArray<number | string>): string {
-	return `${FOLDED_LEAD}${issues.map((issue) => issue_cite.plain(issue)).join(FOLDED_SEPARATOR)}`
+	return `${FOLDED_LEAD}${issues.map((issue) => issue_cite.plain_for('program', issue)).join(FOLDED_SEPARATOR)}`
 }
 
 // The Issues a `folded #A,#B` result appended to, else none; any text after the list is not read.
