@@ -31,6 +31,9 @@ const REPOSITORY_API_URL = 'https://api.github.com/repos/'
 const AUTHOR = 'author { login type: __typename }'
 const BLOCKER = 'number state repository { nameWithOwner }'
 const COMMENT = `url body createdAt authorAssociation ${AUTHOR}`
+// An issue's comments with the page flag that tells a full listing from a cut one — shared with
+// `run:board`'s batched decision read (`run-board-decision-graphql.ts`).
+const COMMENTS = `comments(${PAGE}) { pageInfo { hasNextPage } nodes { ${COMMENT} } }`
 
 // The fields `to_rest_issue` maps — shared with the epic children's batched read
 // (`git-gh-issue-batch-graphql.ts`), so both answer the same REST shape.
@@ -42,7 +45,7 @@ const ISSUE_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
 	repository(owner: $owner, name: $name) {
 		issue(number: $number) {
 			${ISSUE_FIELDS}
-			comments(${PAGE}) { pageInfo { hasNextPage } nodes { ${COMMENT} } }
+			${COMMENTS}
 		}
 	}
 }`
@@ -78,9 +81,11 @@ const issue_fields_schema = z.object({
 	blockedBy: z.object({ totalCount: z.number(), nodes: z.array(blocker_node_schema) }),
 })
 
-const issue_schema = issue_fields_schema.extend({
+const comments_schema = z.object({
 	comments: z.object({ pageInfo: page_info_schema, nodes: z.array(comment_node_schema) }),
 })
+
+const issue_schema = issue_fields_schema.extend(comments_schema.shape)
 
 const response_schema = z.looseObject({
 	data: z.looseObject({ repository: z.looseObject({ issue: issue_schema }) }),
@@ -88,6 +93,7 @@ const response_schema = z.looseObject({
 
 type GraphqlIssue = z.infer<typeof issue_schema>
 type GraphqlIssueFields = z.infer<typeof issue_fields_schema>
+type GraphqlComments = z.infer<typeof comments_schema>['comments']
 type GraphqlAuthor = z.infer<typeof author_schema>
 type BlockerNode = z.infer<typeof blocker_node_schema>
 type BlockingIssue = BlockedBy['nodes'][number]
@@ -134,8 +140,8 @@ function user_of(author: GraphqlAuthor): { user?: { login: string } } {
 	return { user: { login: `${author.login}${suffix}` } }
 }
 
-function to_rest_comments(issue: GraphqlIssue): string {
-	const rows = issue.comments.nodes.map((comment) => ({
+function to_rest_comments(comments: GraphqlComments['nodes']): string {
+	const rows = comments.map((comment) => ({
 		html_url: comment.url,
 		body: comment.body,
 		created_at: comment.createdAt,
@@ -184,7 +190,7 @@ function to_issue_with_comments(issue: GraphqlIssue | undefined): IssueWithComme
 	return {
 		rest: to_rest_issue(issue),
 		blocked_by: to_blocked_by(issue),
-		comments_json: to_rest_comments(issue),
+		comments_json: to_rest_comments(issue.comments.nodes),
 	}
 }
 
@@ -206,15 +212,18 @@ const git_gh_issue_graphql = {
 	repository_variables_of,
 	to_blocked_by,
 	to_blocking_issue,
+	to_rest_comments,
 	to_rest_issue,
 }
 
-export type { GraphqlIssueFields, IssueWithComments, RepositoryVariables }
+export type { GraphqlComments, GraphqlIssueFields, IssueWithComments, RepositoryVariables }
 export {
 	git_gh_issue_graphql,
 	BLOCKER,
+	COMMENTS,
 	ISSUE_FIELDS,
 	PAGE,
 	blocker_node_schema,
+	comments_schema,
 	issue_fields_schema,
 }

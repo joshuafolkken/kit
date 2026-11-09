@@ -79,6 +79,16 @@ describe('run_board_throughput cells', () => {
 		expect(active_at(stranded, NINE)).toBe(30 * MINUTE)
 		expect(active_at(child_stop, NINE)).toBe(HOUR)
 	})
+
+	// joshuafolkken/kit#6677: a merge dated back to its ship's report lands after newer lines.
+	it('counts a backdated merge line once, in time order rather than stream order', () => {
+		const merge = event(local(9, 5), KIND.MERGE, '#12 merged')
+		const after_twenty = beats(NINE, local(9, 20)).length
+		const lines = beats(NINE, NOW).toSpliced(after_twenty, 0, merge)
+		const [day] = rows(lines.map((item, index) => ({ ...item, pos: index + 1 })))
+
+		expect(active_at(day, NINE)).toBe(HOUR)
+	})
 })
 
 describe('run_board_throughput across a clock change', () => {

@@ -52,7 +52,7 @@ and after a cut. `--watch` loops that pass, printing `HH:MM · <label> · <text>
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `usage-limit`, `cut`,
 `resume`, `stop`, `pr-opened`, `review-round`, `filed`, `note`, `lane-phase`, `setup`, `pr-checks`); a kind outside it is refused.
-`lane-phase` is a lane child's first implementation edit, written by the PreToolUse hook.
+`lane-phase` is a child's first implementation edit (PreToolUse hook) or a driver step.
 `pr-checks` is `josh followup`'s poll of a PR's checks, written only on change.
 `setup` is one stage the run works through (`planning`, `dispatching #<N>`, …) — a trace `run:board` times, never a position.
 `filed` is an Issue `issue:file` created, and `note` a one-line
