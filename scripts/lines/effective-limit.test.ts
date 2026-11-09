@@ -142,6 +142,8 @@ describe('effective_limit.options_for — the consumer’s own eslint answers', 
 	it(
 		'asks the named configuration instead of the one the project root holds',
 		async () => {
+			// The root has to resolve this repository's eslint upward, which the platform temp root cannot.
+			// eslint-disable-next-line no-restricted-syntax -- see the fixture note at the top of the file
 			const root = mkdtempSync(path.join(REPO_ROOT, 'node_modules', OTHER_ROOT_PREFIX))
 			const file = path.join(root, SKIPPED)
 			const config_file = fixture(CONFIG_NAME)
