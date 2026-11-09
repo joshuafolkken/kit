@@ -23,6 +23,15 @@ vi.mock('#scripts/lane/lane-implement-rate-read', () => ({
 	lane_implement_rate_read: { measurements: vi.fn() },
 }))
 
+// Within the implement budget unless a test says otherwise, so only the diff decides
+// (`split-early-notice-budget.test.ts` covers the time bar).
+vi.mock('#scripts/run/cut/run-cut-budget-over', () => ({
+	run_cut_budget_over: {
+		implement_over: vi.fn().mockResolvedValue(undefined),
+		spill_steps: vi.fn(),
+	},
+}))
+
 vi.mock('./split-relocations', () => ({
 	split_relocations: {
 		without_relocations: vi.fn(
