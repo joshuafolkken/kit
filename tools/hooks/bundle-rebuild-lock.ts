@@ -41,6 +41,13 @@ function release(lock: string): void {
 	rmSync(lock, { force: true })
 }
 
-const bundle_rebuild_lock = { ABANDONED_LOCK_MS, beside_bundles, claim, lock_path, release }
+const bundle_rebuild_lock = {
+	ABANDONED_LOCK_MS,
+	beside_bundles,
+	claim,
+	is_free,
+	lock_path,
+	release,
+}
 
 export { bundle_rebuild_lock }

@@ -5,7 +5,13 @@ import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { bundle_rebuild_lock } from '#tools/hooks/bundle-rebuild-lock'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { launch, launch_target, type Rebuild } from './josh-ready'
+import {
+	FAILED_NOTICE,
+	launch,
+	launch_target,
+	STILL_STALE_NOTICE,
+	type Rebuild,
+} from './josh-ready'
 
 const INPUT = 'source.ts'
 const make_directory = temporary_directory('suite')
@@ -21,6 +27,7 @@ const BUNDLE = 'dist/josh.js'
 const ENTRY = 'scripts/josh/josh.ts'
 const SPACED_ARGUMENT = 'argument with spaces'
 const OTHER_BUILD_MS = 250
+const EXECUTABLE_MODE = 0o755
 const COMMANDS = 'dist/commands'
 
 function write_bundle(directory: string, source: string): void {
@@ -99,8 +106,11 @@ describe('josh startup with a stale dist (ac-05c27eab, ac-d8bcc144)', () => {
 		})
 
 		expect(target).toBe(path.join(root, ENTRY))
+		expect(console.error).toHaveBeenCalledWith(STILL_STALE_NOTICE)
 	})
+})
 
+describe('josh startup when the rebuild fails', () => {
 	it.each(['dist/inputs.json', BUNDLE, 'dist/commands/inputs.json', 'dist/commands/josh.js'])(
 		'falls back to source when %s is missing and the rebuild fails',
 		async (missing) => {
@@ -108,33 +118,62 @@ describe('josh startup with a stale dist (ac-05c27eab, ac-d8bcc144)', () => {
 			rmSync(path.join(root, missing))
 
 			await expect(launch_target(root, failing_build)).resolves.toBe(path.join(root, ENTRY))
+			expect(console.error).toHaveBeenCalledWith(FAILED_NOTICE)
 		},
 	)
 
 	it('falls back to source before the first build when the build fails', async () => {
 		await expect(launch_target(root, failing_build)).resolves.toBe(path.join(root, ENTRY))
 	})
+
+	it('treats a non-zero exit of the checkout build as a failed rebuild', async () => {
+		const tsx = path.join(root, 'node_modules/.bin/tsx')
+
+		mkdirSync(path.dirname(tsx), { recursive: true })
+		writeFileSync(tsx, '#!/bin/sh\nexit 3\n', { mode: EXECUTABLE_MODE })
+
+		await expect(launch_target(root)).resolves.toBe(path.join(root, ENTRY))
+		expect(console.error).toHaveBeenCalledWith(FAILED_NOTICE)
+	})
 })
 
-// Another launch's build, holding the lock until it has written fresh bundles.
-async function build_elsewhere(lock: string): Promise<void> {
+// Another launch's build, holding the lock until it ends — with fresh bundles when it succeeds.
+async function build_elsewhere(lock: string, is_successful: boolean): Promise<void> {
 	await sleep(OTHER_BUILD_MS)
-	ready_bundles()
+	if (is_successful) ready_bundles()
 	bundle_rebuild_lock.release(lock)
+}
+
+async function launch_beside_other_build(
+	is_successful: boolean,
+	rebuild: Rebuild,
+): Promise<string> {
+	const lock = bundle_rebuild_lock.lock_path(path.join(root, COMMANDS))
+
+	mkdirSync(path.dirname(lock), { recursive: true })
+	writeFileSync(lock, '')
+	const [target] = await Promise.all([
+		launch_target(root, rebuild),
+		build_elsewhere(lock, is_successful),
+	])
+
+	return target
 }
 
 describe('josh startup while another launch rebuilds', () => {
 	it('waits for the lock holder and uses the dist it built', async () => {
 		const rebuild = vi.fn<Rebuild>()
-		const lock = bundle_rebuild_lock.lock_path(path.join(root, COMMANDS))
 
-		mkdirSync(path.dirname(lock), { recursive: true })
-		writeFileSync(lock, '')
-		const other_build = build_elsewhere(lock)
-
-		await expect(launch_target(root, rebuild)).resolves.toBe(path.join(root, BUNDLE))
-		await other_build
+		await expect(launch_beside_other_build(true, rebuild)).resolves.toBe(path.join(root, BUNDLE))
 		expect(rebuild).not.toHaveBeenCalled()
+	})
+
+	it('runs the source without building again when the lock holder build failed', async () => {
+		const rebuild = vi.fn<Rebuild>()
+
+		await expect(launch_beside_other_build(false, rebuild)).resolves.toBe(path.join(root, ENTRY))
+		expect(rebuild).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(STILL_STALE_NOTICE)
 	})
 })
 

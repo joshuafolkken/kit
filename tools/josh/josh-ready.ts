@@ -20,6 +20,8 @@ const LOCK_POLL_MS = 100
 const STDERR_FD = 2
 const FAILED_NOTICE =
 	'josh: dist is stale and could not be rebuilt, so this command runs from source through tsx (pnpm build shows the error)'
+const STILL_STALE_NOTICE =
+	'josh: dist is still stale after the rebuild — the source changed while it ran, or another launch built it and failed — so this command runs from source through tsx'
 
 // Throws when the build fails.
 type Rebuild = (package_directory: string) => void
@@ -41,16 +43,22 @@ function rebuild_from_source(package_directory: string): void {
 	if (status !== 0) throw new Error(`build exited with ${String(status)}`)
 }
 
-// True when this launch rebuilt `dist`, or waited out another launch's build that left it fresh.
+// A waiter never builds after the holder: a build that failed for the holder fails the same way again.
+async function wait_for_release(lock: string): Promise<void> {
+	await sleep(LOCK_POLL_MS)
+	if (!bundle_rebuild_lock.is_free(lock)) await wait_for_release(lock)
+}
+
+// False only when this launch's own build failed; waiting out another launch's build counts as built.
 async function rebuild_once(package_directory: string, rebuild: Rebuild): Promise<boolean> {
 	const lock = bundle_rebuild_lock.lock_path(path.join(package_directory, 'dist', 'commands'))
 
 	mkdirSync(path.dirname(lock), { recursive: true })
 
 	if (!bundle_rebuild_lock.claim(lock)) {
-		await sleep(LOCK_POLL_MS)
+		await wait_for_release(lock)
 
-		return is_fresh(package_directory) || (await rebuild_once(package_directory, rebuild))
+		return true
 	}
 
 	try {
@@ -70,8 +78,9 @@ async function launch_target(
 ): Promise<string> {
 	const bundle = path.join(package_directory, 'dist', 'josh.js')
 	if (is_fresh(package_directory)) return bundle
-	if ((await rebuild_once(package_directory, rebuild)) && is_fresh(package_directory)) return bundle
-	console.error(FAILED_NOTICE)
+	const is_built = await rebuild_once(package_directory, rebuild)
+	if (is_fresh(package_directory)) return bundle
+	console.error(is_built ? STILL_STALE_NOTICE : FAILED_NOTICE)
 
 	return path.join(package_directory, 'scripts/josh/josh.ts')
 }
@@ -95,4 +104,4 @@ async function launch(
 if (process.argv[1] === LAUNCH_SCRIPT) await launch()
 
 export type { Rebuild }
-export { FAILED_NOTICE, launch, launch_target }
+export { FAILED_NOTICE, launch, launch_target, STILL_STALE_NOTICE }
