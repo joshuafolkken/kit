@@ -80,8 +80,9 @@ async function finish_prior_write(
 	fold: FoldWrite,
 	unchanged: ApplyResult | undefined,
 ): Promise<ApplyResult | undefined> {
-	if (unchanged !== 'changed') return undefined
-	if ((await reads_as(fold.issue_number, fold.body)) !== true) return undefined
+	if (unchanged !== 'changed' || (await reads_as(fold.issue_number, fold.body)) !== true) {
+		return undefined
+	}
 
 	return (await raise_floor(fold.issue_number)) ?? 'applied'
 }
