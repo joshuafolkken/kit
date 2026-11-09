@@ -70,7 +70,11 @@ describe('run_ship_return.return_control past the ship-stop cap', () => {
 			'parked',
 		)
 		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'followup')
-		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'followup', BLOCKED)
+		expect(park_mock).toHaveBeenCalledWith(ISSUE, {
+			reason: 'followup',
+			stop: { stage: 'followup', cause: 'check' },
+			blocked: BLOCKED,
+		})
 		expect(relaunch_mock).not.toHaveBeenCalled()
 		expect(request_mock).not.toHaveBeenCalled()
 	})
@@ -98,7 +102,12 @@ describe('run_ship_return.return_control on a merge wait that timed out', () => 
 		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, WAIT_TIMED_OUT)).toBe(
 			'parked',
 		)
-		expect(park_timed_out_mock).toHaveBeenCalledWith(ISSUE, 'followup', BLOCKED)
+		// joshuafolkken/kit#6864: the park carries the stop's stage and cause class.
+		expect(park_timed_out_mock).toHaveBeenCalledWith(ISSUE, {
+			reason: 'followup',
+			stop: { stage: 'followup', cause: 'timeout' },
+			blocked: BLOCKED,
+		})
 		expect(park_mock).not.toHaveBeenCalled()
 		expect(relaunch_mock).not.toHaveBeenCalled()
 		expect(request_mock).not.toHaveBeenCalled()

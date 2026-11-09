@@ -240,6 +240,17 @@ The adapter normalizes patch and shell calls into the same authority check. Opaq
 refused for non-workers. Hosts that skip PreToolUse, including nested tool calls, have no verified
 enforcement; generated settings alone do not establish host coverage.
 
+A consultation scope's shell runs unless it is irreversible: a git, GitHub, dependency or josh
+shared-state write, a visible write to a runtime path, or a command that runs what an expansion or
+standard input spells, or a `case` arm or function body it cannot read. The refusal names that
+operation. The check reads nested commands too:
+substitutions, compound bodies, `xargs`, `timeout`, `find -exec`, `sh -c` and `eval`
+(`scripts/hooks/implementation-shell-nested.ts`); the deny-list is
+`scripts/hooks/implementation-shell-deny.ts`. A runtime file any other call changes in the session's
+own checkout is restored after the call (`scripts/hooks/bash-revert.ts`); a file-writing program
+(`cp`, `mv`, `rsync`, `tar`, `dd`, `sed -i`, …) aimed at a runtime path outside it is refused, as the
+restore does not reach another checkout.
+
 ### `josh stop:guard`
 
 <!-- usage: stop:guard -->

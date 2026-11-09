@@ -2,6 +2,10 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The `git diff` summary flag an issue reproduction runs (#6586).
+  - shortstat
+  # A subshell written without a space after the parenthesis, as a review finding names it (#6586).
+  - unspaced
   # Codex session files grouped into one lane task (#6376).
   - rollouts
   # Claude's update opt-out and an unsupported CPU used by bootstrap tests (#6295).

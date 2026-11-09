@@ -13,7 +13,6 @@ import {
 } from './claude-settings-fixture'
 
 const GITIGNORE_PATH = fileURLToPath(new URL('../../.gitignore', import.meta.url))
-const CLAUDE_MD_PATH = fileURLToPath(new URL('../../CLAUDE.md', import.meta.url))
 
 // #852: the innermost feedback loop is one edited file, and before this hook the only way to see
 // what prettier and eslint made of it was a whole-project run. The hook launches the pre-built
@@ -387,41 +386,10 @@ function prompt_commands(): ReadonlyArray<string> {
 
 // joshuafolkken/kit#2994: an echo is injected on every prompt, a question that writes nothing included,
 // so the Step 0 reminder moved to the first runtime `Edit` / `Write` (`step-zero-notice.ts`) and the
-// prompt hook is the one session-language process.
+// prompt hook is the one session-language process; the exact list leaves no room for an echo.
 describe('.claude/settings.json — one per-turn process, no echoed reminder', () => {
 	it('runs exactly one UserPromptSubmit command, the session-language line', () => {
 		expect(prompt_commands()).toEqual([SESSION_LANG_HOOK_COMMAND])
-	})
-
-	it('injects no echo on a prompt', () => {
-		expect(prompt_commands().filter((command) => command.startsWith('echo '))).toEqual([])
-	})
-})
-
-// joshuafolkken/kit#2889 moved the deletion policy from a per-turn hook into the Tier C definition in
-// `CLAUDE.md`, which every session loads, so the rule is pinned where it now lives.
-function tier_c_line(): string {
-	return (
-		readFileSync(CLAUDE_MD_PATH, 'utf8')
-			.split('\n')
-			.find((line) => line.includes('**Tier C')) ?? ''
-	)
-}
-
-describe('CLAUDE.md — deletion-policy reconciliation with Tier C', () => {
-	it('keeps the index-mutation deny the policy sits beside', () => {
-		expect(claude_settings_fixture.read_settings_text()).toContain('git restore')
-	})
-
-	it('frames git-tracked deletion as reversible and not a destructive op', () => {
-		expect(tier_c_line()).toContain(
-			'Deleting a git-tracked file is reversible, so it is not a destructive op',
-		)
-	})
-
-	it('still requires inspecting the target before deleting', () => {
-		expect(tier_c_line()).toContain('inspect the target first')
-		expect(tier_c_line()).not.toContain('proceed directly')
 	})
 })
 

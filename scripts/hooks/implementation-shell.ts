@@ -1,78 +1,51 @@
-import { canonical_command } from '#scripts/josh/josh-aliases'
-import { josh_read_only } from '#scripts/josh/josh-read-only'
+import path from 'node:path'
 import { git_argv, type ProgramCall } from '#scripts/rules/git-argv'
 import { shell_segments } from '#scripts/rules/shell-segments'
 import { time_shell } from '#scripts/time-runtime/time-shell'
-import { implementation_shell_read } from './implementation-shell-read'
+import { implementation_shell_deny } from './implementation-shell-deny'
+import { implementation_shell_nested } from './implementation-shell-nested'
 import { step_zero_notice } from './step-zero-notice'
 
-// This is a pre-execution check of visible writes, not a shell sandbox. An interpreter body or
-// dynamic destination cannot establish an operational-record-only write, so it fails closed.
+// A consultation scope's pre-execution check (joshuafolkken/kit#6586): a shell runs unless it makes a
+// change no later check takes back. A runtime file a call changes is restored after it
+// (`bash-revert.ts`); a visible write to one is still refused here, as is every call
+// `implementation-shell-deny.ts` names — in a segment, a substitution or a program another one launches.
 const FILE_PROGRAMS: ReadonlySet<string> = new Set(['tee', 'touch', 'rm', 'truncate'])
-const READ_PROGRAMS: ReadonlySet<string> = new Set([
-	'cat',
-	'grep',
-	'head',
-	'tail',
-	'ls',
-	'pwd',
-	'echo',
-	'printf',
-	'true',
-	'false',
-	'wc',
-	'diff',
-	'cut',
-	'tr',
-	// Writes nothing itself; a write beside it is refused, as its target is no longer read off the root.
-	'cd',
+// The other programs that write the files their arguments name. `bash-revert.ts` restores only the
+// session's own checkout, so one aimed at a runtime file outside it is refused. A copy writes only its
+// last argument unless `-t` names the directory; `sed` / `perl` write only in place; an `of=` value is
+// a path.
+const COPY_PROGRAMS: ReadonlySet<string> = new Set(['cp', 'ln', 'install', 'rsync', 'scp'])
+const MOVE_PROGRAMS: ReadonlySet<string> = new Set([
+	...COPY_PROGRAMS,
+	'mv',
+	'dd',
+	'patch',
+	'tar',
+	'unzip',
 ])
-const GIT_READS: ReadonlySet<string> = new Set([
-	'status',
-	'diff',
-	'show',
-	'log',
-	'ls-files',
-	'rev-parse',
-])
-const OPERATIONS =
-	/^(?:issue:|lane:|auto-ok:|epic(?::|$)|run:|doc:|review:|backlog:|report:|observations:|oracle:|plan:consumers$|cost$|delegate$|repo:party$|pin:verify$|rule:list$|notify$|disposition$)/u
-const GH_ACTIONS: ReadonlySet<string> = new Set([
-	'view',
-	'list',
-	'status',
-	'checks',
-	'diff',
-	'create',
-	'edit',
-	'comment',
-	'close',
-	'reopen',
-])
-const GIT_WRITE_FLAGS = /^-c|^--(?:config-env|exec-path|output|ext-diff|textconv)/u
+const TARGET_DIRECTORY = /^-(?:[A-Za-z]*t|-target-directory)/u
+const IN_PLACE_PROGRAMS: ReadonlySet<string> = new Set(['sed', 'perl'])
+const IN_PLACE = /^-(?:[A-Za-z]*i|-in-place)/u
 const REDIRECT = /(?<![<>])(?:<>|>[>|&]?)(?![>&])/gu
 const DESCRIPTOR = /^(?:\d+[+-]?|-)$/u
 const QUOTES = /^['"]|['"]$/gu
 const DYNAMIC_PATH = /[$`*?{}\\]/u
-// Substitutions have their own execution and redirection scope; record text can use Edit/Write.
-const SUBSTITUTION = /\$\(|`|[<>]\(/u
-const ENV_ASSIGNMENT = /(?:^|[\s;&|(])[A-Za-z_]\w*=/u
-// An assignment stands only before the program word, so a `gh api` field after `-f` / `-F` is not one.
-const FIELD_VALUE = /(?<=\s(?:-[Ff]|--(?:raw-)?field)) \S+/gu
-const LOOP_HEADER = /(?:^|[\s;&|(])for\s+([A-Za-z_]\w*)\s+in\s/gu
-const VARIABLE_REFERENCE = /\$([A-Za-z_]\w*)/gu
-const LOOP_BODY = /^\s*do\s+/u
-const LOOP_KEYWORDS: ReadonlySet<string> = new Set(['for', 'do', 'done'])
+// A compound command's opening words and closing brackets, so its body is judged as the command it
+// runs: `if x; then git push; fi` and `(cd x && git push)` launch `git push`.
+const COMPOUND_HEAD = /^\s*(?:[({!]\s*|(?:if|then|else|elif|while|until|do)\s+)+/u
+const COMPOUND_CLOSERS = new Set([')', '}', ' ', '\t', '\n'])
+const KEYWORDS: ReadonlySet<string> = new Set(['for', 'do', 'done', 'then', 'else', 'fi', 'esac'])
+// A `case` arm or a function body sits behind a pattern or a name the cut does not read, so the line is
+// refused rather than guessed.
+const UNREAD_BODY = /^(?:case|select|function)\s|^[\w.:-]+\s*\(\s*\)/u
 const ARGUMENT_QUOTES = /['"\\]/gu
-const ARGUMENT_EXPANSION = /[*?{}[\]]/u
-// `find`'s actions that run a program or write a file; every other primary only selects and prints.
-const FIND_ACTIONS = /^-(?:exec|execdir|ok|okdir|delete|fprint0?|fprintf|fls)$/u
-// `-X` may close a cluster of short flags (`-iX DELETE`), as gh's flag parser reads it.
-const NON_GET_METHOD = /(?:^|\s)(?:-[a-z]*X\s*|--method(?:=|\s+))(?!GET(?:\s|$))\S/iu
-const PNPM_VIEW = /^\s*pnpm(?:\s+-\S+)*\s+view(?:\s|$)/u
+const TIME_PROGRAM = /(?:^|\/)time$/u
+const TIME_WRITE = /^-(?:[A-Za-z]*o|-o)/u
 const CD_WRITE = 'a write beside `cd`, whose target is not read off the repository root'
+const STDIN_SHELL = 'a shell running the commands its standard input spells, which may be any write'
 
-// The rule an unverified shell matched, or `undefined` for a visible read or record write.
+// The irreversible operation a shell matched, or `undefined` when it runs.
 type Refusal = string | undefined
 
 function unsafe_path(target: string, root: string): boolean {
@@ -101,132 +74,124 @@ function write_args_are_unsafe(args: Array<string>, root: string): boolean {
 		.some((argument) => unsafe_path(argument, root))
 }
 
-function is_git_read(segment: string, args: Array<string>): boolean {
-	return (
-		GIT_READS.has(git_argv.parse(segment)?.subcommand ?? '') &&
-		args.every((argument) => !GIT_WRITE_FLAGS.test(argument))
-	)
+function plain_argument(word: string): string | undefined {
+	if (/^'[^']*'$/u.test(word) || /^"[^"\\$`]*"$/u.test(word)) return word.slice(1, -1)
+	if (/['"\\$`]/u.test(word)) return undefined
+
+	return word
 }
 
-function is_gh_action(args: Array<string>): boolean {
-	return ['issue', 'pr'].includes(args[0] ?? '') && GH_ACTIONS.has(args[1] ?? '')
+// `program_of` skips time as a wrapper. Its own output destination still needs checking before
+// the wrapped command is judged; timing a call must not admit a write through `time -o`.
+function wrapper_writes(segment: string): boolean {
+	const words = git_argv.words_of(segment)
+	const index = words.findIndex((word) => TIME_PROGRAM.test(word))
+	if (index === -1) return false
+
+	const call = git_argv.program_of(segment)
+	const program_index = words.length - (call?.args.length ?? 0) - 1
+
+	return words.slice(index + 1, program_index).some((word) => {
+		const argument = plain_argument(word)
+
+		return argument === undefined || TIME_WRITE.test(argument)
+	})
 }
 
-// A query or a field request (`-f`, a POST without `-X`) passes; an explicit method other than GET
-// is a REST write the consultation scope leaves to `gh issue` / `gh pr`. `gh` takes the last of
-// repeated method flags, so every one has to be GET.
-function is_gh_api_allowed(args: Array<string>): boolean {
-	return !NON_GET_METHOD.test(args.join(' '))
+function is_copy_to_last(call: ProgramCall): boolean {
+	if (!COPY_PROGRAMS.has(call.name)) return false
+
+	return call.args.every((argument) => !TARGET_DIRECTORY.test(argument))
 }
 
-function is_gh_operation(args: Array<string>): boolean {
-	if (args.some((argument) => argument.startsWith('--output'))) return false
-	if (args[0] === 'api') return is_gh_api_allowed(args)
+function written_args(call: ProgramCall): Array<string> {
+	const written = is_copy_to_last(call) ? call.args.slice(-1) : call.args
 
-	return is_gh_action(args)
+	return written.map((argument) => argument.slice(argument.indexOf('=') + 1))
 }
 
-function is_operation(name: string, args: Array<string>): boolean {
-	if (name === 'gh') return is_gh_operation(args)
+function is_outside(target: string, root: string): boolean {
+	const relative = path.relative(root, path.resolve(root, target.replaceAll(QUOTES, '')))
 
-	return name === 'josh' && OPERATIONS.test(canonical_command(args[0] ?? ''))
-}
-
-function is_rg_read(_segment: string, args: Array<string>): boolean {
-	return args.every((argument) => !argument.startsWith('--pre'))
-}
-
-function is_find_read(_segment: string, args: Array<string>): boolean {
-	return args.every((argument) => !FIND_ACTIONS.test(argument))
-}
-
-function is_npm_view(_segment: string, args: Array<string>): boolean {
-	return args[0] === 'view'
-}
-
-// `pnpm` is a wrapper the program cut skips, so `pnpm view` is read off the segment's spelling.
-function is_pnpm_view(segment: string): boolean {
-	return PNPM_VIEW.test(segment)
-}
-
-// The programs whose arguments decide whether the call writes.
-const ARGUMENT_READS: ReadonlyMap<string, (segment: string, args: Array<string>) => boolean> =
-	new Map([
-		['rg', is_rg_read],
-		['git', is_git_read],
-		['find', is_find_read],
-		['npm', is_npm_view],
-		['view', is_pnpm_view],
-	])
-
-function is_read_or_operation(segment: string, name: string, args: Array<string>): boolean {
-	if (READ_PROGRAMS.has(name) || implementation_shell_read.is_read(segment, name)) return true
-
-	return ARGUMENT_READS.get(name)?.(segment, args) ?? is_operation(name, args)
-}
-
-// A `josh` command outside the operations passes as a help request, a read-only entry or on a declared read-only flag.
-function program_refusal(segment: string, name: string, args: Array<string>): Refusal {
-	if (is_read_or_operation(segment, name, args)) return undefined
-	if (name === 'josh') return josh_read_only.refusal(args)
-
-	return `\`${name}\` is neither a read-only program nor a consultation operation`
-}
-
-// A glob, brace or loop variable expands into a read-only program's operands only, where no word it
-// yields writes. A double-quoted loop variable still expands, so it is read off the literal blanking.
-function expansion_refusal(segment: string, name: string): Refusal {
-	if (READ_PROGRAMS.has(name)) return undefined
-
-	const is_expanded =
-		ARGUMENT_EXPANSION.test(time_shell.blanked(segment) ?? segment) ||
-		time_shell.literal_blanked(segment).includes('$')
-
-	return is_expanded
-		? `glob, brace or variable expansion in \`${name}\`, which is not a read-only program`
-		: undefined
+	return relative.startsWith('..') || path.isAbsolute(relative)
 }
 
 function file_write_refusal(call: ProgramCall, root: string): Refusal {
 	return write_args_are_unsafe(call.args, root) ? `\`${call.name}\` to a runtime path` : undefined
 }
 
-function call_refusal(segment: string, call: ProgramCall, root: string): Refusal {
-	if (FILE_PROGRAMS.has(call.name)) return file_write_refusal(call, root)
+function writes_elsewhere(call: ProgramCall): boolean {
+	if (MOVE_PROGRAMS.has(call.name)) return true
 
-	const args = call.args.map((argument) => argument.replaceAll(ARGUMENT_QUOTES, ''))
-
-	return program_refusal(segment, call.name, args)
+	return IN_PLACE_PROGRAMS.has(call.name) && call.args.some((argument) => IN_PLACE.test(argument))
 }
 
-// A `for` header, a bare `do` and `done` run no program; a `do` body is judged as the command after
-// it. A keyword is one only as the first word, so `npx done` is a program.
+function outside_write_refusal(call: ProgramCall, root: string): Refusal {
+	if (!writes_elsewhere(call)) return undefined
+
+	const target = written_args(call).find(
+		(argument) => is_outside(argument, root) && unsafe_path(argument, root),
+	)
+
+	return target === undefined
+		? undefined
+		: `\`${call.name}\` to a runtime path outside this checkout`
+}
+
+function call_refusal(segment: string, call: ProgramCall, root: string): Refusal {
+	if (FILE_PROGRAMS.has(call.name)) return file_write_refusal(call, root)
+	if (implementation_shell_nested.reads_stdin(call)) return STDIN_SHELL
+
+	const args = call.args.map((argument) => argument.replaceAll(ARGUMENT_QUOTES, ''))
+	const name = call.name.replaceAll(ARGUMENT_QUOTES, '')
+	// `pnpm install` reaches here as the program `install`, so a writer still meets the deny-list.
+	const outside = outside_write_refusal(call, root)
+
+	return outside ?? implementation_shell_deny.refusal(segment, { name, args })
+}
+
+function body_of(segment: string): string {
+	const body = segment.replace(COMPOUND_HEAD, '')
+	let end = body.length
+
+	while (end > 0 && COMPOUND_CLOSERS.has(body.charAt(end - 1))) end -= 1
+
+	return body.slice(0, end)
+}
+
+// The program a segment launches, read off its compound body. A `for` header and a bare keyword run
+// none — a keyword is one only as the first word, so `npx done` is a program.
+function call_of(segment: string): ProgramCall | undefined {
+	const body = body_of(segment)
+	if (KEYWORDS.has(git_argv.words_of(body)[0] ?? '')) return undefined
+
+	return git_argv.program_of(body)
+}
+
 function command_refusal(segment: string, root: string): Refusal {
-	const body = segment.replace(LOOP_BODY, '')
-	if (LOOP_KEYWORDS.has(git_argv.words_of(body)[0] ?? '')) return undefined
+	const call = call_of(segment)
 
-	const call = git_argv.program_of(body)
-	if (call === undefined) return undefined
-
-	return expansion_refusal(body, call.name) ?? call_refusal(body, call, root)
+	return call === undefined ? undefined : call_refusal(body_of(segment), call, root)
 }
 
 function segment_refusal(segment: string, root: string): Refusal {
-	if (implementation_shell_read.wrapper_writes(segment)) return 'a time output file'
+	if (wrapper_writes(segment)) return 'a time output file'
+	if (UNREAD_BODY.test(body_of(segment))) return 'a `case` arm or function body'
 
-	const target = redirected_paths(segment).find((path) => unsafe_path(path, root))
+	const target = redirected_paths(segment).find((redirected) => unsafe_path(redirected, root))
 
 	return target === undefined ? command_refusal(segment, root) : `redirect to \`${target}\``
 }
 
 function is_cd(segment: string): boolean {
-	return git_argv.program_of(segment.replace(LOOP_BODY, ''))?.name === 'cd'
+	return call_of(segment)?.name === 'cd'
 }
 
 function is_write(segment: string): boolean {
-	const name = git_argv.program_of(segment.replace(LOOP_BODY, ''))?.name ?? ''
+	const call = call_of(segment)
+	if (call !== undefined && (FILE_PROGRAMS.has(call.name) || writes_elsewhere(call))) return true
 
-	return FILE_PROGRAMS.has(name) || redirected_paths(segment).some((path) => path !== '/dev/null')
+	return redirected_paths(segment).some((redirected) => redirected !== '/dev/null')
 }
 
 function segments_refusal(segments: Array<string>, root: string): Refusal {
@@ -238,37 +203,45 @@ function segments_refusal(segments: Array<string>, root: string): Refusal {
 		.find((rule) => rule !== undefined)
 }
 
-// A `for` loop's variable takes a word of its visible list, so its reference is judged per segment.
-function without_loop_references(expanded: string, plain: string): string {
-	const names = new Set([...plain.matchAll(LOOP_HEADER)].map((match) => match[1]))
+function nested_lines(line: string, segments: ReadonlyArray<string>): Array<string> {
+	const launched = segments.flatMap((segment) => {
+		const call = call_of(segment)
 
-	return expanded.replaceAll(VARIABLE_REFERENCE, (reference, name: string) =>
-		names.has(name) ? '' : reference,
-	)
+		return call === undefined ? [] : implementation_shell_nested.call_commands(call)
+	})
+
+	return [...implementation_shell_nested.substitution_bodies(line), ...launched]
 }
 
-// A single-quoted span expands nothing, so a finding quoting `code` in it is text, not a substitution.
-// An assignment or a loop header stands outside every quote, so those are read off the plain text.
+// Every segment the line runs, a nested command's included. A nested line is a part of the one
+// holding it, so the walk ends.
+function segments_of(command: string): Array<string> {
+	const segments: Array<string> = []
+	const pending = [command]
+	let line = pending.pop()
+
+	while (line !== undefined) {
+		const cut = shell_segments.quote_aware_commands_of(line)
+
+		segments.push(...cut)
+		pending.push(...nested_lines(line, cut))
+		line = pending.pop()
+	}
+
+	return segments
+}
+
+// A heredoc's body is not a command the segment cut can read, so it is refused rather than guessed.
 function input_refusal(command: string): Refusal {
-	const expanded = time_shell.literal_blanked(command)
-	const plain = time_shell.blanked(command) ?? expanded
-	const rules: ReadonlyArray<readonly [string, boolean]> = [
-		['an empty command', command.trim() === ''],
-		['a heredoc', time_shell.has_heredoc(command)],
-		['a command or process substitution', SUBSTITUTION.test(expanded)],
-		['an environment assignment', ENV_ASSIGNMENT.test(plain.replaceAll(FIELD_VALUE, ' '))],
-		['a variable expansion', without_loop_references(expanded, plain).includes('$')],
-	]
+	if (command.trim() === '') return 'an empty command'
 
-	return rules.find(([, is_matched]) => is_matched)?.[0]
+	return time_shell.has_heredoc(command) ? 'a heredoc' : undefined
 }
 
-// The rule the first unverified part of the command matched, named so a refusal can be diagnosed.
+// The irreversible operation the first refused part of the command is, named so a refusal can be
+// diagnosed.
 function refusal(command: string, root: string = process.cwd()): Refusal {
-	const input = input_refusal(command)
-	if (input !== undefined) return input
-
-	return segments_refusal(shell_segments.quote_aware_commands_of(command), root)
+	return input_refusal(command) ?? segments_refusal(segments_of(command), root)
 }
 
 function is_unsafe(command: string, root: string = process.cwd()): boolean {

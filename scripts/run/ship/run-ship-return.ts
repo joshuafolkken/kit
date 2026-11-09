@@ -15,7 +15,7 @@ import { run_ship_detach } from './run-ship-detach'
 import { run_ship_next, type ShipResume } from './run-ship-next'
 import { run_ship_place } from './run-ship-place'
 import { run_ship_probe } from './run-ship-probe'
-import { run_ship_relaunch_cap } from './run-ship-relaunch-cap'
+import { run_ship_relaunch_cap, type ParkedStop } from './run-ship-relaunch-cap'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
@@ -210,15 +210,16 @@ async function relaunched_or_brokered(lane: LaneInfo, stop: ShipStop): Promise<R
 // A child past the cap, or on a timed-out merge wait, is parked instead of relaunched
 // (`run-ship-relaunch-cap.ts`); a park the label refused leaves the stop recorded, as before.
 // A timed-out merge wait's block, named in the stage output, becomes the park's cause.
+// The park records the stop's stage and cause class (joshuafolkken/kit#6864).
 async function parked(
 	issue: string,
-	reason: string,
+	parking: Omit<ParkedStop, 'blocked'>,
 	output: StageOutput,
 	is_timed_out: boolean,
 ): Promise<ReturnOutcome> {
 	const blocked = run_ship_stop_cause.blocked_cause_of(output.body)
 	const { park, park_timed_out } = run_ship_relaunch_cap
-	const is_parked = await (is_timed_out ? park_timed_out : park)(issue, reason, blocked)
+	const is_parked = await (is_timed_out ? park_timed_out : park)(issue, { ...parking, blocked })
 
 	if (is_parked) return 'parked'
 
@@ -235,10 +236,13 @@ async function park_outcome(
 	output: StageOutput,
 ): Promise<ReturnOutcome | undefined> {
 	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
-	const is_timed_out = run_ship_stop_cause.parks_at_once(stage, { ...resume, ...output })
+	const failed = { ...resume, ...output }
+	const is_timed_out = run_ship_stop_cause.parks_at_once(stage, failed)
 
 	if (is_timed_out || (await run_ship_relaunch_cap.is_over(issue, reason))) {
-		return await parked(issue, reason, output, is_timed_out)
+		const stop = { stage, cause: run_ship_stop_cause.cause_of(stage, failed) }
+
+		return await parked(issue, { reason, stop }, output, is_timed_out)
 	}
 
 	return undefined

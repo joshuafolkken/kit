@@ -234,6 +234,11 @@ const event_schema = z.object({
 	// reader never has to find its launch again. An event written before it has none. A `sleep` event
 	// carries the sleep's length here.
 	elapsed_ms: z.number().optional(),
+	// The ship stop a park was taken at — its stage and `Cause` class (joshuafolkken/kit#6864) — so a
+	// reader re-dispatching the park reads them without parsing text. Free strings: an event a later
+	// version wrote with a new class still parses. A park written before it, or no ship's, has none —
+	// as does one a lane on older code rewrote, since its schema drops the key, so none is a normal read.
+	stop: z.object({ stage: z.string(), cause: z.string() }).optional(),
 })
 
 type RunEvent = z.infer<typeof event_schema>
