@@ -1,4 +1,4 @@
-import { untyped_lint } from '#eslint/untyped.js'
+import { untyped_environment } from '#eslint/untyped-environment.js'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { make_directory_helpers, payload_for } from './format-edited-file-fixtures'
@@ -36,7 +36,7 @@ describe('format_edited_payload — the type program', () => {
 		expect(spawned_environments().length).toBeGreaterThan(0)
 
 		for (const environment of spawned_environments()) {
-			expect(environment).toMatchObject(untyped_lint.environment())
+			expect(environment).toMatchObject(untyped_environment.environment())
 		}
 	})
 })

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { untyped_lint } from '#eslint/untyped.js'
+import { untyped_environment } from '#eslint/untyped-environment.js'
 import { resolve_local_bin } from '#scripts/build/local-bin'
 import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { json_value } from '#scripts/lib/json-value'
@@ -286,7 +286,7 @@ async function spawn_invocation(
 	const result = await execa(invocation.bin, [...invocation.command_arguments], {
 		reject: false,
 		cwd: project_root,
-		env: { ESLINT_D_MISS: 'fail', ...untyped_lint.environment() },
+		env: { ESLINT_D_MISS: 'fail', ...untyped_environment.environment() },
 		stdout: 'pipe',
 		stderr: 'ignore',
 		timeout: HOOK_PROCESS_TIMEOUT_MS,

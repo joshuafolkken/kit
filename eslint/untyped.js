@@ -1,18 +1,13 @@
 import ts from 'typescript-eslint'
 import { naming_convention_rules } from './rules/naming-convention.js'
+import { untyped_environment } from './untyped-environment.js'
 
 // joshuafolkken/kit#6768: the config the edit-time eslint runs — the `PostToolUse` hook, `josh
 // lint:related` and the pre-commit hook, all through the checkout's warm `eslint_d` — without a
 // TypeScript program. A typed program per checkout stayed resident in each daemon, and with one
 // daemon per lane those programs were what the lanes' memory went to. Typed findings are left to
-// the gate's own lint, which runs cold and never sets this variable.
-//
-// The switch is an environment variable rather than a second config file because every consumer's
-// `eslint.config.js` reaches the shared config through `create_base_config`, and none of them has a
-// second file to point a `--config` at. `eslint_d` reads it once: the daemon keeps the environment
-// of the process that started it, so whoever starts one sets it.
-const ENVIRONMENT_VARIABLE = 'JOSH_ESLINT_UNTYPED'
-const ENABLED = '1'
+// the gate's own lint, which runs cold and never sets the switch (`./untyped-environment.js`).
+const { is_requested } = untyped_environment
 
 const NAMING_CONVENTION = '@typescript-eslint/naming-convention'
 
@@ -30,10 +25,6 @@ const TYPE_GUESSING_RULES = [
 	'unicorn/prefer-string-raw',
 	'unicorn/prefer-top-level-await',
 ]
-
-function is_requested(variables) {
-	return variables[ENVIRONMENT_VARIABLE] === ENABLED
-}
 
 // A `types` selector asks the type checker what a name holds, and typescript-eslint throws on the
 // first file when no program answers. The selector's names are still checked by the ones beside it.
@@ -66,9 +57,4 @@ function blocks(variables) {
 	]
 }
 
-// What a process that starts an edit-time eslint adds to its child's environment.
-function environment() {
-	return { [ENVIRONMENT_VARIABLE]: ENABLED }
-}
-
-export const untyped_lint = { blocks, environment, naming_convention, ENVIRONMENT_VARIABLE }
+export const untyped_lint = { blocks, naming_convention, TYPE_GUESSING_RULES }

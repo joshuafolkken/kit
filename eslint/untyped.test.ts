@@ -6,6 +6,7 @@ import { ESLint, type Linter } from 'eslint'
 import ts from 'typescript-eslint'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { create_base_config } from './base.js'
+import { untyped_environment } from './untyped-environment.js'
 import { untyped_lint } from './untyped.js'
 
 vi.setConfig({ testTimeout: 60_000 })
@@ -68,7 +69,7 @@ afterEach(() => {
 })
 
 function create_linter(is_untyped: boolean): ESLint {
-	if (is_untyped) vi.stubEnv(untyped_lint.ENVIRONMENT_VARIABLE, '1')
+	if (is_untyped) vi.stubEnv(untyped_environment.ENVIRONMENT_VARIABLE, '1')
 	const base_config = create_base_config({
 		gitignore_path: pathToFileURL(path.join(root, GITIGNORE)),
 		tsconfig_root_dir: root,
@@ -86,10 +87,27 @@ async function config_for_probe(is_untyped: boolean): Promise<Linter.Config> {
 	return (await create_linter(is_untyped).calculateConfigForFile(PROBE)) as Linter.Config
 }
 
-async function fixed_output(is_untyped: boolean): Promise<string | undefined> {
-	const [result] = await create_linter(is_untyped).lintText(UNFIXED, { filePath: PROBE })
+async function fixed_output(is_untyped: boolean, text = UNFIXED): Promise<string | undefined> {
+	const [result] = await create_linter(is_untyped).lintText(text, { filePath: PROBE })
 
 	return result?.output
+}
+
+// A disable comment for a typed rule the untyped run switches off: `--fix` must leave it in place,
+// since the gate's typed lint still needs it.
+const TYPED_RULE_DISABLE = [
+	'export function is_set(value: string | undefined): boolean {',
+	'\tconst text = value ?? `${value}`',
+	'\t// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- probe',
+	'\treturn text !== undefined',
+	'}',
+	'',
+].join('\n')
+
+function severity_of(config: Linter.Config, rule: string): unknown {
+	const setting = config.rules?.[rule]
+
+	return Array.isArray(setting) ? setting[0] : setting
 }
 
 interface RuleShape {
@@ -143,6 +161,22 @@ describe('create_base_config — the untyped switch', () => {
 
 		expect(untyped).not.toBe(UNFIXED)
 		expect(untyped).toBe(await fixed_output(false))
+	})
+})
+
+describe('create_base_config — the typed rules the untyped switch drops', () => {
+	it('keeps a disable comment for a typed rule it switches off', async () => {
+		const output = (await fixed_output(true, TYPED_RULE_DISABLE)) ?? TYPED_RULE_DISABLE
+
+		expect(output).toContain('eslint-disable-next-line @typescript-eslint/no-unnecessary-condition')
+	})
+
+	it('switches off every rule that guesses without a type program', async () => {
+		const config = await config_for_probe(true)
+
+		for (const rule of untyped_lint.TYPE_GUESSING_RULES) {
+			expect([rule, severity_of(config, rule)]).toEqual([rule, 0])
+		}
 	})
 
 	it('names the typed rules whose fix the edit hook no longer applies', async () => {

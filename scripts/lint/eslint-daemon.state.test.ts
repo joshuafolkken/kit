@@ -1,5 +1,5 @@
 import { mkdirSync, rmSync } from 'node:fs'
-import { untyped_lint } from '#eslint/untyped.js'
+import { untyped_environment } from '#eslint/untyped-environment.js'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -151,7 +151,7 @@ describe('eslint_daemon.run_or_cold type program', () => {
 
 		await eslint_daemon.run_or_cold(PNPM_ESLINT)
 
-		expect(spawned_environment()).toMatchObject(untyped_lint.environment())
+		expect(spawned_environment()).toMatchObject(untyped_environment.environment())
 	})
 
 	it('leaves the untyped switch out of the cold fallback', async () => {
@@ -160,6 +160,6 @@ describe('eslint_daemon.run_or_cold type program', () => {
 
 		await eslint_daemon.run_or_cold(PNPM_ESLINT)
 
-		expect(spawned_environment()).not.toHaveProperty(untyped_lint.ENVIRONMENT_VARIABLE)
+		expect(spawned_environment()).not.toHaveProperty(untyped_environment.ENVIRONMENT_VARIABLE)
 	})
 })

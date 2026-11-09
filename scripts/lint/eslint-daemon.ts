@@ -3,7 +3,7 @@ import { lstatSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { untyped_lint } from '#eslint/untyped.js'
+import { untyped_environment } from '#eslint/untyped-environment.js'
 import { resolve_package_bin } from '#scripts/build/local-bin'
 import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
@@ -246,9 +246,13 @@ function remember_after_edit(
 
 // `cwd` decides which eslint installation and which flat config answer, and `ESLINT_D_MISS=fail`
 // refuses the bundled eslint the daemon would otherwise fall back to. The daemon keeps the environment
-// it started under, so the untyped switch set here holds for its whole life (`eslint/untyped.js`).
+// it started under, so the untyped switch set here holds for its whole life (`eslint/untyped-environment.js`).
 function daemon_environment(): NodeJS.ProcessEnv {
-	return { ...eslint_heap.environment(), ESLINT_D_MISS: 'fail', ...untyped_lint.environment() }
+	return {
+		...eslint_heap.environment(),
+		ESLINT_D_MISS: 'fail',
+		...untyped_environment.environment(),
+	}
 }
 
 async function spawn_daemon(

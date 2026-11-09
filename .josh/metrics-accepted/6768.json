@@ -1,7 +1,7 @@
 {
-	"reason": "#6768: untyped switch env wiring in eslint-daemon and format-edited hook (+daemon_environment helper)",
+	"reason": "Untyped edit-time lint: the env switch moved to its own module so the hook and the daemon launcher never load the optional typescript-eslint peer",
 	"date": "2026-11-09",
 	"growth": {
-		"scripts.code_lines": 5
+		"scripts.code_lines": 9
 	}
 }
