@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gh_request_tally, type CoreUsage } from './gh-request-tally'
+import { gh_tally_handoff } from './gh-tally-handoff'
 
 // joshuafolkken/kit#6694: the process-wide counts of gh requests and 304 answers.
 // joshuafolkken/kit#6697: the core `used` difference around the process's calls.
@@ -71,6 +72,48 @@ describe('gh_request_tally — per call kind', () => {
 		gh_request_tally.reset()
 
 		expect(gh_request_tally.snapshot()).toStrictEqual(ZERO)
+	})
+})
+
+// joshuafolkken/kit#6965: a spawned child's handed tally joins this process's.
+describe('gh_request_tally.absorb', () => {
+	it('adds a handed tally to the totals and to each kind', () => {
+		gh_request_tally.count_call(KIND)
+		gh_request_tally.absorb({
+			calls: 2,
+			not_modified: 1,
+			endpoints: { [KIND]: { calls: 1, not_modified: 1 }, graphql: { calls: 1, not_modified: 0 } },
+		})
+
+		expect(gh_request_tally.snapshot()).toStrictEqual({
+			calls: 3,
+			not_modified: 1,
+			endpoints: {
+				[KIND]: { calls: 2, not_modified: 1 },
+				graphql: { calls: 1, not_modified: 0 },
+			},
+		})
+	})
+})
+
+describe('gh_request_tally.count_call — the handoff', () => {
+	it('arms the handoff for a process that does not watch the allowance', () => {
+		const arm = vi.spyOn(gh_tally_handoff, 'arm').mockReturnValue(undefined)
+
+		gh_request_tally.count_call(KIND)
+
+		expect(arm).toHaveBeenCalledTimes(1)
+		arm.mockRestore()
+	})
+
+	it('leaves the handoff unarmed for a process that watches the allowance', () => {
+		const arm = vi.spyOn(gh_tally_handoff, 'arm').mockReturnValue(undefined)
+
+		gh_request_tally.watch_core(reader_of(START, END))
+		gh_request_tally.count_call(KIND)
+
+		expect(arm).not.toHaveBeenCalled()
+		arm.mockRestore()
 	})
 })
 
