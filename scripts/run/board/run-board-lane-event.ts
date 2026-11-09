@@ -1,10 +1,12 @@
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
+import { run_event_step } from '#scripts/run/event/run-event-step'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { run_board_phase, type Phase } from './run-board-phase'
 
-// Each running child's newest event of its own — the `lane-phase` the hook writes or a `ship-stage` its
-// ship writes — in words, with the phase whose icon its row's track draws. A child inside a long
+// Each running child's newest event of its own — the `lane-phase` the hook writes, a `ship-stage` its
+// ship writes or the fullrun `step` its `run:step` writes (joshuafolkken/kit#6598) — in words, with
+// the phase whose icon its row's track draws. A child inside a long
 // `josh ship` makes no call of its own while the ship writes on, so the header's third line reads the
 // newer of this and the child's newest operation (joshuafolkken/kit#3767).
 
@@ -32,7 +34,26 @@ function words_of(event: RunEvent): string {
 	return (phase === run_ship_stage.PHASE.START ? words : [...words, phase]).join(WORD_SEPARATOR)
 }
 
+// A `step` event's fullrun step under the phase its row's track draws for it.
+const { STEP } = run_event_step
+const STEP_PHASES: Readonly<Partial<Record<string, Phase>>> = {
+	[STEP.UPDATE_DEPS.name]: 'investigate',
+	[STEP.IMPLEMENT.name]: 'implement',
+	[STEP.GATE.name]: 'gate',
+	[STEP.FOLLOWUP.name]: 'followup',
+}
+
+function step_event_of(event: RunEvent): LaneEvent | undefined {
+	const phase = STEP_PHASES[run_event_step.name_of(event)]
+
+	return phase === undefined
+		? undefined
+		: { phase, words: run_event_step.words_of(event), at_ms: Date.parse(event.at) }
+}
+
 function lane_event_of(event: RunEvent): LaneEvent | undefined {
+	if (event.kind === KIND.STEP) return step_event_of(event)
+
 	const phase = LANE_KINDS.has(event.kind) ? run_board_phase.stage_phase_of(event) : undefined
 
 	return phase === undefined

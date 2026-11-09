@@ -9,6 +9,11 @@ const gather_mock = vi.hoisted(() => vi.fn())
 const confirm_mock = vi.hoisted(() => vi.fn())
 const mark_mock = vi.hoisted(() => vi.fn())
 const sync_mock = vi.hoisted(() => vi.fn())
+const record_step_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/run/run-step-progress', () => ({
+	run_step_progress: { record: record_step_mock },
+}))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
@@ -69,6 +74,7 @@ beforeEach(() => {
 	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(OK)
 	mark_mock.mockReset().mockResolvedValue(true)
 	sync_mock.mockReset().mockResolvedValue(undefined)
+	record_step_mock.mockReset().mockResolvedValue(undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -98,6 +104,8 @@ describe('run_entry_cli.run <N> — a #N entry synchronizes its tree as a new en
 			.mockResolvedValueOnce(UNDER)
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		// joshuafolkken/kit#6598: the verdict the report prints is recorded as the issue's step.
+		expect(record_step_mock).toHaveBeenCalledExactlyOnceWith(ISSUE, expect.any(String), undefined)
 		expect(sync_mock).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ is_adopt: false }))
 		expect(gather_mock).toHaveBeenCalledTimes(1)
 	})

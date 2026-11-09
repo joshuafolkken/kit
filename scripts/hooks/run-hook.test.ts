@@ -14,6 +14,7 @@ const RUN_HOOK_SOURCE = fileURLToPath(new URL('run-hook.sh', import.meta.url))
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const LAUNCHER = 'scripts/hooks/run-hook.sh'
 const GATE = 'tools/hooks/hook-bundle-ready.ts'
+const BUILT_GATE = 'dist/hooks/ready.js'
 const INSTALLED_PACKAGE = 'node_modules/@joshuafolkken/kit'
 const REFUSED = 2
 // A whole launch starts real git and node processes, which the full suite's load can slow past the
@@ -21,6 +22,7 @@ const REFUSED = 2
 const LAUNCH_TIMEOUT_MS = 60_000
 const BUNDLE_RAN = 'bundle first second cleared'
 const GATE_RAN = 'gate demo-hook demo:hook first second cleared'
+const BUILT_GATE_RAN = 'built demo-hook demo:hook first second cleared'
 const LAUNCH_LOG = 'launches.log'
 // A git location variable pointing at no repository, as one inherited from another checkout's hook does.
 const FOREIGN_GIT_DIR = '/elsewhere'
@@ -150,6 +152,14 @@ describe('run-hook.sh in kit checkout', () => {
 		const result = launch(LAUNCHER)
 
 		expect(result).toMatchObject({ status: 0, stdout: GATE_RAN, node_launches: 1 })
+	})
+
+	it('hands the launch to the built gate instead of the TypeScript one once it is built', () => {
+		write_file(workspace.root, BUILT_GATE, stub_script('built'))
+
+		const result = launch(LAUNCHER)
+
+		expect(result).toMatchObject({ status: 0, stdout: BUILT_GATE_RAN, node_launches: 1 })
 	})
 
 	it('passes a refusal through without launching anything else', () => {

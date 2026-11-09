@@ -23,6 +23,7 @@ const lane_child_mock = vi.hoisted(() => vi.fn(() => true))
 const lane_plan_lines_mock = vi.hoisted(() => vi.fn())
 const to_parts_mock = vi.hoisted(() => vi.fn())
 const read_carry_mock = vi.hoisted(() => vi.fn())
+const record_step_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('./run-prep-cli', () => ({
 	run_prep_cli: { parse_number: () => ISSUE, gather: async () => ({}), to_parts: to_parts_mock },
@@ -45,6 +46,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 vi.mock('./run-step-lane-plan', () => ({
 	run_step_lane_plan: { lines_for: lane_plan_lines_mock },
 }))
+vi.mock('./run-step-progress', () => ({ run_step_progress: { record: record_step_mock } }))
 
 const { run_step_cli } = await import('./run-step-cli')
 
@@ -133,6 +135,21 @@ describe('run_step_cli.run — a lane child', () => {
 		expect(printed_lines()[0]).toBe(`pnpm josh ship --log ${ISSUE}`)
 		expect(printed_lines()).not.toContain(LANE_PLAN_LINE)
 		expect(lane_plan_lines_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6598: the computed position goes to the `step` event writer.
+describe('run_step_cli.run — the fullrun step', () => {
+	it('records the fullrun step of the action it computed', async () => {
+		stream([{ pos: 1, at: RUN_START, kind: 'ship-stop', text: `#${ISSUE} gate failed` }])
+
+		await run_step_cli.run([ISSUE])
+
+		expect(record_step_mock).toHaveBeenCalledWith(
+			ISSUE,
+			`pnpm josh ship --log ${ISSUE}`,
+			'ship-stop',
+		)
 	})
 })
 

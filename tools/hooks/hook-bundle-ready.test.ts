@@ -1,13 +1,5 @@
 import { ChildProcess, spawn, spawnSync, type SpawnSyncReturns } from 'node:child_process'
-import {
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	realpathSync,
-	rmSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { build_hooks } from '#scripts/build/build-hooks'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
@@ -39,7 +31,6 @@ const {
 	ensure_bundle,
 	FAILED_NOTICE,
 	FAILING_NOTICE,
-	import_bundle,
 	launch,
 	REBUILD_FLAG,
 	rebuild_detached,
@@ -61,7 +52,6 @@ const ABANDONED_TIME = new Date('2026-01-01T00:00:00Z')
 const PROBE_KEY = 'hook_bundle_ready_probe'
 const PROBE_HOOK = 'probe-hook'
 const PROBE_COMMAND = 'probe:hook'
-const LATE_CHUNK = 'chunk-late.js'
 // A hook bundle in miniature: it runs its main only when launched as `argv[1]`, as every hook does.
 const PROBE_BUNDLE = [
 	"import { fileURLToPath } from 'node:url'",
@@ -289,40 +279,6 @@ describe('ensure_bundle after a failed background rebuild', () => {
 		expect(await ensure_bundle(probe_bundle(out_directory), builds)).toBe(true)
 		expect(builds.start_rebuild).toHaveBeenCalledWith(out_directory)
 		expect(error).toHaveBeenCalledWith(`${FAILING_NOTICE} (${BUILD_ERROR})`)
-	})
-})
-
-describe('import_bundle', () => {
-	it('loads again once when a background build pruned a chunk the stale entry imports', async () => {
-		const out_directory = realpathSync(create_out_directory())
-		const bundle = probe_bundle(out_directory)
-		const load = vi.fn(async (href: string) => {
-			try {
-				const loaded: unknown = await import(href)
-
-				return loaded
-			} finally {
-				writeFileSync(path.join(out_directory, LATE_CHUNK), '')
-			}
-		})
-
-		writeFileSync(bundle, `import './${LATE_CHUNK}'\n${PROBE_BUNDLE}`)
-		process.argv.splice(1, process.argv.length, bundle, 'first')
-		await import_bundle(bundle, load)
-
-		expect(load).toHaveBeenCalledTimes(2)
-		expect(Reflect.get(globalThis, PROBE_KEY)).toEqual(['first'])
-	})
-
-	it('rethrows a failure that is not a missing file of the bundle directory', async () => {
-		const load = vi.fn(async () => {
-			throw new Error(BUILD_ERROR)
-		})
-
-		const bundle = probe_bundle(create_out_directory())
-
-		await expect(import_bundle(bundle, load)).rejects.toThrow(BUILD_ERROR)
-		expect(load).toHaveBeenCalledOnce()
 	})
 })
 

@@ -105,6 +105,40 @@ describe('lane_why_period.table', () => {
 	})
 })
 
+// joshuafolkken/kit#6952: the driver row is linked by the lane's cause keys, not only its stage name.
+describe('lane_why_period — driver cause keys', () => {
+	const SONAR_ISSUE = { number: 5085, title: 'Check whether the SonarJasmin taint engine changed' }
+
+	it('adds the driver keys to the driver followup group only', () => {
+		const causes = lane_why_period.causes_of(breakdown_of(['implement'], 40 * MINUTE_MS), [], ['k'])
+
+		expect(causes.get(CAUSE.DRIVER)).toStrictEqual(['driver followup', 'k'])
+		expect(causes.get(CAUSE.IMPLEMENT)).toStrictEqual(['implement'])
+	})
+
+	// #6537: its followup settled last on SonarQube, which #5085 names.
+	it('links the driver followup row to the Issue its longest CI check names', () => {
+		const records: SinkRecords = {
+			entries: [
+				...entries_of(ISSUE, 60),
+				{
+					kind: 'stage',
+					at: at(59),
+					stage: 'ci-wait',
+					elapsed_ms: 200_000,
+					issue: ISSUE,
+					last_check: 'SonarCloud Code Analysis',
+					check_ms: { 'SonarCloud Code Analysis': 157_000 },
+				},
+			],
+			events: [{ pos: 0, kind: 'ship-stage', at: at(45), text: '#6475 followup start' }],
+		}
+		const table = lane_why_period.table(records, WINDOW, 40, [SONAR_ISSUE])
+
+		expect(table).toContain(`| ${CAUSE.DRIVER} | 1 | 45.0 | #5085 |`)
+	})
+})
+
 describe('lane_why_period.table — missing records', () => {
 	it('distinguishes an unread listing from no matches and an empty period', () => {
 		const records = { entries: entries_of(ISSUE, 60), events: [] }

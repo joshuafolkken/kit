@@ -1,20 +1,21 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { error_text } from '#scripts/lib/error-message'
 import { bundle_rebuild_lock } from '#tools/hooks/bundle-rebuild-lock'
+import { hook_bundle_load } from '#tools/hooks/hook-bundle-load'
 
-// The launch of each of kit's own hook commands in kit's checkout (`scripts/hooks/run-hook.sh`):
-//`node hook-bundle-ready.ts <name> <josh command> [arguments...]` checks
+// The launch of each of kit's own hook commands in kit's checkout (`scripts/hooks/run-hook.sh`) when
+// the built fast path (`dist/hooks/ready.js`, `hook-bundle-fast.ts`) is absent or finds the bundles
+// stale: `node hook-bundle-ready.ts <name> <josh command> [arguments...]` checks
 // that the bundles match the source beside them and runs `dist/hooks/<name>.js` in this same process;
 // a checkout that has no bundle to run and cannot build one runs its `pnpm josh` fallback, which runs
 // the live source.
 //
-// One node launch per hook call avoids paying startup twice. The bundle is imported here
-// with `process.argv` set to what `node dist/hooks/<name>.js [arguments...]` would have given
-// it, because every hook runs its main from `process.argv[1] === fileURLToPath(import.meta.url)`.
+// One node launch per hook call avoids paying startup twice: the bundle is imported here
+// (`hook-bundle-load.ts`).
 //
 // **Stale bundles are rebuilt out of the hook call (joshuafolkken/kit#5628).** Every source edit makes
 // the bundles stale, and the next hook call — the edit's own `format-edited` — would otherwise wait on
@@ -50,14 +51,11 @@ const STALE_NOTICE =
 	'kit hooks: dist/hooks is stale against the source, so this call runs the previous build while it is rebuilt in the background'
 const FAILING_NOTICE =
 	'kit hooks: dist/hooks is stale and its last background rebuild failed, so this call runs the previous build — an edited guard does not take effect until the source builds again (pnpm build shows the error)'
-const MODULE_NOT_FOUND = 'ERR_MODULE_NOT_FOUND'
-const RELOAD_QUERY = 'reload'
 const FAILED_NOTICE =
 	'kit hooks: dist/hooks is stale and could not be rebuilt, so this hook runs from source through pnpm — slow, and a hook that exceeds its timeout lets the call through unguarded. Fix the build (pnpm build) to restore the bundles'
 
 type Rebuild = (out_directory: string) => Promise<void>
 type StartRebuild = (out_directory: string) => void
-type BundleLoad = (href: string) => Promise<unknown>
 
 interface BundleBuilds {
 	rebuild: Rebuild
@@ -68,10 +66,6 @@ interface HookLaunch {
 	hook_name: string
 	josh_command: string
 	hook_arguments: ReadonlyArray<string>
-}
-
-async function load_module(href: string): Promise<unknown> {
-	return await import(href)
 }
 
 async function rebuild_from_source(out_directory: string): Promise<void> {
@@ -165,36 +159,6 @@ async function ensure_bundle(
 	return true
 }
 
-// A file of the bundle's own directory missing at load: the background build pruned the chunks of the
-// stale build this launch was still linking.
-function is_pruned_chunk(error: unknown, bundle_path: string): boolean {
-	if (!(error instanceof Error) || Reflect.get(error, 'code') !== MODULE_NOT_FOUND) return false
-
-	return error.message.includes(path.dirname(bundle_path))
-}
-
-// A link error evaluates nothing, so the load is retried once — under a fresh URL, past the failed one
-// Node remembers — and reads the build that pruned it, whose entry was placed before the prune.
-// `fileURLToPath` drops the query, so the bundle's self-invoke still matches `argv[1]`.
-async function import_bundle(bundle_path: string, load: BundleLoad = load_module): Promise<void> {
-	const { href } = pathToFileURL(bundle_path)
-
-	try {
-		await load(href)
-	} catch (error) {
-		if (!is_pruned_chunk(error, bundle_path)) throw error
-		await load(`${href}?${RELOAD_QUERY}`)
-	}
-}
-
-// The real path, because Node resolves an imported module's `import.meta.url` through symlinks.
-async function run_bundle(bundle: string, hook_arguments: ReadonlyArray<string>): Promise<void> {
-	const bundle_path = realpathSync(bundle)
-
-	process.argv.splice(1, process.argv.length, bundle_path, ...hook_arguments)
-	await import_bundle(bundle_path)
-}
-
 // This checkout's own `tsx` and josh entry, run in the hook's working directory: a hook launched in
 // one of Claude Code's own worktrees runs there, and that worktree has no install for `pnpm josh` —
 // while `pnpm --dir` would move the hook back to the main checkout (joshuafolkken/kit#4617).
@@ -219,7 +183,7 @@ async function launch(
 		return
 	}
 
-	await run_bundle(bundle, request.hook_arguments)
+	await hook_bundle_load.run_bundle(bundle, request.hook_arguments)
 }
 
 async function main(): Promise<void> {
@@ -240,7 +204,6 @@ const hook_bundle_ready = {
 	ensure_bundle,
 	FAILED_NOTICE,
 	FAILING_NOTICE,
-	import_bundle,
 	launch,
 	REBUILD_FLAG,
 	rebuild_detached,

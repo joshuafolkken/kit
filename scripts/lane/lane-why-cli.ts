@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { run_ship_probe } from '#scripts/run/ship/run-ship-probe'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_net_read } from './lane-net-read'
 import { lane_sinks_issues } from './lane-sinks-issues'
@@ -17,6 +19,13 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh lane:why <issue>'
 
+// The ship log's last launch, the source of the ship's cause keys (joshuafolkken/kit#6679).
+async function read_log(issue: number): Promise<string | undefined> {
+	const repository = await run_ship_probe.repository_directory()
+
+	return repository === undefined ? undefined : run_ship_detach.read_log(repository, String(issue))
+}
+
 async function records_of(issue: number): Promise<WhyRecords | undefined> {
 	const { entries, events } = await lane_net_read.read_records({})
 	const breakdown = lane_breakdown_implement.breakdown_of(entries, events, issue)
@@ -27,9 +36,13 @@ async function records_of(issue: number): Promise<WhyRecords | undefined> {
 	const { implement_rate, growth } = await lane_net_read.measurements()
 	const projected = lane_why.projected_of(body, implement_rate, growth)
 
-	const [issues, timing] = await Promise.all([lane_sinks_issues.read(), lane_why_ci.read(issue)])
+	const [issues, timing, log] = await Promise.all([
+		lane_sinks_issues.read(),
+		lane_why_ci.read(issue),
+		read_log(issue),
+	])
 
-	return { issue, entries, breakdown, projected, issues, timing }
+	return { issue, entries, breakdown, projected, issues, timing, log }
 }
 
 async function print(issue: string): Promise<number> {

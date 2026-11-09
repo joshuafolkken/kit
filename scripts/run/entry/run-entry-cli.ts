@@ -22,6 +22,7 @@ import {
 } from '#scripts/run/run-stage'
 import { run_stage_read, type StageRead } from '#scripts/run/run-stage-read'
 import { run_step } from '#scripts/run/run-step'
+import { run_step_progress } from '#scripts/run/run-step-progress'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_children, type EntryRequest, type Resume } from './run-entry-children'
@@ -318,6 +319,9 @@ async function print_report(
 ): Promise<number> {
 	return await timed(STEP.REPORT, async () => {
 		const verdict = run_entry.stage_verdict(state, reads.verdict)
+
+		await run_step_progress.record(entry.issue_number, verdict, undefined)
+
 		const prep = { ...reads.prep, is_planned: state === run_stage.PLANNED }
 		const code = emit_fitted({ ...entry, verdict }, prep)
 

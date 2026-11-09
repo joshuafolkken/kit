@@ -195,6 +195,7 @@ function own_carried(
 }
 
 export const backlog_drive_named = {
+	is_declared,
 	next_of,
 	offer,
 	held_after,
