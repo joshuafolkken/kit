@@ -16,7 +16,7 @@ import { shell_segments } from './shell-segments'
 // **It fires on every occurrence**: the remedy is one command, so a refusal never wedges the run. The
 // handed child runs on the role profile's model, so it enters through `run:entry` untouched.
 
-const HANDOFF_DOC = '`docs/josh-commands-run.md` → "josh run:handoff"'
+const HANDOFF_DOC = '`docs/josh-commands-board.md` → "josh run:handoff"'
 
 const REASON =
 	'⛔ consultation handoff: a consultation-model main line does not enter a run itself. Run ' +

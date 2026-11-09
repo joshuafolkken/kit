@@ -36,7 +36,7 @@ or more always means an epic", then
 **Whatever offers a child — the loop, or a person clearing a label — the child is handed to a lane,
 never run in the parent's context.** `pnpm josh delegate epic-child` answers `delegate`; the unit is a
 detached process from `pnpm josh lane:launch` (`backlogrun-lanes.md` → "Opening one lane and
-dispatching its child"; its profile and model: `docs/josh-commands-run.md` → "`josh lane:dispatch`"). With no isolated
+dispatching its child"; its profile and model: `docs/josh-commands-lane.md` → "`josh lane:dispatch`"). With no isolated
 unit, run the child in the parent's context and still ask the hand-off at every merge.
 
 - **The parent reads GitHub, never the summary** — `pnpm josh issue:state <N>` (or `run:merge`)

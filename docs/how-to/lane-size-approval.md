@@ -2,7 +2,7 @@
 
 ## When to use it
 
-A lane child's [`josh lane:plan`](../josh-commands-run.md#josh-laneplan) answered `split` on the lines or files axis, and a person has approved, in a comment on that same Issue, letting this one Issue run larger. The approval is bounded: you, the operator, read the comment and write its scope into a JSON file. Nothing infers an approval from prose.
+A lane child's [`josh lane:plan`](../josh-commands-lane.md#josh-laneplan) answered `split` on the lines or files axis, and a person has approved, in a comment on that same Issue, letting this one Issue run larger. The approval is bounded: you, the operator, read the comment and write its scope into a JSON file. Nothing infers an approval from prose.
 
 ## Steps
 

@@ -72,7 +72,7 @@ Each shared rule is a **trigger, a one-line action, and the single source** read
 
 | Trigger | Action | Single source |
 | --- | --- | --- |
-| Consultation main (Fable / Astra), excluding lane and `run:handoff` children | `pnpm josh run:handoff <keyword> … --brief-file .josh/tmp/brief.md` | `docs/josh-commands-run.md` → "josh run:handoff" |
+| Consultation main (Fable / Astra), excluding lane and `run:handoff` children | `pnpm josh run:handoff <keyword> … --brief-file .josh/tmp/brief.md` | `docs/josh-commands-board.md` → "josh run:handoff" |
 | A file passed as a `*-file` argument (body, plan, brief, rationale, human-steps, review note) | Write it under `.josh/tmp/` | `prompts/collaboration-workflow/shell-body.md` → "安全な書き方" |
 | First call of any entry | `#N`: `pnpm josh run:entry <N> --to <command>` (claims the tree, except `kickoff`); `new` (not `kickoff`): `pnpm josh run:hold`; `busy` / `unknown` stop | `working-tree-hold.md` |
 | `run:entry` prints its stage line | The command sets how far a run goes, the Issue where it starts; **`start: reached` redoes nothing** — stop (at `merged`, the next line answers) | `docs/how-to/run-issues.md` |

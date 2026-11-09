@@ -77,18 +77,13 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `ui:shot`'s usage section (joshuafolkken/kit#5633) crossed the 49152 block.
 	// `usage:tee`'s usage section (joshuafolkken/kit#6316) crossed the 53248 block.
 	{ path: 'docs/josh-commands-automation.md', bytes: 57_344 },
-	// The carried `--unpinned-ok` record (joshuafolkken/kit#4775) crossed the 73728 block.
-	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
-	// `lane:plan --probe` and the entry probe (joshuafolkken/kit#5211) crossed the 81920 block.
-	// `lane:plan`'s `split` refusal (joshuafolkken/kit#5533) crossed the 86016 block.
-	// `josh run:handoff` (joshuafolkken/kit#5352) crossed the 90112 block.
-	// `josh run:stale` (joshuafolkken/kit#5635) crossed the 94208 block.
-	// `josh run:handoff-lanes` (joshuafolkken/kit#5845) crossed the 98304 block.
-	// `cost:audit --density` / `read:set --bytes` (joshuafolkken/kit#5952) crossed the 102400 block.
-	// `lane:value cell --where` / `--item` examples (joshuafolkken/kit#5947) crossed the 102400 block.
-	// `lane:breakdown`'s `outside calls` (joshuafolkken/kit#6119) crossed the 106496 block;
-	// `lane:why`'s stage budget split (joshuafolkken/kit#6540) crossed the 110592 block.
-	{ path: 'docs/josh-commands-run.md', bytes: 114_688 },
+	// The run reference crossed a block in eleven lanes (joshuafolkken/kit#4775 …
+	// joshuafolkken/kit#6540), so joshuafolkken/kit#6676 split its board, lane and session commands
+	// into pages of their own, each at its smallest block.
+	{ path: 'docs/josh-commands-run.md', bytes: 53_248 },
+	{ path: 'docs/josh-commands-board.md', bytes: 20_480 },
+	{ path: 'docs/josh-commands-lane.md', bytes: 28_672 },
+	{ path: 'docs/josh-commands-session.md', bytes: 16_384 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
 	// (joshuafolkken/kit#5547) crossed the 65536 block; solo evidence in `backlog:triage`
