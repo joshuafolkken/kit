@@ -3,6 +3,7 @@ import { review_record_cli } from '#scripts/review/review-record-cli'
 import { review_record_slot } from '#scripts/review/review-record-slot'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { run_chain, type ChainStage, type HoldStop } from './run-chain'
+import { run_chain_review_fix } from './run-chain-review-fix'
 
 // The half of `josh run:chain` after the review (joshuafolkken/kit#5735): `run:review --join`,
 // `review:attest --check` and `review:record --from-slot`, over the stage runner the half before it
@@ -37,23 +38,25 @@ function low_only_next(issue: string): string {
 	return `fix, file or drop each Low with a one-line reason, record each disposition with ${record_call(issue)} (\`<n>=<disposition>\`: its usage), then ship — no round 2 is due`
 }
 
-function findings_stop(specs: ReadonlyArray<string>): HoldStop {
+// A lane child takes the fix to a fresh session (`run-chain-review-fix.ts`).
+function findings_stop(issue: string, specs: ReadonlyArray<string>): HoldStop {
 	const is_round_two = specs.some((spec) => ROUND_TWO_SEVERITIES.has(severity_of(spec)))
 	const notice = `attested; ${String(specs.length)} finding(s) to settle before the record`
+	const fix_next = is_round_two ? round_two_next : low_only_next
 
-	return { notice, next: is_round_two ? round_two_next : low_only_next }
+	return { notice, next: run_chain_review_fix.route(issue, specs, fix_next) }
 }
 
-function slot_stop(): HoldStop | undefined {
+function slot_stop(issue: string): HoldStop | undefined {
 	const verdict = run_ship_review.read_verdict(review_record_slot.slot_text(is_interaction))
 
 	if (verdict.kind === run_ship_review.VERDICT.INVALID) return undefined
 
-	return verdict.specs.length === 0 ? undefined : findings_stop(verdict.specs)
+	return verdict.specs.length === 0 ? undefined : findings_stop(issue, verdict.specs)
 }
 
-async function findings_hold(): Promise<HoldStop | undefined> {
-	return slot_stop()
+async function findings_hold(issue: string): Promise<HoldStop | undefined> {
+	return slot_stop(issue)
 }
 
 function ship_stage(title: string, mode: ReadonlyArray<string>): ChainStage {
