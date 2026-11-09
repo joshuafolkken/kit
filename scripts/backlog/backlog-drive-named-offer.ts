@@ -203,6 +203,20 @@ async function launch(
 	return held ?? (await classify(issue, named, state, owner))
 }
 
+// An epic `run:add` put in that waits on its children holds nothing up, like an added issue in flight
+// (joshuafolkken/kit#6883): its children are what runs, so the offer passes it as in flight and the
+// issues behind it, or the pool, fill the free lanes (joshuafolkken/kit#6840). A failed read still
+// waits (`retries`), so the epic's retry count reaches its hand-back.
+function is_passed(
+	carry: RunCarry,
+	issue: string | undefined,
+	offered: OfferRead | undefined,
+): issue is string {
+	if (issue === undefined || offered?.verdict !== 'wait') return false
+
+	return offered.retries === NO_RETRIES && !backlog_drive_named.is_declared(carry, issue)
+}
+
 async function offer_of(
 	carry: RunCarry,
 	state: DriveState,
@@ -214,8 +228,11 @@ async function offer_of(
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return budget
 	const [issue] = named.issues
+	const offered = await launch(issue, named, state, context.owner)
+	if (!is_passed(carry, issue, offered)) return offered
+	const past = { ...waiting, in_flight: [...waiting.in_flight, issue] }
 
-	return await launch(issue, named, state, context.owner)
+	return await offer_of(carry, state, past, context)
 }
 
 // A named issue the yield holds while none of the run's own lanes runs — its holder is outside the run

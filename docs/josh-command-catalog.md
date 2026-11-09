@@ -216,7 +216,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh review:submit` | `[--interaction] [--review <absolute-path> [--round <1\|2>]] < findings \| … --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--fresh \| --refresh \| --prose]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
-| `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
+| `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots |
 | `josh run:board` | `[--once \| --chat \| --every <minutes>]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
 | `josh run:carry` | `<operation> [arguments...]` | automation | files | Carry one invocation’s budget across its own session cuts |
 | `josh run:chain` | `<issue> [--from <stage>] [--unpinned-ok "<reason>"] \| <issue> --join [--fixing] [--from <stage>] [--ship "<title> #<N>"]` | automation | processes, files, git, network | Open the review, or --join to join, attest and record it; --ship starts ship --detach --review after a clean record. Stops at the first refusal with its next action |

@@ -1,0 +1,8 @@
+{
+	"reason": "An epic added to a live run must not hold the free lanes while its children wait: the named offer passes it like an added issue in flight (review finding), plus its regression tests",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 80,
+		"ai_cost.on_demand_bytes": 127
+	}
+}

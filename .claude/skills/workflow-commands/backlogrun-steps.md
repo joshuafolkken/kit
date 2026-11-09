@@ -73,7 +73,7 @@ then `run:wake --stop`, stopping at the first failed stage, which it names. **A 
 _stopping_** (a `stop` verdict or the consecutive-failure guard) **ends with `pnpm josh run:report
 --end --stopped "<one-line reason>"`** instead, which sends the one ⏸️ confirmation.
 
-**A driver hand-off of `epic #N` is a named epic**: settle it by `backlogrun-progress.md` → "Running a
+**A driver hand-off of `epic #N` is a named epic**, declared or added by `run:add`: settle it by `backlogrun-progress.md` → "Running a
 named epic's children", never the root as a standalone `fullrun`, then ask `pnpm josh epic:next <E>` —
 a child number or `complete` continues; only `stop` or a failure records `pnpm josh run:carry --done <E>`.
 

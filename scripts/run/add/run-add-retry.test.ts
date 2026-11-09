@@ -1,4 +1,5 @@
 import {
+	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
 	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
@@ -8,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { run_add, type AddContext, type AddPorts } from './run-add'
 
 const ISSUE = 5413
+const RETRY_REFUSAL = 'use --retry'
 const CONTEXT: AddContext = { is_retry: true, done: [ISSUE], active: new Set() }
 
 function ports_for(labels: ReadonlyArray<string>): AddPorts {
@@ -30,7 +32,7 @@ describe('explicit mechanical retry', () => {
 		const ports = { ...ports_for([RUN_STALLED_LABEL]), clear_label: async () => false }
 		const outcomes = await run_add.add_all([ISSUE], true, ports, CONTEXT)
 
-		expect(run_add.is_all_queued(outcomes)).toBe(false)
+		expect(run_add.is_all_added(outcomes)).toBe(false)
 		expect(run_add.additions_of(outcomes, true)).toStrictEqual([])
 	})
 })
@@ -64,6 +66,29 @@ describe('retry of an issue that already has a priority label', () => {
 		expect(outcomes.map((outcome) => run_add.describe(outcome, true))).toStrictEqual([
 			`queued #${String(ISSUE)} · next free lane`,
 		])
+	})
+})
+
+// joshuafolkken/kit#6840: a done epic root comes back with --retry, still unlabelled.
+describe('retry of a done epic root', () => {
+	it('tracks it again without touching its labels', async () => {
+		const ports = ports_for([EPIC_LABEL])
+		const outcomes = await run_add.add_all([ISSUE], true, ports, CONTEXT)
+
+		expect(outcomes).toStrictEqual([{ kind: 'tracked', issue: ISSUE, is_new: true }])
+		expect(run_add.additions_of(outcomes, true)).toStrictEqual([
+			{ issue: ISSUE, is_priority: true },
+		])
+		expect(ports.apply_label).not.toHaveBeenCalled()
+		expect(ports.clear_label).not.toHaveBeenCalled()
+	})
+
+	it('still asks for --retry without it', async () => {
+		const ports = ports_for([EPIC_LABEL])
+
+		expect(
+			await run_add.add_all([ISSUE], true, ports, { ...CONTEXT, is_retry: false }),
+		).toMatchObject([{ kind: 'refused', reason: RETRY_REFUSAL }])
 	})
 })
 
@@ -115,7 +140,7 @@ describe('retry protection', () => {
 			const context = { ...CONTEXT, is_retry: false }
 
 			expect(await run_add.add_all([ISSUE], true, ports, context)).toMatchObject([
-				{ kind: 'refused', reason: 'use --retry' },
+				{ kind: 'refused', reason: RETRY_REFUSAL },
 			])
 			expect(ports.clear_label).not.toHaveBeenCalled()
 		},
