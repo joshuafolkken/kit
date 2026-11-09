@@ -41,6 +41,22 @@ function plain(number: number | string, repo = ''): string {
 	return `${repo}#${String(number)}`
 }
 
+// Why a bare `#N` is right where it is assembled, declared at the call so a new caller edits no
+// central list (joshuafolkken/kit#6807):
+// - `github`: GitHub renders it — a commit message, a PR or Issue title or body, a comment, a query.
+// - `telegram`: a person reads it on Telegram.
+// - `program`: a program reads it back — the run event stream, a process pattern, a child prompt, a
+//   parse key, a stash name.
+// - `terminal`: a person reads it in a terminal frame or a detached driver's stderr, unlinked.
+// - `caller-links`: the caller prints it through `session_cite.text` or `issue_citation.linkify`.
+type PlainReason = 'caller-links' | 'github' | 'program' | 'telegram' | 'terminal'
+
+// `plain` with its reason required, so a call that does not say why its text stays plain does not
+// compile; the reason is the declaration, so it is not read here.
+function plain_for(_reason: PlainReason, number: number | string, repo = ''): string {
+	return plain(number, repo)
+}
+
 function issue_url(slug: string, number: string): string {
 	return `${GITHUB_URL_PREFIX}${slug}${ISSUE_PATH}${number}`
 }
@@ -126,9 +142,10 @@ const issue_cite = {
 	no_repo_line,
 	parse_target,
 	plain,
+	plain_for,
 	reference,
 	unreadable_line,
 }
 
-export type { CiteTarget, IssueCiter }
+export type { CiteTarget, IssueCiter, PlainReason }
 export { issue_cite }

@@ -1,6 +1,7 @@
 import {
 	AUTO_OK_LABEL,
 	EPIC_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RUN_LANE_LABEL,
 } from '#scripts/issue/issue-labels'
@@ -53,6 +54,17 @@ describe('labels_for', () => {
 	it('leaves the priority label off with --no-priority', () => {
 		expect(run_add.labels_for(false)).toStrictEqual([AUTO_OK_LABEL, RUN_LANE_LABEL])
 	})
+
+	it('adds priority:high to an issue with no priority label', () => {
+		expect(run_add.labels_for(true, [AUTO_OK_LABEL])).toContain(PRIORITY_HIGH_LABEL)
+	})
+
+	it.each([PRIORITY_HIGH_LABEL, PRIORITY_CRITICAL_LABEL])(
+		'keeps the priority label already on the issue (%s)',
+		(label) => {
+			expect(run_add.labels_for(true, [label])).toStrictEqual([AUTO_OK_LABEL, RUN_LANE_LABEL])
+		},
+	)
 })
 
 describe('add_all', () => {

@@ -1,6 +1,7 @@
 import { rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fake_result, type ExecaResult } from '#tools/test/execa-result'
 import type { execa } from 'execa'
 import { vi } from 'vitest'
 
@@ -18,18 +19,9 @@ import { vi } from 'vitest'
 // would let one suite go on passing against a refusal the other had already changed.
 const FORWARDED_FLAG = '--workers=1'
 
-type ExecaResult = Awaited<ReturnType<typeof execa>>
 type MockedExeca = ReturnType<typeof vi.mocked<typeof execa>>
 type ExecaImplementation = Parameters<MockedExeca['mockImplementation']>[0]
 type FakeExeca = (...parameters: ReadonlyArray<unknown>) => Promise<ExecaResult>
-
-// execa's resolved Result is a large interface; the gate reads only `all` and `exitCode`, so a
-// minimal stub is bridged through `unknown`.
-function fake_result(exit_code: number, output: string): ExecaResult {
-	const result = { all: output, exitCode: exit_code }
-
-	return result as unknown as ExecaResult
-}
 
 // execa's real return type is a promise carrying IPC methods the gate never touches, so the
 // implementation is bridged the same way the result is.
@@ -109,5 +101,7 @@ const gate_test_fixture = {
 	suite_records,
 }
 
-export type { CapturedOutput, ExecaResult, FakeExeca, SuiteRecords }
+export type { CapturedOutput, FakeExeca, SuiteRecords }
 export { gate_test_fixture }
+
+export { type ExecaResult } from '#tools/test/execa-result'

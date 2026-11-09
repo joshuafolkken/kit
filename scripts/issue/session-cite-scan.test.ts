@@ -10,8 +10,10 @@ import { describe, expect, it } from 'vitest'
 //
 // **`issue_cite.plain` is counted, not trusted.** Refusing the template alone left `plain` free to
 // print a bare `#N` straight to the session, so every call is recorded below against the reason its
-// text stays plain. A new call — in a listed file or a new one — fails here until it is either printed
-// through `session_cite` or added with the reason it is not session-facing.
+// text stays plain. A new call — in a listed file or a new one — fails here; a new caller uses
+// `issue_cite.plain_for`, whose required reason declares at the call why it is not session-facing,
+// so it edits no list here (joshuafolkken/kit#6807). The list only shrinks: joshuafolkken/kit#6810
+// moves the calls below to `plain_for` and deletes it.
 
 const SCRIPTS_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const BARE_TEMPLATE = '#${'
@@ -33,8 +35,8 @@ const EXEMPT = new Set([
 // Every `issue_cite.plain` call, by file, with why its text is not printed to the session as it is.
 const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// GitHub renders it: a commit message, a PR or Issue title or body, a comment, a search query.
+	['backlog/backlog-triage-adopt.ts', 1],
 	['epic/epic-audit-orphans.ts', 1],
-	['epic/epic-body.ts', 1],
 	['epic/epic-bundle-apply.ts', 1],
 	['epic/epic-bundle-recommend.ts', 4],
 	['epic/epic-close-comment.ts', 2],
@@ -78,6 +80,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-drive-retry.ts', 2],
 	['backlog/backlog-measure-close.ts', 1],
 	['backlog/backlog-wait-cause.ts', 1],
+	// The run event stream's trip note, and the park comment GitHub renders.
+	['backlog/backlog-yield-cap.ts', 1],
 	['lane/lane-overrun.ts', 1],
 	['lane/lane-overrun-prompt.ts', 1],
 	['lane/lane-plan-wait-event.ts', 2],
@@ -198,14 +202,15 @@ function by_file(left: readonly [string, number], right: readonly [string, numbe
 	return left[0].localeCompare(right[0])
 }
 
+// The reasonless calls in one source; a `plain_for(` call does not contain `plain(`.
+function plain_count(source: string): number {
+	return source.split(PLAIN_CALL).length - 1
+}
+
 // `posix` paths so the table reads the same on every platform the scan runs on.
 function plain_calls(): Array<readonly [string, number]> {
 	const counted = sources().map(
-		(file) =>
-			[
-				file.split(path.sep).join(path.posix.sep),
-				read_source(file).split(PLAIN_CALL).length - 1,
-			] as const,
+		(file) => [file.split(path.sep).join(path.posix.sep), plain_count(read_source(file))] as const,
 	)
 
 	return counted.filter(([, count]) => count > 0).toSorted(by_file)
@@ -222,5 +227,14 @@ describe('Issue numbers in scripts/ go through issue_cite', () => {
 
 	it('calls issue_cite.plain only where the text is not printed to the session as it is', () => {
 		expect(plain_calls()).toStrictEqual(PLAIN_CALLS.toSorted(by_file))
+	})
+
+	// joshuafolkken/kit#6807: a new file's reasoned call needs no row above; a reasonless one still does.
+	it('counts a reasonless issue_cite.plain call and not a plain_for call', () => {
+		const reasoned = "const line = issue_cite.plain_for('github', issue)\n"
+		const reasonless = 'const line = issue_cite.plain(issue)\n'
+
+		expect(plain_count(reasoned)).toBe(0)
+		expect(plain_count(`${reasoned}${reasonless}`)).toBe(1)
 	})
 })

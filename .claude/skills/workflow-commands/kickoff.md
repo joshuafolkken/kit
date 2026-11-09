@@ -20,7 +20,7 @@
   ... --title "<title>" --notify [--ordered] [--rationale-file .josh/tmp/rationale.md]` (when `#N` is a request, a discussion
   or a container) — `--title` renames it to the step-2 title — or keep `#N` as a child of a new epic
   made with `pnpm josh epic … --notify`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
-  record the reasoning on the Issue. Present `backlogrun #<E> --only` and stop.
+  record the reasoning on the Issue. Present `pnpm josh backlogrun <E> --only` and stop.
 
   `--notify` sends the split path's `planning` Telegram — the epic's URL, every child's URL and the
   `backlogrun` line (`docs/josh-commands-backlog.md` → "`josh epic`").
@@ -50,7 +50,7 @@ checked out here. A third-party owner is Tier C: stop rather than file.
     every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... --notify [--ordered]
     [--rationale-file .josh/tmp/rationale.md] [--origin <owner/repo#N>]`, capturing `<E>`; check a hand-edited epic
     with `pnpm josh epic:check <E>`. (3) `--notify` sends the Telegram listing every created Issue.
-    (4) Present `backlogrun #<E> --only`. (5) **Stop**.
+    (4) Present `pnpm josh backlogrun <E> --only`. (5) **Stop**.
 
   **The epic itself is never implemented** — `backlogrun` runs its *children*, and it closes itself
   once every child is closed, whichever josh path closes the last one. Children with no required order take `None — the children are

@@ -1,17 +1,18 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_scout_cli } from './issue-scout-cli'
 
 const TITLE = 'Add one acceptance criterion'
 const BODY = '## 目的\n\n追加目的\n\n## 受け入れ条件\n\n- [ ] 検証可能'
 const BODY_FILE_OPTION = '--body-file'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-scout-body-file-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-scout-body-file-')
 const draft_path = path.join(work, 'draft.md')
-const repository = cli_body_repository.create()
+const repository = cli_body_repository.create(make_directory('issue-scout-body-file-repository-'))
 
 writeFileSync(draft_path, BODY)
 
@@ -21,11 +22,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
-	repository.remove()
 })
 
 describe('issue_scout_cli draft body', () => {

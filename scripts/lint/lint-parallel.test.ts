@@ -5,6 +5,7 @@ import {
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
+import { fake_result } from '#tools/test/execa-result'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { DaemonState } from './eslint-daemon'
 import type { LintRunTiming } from './lint-parallel'
@@ -36,16 +37,7 @@ const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 const mocked_cache_run = vi.mocked(lane_cache_run.run)
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 type Write = typeof process.stdout.write
-
-// execa's resolved Result is a large interface; the lint check only reads
-// `all` and `exitCode`, so a minimal stub is bridged through `unknown`.
-function fake_result(exit_code: number): ExecaResult {
-	const result = { all: '', exitCode: exit_code }
-
-	return result as unknown as ExecaResult
-}
 
 function mock_exit_codes(prettier_code: number, eslint_code: number): void {
 	mocked_execa

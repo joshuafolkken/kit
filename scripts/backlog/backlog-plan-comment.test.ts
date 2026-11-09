@@ -4,6 +4,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { PLANNED_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import type { IssueComment } from '#scripts/issue/issue-read'
 import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
+import { lane_plan } from '#scripts/lane/lane-plan'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_overlap } from './backlog-overlap'
@@ -31,6 +32,7 @@ const SHARED = 'scripts/lane/lane-overrun-mechanisms-cli.ts'
 const OLD_FILE = 'scripts/issue/issue-priority.ts'
 const NO_DIRECTORY = tmpdir()
 const RUNNING_BODY = `- \`${SHARED}\` を直す`
+const COMMENTED_AT = '2026-10-25T12:48:40Z'
 const CONSUMERS = `${plan_consumers_section.HEADING}\n\n- なし（新しい関数だけ）`
 
 function changes(path: string): string {
@@ -42,7 +44,7 @@ function plan(path: string): string {
 }
 
 function comment(body: string, is_trusted: boolean | undefined = true): IssueComment {
-	return { author: 'joshuafolkken', created_at: '2026-10-25T12:48:40Z', body, is_trusted }
+	return { author: 'joshuafolkken', created_at: COMMENTED_AT, body, is_trusted }
 }
 
 function child(number: number): EpicChild {
@@ -106,6 +108,16 @@ describe('backlog_plan_comment.declared_of', () => {
 		const declared = await backlog_plan_comment.declared_of([issue], NO_DIRECTORY)
 
 		expect(declared.get(CANDIDATE)).toStrictEqual(new Set([OLD_FILE]))
+	})
+
+	// joshuafolkken/kit#6798: a recorded plan yields to a plan comment posted after it.
+	it('hands the lane plans the time its plan comment was posted', async () => {
+		const with_plans = vi.spyOn(lane_plan, 'with_plans')
+
+		parse_comments_mock.mockResolvedValue([comment(plan(SHARED))])
+		await backlog_plan_comment.declared_of([PLANNED_CANDIDATE], NO_DIRECTORY)
+
+		expect(with_plans.mock.calls[0]?.[2]).toStrictEqual(new Map([[CANDIDATE, COMMENTED_AT]]))
 	})
 
 	it('keeps the body when the plan comment names no path', async () => {

@@ -46,11 +46,13 @@ describe('codex_hook_config', () => {
 		expect(derived_command('PostToolUse')).toBe(codex_hooks.adapter_command('posttool'))
 	})
 
-	it('adds apply_patch to the tool-event matchers only', () => {
+	it('adds apply_patch and the shell tools to the tool-event matchers only', () => {
 		expect(derived_group('PreToolUse').matcher).toBe(
 			`${TOOL_MATCHER}|apply_patch|functions.apply_patch|exec_command|functions.exec_command|exec|functions.exec`,
 		)
-		expect(derived_group('PostToolUse').matcher).toBe('Edit|apply_patch|functions.apply_patch')
+		expect(derived_group('PostToolUse').matcher).toBe(
+			'Edit|apply_patch|functions.apply_patch|exec_command|functions.exec_command|exec|functions.exec',
+		)
 		expect(derived_group('Stop').matcher).toBe('')
 	})
 

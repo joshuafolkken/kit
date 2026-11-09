@@ -13,7 +13,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // once under each.
 
 const COLUMNS = ['reason', 'noticed lanes', 'split'] as const
-const REASONS = ['files', 'hunks', 'lines', 'diff', 'budget'] as const
+const REASONS = ['files', 'hunks', 'lines', 'hub', 'diff', 'budget'] as const
 const ALL = 'all'
 
 function reason_of(entry: SplitNoticeEntry): string {

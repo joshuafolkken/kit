@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
-import { afterAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { yaml_config_fixture } from './yaml-config-fixture'
 
 // A guard built on this reader asserts that a shipped config declares something. If a truncated or
@@ -15,9 +15,10 @@ const EMPTY_DOCUMENT_MESSAGE = /the input is empty/u
 
 // Written under the OS temp directory and reached by a package-root-relative path: several suites
 // in this repo assert on the repository's own file listing, so an orphaned fixture at the package
-// root would break them rather than merely leave litter. mkdtempSync rather than a fixed name so
-// a watch-mode run and a lefthook-triggered run cannot delete each other's directory.
-const TEST_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'yaml-config-fixture-'))
+// root would break them rather than merely leave litter. A unique directory rather than a fixed name
+// so a watch-mode run and a lefthook-triggered run cannot delete each other's directory.
+const make_directory = temporary_directory('suite')
+const TEST_DIRECTORY = make_directory('yaml-config-fixture-')
 
 function write_fixture(file_name: string, content: string): string {
 	const absolute_path = path.join(TEST_DIRECTORY, file_name)
@@ -26,10 +27,6 @@ function write_fixture(file_name: string, content: string): string {
 
 	return path.relative(PACKAGE_DIR, absolute_path)
 }
-
-afterAll(() => {
-	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
-})
 
 describe('yaml_config_fixture.load_yaml_config', () => {
 	it('parses a shipped config into a mapping', () => {

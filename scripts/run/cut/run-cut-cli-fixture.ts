@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
@@ -15,6 +14,7 @@ import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { split_resolution } from '#scripts/split/split-resolution'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
 import { run_cut_budget } from './run-cut-budget'
@@ -24,7 +24,8 @@ import { run_cut_digest } from './run-cut-digest'
 // the per-test reset — so the setup-boundary suite runs on the same harness as the main suite rather
 // than on a second copy of it.
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-cut-cli-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('run-cut-cli-test-')
 const REPOSITORY = path.join(scratch, 'repository.git')
 
 const ISSUE = '1839'
@@ -170,7 +171,6 @@ function install(): void {
 
 	afterAll(() => {
 		vi.restoreAllMocks()
-		rmSync(scratch, { force: true, recursive: true })
 	})
 }
 

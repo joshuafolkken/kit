@@ -1,17 +1,15 @@
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
 
 // joshuafolkken/kit#6056: `issue:file --body-file` reads through `cli_body`, so a body left in the
 // work tree is refused with the reader's own sentence before anything is sent.
 
 const FAILURE_EXIT_CODE = 1
-const repository = cli_body_repository.create()
-
-afterAll(() => {
-	repository.remove()
-})
+const make_directory = temporary_directory('suite')
+const repository = cli_body_repository.create(make_directory('issue-file-cli-body-location-'))
 
 describe('issue_file_cli.run — where the body file sits', () => {
 	it('refuses a body in the work tree that git does not ignore, sending nothing', async () => {

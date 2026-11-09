@@ -1,4 +1,3 @@
-import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
@@ -6,6 +5,7 @@ import { run_board_github, type Gather } from './run-board-github'
 import type { BoardLanes } from './run-board-lane-state'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
+import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_state, type Pace } from './run-board-state'
 import type { ItemStatus } from './run-board-status'
 
@@ -163,10 +163,13 @@ describe('run_board_github.statuses_for with a lane an earlier run left', () => 
 
 // joshuafolkken/kit#6559: GitHub's core rate limit is read beside the plan, as often as the plan, and a
 // failed read clears the allowance rather than keeping a stale one on the usage row.
-const CORE: CoreRateLimit = { remaining: 4321, limit: 5000, reset_ms: START + 1 }
+const CORE: GithubRateLimit = {
+	core: { remaining: 4321, limit: 5000, reset_ms: START + 1 },
+	graphql: undefined,
+}
 
 function rate_gather(
-	read_rate_limit: () => Promise<CoreRateLimit | undefined>,
+	read_rate_limit: () => Promise<GithubRateLimit | undefined>,
 	pace: Pace,
 	now_ms = START,
 ): Gather {
@@ -187,7 +190,7 @@ describe('run_board_github.gather_github rate limit', () => {
 	})
 
 	it('waits at the settled pace for a rate limit that lands after the plan', async () => {
-		async function later(): Promise<CoreRateLimit> {
+		async function later(): Promise<GithubRateLimit> {
 			return await new Promise((resolve) => {
 				setTimeout(() => {
 					resolve(CORE)
@@ -224,7 +227,7 @@ describe('run_board_github.gather_github rate limit throttle', () => {
 
 	it('reads again only after the plan interval, clearing the allowance when that read fails', async () => {
 		const read = vi
-			.fn<() => Promise<CoreRateLimit | undefined>>()
+			.fn<() => Promise<GithubRateLimit | undefined>>()
 			.mockResolvedValueOnce(CORE)
 			.mockRejectedValueOnce(new Error('offline'))
 		const first = await gather_github(FRESH_STATE, rate_gather(read, 'settled'))

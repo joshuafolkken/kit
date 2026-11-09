@@ -210,7 +210,7 @@ pnpm josh run:add 101 --retry         # retry a mechanically stopped issue in th
 Adds to this repository's live `backlogrun` at the next free lane, without interrupting running children.
 
 - Epic children are read on every driver pass and need no `run:add`.
-- Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`. Named runs also record additions beside their unchanged invocation.
+- Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`; an issue already labelled `priority:critical` or `priority:high` keeps that label alone, still ahead of the queue. Named runs also record additions beside their unchanged invocation.
 - Refuses closed/unreadable issues, epics, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
 - Each `add` event wakes `run:progress --wait`.
 - `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
@@ -873,7 +873,7 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 
 **Options:**
 
-- `--chat` — answers a `backlogrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
+- `--chat` — answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
 
 <!-- /usage -->
@@ -901,7 +901,7 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-Below the header: the `📈 throughput` section, `24h` in hourly cells and `7d` in 12-hour cells (a sparkline of closes per cell scaled to the row's peak, `┊` a stopped cell; `⚡` closes per active hour over complete cells, `🟢` active hours, `✅` closes, `🏔` the peak cell's rate and start, `🔄` closes this hour; folded with `t`); then the `⛽ usage` section, Claude's and Codex's 5h and 7d gauges (percent, `┊` at even pace, `↻` reset, `≈N` tasks left at the spend per task of the last ten done logs (its derivation: the rationale's "`josh run:board` in detail"); read off lane logs and Codex rollout files, no API asked; folded with `u`), then a row per touched child (phase icon, elapsed time, CPU and memory), then an earlier run's lane holding a place (drawn alike — its running row marked `🧳` in its phase's place — never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+Below the header: the `📈 throughput` section, `24h` in hourly cells and `7d` in 12-hour cells (a sparkline of closes per cell scaled to the row's peak, `┊` a stopped cell; `⚡` closes per active hour over complete cells, `🟢` active hours, `✅` closes, `🏔` the peak cell's rate and start, `🔄` closes this hour; folded with `t`); then the `⛽ usage` section, Claude's and Codex's 5h and 7d gauges (window label, percent, `┊` at even pace, `≈N` tasks left at the spend per task of the last ten done logs (its derivation: the rationale's "`josh run:board` in detail"), the reset time, and `N′` the reading's age once it is over ten minutes old; read off lane logs and Codex rollout files, no API asked; folded with `u`), and GitHub's `rest` and `graphql` allowances in the same columns, the calls left in place of `≈N`, then a row per touched child (phase icon, elapsed time, CPU and memory), then an earlier run's lane holding a place (drawn alike — its running row marked `🧳` in its phase's place — never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the icon a row leads with is what it waits on. An epic's children stay gathered under the epic.
 
@@ -933,7 +933,9 @@ While the run is at its `planning` stage, the one row it launches next — a nam
 
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 
-**Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
+**Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
+
+A running `fullrun #N` or `halfrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane; a stop-marked hold is not running.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".
 
@@ -982,7 +984,9 @@ pnpm josh run:handoff backlogrun <E> --only                         # josh backl
 
 <!-- /usage -->
 
-Consultation main (Fable / Astra): uses its provider's role profile (`kickoff` scheduler, else worker). Background `kickoff`. Lane children cannot use `run:handoff`: exit 1 before launch; continue in the current session.
+Consultation main (Fable / Astra): uses its provider's role profile (`kickoff` / `retrospective` scheduler, else worker). Background `kickoff`. Lane children cannot use `run:handoff`: exit 1 before launch; continue in the current session.
+
+`run:handoff retrospective` starts the end-of-run unit on a generated brief and waits; the brief's close names the calling session as `--owner`, since the carry is that session's. It exits 0 only once the carry holds the unit's `run:carry --retrospective` mark, and exits 1 without starting when the mark is already there.
 
 **Output / exit codes:** exits 0 once the child starts (`kickoff`: once it exits 0); `backlogrun` exits with `josh backlogrun`'s code. A bad argument, an unreadable brief, an unresolvable profile, no git repository, a failed start, or a tree hold that blocks the child's `run:entry` claim exits 1.
 
@@ -1075,6 +1079,14 @@ pnpm josh lane:prune
 Unreadable `.env`: report lane/reason on stderr; check ports before allocating other seats. Failed process/socket probes refuse allocation.
 
 `lane:prune` names each lane it keeps, with why, on stderr.
+
+Codex hooks in a lane: Codex runs the main checkout's `.codex/hooks.json` in every lane.
+
+- Its trust is the main path and definition hash in `~/.codex/config.toml` `[hooks.state]`.
+- Each command finds the lane's scripts through `git rev-parse --show-toplevel`.
+- No per-lane trust; `--dangerously-bypass-hook-trust` is never passed.
+- A lane's own `.codex/hooks.json` edit takes effect only after it reaches the main checkout.
+- A changed hook definition reads `modified` and Codex skips it in every checkout until a person re-approves it in Codex's hook review.
 
 **Settings:**
 
@@ -1421,9 +1433,11 @@ A first plan over twice the files its `- 規模見積もり:` declares (tests ex
 
 Hunks over twice declared files or declared lines × recent ratio over 200 also split. Splits log their reason; hunks exclude planned files.
 
+A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-related-cap.ts`) also splits, as `split (hub)` naming it; with no dependency graph none reads as a hub. Related: [#6180](https://github.com/joshuafolkken/kit/issues/6180) splits the hubs themselves.
+
 A `--single` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply.
 
-`--size-approval <json-file>` (optional; a re-plan never needs one): `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain.
+`--size-approval <json-file>` (optional; a re-plan never needs one): `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain. Steps: [Approve a lane plan past its size guide](./how-to/lane-size-approval.md).
 
 `--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
 

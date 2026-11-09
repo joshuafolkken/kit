@@ -1,21 +1,18 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { issue_label_schema } from '#scripts/git/git-schemas'
+import type { IssueListOutcome } from '#scripts/gh/git-gh-issue-list'
+import { blocked_by_schema, issue_label_schema } from '#scripts/git/git-schemas'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { session_cite } from '#scripts/issue/session-cite'
-import { bounded_pool } from '#scripts/lib/bounded-pool'
-import type { PollOptions } from '#scripts/lib/poll'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { z } from 'zod'
 import { epic_bundle, type BacklogIssue, type MembershipContext } from './epic-bundle'
 import { epic_bundle_apply } from './epic-bundle-apply'
 import { epic_bundle_format } from './epic-bundle-format'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
-import { epic_bundle_poll } from './epic-bundle-poll'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
 import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
 import { epic_issue } from './epic-issue'
-import type { IssueReference } from './epic-reference'
 
 // `josh epic:bundle <N>` — after an issue is filed, look at the open backlog and say whether it
 // belongs with something already there.
@@ -38,18 +35,11 @@ const UNKNOWN_REPO_MESSAGE =
 // listing's schema rather than made optional on one: the epic listing does not ask for the field, and
 // a schema that tolerates its absence everywhere would let a missing title pass unnoticed here.
 //
-// `blocked_by_count` is the blocker count GitHub already puts in the listing response.
-// It is **nullish rather than defaulted**, and that is the whole safety of
-// the read below: a row the listing carries no summary for must not be read as a row with no
-// blockers, because that reading is what would silently drop a relation instead of costing a
-// request. Nothing in today's pipeline is expected to arrive without one — the response carries the
-// summary on every issue, and `git-gh-issue-list.ts` filters pull requests, which are what lack it,
-// out client-side — so this tolerates a shape the listing is not supposed to hand over rather than
-// describing one it does.
+// `blockedBy` is absent on the listing that asks for no relations, and reads as none there.
 const backlog_schema = epic_schema.extend({
 	title: z.string().nullable(),
 	labels: z.array(issue_label_schema).default([]),
-	blocked_by_count: z.number().nullish(),
+	blockedBy: blocked_by_schema,
 })
 
 type BacklogRow = z.infer<typeof backlog_schema>
@@ -58,58 +48,21 @@ type BacklogRow = z.infer<typeof backlog_schema>
 // task-list read would answer differently the first time that shape moved.
 const { build_epic_index } = epic_index
 
-// Undefined when the read failed, which the caller reports — as opposed to an issue that genuinely
-// declares no relations, which is an empty array.
-async function epic_issue_relations(
-	issue_number: string,
-	repo: string,
-): Promise<Array<IssueReference> | undefined> {
-	const parsed = epic_issue.parse_epic_issue(
-		await git_gh_command.issue_get_state_and_relations(issue_number),
-	)
-
-	return parsed === undefined ? undefined : epic_issue.blocker_references_of(parsed, repo)
-}
-
-// One read per backlog issue *that has blockers*, a few at a time.
+// The listing that carries each row's blocker relations, or the one that carries none.
 //
-// A read is `gh api`: one REST request for the issue, and a second to its `dependencies/blocked_by`
-// endpoint unless the issue's own dependency summary reports exactly zero blockers. The listing that
-// produced these rows already carries that same summary, so the zero is known *before* the read
-// rather than inside it, and the read is skipped outright — otherwise the command would pay one
-// request for every open issue in the repository, a cost that grows with the backlog.
-//
-// One read would do if `gh` exposed the reverse of `blockedBy`, but it does not (`blocks` is not a
-// JSON field), so a dependency declared on the *other* issue is only visible by asking that issue.
-// Spawning all of them at once is what turns a rate limit into a wrong answer: a refused read becomes
-// an empty relation list, and a bundle that should have been proposed is reported as "no strong
-// signal" instead. Batching bounds the burst; the `unreadable` list below is what keeps a refused
-// read from passing as an answer. The pool itself is `bounded-pool.ts`,
-// shared with the reference reads below it and with the eval suite.
-const RELATION_CONCURRENCY = 8
-const NO_BLOCKERS = 0
-
-// GitHub's own count, not an inference from what was read. Strictly `=== 0`, so a row carrying no
-// summary at all answers `false` and keeps its read: an absent count says nothing about whether the
-// issue has blockers, and treating the two alike is the one way this shortcut could lose a
-// relation. Skipping is cheap and wrong-in-silence; reading is a request and always right.
-function has_no_blockers(row: BacklogRow): boolean {
-	return row.blocked_by_count === NO_BLOCKERS
-}
-
-// Every row still gets an entry, in order, so the index alignment `fetch_backlog` relies on is the
-// same whether a row was read or answered from the listing.
-async function fetch_relations(
-	rows: ReadonlyArray<BacklogRow>,
-	repo: string,
-): Promise<Array<Array<IssueReference> | undefined>> {
-	return await bounded_pool.bounded_map(rows, RELATION_CONCURRENCY, async (row) =>
-		has_no_blockers(row) ? [] : await epic_issue_relations(String(row.number), repo),
-	)
+// The relations ride on the listing (`issue_list_open_relations`), which reads them in one GraphQL
+// query per hundred rows. Read here one issue at a time they cost two requests per open issue
+// declaring a blocker — the bulk of an `issue:file` run's REST calls (joshuafolkken/kit#6796). The
+// listing still skips a row GitHub's own summary reports no blockers on, and a relation it cannot
+// read fails the whole listing, which this command reports, rather than passing as "none".
+async function list_backlog(options: BacklogOptions | undefined): Promise<IssueListOutcome> {
+	return options?.include_relations === false
+		? await git_gh_command.issue_list_open_bodies(BACKLOG_LIMIT)
+		: await git_gh_command.issue_list_open_relations(BACKLOG_LIMIT)
 }
 
 // The open backlog, with each issue's relations and the epic tracking it. `unreadable` names the
-// issues whose relations could not be read, so a "nothing to bundle" verdict is never quietly based
+// referenced issues that could not be read, so a "nothing to bundle" verdict is never quietly based
 // on data that never arrived.
 interface FetchedBacklog {
 	issues: Array<BacklogIssue>
@@ -131,9 +84,8 @@ interface FetchedBacklog {
 // One listing row as the bundler reads it. Split from the fetch so that function stays a list of
 // requests rather than a request list plus a row mapping.
 function to_backlog_issue(
-	row: Pick<BacklogRow, 'number' | 'title' | 'body' | 'labels'>,
+	row: BacklogRow,
 	context: MembershipContext & { repo: string },
-	blocked_by: ReadonlyArray<IssueReference>,
 ): BacklogIssue {
 	const labels = row.labels.map((label) => label.name)
 
@@ -142,7 +94,7 @@ function to_backlog_issue(
 		repo: context.repo,
 		title: row.title ?? '',
 		body: row.body ?? '',
-		blocked_by,
+		blocked_by: epic_issue.blocker_references_of(row, context.repo),
 		...epic_bundle.membership_of(row.number, labels, context),
 	}
 }
@@ -150,22 +102,9 @@ function to_backlog_issue(
 // What a caller does not need read for it. `issue:scout` asks about an issue that does not exist yet:
 // it has no number, so no recorded dependency can name it and it declares none of its own — the
 // relation reads cannot change its answer, and skipping them takes one request per open issue off the
-// command a run makes before every filing. `epic:bundle` leaves it unset and
-// reads them exactly as before.
+// command a run makes before every filing. `epic:bundle` leaves it unset and reads them.
 interface BacklogOptions {
 	include_relations?: boolean
-}
-
-// The relations, or an empty list each when the caller asked for none. Every issue still gets a row,
-// so the index alignment `fetch_backlog` relies on holds either way.
-async function read_relations(
-	rows: ReadonlyArray<BacklogRow>,
-	repo: string,
-	options: BacklogOptions | undefined,
-): Promise<Array<Array<IssueReference> | undefined>> {
-	if (options?.include_relations === false) return rows.map(() => [])
-
-	return await fetch_relations(rows, repo)
 }
 
 async function fetch_backlog(
@@ -174,24 +113,21 @@ async function fetch_backlog(
 	epic_numbers: ReadonlySet<number> = new Set(epics.values()),
 	options?: BacklogOptions,
 ): Promise<FetchedBacklog> {
-	const { json, is_capped } = await git_gh_command.issue_list_open_bodies(BACKLOG_LIMIT)
+	const { json, is_capped } = await list_backlog(options)
 	// A failed listing is not an empty backlog. Reported rather than degraded into one, which would
 	// have a `gh` failure arrive as "that issue does not exist".
 	if (json === undefined) return { issues: [], unreadable: [], is_readable: false }
 	// Same reason as `fetch_epics`: an unparseable listing is not an empty backlog.
 	const rows = parse_json_array_or_undefined(json, backlog_schema)
 	if (rows === undefined) return { issues: [], unreadable: [], is_readable: false }
-	const relations = await read_relations(rows, repo, options)
 
 	return {
 		is_readable: true,
 		// Either cutoff hides the same thing: a related issue past it, reported as "no existing issue
 		// shares a reference" — an assertion about data that was never loaded.
 		cutoff: cutoff_of(rows.length, BACKLOG_LIMIT, is_capped),
-		issues: rows.map((row, index) =>
-			to_backlog_issue(row, { repo, epics, epic_numbers }, relations[index] ?? []),
-		),
-		unreadable: rows.filter((_, index) => relations[index] === undefined).map((row) => row.number),
+		issues: rows.map((row) => to_backlog_issue(row, { repo, epics, epic_numbers })),
+		unreadable: [],
 	}
 }
 
@@ -318,19 +254,24 @@ async function report_widened(
 	return await report_decision(subject, widened, repo, is_apply)
 }
 
-// The recommendation for one issue, from the open backlog around it. `options` is the poll a caller
-// holding a just-filed issue passes, since the listing trails the create call (`epic-bundle-poll.ts`).
-async function report_for(
+// The subject from the listing, or read on its own when the listing does not show it. A just-filed
+// issue trails the listing for a while; re-reading the whole backlog until it appeared cost every
+// open issue's requests again per attempt (joshuafolkken/kit#6796), where one read answers.
+async function find_subject(
 	issue_number: number,
-	repo: string,
-	options?: PollOptions,
-	is_apply = false,
-): Promise<number> {
-	const backlog = await epic_bundle_poll.read_until_listed(
-		async () => await read_backlog(repo),
-		issue_number,
-		options,
-	)
+	backlog: FetchedBacklog,
+): Promise<BacklogIssue | undefined> {
+	const listed = backlog.issues.find((issue) => issue.number === issue_number)
+	if (listed !== undefined || backlog.context === undefined) return listed
+	const read = await epic_bundle_referenced.read_subject(issue_number, backlog.context)
+	if (read !== undefined) backlog.issues.push(read)
+
+	return read
+}
+
+// The recommendation for one issue, from the open backlog around it.
+async function report_for(issue_number: number, repo: string, is_apply = false): Promise<number> {
+	const backlog = await read_backlog(repo)
 
 	if (!backlog.is_readable) {
 		console.error(unreadable_backlog_message(backlog))
@@ -338,7 +279,7 @@ async function report_for(
 		return FAILURE_EXIT_CODE
 	}
 
-	const subject = backlog.issues.find((issue) => issue.number === issue_number)
+	const subject = await find_subject(issue_number, backlog)
 
 	if (subject === undefined) {
 		console.error(
@@ -374,7 +315,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await report_for(issue_number, repo, undefined, argv.includes(APPLY_FLAG))
+	return await report_for(issue_number, repo, argv.includes(APPLY_FLAG))
 }
 
 const epic_bundle_cli = {

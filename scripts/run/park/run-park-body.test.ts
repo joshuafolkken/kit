@@ -10,6 +10,7 @@ const PICK_TWO = '2 the key leaked'
 const PICK_ONE = '1 cheaper'
 const NO_PICK = '推奨なし both need the owner'
 const PICK_MISSING = '### 推奨 needs one line'
+const OFF_SCHEMA = 'Which option?'
 
 function body_with(pick: string, options = OPTIONS): string {
 	return `## Which account?\n\n${options}\n\n### 推奨\n${pick}\n`
@@ -67,6 +68,61 @@ describe('run_park_body.summary_of', () => {
 	})
 
 	it('answers undefined for a body off the schema', () => {
-		expect(run_park_body.summary_of('Which option?')).toBeUndefined()
+		expect(run_park_body.summary_of(OFF_SCHEMA)).toBeUndefined()
+	})
+})
+
+function single_option(tier: string, permission: string): string {
+	return body_with(
+		PICK_ONE,
+		['### 選択肢', '1. File it', `   - 層: ${tier}`, `   - 必要な権限: ${permission}`].join('\n'),
+	)
+}
+
+// joshuafolkken/kit#6738: a park whose recommendation needs no person is the parent's to take.
+describe('run_park_body.auto_pick', () => {
+	it.each([
+		['tier A needing no permission', 'A', 'なし'],
+		["tier A needing the parent's", 'A', '親'],
+	])('picks the recommendation for %s', (_case, tier, permission) => {
+		expect(run_park_body.auto_pick(single_option(tier, permission))).toBe(1)
+	})
+
+	it.each([
+		['tier B needing no permission', 'B', 'なし'],
+		['tier A needing a person', 'A', '人'],
+		['tier A needing the trust setting', 'A', '信頼設定'],
+		['tier A needing an owner comment', 'A', 'owner コメント'],
+	])('leaves %s to a person', (_case, tier, permission) => {
+		expect(run_park_body.auto_pick(single_option(tier, permission))).toBeUndefined()
+	})
+
+	it('lists the permissions a parent takes itself in the schema it prints', () => {
+		expect(run_park_body.FORMAT).toContain('必要な権限: なし | 親 |')
+	})
+
+	it.each([
+		['no recommendation', body_with(NO_PICK)],
+		['a body off the schema', OFF_SCHEMA],
+	])('picks nothing for %s', (_case, body) => {
+		expect(run_park_body.auto_pick(body)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6670: the option `backlog:triage --adopt` may take, refused before any write.
+describe('run_park_body.adopt_problem', () => {
+	it.each([
+		['the recommended tier A option', PICK_ONE, 1],
+		['another tier A option beside a recommendation', PICK_TWO, 1],
+	])('lets a parent adopt %s', (_case, pick, option) => {
+		expect(run_park_body.adopt_problem(body_with(pick), option)).toBeUndefined()
+	})
+
+	it.each([
+		['a park with no recommendation (ac-77bc914f)', NO_PICK, 1, 'the park says 推奨なし'],
+		['an unlisted option (ac-77bc914f)', PICK_ONE, 3, '### 選択肢 lists no option 3'],
+		['a tier C option (ac-77bc914f)', PICK_TWO, 2, 'option 2 is tier C'],
+	])('refuses %s', (_case, pick, option, problem) => {
+		expect(run_park_body.adopt_problem(body_with(pick), option)).toContain(problem)
 	})
 })

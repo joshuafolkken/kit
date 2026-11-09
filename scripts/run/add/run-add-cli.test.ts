@@ -90,6 +90,7 @@ describe('run', () => {
 
 		expect(await run_add_cli.run([String(ADDED_ISSUE)], { ...OPEN_PORTS, apply_label })).toBe(1)
 		expect(console.error).toHaveBeenCalledWith(run_add_cli.NO_RUN_MESSAGE)
+		expect(run_add_cli.NO_RUN_MESSAGE).toContain('`pnpm josh backlogrun N`')
 		expect(apply_label).not.toHaveBeenCalled()
 	})
 })

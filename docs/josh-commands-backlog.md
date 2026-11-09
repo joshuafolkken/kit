@@ -637,7 +637,7 @@ pnpm josh epic --untrack 893 894                                             # r
 
 It satisfies all four mechanical requirements by construction: `epic` label, task-list child rows, machine-readable `Dependencies`, an `Execution` run command.
 
-`Execution` prints `backlogrun #<E> --only`. A failed `blocked-by` write is reported as a count; the epic stays correct.
+`Execution` prints `pnpm josh backlogrun <E> --only`. A failed `blocked-by` write is reported as a count; the epic stays correct.
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
@@ -898,6 +898,7 @@ pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
 pnpm josh backlog:triage --apply 913 --solo --defect yes --verification yes --every-run yes --reason "<why>" --clear
 pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"
 pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
+pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 ```
 
 **Options:**
@@ -908,6 +909,7 @@ pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"
 - `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
 - `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
+- `--adopt <k>` — takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.
 
 <!-- /usage -->
 
@@ -989,6 +991,10 @@ pnpm josh backlog:drive [--max <n>] [--idle <minutes>] [--only]
 <!-- /usage -->
 
 An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags. A `run` that owes a judgment opens its lanes first, then hands `triage` back in the same pass.
+
+A drained `stop` that owes the retrospective starts one retrospective unit, a headless model child, and waits for it to exit; the board's now line reads `🔍 retrospective` meanwhile. The unit closes under the driver's `--owner`.
+
+A record the unit marked done lets the `stop` end the run; an unmarked record, at any exit code, hands `retrospective` back.
 
 The supervisor claims the record for the session it wakes; the session acts and ends its turn; its `Stop` hook writes the cut that hands the loop back.
 

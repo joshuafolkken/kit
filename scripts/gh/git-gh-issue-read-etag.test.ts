@@ -1,12 +1,14 @@
 import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
 import { git_gh_exec } from './git-gh-exec'
-import { read_blocked_by } from './git-gh-issue-read'
+import { git_gh_issue_read, read_blocked_by } from './git-gh-issue-read'
 import { git_gh_issue_rest } from './git-gh-issue-rest'
 import {
 	BLOCKER_NUMBER,
 	ISSUE_NUMBER,
+	ISSUE_TITLE,
 	rest_blockers,
 	rest_dependencies_summary,
 	rest_issue,
@@ -68,5 +70,37 @@ describe('read_blocked_by — the previous ETag', () => {
 
 		expect(await blocker_states()).toStrictEqual([`${String(BLOCKER_NUMBER)}:CLOSED`])
 		expect(sent_etags()).toStrictEqual([undefined, FIRST_ETAG])
+	})
+})
+
+// joshuafolkken/kit#6754: the issue GET itself is the read the five commands `josh gh:usage` counts
+// most calls for all make, so it is sent with the previous ETag as well.
+describe('git_gh_issue_read — the issue GET through the ETag layer', () => {
+	it('sends the issue GET through the ETag layer, not an unconditional gh api', async () => {
+		const unconditional = vi.spyOn(git_gh_exec, 'exec_gh_api')
+
+		serve({ kind: 'changed', etag: FIRST_ETAG, body: rest_issue() })
+
+		expect(await git_gh_issue_read.issue_get_title(READ_NUMBER)).toBe(ISSUE_TITLE)
+		expect(git_gh_conditional.read_conditional).toHaveBeenCalledWith(
+			git_gh_api_path.issue_api_path(READ_NUMBER),
+			undefined,
+			undefined,
+		)
+		expect(unconditional).not.toHaveBeenCalled()
+	})
+
+	it('sends the previous ETag and answers the previous issue on a 304', async () => {
+		serve({ kind: 'changed', etag: FIRST_ETAG, body: rest_issue() }, { kind: 'unchanged' })
+
+		expect(await git_gh_issue_read.issue_get_title(READ_NUMBER)).toBe(ISSUE_TITLE)
+		expect(await git_gh_issue_read.issue_get_title(READ_NUMBER)).toBe(ISSUE_TITLE)
+		expect(sent_etags()).toStrictEqual([undefined, FIRST_ETAG])
+	})
+
+	it('answers undefined for an issue that cannot be read, as the unconditional read did', async () => {
+		serve({ kind: 'unreadable', cause: new Error('HTTP 502') })
+
+		expect(await git_gh_issue_read.issue_get_title(READ_NUMBER)).toBeUndefined()
 	})
 })

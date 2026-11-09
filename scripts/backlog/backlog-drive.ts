@@ -28,8 +28,10 @@ import { backlog_drive_judge } from './backlog-drive-judge'
 import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_paused } from './backlog-drive-paused'
+import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 import { backlog_offer_timing, type LoopRun, type OfferTiming } from './backlog-offer-timing'
+import { backlog_yield_cap, type YieldCapPorts } from './backlog-yield-cap'
 
 const { MERGE_TOKEN } = run_merge_token
 const { HANDOFF_TOKENS, IMMEDIATE_TOKENS, TOKEN_HANDLING } = backlog_drive_token_handling
@@ -46,12 +48,12 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 	'wait',
 ])
 const NO_RETRIES = 0
-const EXHAUSTED_ANSWER = 'exhausted'
 const JUDGE_REASON = 'judge'
 const TRIAGE_TOKEN = epic_triage.TRIAGE_VERDICT
 // The `hold` reason a pass held by a Claude usage limit records.
 const USAGE_LIMIT_REASON = 'usage-limit'
 const { launch_all } = backlog_drive_launch_pass
+const { is_drain_owed } = backlog_drive_retrospective
 
 interface OfferRead extends HeldWaiting, OfferTiming {
 	verdict: string
@@ -74,7 +76,8 @@ interface DriveState extends OfferTiming {
 	// The children this run has in flight — seeded from the open lanes, so a restarted loop resumes them.
 	in_flight: Array<string>
 	// Every child merged, fed back to `backlog:offer` because GitHub closes a merged issue late. A parked
-	// child is left out: its labels classify it, so one a person released is offered again.
+	// child is left out: its labels classify it, so one a person released is offered again — except one
+	// the yield cap parked (`backlog-yield-cap.ts`), which stays out whether or not its park went through.
 	exclude: Array<string>
 	// When the run last did something, handed to `backlog:budget` as `--active`.
 	active: string
@@ -102,7 +105,8 @@ interface DriveEnd {
 
 type Collected = Pick<MergeResult, 'token' | 'outcome' | 'is_offer'>
 
-interface DrivePorts {
+// The yield cap's ports (`backlog-yield-cap.ts`): the issue's yields, and its park.
+interface DrivePorts extends YieldCapPorts {
 	// Whether a child's process has confirmed-ended — `lane:await`'s re-confirmed check in production.
 	is_finished: (issue: string) => boolean
 	// `run:merge <N>`'s first stdout token and the outcome it handled the child as.
@@ -141,6 +145,9 @@ interface DrivePorts {
 	// A holding offer with nothing in flight — the paused-lane notice (`backlog-drive-paused.ts`), which
 	// reads the lane records itself and is deduplicated per pause episode by the port.
 	paused: () => Promise<void>
+	// A `stop` drain owing the retrospective: the unit run to its end, `true` once the run record's
+	// retrospective is marked (`backlog_drive_retrospective_unit.run` in production).
+	retrospective: () => Promise<boolean>
 	now: () => Date
 }
 
@@ -162,18 +169,6 @@ function ended(reason: string, state: DriveState, token?: string, issue?: string
 		},
 		state,
 	}
-}
-
-// A drain owing the retrospective, read under a `watch` or a `stop` verdict. Only an empty backlog
-// drains: `backlog:offer` marks the drain on `exhausted` alone, so a watch over a parked or unreadable
-// backlog has no retrospective for `run:step` to fire and stays the driver's.
-function is_drain_owed(read: OfferRead, state: DriveState, verdict: string): boolean {
-	return (
-		read.verdict === verdict &&
-		read.answer === EXHAUSTED_ANSWER &&
-		state.in_flight.length === 0 &&
-		read.is_retrospective_owed === true
-	)
 }
 
 function initial_state(in_flight: ReadonlyArray<string>, active: string): DriveState {
@@ -234,7 +229,13 @@ async function collect(issue: string, state: DriveState, ports: DrivePorts): Pro
 	if (token === '') return ended('merge', state, undefined, issue)
 	if (!is_offer && IMMEDIATE_TOKENS.has(token)) return ended('merge', state, token, issue)
 
-	const next = collected_state(issue, collected, state, ports.now().toISOString())
+	const active = ports.now().toISOString()
+	const next = await backlog_yield_cap.capped(
+		issue,
+		collected.outcome,
+		collected_state(issue, collected, state, active),
+		ports,
+	)
 
 	return {
 		kind: 'continue',
@@ -261,13 +262,10 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 }
 
 // A watch with nothing in flight is the drain: `run:step` owes the retrospective there, so it is the
-// parent's. With children still running the watch is only waiting on them.
+// parent's. With children still running the watch is only waiting on them. A `stop` drain's
+// retrospective is the driver's own unit (`backlog_drive_retrospective.ran`).
 function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	if (!KNOWN_VERDICTS.has(read.verdict)) return ended(read.verdict, state, read.verdict)
-
-	if (is_drain_owed(read, state, STOP_VERDICT)) {
-		return ended('retrospective', state, 'retrospective')
-	}
 
 	if (read.verdict === STOP_VERDICT) {
 		return {
@@ -337,7 +335,8 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	if (read.verdict === RUN_VERDICT) return await run_then_judge(read, next, ports)
 	if (await backlog_drive_judge.is_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
-	const idle = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)
+	const verdict = await backlog_drive_retrospective.ran(on_verdict(read, next), read, ports)
+	const idle = await backlog_drive_idle.noticed(verdict, read, ports)
 	const result = await backlog_drive_paused.noticed(idle, read, ports)
 
 	return await backlog_drive_hold.held(result, read, ports)
@@ -377,8 +376,11 @@ async function run_pass(
 interface LoopConfig {
 	poll_ms: number
 	// The floor between two `backlog:offer` asks while nothing was collected, running or idle alike —
-	// `backlog_budget.OFFER_INTERVAL_MS`.
+	// `backlog_budget.OFFER_INTERVAL_MS`. A `run:add` since the last ask skips it.
 	offer_ms: number
+	// The floor instead while no lane runs and a named issue is left to dispatch —
+	// `backlog_budget.IDLE_OFFER_INTERVAL_MS`.
+	idle_offer_ms: number
 	// How long one invocation may wait before returning `window`, or `undefined` for no bound. A headless
 	// parent's foreground call is capped by its shell's timeout, so it passes one under that cap.
 	window_ms: number | undefined
@@ -386,6 +388,11 @@ interface LoopConfig {
 
 interface LoopPorts extends DrivePorts {
 	sleep: (milliseconds: number) => Promise<void>
+	// Whether `run:add` handed the run an issue at or after the given instant —
+	// `backlog_arrival_added.is_added_since` in production.
+	added_since: (since_ms: number) => Promise<boolean>
+	// Whether an issue the run names is still left to dispatch — the run record's remaining in production.
+	named_left: () => Promise<boolean>
 	finish: (end: DriveEnd) => Promise<void>
 	// Called after every pass, ended ones included, so the caller can keep the resume line current.
 	on_state: (state: DriveState) => void
@@ -395,16 +402,10 @@ const WINDOW_END: DriveEnd = { reason: 'window', token: undefined, issue: undefi
 
 type LoopStep = { kind: 'end'; end: DriveEnd } | { kind: 'next'; run: LoopRun }
 
-// A dated wait asks again at its deadline; other waits keep `offer_ms`. A collected child or cleared
-// memory hold can still ask immediately.
+// When a pass asks is `backlog_offer_timing.is_due`'s; a collected child can still ask immediately.
 async function loop_step(run: LoopRun, config: LoopConfig, ports: LoopPorts): Promise<LoopStep> {
 	const now_ms = ports.now().getTime()
-	const due_ms = backlog_offer_timing.due_ms(
-		backlog_offer_timing.deadline_of(run.state),
-		run.offered_ms,
-		config.offer_ms,
-	)
-	const is_due = now_ms >= due_ms || (await backlog_drive_memory.is_cleared(run.state, ports))
+	const is_due = await backlog_offer_timing.is_due(run, config, ports, now_ms)
 	const result = await run_pass(run.state, is_due, ports)
 
 	ports.on_state(result.state)

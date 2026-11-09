@@ -57,19 +57,24 @@ function candidates_of(
 	)
 }
 
+// The reach of each of `files`, root-relative — none for no files or no graph.
+async function relative_counts(
+	root: string,
+	files: ReadonlyArray<string>,
+	read_counts: CountReader,
+): Promise<Array<ReachedCount>> {
+	if (files.length === 0) return []
+	const counts = await read_counts(files.map((file) => path.join(root, file)))
+
+	return (counts ?? []).map((reached) => ({ ...reached, file: path.relative(root, reached.file) }))
+}
+
 async function read_over_cap(
 	root: string,
 	files: ReadonlyArray<string>,
 	read_counts: CountReader,
 ): Promise<Array<string>> {
-	if (files.length === 0) return []
-	const counts = await read_counts(files.map((file) => path.join(root, file)))
-	const relative = (counts ?? []).map((reached) => ({
-		...reached,
-		file: path.relative(root, reached.file),
-	}))
-
-	return over_cap_of(relative)
+	return over_cap_of(await relative_counts(root, files, read_counts))
 }
 
 // A file past the cap that no test imports directly keeps its whole reach: narrowed, it would run no
@@ -85,6 +90,16 @@ async function direct_of(
 	return narrowed.map(([file, tests]) => [file, test_related_pins.with_pins(file, tests)])
 }
 
+// The files every test imports, and the other code files of `files` whose reach is read.
+async function split_of(
+	root: string,
+	files: ReadonlyArray<string>,
+): Promise<[Map<string, Array<string>>, Array<string>]> {
+	const every_test = await direct_importers.every_test_importers(root, files)
+
+	return [every_test, candidates_of(root, files, every_test)]
+}
+
 // `files` are repository-root-relative, as the change was read. `is_whole` keeps the whole suite:
 // nothing narrows, and no graph is built.
 async function capped_importers(
@@ -94,11 +109,26 @@ async function capped_importers(
 	read_counts: CountReader = test_pinned_reach.reached_test_counts,
 ): Promise<CappedImporters> {
 	if (is_whole) return NO_CAP
-	const every_test = await direct_importers.every_test_importers(root, files)
-	const over_cap = await read_over_cap(root, candidates_of(root, files, every_test), read_counts)
+	const [every_test, candidates] = await split_of(root, files)
+	const over_cap = await read_over_cap(root, candidates, read_counts)
 	const capped = await direct_of(root, over_cap)
 
 	return { importers: new Map([...every_test, ...capped]), over_cap: capped.map(([file]) => file) }
+}
+
+// The hubs among `files`, read before any edit so `lane:plan` can split them off
+// (joshuafolkken/kit#6543): each file whose own reach passes the cap — a narrowed one or one no test
+// imports directly, which keeps its whole reach — not the widest of a spread that only sums past it.
+// None without a graph.
+async function hubs_of(
+	root: string,
+	files: ReadonlyArray<string>,
+	read_counts: CountReader = test_pinned_reach.reached_test_counts,
+): Promise<ReadonlyArray<string>> {
+	const [, candidates] = await split_of(root, files)
+	const counts = await relative_counts(root, candidates, read_counts)
+
+	return counts.flatMap((reached) => over_cap_of([reached]))
 }
 
 // The test files the capped files run instead of their reach — their direct importers and a registry's
@@ -141,6 +171,7 @@ const test_related_cap = {
 	NO_CAP,
 	capped_importers,
 	hub_of,
+	hubs_of,
 	over_cap_line,
 	over_cap_of,
 	report_over_cap,

@@ -1,11 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_conditional, type ConditionalRead } from '#scripts/gh/git-gh-conditional'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { review_attest } from '#scripts/review/review-attest'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { issue_watch, type WatchRecord } from './issue-watch'
 import { issue_watch_diff } from './issue-watch-diff'
@@ -40,16 +38,16 @@ const OPEN_STATE = 'open'
 // A fresh root per case, and its record removed with it. A getter rather than the path: `beforeEach`
 // assigns a new one per case, and a value captured at definition would be the previous case's.
 function use_temporary_root(): () => string {
+	const make_directory = temporary_directory()
 	let directory = ''
 
 	beforeEach(() => {
-		directory = mkdtempSync(path.join(tmpdir(), 'issue-watch-'))
+		directory = make_directory('issue-watch-')
 		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue(COMMENTS)
 	})
 
 	afterEach(() => {
 		issue_watch.clear(directory)
-		rmSync(directory, { recursive: true, force: true })
 		vi.restoreAllMocks()
 	})
 

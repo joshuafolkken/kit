@@ -1,0 +1,189 @@
+import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
+import { epic_decide } from '#scripts/epic/epic-decide'
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { issue_cite } from '#scripts/issue/issue-cite'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_read, type IssueComment } from '#scripts/issue/issue-read'
+import { session_cite } from '#scripts/issue/session-cite'
+import { josh_command } from '#scripts/josh/josh-run'
+import { cli_flags } from '#scripts/lib/cli-flags'
+import { error_text } from '#scripts/lib/error-message'
+import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_park } from '#scripts/run/park/run-park'
+import { run_park_body } from '#scripts/run/park/run-park-body'
+
+// `josh backlog:triage --apply <N> --adopt <k> --reason <text>` — a parent takes option `<k>` of a
+// parked child's park in one call (joshuafolkken/kit#6670): the decision recorded in the tracking
+// epic's `## Decisions` and on the child (`epic --decide`'s path, which clears `needs-decision`), the
+// park record cleared (`run:park --clear`'s), then the child requeued (`run:add --retry`: a park left
+// for a person is marked done in the run, so a plain add refuses it).
+//
+// **Every read comes before the first write**: the latest park body that meets the schema
+// (`run_park_body`) refuses a park with no recommendation, an unlisted option and a tier C option, and
+// the child needs exactly one tracking epic and a backlogrun must hold the carry record here (`run:add`
+// refuses without one), so a refusal leaves nothing written. `epic --decide`
+// skips an entry or a comment already there, so a re-run after a later failure records nothing twice.
+
+const SUCCESS_EXIT_CODE = 0
+const FAILURE_EXIT_CODE = 1
+const OPTION_SHAPE = /^[1-9]\d*$/u
+const USAGE = 'Usage: josh backlog:triage --apply <N> --adopt <k> --reason <text>'
+const DECIDE_FAILED = 'could not record the decision; nothing after it was written'
+const REQUEUE_FAILED_HEAD = 'decision recorded and park cleared, but'
+const NO_RUN = 'no backlogrun is running here to requeue it; nothing was written'
+
+const OPTIONS = {
+	apply: { type: 'string' },
+	adopt: { type: 'string' },
+	reason: { type: 'string' },
+} as const
+
+interface AdoptRequest {
+	issue: string
+	option: number
+	reason: string
+}
+
+type EpicRead = { epic: number } | { problem: string }
+
+type Values = NonNullable<ReturnType<typeof cli_flags.values_of<typeof OPTIONS>>>
+
+function text_of(value: string | undefined): string {
+	return value?.trim() ?? ''
+}
+
+function option_of(text: string): number | undefined {
+	return OPTION_SHAPE.test(text) ? Number(text) : undefined
+}
+
+function request_of(values: Values): AdoptRequest | undefined {
+	const issue = text_of(values.apply)
+	const option = option_of(text_of(values.adopt))
+	const reason = text_of(values.reason)
+
+	if (option === undefined || reason === '') return undefined
+
+	return issue_number_shape.is_issue_number(issue) ? { issue, option, reason } : undefined
+}
+
+function refused(issue: string, problem: string): number {
+	console.error(`${session_cite.issue(issue)}: ${problem}`)
+
+	return FAILURE_EXIT_CODE
+}
+
+// The latest trusted comment that meets the park body schema — what the child parked with.
+function park_body(comments: ReadonlyArray<IssueComment>): string | undefined {
+	return issue_read
+		.trusted_bodies(comments)
+		.findLast((body) => run_park_body.problem_of(body) === undefined)
+}
+
+async function option_problem(request: AdoptRequest): Promise<string | undefined> {
+	const json = await git_gh_issue_read.issue_list_comments(request.issue)
+	const comments = await issue_read.parse_comments(json)
+
+	if (comments === undefined) return 'could not read its comments'
+	const body = park_body(comments)
+
+	if (body === undefined) return 'no trusted comment follows the park body schema'
+
+	return run_park_body.adopt_problem(body, request.option)
+}
+
+function epics_problem(count: number): string {
+	return `${String(count)} epics track it; record the decision with \`josh epic --decide\``
+}
+
+async function epic_of(issue: string): Promise<EpicRead> {
+	try {
+		const epics = await epic_blocked_by.listing_epics(issue)
+		const [epic] = epics
+
+		return epic === undefined || epics.length > 1
+			? { problem: epics_problem(epics.length) }
+			: { epic }
+	} catch (error) {
+		return { problem: `could not read the tracking epic: ${error_text.message_of(error)}` }
+	}
+}
+
+async function run_problem(): Promise<string | undefined> {
+	const git_directory = await run_carry.repository_directory()
+
+	if (git_directory === undefined) return NO_RUN
+	const read = run_carry.read_carry(run_carry.carry_path(git_directory))
+
+	return read.kind === 'carried' ? undefined : NO_RUN
+}
+
+function decision_of(request: AdoptRequest): string {
+	const { issue, option, reason } = request
+	const adopted = `adopted park option ${String(option)} (backlog:triage --adopt)`
+
+	return `${issue_cite.plain(issue)}: ${adopted} — ${reason}`
+}
+
+async function is_requeued(issue: string): Promise<boolean> {
+	const result = await josh_command.josh_run(['run:add', issue, '--retry'], true)
+
+	return result.code === SUCCESS_EXIT_CODE
+}
+
+// The decision, the park, then the requeue — the problem naming what was written before it, or
+// `undefined`.
+async function write(
+	request: AdoptRequest,
+	epic: number,
+	directory: string,
+): Promise<string | undefined> {
+	const { issue } = request
+	const decision = decision_of(request)
+	const decided = await epic_decide.decide({
+		epic_number: epic,
+		children: [Number(issue)],
+		decision,
+	})
+
+	if (decided !== SUCCESS_EXIT_CODE) return DECIDE_FAILED
+
+	run_park.clear(issue, directory)
+
+	if (await is_requeued(issue)) return undefined
+
+	return `${REQUEUE_FAILED_HEAD} \`run:add ${issue} --retry\` failed; re-run this command`
+}
+
+async function adopt(request: AdoptRequest, directory: string): Promise<number> {
+	const { issue, option } = request
+	const problem = (await run_problem()) ?? (await option_problem(request))
+
+	if (problem !== undefined) return refused(issue, problem)
+	const read = await epic_of(issue)
+
+	if ('problem' in read) return refused(issue, read.problem)
+	const write_problem = await write(request, read.epic, directory)
+
+	if (write_problem !== undefined) return refused(issue, write_problem)
+	const epic = session_cite.issue(String(read.epic))
+
+	console.info(
+		`adopt ${session_cite.issue(issue)} — option ${String(option)} · decided in ${epic} · park cleared · requeued`,
+	)
+
+	return SUCCESS_EXIT_CODE
+}
+
+async function run(argv: ReadonlyArray<string>, directory: string): Promise<number> {
+	const values = cli_flags.values_of(argv, OPTIONS)
+	const request = values === undefined ? undefined : request_of(values)
+
+	if (request !== undefined) return await adopt(request, directory)
+	console.error(USAGE)
+
+	return FAILURE_EXIT_CODE
+}
+
+const backlog_triage_adopt = { FLAG: '--adopt', run }
+
+export { backlog_triage_adopt }

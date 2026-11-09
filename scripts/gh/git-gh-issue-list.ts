@@ -2,8 +2,10 @@ import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_blocked_by_graphql } from './git-gh-blocked-by-graphql'
 import { git_gh_etag_read } from './git-gh-etag-read'
+import { git_gh_issue_list_graphql } from './git-gh-issue-list-graphql'
 import { read_blocked_by } from './git-gh-issue-read'
 import {
+	BLOCKED_BY_COUNT_FIELD,
 	BLOCKED_BY_FIELD,
 	git_gh_issue_rest,
 	type BlockedBy,
@@ -16,6 +18,9 @@ import {
 // is served normally. The callers differ only in filter and fields, so
 // the request, the paging and the mapping are decided once here and every caller downstream keeps
 // reading the field names it already reads.
+//
+// Where the transport allows GraphQL, the open listing newest first is asked in one query first
+// (`read_graphql`, joshuafolkken/kit#6785); REST answers whatever that query cannot.
 //
 // `state` is a parameter because the duplicate scan needs the issue that closed an hour ago, and the
 // name describes that behavior rather than the open-only listing most callers ask for.
@@ -199,7 +204,7 @@ async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> 
 //
 // The REST reads are bounded rather than sequential: the pass was paced one request at a time,
 // which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a blocker. The width
-// is the one `epic:bundle` already reads the same endpoint at, so the burst stays bounded while a
+// is the one `epic:bundle`'s referenced reads use, so the burst stays bounded while a
 // rate-limited read still fails the whole listing rather than a row (`bounded-pool.ts`).
 const RELATION_CONCURRENCY = 8
 
@@ -228,19 +233,84 @@ interface IssueListOutcome {
 	is_capped: boolean
 }
 
+interface MappedListing {
+	rows: Array<Record<string, unknown>>
+	is_capped: boolean
+}
+
+// The fields a GraphQL listing row carries (`git_gh_issue_graphql.to_rest_issue`). A request naming
+// any other — `stateReason`, `updatedAt`, `state` — stays on REST, which answers every field.
+const GRAPHQL_FIELDS = new Set([
+	'number',
+	'title',
+	'body',
+	'labels',
+	'createdAt',
+	'url',
+	'author_association',
+	'user',
+	BLOCKED_BY_FIELD,
+	BLOCKED_BY_COUNT_FIELD,
+])
+
+function is_open_newest_first(request: IssueListRequest): boolean {
+	return (
+		(request.state ?? DEFAULT_STATE) === DEFAULT_STATE &&
+		(request.sort ?? DEFAULT_SORT) === DEFAULT_SORT
+	)
+}
+
+// One GraphQL page answers only the open listing newest first. A limit past one page still asks it:
+// a pool that fits the page answers whole, and one that does not reads REST (`read_graphql`).
+function is_graphql_listing(request: IssueListRequest, fields: ReadonlyArray<string>): boolean {
+	return is_open_newest_first(request) && fields.every((field) => GRAPHQL_FIELDS.has(field))
+}
+
+// The listing in one GraphQL query (joshuafolkken/kit#6785), so a `backlog:next` cold scan spends
+// no REST core request. `undefined` — a REST session, a failed query, or a page that does not answer
+// the caller — hands the listing to REST, whose answer this one matches row for row.
+async function read_graphql(
+	request: IssueListRequest,
+	fields: ReadonlyArray<string>,
+): Promise<MappedListing | undefined> {
+	if (!is_graphql_listing(request, fields)) return undefined
+
+	const page = await git_gh_issue_list_graphql.read_open_page(request.label, request.repo)
+	if (page === undefined) return undefined
+
+	const selected = page.issues.filter((issue) => is_selected(issue.rest, request))
+	if (wants_more(page.has_next_page, selected.length, request.limit)) return undefined
+
+	const rows = selected
+		.slice(0, request.limit)
+		.map((issue) => git_gh_issue_rest.to_gh_issue(issue.rest, fields, issue.blocked_by))
+
+	return { rows, is_capped: false }
+}
+
+async function read_rest(
+	request: IssueListRequest,
+	fields: ReadonlyArray<string>,
+): Promise<MappedListing> {
+	const { rows, is_capped } = await fetch_selected(request)
+	const relations = fields.includes(BLOCKED_BY_FIELD)
+		? await read_relations(rows, request.repo)
+		: undefined
+	const mapped = rows.map((row, index) =>
+		git_gh_issue_rest.to_gh_issue(row, fields, relations?.[index]),
+	)
+
+	return { rows: mapped, is_capped }
+}
+
 // One invocation shape for every issue listing.
 async function issue_list(request: IssueListRequest): Promise<IssueListOutcome> {
 	try {
-		const { rows, is_capped } = await fetch_selected(request)
 		const fields = git_gh_issue_rest.split_fields(request.json_fields)
-		const relations = fields.includes(BLOCKED_BY_FIELD)
-			? await read_relations(rows, request.repo)
-			: undefined
-		const mapped = rows.map((row, index) =>
-			git_gh_issue_rest.to_gh_issue(row, fields, relations?.[index]),
-		)
+		const { rows, is_capped } =
+			(await read_graphql(request, fields)) ?? (await read_rest(request, fields))
 
-		return { json: JSON.stringify(mapped), is_capped }
+		return { json: JSON.stringify(rows), is_capped }
 	} catch {
 		return { json: undefined, is_capped: false }
 	}

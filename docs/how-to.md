@@ -22,11 +22,12 @@ For anyone who knows what they want to do but not which command does it. Each gu
 
 ## Work with agents
 
-| I want to…                                       | Guide                                                           |
-| ------------------------------------------------ | --------------------------------------------------------------- |
-| Have an agent plan, implement or merge an Issue  | [Run Issues with the workflow keywords](./how-to/run-issues.md) |
-| Let an agent work through many Issues unattended | [Run the backlog unattended](./how-to/run-backlog.md)           |
-| Continue or clean up after a run stopped         | [Recover a stopped run](./how-to/recover-a-run.md)              |
+| I want to…                                       | Guide                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------- |
+| Have an agent plan, implement or merge an Issue  | [Run Issues with the workflow keywords](./how-to/run-issues.md)           |
+| Let an agent work through many Issues unattended | [Run the backlog unattended](./how-to/run-backlog.md)                     |
+| Continue or clean up after a run stopped         | [Recover a stopped run](./how-to/recover-a-run.md)                        |
+| Let one Issue's lane run past its size guide     | [Approve a lane plan past its size guide](./how-to/lane-size-approval.md) |
 
 ## Fix problems
 

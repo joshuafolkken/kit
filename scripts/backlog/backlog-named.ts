@@ -24,7 +24,7 @@ const NOT_FOUND = -1
 // stop", and an empty named list makes that the empty run. Refused before anything starts rather than
 // begun and found empty, the same way a budget-only invocation is still a valid bare `backlogrun`.
 const NOTHING_TO_RUN =
-	'`--only` runs the named issues and stops, but none were named, so there is nothing to run. Name the issues (`backlogrun #N1 #N2 … --only`), or drop `--only` to drain the opted-in backlog.'
+	'`--only` runs the named issues and stops, but none were named, so there is nothing to run. Name the issues (`pnpm josh backlogrun N1 N2 … --only`), or drop `--only` to drain the opted-in backlog.'
 
 // One named item: a single issue (`is_epic: false`) or an epic (`is_epic: true`). The parser only sees
 // `#N`, so which one it is is decided by the caller from GitHub state; the pure functions here carry

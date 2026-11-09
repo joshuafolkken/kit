@@ -237,7 +237,7 @@ const split_notice_schema = z.object({
 	issue: z.number(),
 	files: z.number(),
 	lines: z.number(),
-	reason: z.enum(['files', 'hunks', 'lines', 'budget']).optional(),
+	reason: z.enum(['files', 'hunks', 'lines', 'hub', 'budget']).optional(),
 })
 // One `josh issue:file --route split` filed from the lane of `issue`; `child` is its reference.
 const split_filed_schema = z.object({
