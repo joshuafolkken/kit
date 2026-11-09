@@ -21,6 +21,7 @@ const ISOLATING_SOURCES: ReadonlyArray<[string, string]> = [
 	['child_process import', 'import { fork } from "node:child_process"'],
 	['file write', 'writeFileSync(target, data)'],
 	['mkdir', 'mkdirSync(directory)'],
+	['shared file write helper', "write_file(root, 'a.txt', data)"],
 	['remove', 'rmSync(target)'],
 ]
 

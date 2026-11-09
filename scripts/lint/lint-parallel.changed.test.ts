@@ -2,6 +2,7 @@ import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
+import { fake_result } from '#tools/test/execa-result'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ESLINT_HEAP_MIB } from './eslint-heap'
 import { lint_parallel } from './lint-parallel'
@@ -26,8 +27,6 @@ vi.mock('./eslint-cache-dependencies', () => ({
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-
 const ROOT = process.cwd()
 const CHANGED = path.join('scripts', 'lint', 'lint-parallel.ts')
 const ABSOLUTE_CHANGED = path.join(ROOT, CHANGED)
@@ -38,13 +37,6 @@ const PRETTIER_PASS = 'All matched files use Prettier code style!'
 const TIMING_LINE = /^lint timing — prettier \d+\.\d s · eslint \d+\.\d s\n$/u
 const ESLINT_HEAP = `--max-old-space-size=${String(ESLINT_HEAP_MIB)}`
 const COLD_OPTIONS = `${ESLINT_HEAP} --import=${new URL('eslint-memory.js', import.meta.url).href}`
-
-// The lint check reads only `all` and `exitCode` of execa's large result interface.
-function fake_result(exit_code: number, all = ''): ExecaResult {
-	const result = { all, exitCode: exit_code }
-
-	return result as unknown as ExecaResult
-}
 
 function mock_exit_codes(prettier_code: number, eslint_code: number): void {
 	mocked_execa
