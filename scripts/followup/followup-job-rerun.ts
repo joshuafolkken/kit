@@ -88,7 +88,7 @@ const failed_check_schema = z.looseObject({
 const rollup_schema = z.looseObject({ statusCheckRollup: z.array(z.unknown()) })
 
 // REST answers `null` for a step that never finished; a test fixture may leave the field out.
-const step_schema = z.looseObject({ conclusion: z.string().nullish() })
+const step_schema = z.looseObject({ name: z.string().optional(), conclusion: z.string().nullish() })
 
 const job_schema = z.looseObject({
 	id: z.number(),
@@ -187,26 +187,44 @@ function is_download_failure(log: string): boolean {
 
 // A job whose every step passed stopped on the runner; a red one is rerun on any attempt when its log
 // shows a download failing (joshuafolkken/kit#6834), and on its first attempt only is otherwise judged
-// by the failed tests its log names.
+// by the failed tests its log names; a later one names none, left to `settle_unnamed`.
 async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged> {
 	if (has_every_step_passed(job)) return { job, verdict: RERUN_VERDICT }
 	if (job.conclusion !== FAILURE_CONCLUSION) return { job, verdict: KEPT_VERDICT }
 
 	const log = await read_job_log(job)
 	if (is_download_failure(log)) return { job, verdict: RERUN_VERDICT }
-	if (!is_first_attempt(job)) return { job, verdict: KEPT_VERDICT }
+	if (!is_first_attempt(job)) return { job, verdict: UNNAMED_VERDICT }
 
 	const tests = followup_failed_tests.read_failed_tests(log)
 
 	return { job, verdict: followup_failed_tests.verdict_of(tests, changed), tests }
 }
 
-// A job red with no test named qualifies only as one waiting on a job that is itself rerun, or on one
-// the run never created (`run_jobs` names every job of the run).
+// A job red with no test named qualifies as a gate that failed though every job it needs succeeded, and
+// on its first attempt only as one waiting on a job that is itself rerun, or on one the run never
+// created (`run_jobs` holds every job of the run).
+function is_infra_failure(
+	job: Job,
+	graph: NeedsGraph,
+	reruns: ReadonlyArray<string>,
+	run_jobs: ReadonlyArray<Job>,
+): boolean {
+	if (followup_job_needs.is_gate_of_successes(graph, job, run_jobs)) return true
+	if (!is_first_attempt(job)) return false
+
+	const names = run_jobs.map(({ name }) => name)
+
+	return (
+		followup_job_needs.is_waiting_on(graph, job.name, reruns) ||
+		followup_job_needs.is_missing_need(graph, job.name, names)
+	)
+}
+
 function settle_unnamed(
 	judged: ReadonlyArray<Judged>,
 	graph: NeedsGraph,
-	run_jobs: ReadonlyArray<string>,
+	run_jobs: ReadonlyArray<Job>,
 ): Array<Judged> {
 	const reruns = judged
 		.filter(({ verdict }) => verdict === RERUN_VERDICT)
@@ -215,12 +233,9 @@ function settle_unnamed(
 	return judged.map((entry) => {
 		if (entry.verdict !== UNNAMED_VERDICT) return entry
 
-		const { name } = entry.job
-		const is_infra =
-			followup_job_needs.is_waiting_on(graph, name, reruns) ||
-			followup_job_needs.is_missing_need(graph, name, run_jobs)
-
-		return is_infra ? { job: entry.job, verdict: RERUN_VERDICT } : entry
+		return is_infra_failure(entry.job, graph, reruns, run_jobs)
+			? { job: entry.job, verdict: RERUN_VERDICT }
+			: entry
 	})
 }
 
@@ -250,11 +265,7 @@ async function read_rerun_jobs(
 	const failed = jobs.filter((job) => FAILED_JOB_CONCLUSIONS.has(job.conclusion ?? ''))
 	const judged = await Promise.all(failed.map(async (job) => await judge_job(job, changed)))
 	const graph = await read_needs_graph(run_id, judged)
-	const settled = settle_unnamed(
-		judged,
-		graph,
-		jobs.map((job) => job.name),
-	)
+	const settled = settle_unnamed(judged, graph, jobs)
 
 	return settled.every(({ verdict }) => verdict === RERUN_VERDICT) ? settled : undefined
 }
