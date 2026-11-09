@@ -11,6 +11,7 @@ import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_lane_handover } from '#scripts/review/review-lane-handover'
+import { review_pair } from '#scripts/review/review-pair'
 import { review_round } from '#scripts/review/review-round'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_step_section } from '#scripts/run/run-step-section'
@@ -147,6 +148,8 @@ function save_brief(slot: ReviewSlot, text: string): void {
 			: run_ship_review.round_one_opening(brief)
 
 	process.stdout.write(`${slot} brief: ${brief}\n${slot} prompt: ${opening}\n`)
+	const paired = slot === CODE ? review_pair.offer(text) : undefined
+	if (paired !== undefined) process.stdout.write(`${paired}\n`)
 }
 
 async function write_brief(slot: ReviewSlot): Promise<number> {
