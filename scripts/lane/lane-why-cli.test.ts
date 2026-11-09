@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
 	issue_get_body: vi.fn<() => Promise<string | undefined>>(),
 	read_issues: vi.fn(),
 	timing_of: vi.fn(),
+	repository_directory: vi.fn<() => Promise<string | undefined>>(),
+	read_log: vi.fn<() => string | undefined>(),
 }))
 
 vi.mock(import('./lane-net-read'), async (import_original) => {
@@ -38,6 +40,16 @@ vi.mock(import('./lane-sinks-issues'), async (import_original) => {
 	const { lane_sinks_issues } = await import_original()
 
 	return { lane_sinks_issues: { ...lane_sinks_issues, read: mocks.read_issues } }
+})
+vi.mock(import('#scripts/run/ship/run-ship-probe'), async (import_original) => {
+	const { run_ship_probe } = await import_original()
+
+	return { run_ship_probe: { ...run_ship_probe, repository_directory: mocks.repository_directory } }
+})
+vi.mock(import('#scripts/run/ship/run-ship-detach'), async (import_original) => {
+	const { run_ship_detach } = await import_original()
+
+	return { run_ship_detach: { ...run_ship_detach, read_log: mocks.read_log } }
 })
 vi.mock(import('#scripts/ci/ci-timing'), async (import_original) => {
 	const { ci_timing } = await import_original()
@@ -72,6 +84,8 @@ beforeEach(() => {
 	mocks.issue_get_body.mockResolvedValue(undefined)
 	mocks.read_issues.mockResolvedValue(undefined)
 	mocks.timing_of.mockRejectedValue(new Error('gh failed'))
+	mocks.repository_directory.mockResolvedValue(undefined)
+	mocks.read_log.mockReturnValue(undefined)
 })
 
 describe('lane_why_cli.run', () => {
@@ -86,6 +100,33 @@ describe('lane_why_cli.run', () => {
 
 		await expect(lane_why_cli.run([String(ISSUE)])).resolves.toBe(0)
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('| 15.0 min |'))
+	})
+})
+
+// joshuafolkken/kit#6679: the ship log is where the ship's cause keys come from.
+describe('lane_why_cli.run ship log', () => {
+	it("reads the lane's ship log from the repository directory", async () => {
+		mocks.repository_directory.mockResolvedValue('/repo')
+
+		await expect(lane_why_cli.run([String(ISSUE)])).resolves.toBe(0)
+		expect(mocks.read_log).toHaveBeenCalledWith('/repo', String(ISSUE))
+	})
+
+	it("prints the failed check the ship log names as a ship row's cause key", async () => {
+		mocks.read_records.mockResolvedValue({
+			entries: lane(61),
+			events: [
+				{ pos: 1, at: at(10), kind: 'plan', text: `#${String(ISSUE)} plan` },
+				{ pos: 2, at: at(20), kind: 'ship-stage', text: `#${String(ISSUE)} review start` },
+			],
+		})
+		mocks.repository_directory.mockResolvedValue('/repo')
+		mocks.read_log.mockReturnValue('PR checks failed (failed checks: Static Checks (lint)).')
+
+		await expect(lane_why_cli.run([String(ISSUE)])).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining('| static checks (lint) | unread | unread |'),
+		)
 	})
 })
 

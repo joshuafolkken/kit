@@ -67,6 +67,7 @@ function records_of(overrides: Partial<WhyRecords> = {}): WhyRecords {
 		projected: PROJECTED,
 		issues: [{ number: 6124, title: 'Speed up the implement stage' }],
 		timing: undefined,
+		log: undefined,
 		...overrides,
 	}
 }
@@ -82,10 +83,10 @@ describe('lane_why.table', () => {
 	it('builds one row per stage over budget from the fixture records', () => {
 		expect(lane_why.table(records_of())).toBe(
 			[
-				'| stage | min | budget | projected | CI | ship | open issues |',
-				'| --- | --- | --- | --- | --- | --- | --- |',
-				'| implement | 51.0 min | 9 min | 20.3 min |  |  | #6124 |',
-				'| start to plan | 10.0 min | 3 min |  |  |  | none |',
+				'| stage | min | budget | projected | CI | ship | causes | open issues | unfiled |',
+				'| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+				'| implement | 51.0 min | 9 min | 20.3 min |  |  |  | #6124 |  |',
+				'| start to plan | 10.0 min | 3 min |  |  |  |  | none |  |',
 			].join('\n'),
 		)
 	})
@@ -101,11 +102,11 @@ describe('lane_why.table', () => {
 		expect(rows?.[3]).toContain('| (last check: e2e 150.0s) |  |')
 	})
 
-	it('leaves the cells of missing records blank', () => {
+	it('leaves the cells of missing records blank and marks an unread listing', () => {
 		const records = records_of({ projected: undefined, issues: undefined })
 
 		expect(lane_why.table(records)?.split('\n', 3)[2]).toBe(
-			'| implement | 51.0 min | 9 min |  |  |  |  |',
+			'| implement | 51.0 min | 9 min |  |  |  |  | unread |  |',
 		)
 	})
 
@@ -113,6 +114,29 @@ describe('lane_why.table', () => {
 		const breakdown = { ...breakdown_of(), stages: [{ name: 'implement', ms: MINUTE_MS }] }
 
 		expect(lane_why.table(records_of({ breakdown }))).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6679: a ship row's open Issues name its cause keys, not its stage.
+describe('lane_why.table ship cause cells', () => {
+	const log = [
+		'PR checks failed (failed checks: SonarQube Cloud Code Analysis, e2e).',
+		'🔀 Not rerunning: main changed the failed tests since the branch point (a.ts); merge main first.',
+	].join('\n')
+	const issues = [{ number: 5085, title: 'Check whether the SonarJasmin JS/TS taint engine ...' }]
+
+	it('lists the cause keys, the open Issues they name and the keys none names', () => {
+		const entries = [...LANE, ...SHIP_ROWS]
+		const breakdown = with_stages([SHIP_STAGE])
+		const rows = lane_why.table(records_of({ entries, breakdown, issues, log }))?.split('\n')
+
+		expect(rows?.[2]).toContain('| sonarqube, e2e, main move | #5085 | e2e, main move |')
+	})
+
+	it('answers none for a ship row with no cause key', () => {
+		const rows = lane_why.table(records_of({ breakdown: with_stages([SHIP_STAGE]) }))?.split('\n')
+
+		expect(rows?.[2]).toContain('|  | none |  |')
 	})
 })
 

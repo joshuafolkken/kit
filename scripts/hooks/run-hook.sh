@@ -4,7 +4,8 @@
 # Claude Code worktree the hook was launched in, if any, with the launch directory in `JOSH_HOOK_CWD` —
 # clear the git location variables (`GIT_LOCATION_VARIABLES`) when the checkout resolves without them,
 # then run `dist/hooks/<name>.js`, or josh with `<name>`'s first `-` as `:`. kit's checkout gates the
-# bundles with `tools/hooks/hook-bundle-ready.ts`. No process the shell can do itself, and `if`/`else`
+# bundles with the built `dist/hooks/ready.js`, or `tools/hooks/hook-bundle-ready.ts` before a first
+# build. No process the shell can do itself, and `if`/`else`
 # rather than `&&`/`||`: a guard's refusal is a non-zero exit that must not run the hook twice.
 
 hook_name=$1
@@ -42,6 +43,8 @@ case $0 in
 	if [ -d "$package_dir/dist/hooks" ]; then exec node "$bundle" "$@"; else exec node "$package_dir/dist/josh.js" "$josh_command" "$@"; fi
 	;;
 *)
-	NODE_COMPILE_CACHE="$package_dir/node_modules/.cache/kit-hook-compile" exec node --disable-warning=ExperimentalWarning "$package_dir/tools/hooks/hook-bundle-ready.ts" "$hook_name" "$josh_command" "$@"
+	gate="$package_dir/dist/hooks/ready.js"
+	if [ ! -f "$gate" ]; then gate="$package_dir/tools/hooks/hook-bundle-ready.ts"; fi
+	NODE_COMPILE_CACHE="$package_dir/node_modules/.cache/kit-hook-compile" exec node --disable-warning=ExperimentalWarning "$gate" "$hook_name" "$josh_command" "$@"
 	;;
 esac

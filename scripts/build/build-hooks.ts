@@ -72,6 +72,10 @@ const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 	{ source: 'scripts/security/security-audit-provision-main.ts', out: 'audit-provision' },
 ]
 
+// Kit's own launch of those hooks (`scripts/hooks/run-hook.sh`): built beside them so a fresh build
+// runs without TypeScript, and kept out of `HOOK_BUNDLES` because no hook config launches it.
+const LAUNCH_GATE: HookBundle = { source: 'tools/hooks/hook-bundle-fast.ts', out: 'ready' }
+
 function entry_point(bundle: HookBundle): { in: string; out: string } {
 	return { in: path.join(PACKAGE_DIR, bundle.source), out: bundle.out }
 }
@@ -212,22 +216,39 @@ function build_inputs(build_script: string = BUILD_SCRIPT): Map<string, Uint8Arr
 	])
 }
 
-async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
-	const sources = build_inputs()
-	const entry_points = HOOK_BUNDLES.map((bundle) => entry_point(bundle))
+async function bundle_pass(
+	bundles: ReadonlyArray<HookBundle>,
+	is_split: boolean,
+	sources: Map<string, Uint8Array>,
+	out_directory: string,
+): Promise<ReadonlyArray<OutputFile>> {
+	const entry_points = bundles.map((bundle) => entry_point(bundle))
 	const entries = new Set(entry_points.map((entry) => entry.in))
 	const { outputFiles: files } = await build({
 		absWorkingDir: PACKAGE_DIR,
 		entryPoints: entry_points,
 		outdir: out_directory,
 		bundle: true,
-		splitting: true,
+		splitting: is_split,
 		platform: 'node',
 		format: 'esm',
 		target: 'node22',
 		write: false,
 		plugins: [dependency_boundary(), source_recorder(sources, entries)],
 	})
+
+	return files
+}
+
+// The launch gate is built unsplit: a launch that read the previous `ready.js` would otherwise link
+// chunks a background rebuild had just pruned, and fail open. Both passes share one stamp.
+async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
+	const sources = build_inputs()
+	const passes = await Promise.all([
+		bundle_pass(HOOK_BUNDLES, true, sources, out_directory),
+		bundle_pass([LAUNCH_GATE], false, sources, out_directory),
+	])
+	const files = passes.flat()
 	const stamp = hook_bundle_stamp.stamp_text(
 		sources,
 		files.map((file) => file.path),
