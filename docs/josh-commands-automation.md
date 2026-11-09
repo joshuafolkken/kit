@@ -258,6 +258,20 @@ A failed step of its own blocks too. The rows are in `prompts/collaboration-work
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh stop:guard` in detail".
 
+### `josh hook:ledger`
+
+<!-- usage: hook:ledger -->
+
+Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule.
+
+```bash
+pnpm josh hook:ledger --period 7   # a 7-day period's refusals per rule
+```
+
+<!-- /usage -->
+
+Reads the hook ledger, `<git common dir>/josh/hook-ledger/<date>.jsonl`. The ledger keeps no tool-use id, so `passed later` matches a refused call by its tool and command head. It counts a later call in the same transcript that came back without `is_error`. `interrupts` prints `unknown` when the Issue listing cannot be read.
+
 ### `josh session:lang`
 
 <!-- usage: session:lang -->

@@ -23,6 +23,25 @@ function result_line(id: string, content: unknown, at = END): string {
 	return JSON.stringify({ type: 'user', timestamp: at, message: { content: [block] } })
 }
 
+// joshuafolkken/kit#6664: `josh hook:ledger` tells a refused call from one that later went through.
+describe('lane_transcript_calls.parse — error flag', () => {
+	it('keeps the error flag a refused call result carries', () => {
+		const block = { type: 'tool_result', tool_use_id: 'e', content: 'refused', is_error: true }
+		const refused = JSON.stringify({ type: 'user', timestamp: END, message: { content: [block] } })
+		const [call] = lane_transcript_calls.parse(SOURCE, [use_line('e', {}), refused].join('\n'))
+
+		expect(call?.is_error).toBe(true)
+	})
+})
+
+describe('lane_transcript_calls.parse — head', () => {
+	it('keeps the head the hook ledger writes, from whichever field the tool carries', () => {
+		const raw = [use_line('a', { pattern: 'needle' }), result_line('a', 'ok')]
+
+		expect(lane_transcript_calls.parse(SOURCE, raw.join('\n'))[0]?.head).toBe('needle')
+	})
+})
+
 describe('lane_transcript_calls.parse — timing', () => {
 	it('times a foreground call as the gap from its use line to its result line', () => {
 		const command = 'pnpm josh lint:related'
@@ -40,6 +59,8 @@ describe('lane_transcript_calls.parse — timing', () => {
 				subagent: undefined,
 				output: 'ok',
 				file_path: undefined,
+				head: command,
+				is_error: false,
 			},
 		])
 	})
