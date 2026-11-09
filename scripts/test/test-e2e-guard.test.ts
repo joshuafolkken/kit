@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
+import { fake_result } from '#tools/test/execa-result'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,15 +11,9 @@ vi.mock('execa', () => ({ execa: vi.fn() }))
 
 const mocked_execa = vi.mocked(execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa>>
-
 const E2E_BASENAME = 'home.e2e.ts'
 const E2E_FILE = path.join('tests', E2E_BASENAME)
 const LOCAL_WORKERS = `--workers=${String(core_budget.CORE_WEIGHTS.e2e)}`
-
-function fake_result(exit_code: number | undefined): ExecaResult {
-	return { exitCode: exit_code } as unknown as ExecaResult
-}
 
 const ctx = { project_directory: '' }
 const make_directory = temporary_directory()

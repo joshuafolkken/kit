@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
+import { fake_result } from '#tools/test/execa-result'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
@@ -12,15 +13,8 @@ const { format } = await import('./format')
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-
 const PRETTIER_FAILURE_EXIT_CODE = 2
 const make_directory = temporary_directory()
-
-// execa's resolved Result is a large interface; the command only reads `exitCode`.
-function fake_result(exit_code: number): ExecaResult {
-	return { exitCode: exit_code } as unknown as ExecaResult
-}
 
 type ProjectFiles = ReadonlyArray<readonly [string, string]>
 

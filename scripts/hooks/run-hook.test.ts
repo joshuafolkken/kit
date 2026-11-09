@@ -1,19 +1,12 @@
 import { spawnSync } from 'node:child_process'
-import {
-	chmodSync,
-	copyFileSync,
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	realpathSync,
-	writeFileSync,
-} from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 import { hook_command_bootstrap } from '#scripts/init/hook-command-bootstrap-fixture'
 import { hook_launch } from '#scripts/init/hook-launch'
 import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 const make_directory = temporary_directory()
@@ -61,13 +54,6 @@ interface LaunchResult {
 
 const workspace = { root: '' }
 
-function write_file(relative_path: string, content: string): void {
-	const file_path = path.join(workspace.root, relative_path)
-
-	mkdirSync(path.dirname(file_path), { recursive: true })
-	writeFileSync(file_path, content)
-}
-
 // The launcher, its gate and a bundle under `package_root`, laid out as kit's checkout or as the
 // installed package; `has_bundles: false` leaves `dist/hooks` out.
 function create_package(package_root: string, has_bundles = true): void {
@@ -75,9 +61,12 @@ function create_package(package_root: string, has_bundles = true): void {
 
 	mkdirSync(path.dirname(launcher_path), { recursive: true })
 	copyFileSync(RUN_HOOK_SOURCE, launcher_path)
-	write_file(path.join(package_root, GATE), GATE_STUB)
-	write_file(path.join(package_root, 'dist/josh.js'), DISPATCHER_STUB)
-	if (has_bundles) write_file(path.join(package_root, 'dist/hooks/demo-hook.js'), BUNDLE_STUB)
+	write_file(workspace.root, path.join(package_root, GATE), GATE_STUB)
+	write_file(workspace.root, path.join(package_root, 'dist/josh.js'), DISPATCHER_STUB)
+
+	if (has_bundles) {
+		write_file(workspace.root, path.join(package_root, 'dist/hooks/demo-hook.js'), BUNDLE_STUB)
+	}
 }
 
 // Each counted program first on PATH logs its launch by name and runs the real one off the original
@@ -89,6 +78,7 @@ function counting_path(): string {
 
 	for (const program of COUNTED_PROGRAMS) {
 		write_file(
+			workspace.root,
 			`bin/${program}`,
 			`#!/bin/sh\necho ${program} >> "${log_path}"\nPATH="${original_path}" exec ${program} "$@"\n`,
 		)
@@ -169,7 +159,7 @@ describe('run-hook.sh in kit checkout', () => {
 	})
 
 	it('hands the gate a compile cache under the checkout node_modules/.cache', () => {
-		write_file(GATE, COMPILE_CACHE_STUB)
+		write_file(workspace.root, GATE, COMPILE_CACHE_STUB)
 		mkdirSync(path.join(workspace.root, 'node_modules'))
 
 		const cache_directory = launch(LAUNCHER).stdout

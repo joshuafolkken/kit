@@ -10,9 +10,11 @@ import { step_zero_notice } from './step-zero-notice'
 
 // **A consultation session's shell is judged by what it left in the tree, not by its text**
 // (joshuafolkken/kit#6589). Before a `Bash` call the dirty runtime files and their content hashes are
-// stamped; after it, any runtime file whose hash moved is copied under `.josh/tmp/bash-revert/` and
-// put back — a tracked one from `HEAD`, an untracked one removed — and the session is told which
-// paths it may not write. A session that can
+// stamped, and each one's content saved under `.josh/tmp/bash-revert/before-call/`; after it, any
+// runtime file whose hash moved is copied under `.josh/tmp/bash-revert/` and put back — one clean
+// before the call from `HEAD` (an untracked one removed), one dirty before it to its saved content, so
+// the edit it carried survives (#6812); a dirty file whose saved copy no longer matches its stamp is
+// only named — and the session is told which paths it may not write. A session that can
 // implement is never stamped nor reverted, and a path outside the runtime set (`.josh/`, a doc) is
 // left as the shell wrote it.
 
@@ -24,15 +26,21 @@ const STATUS_WIDTH = 3
 // session's operations append to, whatever their extension.
 const OPERATIONAL_RECORDS = '.josh/'
 const BACKUP_DIRECTORY = '.josh/tmp/bash-revert'
+const BEFORE_CALL_DIRECTORY = 'before-call'
+const STAMP_EXTENSION = '.json'
 const snapshot_schema = z.record(z.string(), z.string())
 
 type Snapshot = Record<string, string>
 
-// `revert` holds the dirty entries clean before the call; `keep` the files dirty before it.
+// `revert` holds the dirty entries clean before the call; `restore` the files dirty before it whose
+// saved content matches the stamp; `keep` the rest dirty before it, which nothing can put back.
 interface Moved {
 	revert: Array<string>
+	restore: Array<string>
 	keep: Array<string>
 }
+
+const NONE_MOVED: Moved = { revert: [], restore: [], keep: [] }
 
 const HANDOFF = 'This shell wrote runtime files; hand implementation to a worker lane.'
 
@@ -75,6 +83,26 @@ function guarded_transcript(raw_payload: string): string | undefined {
 	return payload?.tool_name === 'Bash' ? payload.transcript_path : undefined
 }
 
+function copy_into(source: string, destination: string): void {
+	mkdirSync(path.dirname(destination), { recursive: true })
+	copyFileSync(source, destination)
+}
+
+// Where the stamp of `transcript` keeps its dirty files' content from before the call.
+function saved_directory(transcript: string, root: string): string {
+	const key = path.basename(stamp_file.stamp_path(STAMP_PREFIX, transcript), STAMP_EXTENSION)
+
+	return path.join(root, BACKUP_DIRECTORY, BEFORE_CALL_DIRECTORY, key)
+}
+
+function save_dirty(before: Snapshot, root: string, saved: string): void {
+	rmSync(saved, { recursive: true, force: true })
+
+	for (const [file, hash] of Object.entries(before)) {
+		if (hash !== ABSENT) copy_into(path.join(root, file), path.join(saved, file))
+	}
+}
+
 function stamp(raw_payload: string, root: string = process.cwd()): void {
 	const transcript = guarded_transcript(raw_payload)
 
@@ -83,8 +111,13 @@ function stamp(raw_payload: string, root: string = process.cwd()): void {
 	const target = stamp_file.stamp_path(STAMP_PREFIX, transcript)
 
 	// A failed write leaves no own record (`write_text_stamp` unlinks first), so the revert does nothing.
+	// The save follows the write, so a failed one still leaves this call's stamp, and copies missing or
+	// not matching it, whose files the revert only names.
 	try {
-		stamp_file.write_text_stamp(target, JSON.stringify(snapshot(root)))
+		const before = snapshot(root)
+
+		stamp_file.write_text_stamp(target, JSON.stringify(before))
+		save_dirty(before, root, saved_directory(transcript, root))
 	} catch {
 		// Nothing to revert against is the safe answer.
 	}
@@ -101,25 +134,30 @@ function entry_file(entry: string): string {
 	return entry.slice(STATUS_WIDTH)
 }
 
-// The dirty entries whose runtime file the guarded call wrote, created or deleted: one clean before
-// the call is put back, one already dirty is only named — `HEAD` would discard the edit it carried.
-function moved_entries(raw_payload: string, root: string): Moved {
-	const transcript = guarded_transcript(raw_payload)
-	const before = transcript === undefined ? undefined : stamped(transcript)
+// The runtime files the guarded call wrote, created or deleted: a dirty entry clean before the call
+// is put back from `HEAD`; a file dirty before it whose content moved — still dirty or reset to
+// `HEAD` — goes back to its saved content, which `HEAD` would not carry, when that copy is intact.
+function moved_entries(transcript: string, root: string): Moved {
+	const before = stamped(transcript)
 
-	if (before === undefined) return { revert: [], keep: [] }
+	if (before === undefined) return NONE_MOVED
 
 	const entries = dirty_entries(root)
 	const after = snapshot(root, entries)
-	const moved = entries.filter((entry) => {
-		const hash = after[entry_file(entry)]
-
-		return hash !== undefined && hash !== before[entry_file(entry)]
-	})
+	const saved = saved_directory(transcript, root)
+	const dirty = Object.keys(before).filter(
+		(file) => content_hash(path.join(root, file)) !== before[file],
+	)
+	const intact = dirty.filter((file) => content_hash(path.join(saved, file)) === before[file])
 
 	return {
-		revert: moved.filter((entry) => !Object.hasOwn(before, entry_file(entry))),
-		keep: moved.map((entry) => entry_file(entry)).filter((file) => Object.hasOwn(before, file)),
+		revert: entries.filter((entry) => {
+			const file = entry_file(entry)
+
+			return Object.hasOwn(after, file) && !Object.hasOwn(before, file)
+		}),
+		restore: intact,
+		keep: dirty.filter((file) => !intact.includes(file)),
 	}
 }
 
@@ -131,27 +169,49 @@ function restore(file: string, root: string): void {
 
 // The change may be a person's or another session's rather than this shell's, so its content is
 // copied under `backup` before the revert discards it.
-function revert_file(entry: string, root: string, backup: string): void {
-	const file = entry_file(entry)
+function back_up(file: string, root: string, backup: string): void {
 	const source = path.join(root, file)
 
-	if (existsSync(source)) {
-		mkdirSync(path.dirname(path.join(backup, file)), { recursive: true })
-		copyFileSync(source, path.join(backup, file))
-	}
+	if (existsSync(source)) copy_into(source, path.join(backup, file))
+}
 
-	if (entry.startsWith(UNTRACKED)) rmSync(source, { force: true })
+function revert_file(entry: string, root: string, backup: string): void {
+	const file = entry_file(entry)
+
+	back_up(file, root, backup)
+
+	if (entry.startsWith(UNTRACKED)) rmSync(path.join(root, file), { force: true })
 	else restore(file, root)
+}
+
+// A file absent before the call has no saved copy, and is removed again.
+function restore_saved(file: string, root: string, backup: string, saved: string): void {
+	const copy = path.join(saved, file)
+
+	back_up(file, root, backup)
+
+	if (existsSync(copy)) copy_into(copy, path.join(root, file))
+	else rmSync(path.join(root, file), { force: true })
+}
+
+function put_back(moved: Moved, root: string, backup: string, saved: string): void {
+	for (const entry of moved.revert) revert_file(entry, root, backup)
+	for (const file of moved.restore) restore_saved(file, root, backup, saved)
 }
 
 function block_reason(moved: Moved, backup: string): string {
 	const parts = [HANDOFF]
 
 	if (moved.revert.length > 0) {
-		parts.push(
-			`Reverted: ${moved.revert.map((entry) => entry_file(entry)).join(', ')}.`,
-			`Their content before the revert: ${backup}/.`,
-		)
+		parts.push(`Reverted: ${moved.revert.map((entry) => entry_file(entry)).join(', ')}.`)
+	}
+
+	if (moved.restore.length > 0) {
+		parts.push(`Restored to their content before the call: ${moved.restore.join(', ')}.`)
+	}
+
+	if (moved.revert.length + moved.restore.length > 0) {
+		parts.push(`Their content before the revert: ${backup}/.`)
 	}
 
 	if (moved.keep.length > 0) {
@@ -163,13 +223,17 @@ function block_reason(moved: Moved, backup: string): string {
 
 // The block a `PostToolUse` hook answers with, naming the moved paths, or nothing to say.
 function revert(raw_payload: string, root: string = process.cwd()): string | undefined {
-	const moved = moved_entries(raw_payload, root)
+	const transcript = guarded_transcript(raw_payload)
 
-	if (moved.revert.length + moved.keep.length === 0) return undefined
+	if (transcript === undefined) return undefined
+
+	const moved = moved_entries(transcript, root)
+
+	if (moved.revert.length + moved.restore.length + moved.keep.length === 0) return undefined
 
 	const backup = path.join(BACKUP_DIRECTORY, new Date().toISOString().replaceAll(':', '-'))
 
-	for (const entry of moved.revert) revert_file(entry, root, path.join(root, backup))
+	put_back(moved, root, path.join(root, backup), saved_directory(transcript, root))
 
 	return JSON.stringify({ decision: 'block', reason: block_reason(moved, backup) })
 }
