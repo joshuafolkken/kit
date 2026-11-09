@@ -28,7 +28,7 @@ const WEEK_MS = WEEK_MINUTES * MS_PER_MINUTE
 const STALE_MINUTES = 10
 const PERCENT = 100
 const INDENT = '  '
-// `🤖 claude`, the widest name, and a space; the label column's own lead space makes it two.
+// `🤖 Claude`, the widest name, and a space; the label column's own lead space makes it two.
 const NAME_WIDTH = 10
 const COUNT_MARK = '≈'
 // The widest count the column holds.
@@ -45,7 +45,9 @@ const SEPARATOR = ' · '
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
 const SCHEDULER_MARK = '🤖'
-const GITHUB = 'github'
+const GITHUB = 'GitHub'
+// The providers' names as drawn, in their proper case; the keys stay lower case.
+const PROVIDER_NAMES: Readonly<Record<QuotaProvider, string>> = { claude: 'Claude', codex: 'Codex' }
 const LEGEND = [
 	LABEL,
 	`${SCHEDULER_MARK} scheduler`,
@@ -187,12 +189,13 @@ function providers_of(view: QuotaView): ReadonlyArray<QuotaProvider> {
 		: [first, ...PROVIDERS.filter((provider) => provider !== first)]
 }
 
-function name_of(provider: QuotaProvider | typeof GITHUB, view: QuotaView): string {
-	if (view.scheduler_provider === undefined) return provider
+function name_of(provider: QuotaProvider | 'github', view: QuotaView): string {
+	const name = provider === 'github' ? GITHUB : PROVIDER_NAMES[provider]
+	if (view.scheduler_provider === undefined) return name
 
 	const mark = provider === view.scheduler_provider ? SCHEDULER_MARK : '  '
 
-	return `${mark} ${provider}`
+	return `${mark} ${name}`
 }
 
 function name_cell(name: string): string {
@@ -239,10 +242,10 @@ function rate_limit_rows(view: QuotaView): Array<string> {
 
 	const body = run_board_render_quota_github.row_text(rate_limit, now_ms)
 
-	return [`${INDENT}${name_cell(name_of(GITHUB, view))}${body}`]
+	return [`${INDENT}${name_cell(name_of('github', view))}${body}`]
 }
 
-// `github rest 38% 1877/5000 ↻12:33 · ▶graphql 1% 48/5000 ↻12:40`.
+// `GitHub REST 38% 1877/5000 ↻12:33 · ▶ GraphQL 1% 48/5000 ↻12:40`.
 function rate_limit_summary(view: QuotaView): Array<string> {
 	const { rate_limit, now_ms } = view
 	if (rate_limit === undefined) return []
@@ -250,7 +253,7 @@ function rate_limit_summary(view: QuotaView): Array<string> {
 	return [`${GITHUB} ${run_board_render_quota_github.summary_text(rate_limit, now_ms)}`]
 }
 
-// `claude 42/68 ≈9/5`: each drawn window's percent, then its count.
+// `Claude 42/68 ≈9/5`: each drawn window's percent, then its count.
 function summary_of(view: QuotaView): string {
 	const parts = providers_of(view).map((provider) => {
 		const reading = view.quotas?.[provider]

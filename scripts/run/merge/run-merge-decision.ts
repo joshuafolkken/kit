@@ -150,7 +150,7 @@ function is_decision(short: string | undefined): boolean {
 
 function park_event(child: string, short: string): string {
 	return is_decision(short)
-		? `${issue_cite.plain(child)} parked (${NEEDS_DECISION_LABEL})`
+		? `${issue_cite.plain_for('program', child)} parked (${NEEDS_DECISION_LABEL})`
 		: run_stalled.park_event(child, short)
 }
 

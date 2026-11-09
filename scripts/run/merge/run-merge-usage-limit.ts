@@ -13,7 +13,7 @@ const KIND = run_event_stream.EVENT_KIND.USAGE_LIMIT
 const RESUMES_AT = /resumes at (\S+)$/u
 
 function stop_text(child: string, reset_ms: number, limit: string): string {
-	return `${issue_cite.plain(child)} ${limit} — resumes at ${new Date(reset_ms).toISOString()}`
+	return `${issue_cite.plain_for('program', child)} ${limit} — resumes at ${new Date(reset_ms).toISOString()}`
 }
 
 // `limit` names what stopped the child — a GitHub rate limit holds launches the same way

@@ -56,15 +56,15 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 
 		expect(rows).toHaveLength(3)
 		expect(rows[2]).toBe(
-			`  github     rest  38% ${'■'.repeat(8)}─┊${'─'.repeat(10)} 3123     12:33`,
+			`  GitHub      REST  38% ${'■'.repeat(8)}─┊${'─'.repeat(10)} 3123     12:33`,
 		)
 	})
 
-	it('starts the github name at the codex name column while a scheduler is marked', () => {
+	it('starts the GitHub name at the Codex name column while a scheduler is marked', () => {
 		const { rows } = part_of({ rate_limit: REST_ONLY, scheduler_provider: 'claude' })
 
-		expect(rows[2]?.indexOf('github')).toBe(rows[1]?.indexOf('codex'))
-		expect(rows[2]).toMatch(/^ {5}github {2}rest {2}38% \S{20} 3123 {5}12:33$/u)
+		expect(rows[2]?.indexOf('GitHub')).toBe(rows[1]?.indexOf('Codex'))
+		expect(rows[2]).toMatch(/^ {5}GitHub {3}REST {2}38% \S{20} 3123 {5}12:33$/u)
 	})
 
 	it('puts the pace mark where the clock is through the hour-long window', () => {
@@ -86,7 +86,7 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 
 	it('draws the allowance unspent, its whole limit left and without a reset once its reset has passed', () => {
 		expect(part_of({ rate_limit: PASSED }).rows[2]).toBe(
-			`  github     rest   0% ┊${'─'.repeat(19)} 5000`,
+			`  GitHub      REST   0% ┊${'─'.repeat(19)} 5000`,
 		)
 	})
 })
@@ -96,15 +96,15 @@ describe('run_board_render_quota.usage_part rate limit row beside 7d-only rows',
 		const { rows } = part_of({ rate_limit: undefined })
 
 		expect(rows).toHaveLength(2)
-		expect(rows.join('\n')).not.toContain('github')
+		expect(rows.join('\n')).not.toContain('GitHub')
 	})
 
-	it('starts the 7d gauges and the github rest gauge at one column, github without `1h`', () => {
+	it('starts the 7d gauges and the GitHub REST gauge at one column, GitHub without `1h`', () => {
 		const week = { minutes: 10_080, used_percent: 46, resets_ms: NOW_MS + 24 * HOUR_MS }
 		const reading = { windows: [week], taken_ms: NOW_MS }
 		const { rows } = part_of({ quotas: { claude: reading, codex: reading }, rate_limit: REST_ONLY })
 
-		expect(rows.map((row) => row.indexOf('%'))).toStrictEqual([21, 21, 21])
+		expect(rows.map((row) => row.indexOf('%'))).toStrictEqual([22, 22, 22])
 		expect(rows.join('\n')).not.toMatch(/ {2}—|1h/u)
 	})
 })
@@ -118,7 +118,7 @@ describe('run_board_render_quota.usage_part column alignment', () => {
 	const WEEK = 10_080
 	const week = { minutes: WEEK, used_percent: 46, resets_ms: NOW_MS + 24 * HOUR_MS }
 
-	it('lines up the claude, codex and github rows column by column', () => {
+	it('lines up the Claude, Codex and GitHub rows column by column', () => {
 		const claude = { windows: [week], taken_ms: NOW_MS, per_task: { [WEEK]: 0.125 } }
 		const codex = { windows: [week], taken_ms: NOW_MS - HOUR_MS, per_task: { [WEEK]: 1 } }
 		const quotas = { claude, codex }
@@ -126,27 +126,27 @@ describe('run_board_render_quota.usage_part column alignment', () => {
 		const cells = [
 			['7d', '46%', '≈432', 'Fri 12:00'],
 			['7d', '46%', '≈54', 'Fri 12:00'],
-			['rest', '38%', '3123', '12:33'],
+			['REST', '38%', '3123', '12:33'],
 		]
 		const ends = cells.map((texts, index) => texts.map((text) => end_of(rows[index] ?? '', text)))
 
 		expect(ends).toStrictEqual([
-			[17, 22, 48, 58],
-			[17, 22, 48, 58],
-			[17, 22, 48, 58],
+			[18, 23, 49, 59],
+			[18, 23, 49, 59],
+			[18, 23, 49, 59],
 		])
 		expect(rows[1]).toMatch(/Fri 12:00 60′$/u)
 	})
 
-	it('keeps rest in the 7d column with ▶ while the session reads through rest', () => {
+	it('keeps REST in the 7d column with ▶ while the session reads through REST', () => {
 		const quotas = { claude: { windows: [week], taken_ms: NOW_MS }, codex: undefined }
 		const rate_limit: GithubRateLimit = { ...REST_ONLY, transport: 'rest' }
 		const { rows } = part_of({ quotas, rate_limit })
 		const claude = rows.at(0) ?? ''
 		const github = rows.at(-1) ?? ''
 
-		expect(github).toContain(' ▶rest ')
-		expect([end_of(github, 'rest'), end_of(github, '38%')]).toStrictEqual([
+		expect(github).toContain(' ▶ REST ')
+		expect([end_of(github, 'REST'), end_of(github, '38%')]).toStrictEqual([
 			end_of(claude, '7d'),
 			end_of(claude, '46%'),
 		])
@@ -156,17 +156,17 @@ describe('run_board_render_quota.usage_part column alignment', () => {
 describe('run_board_render_quota.usage_part rate limit summary', () => {
 	it('sums the allowance up in the folded line', () => {
 		expect(part_of({ rate_limit: REST_ONLY }).summary).toBe(
-			'claude 42 · codex — · github rest 38% 1877/5000 ↻12:33',
+			'Claude 42 · Codex — · GitHub REST 38% 1877/5000 ↻12:33',
 		)
 	})
 
 	it('sums the allowance up without a reset once it has passed', () => {
 		expect(part_of({ rate_limit: PASSED }).summary).toBe(
-			'claude 42 · codex — · github rest 0% 0/5000',
+			'Claude 42 · Codex — · GitHub REST 0% 0/5000',
 		)
 	})
 
 	it('sums the usage limits up as before where the allowance could not be read', () => {
-		expect(part_of({ rate_limit: undefined }).summary).toBe('claude 42 · codex —')
+		expect(part_of({ rate_limit: undefined }).summary).toBe('Claude 42 · Codex —')
 	})
 })

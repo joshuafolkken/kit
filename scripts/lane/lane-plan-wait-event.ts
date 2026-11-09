@@ -29,7 +29,7 @@ interface Named extends LaneSpan {
 }
 
 function text_of(pair: WaitPair, phase: string): string {
-	return `${issue_cite.plain(pair.issue)} ${phase} ${issue_cite.plain(pair.holder)}`
+	return `${issue_cite.plain_for('program', pair.issue)} ${phase} ${issue_cite.plain_for('program', pair.holder)}`
 }
 
 /** Run `wait` between a `plan-wait` start and end of `pair`, written best-effort. */

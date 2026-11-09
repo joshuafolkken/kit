@@ -37,7 +37,7 @@ const RESULT_WORDS: Readonly<Record<EffectResult, string>> = {
 
 // Plain: the rows feed an issue body as well as the session, which links them where it prints them.
 function cite(issue: SearchIssue): string {
-	return issue_cite.plain(issue.number)
+	return issue_cite.plain_for('linked', issue.number)
 }
 
 // The closed time-shortening issues of the window. The search narrows by the declaration's words; the

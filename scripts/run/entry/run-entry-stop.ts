@@ -60,7 +60,7 @@ function is_parking_child(): boolean {
 const DEFAULT_PORTS: StopPorts = { notify: telegram_notify.confirm, release, is_parking_child }
 
 function body_of(notice: StopNotice): string {
-	return `${notice.command} ${issue_cite.plain(notice.issue_number)} stopped at entry: ${notice.reason}.\nResume with \`${notice.command} ${issue_cite.plain(notice.issue_number)}\`.`
+	return `${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)} stopped at entry: ${notice.reason}.\nResume with \`${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)}\`.`
 }
 
 // The release runs first, so the resume the Telegram names finds the tree free when a person acts on it.
@@ -79,12 +79,12 @@ async function notify_stop(notice: StopNotice, ports: StopPorts): Promise<void> 
 	if (ports.is_parking_child()) return
 
 	const is_sent = await ports.notify({
-		issue_title: `${notice.command} ${issue_cite.plain(notice.issue_number)} stopped`,
+		issue_title: `${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)} stopped`,
 		body: body_of(notice),
 		recovery: RECOVERY,
 		recommended:
 			notice.recommended ??
-			`Run \`${notice.command} ${issue_cite.plain(notice.issue_number)}\` again in a fresh session`,
+			`Run \`${notice.command} ${issue_cite.plain_for('telegram', notice.issue_number)}\` again in a fresh session`,
 		alternatives: notice.alternatives ?? [LATER_ALTERNATIVE],
 	})
 

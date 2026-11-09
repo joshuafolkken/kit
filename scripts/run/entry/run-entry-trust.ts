@@ -32,7 +32,7 @@ interface TrustStop {
 
 // The remedy, named with the issue: a trusted person's `kickoff` writes the plan the run will follow.
 function recommended(issue_number: string): string {
-	return `Have a person with write access run \`kickoff ${issue_cite.plain(issue_number)}\`, then run it again`
+	return `Have a person with write access run \`kickoff ${issue_cite.plain_for('telegram', issue_number)}\`, then run it again`
 }
 
 function untrusted_stop(issue_number: string): TrustStop {

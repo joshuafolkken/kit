@@ -43,7 +43,7 @@ function cell(
 
 	return named.length === 0
 		? NONE
-		: named.map((issue) => issue_cite.plain(issue.number)).join(SEPARATOR)
+		: named.map((issue) => issue_cite.plain_for('linked', issue.number)).join(SEPARATOR)
 }
 
 const lane_sinks_issues = { NONE, UNREAD, read, cell }
