@@ -126,3 +126,71 @@ describe('run_park_body.adopt_problem', () => {
 		expect(run_park_body.adopt_problem(body_with(pick), option)).toContain(problem)
 	})
 })
+
+// joshuafolkken/kit#6776: a size-approval option carries the paths and both axes of the json
+// `backlog:triage --adopt` writes for it.
+const FIRST_PATH = 'scripts/a.ts'
+const APPROVAL_PATHS = `   - 規模承認のパス: \`${FIRST_PATH}\`, \`docs/b.md\``
+const APPROVAL_LINES = '   - 規模承認の行数: 150 / 260'
+const APPROVAL_FILES = '   - 規模承認のファイル数: 4/6'
+const APPROVAL = [APPROVAL_PATHS, APPROVAL_LINES, APPROVAL_FILES]
+const LINES_FORMAT = '- 規模承認の行数: <declared> / <max>'
+
+function approval_body(range: ReadonlyArray<string>): string {
+	return body_with(PICK_ONE, ['### 選択肢', ...OPTION_ONE, ...range, ...OPTION_TWO].join('\n'))
+}
+
+describe('run_park_body size-approval options', () => {
+	it('accepts an option with its whole range and reads it back', () => {
+		const body = approval_body(APPROVAL)
+
+		expect(run_park_body.problem_of(body)).toBeUndefined()
+		expect(run_park_body.approval_range(body, 1)).toStrictEqual({
+			paths: [FIRST_PATH, 'docs/b.md'],
+			lines: { declared: 150, max: 260 },
+			files: { declared: 4, max: 6 },
+		})
+	})
+
+	it.each([
+		['paths (ac-1a33e298)', APPROVAL_PATHS, '- 規模承認のパス: <path> …'],
+		['the line axis (ac-1a33e298)', APPROVAL_LINES, LINES_FORMAT],
+		['the file axis (ac-1a33e298)', APPROVAL_FILES, '- 規模承認のファイル数: <declared> / <max>'],
+	])('refuses a range missing %s', (_case, missing, line) => {
+		const body = approval_body(APPROVAL.filter((part) => part !== missing))
+
+		expect(run_park_body.problem_of(body)).toBe(`option 1 has no "${line}" line`)
+		expect(run_park_body.approval_range(body, 1)).toBeUndefined()
+	})
+
+	it('prints the three range lines in the schema it refuses with', () => {
+		expect(run_park_body.FORMAT).toContain(`   ${LINES_FORMAT}`)
+		expect(run_park_body.FORMAT).toContain('   (a size-approval option adds all three:)')
+	})
+
+	it('reads no range from an option that is no size approval', () => {
+		expect(run_park_body.approval_range(approval_body(APPROVAL), 2)).toBeUndefined()
+	})
+})
+
+// The approval json's schema refuses an empty path and a zero bound, so the park refuses them first.
+describe('run_park_body size-approval values', () => {
+	it.each([
+		['a trailing separator', `   - 規模承認のパス: \`${FIRST_PATH}\`,`, [FIRST_PATH]],
+		['backticks only', '   - 規模承認のパス: ``', undefined],
+	])('reads no empty path from %s', (_case, line, paths) => {
+		const range = run_park_body.approval_range(approval_body([line, ...APPROVAL.slice(1)]), 1)
+
+		expect(range?.paths).toStrictEqual(paths)
+	})
+
+	it.each([
+		['a zero declared bound', '   - 規模承認の行数: 0 / 260'],
+		['a zero max bound', '   - 規模承認の行数: 150 / 0'],
+		['a leading zero', '   - 規模承認の行数: 0150 / 260'],
+	])('refuses a line axis with %s', (_case, line) => {
+		const body = approval_body([APPROVAL_PATHS, line, APPROVAL_FILES])
+
+		expect(run_park_body.problem_of(body)).toBe(`option 1 has no "${LINES_FORMAT}" line`)
+	})
+})
