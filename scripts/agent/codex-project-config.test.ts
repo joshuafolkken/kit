@@ -91,6 +91,24 @@ describe('Codex hook wiring', () => {
 	})
 })
 
+// A lane runs the main checkout's trusted hooks.json (joshuafolkken/kit#6658), so every command
+// must find its scripts through the running work tree rather than a fixed path.
+describe('Codex hooks in a lane', () => {
+	it('resolves every hook command from the running work tree', () => {
+		const handlers = Object.values(load_hooks(CODEX_HOOKS).hooks)
+			.flat()
+			.flatMap((group) => group?.hooks ?? [])
+
+		expect(handlers.length).toBeGreaterThan(0)
+
+		for (const handler of handlers) {
+			expect(handler.command).toMatch(
+				/^sh "\$\( \(unset GIT_DIR GIT_WORK_TREE; git rev-parse --show-toplevel/u,
+			)
+		}
+	})
+})
+
 // `.codex/hooks.json` is generated from `.claude/settings.json` (joshuafolkken/kit#2997), so the
 // committed copy has to be exactly what the generator prints for the current Claude settings.
 describe('Codex and Claude hook parity', () => {
