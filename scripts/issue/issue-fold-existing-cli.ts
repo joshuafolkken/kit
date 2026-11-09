@@ -5,6 +5,7 @@ import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { z } from 'zod'
 import { issue_fold_apply, type ApplyResult } from './issue-fold-apply'
@@ -124,7 +125,7 @@ async function record_split_fold(
 	} catch (error) {
 		console.error(error_text.message_of(error))
 		console.error(
-			`Rerun \`josh issue:fold-existing ${path} ${APPLY_FLAG} ${issue_number} ${FOUND_DURING_FLAG} ${found_during}\` to record it.`,
+			`Rerun \`pnpm josh issue:fold-existing ${shell_quote.word(path)} ${APPLY_FLAG} ${issue_number} ${FOUND_DURING_FLAG} ${found_during}\` to record it.`,
 		)
 
 		return FAILURE_EXIT_CODE
