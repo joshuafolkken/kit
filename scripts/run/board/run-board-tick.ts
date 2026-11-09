@@ -196,6 +196,7 @@ interface Redraw {
 // environment, `.env` loaded as for `run:merge`.
 type LocalHeader = Pick<
 	BoardHeader,
+	| 'run_name'
 	| 'started_ms'
 	| 'ended_ms'
 	| 'activity'
@@ -210,6 +211,7 @@ type LocalHeader = Pick<
 
 function local_header(local: LocalRead): LocalHeader {
 	return {
+		run_name: local.run_name,
 		started_ms: local.started_ms,
 		ended_ms: local.ended_ms,
 		activity: activity_here(local),

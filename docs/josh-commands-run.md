@@ -873,7 +873,7 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 
 **Options:**
 
-- `--chat` — answers a `backlogrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
+- `--chat` — answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.
 - `--every <minutes>` — sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.
 
 <!-- /usage -->
@@ -933,7 +933,9 @@ While the run is at its `planning` stage, the one row it launches next — a nam
 
 On a terminal it draws on the alternate screen, so redraws never grow the scrollback; Ctrl+C, SIGTERM or a normal exit restores the screen and cursor. `--once`, or a stdout that is not a terminal, writes one frame with no screen control and exits — no color either when it is not a terminal.
 
-**Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
+**Output / exit codes:** exits 0; an unknown argument or a bad `--every` exits 1; Ctrl+C exits 130 and SIGTERM 143. With no run, running or ended, and no held single run (below), it prints `no run`; while the reads fail it prints `❗ read HH:MM <reason>` instead.
+
+A running `fullrun #N` or `halfrun #N` this checkout's `run:hold` record holds is drawn as a one-row board under its own name, the row's phase read from #N's events — over a carry record too, outside a lane; a stop-marked hold is not running.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".
 
