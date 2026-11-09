@@ -4,6 +4,8 @@ Point-of-use, read one section at a time from `backlogrun.md` → "The manifest 
 
 ## Running a named epic's children
 
+An epic `pnpm josh run:add <E>` tracked as a root is a named epic too, in a pool run as well.
+
 **`backlog:drive` walks this loop on its own; a session runs it when the driver hands back `epic #N`.**
 Each child runs as `fullrun #<N>` in a lane —
 `pnpm josh lane:launch <N>` (`backlogrun-lanes.md` → "Opening one lane and dispatching its child"),
