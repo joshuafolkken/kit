@@ -1,6 +1,7 @@
 import { review_record_slot } from '#scripts/review/review-record-slot'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
+import { run_chain_review_fix } from './run-chain-review-fix'
 
 const josh_run_mock = vi.hoisted(() =>
 	vi.fn(async (_argv: ReadonlyArray<string>) => ({ code: 0, out: '' })),
@@ -141,6 +142,21 @@ describe('run_chain_cli.run --join — findings held for the record', () => {
 
 		expect(errors()).toContain('2 finding(s)')
 		expect(errors()).toContain(SHIP_REVIEW)
+	})
+
+	it('routes the held round through the review-fix next action (ac-c38296ce)', async () => {
+		const route = vi.spyOn(run_chain_review_fix, 'route').mockReturnValue(() => 'cut now')
+
+		slot_holds(MEDIUM_FINDING)
+
+		await expect(run_chain_cli.run([ISSUE, JOIN])).resolves.toBe(1)
+
+		expect(route).toHaveBeenCalledWith(
+			ISSUE,
+			[expect.stringContaining('bug-risks:medium:scripts/b.ts')],
+			expect.any(Function),
+		)
+		expect(errors()).toContain('cut now')
 	})
 })
 

@@ -1,4 +1,5 @@
-import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry_added } from '#scripts/run/carry/run-carry-added'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_arrival_added } from './backlog-arrival-added'
@@ -13,11 +14,13 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-function carried(invocation: string): void {
+function carried(invocation: string): { target: string; carry: RunCarry | undefined } {
 	const directory = make_directory('josh-drive-record-')
+	const target = run_carry.carry_path(directory)
 
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
-	run_carry.begin_carry(run_carry.carry_path(directory), invocation)
+
+	return { target, carry: run_carry.begin_carry(target, invocation) }
 }
 
 describe('backlog_drive_record.record_ports — named_left', () => {
@@ -31,6 +34,16 @@ describe('backlog_drive_record.record_ports — named_left', () => {
 		carried('backlogrun')
 
 		await expect(backlog_drive_record.record_ports().named_left()).resolves.toBe(false)
+	})
+
+	// joshuafolkken/kit#6839: the roots `run:add` gave a pool run hold its drain until they are done.
+	it('answers true for a run that names no issue while a root run:add gave it is left', async () => {
+		const { target, carry } = carried('backlogrun')
+
+		if (carry === undefined) throw new Error('the scratch record was not created')
+		run_carry_added.add_issues(target, carry, [{ issue: 6839, is_priority: false }])
+
+		await expect(backlog_drive_record.record_ports().named_left()).resolves.toBe(true)
 	})
 
 	it('answers false outside a repository', async () => {
