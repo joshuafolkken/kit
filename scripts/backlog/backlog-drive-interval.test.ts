@@ -181,11 +181,16 @@ describe('backlog_drive.run_loop — the ask interval', () => {
 
 // joshuafolkken/kit#6788: an issue `run:add` hands the run, and a named issue with no lane running,
 // are asked about without waiting out the three minutes.
-describe('backlog_drive.run_loop — a run:add', () => {
-	it('asks at the next poll after run:add, not after the interval', async () => {
-		// The #6707 timeline: the first ask waits, and `run:add` writes between two polls.
-		const next_poll_ms = POLL_MS * FINISH_AFTER_POLLS
-		const { ports, calls } = harness({ added_at_ms: next_poll_ms - 1 })
+// joshuafolkken/kit#6861: a `lane:limit` raise is asked about the same way, once per raise.
+describe('backlog_drive.run_loop — a run:add or a lane:limit raise', () => {
+	const next_poll_ms = POLL_MS * FINISH_AFTER_POLLS
+
+	it.each([
+		{ name: 'run:add', script: { added_at_ms: next_poll_ms - 1 } },
+		{ name: 'a lane:limit raise', script: { raised_at_ms: next_poll_ms - 1 } },
+	])('asks once at the next poll after $name, not after the interval', async ({ script }) => {
+		// The #6707 timeline: the first ask waits, and the event is written between two polls.
+		const { ports, calls } = harness(script)
 		const start_ms = ports.now().getTime()
 		const asked_ms: Array<number> = []
 		const window_ms = POLL_MS * WINDOW_POLLS
@@ -205,6 +210,15 @@ describe('backlog_drive.run_loop — a run:add', () => {
 
 		expect(asks(calls)).toBe(2)
 		expect(asked_ms).toStrictEqual([0, next_poll_ms])
+	})
+
+	// A lowered or reset limit writes no event, so the next ask waits out the interval.
+	it('asks only once inside the interval with no raise', async () => {
+		const { ports, calls } = harness({})
+
+		await backlog_drive.run_loop(state(), { ...CONFIG, window_ms: POLL_MS * WINDOW_POLLS }, ports)
+
+		expect(asks(calls)).toBe(1)
 	})
 })
 
