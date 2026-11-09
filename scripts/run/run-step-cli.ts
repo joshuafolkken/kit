@@ -15,6 +15,7 @@ import { run_prep_cli } from './run-prep-cli'
 import { run_retrospective } from './run-retrospective'
 import { run_step, type ParentInput, type StepInput } from './run-step'
 import { run_step_lane_plan } from './run-step-lane-plan'
+import { run_step_progress } from './run-step-progress'
 import { run_step_section } from './run-step-section'
 
 // `josh run:step [<N>]` — print the run's next single action, followed by the section that governs it
@@ -188,6 +189,8 @@ async function action_lines(input: StepInput, line: string): Promise<ReadonlyArr
 
 async function report({ input, ship_problems }: Gathered): Promise<number> {
 	const action = run_step.next_action(input)
+
+	await run_step_progress.record(input.issue_number, action.line, input.last_event)
 
 	const lines = await action_lines(input, action.line)
 

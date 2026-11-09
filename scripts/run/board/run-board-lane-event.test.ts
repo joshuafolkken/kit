@@ -1,3 +1,4 @@
+import { run_event_step } from '#scripts/run/event/run-event-step'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { describe, expect, it } from 'vitest'
@@ -51,6 +52,27 @@ describe('run_board_lane_event.newest_of', () => {
 		const lanes = newest_of([event_of(KIND.LANE_PHASE, '#7 implement', 1)])
 
 		expect(lanes.get(7)).toMatchObject({ phase: 'implement', words: 'implement' })
+	})
+})
+
+describe('run_board_lane_event.newest_of — fullrun steps', () => {
+	// joshuafolkken/kit#6598: the newest `step` event reads as `step <n>/<total> <name>`.
+	const gate_step = event_of(KIND.STEP, run_event_step.text_of('7', run_event_step.STEP.GATE), 2)
+
+	it('reads a `step` event as its step out of the total, under the step’s phase', () => {
+		const lanes = newest_of([event_of(KIND.SHIP_STAGE, '#7 preflight start', 1), gate_step])
+
+		expect(lanes.get(7)).toMatchObject({ phase: 'gate', words: 'step 6/8 gate' })
+	})
+
+	it('reads a later ship stage over the step it followed', () => {
+		const lanes = newest_of([gate_step, ship('7', STAGE.REVIEW, PHASE.START, 3)])
+
+		expect(lanes.get(7)?.words).toBe('ship review')
+	})
+
+	it('reads no `step` event whose name is not a fullrun step', () => {
+		expect(newest_of([event_of(KIND.STEP, '#7 step 9/8 reticulating', 1)]).size).toBe(0)
 	})
 })
 

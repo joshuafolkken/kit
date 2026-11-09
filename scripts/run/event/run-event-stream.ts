@@ -138,6 +138,10 @@ const EVENT_KIND = {
 	// (`backlog-drive-trace.ts`). A trace, like `SHIP_STAGE`: it says where the child's work is, not where
 	// the run is.
 	LANE_PHASE: 'lane-phase',
+	// The fullrun step `run:step` or `run:entry` computed for an issue: `#<N> step <n>/<total> <name>`,
+	// written once per change of step (`run-event-step.ts`), so `run:board` draws it (joshuafolkken/kit#6598).
+	// A trace: it says which step the issue's run reached, not where the run is.
+	STEP: 'step',
 	// An issue `run:add` put into the live run. The parent's `--wait` watcher
 	// ends on it, so the issue takes the next free lane without waiting out the arrival probe's minute. A
 	// trace: it says what the run was handed, not where the run is.
@@ -204,6 +208,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.FILED,
 	EVENT_KIND.NOTE,
 	EVENT_KIND.LANE_PHASE,
+	EVENT_KIND.STEP,
 	EVENT_KIND.ADD,
 	EVENT_KIND.LANE_LIMIT,
 	EVENT_KIND.SETUP,
