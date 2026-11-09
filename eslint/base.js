@@ -18,7 +18,6 @@ import { early_return_one_liner_rule } from './rules/early-return-one-liner.js'
 import { formatting_rules } from './rules/formatting.js'
 import { import_rules } from './rules/import.js'
 import { namespace_object_export_rule } from './rules/namespace-object-export.js'
-import { naming_convention_rules } from './rules/naming-convention.js'
 import { promise_rules } from './rules/promise.js'
 import { sonarjs_rules } from './rules/sonarjs.js'
 import {
@@ -30,6 +29,7 @@ import {
 } from './rules/test-filename.js'
 import { typescript_rules } from './rules/typescript.js'
 import { unicorn_rules, unicorn_test_rules } from './rules/unicorn.js'
+import { untyped_lint } from './untyped.js'
 
 const FILE_PATTERNS = {
 	d_ts: ['**/*.d.ts'],
@@ -178,7 +178,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				'no-undef': 'off',
 				'local/namespace-object-export': 'error',
 				'local/early-return-one-liner': 'error',
-				...naming_convention_rules,
+				...untyped_lint.naming_convention(process.env),
 				...typescript_rules,
 				...code_quality_rules,
 				...import_rules,
@@ -307,5 +307,7 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
 			CENTRALIZED_TESTS_DIRECTORY_ENTRY,
 		),
+		// joshuafolkken/kit#6768: nothing unless the process was started for edit-time lint.
+		untyped_lint.blocks(process.env),
 	)
 }

@@ -3,6 +3,7 @@ import { lstatSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { untyped_environment } from '#eslint/untyped-environment.js'
 import { resolve_package_bin } from '#scripts/build/local-bin'
 import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
@@ -13,7 +14,9 @@ import { eslint_daemon_sources } from './eslint-daemon-sources'
 import { eslint_heap } from './eslint-heap'
 
 // One warm eslint per checkout, reached by every eslint run that is not the gate's whole tree: the
-// `PostToolUse` edit hook, `josh lint:related` and the pre-commit hook (joshuafolkken/kit#4358).
+// `PostToolUse` edit hook, `josh lint:related` and the pre-commit hook (joshuafolkken/kit#4358). It
+// lints without a type program, so no checkout keeps one resident; typed findings are the gate's,
+// whose lint runs cold (joshuafolkken/kit#6768).
 // `eslint_d` forwards the argument list to the project's own `eslint/lib/cli.js` → `execute`, run in
 // the forwarding process's cwd, so the report, the exit code and the cache file are eslint's own:
 // measured on this repository, a CLI run and a daemon run over the same files wrote byte-identical
@@ -242,7 +245,16 @@ function remember_after_edit(
 }
 
 // `cwd` decides which eslint installation and which flat config answer, and `ESLINT_D_MISS=fail`
-// refuses the bundled eslint the daemon would otherwise fall back to.
+// refuses the bundled eslint the daemon would otherwise fall back to. The daemon keeps the environment
+// it started under, so the untyped switch set here holds for its whole life (`eslint/untyped-environment.js`).
+function daemon_environment(): NodeJS.ProcessEnv {
+	return {
+		...eslint_heap.environment(),
+		ESLINT_D_MISS: 'fail',
+		...untyped_environment.environment(),
+	}
+}
+
 async function spawn_daemon(
 	cli: string,
 	cli_arguments: ReadonlyArray<string>,
@@ -252,7 +264,7 @@ async function spawn_daemon(
 		reject: false,
 		all: true,
 		cwd: options.project_root,
-		env: { ...eslint_heap.environment(), ESLINT_D_MISS: 'fail' },
+		env: daemon_environment(),
 		extendEnv: false,
 		...(options.timeout_ms !== undefined && { timeout: options.timeout_ms }),
 	})
