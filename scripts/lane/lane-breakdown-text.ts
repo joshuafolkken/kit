@@ -17,7 +17,7 @@ import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 // investigation comments it on the lane's Issue and leads its prompt with it (`lane-overrun.ts`).
 
 const HEADING = 'Net time by stage, longest first'
-const EXCLUDED = 'waits taken out (park, outage, usage limit, yield, host sleep)'
+const EXCLUDED = 'waits taken out (park, outage, usage limit, yield, split run, host sleep)'
 const SLEPT = 'of which host sleep'
 const YIELDED = 'of which yield wait'
 const HOLDER = 'yield wait: holder remaining'

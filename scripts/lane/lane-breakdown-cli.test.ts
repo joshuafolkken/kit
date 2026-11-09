@@ -78,7 +78,7 @@ describe('lane_breakdown_cli.run', () => {
 				'',
 				'- implement 51.0 min, over budget +42 min (editing & thinking 51.0 min)',
 				'- start to plan 10.0 min, over budget +7 min',
-				'- waits taken out (park, outage, usage limit, yield, host sleep) 0.0 min, of which yield wait 0.0 min, of which host sleep 0.0 min',
+				'- waits taken out (park, outage, usage limit, yield, split run, host sleep) 0.0 min, of which yield wait 0.0 min, of which host sleep 0.0 min',
 				'- Largest time sinks (stages and laps overlap): implement 51.0 min; start to plan 10.0 min',
 			].join('\n'),
 		)
