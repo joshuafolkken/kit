@@ -89,8 +89,8 @@ saying nobody was notified while the merge carries on. See
 ## `gh` — `gh api` only, and it has to be installed
 
 **Every GitHub call this package makes is `gh api`.** A cloud session's egress is answered `403` for
-GitHub's GraphQL endpoint, so a GraphQL read falls back to REST for that session through the
-transport switch (`JOSH_GH_TRANSPORT`, default `auto` —
+GitHub's GraphQL endpoint, so the issue, blocker and merge-state reads fall back to REST for that
+session through the transport switch (`JOSH_GH_TRANSPORT`, default `auto` —
 [Environment variables](./environment-variables.md)), and the subcommand forms — `gh issue view`,
 `gh pr list`, `gh repo view --json` and the rest — are not used. `tools/gh/gh-subcommand-guard.ts`
 and `scripts/gh/gh-document-guard.test.ts` hold the code and the shipped documents to that rule, and

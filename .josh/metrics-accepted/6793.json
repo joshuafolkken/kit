@@ -3,7 +3,7 @@
 	"date": "2026-11-09",
 	"growth": {
 		"rules.lines": 7,
-		"ai_cost.on_demand_bytes": 507,
+		"ai_cost.on_demand_bytes": 513,
 		"prose.long_paragraphs": 1
 	}
 }

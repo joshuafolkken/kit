@@ -14,7 +14,7 @@
 
 `scripts/gh/` に読みを足すとき → ETag の条件付き GET（`304` は REST core を消費しない、`git-gh-etag-read.ts`）、
 バッチ（N 件を 1 回、`git-gh-issue-batch-graphql.ts`）、transport（`git-gh-transport.ts`）のどれかに乗せる。
-GraphQL の読みは `git_gh_transport.query` だけが送る。`JOSH_GH_TRANSPORT`（既定 `auto`）の `auto` では、
+GraphQL の読みは `git_gh_transport.query` で送る。`JOSH_GH_TRANSPORT`（既定 `auto`）の `auto` では、
 `403` で拒否されたセッションの読みが 1 時間 REST に戻る。GraphQL の mutation は対象外。
 
 ## 認証は環境によって別物である
@@ -22,11 +22,11 @@ GraphQL の読みは `git_gh_transport.query` だけが送る。`JOSH_GH_TRANSPO
 **手元では `gh auth login` を一度実行すれば足り、`GH_TOKEN` は要らない**（認証情報は OS のキーチェーン）。
 **CI とクラウドセッションにはキーチェーンが無いので、`GH_TOKEN` を設定する。** 説明を書くときは両方を書く。
 
-## 散文でも「指示の形」なら REST で書く
+## 散文でも「指示の形」なら `gh api` で書く
 
-**文書の散文に書いたコマンドでも、読み手に実行を指示する形なら REST で書く。**
+**文書の散文に書いたコマンドでも、読み手に実行を指示する形なら `gh api` で書く。**
 
-- 指示の形（REST で書く）— 「数えるのはコマンド 1 つで済む: `…`」「各子 Issue に `…` でコメントを書く」のように、
+- 指示の形（`gh api` で書く）— 「数えるのはコマンド 1 つで済む: `…`」「各子 Issue に `…` でコメントを書く」のように、
   読み手がそのまま打つ書き方
 - 引用の形（そのままでよい）— 「`gh issue create` は使わない」のような禁止の引用や、CLI の対応状況の記録
 
