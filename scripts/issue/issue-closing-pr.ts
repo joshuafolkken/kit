@@ -4,7 +4,6 @@ import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
-import { session_cite } from './session-cite'
 
 // **The merged pull request that closes an issue GitHub left open**. A
 // `backlogrun` child whose pull request merged while GitHub did not apply its `closes #N`
@@ -60,12 +59,11 @@ function parse_row(line: string): TimelineRow {
 	return row
 }
 
-function parse_references(raw: string, state: 'open' | 'merged'): Array<MergedReference> {
+function parse_references(raw: string): Array<MergedReference> {
 	const rows = raw
 		.split(LINE_SEPARATOR)
 		.filter((line) => line.trim() !== '')
 		.map((line) => parse_row(line))
-	if (state === 'open') return rows.filter((row) => is_reference(row))
 	const last_reopen = rows.findLastIndex((row) => !is_reference(row))
 
 	return rows.slice(last_reopen + 1).filter((row) => is_reference(row))
@@ -84,7 +82,7 @@ function pick_closing_pr(
 	)?.url
 }
 
-async function read_result(issue: string, state: 'open' | 'merged'): Promise<ClosingRead> {
+async function read_closing_result(issue: string): Promise<ClosingRead> {
 	try {
 		// The canonical name, not the remote as typed: the timeline names the repository GitHub's way
 		// (joshuafolkken/kit#6752).
@@ -99,30 +97,10 @@ async function read_result(issue: string, state: 'open' | 'merged'): Promise<Clo
 
 		if (repo === undefined) return { kind: 'unreadable' }
 
-		const references = parse_references(raw, state)
-		const url =
-			state === 'merged'
-				? pick_closing_pr(references, issue, repo)
-				: references.find((reference) => reference.repo === repo && reference.state === 'open')?.url
-
-		return { kind: 'read', url }
+		return { kind: 'read', url: pick_closing_pr(parse_references(raw), issue, repo) }
 	} catch {
 		return { kind: 'unreadable' }
 	}
-}
-
-async function read_closing_result(issue: string): Promise<ClosingRead> {
-	return await read_result(issue, 'merged')
-}
-
-async function has_open_pr(issue: string): Promise<boolean> {
-	const result = await read_result(issue, 'open')
-
-	if (result.kind === 'unreadable') {
-		throw new Error(`the pull requests on ${session_cite.issue(issue)} could not be read`)
-	}
-
-	return result.url !== undefined
 }
 
 // Legacy callers leave the child unchanged when discovery is unavailable.
@@ -152,7 +130,6 @@ const issue_closing_pr = {
 	read_closing_number,
 	read_closing_number_result,
 	read_closing_pr,
-	has_open_pr,
 }
 
 export { issue_closing_pr }

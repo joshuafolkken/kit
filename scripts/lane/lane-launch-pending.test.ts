@@ -11,7 +11,7 @@ const make_directory = temporary_directory()
 const { claim } = core_budget
 const CONTEXT: LaunchContext = { issue: '17', stash: undefined }
 const LAUNCHED: LaunchOutcome = { kind: 'launched', pid: String(process.pid) }
-const MEMORY_MB = 810
+const MEMORY_MB = 470
 const probe = { directory: '', available: 0 }
 
 beforeEach(() => {
