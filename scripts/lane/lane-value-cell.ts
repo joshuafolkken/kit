@@ -110,12 +110,22 @@ function numbers_in(texts: ReadonlyArray<string>, item: string | undefined): Rea
 		.filter((text): text is string => text !== undefined && NUMBER_PATTERN.test(text))
 }
 
+interface Addressed {
+	named: ReadonlyArray<ReadonlyArray<Cells>>
+	texts: ReadonlyArray<string>
+}
+
+function addressed(tables: ReadonlyArray<string>, address: CellAddress): Addressed {
+	const named = blocks_of(tables).filter((rows) => is_table(rows, address))
+
+	return { named, texts: named.flatMap((rows) => texts_in(rows, address)) }
+}
+
 // The one numeric cell at `address` across `tables`, or `undefined` for none, many or a non-number.
 // With `zero`, a named table no row of which matches reads `0`: a count table prints only the rows
 // that occurred, so the count's success state is the row it leaves out.
 function value(tables: ReadonlyArray<string>, address: CellAddress): number | undefined {
-	const named = blocks_of(tables).filter((rows) => is_table(rows, address))
-	const texts = named.flatMap((rows) => texts_in(rows, address))
+	const { named, texts } = addressed(tables, address)
 
 	if (address.zero === true && named.length > 0 && texts.length === 0) return 0
 
@@ -124,7 +134,13 @@ function value(tables: ReadonlyArray<string>, address: CellAddress): number | un
 	return numbers.length === 1 ? Number(numbers[0]) : undefined
 }
 
-const lane_value_cell = { value }
+// Whether `address` matches more than one numeric cell — an address to narrow, not a period still
+// without its sample (joshuafolkken/kit#6503).
+function is_several(tables: ReadonlyArray<string>, address: CellAddress): boolean {
+	return numbers_in(addressed(tables, address).texts, address.item).length > 1
+}
+
+const lane_value_cell = { value, is_several }
 
 export type { CellAddress, CellFilter }
 export { lane_value_cell }

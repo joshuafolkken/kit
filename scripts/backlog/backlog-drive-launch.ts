@@ -5,7 +5,7 @@ import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-lau
 import { backlog_drive_owner } from './backlog-drive-owner'
 import { backlog_measure_close } from './backlog-measure-close'
 
-const { MEASURED_LAUNCH } = backlog_drive_launch_pass
+const { MEASURED_LAUNCH, UNSAMPLED_LAUNCH } = backlog_drive_launch_pass
 
 // The driver's lane launch. The parent that ran `josh latest` in the primary
 // checkout leaves its rewritten lock file in a stash under this message — `backlogrun-lanes.md` →
@@ -67,10 +67,22 @@ function no_child(issue: string, detail: string | undefined): string {
 	return `${event}: ${capped}`
 }
 
-// An issue its measurement declaration closed takes no lane (`backlog-measure-close.ts`).
+// An issue its measurement declaration closed, or that waits for a sample, takes no lane
+// (`backlog-measure-close.ts`, which puts the wait on the stream).
+async function measured(issue: string): Promise<DriveLaunch | undefined> {
+	const outcome = await backlog_measure_close.outcome(issue)
+
+	if (outcome === 'closed') return MEASURED_LAUNCH
+
+	return outcome === 'wait' ? UNSAMPLED_LAUNCH : undefined
+}
+
 async function launch(issue: string, owner: string): Promise<DriveLaunch> {
 	await backlog_drive_owner.assert_current(owner)
-	if (await backlog_measure_close.closed(issue)) return MEASURED_LAUNCH
+
+	const settled = await measured(issue)
+
+	if (settled !== undefined) return settled
 	await run_event_setup.emit(run_event_setup.opening_lane(issue))
 
 	const outcome = await launch_ready(issue)

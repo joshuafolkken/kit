@@ -130,6 +130,16 @@ describe('backlog_drive_cli.offer_argv', () => {
 	})
 })
 
+// joshuafolkken/kit#6503: an issue waiting for its measurement sample is not offered again this run.
+describe('backlog_drive_cli.offer_argv — a sample wait', () => {
+	it('never offers a child waiting for its measurement sample', () => {
+		const state = { ...backlog_drive.initial_state([], ACTIVE), waiting: ['2502'] }
+		const argv = backlog_drive_cli.offer_argv(state, CARRY, [])
+
+		expect(argv.slice(argv.indexOf('--exclude'))).toStrictEqual(['--exclude', '2502'])
+	})
+})
+
 // joshuafolkken/kit#4102: each merge runs `run:merge --driver` as its own process, so a fix merged
 // after the loop started is the code that decides the child.
 const MERGED: MergeResult = { token: '2600', code: 0, outcome: 'merged', is_offer: true }
@@ -265,12 +275,13 @@ describe('backlog_drive_cli — a merge stop across a hand-back', () => {
 // joshuafolkken/kit#4365: a child withdrawn while the drive was handed back is never collected by the
 // resumed drive, so the resume line alone would offer it again in the same run.
 describe('backlog_drive_cli.seeded_state — a withdrawal across a hand-back', () => {
-	it('excludes a child the stream reads withdrawn beside the resume line exclusion', () => {
+	it('starts from the exclusion and the sample waits the stream left out', () => {
 		const context = backlog_drive_cli.parse(['--owner', '4242', '--exclude', '2400'])
-		const seeded = { lanes: ['2402'], withdrawn: ['2401', '2400'] }
-		const state = context && backlog_drive_cli.seeded_state(seeded, context)
+		const left_out = { exclude: ['2400', '2401'], waiting: ['2403'] }
+		const state = context && backlog_drive_cli.seeded_state({ lanes: ['2402'], left_out }, context)
 
 		expect(state?.exclude).toStrictEqual(['2400', '2401'])
+		expect(state?.waiting).toStrictEqual(['2403'])
 		expect(state?.in_flight).toStrictEqual(['2402'])
 	})
 })

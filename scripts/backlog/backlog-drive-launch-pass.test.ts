@@ -38,6 +38,38 @@ describe('backlog_drive.run_pass — a measured close', () => {
 	})
 })
 
+// joshuafolkken/kit#6503: an issue whose declaration has no sample yet waits — out of this run's later
+// offers, so it is not measured again each pass, and no activity, since nothing started.
+describe('backlog_drive.run_pass — no sample yet', () => {
+	it('keeps the waiting issue out of flight and apart from the merged ones', async () => {
+		const { ports } = harness({
+			offers: [offer('run', [OFFERED, OFFERED_TOO])],
+			unsampled_launches: [OFFERED],
+		})
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind).toBe('continue')
+		expect(result.state.in_flight).toStrictEqual([OFFERED_TOO])
+		expect(result.state.waiting).toStrictEqual([OFFERED])
+		expect(result.state.exclude).toStrictEqual([])
+	})
+
+	it('leaves activity where it was when the wait is all the pass did', async () => {
+		const { ports } = harness({
+			offers: [offer('run', [OFFERED])],
+			unsampled_launches: [OFFERED],
+		})
+		const result = await backlog_drive.run_pass(
+			backlog_drive.initial_state([], EARLIER),
+			true,
+			ports,
+		)
+
+		expect(result.state.waiting).toStrictEqual([OFFERED])
+		expect(result.state.active).toBe(EARLIER)
+	})
+})
+
 // A launch that ends only once every launch of the pass has started — never, launched one by one.
 function gated_launch(count: number): (issue: string) => Promise<'launched'> {
 	const started: Array<string> = []

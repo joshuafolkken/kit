@@ -19,6 +19,7 @@ import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
 import { lane_value_cell, type CellAddress, type CellFilter } from './lane-value-cell'
+import { lane_value_missing } from './lane-value-missing'
 import { lane_why_period } from './lane-why-period'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement; `josh lane:value` and
@@ -262,33 +263,45 @@ function value_request(rest: ReadonlyArray<string>): ValueRequest | undefined {
 	return address === undefined ? undefined : { ...request, address }
 }
 
-// The value alone on its line, so a measurement declaration reads it as the output's last line; a
-// period with no sample prints nothing there and fails, which the drive reads as unreadable.
-function print_value(request: ValueRequest, measured: number | undefined): number {
-	if (measured === undefined) {
-		const since = new Date(request.since_ms).toISOString()
+// A value read, or the words `lane:value` fails with when there is none.
+interface Measured {
+	value: number | undefined
+	missing: string
+}
 
-		const missing = request.address === undefined ? 'no sample' : 'no single numeric cell'
+// The value alone on its line, so a measurement declaration reads it as the output's last line; a
+// period with no sample prints nothing there and fails, which the drive reads as a wait
+// (`lane-value-missing.ts`).
+function print_value(request: ValueRequest, measured: Measured): number {
+	const { value, missing } = measured
+
+	if (value === undefined) {
+		const since = new Date(request.since_ms).toISOString()
 
 		console.error(`josh lane:value ${request.metric}: ${missing} since ${since}`)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	console.info(measured.toFixed(VALUE_DIGITS))
+	console.info(value.toFixed(VALUE_DIGITS))
 
 	return 0
 }
 
-// The addressed cell of the tables `lane:stats` would print for `window`.
+// The addressed cell of the tables `lane:stats` would print for `window`, and why there is none.
 async function cell_value(
 	address: CellAddress,
 	window: StatsWindow,
 	context: MeasureContext,
-): Promise<number | undefined> {
+): Promise<Measured> {
 	const tables = lane_stats_tables.tables_of(await period_records(context, window), window)
+	const { MISSING } = lane_value_missing
+	const is_several = lane_value_cell.is_several(tables, address)
 
-	return lane_value_cell.value(tables, address)
+	return {
+		value: lane_value_cell.value(tables, address),
+		missing: is_several ? MISSING.SEVERAL : MISSING.CELL,
+	}
 }
 
 async function value_command(
@@ -310,7 +323,9 @@ async function value_command(
 		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
 	}
 
-	return print_value(request, lane_value.value(request.metric, records, window))
+	const value = lane_value.value(request.metric, records, window)
+
+	return print_value(request, { value, missing: lane_value_missing.MISSING.SAMPLE })
 }
 
 // The lane's net minutes, whole, alone on the line a causing-lane declaration copies

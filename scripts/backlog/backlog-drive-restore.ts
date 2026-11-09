@@ -4,6 +4,12 @@ import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { backlog_offer_exclude } from './backlog-offer-exclude'
 
+// The `DriveState` lists a seeded drive starts from.
+interface LeftOut {
+	exclude: Array<string>
+	waiting: Array<string>
+}
+
 const ISSUE_IN_EVENT = /#([1-9]\d*)\b/u
 const SETTLED_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.MERGE,
@@ -74,12 +80,26 @@ function withdrawn_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string
 	)
 }
 
-// The offer's exclusion as the stream records it: the merged and withdrawn children and the ones still
-// in flight — the list the drive keeps in memory, read by a reader that has only the stream
-// (joshuafolkken/kit#4349).
+// The issues this run found waiting for their measurement sample (joshuafolkken/kit#6503): a drive
+// resumed after a hand-back restores its `waiting` list from them, so it measures none of them again.
+function waiting_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
+	return [...new Set(issues_of_kind(events, run_event_stream.EVENT_KIND.SAMPLE_WAIT))]
+}
+
+// What a drive seeded from the stream keeps out of its offers: the resume line's exclusion with the
+// withdrawals beside it, and the sample waits apart from both.
+function left_out(events: ReadonlyArray<RunEvent>, carried: ReadonlyArray<string>): LeftOut {
+	const exclude = [...new Set([...carried, ...withdrawn_issues(events)])]
+
+	return { exclude, waiting: [...waiting_issues(events)] }
+}
+
+// The offer's exclusion as the stream records it: the merged and withdrawn children, the ones waiting
+// for a sample and the ones still in flight — the lists the drive keeps in memory, read by a reader
+// that has only the stream (joshuafolkken/kit#4349).
 function offer_exclude(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
 	const merged = issues_of_kind(events, run_event_stream.EVENT_KIND.MERGE)
-	const settled = [...merged, ...withdrawn_issues(events)]
+	const settled = [...merged, ...waiting_issues(events), ...withdrawn_issues(events)]
 
 	return backlog_offer_exclude.exclude_of(settled, active_issues(events))
 }
@@ -120,9 +140,11 @@ function restore(
 	)
 }
 
+export type { LeftOut }
 export const backlog_drive_restore = {
 	DONE_KINDS,
 	active_issues,
+	left_out,
 	mentioned_issues,
 	offer_exclude,
 	restore,

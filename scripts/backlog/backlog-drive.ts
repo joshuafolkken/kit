@@ -79,6 +79,8 @@ interface DriveState extends OfferTiming {
 	// child is left out: its labels classify it, so one a person released is offered again — except one
 	// the yield cap parked (`backlog-yield-cap.ts`), which stays out whether or not its park went through.
 	exclude: Array<string>
+	// The issues whose measurement declaration had no sample yet: kept out of the offer, not merged.
+	waiting?: Array<string> | undefined
 	// When the run last did something, handed to `backlog:budget` as `--active`.
 	active: string
 	retries: number
@@ -119,7 +121,8 @@ interface DrivePorts extends YieldCapPorts {
 	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
 	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken) —
-	// or `measured`, the issue closed by its declaration with no lane taken.
+	// or `measured` / `unsampled`, the issue closed by its declaration or waiting for its sample, with
+	// no lane taken.
 	launch: (issue: string) => Promise<DriveLaunch>
 	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
 	// open lanes.
