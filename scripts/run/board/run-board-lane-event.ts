@@ -5,7 +5,8 @@ import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { run_board_phase, type Phase } from './run-board-phase'
 
 // Each running child's newest event of its own — the `lane-phase` the hook writes, a `ship-stage` its
-// ship writes or the fullrun `step` its `run:step` writes (joshuafolkken/kit#6598) — in words, with the phase whose icon its row's track draws. A child inside a long
+// ship writes or the fullrun `step` its `run:step` writes (joshuafolkken/kit#6598) — in words, with
+// the phase whose icon its row's track draws. A child inside a long
 // `josh ship` makes no call of its own while the ship writes on, so the header's third line reads the
 // newer of this and the child's newest operation (joshuafolkken/kit#3767).
 

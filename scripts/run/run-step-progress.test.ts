@@ -21,12 +21,14 @@ describe('run_step_progress.step_of', () => {
 
 	it('reads the newest event as the step after the implementation', () => {
 		expect(step_of('pnpm josh ship --review', KIND.REVIEW_ROUND)).toBe(STEP.GATE)
-		expect(step_of(run_step.WAIT, KIND.SHIP_LAUNCH)).toBe(STEP.GATE)
 		expect(step_of('pnpm josh followup', KIND.PR_OPENED)).toBe(STEP.FOLLOWUP)
 	})
 
 	it('names no step for a position outside the fullrun steps', () => {
 		expect(step_of(run_step.STOP, KIND.MERGE)).toBeUndefined()
+		// The ship's own stage lines are the newer words on the board; a step written over them hides a failure.
+		expect(step_of(run_step.WAIT, KIND.SHIP_LAUNCH)).toBeUndefined()
+		expect(step_of(run_step.WAIT, KIND.SHIP_STOP)).toBeUndefined()
 		expect(step_of(run_step.UNKNOWN)).toBeUndefined()
 	})
 })

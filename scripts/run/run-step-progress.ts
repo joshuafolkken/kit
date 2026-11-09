@@ -19,8 +19,6 @@ const VERDICT_STEPS: Readonly<Partial<Record<string, FullrunStep>>> = {
 
 const EVENT_STEPS: Readonly<Partial<Record<string, FullrunStep>>> = {
 	[KIND.REVIEW_ROUND]: STEP.GATE,
-	[KIND.SHIP_LAUNCH]: STEP.GATE,
-	[KIND.SHIP_STOP]: STEP.GATE,
 	[KIND.PR_OPENED]: STEP.FOLLOWUP,
 }
 
