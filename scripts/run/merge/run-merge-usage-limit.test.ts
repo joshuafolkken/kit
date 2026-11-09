@@ -132,6 +132,16 @@ describe('run_merge_usage_limit.held_until', () => {
 		expect(run_merge_usage_limit.held_until(events as never, RESET_MS)).toBeUndefined()
 		expect(run_merge_usage_limit.held_until([], RESET_MS)).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#6502: a GitHub rate limit's earlier reset, recorded after, ends no Claude hold.
+	it('names the latest reset still ahead, not the newest stop', () => {
+		const mixed = [
+			...events,
+			event(2, '#2 GitHub rate limit — resumes at 2026-10-23T17:30:00.000Z'),
+		]
+
+		expect(run_merge_usage_limit.held_until(mixed as never, STOPPED_MS)).toBe(RESET_MS)
+	})
 })
 
 // joshuafolkken/kit#5395: the children the `⛽ usage` section counts as parked.

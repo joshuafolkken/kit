@@ -30,6 +30,7 @@ import { run_merge, type EndingSignals } from './run-merge'
 import { run_merge_cap } from './run-merge-cap'
 import { run_merge_close } from './run-merge-close'
 import { run_merge_decision } from './run-merge-decision'
+import { run_merge_github_limit } from './run-merge-github-limit'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
 // callers surface the refusal as a hard failure rather than silently continuing on a carry that was
@@ -417,6 +418,7 @@ async function do_outage(ctx: MergeContext): Promise<OutageResult> {
 	if (result.kind === 'refused') return { carry: result.carry, is_refused: true }
 
 	await release_child(ctx.child)
+	await run_merge_github_limit.hold(ctx.child, ctx.output)
 
 	return { carry: result.kind === 'applied' ? result.carry : undefined, is_refused: false }
 }
