@@ -13,7 +13,8 @@ import { lane_yield } from './lane-yield'
 // usage-limit stop (joshuafolkken/kit#4745), each until the issue's next ship stage, re-dispatch or
 // another of the two, the wait `josh lane:stats` derives for a stop (`lane-stop-stats.ts`) — and the
 // host's sleeps (joshuafolkken/kit#5032), whatever the issue (`lane-sleep.ts`), and a yield's wait for
-// the issue's next dispatch (joshuafolkken/kit#5216), no lane seat held while the holder runs. The
+// the issue's next dispatch (joshuafolkken/kit#5216), no lane seat held while the holder runs, and a
+// run that ended in a split until the next dispatch (joshuafolkken/kit#6678), the parts' cost. The
 // ship's followup — CI, CodeRabbit and the merge, waited on by the driver with no lane seat held — is
 // taken out too, counted apart as a driver stage (joshuafolkken/kit#6541). A ship stop is not taken
 // out: a relaunched child works through its wait. `josh lane:net` prints it, and a causing-lane line
@@ -128,17 +129,37 @@ function yield_spans(
 	})
 }
 
-// `issue`'s yields inside `span`, each until its redispatch, cut at the merge.
-function yielded(
+// The dispatch that started the run `split` ended: the issue's last dispatch at or before it.
+function run_start_ms(dispatches: ReadonlyArray<IssueAt>, split: IssueAt): number {
+	const start = dispatches.findLast(
+		(entry) => entry.issue === split.issue && entry.at_ms <= split.at_ms,
+	)
+
+	return start?.at_ms ?? split.at_ms
+}
+
+// Each run that ended with its issue split (`run:merge` closing the lane), from its dispatch until the
+// issue's next one: the split run filed the parts, the next run is the lane (joshuafolkken/kit#6678).
+// A split no later dispatch followed is no wait.
+function split_spans(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
-	issue: number,
-	span: LaneSpan,
-): Array<LaneSpan> {
-	const of_issue = events.filter((event) => lane_stop_stats.issue_of(event) === issue)
-	const inside = yield_spans(entries, of_issue).filter(
-		(wait) => wait.from_ms >= span.from_ms && wait.from_ms < span.to_ms,
-	)
+): Array<Span> {
+	const splits = lane_stop_stats.events_of(events, EVENT_KIND.SPLIT)
+	const dispatches = lane_stop_stats.dispatches_of(entries)
+	const spans = lane_spans.issue_spans({ starts: splits, bounds: splits, ends: dispatches })
+
+	return splits
+		.map((split, index) => ({
+			from_ms: run_start_ms(dispatches, split),
+			end_ms: spans[index]?.end_ms,
+		}))
+		.filter((wait) => wait.end_ms !== undefined)
+}
+
+// The waits of `spans` that began inside `span`, each cut at the merge.
+function cut_inside(spans: ReadonlyArray<Span>, span: LaneSpan): Array<LaneSpan> {
+	const inside = spans.filter((wait) => wait.from_ms >= span.from_ms && wait.from_ms < span.to_ms)
 
 	return inside.map((wait) => ({
 		from_ms: wait.from_ms,
@@ -146,9 +167,33 @@ function yielded(
 	}))
 }
 
+function events_of_issue(events: ReadonlyArray<RunEvent>, issue: number): Array<RunEvent> {
+	return events.filter((event) => lane_stop_stats.issue_of(event) === issue)
+}
+
+// `issue`'s yields inside `span`, each until its redispatch, cut at the merge.
+function yielded(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	return cut_inside(yield_spans(entries, events_of_issue(events, issue)), span)
+}
+
+// `issue`'s split runs inside `span`, each until its redispatch, cut at the merge.
+function split_waits(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	return cut_inside(split_spans(entries, events_of_issue(events, issue)), span)
+}
+
 // The waits `net_ms` takes out of `span` — each hold from itself to its end, cut at the merge, each
-// yield until its redispatch, and each sleep of the host — the intervals `josh lane:breakdown` counts
-// as excluded (`lane-breakdown.ts`).
+// yield and split run until its redispatch, and each sleep of the host — the intervals `josh
+// lane:breakdown` counts as excluded (`lane-breakdown.ts`).
 function waits(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
@@ -158,6 +203,7 @@ function waits(
 	return joined([
 		...hold_waits(entries, events, issue, span),
 		...yielded(entries, events, issue, span),
+		...split_waits(entries, events, issue, span),
 		...slept(events, span),
 	])
 }

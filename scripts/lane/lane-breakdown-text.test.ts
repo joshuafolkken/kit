@@ -39,7 +39,7 @@ const IMPLEMENT_TEXT =
 	'implement 51.0 min, over budget +42 min (editing & thinking 41.0 min, gate 10.0 min, 2 backgrounded calls, their waits in editing & thinking)'
 const PLAN_TEXT = 'start to plan 10.0 min, over budget +7 min'
 const EXCLUDED_TEXT =
-	'waits taken out (park, outage, usage limit, yield, host sleep) 3.0 min, of which yield wait 1.0 min, of which host sleep 1.0 min'
+	'waits taken out (park, outage, usage limit, yield, split run, host sleep) 3.0 min, of which yield wait 1.0 min, of which host sleep 1.0 min'
 
 describe('lane_breakdown_text.comment', () => {
 	it('heads the stages with the net minutes and the command that prints them', () => {

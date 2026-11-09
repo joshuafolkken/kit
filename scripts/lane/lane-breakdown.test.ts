@@ -238,6 +238,27 @@ describe('lane_breakdown.of — a yield', () => {
 	})
 })
 
+// joshuafolkken/kit#6678: #6537 split in its first run and was dispatched again a day later; its start
+// to plan counted the day between the two runs.
+describe('lane_breakdown.of — a split, then a redispatch', () => {
+	const entries: ReadonlyArray<LedgerEntry> = [
+		{ kind: 'dispatch', at: at(-1900), issue: ISSUE },
+		{ kind: 'dispatch', at: at(0), issue: ISSUE },
+		{ kind: 'merge', at: at(MERGE_MINUTE), issue: ISSUE },
+	]
+	const events = [event(-1886, 'split', `${LANE} split`), ...events_4970()]
+	const breakdown = lane_breakdown.of(entries, events, ISSUE)
+
+	it('counts start to plan from the last dispatch only', () => {
+		expect(stage_minutes(breakdown, START_TO_PLAN)).toBe(10)
+		expect(breakdown?.excluded_ms).toBe(1900 * MINUTE_MS)
+	})
+
+	it('still adds up to the net time', () => {
+		expect(total_ms(breakdown)).toBe(lane_net_time.net_ms(entries, events, ISSUE))
+	})
+})
+
 describe('lane_breakdown.of — Codex resume events', () => {
 	it('uses plan and implement events after a Codex resume without a transcript', () => {
 		const events = [
