@@ -97,8 +97,8 @@ excluded children are not read. After recording answers, repeat it with `--exclu
 for decisions left parked in this pass; when none remain it prints `pnpm josh backlog:plan --waves`.
 The reader supplies semantic evidence; the command cannot infer a person's answer or prove a main failure:
 
-- **An answer already in the issue** — `pnpm josh epic --decide <E> <N...> --decision-file .josh/tmp/d.md`
-  records a Tier A answer and clears `needs-decision` (no epic: comment, `run:park <N> --clear`).
+- **A park the parent resolves** — `pnpm josh backlog:triage --apply <N> --adopt <k> --reason <text>`
+  (`backlogrun-park.md` → "A park the parent session resolves").
   **Never measure in order to decide**: a question needing a benchmark or a run stays labelled.
 - **A recovered mechanical failure** — retry with `pnpm josh run:add <N> --retry`, which clears
   `run:stalled` and the previous attempt; unresolved failures stay parked and excluded from this pass.
