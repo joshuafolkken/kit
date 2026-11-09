@@ -142,7 +142,6 @@ describe('run_board_plan.read_plan', () => {
 	})
 })
 
-// joshuafolkken/kit#4222: a running issue sits in no wave, yet the joined plan still holds it once.
 // joshuafolkken/kit#6836: an `--only` run drew none of the issues `run:add` handed it.
 describe('run_board_plan.read_plan added issues', () => {
 	// The rows keep the classification's order, as the declared ones do; `run_board_scope` pins the scope's.
@@ -165,6 +164,7 @@ describe('run_board_plan.read_plan added issues', () => {
 	})
 })
 
+// joshuafolkken/kit#4222: a running issue sits in no wave, yet the joined plan still holds it once.
 describe('run_board_plan.read_plan running issues', () => {
 	it('joins the running issues of the named plan and the pool, never holding one twice', async () => {
 		const running = child(SINGLE)
