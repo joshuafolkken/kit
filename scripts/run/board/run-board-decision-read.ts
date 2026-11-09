@@ -21,7 +21,8 @@ interface DecisionRead {
 // The board re-reads these every two minutes, so a node goes through GraphQL where the transport
 // allows (`run-board-decision-graphql.ts`, joshuafolkken/kit#6819), and otherwise the issue and its
 // comments go with the previous process's ETag (joshuafolkken/kit#6700): an unchanged answer costs
-// no core request. A blocked node's relations follow-up is still read unconditionally.
+// no core request. A blocked node's relations follow-up is still read unconditionally. The
+// `needs-decision` children's comments go through GraphQL the same way (joshuafolkken/kit#6857).
 async function read_node(
 	reference: IssueReference,
 	load_view: ViewLoader,
@@ -111,13 +112,16 @@ async function blocker_of(
 async function question_of(
 	number: number,
 	repo: string,
+	answered: ReadonlyMap<number, string>,
 ): Promise<readonly [number, string] | undefined> {
-	const json = await git_gh_issue_read.issue_list_comments(
-		String(number),
-		undefined,
-		repo,
-		git_gh_issue_read.read_comments_conditionally,
-	)
+	const json =
+		answered.get(number) ??
+		(await git_gh_issue_read.issue_list_comments(
+			String(number),
+			undefined,
+			repo,
+			git_gh_issue_read.read_comments_conditionally,
+		))
 	const comments = await issue_read.parse_comments(json, repo)
 	const question = run_board_decision.comment_question(issue_read.trusted_bodies(comments ?? []))
 
@@ -125,11 +129,13 @@ async function question_of(
 }
 
 async function questions_of(plan: BoardPlan): Promise<ReadonlyMap<number, string>> {
-	const numbers = [...plan.labels].filter(([, labels]) =>
-		has_label_name(labels, NEEDS_DECISION_LABEL),
-	)
+	const { repo } = plan.context
+	const numbers = [...plan.labels]
+		.filter(([, labels]) => has_label_name(labels, NEEDS_DECISION_LABEL))
+		.map(([number]) => number)
+	const answered = await run_board_decision_graphql.read_comments(numbers, repo)
 	const pairs = await Promise.all(
-		numbers.map(async ([number]) => await question_of(number, plan.context.repo)),
+		numbers.map(async (number) => await question_of(number, repo, answered)),
 	)
 
 	return new Map(pairs.filter((pair) => pair !== undefined))
