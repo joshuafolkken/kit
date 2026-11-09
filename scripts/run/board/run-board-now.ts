@@ -147,7 +147,7 @@ function stage_line(read: NowRead, setup: string): TimedLine {
 
 // A running child's words, named by its issue.
 function child_said(issue: number, words: string): string {
-	return `${issue_cite.plain(issue)}${OPERATION_SEPARATOR}${words}`
+	return `${issue_cite.plain_for('terminal', issue)}${OPERATION_SEPARATOR}${words}`
 }
 
 // What the running children's newest activity is read from: each session's newest operation and each

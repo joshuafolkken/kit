@@ -109,11 +109,11 @@ function declarations(body: string): ReadonlyArray<string> {
 }
 
 function follow_up_title(subject: SpillSubject): string {
-	return `Follow up ${issue_cite.plain(subject.issue_number)}: ${subject.title}`
+	return `Follow up ${issue_cite.plain_for('github', subject.issue_number)}: ${subject.title}`
 }
 
 function follow_up_body(subject: SpillSubject, estimate: string): string {
-	const origin = issue_cite.plain(subject.issue_number)
+	const origin = issue_cite.plain_for('github', subject.issue_number)
 
 	return [
 		BACKGROUND_HEADING,
@@ -142,7 +142,7 @@ function follow_up_body(subject: SpillSubject, estimate: string): string {
 function kept_body(body: string, follow_up: number): string {
 	const moved = unchecked_indices(body)
 	const [first] = moved
-	const link = `- → ${issue_cite.plain(follow_up)} に移した`
+	const link = `- → ${issue_cite.plain_for('github', follow_up)} に移した`
 
 	return markdown_section
 		.lines_of(body)

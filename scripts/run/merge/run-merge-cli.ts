@@ -222,7 +222,7 @@ async function is_on_record(text: string): Promise<boolean> {
 // **Put on record once, dated to the merge's confirmation**: a pass that collects a child already on
 // record — `run:carry --end` after `run:merge` — writes neither again.
 async function put_merge_on_record(child: string, at: Date): Promise<void> {
-	const text = `${issue_cite.plain(child)} merged`
+	const text = `${issue_cite.plain_for('program', child)} merged`
 
 	if (await is_on_record(text)) return
 
@@ -262,7 +262,7 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 async function on_waiting(ctx: MergeContext, waits: ReadonlyArray<string>): Promise<MergeVerdict> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(ctx.child)} waiting on ${waits.join(', ')}`,
+		`${issue_cite.plain_for('program', ctx.child)} waiting on ${waits.join(', ')}`,
 	)
 
 	return await offered(ctx)
@@ -308,7 +308,7 @@ async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.OUTAGE,
-		`${issue_cite.plain(ctx.child)} outage (re-dispatchable)`,
+		`${issue_cite.plain_for('program', ctx.child)} outage (re-dispatchable)`,
 	)
 
 	if (result.carry !== undefined && run_merge.is_outage_guard_tripped(result.carry.outages)) {
@@ -350,7 +350,7 @@ async function on_cut(ctx: MergeContext): Promise<MergeVerdict> {
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
-		`${issue_cite.plain(ctx.child)} resumed from its cut`,
+		`${issue_cite.plain_for('program', ctx.child)} resumed from its cut`,
 	)
 
 	return emit(MERGE_TOKEN.RESUMED, SUCCESS_EXIT_CODE)
@@ -364,7 +364,7 @@ async function on_parked(ctx: MergeContext): Promise<MergeVerdict> {
 	await run_merge_steps.release_child(ctx.child)
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(ctx.child)} parked`,
+		`${issue_cite.plain_for('program', ctx.child)} parked`,
 	)
 
 	return await offered(ctx)
@@ -376,7 +376,7 @@ async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	await run_merge_steps.close_split_lane(ctx.child)
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.SPLIT,
-		`${issue_cite.plain(ctx.child)} split`,
+		`${issue_cite.plain_for('program', ctx.child)} split`,
 	)
 
 	return await offered(ctx)

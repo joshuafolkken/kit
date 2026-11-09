@@ -30,7 +30,7 @@ function is_ready(issue: EpicIssue, cause: number, repo: string): boolean {
 async function park_protected(issue: number, cause: number, label: string): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.PARK,
-		`${issue_cite.plain(issue)} parked (${label}; blocker ${issue_cite.plain(cause)} closed)`,
+		`${issue_cite.plain_for('program', issue)} parked (${label}; blocker ${issue_cite.plain_for('program', cause)} closed)`,
 	)
 }
 

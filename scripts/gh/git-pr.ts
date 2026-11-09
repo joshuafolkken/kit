@@ -148,11 +148,11 @@ async function create(
 }
 
 function build_title(issue_info: IssueInfo): string {
-	return `${issue_info.title} ${issue_cite.plain(issue_info.number)}`
+	return `${issue_info.title} ${issue_cite.plain_for('github', issue_info.number)}`
 }
 
 function build_body(issue_info: IssueInfo, extra_body?: string): string {
-	const closes = `closes ${issue_cite.plain(issue_info.number)}`
+	const closes = `closes ${issue_cite.plain_for('github', issue_info.number)}`
 
 	if (extra_body === undefined) return closes
 

@@ -177,7 +177,8 @@ async function record_parks(url: string, filing: Filing): Promise<void> {
 
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
-	const reference = issue_cite.plain(
+	const reference = issue_cite.plain_for(
+		'terminal',
 		number,
 		issue_file_fold.reference_prefix(filing.target, filing.current),
 	)

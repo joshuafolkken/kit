@@ -73,7 +73,7 @@ function park_note(event: RunEvent, titles: Titles): BoardNote | undefined {
 function note_body(text: string, issue: string | undefined): string {
 	if (issue === undefined) return text
 
-	const lead = `${issue_cite.plain(issue)} `
+	const lead = `${issue_cite.plain_for('terminal', issue)} `
 
 	return text.startsWith(lead) ? text.slice(lead.length) : text
 }

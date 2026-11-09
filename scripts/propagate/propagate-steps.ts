@@ -340,7 +340,7 @@ function pull_request_step(
 ): StepResult {
 	const number = issue_numbers.get(target.repo)
 	if (number === undefined) return { step, is_ok: false, detail: 'no issue number' }
-	const argument = `${plan_title(plan.releases)} ${issue_cite.plain(number)}`
+	const argument = `${plan_title(plan.releases)} ${issue_cite.plain_for('github', number)}`
 	const outcome = spawn_captured(target, step, ['pnpm', 'josh', 'git', '-y', argument])
 	if (outcome.result.is_ok) return outcome.result
 

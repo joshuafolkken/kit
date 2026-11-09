@@ -48,3 +48,12 @@ describe('backlog_drive_record.record_ports — added_since', () => {
 		expect(added).toHaveBeenCalledWith(SINCE_MS)
 	})
 })
+
+describe('backlog_drive_record.record_ports — raised_since', () => {
+	it('asks the event stream for a lane:limit raise since the given instant', async () => {
+		const raised = vi.spyOn(backlog_arrival_added, 'is_raised_since').mockResolvedValue(true)
+
+		await expect(backlog_drive_record.record_ports().raised_since(SINCE_MS)).resolves.toBe(true)
+		expect(raised).toHaveBeenCalledWith(SINCE_MS)
+	})
+})

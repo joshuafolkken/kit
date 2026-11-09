@@ -50,12 +50,12 @@ async function placement_of(issue: string, children: ReadonlyArray<string>): Pro
 }
 
 function cited_children(request: SplitRequest): string {
-	return request.children.map((child) => issue_cite.plain(child)).join(', ')
+	return request.children.map((child) => issue_cite.plain_for('github', child)).join(', ')
 }
 
 // `is_handed_off` when the children take the work over; a park keeps it on `#issue`'s own lane.
 function aside_of(request: SplitRequest, is_handed_off = false): AsideRequest {
-	const issue = issue_cite.plain(request.issue)
+	const issue = issue_cite.plain_for('program', request.issue)
 	const children = cited_children(request)
 
 	return {
@@ -110,7 +110,7 @@ async function audit(epic: number): Promise<string> {
 }
 
 function park_body(request: SplitRequest, reason: string): string {
-	const issue = issue_cite.plain(request.issue)
+	const issue = issue_cite.plain_for('github', request.issue)
 
 	return `${NEEDS_DECISION_LABEL}: could not tell whether an epic already tracks ${issue} (${reason}), so the split was not placed. Place ${cited_children(request)} by hand once the epic listing reads in full.`
 }

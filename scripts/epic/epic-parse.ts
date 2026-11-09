@@ -174,7 +174,7 @@ function parse_external_task_list_children(body: string | undefined): Array<Exte
 	const seen = new Set<string>()
 
 	return found.filter((child) => {
-		const key = issue_cite.plain(child.number, child.repo)
+		const key = issue_cite.plain_for('program', child.number, child.repo)
 		const is_new = !seen.has(key)
 
 		seen.add(key)

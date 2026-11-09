@@ -67,7 +67,7 @@ async function noticed(
 }
 
 function cited(issue: OpenIssueData, suffix = ''): string {
-	return `- ${issue_cite.plain(issue.number)} ${issue.title}${suffix}`
+	return `- ${issue_cite.plain_for('telegram', issue.number)} ${issue.title}${suffix}`
 }
 
 // The cited issues carrying one park label. `needs-decision` and `run:stalled` are listed apart: one asks

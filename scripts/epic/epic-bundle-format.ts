@@ -31,7 +31,7 @@ function headline(decision: BundleDecision): string {
 }
 
 function format_numbers(numbers: ReadonlyArray<number>): string {
-	return numbers.map((issue_number) => issue_cite.plain(issue_number)).join(', ')
+	return numbers.map((issue_number) => issue_cite.plain_for('linked', issue_number)).join(', ')
 }
 
 // The backlog rows of the verdict's candidates — what the printed order and `--apply` both read.
@@ -90,7 +90,7 @@ function format_epics(decision: BundleDecision): Array<string> {
 	const involved = `  Epics involved: ${format_numbers(decision.epics)}`
 	if (decision.recommended === undefined) return [involved, NO_RECOMMENDATION_LINE]
 
-	return [involved, `  Recommended: ${issue_cite.plain(decision.recommended)}`]
+	return [involved, `  Recommended: ${issue_cite.plain_for('linked', decision.recommended)}`]
 }
 
 // `is_membership_established` is what separates "no epic tracks these" from "their epics were never

@@ -18,7 +18,7 @@ function merge_stopped(issue: string, state: DriveState): DriveState {
 	return {
 		...state,
 		is_stopping: true,
-		stop_reason: `run:merge ${issue_cite.plain(issue)} answered stop`,
+		stop_reason: `run:merge ${issue_cite.plain_for('terminal', issue)} answered stop`,
 		stopped_by: issue,
 	}
 }
