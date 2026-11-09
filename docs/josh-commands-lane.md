@@ -178,7 +178,7 @@ pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes"   # th
 
 Dependencies are re-installed against the lock the popped stash brought in. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
 
-Launches reserve 810 MB for the parent and two subagents, waiting for free memory without a timeout bypass. The child retains the claim. `run:board` shows the wait; `lane:stats` lists it as `lane:launch` under held-by.
+Launches reserve 470 MB, one lane's share of the measured claude RSS peak (its subagents run inside it), waiting for free memory without a timeout bypass. The child retains the claim. `run:board` shows the wait; `lane:stats` lists it as `lane:launch` under held-by.
 
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
