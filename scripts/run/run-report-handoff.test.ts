@@ -13,6 +13,7 @@ const THRESHOLD = 135_000
 const COST = 200_000
 const LABELS = report_labels.JAPANESE_LABELS
 const BUDGET_ONLY = 'backlogrun --max 5'
+const POOL_LINE = '- **残っていること**: 残りの auto-ok プール\n'
 
 const CARRY: RunCarry = {
 	invocation: 'backlogrun #11 #12 #13 #14 --only',
@@ -79,8 +80,21 @@ describe('run_report_handoff.build_handoff at the edges', () => {
 		const carry: RunCarry = { ...CARRY, invocation: BUDGET_ONLY, done: [11] }
 		const handoff = run_report_handoff.build_handoff(input_of({ carry, events: [] }))
 
-		expect(handoff.body).toContain('- **残っていること**: 残りの auto-ok プール\n')
+		expect(handoff.body).toContain(POOL_LINE)
 		expect(handoff.resume).toBe(BUDGET_ONLY)
+	})
+
+	// joshuafolkken/kit#6839: the roots `run:add` gave a pool run are what is left, not the pool.
+	it('lists the roots run:add gave a budget-only invocation', () => {
+		const added = [{ issue: 21, is_priority: false }]
+		const carry: RunCarry = { ...CARRY, invocation: BUDGET_ONLY, done: [], added }
+		const { body } = run_report_handoff.build_handoff(input_of({ carry, events: [] }))
+
+		expect(body).toContain('- **残っていること**: #21 (1)\n')
+		expect(
+			run_report_handoff.build_handoff(input_of({ carry: { ...carry, done: [21] }, events: [] }))
+				.body,
+		).toContain(POOL_LINE)
 	})
 
 	it('quotes the verdict where an unmeasurable session has no cost', () => {
