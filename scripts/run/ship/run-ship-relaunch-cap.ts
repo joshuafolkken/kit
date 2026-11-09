@@ -7,6 +7,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_stalled, type ParkStop } from '#scripts/run/park/run-stalled'
 import { run_ship_stage } from './run-ship-stage'
+import { run_ship_stop_cause } from './run-ship-stop-cause'
 import { run_ship_stop_text } from './run-ship-stop-text'
 
 // How many times a stopped ship relaunches its lane child before the issue goes to a person. A child
@@ -31,6 +32,8 @@ import { run_ship_stop_text } from './run-ship-stop-text'
 const MAX_SHIP_STOP_RELAUNCHES = 4
 const PARK_CAUSE = 'ship-stop cap'
 const TIMEOUT_PARK_CAUSE = 'merge-wait timeout'
+const CI_INFRA_PARK_CAUSE = 'CI infrastructure failure'
+const { CI_INFRA } = run_ship_stop_cause.CAUSE
 const { CHILD_LAUNCH, PARK, SHIP_STOP } = run_event_stream.EVENT_KIND
 const STOP_KIND = { REVIEW: 'review', MECHANICAL: 'mechanical' } as const
 const REVIEW_REASONS: ReadonlySet<string> = new Set([
@@ -46,8 +49,16 @@ function kind_of(reason: string | undefined): StopKind {
 		: STOP_KIND.MECHANICAL
 }
 
+// A CI-infrastructure stop spends no relaunch: it parks at once, and its resume is a re-run once CI
+// recovers, which must not find the cap spent (joshuafolkken/kit#6848).
+function is_capped_stop(text: string): boolean {
+	return run_ship_stop_text.cause_of(text) !== CI_INFRA
+}
+
 function is_stop_of(event: RunEvent, kind: StopKind): boolean {
-	return event.kind === SHIP_STOP && kind_of(run_ship_stop_text.reason_of(event.text)) === kind
+	if (event.kind !== SHIP_STOP || !is_capped_stop(event.text)) return false
+
+	return kind_of(run_ship_stop_text.reason_of(event.text)) === kind
 }
 
 function stops_since_dispatch(
@@ -152,12 +163,37 @@ async function park_timed_out(issue: string, parked: ParkedStop): Promise<boolea
 	)
 }
 
+// A followup whose CI-infrastructure reruns ran out parks at once: a relaunch meets the same outage, and
+// a re-run once CI recovers resumes it (joshuafolkken/kit#6848).
+async function park_ci_infra(issue: string, parked: ParkedStop): Promise<boolean> {
+	const { reason } = parked
+
+	return await park_with(
+		issue,
+		{
+			lead: `Parked by the \`josh ship\` supervisor: CI infrastructure failures outlasted every rerun at \`${reason}\`, which a relaunch of the lane child does not clear, so none was started. Resume it once CI recovers.`,
+			cause: CI_INFRA_PARK_CAUSE,
+			title: CI_INFRA_PARK_CAUSE,
+			body: `CI infrastructure failures outlasted every rerun at ${reason}, so the lane child was not relaunched and the issue is parked until CI recovers.`,
+		},
+		parked,
+	)
+}
+
+// The park of a stop that parks at once (`run-ship-stop-cause.ts` → `parks_at_once`), by its cause.
+async function park_at_once(issue: string, parked: ParkedStop): Promise<boolean> {
+	if (parked.stop.cause === CI_INFRA) return await park_ci_infra(issue, parked)
+
+	return await park_timed_out(issue, parked)
+}
+
 const run_ship_relaunch_cap = {
 	MAX_SHIP_STOP_RELAUNCHES,
 	STOP_KIND,
 	is_over,
 	kind_of,
 	park,
+	park_at_once,
 	park_timed_out,
 	stops_since_dispatch,
 }
