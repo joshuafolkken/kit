@@ -262,15 +262,24 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh stop
 
 <!-- usage: hook:ledger -->
 
-Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule.
+Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule; list, demote or restore rules that mostly refuse allowed work.
 
 ```bash
-pnpm josh hook:ledger --period 7   # a 7-day period's refusals per rule
+pnpm josh hook:ledger --period 7                    # a 7-day period's refusals per rule
+pnpm josh hook:ledger --period 7 --demote           # rules to demote from blocking to notice
+pnpm josh hook:ledger --period 7 --demote --apply   # record them in .josh/hook-demoted.json
+pnpm josh hook:ledger --restore batching            # make a demoted rule block again
 ```
 
 <!-- /usage -->
 
 Reads the hook ledger, `<git common dir>/josh/hook-ledger/<date>.jsonl`. The ledger keeps no tool-use id, so `passed later` matches a refused call by its tool and command head. It counts a later call in the same transcript that came back without `is_error`. `interrupts` prints `unknown` when the Issue listing cannot be read.
+
+`--demote` lists a rule with at least 10 refusals over the period, half or more of them passing later.
+`--apply` adds those rules to the tracked `.josh/hook-demoted.json`; `--restore <rule>` takes one back out.
+
+The PreToolUse guard returns a demoted rule's refusal as an `additionalContext` notice under a header saying the call ran,
+and lets the call run; the ledger still records the refusal. A rule not demoted still blocks.
 
 ### `josh session:lang`
 
