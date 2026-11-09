@@ -1007,7 +1007,7 @@ A record the unit marked done lets the `stop` end the run; an unmarked record, a
 
 The supervisor claims the record for the session it wakes; the session acts and ends its turn; its `Stop` hook writes the cut that hands the loop back.
 
-A pass launches every free lane it seats side by side. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
+A pass launches every free lane it seats side by side. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash. The driver parks the refused issue with `run:stalled` (park event `launch <outcome>`) before it hands back `launch #N`; `run:add <N> --retry` offers it again.
 
 A measurement declaration with no sample yet waits, not a lane (`sample condition not met`).
 

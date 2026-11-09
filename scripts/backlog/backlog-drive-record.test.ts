@@ -1,5 +1,6 @@
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_added } from '#scripts/run/carry/run-carry-added'
+import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_arrival_added } from './backlog-arrival-added'
@@ -9,6 +10,7 @@ import { backlog_drive_record } from './backlog-drive-record'
 
 const make_directory = temporary_directory()
 const SINCE_MS = Date.parse('2026-11-08T14:04:18Z')
+const ISSUE = '6878'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -68,5 +70,20 @@ describe('backlog_drive_record.record_ports — raised_since', () => {
 
 		await expect(backlog_drive_record.record_ports().raised_since(SINCE_MS)).resolves.toBe(true)
 		expect(raised).toHaveBeenCalledWith(SINCE_MS)
+	})
+})
+
+// joshuafolkken/kit#6878: a refused launch is parked `run:stalled`, its cause the launch's answer.
+describe('backlog_drive_record.record_ports — stall', () => {
+	it('parks the issue run:stalled under the launch outcome with the retry as next step', async () => {
+		const apply = vi.spyOn(run_stalled_park, 'apply').mockResolvedValue(true)
+
+		await backlog_drive_record.record_ports().stall(ISSUE, 'unopened')
+
+		expect(apply).toHaveBeenCalledWith(
+			ISSUE,
+			expect.stringContaining(`pnpm josh run:add ${ISSUE} --retry`),
+			'launch unopened',
+		)
 	})
 })
