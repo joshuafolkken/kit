@@ -133,9 +133,9 @@ Below the header: the `📈 throughput` section, `24h` in hourly cells and `7d` 
 
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the icon a row leads with is what it waits on. An epic's children stay gathered under the epic.
 
-A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped; a probe that does not answer leaves it running. A single frame that finds an idle lane waits out the window and reads again. A lane this run's record ended (`lane:close`) is stopped too.
+A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped; an unanswered probe leaves it running. A single frame that finds an idle lane waits out the window and reads again. A lane this run's record ended (`lane:close`) is stopped too.
 
-A stopped row's times freeze at its stop — the record's end, else its first idle read or its transcript's last write, if earlier — and its tail reads `stopped by <command>` where one is recorded. A child labelled stopped whose transcript reads running stays running: `ship stopped by <command>`.
+A stopped row's times freeze at its stop — the record's end, else its first idle read or transcript's last write, if earlier — and its tail reads `stopped by <command>` if recorded. A child labelled stopped whose transcript reads running stays running: `ship stopped by <command>`.
 
 A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 
