@@ -51,9 +51,9 @@ Procedure: [`.claude/skills/workflow-commands/issue-comments.md`](../.claude/ski
 
 ## Run states
 
-| Board icon | Meaning                                                                                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 🔏         | An OPEN Issue carrying `needs-human-merge`: its workflow PR awaits a person's merge. The waiting row names the PR number; the terminal and chat board use the same icon. |
+| Board icon | Meaning                                                                                                                                                                |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔏         | An OPEN Issue carrying `needs-human-merge` awaits a human merge. The row ends `→ merge PR #<P>`, `→ find its PR for #<N>` when no open PR pairs, or nothing if unread. |
 
 A run starts from the Issue's state. Keyword entry points: [Run Issues](./how-to/run-issues.md#going-up-the-ladder-a-stage-at-a-time).
 

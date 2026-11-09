@@ -3,6 +3,7 @@ import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_pr_rest } from '#scripts/gh/git-gh-pr-rest'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, NEEDS_HUMAN_MERGE_LABEL } from '#scripts/issue/issue-labels'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan, Overlay, RowReason } from './run-board-layout'
@@ -38,14 +39,31 @@ async function read_prs(plan: BoardPlan): Promise<ReadonlyMap<number, number>> {
 	return new Map(pairs)
 }
 
-function reason_of(child: EpicChild, plan: BoardPlan): RowReason | undefined {
-	if (child.state !== 'OPEN' || !is_waiting(plan, child.number)) return undefined
-	const pr = plan.human_merge_prs?.get(child.number)
+// The tail says what the person does next: merge the PR, or find it when the read listing pairs
+// none with the issue. The pairing reads only the first `closes #N`, so the find tail claims no
+// absence. An unread listing says nothing either way, so it adds no tail.
+function pr_reason(issue: number, prs: BoardPlan['human_merge_prs']): RowReason {
+	const icon = run_board_labels.WAIT_ICONS.human_merge
+	if (prs === undefined) return { icon, value: undefined }
+	const pr = prs.get(issue)
+
+	if (pr === undefined) {
+		const tail = `→ find its PR for ${issue_cite.plain_for('terminal', issue)}`
+
+		return { icon, value: undefined, tail }
+	}
 
 	return {
-		icon: run_board_labels.WAIT_ICONS.human_merge,
-		value: pr === undefined ? undefined : `PR ${String(pr)}`,
+		icon,
+		value: `PR ${String(pr)}`,
+		tail: `→ merge PR ${issue_cite.plain_for('terminal', pr)}`,
 	}
+}
+
+function reason_of(child: EpicChild, plan: BoardPlan): RowReason | undefined {
+	if (child.state !== 'OPEN' || !is_waiting(plan, child.number)) return undefined
+
+	return pr_reason(child.number, plan.human_merge_prs)
 }
 
 async function with_prs(plan: BoardPlan | undefined): Promise<BoardPlan | undefined> {
