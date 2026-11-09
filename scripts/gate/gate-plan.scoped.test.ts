@@ -1,5 +1,5 @@
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_plan } from './gate-plan'
 
 const { MEASURED_CORES } = gate_plan
@@ -31,5 +31,30 @@ describe('gate_plan.scoped_unit_weight — the cores a narrowed related run rese
 		const workers = MIN_WORKERS + 1
 
 		expect(weight_of(gate_plan.FILES_PER_WORKER * workers)).toBe(workers + MAIN_PROCESS_CORES)
+	})
+})
+
+// joshuafolkken/kit#6682: a claim left to its defaults divides by the lanes the machine has live.
+describe('gate_plan unit weights — the live lanes read by default', () => {
+	const LANES = 3
+
+	beforeEach(() => {
+		vi.spyOn(unit_worker_share, 'live_lane_count').mockReturnValue(LANES)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('sizes a direct run by the live lanes', () => {
+		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBe(
+			gate_plan.direct_unit_weight(MEASURED_CORES, 0, LANES),
+		)
+	})
+
+	it('sizes a scoped run by the live lanes', () => {
+		expect(gate_plan.scoped_unit_weight(SUITE_FILES, MEASURED_CORES, 0)).toBe(
+			gate_plan.scoped_unit_weight(SUITE_FILES, MEASURED_CORES, 0, LANES),
+		)
 	})
 })

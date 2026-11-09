@@ -76,6 +76,16 @@ describe('vitest_config_workers.config_workers', () => {
 		expect(workers(lanes)).toBe(3)
 	})
 
+	it('reads the live lanes when no count is passed', () => {
+		const lanes = 3
+
+		vi.spyOn(unit_run_marker, 'live_lane_count').mockReturnValue(lanes)
+
+		expect(vitest_config_workers.config_workers(MEASURED_CORES, probe.directory)).toBe(
+			workers(lanes),
+		)
+	})
+
 	// The `josh` guard sizes a nested run itself; a second answer here would make two deciders.
 	it('leaves a josh-driven run to the flag josh passed', () => {
 		record_other_run()
