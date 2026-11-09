@@ -3,14 +3,16 @@ import { git_gh_helpers } from '#scripts/gh/git-gh-helpers'
 import { is_required_match, type MissingContexts } from '#scripts/gh/git-pr-checks-missing'
 import { poll } from '#scripts/lib/poll'
 import { z } from 'zod'
-import { followup_job_rerun } from './followup-job-rerun'
+import { followup_job_rerun, MAX_CHECK_RERUNS } from './followup-job-rerun'
 
 // **A required job a partial rerun dropped from its run's latest attempt** (joshuafolkken/kit#5778)
 // leaves no failed job for `rerun-failed-jobs` to retry, so the wait's `MissingContextError` is
 // answered by rerunning the whole run that lost it — the run whose `filter=all` jobs hold the context
 // and whose `filter=latest` jobs do not. A context no job of the head's runs ever had (an outside
-// app's check) is not ours to recover, and a run with a failed latest job is not rerun, or a test the
-// change broke could be retried into a merge.
+// app's check) is not ours to recover, unless a run failed before GitHub created every job
+// (joshuafolkken/kit#6922): that run is rerun whole, up to `MAX_CHECK_RERUNS` reruns. A cancelled run
+// is not: the concurrency group cancels a superseded run before it creates any job. A run with a
+// failed latest job is not rerun, or a test the change broke could be retried into a merge.
 
 const PAGE = 'per_page=100'
 const FAILED_CONCLUSIONS: ReadonlySet<string> = new Set(['failure', 'cancelled', 'timed_out'])
@@ -22,13 +24,19 @@ const LATEST_INTERVAL_MS = 15_000
 
 const job_schema = z.looseObject({ name: z.string(), conclusion: z.string().nullish() })
 const jobs_page_schema = z.looseObject({ jobs: z.array(job_schema) })
-const run_schema = z.looseObject({ id: z.number() })
+const run_schema = z.looseObject({
+	id: z.number(),
+	status: z.string(),
+	conclusion: z.string().nullish(),
+	run_attempt: z.number(),
+})
 const runs_page_schema = z.looseObject({ workflow_runs: z.array(run_schema) })
 
 type Job = z.infer<typeof job_schema>
 
 interface RunJobs {
 	run_id: number
+	run: z.infer<typeof run_schema>
 	all: Array<Job>
 	latest: Array<Job>
 }
@@ -49,10 +57,11 @@ async function read_run_jobs(head_sha: string): Promise<Array<RunJobs>> {
 	const { workflow_runs } = await followup_job_rerun.read_actions(rest, runs_page_schema)
 
 	return await Promise.all(
-		workflow_runs.map(async ({ id }) => ({
-			run_id: id,
-			all: await read_jobs(id, 'all'),
-			latest: await read_jobs(id, 'latest'),
+		workflow_runs.map(async (run) => ({
+			run_id: run.id,
+			run,
+			all: await read_jobs(run.id, 'all'),
+			latest: await read_jobs(run.id, 'latest'),
 		})),
 	)
 }
@@ -65,10 +74,21 @@ function holds_every(jobs: ReadonlyArray<Job>, contexts: ReadonlyArray<string>):
 	return contexts.every((context) => holds(jobs, context))
 }
 
+function has_failed_job(run: RunJobs): boolean {
+	return run.latest.some((job) => FAILED_CONCLUSIONS.has(job.conclusion ?? ''))
+}
+
 function is_rerun_target(run: RunJobs, lost: ReadonlyArray<string>): boolean {
-	if (run.latest.some((job) => FAILED_CONCLUSIONS.has(job.conclusion ?? ''))) return false
+	if (has_failed_job(run)) return false
 
 	return lost.some((context) => holds(run.all, context) && !holds(run.latest, context))
+}
+
+// A run GitHub failed with no failed job, before it created the jobs that carry the contexts.
+function is_truncated(run: RunJobs): boolean {
+	if (run.run.status !== 'completed' || run.run.run_attempt > MAX_CHECK_RERUNS) return false
+
+	return run.run.conclusion === 'failure' && !has_failed_job(run)
 }
 
 async function await_latest_jobs(
@@ -117,10 +137,22 @@ async function rerun_whole(
 	await await_latest_jobs(runs, lost)
 }
 
+async function rerun_truncated(
+	runs: ReadonlyArray<RunJobs>,
+	contexts: ReadonlyArray<string>,
+): Promise<MissingOutcome> {
+	const targets = runs.filter((run) => is_truncated(run))
+	if (targets.length === 0) return 'none'
+
+	await rerun_whole(targets, contexts)
+
+	return 'rerun'
+}
+
 async function recover(missing: MissingContexts): Promise<MissingOutcome> {
 	const runs = await read_run_jobs(missing.head_sha)
 	const lost = missing.contexts.filter((context) => runs.some((run) => holds(run.all, context)))
-	if (lost.length === 0) return 'none'
+	if (lost.length === 0) return await rerun_truncated(runs, missing.contexts)
 	const latest = runs.flatMap((run) => run.latest)
 	if (holds_every(latest, lost)) return 'present'
 	const targets = runs.filter((run) => is_rerun_target(run, lost))
