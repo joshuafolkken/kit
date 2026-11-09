@@ -98,6 +98,7 @@ describe('cost_audit_format.report_lines — the phase table', () => {
 		)
 		const phase = lines.indexOf('  implement: read: $2.5000 — 0 / 0 / 0 / 0')
 
+		expect(lines.filter((line) => line.endsWith('; per model in dollars)'))).toHaveLength(2)
 		expect(lines[phase + 1]).toBe(
 			'    claude-opus-4-6: $2.5000 — $0.5000 / $1.0000 / $0.2500 / $0.7500',
 		)
