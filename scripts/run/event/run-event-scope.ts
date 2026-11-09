@@ -107,7 +107,7 @@ const ISSUE_REFERENCE = /#(\d+)/u
 function is_foreign_ship_event(event: RunEvent, issue: string): boolean {
 	return (
 		SHIP_POSITION_KINDS.has(event.kind) &&
-		!event.text.startsWith(`${issue_cite.plain_for('terminal', issue)} `)
+		!event.text.startsWith(`${issue_cite.plain_for('program', issue)} `)
 	)
 }
 

@@ -40,7 +40,7 @@ function boundary(
 }
 
 function marker(point: HistoricalEvidence, issue: number): RunEvent | undefined {
-	const text = issue_cite.plain_for('terminal', issue)
+	const text = issue_cite.plain_for('program', issue)
 	if (point.kind === 'plan') return { pos: 0, at: point.at, kind: 'plan', text: `${text} plan` }
 
 	if (point.kind === 'ship-review') {

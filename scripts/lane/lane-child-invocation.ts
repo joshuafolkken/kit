@@ -25,7 +25,7 @@ const SHIP_PROCESS = String.raw`(josh(\.[jt]s)? ship|run-ship-cli\.ts)`
 function child_invocation(issue: string): string {
 	issue_number_shape.require_issue_number(issue)
 
-	return `${CHILD_INVOCATION} ${issue_cite.plain_for('terminal', issue)}`
+	return `${CHILD_INVOCATION} ${issue_cite.plain_for('program', issue)}`
 }
 
 // The `pgrep -f` pattern that finds a running child: the invocation is always the last argument of
@@ -44,24 +44,24 @@ function child_invocation(issue: string): string {
 function process_pattern(issue: string): string {
 	issue_number_shape.require_issue_number(issue)
 
-	return `(${CHILD_INVOCATION}|${REVIEW_INVOCATION}|${SHIP_PROCESS} .*) ${issue_cite.plain_for('terminal', issue)}$`
+	return `(${CHILD_INVOCATION}|${REVIEW_INVOCATION}|${SHIP_PROCESS} .*) ${issue_cite.plain_for('program', issue)}$`
 }
 
 // The `pgrep -f` pattern that finds the detached ship supervisor of `issue` alone.
 function ship_pattern(issue: string): string {
 	issue_number_shape.require_issue_number(issue)
 
-	return `${SHIP_PROCESS} .* ${issue_cite.plain_for('terminal', issue)}$`
+	return `${SHIP_PROCESS} .* ${issue_cite.plain_for('program', issue)}$`
 }
 
 function review_invocation(issue: string): string {
 	issue_number_shape.require_issue_number(issue)
 
-	return `${REVIEW_INVOCATION} ${issue_cite.plain_for('terminal', issue)}`
+	return `${REVIEW_INVOCATION} ${issue_cite.plain_for('program', issue)}`
 }
 
 function resume_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue ${issue_cite.plain_for('terminal', issue)} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:entry ${issue}\` once before anything else; it checks the carried cut and completes the entry on \`fresh\`. Follow its resume verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Continue this`
+	const preamble = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Run \`pnpm josh run:entry ${issue}\` once before anything else; it checks the carried cut and completes the entry on \`fresh\`. Follow its resume verdict in ${RESUME_GUIDE}: \`resume\` goes to the gate, \`resume-impl\` continues implementation. Continue this`
 
 	return `${preamble} ${child_invocation(issue)}`
 }
@@ -76,7 +76,7 @@ function resume_invocation(issue: string): string {
 // `process_pattern` against the command line, so the trailing
 // `fullrun #<N>` keeps the relaunched process matching, and it is the ordinary run the child carries on.
 function outage_resume_invocation(issue: string): string {
-	const preamble = `Resuming the lane child for issue ${issue_cite.plain_for('terminal', issue)} after an API disconnection — your session was restored with its full context, so do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Continue the run from where it stopped: run \`pnpm josh run:step ${issue}\` to find the next action, redoing only the last step if it did not complete.`
+	const preamble = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} after an API disconnection — your session was restored with its full context, so do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md). Continue the run from where it stopped: run \`pnpm josh run:step ${issue}\` to find the next action, redoing only the last step if it did not complete.`
 
 	return `${preamble} ${child_invocation(issue)}`
 }
@@ -115,7 +115,7 @@ function known_stop_lines(
 }
 
 function ship_stop_invocation(issue: string, stop?: ShipStop): string {
-	const opening = `Resuming the lane child for issue ${issue_cite.plain_for('terminal', issue)} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
+	const opening = `Resuming the lane child for issue ${issue_cite.plain_for('program', issue)} after its detached ship supervisor stopped at a failed stage — do not re-read the workflow-commands entry documents (SKILL.md, fullrun.md).`
 	const closing = `Do not re-plan or re-implement what is already on the branch. ${child_invocation(issue)}`
 	const middle =
 		stop === undefined

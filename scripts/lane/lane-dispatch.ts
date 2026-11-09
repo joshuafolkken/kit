@@ -344,7 +344,7 @@ async function record_started(issue: string, start: DispatchStart): Promise<void
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CHILD_LAUNCH,
-		`${issue_cite.plain_for('terminal', issue)} dispatched`,
+		`${issue_cite.plain_for('program', issue)} dispatched`,
 		now,
 	)
 	await lane_ledger_write.record_dispatch(Number(issue))
@@ -482,7 +482,7 @@ function is_worth_warning(outcome: DispatchOutcome): boolean {
 // own failures to standard error and never throws, so this cannot turn a refusal into an exception.
 async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise<void> {
 	await telegram_notify.warn({
-		issue_title: `lane child dispatch ${issue_cite.plain_for('terminal', issue)}`,
+		issue_title: `lane child dispatch ${issue_cite.plain_for('telegram', issue)}`,
 		body: describe(outcome, issue),
 		recovery: WARNING_RECOVERY,
 	})
