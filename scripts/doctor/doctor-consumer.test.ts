@@ -1,7 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { doctor } from './doctor'
 import { doctor_consumer } from './doctor-consumer'
@@ -16,13 +16,6 @@ const TARGET_MISSING = 'target-missing'
 
 function temporary_project(): string {
 	return make_directory('doctor-consumer-')
-}
-
-function write_file(root: string, relative: string, content: string): void {
-	const file_path = path.join(root, relative)
-
-	mkdirSync(path.dirname(file_path), { recursive: true })
-	writeFileSync(file_path, content)
 }
 
 describe('doctor.parse_options', () => {

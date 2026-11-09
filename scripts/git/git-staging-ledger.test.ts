@@ -1,9 +1,9 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {
 	observation_ledger,
 	OBSERVATION_LEDGER_DIRECTORY,
 } from '#scripts/observations/observation-ledger'
+import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { git_command } from './git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
@@ -29,24 +29,21 @@ const state: { fixture: FixtureWorkspace } = {
 	fixture: { workspace: '', previous_cwd: '', restore_environment: undefined },
 }
 
-function write_file(relative_path: string, body: string): void {
-	const target = path.join(state.fixture.workspace, relative_path)
-
-	mkdirSync(path.dirname(target), { recursive: true })
-	writeFileSync(target, body, 'utf8')
-}
-
 async function build_repository(): Promise<void> {
 	await git(state.fixture.workspace, ['init', git_fixture_workspace.MAIN_BRANCH])
-	write_file(OTHER_FILE, 'first\n')
-	write_file(OBSERVATION_LEDGER_PATH, LEDGER_FIRST_LINE)
+	write_file(state.fixture.workspace, OTHER_FILE, 'first\n')
+	write_file(state.fixture.workspace, OBSERVATION_LEDGER_PATH, LEDGER_FIRST_LINE)
 	await git(state.fixture.workspace, ['add', '-A'])
 	await git(state.fixture.workspace, ['commit', '-m', 'initial'])
 }
 
 function modify_both_files(): void {
-	write_file(OTHER_FILE, 'second\n')
-	write_file(OBSERVATION_LEDGER_PATH, `${LEDGER_FIRST_LINE}${LEDGER_SECOND_LINE}`)
+	write_file(state.fixture.workspace, OTHER_FILE, 'second\n')
+	write_file(
+		state.fixture.workspace,
+		OBSERVATION_LEDGER_PATH,
+		`${LEDGER_FIRST_LINE}${LEDGER_SECOND_LINE}`,
+	)
 }
 
 // git orders `--name-only` by path bytes of its own accord, so the expectations below are written in

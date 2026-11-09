@@ -33,8 +33,8 @@ silence clock; the interval and its overrides are the person's (`docs/josh-comma
 
 ### What a report says
 
-**Every unscheduled progress statement is answered by `pnpm josh run:progress --once`** — under
-`backlogrun`, `pnpm josh run:board --chat` in one code block — the reply to an explicit ask and
+**Every unscheduled progress statement is answered by `pnpm josh run:board --chat`** in one code
+block — a `backlogrun`, a `fullrun` or a `halfrun` alike — the reply to an explicit ask and
 the note just after a run starts alike; each is exempt from the interval and records the report
 itself, so no `--mark` beside it. **Relay its lines verbatim** — round, rephrase
 or re-label nothing, and **never write a clock time the command did not print**; where a field is

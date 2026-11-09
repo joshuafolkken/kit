@@ -3,12 +3,14 @@ import type { Transport } from '#scripts/gh/git-gh-transport'
 import { figure_format } from '#scripts/lib/figure-format'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_machine } from './run-board-machine'
+import { run_board_render_quota_cell, type Cell } from './run-board-render-quota-cell'
 
 // The `⛽ usage` section's github row (joshuafolkken/kit#6559, joshuafolkken/kit#6822): GitHub's REST
-// core allowance and its GraphQL one, each with its own limit and reset, as two gauges on one row —
-// `rest  4% ■──┊── 213/5000 ↻10:55 · ▶graphql  1% ┊──── 48/5000 ↻11:02`. ▶ marks the transport the
-// session reads through. ▶ (U+25B6) is kept although some terminals draw it two columns wide: the board's
-// ↻, ┊ and ■ are ambiguous-width already, so a `>` fallback would mend one symbol of four.
+// core allowance and its GraphQL one, each with its own limit and reset, as two gauges on one row in
+// the usage rows' columns, each with what is left — `rest   4% ■──┊── 4787     10:55  ▶graphql   1%
+// ┊──── 4952     11:02` (joshuafolkken/kit#6828). ▶ marks the transport the session reads through.
+// ▶ (U+25B6) is kept although some terminals draw it two columns wide: the board's ↻, ┊ and ■ are
+// ambiguous-width already, so a `>` fallback would mend one symbol of four.
 
 const { minute_of } = figure_format
 const WINDOW_MINUTES = 60
@@ -25,14 +27,12 @@ interface GithubRateLimit extends RateLimitResources {
 	transport?: Transport | undefined
 }
 
-// The percent and the bar with ┊ at `pace`, as the usage rows draw them.
-type Gauge = (used_percent: number, pace: number) => string
-
-// One allowance as drawn: the percent spent, ┊, `used/limit` and the reset.
+// One allowance as drawn: the percent spent, ┊, what is left, `used/limit` and the reset time.
 interface Allowance {
 	label: string
 	used_percent: number
 	pace: number
+	left: number
 	spent: string
 	reset: string
 }
@@ -46,8 +46,8 @@ function pace_of(reset_ms: number, now_ms: number): number {
 	return Math.min(1, Math.max(0, 1 - (reset_ms - now_ms) / WINDOW_MS))
 }
 
-// A reading whose reset has passed has spent none and has no reset: the next window starts at the next
-// call (joshuafolkken/kit#6621).
+// A reading whose reset has passed has spent none, has all of its limit left and has no reset: the next
+// window starts at the next call (joshuafolkken/kit#6621).
 function allowance_of(label: string, rate_limit: CoreRateLimit, now_ms: number): Allowance {
 	const { limit, remaining, reset_ms } = rate_limit
 	const is_open = reset_ms > now_ms
@@ -57,8 +57,9 @@ function allowance_of(label: string, rate_limit: CoreRateLimit, now_ms: number):
 		label,
 		used_percent: (used / limit) * PERCENT,
 		pace: is_open ? pace_of(reset_ms, now_ms) : 0,
+		left: limit - used,
 		spent: `${String(used)}/${String(limit)}`,
-		reset: is_open ? `${RESET_MARK}${minute_of(reset_ms)}` : '',
+		reset: is_open ? minute_of(reset_ms) : '',
 	}
 }
 
@@ -76,20 +77,27 @@ function joined(parts: ReadonlyArray<string>): string {
 	return parts.filter((part) => part !== '').join(' ')
 }
 
-// `rest  4% ■──┊── 213/5000 ↻10:55 · ▶graphql …`: the row after the github name.
-function row_text(github: GithubRateLimit, now_ms: number, gauge: Gauge): string {
-	return allowances_of(github, now_ms)
-		.map(({ label, used_percent, pace, spent, reset }) =>
-			joined([label, gauge(used_percent, pace), spent, reset]),
-		)
-		.join(SEPARATOR)
+function cell_of({ label, used_percent, pace, left, reset }: Allowance): Cell {
+	return { label, used_percent, pace, count: String(left), reset }
+}
+
+// `rest   4% ■──┊── 4787     10:55  ▶graphql …`: the row after the github name.
+function row_text(github: GithubRateLimit, now_ms: number): string {
+	const allowances = allowances_of(github, now_ms)
+
+	return run_board_render_quota_cell.row_text(allowances.map((allowance) => cell_of(allowance)))
 }
 
 // `rest 4% 213/5000 ↻10:55 · ▶graphql 1% 48/5000 ↻11:02`: the folded line's github part.
 function summary_text(github: GithubRateLimit, now_ms: number): string {
 	return allowances_of(github, now_ms)
 		.map(({ label, used_percent, spent, reset }) =>
-			joined([label, run_board_machine.percent_text(used_percent).trimStart(), spent, reset]),
+			joined([
+				label,
+				run_board_machine.percent_text(used_percent).trimStart(),
+				spent,
+				reset === '' ? '' : `${RESET_MARK}${reset}`,
+			]),
 		)
 		.join(SEPARATOR)
 }

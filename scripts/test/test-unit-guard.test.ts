@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { LANE_SEAT_KEY, PORT_SEED_KEY } from '#ports'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { fake_result } from '#tools/test/execa-result'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -30,8 +31,6 @@ beforeEach(() => {
 	mocked_recording.mockImplementation(async (_root, _arguments, run) => await run(RECORDING))
 })
 
-type ExecaResult = Awaited<ReturnType<typeof execa>>
-
 const UNIT_TEST_BASENAME = 'sample.test.ts'
 const PACKAGE_JSON = 'package.json'
 const COVERAGE_FLAG = '--coverage'
@@ -41,10 +40,6 @@ const OUTER_SEAT = '3'
 const SPAWN_OPTIONS_POSITION = 2
 const FREE_CORES = 3
 const CALLER_WORKERS = '--maxWorkers=4'
-
-function fake_result(exit_code: number | undefined): ExecaResult {
-	return { exitCode: exit_code } as unknown as ExecaResult
-}
 
 function is_record(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null

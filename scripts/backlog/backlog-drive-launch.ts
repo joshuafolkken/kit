@@ -51,6 +51,22 @@ async function launch_ready(issue: string): Promise<LaunchOutcome> {
 	}
 }
 
+// A refusal's stage keeps the failing step's own explanation after the issue, folded onto the event's
+// one line and capped, since the board draws the newest stage whole as its header; the
+// `no child launched` prefix the board ends the stage on is unchanged.
+const DETAIL_LIMIT = 200
+
+function no_child(issue: string, detail: string | undefined): string {
+	const event = run_event_setup.no_child(issue)
+
+	if (detail === undefined) return event
+
+	const folded = detail.replaceAll(/\s+/gu, ' ')
+	const capped = folded.length > DETAIL_LIMIT ? `${folded.slice(0, DETAIL_LIMIT)}…` : folded
+
+	return `${event}: ${capped}`
+}
+
 // An issue its measurement declaration closed takes no lane (`backlog-measure-close.ts`).
 async function launch(issue: string, owner: string): Promise<DriveLaunch> {
 	await backlog_drive_owner.assert_current(owner)
@@ -61,7 +77,7 @@ async function launch(issue: string, owner: string): Promise<DriveLaunch> {
 
 	// A refusal the driver waits out writes nothing else, so the lane's stage is ended here.
 	if (outcome.kind !== 'launched' && outcome.kind !== 'waiting') {
-		await run_event_setup.emit(run_event_setup.no_child(issue))
+		await run_event_setup.emit(no_child(issue, outcome.detail))
 	}
 
 	return outcome.kind

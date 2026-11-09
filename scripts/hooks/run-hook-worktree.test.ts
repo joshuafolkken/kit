@@ -1,11 +1,12 @@
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { claude_plugin_config } from '#scripts/init/claude-plugin-config'
 import { hook_command_bootstrap } from '#scripts/init/hook-command-bootstrap-fixture'
 import { hook_launch } from '#scripts/init/hook-launch'
 import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 const make_directory = temporary_directory()
@@ -19,13 +20,6 @@ const INSTALLED_BUNDLE = 'dist/hooks/demo-hook.js'
 
 const workspace = { root: '' }
 
-function write_file(relative_path: string, content: string): void {
-	const file_path = path.join(workspace.root, relative_path)
-
-	mkdirSync(path.dirname(file_path), { recursive: true })
-	writeFileSync(file_path, content)
-}
-
 // The launcher with a stub where it hands the hook over: the gate in kit's checkout, the bundle in an
 // installed package.
 function create_package(package_root: string, hand_over: string): void {
@@ -33,7 +27,7 @@ function create_package(package_root: string, hand_over: string): void {
 
 	mkdirSync(path.dirname(launcher_path), { recursive: true })
 	copyFileSync(RUN_HOOK_SOURCE, launcher_path)
-	write_file(path.join(package_root, hand_over), CWD_STUB)
+	write_file(workspace.root, path.join(package_root, hand_over), CWD_STUB)
 }
 
 // Launched as Claude Code launches a hook inside one of its worktrees: from where the session stands,
@@ -100,7 +94,11 @@ describe('a hook launched inside a Claude Code worktree', () => {
 
 	it.each(LAUNCHES)('runs in an installed package from %s', (_case, launch_directory, expected) => {
 		create_package(claude_plugin_config.MARKETPLACE_PATH, INSTALLED_BUNDLE)
-		write_file(path.join(claude_plugin_config.MARKETPLACE_PATH, 'package.json'), '{}\n')
+		write_file(
+			workspace.root,
+			path.join(claude_plugin_config.MARKETPLACE_PATH, 'package.json'),
+			'{}\n',
+		)
 
 		expect(
 			hook_directory(hook_command_bootstrap.consumer_command(KIT_COMMAND), launch_directory),
