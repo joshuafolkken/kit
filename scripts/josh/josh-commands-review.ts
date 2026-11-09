@@ -109,6 +109,27 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'review:pair': {
+		script: 'scripts/review/review-pair-cli.ts',
+		description:
+			'Record a paired comparison under JOSH_REVIEWER_PAIRED=1: the Opus and Sonnet round-1 findings with severity and each agent cost; never gates',
+		category: 'AI tools',
+		reference: ['--issue <N> --opus-agent <id> --sonnet-agent <id>', 'automation', ['files']],
+		usage: {
+			examples: [
+				{
+					arguments: '--issue 6902 --opus-agent a1b2 --sonnet-agent c3d4',
+					note: 'after both round-1 reviewers return, before review:record',
+				},
+			],
+			flags: [
+				{
+					names: ['--opus-agent <id>', '--sonnet-agent <id>'],
+					description: "each reviewer's agentId, whose transcript prices its cost.",
+				},
+			],
+		},
+	},
 	// The self-check's "Prose matches the code" as a search: each word the diff removed that prose still names.
 	'prose:stale': {
 		script: 'scripts/review/prose-stale-cli.ts',
