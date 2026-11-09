@@ -1,7 +1,7 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { PLATFORM_TEMP_ROOT } from './platform-temporary'
 import { stamp_file } from './stamp-file'
 
@@ -23,11 +23,8 @@ const SECOND_ACCOUNT = 502
 const REPLACED_TEXT = 'mine\n'
 const STREAM_NAME = 'stream.jsonl'
 
-const scratch = mkdtempSync(path.join(tmpdir(), TEST_PREFIX))
-
-afterAll(() => {
-	rmSync(scratch, { recursive: true, force: true })
-})
+const make_directory = temporary_directory('suite')
+const scratch = make_directory(TEST_PREFIX)
 
 describe('stamp_file.stamp_path', () => {
 	// One checkout's record must not answer another's question, and both commands have to arrive at
@@ -169,7 +166,7 @@ describe('stamp_file.create_stamp', () => {
 // published by a rename, so the old one stays readable until the new one replaces it whole.
 describe('stamp_file.replace_text_stamp', () => {
 	it('replaces the text and leaves no temporary file beside it', () => {
-		const directory = mkdtempSync(path.join(scratch, 'replace-'))
+		const directory = make_directory(`${TEST_PREFIX}replace-`)
 		const target = path.join(directory, STREAM_NAME)
 
 		stamp_file.replace_text_stamp(target, 'first\n')

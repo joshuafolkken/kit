@@ -1,17 +1,16 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { epic_graph } from '#scripts/epic/epic-graph'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_state } from '#scripts/lane/lane-state'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_gate_scope, type PoolContext } from './backlog-gate-scope'
 
 // joshuafolkken/kit#4864: a candidate waits on the files a running lane plans to edit as it waits on its
 // body's. joshuafolkken/kit#5107: an issue that yielded its lane is named, so the offer puts it first.
 
-const ROOT = mkdtempSync(path.join(tmpdir(), 'backlog-gate-scope-'))
+const make_directory = temporary_directory('suite')
+const ROOT = make_directory('backlog-gate-scope-')
 const REPO = 'joshuafolkken/kit'
 const RUNNING = 4858
 const YIELDED = 5083
@@ -41,10 +40,6 @@ beforeEach(() => {
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(ROOT)
 	vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
 	lane_plan.record({ issue: RUNNING, paths: [PLANNED_FILE], planned_at: PLANNED_AT }, process.cwd())
-})
-
-afterAll(() => {
-	rmSync(ROOT, { recursive: true, force: true })
 })
 
 describe('backlog_gate_scope.gate_scope', () => {

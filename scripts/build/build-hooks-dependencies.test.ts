@@ -1,9 +1,9 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { json_value } from '#scripts/lib/json-value'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { build_hooks, INLINED_PACKAGES } from './build-hooks'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
 
@@ -14,7 +14,7 @@ const DEPENDENCY_SEGMENT = 'node_modules/'
 // bundles tenfold, so it stays a runtime import.
 const EXTERNAL_PACKAGE = 'typescript'
 
-const out_directory = mkdtempSync(path.join(tmpdir(), 'build-hooks-deps-'))
+const out_directory = temporary_directory('suite')('build-hooks-deps-')
 
 function built_code(): string {
 	const outputs = readdirSync(out_directory).filter((name) => name.endsWith('.js'))
@@ -38,10 +38,6 @@ function recorded_inputs(): Array<string> {
 beforeAll(async () => {
 	await build_hooks(out_directory)
 }, BUILD_TIMEOUT_MS)
-
-afterAll(() => {
-	rmSync(out_directory, { recursive: true, force: true })
-})
 
 // joshuafolkken/kit#5641: loading these from node_modules file by file was most of the pretool
 // bundle's import time on every tool call.

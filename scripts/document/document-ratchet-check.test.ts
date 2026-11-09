@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { command_reference_line_budget } from './command-reference-line-budget'
 import { document_ratchet_check } from './document-ratchet-check'
@@ -16,7 +16,8 @@ const CITING_PAGE = 'docs/josh-commands-run.md'
 const UNRELATED_FILE = 'scripts/unrelated.ts'
 
 // One scratch root, emptied after every case.
-const root = mkdtempSync(path.join(tmpdir(), 'document-ratchet-check-'))
+const make_directory = temporary_directory('suite')
+const root = make_directory('document-ratchet-check-')
 
 function write(relative_path: string, text: string): string {
 	const absolute_path = path.join(root, relative_path)

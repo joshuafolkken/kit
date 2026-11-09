@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_evidence_exit } from './issue-evidence-exit'
 
 // joshuafolkken/kit#4475: the shape `issue:already-done` and `issue:measured` share — the evidence
@@ -19,7 +19,8 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({ run_hold_cli: { run: release 
 const ISSUE = '4475'
 const FLAG = '--evidence-file'
 const COMMAND = 'issue:example'
-const work = mkdtempSync(path.join(tmpdir(), 'issue-evidence-exit-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-evidence-exit-')
 const EVIDENCE_FILE = path.join(work, 'evidence.md')
 
 writeFileSync(EVIDENCE_FILE, '  evidence\n')
@@ -50,10 +51,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_evidence_exit.run', () => {

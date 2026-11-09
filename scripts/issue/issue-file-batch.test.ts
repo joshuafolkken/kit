@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
@@ -8,6 +7,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_batch } from './issue-file-batch'
 import { issue_file_cap } from './issue-file-cap'
@@ -45,7 +45,8 @@ interface CreateRequest {
 	title: string
 }
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-batch-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-batch-')
 
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 const info = vi.spyOn(console, 'info')
@@ -62,7 +63,7 @@ vi.spyOn(issue_file_cap, 'is_cap_clear').mockResolvedValue(true)
 
 // A batch directory holding one body file per `[title, body]` pair, named in order.
 function batch_of(name: string, bodies: ReadonlyArray<readonly [string, string]>): string {
-	const directory = mkdtempSync(path.join(work, `${name}-`))
+	const directory = make_directory(`issue-file-batch-${name}-`)
 
 	for (const [index, [title, body]] of bodies.entries()) {
 		writeFileSync(path.join(directory, `${String(index)}.md`), `---\ntitle: ${title}\n---\n${body}`)
@@ -108,7 +109,6 @@ afterEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_file_batch.run — several body files in one call', () => {

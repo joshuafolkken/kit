@@ -1,7 +1,7 @@
-import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_branch_rules } from './git-gh-branch-rules'
-import { git_gh_exec } from './git-gh-exec'
 import { git_gh_poll_read } from './git-gh-poll-read'
+import { git_gh_pr_graphql_snapshot } from './git-gh-pr-graphql-snapshot'
 import { git_gh_pr_graphql_state } from './git-gh-pr-graphql-state'
 import { read_listed_pull, read_pull, require_pr_number } from './git-gh-pr-read'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
@@ -9,8 +9,10 @@ import { git_gh_pr_review } from './git-gh-pr-review'
 import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 import { to_gh_state } from './git-gh-rest-state'
 
-// The merge gate's pull request state snapshot, rebuilt from REST — GraphQL only for the merge state
-// of a pull request whose REST detail GitHub refuses as too large or answers 304 (`resolve_pull`).
+// The merge gate's pull request state snapshot. A session whose transport allows GraphQL reads it in
+// one query (`git-gh-pr-graphql-snapshot.ts`, joshuafolkken/kit#6786); otherwise, or where that query
+// does not answer, it is rebuilt from REST — GraphQL only for the merge state of a pull request whose
+// REST detail GitHub refuses as too large or answers 304 (`resolve_pull`).
 //
 // `gh pr view --json mergeStateStatus,reviewDecision,statusCheckRollup` is answered 403 in a cloud
 // session, and all three fields are GraphQL-only: one has no REST
@@ -22,15 +24,6 @@ import { to_gh_state } from './git-gh-rest-state'
 // `git-pr-checks-parse.ts`, `git-pr-checks-eval.ts`, `git-pr-followup.ts` — changes.
 
 const NO_HEAD_SHA_MESSAGE = 'gh api answered a pull request with no head commit'
-
-// The reviews endpoint answers a bare array, whose pages `gh` merges into one array on its own —
-// slurping it would produce `[[…],[…]]`, which the listing schema then rejects.
-async function read_array_pages(path: string): Promise<string> {
-	return await git_gh_exec.exec_gh_api({
-		path: `${path}${FULL_PAGE_QUERY}`,
-		should_paginate: true,
-	})
-}
 
 function read_head_sha(pull: RestPull): string {
 	const sha = pull.head?.sha
@@ -53,10 +46,16 @@ async function read_status_check_rollup(commit_sha: string): Promise<Array<objec
 
 // The review history, folded into GraphQL's `reviewDecision`. One request, and the only one of the
 // four the merge gate does not need on every poll — see `is_review_decision_decisive`.
-async function pr_get_review_decision(pr_number: number): Promise<string> {
+async function read_rest_review_decision(pr_number: number): Promise<string> {
 	const path = git_gh_api_path.pull_reviews_api_path(String(pr_number))
 
-	return git_gh_pr_review.to_review_decision(await read_array_pages(path))
+	return git_gh_pr_review.to_review_decision(await git_gh_poll_read.read_array_pages(path))
+}
+
+async function pr_get_review_decision(pr_number: number): Promise<string> {
+	const graphql_decision = await git_gh_pr_graphql_snapshot.read_review_decision(pr_number)
+
+	return graphql_decision ?? (await read_rest_review_decision(pr_number))
 }
 
 // `mergeStateStatus` is upper-cased because that is the spelling `gh` uses and the spelling
@@ -143,6 +142,12 @@ interface PrChecksSnapshot {
 }
 
 async function pr_get_checks_snapshot(branch_name: string): Promise<PrChecksSnapshot> {
+	const graphql = await git_gh_pr_graphql_snapshot.read_snapshot(branch_name)
+
+	if (graphql !== undefined) {
+		return { pr_number: graphql.pr_number, snapshot_json: JSON.stringify(graphql.fields) }
+	}
+
 	const { pr_number, pull } = await resolve_pull(branch_name)
 
 	return { pr_number, snapshot_json: JSON.stringify(await build_checks_fields(pull)) }
@@ -157,6 +162,15 @@ async function pr_get_checks_snapshot(branch_name: string): Promise<PrChecksSnap
 // three-field value `gh pr view --json …` answered with is still one thing, and it is asserted here
 // rather than reassembled inside a test.
 async function pr_get_state_snapshot(branch_name: string): Promise<string> {
+	const graphql = await git_gh_pr_graphql_snapshot.read_snapshot(branch_name)
+
+	if (graphql !== undefined) {
+		const review_decision =
+			graphql.review_decision ?? (await read_rest_review_decision(graphql.pr_number))
+
+		return JSON.stringify({ ...graphql.fields, reviewDecision: review_decision })
+	}
+
 	const { pr_number, pull } = await resolve_pull(branch_name)
 	const [fields, review_decision] = await Promise.all([
 		build_checks_fields(pull),

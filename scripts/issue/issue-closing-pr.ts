@@ -86,13 +86,15 @@ function pick_closing_pr(
 
 async function read_result(issue: string, state: 'open' | 'merged'): Promise<ClosingRead> {
 	try {
+		// The canonical name, not the remote as typed: the timeline names the repository GitHub's way
+		// (joshuafolkken/kit#6752).
 		const [raw, repo] = await Promise.all([
 			git_gh_exec.exec_gh_api({
 				path: `${git_gh_api_path.issue_api_path(issue)}/timeline?per_page=100`,
 				should_paginate: true,
 				jq_filter: TIMELINE_FILTER,
 			}),
-			git_gh_repo.repo_get_name_with_owner(),
+			git_gh_repo.repo_get_canonical_name_with_owner(),
 		])
 
 		if (repo === undefined) return { kind: 'unreadable' }

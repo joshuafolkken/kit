@@ -1,7 +1,9 @@
 import path from 'node:path'
+import { agent_provider, type AgentEnvironment } from '#scripts/agent/agent-provider'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -80,7 +82,42 @@ function can_cut_sync(issue: string): boolean {
 	return !run_cut_decline.is_declined_sync(issue) && run_cut_ready.is_ready_sync()
 }
 
-function current_state(): LaneCostState {
+function is_named(value: string | undefined): boolean {
+	return value !== undefined && value !== ''
+}
+
+// A relaunched Claude hook names its transcript even when no session id is exported. An exported id
+// (a unit prices its parent's session) and an OpenAI thread id already identify the session;
+// conflicting providers remain unmeasurable.
+function environment_for(transcript: string, source: AgentEnvironment): AgentEnvironment {
+	if (
+		agent_provider.resolve_provider(source).kind === 'rejected' ||
+		is_named(source[agent_provider.CODEX_SESSION_KEY]) ||
+		is_named(source[agent_session_environment.SESSION_ID_KEY])
+	) {
+		return source
+	}
+
+	return {
+		...source,
+		[agent_session_environment.SESSION_ID_KEY]: path.basename(transcript, '.jsonl'),
+	}
+}
+
+// The verdict of the hook's own transcript, cached per transcript so a resumed session never reads
+// the verdict its predecessor left.
+function session_verdict(
+	transcript: string,
+	directory: string = process.cwd(),
+	source: AgentEnvironment = process.env,
+): CostVerdict {
+	return implementation_cut_verdict.reused_verdict(
+		() => cost_cli.session_verdict(directory, environment_for(transcript, source)),
+		transcript,
+	)
+}
+
+function current_state(transcript?: string): LaneCostState {
 	return {
 		directory: process.cwd(),
 		source: process.env,
@@ -90,7 +127,9 @@ function current_state(): LaneCostState {
 		// threshold crossing rather than once per run, so this predicate is a candidate on every edit;
 		// the window collapses one turn's burst of edits to a single whole-transcript price.
 		verdict: (): CostVerdict =>
-			implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict()),
+			transcript === undefined
+				? implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict())
+				: session_verdict(transcript),
 		can_cut: can_cut_sync,
 	}
 }
@@ -232,6 +271,25 @@ function decide(
 	return !is_reissued_refusal(run.now_ms, delivered_at_ms)
 }
 
+// Delivery has the calling transcript; candidate selection has only the tool call.
+function decide_for_session(
+	call: GuardedCall,
+	run: GuardRun,
+	can_record: boolean,
+	delivered_at_ms: number,
+): boolean {
+	return (
+		decide(call, run, can_record, delivered_at_ms) &&
+		is_over_threshold_edit(call, current_state(run.transcript))
+	)
+}
+
+// The candidate half, priced on nothing: an edit an uncut run could be refused for. Outside a run no
+// edit is a candidate, so the row claims nothing another rule delivers.
+function is_refusable_edit(call: GuardedCall, state: LaneCostState = current_state()): boolean {
+	return is_edit_tool(call.name) && refusable_issue(call, state) !== undefined
+}
+
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing
 // in a run that can cut. It declares no `keeps`: the trigger is a budget threshold the child cannot
 // observe, so no run takes `run:cut --impl` before crossing it unaided, and the row is reported
@@ -239,9 +297,9 @@ function decide(
 // `keeps` predicate is reported as unmeasured").
 const ROW = {
 	id: 'implementation-cut',
-	is_trigger: is_over_threshold_edit,
+	is_trigger: is_refusable_edit,
 	reason: IMPLEMENTATION_CUT_REASON,
-	decide,
+	decide: decide_for_session,
 	// The opening the reason carried before it was cut to the action and the next command.
 	former_reasons: [
 		'⛔ implementation-phase cut: this checkout is a lane dispatched',
@@ -266,6 +324,7 @@ const implementation_cut = {
 	is_over_threshold_edit,
 	is_reissued_refusal,
 	resumes_a_cut,
+	session_verdict,
 	takes_the_impl_cut,
 	uncut_run_issue,
 }

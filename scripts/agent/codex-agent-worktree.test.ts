@@ -1,14 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it } from 'vitest'
 import { agent_role_profile } from './agent-role-profile'
 import { codex_agent_argv } from './codex-agent-argv'
 
 const is_cli_available =
 	process.platform === 'darwin' && spawnSync('codex', ['--version']).status === 0
-const ROOTS: Array<string> = []
+const make_directory = temporary_directory()
 const PROBE = String.raw`
 const {execFileSync} = require('node:child_process');
 const fs = require('node:fs');
@@ -34,19 +33,14 @@ const nested = execFileSync('codex', ['sandbox', '-P', ':workspace', '--',
 process.stdout.write(JSON.stringify({removed:!fs.existsSync(detached), rss:Number(rss), nested}));
 `
 
-afterEach(() => {
-	for (const root of ROOTS.splice(0)) rmSync(root, { force: true, recursive: true })
-})
-
 function git(cwd: string, args: ReadonlyArray<string>): string {
 	return execFileSync('git', [...args], { cwd, encoding: 'utf8', stdio: 'pipe' }).trim()
 }
 
 function worktree(): string {
-	const root = mkdtempSync(path.join(tmpdir(), 'codex-worktree-'))
+	const root = make_directory('codex-worktree-')
 	const lane = path.join(root, 'lane with spaces')
 
-	ROOTS.push(root)
 	git(root, ['init', '--quiet'])
 	git(root, [
 		'-c',

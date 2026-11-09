@@ -13,7 +13,12 @@ const SECOND = '2'
 const THIRD = '3'
 const REPORT_END = 'report and end'
 const REPORT_STOP = 'report and stop'
-const NO_WINDOW = { poll_ms: POLL_MS, offer_ms: OFFER_MS, window_ms: undefined }
+const NO_WINDOW = {
+	poll_ms: POLL_MS,
+	offer_ms: OFFER_MS,
+	idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+	window_ms: undefined,
+}
 const FREE_LANES = 6
 
 interface World {
@@ -87,13 +92,18 @@ function ports(world_state: World): LoopPorts {
 		judgement_owed: async () => 0,
 		memory_held: async () => false,
 		usage_limited: async () => false,
+		yields: async () => [],
+		park: async () => undefined,
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,
+		retrospective: async () => true,
 		now: () => new Date(world_state.clock),
 		sleep: async (milliseconds) => {
 			world_state.clock += milliseconds
 		},
+		added_since: async () => false,
+		named_left: async () => false,
 		on_state: () => undefined,
 		finish: async (end) => {
 			world_state.calls.push(end.is_finish === true ? REPORT_END : REPORT_STOP)

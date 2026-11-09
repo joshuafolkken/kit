@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { delegation_policy } from './delegation-policy'
@@ -24,7 +24,8 @@ import { investigation_reads } from './investigation-reads'
 // all, that it happens once per accumulation, and that a delegation re-arms it — the three properties
 // that make the threshold fire more than once in a run.
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigation-guard-'))
+const make_directory = temporary_directory('suite')
+const WORK_DIRECTORY = make_directory('investigation-guard-')
 // The directory vitest was launched from, restored in teardown. `should_block` now reads the live
 // process.cwd() and `JOSH_LANE_CHILD` to decide whether the session is a dispatched lane child
 // (joshuafolkken/kit#2138), so the lane case chdirs into a lane checkout and this puts it back.
@@ -135,8 +136,6 @@ afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(refusal_path(transcript), { force: true })
 	}
-
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 describe('investigation_refusal — the threshold, and its second firing', () => {

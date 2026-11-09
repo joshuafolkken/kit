@@ -1,11 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_closing_pr } from './issue-closing-pr'
 import { issue_file_cap } from './issue-file-cap'
@@ -25,7 +25,8 @@ const CITED = 4442
 const CLOSING = 4448
 const FAILURE_EXIT_CODE = 1
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-source-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-cli-source-')
 const body_path = path.join(work, 'conditioned.md')
 
 const origin_path = path.join(work, 'origin.md')
@@ -95,7 +96,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_file_cli.run — a measurement follow-up with no start condition', () => {

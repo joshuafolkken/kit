@@ -23,6 +23,9 @@ const STAGE = {
 	// The supervisor started that session, which is now acting on the driver's answer. It is detached, so
 	// its end is the supervisor's next hand-off, which replaces this.
 	SESSION: 'judgment session running',
+	// The driver read a drain owing the retrospective and is waiting on the retrospective unit it
+	// started (joshuafolkken/kit#6745). The unit's end is the driver's next stage, which replaces this.
+	RETROSPECTIVE: 'retrospective',
 	// The driver's launch of a lane returned without a child: no lane was free to open, or a step after
 	// the open failed. Written through `no_child`, naming its issue, so it ends that lane's stage alone
 	// while the pass's other launches run on (joshuafolkken/kit#5519).

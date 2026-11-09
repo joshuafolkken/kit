@@ -9,8 +9,7 @@ const josh_run_mock = vi.hoisted(() =>
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 
-const SPLIT_REFUSAL = 'split notice unresolved: file a split child'
-const ISSUE_NUMBER = 5630
+const SPLIT_WARNING = 'size warning: split notice unanswered'
 
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
@@ -43,7 +42,7 @@ beforeEach(() => {
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
-	vi.spyOn(split_resolution, 'ledger_refusal').mockResolvedValue(undefined)
+	vi.spyOn(split_resolution, 'ledger_warning').mockResolvedValue(undefined)
 	info_lines.length = 0
 	error_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
@@ -112,17 +111,22 @@ describe('run_chain_cli.run — main:merge', () => {
 		)
 	})
 
-	it('holds after main:merge on an unanswered split notice, before the review stages', async () => {
-		vi.mocked(split_resolution.ledger_refusal).mockResolvedValue(SPLIT_REFUSAL)
+	it('goes on past main:merge to the review stages on an unanswered split notice', async () => {
+		vi.mocked(split_resolution.ledger_warning).mockResolvedValue(SPLIT_WARNING)
+
+		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(0)
+
+		expect(ran()).toStrictEqual(MAIN_LINE)
+		expect(error_lines.join('\n')).not.toContain('stopped at main:merge')
+	})
+
+	it('still stops on a red quality stage when a split notice stands', async () => {
+		vi.mocked(split_resolution.ledger_warning).mockResolvedValue(SPLIT_WARNING)
+		stop_at(CHECK_RELATED)
 
 		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(1)
 
-		expect(split_resolution.ledger_refusal).toHaveBeenCalledWith(ISSUE_NUMBER)
-		expect(ran()).toStrictEqual([[MAIN_MERGE]])
-		expect(error_lines.join('\n')).toContain(`stopped at main:merge (${SPLIT_REFUSAL})`)
-		expect(error_lines.join('\n')).toContain(
-			'stop implementation, file the rest as a split child, issue `pnpm josh run:cut 5630` alone again, then rerun `pnpm josh run:chain 5630 --from review:selfcheck`',
-		)
+		expect(ran()).toStrictEqual([[MAIN_MERGE], [SELFCHECK], [CHECK_RELATED]])
 	})
 })
 

@@ -87,6 +87,9 @@ function unit_environment(source: EnvironmentSource): Record<string, string> {
 		CODEX_THREAD_ID: '',
 		JOSH_AGENT_PROVIDER: '',
 		JOSH_AGENT_ROLE: '',
+		// `auto` would probe GitHub and keep its answer in the repository's shared cache, which the
+		// developer's own sessions read; a test that exercises `auto` sets it and isolates that cache.
+		JOSH_GH_TRANSPORT: 'graphql',
 		JOSH_SHIP_SUPERVISED: '',
 	}
 }

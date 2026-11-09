@@ -30,6 +30,19 @@ describe('issue_cite.plain', () => {
 	})
 })
 
+// joshuafolkken/kit#6807: the reason a bare `#N` is right is declared at the call, not in a central list.
+describe('issue_cite.plain_for', () => {
+	it('prints the bare number, qualified when a repository is named', () => {
+		expect(issue_cite.plain_for('github', Number(NUMBER))).toBe(`#${NUMBER}`)
+		expect(issue_cite.plain_for('program', NUMBER, OTHER_REPO)).toBe(`${OTHER_REPO}#${NUMBER}`)
+	})
+
+	it('does not compile without a reason', () => {
+		// @ts-expect-error -- a call that does not say why its text stays plain is refused
+		expect(issue_cite.plain_for(Number(NUMBER))).toBeDefined()
+	})
+})
+
 // joshuafolkken/kit#2943: the progress listings name an issue through this, so the form a report copies
 // is decided by what the listing holds, never left as the bare `#N` the Stop guard sends back.
 describe('issue_cite.citer', () => {

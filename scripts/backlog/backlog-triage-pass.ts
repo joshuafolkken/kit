@@ -37,7 +37,7 @@ async function next_action(plan: TriageSnapshot): Promise<string> {
 		'Answer existing decisions from the body and comments; keep questions needing a person or measurement parked. Use backlog:triage --decide for the three solo conditions, then --apply with the reason and any --blocked-by / --clear. Repeat --pass, excluding decisions left parked in this pass.',
 	)
 	console.error(
-		'For Tier A answers, use epic --decide to record the decision and clear needs-decision; for recovered failures, use run:add --retry. Record dependencies with backlog:triage --apply --blocked-by; leave questions needing a person or measurement parked and exclude them from this pass.',
+		'For a park whose recommendation you take, use backlog:triage --apply <N> --adopt <k> --reason <text>: it records the decision, clears the park and requeues in one call. For other Tier A answers, use epic --decide to record the decision and clear needs-decision; for recovered failures, use run:add --retry. Record dependencies with backlog:triage --apply --blocked-by; leave questions needing a person or measurement parked and exclude them from this pass.',
 	)
 
 	return `pnpm josh issue:read ${numbers.join(' ')}`

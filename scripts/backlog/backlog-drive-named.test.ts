@@ -1,16 +1,15 @@
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_carry_added } from '#scripts/run/carry/run-carry-added'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { expect, test, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_named } from './backlog-drive-named'
 
 const ACTIVE = '2026-09-24T00:00:00.000Z'
+const make_directory = temporary_directory()
 const CARRY = {
 	invocation: 'backlogrun #1 #2 --only',
 	started_at: ACTIVE,
@@ -102,7 +101,7 @@ test('stops after all named issues when only mode is declared', () => {
 test.each(['merged', 'withdrawn', 'human-review'] as const)(
 	'records a named %s child under the separate supervisor PID',
 	async (outcome) => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-named-'))
+		const directory = make_directory('josh-drive-named-')
 		const target = run_carry.carry_path(directory)
 		const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
 		const supervisor = spawn('sleep', ['30'])
@@ -117,14 +116,13 @@ test.each(['merged', 'withdrawn', 'human-review'] as const)(
 		expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1] } })
 		supervisor.kill()
 		read_directory.mockRestore()
-		rmSync(directory, { recursive: true, force: true })
 	},
 )
 
 test.each([run_event_stream.EVENT_KIND.MERGE, run_event_stream.EVENT_KIND.HUMAN_REVIEW])(
 	'recovers a named %s from the event stream after an interrupted handoff',
 	async (kind) => {
-		const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-reconcile-'))
+		const directory = make_directory('josh-drive-reconcile-')
 		const target = run_carry.carry_path(directory)
 		const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
 		const carry = run_carry.begin_carry(target, CARRY.invocation, run_carry.owner_of(process.pid))
@@ -134,7 +132,6 @@ test.each([run_event_stream.EVENT_KIND.MERGE, run_event_stream.EVENT_KIND.HUMAN_
 		await backlog_drive_named.reconcile(carry, events, String(process.pid))
 		expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1] } })
 		read_directory.mockRestore()
-		rmSync(directory, { recursive: true, force: true })
 	},
 )
 
@@ -151,7 +148,7 @@ const FAILED_RESULTS: ReadonlyArray<[string, MergeResult, ReadonlyArray<number>]
 ]
 
 test.each(FAILED_RESULTS)('marks %s after a failed first issue', async (_label, result, done) => {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-failed-'))
+	const directory = make_directory('josh-drive-failed-')
 	const target = run_carry.carry_path(directory)
 	const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
 
@@ -161,11 +158,10 @@ test.each(FAILED_RESULTS)('marks %s after a failed first issue', async (_label, 
 
 	expect(read.kind === 'carried' ? (read.carry.done ?? []) : undefined).toStrictEqual(done)
 	read_directory.mockRestore()
-	rmSync(directory, { recursive: true, force: true })
 })
 
 async function done_after_failure(failed: string, is_priority: boolean): Promise<unknown> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-added-'))
+	const directory = make_directory('josh-drive-added-')
 	const target = run_carry.carry_path(directory)
 	const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
 	const carry = run_carry.begin_carry(target, CARRY.invocation, run_carry.owner_of(process.pid))
@@ -179,7 +175,6 @@ async function done_after_failure(failed: string, is_priority: boolean): Promise
 	const read = run_carry.read_carry(target)
 
 	read_directory.mockRestore()
-	rmSync(directory, { recursive: true, force: true })
 
 	return read.kind === 'carried' ? read.carry.done : undefined
 }

@@ -2,7 +2,9 @@ import { epic_issue, type EpicIssue } from '#scripts/epic/epic-issue'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { josh_command } from '#scripts/josh/josh-run'
+import { run_add } from '#scripts/run/add/run-add'
 import { run_add_issue } from '#scripts/run/add/run-add-issue'
+import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { backlog_drive_restore } from './backlog-drive-restore'
 
@@ -22,12 +24,30 @@ function is_ready(issue: EpicIssue, cause: number, repo: string): boolean {
 	)
 }
 
+// A child still carrying a protected label stays parked: `run:add` would refuse it, so the park is
+// restated with the closed blocker as a note, which the board appends to the child's row (on the 🙋
+// row after the decision question for `needs-decision`, `run-board-decision.ts`).
+async function park_protected(issue: number, cause: number, label: string): Promise<void> {
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.PARK,
+		`${issue_cite.plain(issue)} parked (${label}; blocker ${issue_cite.plain(cause)} closed)`,
+	)
+}
+
 async function retry_one(issue: number, cause: number, repo: string): Promise<void> {
 	const read = await run_add_issue.read(issue)
 	const citation = issue_cite.reference(repo, String(issue), undefined)
 
 	if (read === undefined) throw new Error(`Could not read all dependencies of ${citation}.`)
 	if (!is_ready(read, cause, repo)) return
+
+	const label = run_add.protected_label(epic_issue.label_names(read))
+
+	if (label !== undefined) {
+		await park_protected(issue, cause, label)
+
+		return
+	}
 
 	const result = await josh_command.josh_run(['run:add', String(issue), '--retry'], true)
 

@@ -84,6 +84,18 @@ describe('git_gh_etag_read.read — the previous ETag', () => {
 	})
 })
 
+// joshuafolkken/kit#6754: a lookup inside a hook's own timeout bounds its request.
+describe('git_gh_etag_read.read — the timeout', () => {
+	it("passes the caller's timeout to the conditional request", async () => {
+		const timeout_ms = 5000
+
+		answer_with({ kind: 'changed', etag: ETAG, body: BODY })
+		await git_gh_etag_read.read(PATH, timeout_ms)
+
+		expect(git_gh_conditional.read_conditional).toHaveBeenCalledWith(PATH, undefined, timeout_ms)
+	})
+})
+
 describe('git_gh_etag_read.read — a failure', () => {
 	// The classified issue reads tell a missing number from a gap by the failure's own status.
 	it("throws gh's own failure", async () => {

@@ -36,6 +36,7 @@ describe('run_handoff_args.parse', () => {
 	})
 
 	it.each([
+		{ argv: ['retrospective', BRIEF_FLAG, BRIEF], why: 'a brief file on retrospective' },
 		{ argv: [], why: 'no keyword' },
 		{ argv: ['deploy', BRIEF_FLAG, BRIEF], why: 'an unknown keyword' },
 		{ argv: ['halfrun', '#3'], why: 'no brief flag' },
@@ -44,5 +45,21 @@ describe('run_handoff_args.parse', () => {
 		{ argv: ['fullrun', BRIEF_FLAG, 'a', BRIEF_FLAG, 'b'], why: 'a repeated brief flag' },
 	])('refuses $why', ({ argv }) => {
 		expect(run_handoff_args.parse(argv)).toMatchObject({ kind: 'refused' })
+	})
+})
+
+// joshuafolkken/kit#6743: the retrospective unit's brief is generated, so it takes no brief file.
+describe('run_handoff_args.parse retrospective', () => {
+	it('reads retrospective alone, with no brief file to read', () => {
+		expect(run_handoff_args.parse(['retrospective'])).toEqual({
+			kind: 'workflow',
+			keyword: 'retrospective',
+			line: 'retrospective',
+			brief_file: undefined,
+		})
+	})
+
+	it('keeps retrospective out of the keywords a person types', () => {
+		expect(run_handoff_args.KEYWORDS).not.toContain(run_handoff_args.RETROSPECTIVE_KEYWORD)
 	})
 })

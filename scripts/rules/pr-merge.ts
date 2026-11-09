@@ -12,7 +12,7 @@ import { shell_segments } from './shell-segments'
 // `Bash(gh api *pulls/*/merge*)` miss `curl -X PUT …/pulls/5/merge`, a GraphQL body read from a file
 // (`gh api graphql -F query=@merge.graphql`), and `enablePullRequestAutoMerge`, which merges once
 // the checks pass. A body kept in a file or computed by the shell cannot be read here, so such a
-// GraphQL call is refused whatever it holds — kit's own GitHub calls are REST (`gh-rest.md`).
+// GraphQL call is refused whatever it holds — kit's own GraphQL calls are reads (`gh-rest.md`).
 //
 // **It fires on every occurrence**, for the reason `git-force.ts` does.
 

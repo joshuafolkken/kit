@@ -23,6 +23,10 @@ import {
 const api_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+// The permission lookup goes through the ETag layer (joshuafolkken/kit#6754); here it reaches the mock.
+vi.mock('#scripts/gh/git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (api_path: string) => await api_mock({ path: api_path }) },
+}))
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_summary: vi.fn(), issue_list_by_label: vi.fn() },
 }))

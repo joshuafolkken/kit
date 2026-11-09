@@ -72,7 +72,8 @@ function waits_outside(issue: OpenIssueData, running: ReadonlySet<string>, repo:
 }
 
 // An issue whose author lacks write access waits on a person too: only they can vouch for its body.
-// So does one declared over the size cap: only a person splits it (joshuafolkken/kit#5502).
+// So does one declared over the size cap with no declared reason: only a person splits it or declares
+// it one deliverable (joshuafolkken/kit#5502, joshuafolkken/kit#6602).
 function is_stuck(
 	issue: OpenIssueData,
 	running: ReadonlySet<string>,

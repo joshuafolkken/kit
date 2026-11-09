@@ -1,13 +1,14 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { describe, expect, it, vi } from 'vitest'
 import { hook_ledger } from './hook-ledger'
 
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 
-const scratch = mkdtempSync(path.join(tmpdir(), 'hook-ledger-test-'))
+const make_directory = temporary_directory('suite')
+const scratch = make_directory('hook-ledger-test-')
 const HOOK = 'pretool-guard'
 const TRANSCRIPT = '/sessions/a.jsonl'
 const COMMAND = 'pnpm josh gate'
@@ -16,10 +17,6 @@ const BASH_PAYLOAD = JSON.stringify({
 	tool_name: 'Bash',
 	tool_input: { command: COMMAND },
 	transcript_path: TRANSCRIPT,
-})
-
-afterAll(() => {
-	rmSync(scratch, { force: true, recursive: true })
 })
 
 function lines_in(directory: string): Array<string> {
