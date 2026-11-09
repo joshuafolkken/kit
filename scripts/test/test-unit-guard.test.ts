@@ -334,6 +334,7 @@ describe('test_unit_guard.run_guarded_unit — the free cores', () => {
 			expect.any(Number),
 			expect.any(Number),
 			{ cores: FREE_CORES, memory_workers: undefined },
+			expect.any(Number),
 		)
 	})
 

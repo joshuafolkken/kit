@@ -24,8 +24,9 @@ function record_other_run(): void {
 	writeFileSync(marker, JSON.stringify(process_identity.own_fields()))
 }
 
-function workers(): number | undefined {
-	return vitest_config_workers.config_workers(MEASURED_CORES, probe.directory)
+// One live lane — this one — so the machine's own lanes do not move the answers below.
+function workers(lanes = 1): number | undefined {
+	return vitest_config_workers.config_workers(MEASURED_CORES, probe.directory, lanes)
 }
 
 const make_directory = temporary_directory()
@@ -66,6 +67,13 @@ describe('vitest_config_workers.config_workers', () => {
 
 	it("leaves vitest's default when no other run is recorded", () => {
 		expect(workers()).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#6682: a direct run beside idle lanes takes only its lane's share.
+	it('takes its lane share when other lanes are live', () => {
+		const lanes = 3
+
+		expect(workers(lanes)).toBe(3)
 	})
 
 	// The `josh` guard sizes a nested run itself; a second answer here would make two deciders.

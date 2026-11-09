@@ -9,7 +9,7 @@ const NARROW_FILES = 69
 const SUITE_FILES = 2080
 
 function weight_of(files: number): number {
-	return gate_plan.scoped_unit_weight(files, MEASURED_CORES, 0)
+	return gate_plan.scoped_unit_weight(files, MEASURED_CORES, 0, 0)
 }
 
 // joshuafolkken/kit#5135: a 69-file `josh test:related` claimed the same width as the whole suite, so
@@ -24,7 +24,7 @@ describe('gate_plan.scoped_unit_weight — the cores a narrowed related run rese
 	})
 
 	it('never claims more than a direct unit run does', () => {
-		expect(weight_of(SUITE_FILES)).toBe(gate_plan.direct_unit_weight(MEASURED_CORES, 0))
+		expect(weight_of(SUITE_FILES)).toBe(gate_plan.direct_unit_weight(MEASURED_CORES, 0, 0))
 	})
 
 	it('opens one worker for each FILES_PER_WORKER files between the bounds', () => {
