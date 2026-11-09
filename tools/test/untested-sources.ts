@@ -44,6 +44,7 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/ci/composite-actions.ts',
 	'tools/claude/skill-meta.ts',
 	'scripts/claude/workflow-destination.ts',
+	'scripts/config-merge/index.ts',
 	'scripts/cost-runtime/transcript-cwd.ts',
 	'scripts/delegation/delegation-cli.ts',
 	'scripts/delegation/fanout-cli.ts',
@@ -96,6 +97,7 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'tools/josh/josh-script-reader.ts',
 	'scripts/josh/process-owner.ts',
 	'scripts/lib/status-icons.ts',
+	'scripts/managed-marker/index.ts',
 	'scripts/overrides/overrides-schemas.ts',
 	'tools/package/production-dependency-graph.ts',
 	'scripts/package/verify-optional-eslint-install.ts',
@@ -126,6 +128,7 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/time-runtime/time-phase-names.ts',
 	'scripts/time-runtime/time-tool-call.ts',
 	'scripts/ui/ui-routes-cli.ts',
+	'scripts/version/index.ts',
 	'scripts/version/upgrade-shell-command.ts',
 	'scripts/version/version-check-arguments.ts',
 ]

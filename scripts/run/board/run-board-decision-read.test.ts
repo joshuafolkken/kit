@@ -1,6 +1,7 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
 import { NEEDS_DECISION_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_read } from '#scripts/issue/issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -43,7 +44,9 @@ function plan_of(children: Array<EpicChild>): BoardPlan {
 	}
 }
 
+// The REST read is under test here; the GraphQL one is `run-board-decision-graphql.test.ts`'s.
 beforeEach(() => {
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
 	vi.spyOn(git_gh_issue_read, 'issue_view_json').mockResolvedValue(
 		JSON.stringify({
 			number: PERSON,

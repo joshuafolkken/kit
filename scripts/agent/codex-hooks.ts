@@ -7,7 +7,8 @@ import { hook_launch } from '#scripts/init/hook-launch'
 //
 // 1. The pretool and posttool handlers run through the Codex input adapter, which translates the
 //    `apply_patch` payload into the Edit/Write shape the Claude-side guards read.
-// 2. The PreToolUse and PostToolUse matchers also select `apply_patch`, Codex's edit tool.
+// 2. The PreToolUse and PostToolUse matchers also select `apply_patch`, Codex's edit tool, and
+//    `exec_command`, its shell, whose writes the posttool revert reads (`bash-revert.ts`).
 // 3. UserPromptSubmit carries no matcher — Codex documents that the event ignores it.
 
 interface HookHandler {
@@ -50,15 +51,11 @@ function codex_handler(handler: HookHandler): HookHandler {
 	return { ...handler, command }
 }
 
-function additional_tools(event: string): string {
-	return event === 'PreToolUse' ? `${CODEX_EDIT_TOOL}|${CODEX_SHELL_TOOLS}` : CODEX_EDIT_TOOL
-}
-
 function codex_matcher(event: string, matcher: string | undefined): string | undefined {
 	if (UNMATCHED_EVENTS.has(event)) return undefined
 
 	if (matcher !== undefined && TOOL_EVENTS.has(event)) {
-		return `${matcher}|${additional_tools(event)}`
+		return `${matcher}|${CODEX_EDIT_TOOL}|${CODEX_SHELL_TOOLS}`
 	}
 
 	return matcher

@@ -5,6 +5,7 @@ import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
+import { run_board_closed_graphql, type ClosedSource } from './run-board-closed-graphql'
 
 // A child the run touched that has left the open listing, read from GitHub one issue at a time. The
 // listing is the board's only other source of a title, so without this read a board opened after its
@@ -73,19 +74,38 @@ function closed_ms_of(view: ClosedView): number | undefined {
 //
 // Sent with the previous ETag (joshuafolkken/kit#6696): a parked or human child stays a candidate after
 // its run ends, so the board asks every two minutes, and an unchanged issue answers `304` for no core.
-async function read_closed(issue: number): Promise<ClosedRead> {
-	const json = await git_gh_issue_read.issue_view_json(
-		String(issue),
-		CLOSED_FIELDS,
-		undefined,
-		git_gh_etag_read.read,
-	)
-	const view = json === undefined ? undefined : parse_json_object_or_undefined(json, closed_schema)
+async function read_view(
+	issue: number,
+	source: ClosedSource | undefined,
+): Promise<ClosedView | undefined> {
+	const json =
+		source?.json ??
+		(await git_gh_issue_read.issue_view_json(
+			String(issue),
+			CLOSED_FIELDS,
+			undefined,
+			git_gh_etag_read.read,
+		))
+
+	return json === undefined ? undefined : parse_json_object_or_undefined(json, closed_schema)
+}
+
+async function read_merged(
+	issue: number,
+	source: ClosedSource | undefined,
+): Promise<boolean | undefined> {
+	return source?.is_merged ?? (await issue_merged.read_merge_state(String(issue)))
+}
+
+// `source` is what GraphQL already answered for the issue (`run-board-closed-graphql.ts`); what it
+// left unanswered — the whole issue, or a timeline past one page — is read through REST.
+async function read_closed(issue: number, source?: ClosedSource): Promise<ClosedRead> {
+	const view = await read_view(issue, source)
 
 	if (view === undefined) return undefined
 	if (view.state !== CLOSED_STATE) return STILL_OPEN
 
-	const is_merged = await issue_merged.read_merge_state(String(issue))
+	const is_merged = await read_merged(issue, source)
 
 	if (is_merged === undefined) return undefined
 
@@ -98,11 +118,12 @@ async function read_closed(issue: number): Promise<ClosedRead> {
 
 async function read_all(
 	issues: ReadonlyArray<number>,
-	read: (issue: number) => Promise<ClosedRead> = read_closed,
+	read: (issue: number, source?: ClosedSource) => Promise<ClosedRead> = read_closed,
 ): Promise<ClosedAnswer> {
+	const sources = await run_board_closed_graphql.read_sources(issues)
 	const answers = await bounded_pool.bounded_map(issues, READ_CONCURRENCY, async (issue) => ({
 		issue,
-		answer: await read(issue),
+		answer: await read(issue, sources.get(issue)),
 	}))
 	const closed = new Map(
 		answers.flatMap(({ issue, answer }) =>

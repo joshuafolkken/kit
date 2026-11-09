@@ -11,6 +11,7 @@ const NOW = Date.parse('2026-10-23T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
 const OUTSIDE_MINUTES = 2 * 24 * 60
 const NO_FILES_ROW = '| files | 0 | 0 |'
+const NO_HUB_ROW = '| hub | 0 | 0 |'
 
 function at(minutes_before: number): string {
 	return new Date(NOW - minutes_before * MS_PER_MINUTE).toISOString()
@@ -63,7 +64,9 @@ describe('lane_split_stats.table', () => {
 			NO_FILES_ROW,
 			'| hunks | 0 | 0 |',
 			'| lines | 0 | 0 |',
+			NO_HUB_ROW,
 			'| diff | 0 | 0 |',
+			'| budget | 0 | 0 |',
 		])
 	})
 })
@@ -76,14 +79,23 @@ describe('lane_split_stats.table by reason', () => {
 			notice(2, 10, 'lines'),
 			notice(2, 8, 'hunks'),
 			notice(3),
+			notice(4, 10, 'budget'),
 		]
 
 		expect(rows_of(entries)).toStrictEqual([
-			'| all | 3 | 1 |',
+			'| all | 4 | 1 |',
 			NO_FILES_ROW,
 			'| hunks | 2 | 1 |',
 			'| lines | 1 | 0 |',
+			NO_HUB_ROW,
 			'| diff | 1 | 0 |',
+			'| budget | 1 | 0 |',
 		])
+	})
+
+	it('counts a lane noticed on a test:related hub under hub', () => {
+		const entries = [notice(1, 10, 'hub'), split(1), notice(2, 10, 'hub')]
+
+		expect(rows_of(entries)[4]).toBe('| hub | 2 | 1 |')
 	})
 })

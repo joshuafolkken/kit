@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { document_byte_budget } from './document-byte-budget'
 import { entry_read_budget } from './entry-read-budget'
@@ -17,6 +17,7 @@ const {
 const { BLOCK_BYTES, block_ceiling } = document_byte_budget
 
 const ROOT = process.cwd()
+const make_directory = temporary_directory()
 
 function sorted(values: ReadonlyArray<string>): Array<string> {
 	return [...values].toSorted((left, right) => left.localeCompare(right))
@@ -26,20 +27,16 @@ describe('consumer resident document', () => {
 	it.each(ENTRY_READ_BUDGET)(
 		'$entry measures kit rules even when a consumer adds resident rules',
 		({ entry }) => {
-			const consumer = mkdtempSync(path.join(os.tmpdir(), 'kit-entry-budget-'))
+			const consumer = make_directory('kit-entry-budget-')
 
-			try {
-				writeFileSync(path.join(consumer, 'CLAUDE.md'), 'consumer rules'.repeat(10_000))
-				writeFileSync(path.join(consumer, 'package.json'), '{}')
-				const skill_directory = path.join(consumer, '.claude', 'skills', 'workflow-commands')
+			writeFileSync(path.join(consumer, 'CLAUDE.md'), 'consumer rules'.repeat(10_000))
+			writeFileSync(path.join(consumer, 'package.json'), '{}')
+			const skill_directory = path.join(consumer, '.claude', 'skills', 'workflow-commands')
 
-				mkdirSync(skill_directory, { recursive: true })
-				writeFileSync(path.join(skill_directory, 'SKILL.md'), 'stale consumer instructions')
-				writeFileSync(path.join(skill_directory, 'fullrun.md'), 'stale fullrun instructions')
-				expect(entry_total_bytes(consumer, entry)).toBe(entry_total_bytes(ROOT, entry))
-			} finally {
-				rmSync(consumer, { recursive: true, force: true })
-			}
+			mkdirSync(skill_directory, { recursive: true })
+			writeFileSync(path.join(skill_directory, 'SKILL.md'), 'stale consumer instructions')
+			writeFileSync(path.join(skill_directory, 'fullrun.md'), 'stale fullrun instructions')
+			expect(entry_total_bytes(consumer, entry)).toBe(entry_total_bytes(ROOT, entry))
 		},
 	)
 })

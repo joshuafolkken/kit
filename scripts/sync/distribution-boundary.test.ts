@@ -21,12 +21,18 @@ const TIME_RUNTIME = 'time-runtime'
 const COST_RUNTIME = 'cost-runtime'
 const RUNTIME_DIRS = [TIME_RUNTIME, COST_RUNTIME]
 
+// Test fixtures are left out of the package (`package.json` → `files`: `!**/*-fixture*.ts`), so they
+// may import the kit-only test helpers.
+function is_distributed(entry: string): boolean {
+	return entry.endsWith('.ts') && !entry.endsWith('.test.ts') && !entry.includes('-fixture')
+}
+
 // The runtime files distributed to consumers, reached through commands, hooks, guards and
 // `josh cost --over`.
 function seed_files(): Array<string> {
 	return RUNTIME_DIRS.flatMap((directory) =>
 		readdirSync(path.join(SCRIPTS_DIR, directory))
-			.filter((entry) => entry.endsWith('.ts') && !entry.endsWith('.test.ts'))
+			.filter((entry) => is_distributed(entry))
 			.map((entry) => path.join(SCRIPTS_DIR, directory, entry)),
 	)
 }

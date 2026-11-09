@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
 import { git_gh_issue_read, type IssueWithComments } from './git-gh-issue-read'
@@ -12,7 +12,7 @@ import {
 	ISSUE_NUMBER,
 	ISSUE_TITLE,
 } from './git-gh-issue-rest-fixture'
-import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
+import { GRAPHQL_PATH, REFUSED_MESSAGE, TRANSPORT_ENV_VAR } from './git-gh-transport'
 
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn(), exec_gh_api_status: vi.fn() },
@@ -132,11 +132,21 @@ async function read(repo: string = REPO): Promise<IssueWithComments> {
 	return await git_gh_issue_read.issue_read_with_comments(READ_NUMBER, FIELDS, repo)
 }
 
+// A session on REST: GraphQL would answer, and is never asked.
 async function read_through_rest(): Promise<IssueWithComments> {
-	serve(gh_failure.attach(new Error('forbidden'), { status: FORBIDDEN_STATUS }))
+	serve(graphql_issue())
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
 
-	return await read()
+	const answer = await read()
+
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'graphql')
+
+	return answer
 }
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 
 describe('issue_read_with_comments — one GraphQL query', () => {
 	it('reads the fields and the comments in one GraphQL request and no REST request', async () => {
@@ -149,14 +159,23 @@ describe('issue_read_with_comments — one GraphQL query', () => {
 		expect(parsed(answer).comments).toStrictEqual(JSON.parse(REST_COMMENTS))
 	})
 
-	it('answers exactly what the REST reads answer when GraphQL is refused', async () => {
+	it('answers exactly what the REST reads answer on a REST session, which sends no GraphQL', async () => {
 		serve(graphql_issue())
 		const through_graphql = parsed(await read())
 
 		const through_rest = await read_through_rest()
 
 		expect(api_paths()).toContain(`repos/${REPO}/issues/${READ_NUMBER}`)
+		expect(api_paths()).not.toContain(GRAPHQL_PATH)
 		expect(parsed(through_rest)).toStrictEqual(through_graphql)
+	})
+
+	it('stops with its reason when a GraphQL session is refused', async () => {
+		serve(gh_failure.attach(new Error('forbidden'), { status: FORBIDDEN_STATUS }))
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'graphql')
+
+		await expect(read()).rejects.toThrow(REFUSED_MESSAGE)
+		expect(api_paths()).toStrictEqual([GRAPHQL_PATH])
 	})
 
 	it('maps the blockers and the counts the way the REST reads do', async () => {

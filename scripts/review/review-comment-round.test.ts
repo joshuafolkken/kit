@@ -22,6 +22,10 @@ vi.mock('#scripts/issue/session-cite', async (original) => {
 	return { session_cite: { ...actual.session_cite, session_repo: repo_mock } }
 })
 vi.mock('#scripts/gh/git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: api_mock } }))
+// The permission lookup goes through the ETag layer (joshuafolkken/kit#6754); here it reaches the mock.
+vi.mock('#scripts/gh/git-gh-etag-read', () => ({
+	git_gh_etag_read: { read: async (api_path: string) => await api_mock({ path: api_path }) },
+}))
 vi.mock('#scripts/gh/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_list_comments: comments_mock },
 }))

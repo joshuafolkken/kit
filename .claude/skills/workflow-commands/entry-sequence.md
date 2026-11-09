@@ -39,11 +39,11 @@ run is quiet", never fetched: `run:entry` prints it. A lane child starts none.
   `in-progress`; `needs-human-review.md`.
 - **A split** — the assessment (`split-assessment.md` → "The question") finds two or more
   separately-mergeable deliverables over one gate: file the children (each `route:split`) and the epic,
-  then **STOP** with "Please run `backlogrun #<E> --only` to execute this epic." Typing the command
-  approved **one** Issue, never a batch.
+  then **STOP** with "Please run `pnpm josh backlogrun <E> --only` to execute this epic." Typing the
+  command approved **one** Issue, never a batch.
 - **A prerequisite** — file it (`route:tier-a`), `pnpm josh run:pause <M> --for <N>`, and **STOP**
-  with "Please run `backlogrun #<E> --only` to execute this epic"; `prerequisite.md` is the single
-  source of the filing, the pause and the epic:bundle branch.
+  with the same line; `prerequisite.md` is the single source of the filing, the pause and the
+  epic:bundle branch.
 - **An observation** — `observation-filing.md` (ask first if interactive).
 
 **The per-origin filing cap is `prerequisite.md`'s** (`issue:file`'s own step); on its refusal, stop and report.

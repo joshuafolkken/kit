@@ -3,6 +3,7 @@ import {
 	backlog_drive,
 	type LoopPorts as DrivePorts,
 	type DriveState,
+	type OfferRead,
 } from '#scripts/backlog/backlog-drive'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -28,7 +29,7 @@ const HANDED_OFF: CarryRead = {
 		is_handed_off: true,
 	},
 }
-const NO_WINDOW = { poll_ms: 0, offer_ms: 0, window_ms: undefined }
+const NO_WINDOW = { poll_ms: 0, offer_ms: 0, idle_offer_ms: 0, window_ms: undefined }
 const FREE_LANES = 6
 
 interface World {
@@ -36,6 +37,15 @@ interface World {
 	merged: boolean
 	agents: number
 	reports: number
+}
+
+function offered(world: World, state: DriveState): OfferRead {
+	return {
+		verdict: world.merged ? 'stop' : 'run',
+		issues: world.merged || state.in_flight.length > 0 ? [] : [ISSUE],
+		retries: 0,
+		is_finish: true,
+	}
 }
 
 function drive_ports(world: World): DrivePorts {
@@ -47,12 +57,7 @@ function drive_ports(world: World): DrivePorts {
 
 			return { token: 'none', outcome: 'merged', is_offer: true }
 		},
-		offer: async (state: DriveState) => ({
-			verdict: world.merged ? 'stop' : 'run',
-			issues: world.merged || state.in_flight.length > 0 ? [] : [ISSUE],
-			retries: 0,
-			is_finish: true,
-		}),
+		offer: async (state: DriveState) => offered(world, state),
 		launch: async () => {
 			world.started = true
 
@@ -64,11 +69,16 @@ function drive_ports(world: World): DrivePorts {
 		judgement_owed: async () => 0,
 		memory_held: async () => false,
 		usage_limited: async () => false,
+		yields: async () => [],
+		park: async () => undefined,
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,
+		retrospective: async () => true,
 		now: () => NOW,
 		sleep: async () => undefined,
+		added_since: async () => false,
+		named_left: async () => false,
 		on_state: () => undefined,
 		finish: async () => {
 			world.reports += 1

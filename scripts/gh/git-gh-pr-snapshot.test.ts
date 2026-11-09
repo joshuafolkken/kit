@@ -105,6 +105,21 @@ describe('pr_get_state_snapshot — the three fields', () => {
 		expect(snapshot.review_decision).toBe('APPROVED')
 	})
 
+	// joshuafolkken/kit#6756: the review listing is read with the previous ETag like the other polls.
+	it('keeps the review decision a 304 stands for', async () => {
+		await read_snapshot({ reviews: JSON.stringify([APPROVED_REVIEW]) })
+		const fresh = conditional_read_over(mocked_api)
+
+		mocked_conditional.mockImplementation(async (path, etag) =>
+			etag !== undefined && path.startsWith(pr_reviews_path())
+				? { kind: 'unchanged' }
+				: await fresh(path, etag),
+		)
+		const snapshot = await read_snapshot()
+
+		expect(snapshot.review_decision).toBe('APPROVED')
+	})
+
 	// `gh` answered the empty string, which `read_string` folds to `undefined` — the same answer the
 	// GraphQL field gave on a pull request nobody had reviewed.
 	it('leaves the review decision unset when nobody has reviewed', async () => {

@@ -5,6 +5,7 @@ import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { declared_growth } from '#scripts/split/declared-growth'
 import { split_assess, type SplitGuide } from '#scripts/split/split-assess'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_approval } from './lane-plan-approval'
@@ -53,8 +54,13 @@ import { lane_stage_budget } from './lane-stage-budget'
 // planned scripts module the base holds is a candidate importer, here only one in the new module's
 // directory; with no `base_files`, every file stands alone. The grouping is the split notice's
 // (`split_assess.units_of`, joshuafolkken/kit#6724).
+//
+// **A plan that edits a `test:related` hub answers `split (hub)`** (joshuafolkken/kit#6543), naming it:
+// a file whose reach passes the test-file cap (`test-related-cap.ts`) runs past the cap on every check,
+// and lanes that edited one overran their budget among the most often. With no graph no file reads as a hub, so the
+// other axes decide as before. Splitting the hub itself is joshuafolkken/kit#6180.
 
-type SplitReason = 'files' | 'hunks' | 'lines'
+type SplitReason = 'files' | 'hunks' | 'lines' | 'hub'
 
 // What `lane:plan` measured beside the plan (`lane-plan-signals.ts`); one `hunk_files` entry per hunk,
 // one `committed_files` entry per file the branch changed between its base and `HEAD`, and the files
@@ -67,6 +73,7 @@ interface PlanSignals {
 	lines_ratio: number | undefined
 	implement_rate: ImplementRate | undefined
 	split_filed: boolean
+	hubs?: ReadonlyArray<string> | undefined
 }
 
 interface FilesOver {
@@ -85,7 +92,14 @@ interface MeasureOver {
 	measured: number
 }
 
-type Oversize = (FilesOver | MeasureOver) & { guide?: SplitGuide }
+// `limit` is the test-file cap the hubs' reach passes.
+interface HubOver {
+	reason: 'hub'
+	limit: number
+	hubs: ReadonlyArray<string>
+}
+
+type Oversize = (FilesOver | MeasureOver | HubOver) & { guide?: SplitGuide }
 
 interface Declared {
 	files: number
@@ -253,17 +267,25 @@ function is_waived(plan: LanePlan, over: Oversize | undefined): boolean {
 	return over !== undefined && (plan.single === true || plan.sized === true)
 }
 
-// Files first, then hunks, then lines; a waived files overrun stands only once the other axes pass.
+function hub_over(signals: PlanSignals): HubOver | undefined {
+	const hubs = signals.hubs ?? []
+
+	return hubs.length === 0
+		? undefined
+		: { reason: 'hub', limit: test_pinned_logic.MAX_TEST_FILES, hubs }
+}
+
+// Files first, then hubs, hunks and lines; a waived files overrun stands only once the other axes pass.
 function first_over(
 	plan: LanePlan,
 	declared: Declared,
 	recorded: LanePlan | undefined,
 	signals: PlanSignals,
-): FilesOver | MeasureOver | undefined {
+): FilesOver | MeasureOver | HubOver | undefined {
 	const files = files_over(plan, declared.files, recorded, signals)
 	if (files !== undefined && !is_waived(plan, files)) return files
 
-	return measure_over(declared, signals, plan, recorded) ?? files
+	return hub_over(signals) ?? measure_over(declared, signals, plan, recorded) ?? files
 }
 
 // `undefined` while every axis stays within its bar, or no size is declared.
@@ -309,8 +331,18 @@ function measure_text(issue: number, over: MeasureOver): string {
 	return `split (${over.reason}): ${session_cite.issue(issue)}'s ${measure_bar(over)}, so the plan is not recorded. Carve a separately-mergeable part off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. ${bar_tail()}`
 }
 
+function hub_text(issue: number, over: HubOver): string {
+	return `split (hub): ${session_cite.issue(issue)}'s plan edits ${over.hubs.join(', ')}, whose \`test:related\` reach passes the ${String(over.limit)}-test-file cap, so the plan is not recorded. Carve the hub edit off as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to it here, and run \`pnpm josh lane:plan ${String(issue)} <paths>\` again on what stays. The hub edit is the one deliverable instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
+}
+
+function over_text(issue: number, over: Oversize): string {
+	if (over.reason === 'files') return files_text(issue, over)
+
+	return over.reason === 'hub' ? hub_text(issue, over) : measure_text(issue, over)
+}
+
 function refusal_text(issue: number, over: Oversize): string {
-	const text = over.reason === 'files' ? files_text(issue, over) : measure_text(issue, over)
+	const text = over_text(issue, over)
 	const guide = over.guide ?? split_assess.guide_for(lane_stage_budget.BUDGET_MINUTES.implement)
 
 	return `${text} ${split_assess.policy_text(guide)}`

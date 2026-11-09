@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_already_done_cli } from './issue-already-done-cli'
 
 // joshuafolkken/kit#4130: the already-merged exit as one command. The GitHub writes and the hold
@@ -32,7 +32,8 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({ run_hold_cli: { run: release 
 const ISSUE = '4130'
 const FLAG = '--evidence-file'
 const EVIDENCE = 'merged in #4000\n- criterion 1: scripts/a.ts:12\n'
-const work = mkdtempSync(path.join(tmpdir(), 'issue-already-done-cli-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-already-done-cli-')
 const EVIDENCE_FILE = path.join(work, 'evidence.md')
 const EMPTY_FILE = path.join(work, 'empty.md')
 
@@ -83,10 +84,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(work, { recursive: true, force: true })
 })
 
 describe('issue_already_done_cli.run — the exit in order', () => {

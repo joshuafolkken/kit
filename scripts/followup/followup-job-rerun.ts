@@ -70,6 +70,15 @@ const REGISTER_ATTEMPTS = 10
 const REGISTER_INTERVAL_MS = 3000
 const REGISTER_BACKOFF = { ...POLL_BACKOFF, initial_ms: REGISTER_INTERVAL_MS }
 
+// A download outage outlasts a rerun at once (joshuafolkken/kit#6834): `followup` reruns up to
+// `MAX_CHECK_RERUNS` times, the first at once and each later one after a wait that doubles. Past the cap
+// it stops on `RERUNS_SPENT_MESSAGE`, which names the outage rather than the red checks.
+const MAX_CHECK_RERUNS = 3
+const RERUN_BACKOFF_MS = 120_000
+const RERUN_BACKOFF_FACTOR = 2
+const MS_PER_SECOND = 1000
+const RERUNS_SPENT_MESSAGE = 'CI infrastructure failures outlasted every followup rerun'
+
 const failed_check_schema = z.looseObject({
 	id: z.number(),
 	conclusion: z.enum(FAILED_CONCLUSIONS),
@@ -158,28 +167,34 @@ function has_every_step_passed(job: Job): boolean {
 	return job.steps.every((step) => PASSING_STEP_CONCLUSIONS.has(step.conclusion ?? ''))
 }
 
-function is_first_failure(job: Job): boolean {
-	return (
-		job.conclusion === FAILURE_CONCLUSION && (job.run_attempt ?? FIRST_ATTEMPT) <= FIRST_ATTEMPT
-	)
+function is_first_attempt(job: Job): boolean {
+	return (job.run_attempt ?? FIRST_ATTEMPT) <= FIRST_ATTEMPT
 }
 
-// A job whose every step passed stopped on the runner; one red on its first attempt is rerun when its
-// log shows a download failing, and otherwise judged by the failed tests its log names. The log
-// endpoint redirects to the plain text, which `gh api` follows; a vitest log is colored.
-async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged> {
-	if (has_every_step_passed(job)) return { job, verdict: RERUN_VERDICT }
-	if (!is_first_failure(job)) return { job, verdict: KEPT_VERDICT }
-
-	const log = await git_gh_exec.exec_gh_api({
+// The log endpoint redirects to the plain text, which `gh api` follows; a vitest log is colored.
+async function read_job_log(job: Job): Promise<string> {
+	return await git_gh_exec.exec_gh_api({
 		path: actions_api_path(`jobs/${String(job.id)}/logs`),
 		should_allow_escapes: true,
 	})
-	const download_log = stripVTControlCharacters(log)
+}
 
-	if (DOWNLOAD_ERRORS.some((error) => error.test(download_log))) {
-		return { job, verdict: RERUN_VERDICT }
-	}
+function is_download_failure(log: string): boolean {
+	const plain_log = stripVTControlCharacters(log)
+
+	return DOWNLOAD_ERRORS.some((error) => error.test(plain_log))
+}
+
+// A job whose every step passed stopped on the runner; a red one is rerun on any attempt when its log
+// shows a download failing (joshuafolkken/kit#6834), and on its first attempt only is otherwise judged
+// by the failed tests its log names.
+async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged> {
+	if (has_every_step_passed(job)) return { job, verdict: RERUN_VERDICT }
+	if (job.conclusion !== FAILURE_CONCLUSION) return { job, verdict: KEPT_VERDICT }
+
+	const log = await read_job_log(job)
+	if (is_download_failure(log)) return { job, verdict: RERUN_VERDICT }
+	if (!is_first_attempt(job)) return { job, verdict: KEPT_VERDICT }
 
 	const tests = followup_failed_tests.read_failed_tests(log)
 
@@ -312,33 +327,72 @@ async function should_merge_first(
 	)
 }
 
+function rerun_delay_ms(round: number): number {
+	return round === 0 ? 0 : RERUN_BACKOFF_MS * RERUN_BACKOFF_FACTOR ** (round - 1)
+}
+
+async function wait_before_rerun(round: number): Promise<void> {
+	const delay_ms = rerun_delay_ms(round)
+	if (delay_ms === 0) return
+
+	console.info(
+		`⏳ Waiting ${String(delay_ms / MS_PER_SECOND)}s before CI job rerun ${String(round + 1)}`,
+	)
+	await poll.sleep(delay_ms)
+}
+
+function report_rerun_error(error: unknown): Array<string> {
+	console.info(`⚠️ CI job rerun failed: ${git_gh_helpers.get_error_message_with_stderr(error)}`)
+
+	return []
+}
+
 // **Returns the names of the jobs it reran**, empty when there was none to rerun or main has to be
 // merged first. A read or a rerun that fails is reported and answers empty: the rerun is a recovery,
-// so the original failure stands.
-async function rerun_failed_jobs(branch_name: string): Promise<Array<string>> {
+// so the original failure stands. `round` counts the reruns before this one and sets its wait.
+async function rerun_failed_jobs(branch_name: string, round = 0): Promise<Array<string>> {
 	try {
 		const entries = await find_rerun_jobs(branch_name)
 
 		if (entries.length === 0 || (await should_merge_first(branch_name, entries))) return []
+		await wait_before_rerun(round)
 
 		return await rerun(branch_name, entries)
 	} catch (error) {
-		console.info(`⚠️ CI job rerun failed: ${git_gh_helpers.get_error_message_with_stderr(error)}`)
-
-		return []
+		return report_rerun_error(error)
 	}
+}
+
+// **The names of the jobs a rerun would retry**, read without rerunning: the red a spent cap leaves.
+async function read_rerun_names(branch_name: string): Promise<Array<string>> {
+	try {
+		const entries = await find_rerun_jobs(branch_name)
+
+		return entries.map(({ job }) => job.name)
+	} catch (error) {
+		return report_rerun_error(error)
+	}
+}
+
+function reruns_spent_message(names: ReadonlyArray<string>): string {
+	return `${RERUNS_SPENT_MESSAGE} (${String(MAX_CHECK_RERUNS)} reruns; still failing: ${names.join(', ')}). Rerun the failed jobs once CI recovers, then run followup again.`
 }
 
 const followup_job_rerun = {
 	actions_api_path,
 	read_actions,
+	read_rerun_names,
 	rerun_failed_jobs,
+	reruns_spent_message,
 }
 
 export {
 	followup_job_rerun,
 	COMPLETE_ATTEMPTS,
 	COMPLETE_INTERVAL_MS,
+	MAX_CHECK_RERUNS,
 	REGISTER_ATTEMPTS,
 	REGISTER_INTERVAL_MS,
+	RERUN_BACKOFF_MS,
+	RERUNS_SPENT_MESSAGE,
 }

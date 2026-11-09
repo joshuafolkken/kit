@@ -65,6 +65,7 @@ describe('run_ship_reship.is_due', () => {
 		['a review check', REVIEW_CHECK],
 		['a review finding', { reason: 'review', cause: 'finding', base: BASE }],
 		['a round-2 finding', { reason: 'round-2', cause: 'finding', base: BASE }],
+		['a followup check', { reason: 'followup', cause: 'check', base: BASE }],
 	])('passes over the pre-detach region after %s on an unmoved base', async (_name, stop) => {
 		expect(await is_due_after([{ reason: 'preflight' }, stop])).toBe(true)
 	})
@@ -78,6 +79,8 @@ describe('run_ship_reship.is_due', () => {
 		['a failed preflight', { reason: 'preflight', cause: 'check' }],
 		['a red gate', { reason: 'gate', cause: 'check' }],
 		['a review the reviewer never finished', { reason: 'review', cause: 'infra', base: BASE }],
+		['a followup that hit an outage', { reason: 'followup', cause: 'infra', base: BASE }],
+		['a followup conflict', { reason: 'followup', cause: 'conflict', base: BASE }],
 	])('runs it all after %s that followed a review failure', async (_name, stop) => {
 		expect(await is_due_after([REVIEW_CHECK, stop])).toBe(false)
 	})
@@ -114,11 +117,13 @@ describe('run_ship_reship.is_due — a ship stage after the review failure', () 
 })
 
 describe('run_ship_reship.with_base', () => {
-	it('records the base on a review failure only', async () => {
+	it('records the base on a review failure or a followup check only', async () => {
 		const review = { issue: ISSUE, reason: 'review', cause: 'finding' }
+		const followup = { issue: ISSUE, reason: 'followup', cause: 'check' }
 		const gate = { issue: ISSUE, reason: 'gate', cause: 'check' }
 
 		expect(await run_ship_reship.with_base(review)).toStrictEqual({ ...review, base: BASE })
+		expect(await run_ship_reship.with_base(followup)).toStrictEqual({ ...followup, base: BASE })
 		expect(await run_ship_reship.with_base(gate)).toStrictEqual(gate)
 	})
 
@@ -137,10 +142,12 @@ describe('run_ship_reship.skipped', () => {
 
 		const section = await run_ship_reship.skipped(String(ISSUE))
 
-		expect(error).toHaveBeenCalledWith('pre-detach: skipped (re-ship after review failure)')
+		expect(error).toHaveBeenCalledWith(
+			'pre-detach: skipped (re-ship after review or followup failure)',
+		)
 		expect(emit).toHaveBeenCalledWith(
 			'ship-stage',
-			expect.stringMatching(/pre-detach skipped .*re-ship after review failure$/u),
+			expect.stringMatching(/pre-detach skipped .*re-ship after review or followup failure$/u),
 		)
 		expect(section).toStrictEqual({
 			header: run_ship.PREFLIGHT_HEADER,

@@ -1,9 +1,9 @@
-import { mkdtempSync, readdirSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { codex_hook_adapter } from './codex-hook-adapter'
@@ -24,7 +24,7 @@ const FIXTURE_DIRECTORY = path.join(import.meta.dirname, 'fixtures')
 const CODEX_PREFIX = 'codex-'
 const WRITE_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'apply_patch'])
 // No transcript exists under it, so each fixture replays as a session's first call.
-const REPLAY_HOME = mkdtempSync(path.join(tmpdir(), 'hook-payload-replay-'))
+const REPLAY_HOME = temporary_directory('suite')('hook-payload-replay-')
 const PLACEHOLDERS: ReadonlyArray<readonly [string, string]> = [
 	['__ROOT__', process.cwd()],
 	['__HOME__', REPLAY_HOME],

@@ -13,9 +13,10 @@ import { run_board_quota_status } from './run-board-quota-status'
 // the held readings and reads no file; once a minute one read runs in the background
 // (`run-board-held.ts`), and a provider's newest file it finds unchanged since the last read — the same
 // path and `mtime` — is not opened again. A provider's newest file may hold no reading (a Codex child's
-// lane log, a rollout of an API-key session), so the reading is the newest that holds one. A done
-// file's head is read too, for the spend per task of `run-board-quota-spent.ts`, and files are read
-// newest first until enough done ones tell it, then back for the tasks done across their rise.
+// lane log, a rollout of an API-key session), so the reading is the one taken last among those that
+// hold one. A done file's head is read too, for the spend per task of `run-board-quota-spent.ts`, and
+// files are read newest first until enough done ones tell it, then back for the tasks done across
+// their rise.
 
 const QUOTA_INTERVAL_MS = 60_000
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
@@ -173,12 +174,28 @@ async function read_back(
 	return await read_back(back, limit * run_board_quota_read.SCAN_FACTOR, all)
 }
 
-// The newest file's reading that holds windows, with each window's spend per task where told.
+function taken_of(reading: QuotaReading): number {
+	return reading.taken_ms ?? -Infinity
+}
+
+// The reading holding windows that was taken last, not the newest file's: a lane log's mtime moves with
+// every line, while Claude writes a `rate_limit_event` only now and then (joshuafolkken/kit#6692). An
+// untimed reading loses to a timed one; a tie keeps the newer file's.
+function freshest(marks: ReadonlyArray<QuotaMark>): QuotaReading | undefined {
+	const readings = marks.flatMap(({ reading }) =>
+		reading !== undefined && reading.windows.length > 0 ? [reading] : [],
+	)
+	const latest = Math.max(...readings.map((reading) => taken_of(reading)))
+
+	return readings.find((reading) => taken_of(reading) === latest)
+}
+
+// The freshest reading that holds windows, with each window's spend per task where told.
 function reading_with(
 	marks: ReadonlyArray<QuotaMark>,
 	ends: ReadonlyArray<QuotaEnd>,
 ): QuotaReading | undefined {
-	const reading = marks.find((mark) => (mark.reading?.windows.length ?? 0) > 0)?.reading
+	const reading = freshest(marks)
 
 	if (reading === undefined) return undefined
 

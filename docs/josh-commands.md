@@ -946,6 +946,25 @@ pnpm josh ci:timing 18912345678 --json   # a run id, machine-readable
 
 A number from 100,000,000 up is a run id, a smaller one a pull request; unfinished prints `—`; no run exits 1.
 
+### `josh gh:usage`
+
+<!-- usage: gh:usage -->
+
+Tally the josh processes' logged GitHub API usage per command — runs, calls, 304 answers and core used — most calls first, under the period the lines cover.
+
+```bash
+pnpm josh gh:usage                             # every line the log holds
+pnpm josh gh:usage --since 2026-11-08T00:00Z   # the lines at or after an instant
+```
+
+<!-- /usage -->
+
+- Reads the one file each josh process appends to (`scripts/gh/gh-usage-log.ts`, newest 2000 lines); the heading names the period and line count.
+- A hook-recorded direct `gh` call is its own `direct:<subcommand>` row.
+- `core Δ` sums the lines that carry a reading; `—` means none did.
+- A line that does not parse is counted in the heading, not tallied.
+- An unreadable `--since` or an unknown flag prints the usage and exits 1.
+
 ## AI tools
 
 Helpers for AI-assisted development workflows.

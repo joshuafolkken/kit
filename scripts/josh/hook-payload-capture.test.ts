@@ -1,8 +1,10 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { hook_payload_capture } from './hook-payload-capture'
+
+const make_directory = temporary_directory()
 
 const { CAPTURE_DIR_KEY, capture } = hook_payload_capture
 const PRETOOL_HOOK = 'pretool:guard'
@@ -13,7 +15,7 @@ const FIRST_STOP_CAPTURE = 'stop-guard-none-1.json'
 const MISSING_DIRECTORY = 'nested'
 
 function fresh_directory(): string {
-	return mkdtempSync(path.join(tmpdir(), 'hook-capture-'))
+	return make_directory('hook-capture-')
 }
 
 function capturing_into(directory: string): NodeJS.ProcessEnv {

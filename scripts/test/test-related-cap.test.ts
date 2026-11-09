@@ -238,6 +238,43 @@ describe('test_related_cap.capped_importers with no graph', () => {
 	})
 })
 
+describe('test_related_cap.hubs_of', () => {
+	let fixture: FixtureWorkspace
+
+	beforeEach(async () => {
+		fixture = await open_fixture()
+	})
+
+	afterEach(async () => {
+		await git_fixture_workspace.close_workspace(fixture)
+	})
+
+	it.each([
+		['a planned file past the cap (joshuafolkken/kit#6543)', WIDE_MODULE, MAX_TEST_FILES + 1, true],
+		['a file past the cap no test imports directly', LONE_MODULE, MAX_TEST_FILES + 1, true],
+		['no file at the cap', WIDE_MODULE, MAX_TEST_FILES, false],
+	])('names %s as a hub', async (_, file, count, is_hub) => {
+		const hubs = await test_related_cap.hubs_of(fixture.workspace, [file], reader_of(count))
+
+		expect(hubs).toEqual(is_hub ? [file] : [])
+	})
+
+	it('names no hub among files each under the cap whose reach sums past it', async () => {
+		const files = [WIDE_MODULE, MIDDLE_MODULE]
+		const reader = reader_of(MAX_TEST_FILES - 1)
+
+		expect(await test_related_cap.hubs_of(fixture.workspace, files, reader)).toEqual([])
+	})
+
+	it('names no hub without a graph', async () => {
+		const reader = vi.fn(async (): Promise<undefined> => {
+			await Promise.resolve(undefined)
+		})
+
+		expect(await test_related_cap.hubs_of(fixture.workspace, [WIDE_MODULE], reader)).toEqual([])
+	})
+})
+
 describe('test_related_cap.over_cap_of', () => {
 	it('keeps the files reaching more test files than the cap', () => {
 		const counts = [

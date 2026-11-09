@@ -1,12 +1,11 @@
-import { mkdtempSync } from 'node:fs'
 import { readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { stash_push_cli } from '#scripts/git/stash/stash-push-cli'
 import { cli_body_repository } from '#scripts/josh/cli-body-repository-fixture'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
 import { session_cite } from './session-cite'
@@ -25,7 +24,8 @@ const STASH_MESSAGE = 'upstream-interrupt: paused #5546'
 const BODY_FILE_FLAG = '--body-file'
 const REPO_FLAG = '--repo'
 const BLOCKS_FINDER_FLAG = '--blocks-finder'
-const BODY_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'upstream-interrupt-test-'))
+const make_directory = temporary_directory('suite')
+const BODY_DIRECTORY = make_directory('upstream-interrupt-test-')
 const BODY_FILE = path.join(BODY_DIRECTORY, 'body.md')
 
 await writeFile(BODY_FILE, DRAFT)
@@ -41,7 +41,7 @@ function body_argv(body_file: string): ReadonlyArray<string> {
 // A body written into the tree the stash sets aside: its own directory, so a test that removes it
 // leaves the shared body file alone.
 async function tree_body_file(): Promise<string> {
-	const directory = mkdtempSync(path.join(tmpdir(), 'upstream-interrupt-tree-'))
+	const directory = make_directory('upstream-interrupt-tree-')
 	const body_file = path.join(directory, 'body.md')
 
 	await writeFile(body_file, DRAFT)
@@ -255,7 +255,9 @@ describe('josh upstream:interrupt — where the body file sits', () => {
 	it.each([FIRST_PARTY_REPO, THIRD_PARTY_REPO])(
 		'refuses a body in the work tree that git does not ignore (%s)',
 		async (repo) => {
-			const repository = cli_body_repository.create()
+			const repository = cli_body_repository.create(
+				make_directory('upstream-interrupt-repository-'),
+			)
 			const body_file = repository.write(cli_body_repository.UNIGNORED_DIRECTORY, DRAFT)
 			const code = await upstream_interrupt_cli.run([
 				FINDER,
@@ -266,7 +268,6 @@ describe('josh upstream:interrupt — where the body file sits', () => {
 				body_file,
 			])
 
-			repository.remove()
 			expect(code).toBe(FAILURE_EXIT_CODE)
 			expect(vi.mocked(git_gh_command.issue_comment)).not.toHaveBeenCalled()
 			expect(stderr_text()).toContain('not git-ignored')

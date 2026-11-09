@@ -72,7 +72,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 			"Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict",
 		category: 'AI tools',
 		reference: [
-			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear]',
+			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear] | --apply <n> --adopt <k> --reason <text>',
 			'automation',
 			['files', 'network'],
 		],
@@ -90,6 +90,9 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '--apply 914 --unblock 912 --reason "<why>"',
+				},
+				{
+					arguments: '--apply 915 --adopt 1 --reason "<why>"',
 				},
 			],
 			flags: [
@@ -121,6 +124,11 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--unblock <M>'],
 					description:
 						"removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.",
+				},
+				{
+					names: ['--adopt <k>'],
+					description:
+						"takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.",
 				},
 			],
 		},

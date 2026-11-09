@@ -73,7 +73,7 @@ async function oversize_of(
 	directory: string,
 ): Promise<Oversize | undefined> {
 	if (issues === undefined || !lane_plan_size.declares(plan.issue, issues)) return undefined
-	const signals = await lane_plan_signals.signals_of(plan.issue)
+	const signals = await lane_plan_signals.signals_of(plan.issue, plan.paths)
 
 	return lane_plan_size.oversize(plan, issues, lane_plan.read(plan.issue, directory), signals)
 }

@@ -70,7 +70,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--chat'],
 					description:
-						'answers a `backlogrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.',
+						'answers a `backlogrun`, `fullrun` or `halfrun` progress question: the frame `--once` draws, with only `🧠` on the machine line and no escapes; it records the report as `run:progress --mark` does.',
 				},
 				{
 					names: ['--every <minutes>'],

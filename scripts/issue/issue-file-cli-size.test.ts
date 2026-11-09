@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
@@ -19,7 +19,8 @@ const OVER_GUIDE = '- 規模見積もり: 約 6 ファイル / 150 行（テス�
 const OVER_CAP = '- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）'
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-size-'))
+const make_directory = temporary_directory('suite')
+const work = make_directory('issue-file-cli-size-')
 const over_path = path.join(work, 'over.md')
 const reasoned_path = path.join(work, 'reasoned.md')
 const capped_path = path.join(work, 'capped.md')
@@ -64,7 +65,6 @@ beforeEach(() => {
 
 afterAll(() => {
 	vi.restoreAllMocks()
-	rmSync(work, { recursive: true, force: true })
 })
 
 function refusals(): string {

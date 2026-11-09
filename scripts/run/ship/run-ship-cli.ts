@@ -410,8 +410,8 @@ async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<S
 	return await pre_detach_checks(args, preflight, run_ship_pre_detach_pinned.timed_checks)
 }
 
-// A re-ship after a review failure on an unmoved base passes over both but a `--review` ship's
-// `test:pinned` (`run-ship-reship.ts`).
+// A re-ship after a review or followup failure on an unmoved base passes over both but a `--review`
+// ship's `test:pinned` (`run-ship-reship.ts`).
 async function detach_after_preflight(args: ShipArguments): Promise<number> {
 	const sections = (await run_ship_reship.is_due(args.number))
 		? await pre_detach_checks(

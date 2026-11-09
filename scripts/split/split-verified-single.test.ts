@@ -1,13 +1,12 @@
-import { mkdtempSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { acceptance_map } from '#scripts/review/acceptance-map'
 import { run_ship_body_draft } from '#scripts/run/ship/run-ship-body-draft'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { split_verified_single } from './split-verified-single'
 
 // joshuafolkken/kit#6572: one verified deliverable answers a size-only split notice; anything short of
@@ -40,7 +39,8 @@ const MET = '満たした: split-verified-single.test.ts'
 const MET_DRAFT = draft(row(DONE, MET))
 const DONE_BODY = body(DONE)
 
-const DRAFT_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'split-verified-'))
+const make_directory = temporary_directory('suite')
+const DRAFT_DIRECTORY = make_directory('split-verified-')
 
 async function draft_file(text: string): Promise<string> {
 	const target = path.join(DRAFT_DIRECTORY, 'draft.md')
@@ -49,10 +49,6 @@ async function draft_file(text: string): Promise<string> {
 
 	return target
 }
-
-afterAll(async () => {
-	await rm(DRAFT_DIRECTORY, { recursive: true, force: true })
-})
 
 beforeEach(async () => {
 	read_gate_tree.mockResolvedValue({ files: { 'a.ts': 'hash' }, base: 'base' })

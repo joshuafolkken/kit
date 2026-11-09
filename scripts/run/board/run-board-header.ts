@@ -16,6 +16,7 @@ import type { ProcessGroups } from './run-board-process-groups'
 import type { QuotaHold, QuotaView } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_title } from './run-board-render-title'
+import type { SeatRead } from './run-board-seat'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
@@ -70,6 +71,8 @@ interface BoardUsage {
 // (`run-board-render-quota.ts`).
 interface BoardHeader extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 'rate_limit'> {
 	now_ms: number
+	// A single run's name (`run-board-single.ts`); `undefined` draws `backlogrun`.
+	run_name?: string | undefined
 	started_ms: number
 	// Set once the run has ended: the title then says when, and how long it took.
 	ended_ms: number | undefined
@@ -101,6 +104,8 @@ interface BoardHeader extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 
 	lane_limit?: number | undefined
 	// The slots occupied according to the same capacity read that supplies the limit.
 	occupied_count?: number | undefined
+	// What explains the seats no lane holds (`run-board-seat.ts`).
+	seats?: SeatRead | undefined
 	// What each done row says after its time (`run-board-found.ts`); none where nothing was read.
 	found?: FoundOf | undefined
 	// Whether `JOSH_LANE_INVESTIGATION` is on; off, a merged row hides its minutes and investigation
@@ -177,10 +182,10 @@ function mark_of(header: BoardHeader, running: number): RunMark {
 }
 
 // The mark stands still in every state: the spinner turns on the third line.
-function run_part(mark: RunMark): string {
+function run_part(mark: RunMark, name = RUN_NAME): string {
 	const { glyph, color } = RUN_MARKS[mark]
 
-	return styleText(color, `${glyph} ${RUN_NAME}`)
+	return styleText(color, `${glyph} ${name}`)
 }
 
 // The repository's own name — `kit` of `owner/kit` — under the run's, past the mark's columns, so a
@@ -441,7 +446,7 @@ function header_lines(header: BoardHeader): Array<string> {
 	const counts = counts_of(layout_of(header))
 	const mark = mark_of(header, counts.running)
 	const now = now_line(counts, header)
-	const names = column_of([run_part(mark), repo_part(header, mark), ''])
+	const names = column_of([run_part(mark, header.run_name), repo_part(header, mark), ''])
 	const times = column_of(time_parts(header, mark, now))
 	const lasts = [progress_part(counts, header), machine_part(counts, header)]
 	const third =

@@ -28,7 +28,10 @@ tree's `origin` rather than a `gh` call, and `issue_cite.plain` keeps `#N` for w
 program parses. A line built from `plain` by a helper that also feeds GitHub or a parser is linked
 where it is printed, through `session_cite.text`. `scripts/issue/session-cite-scan.test.ts` refuses a
 bare `#${…}` assembled anywhere else and counts every `plain` call against the reason its text is not
-printed to the session as it is, so a new one fails until it is linked or justified.
+printed to the session as it is, so a new one fails until it is linked or justified. A new caller
+uses `issue_cite.plain_for`, whose required reason states that justification at the call, so it
+edits no central list; [#6810](https://github.com/joshuafolkken/kit/issues/6810) moves the counted
+calls onto it.
 
 Not every line josh prints is linked: a commit message, a PR body, a run event line or a Telegram body
 keeps the plain `#N` its reader needs. A session copying one of those into a reply still cites it.

@@ -49,7 +49,7 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('josh ship --detach — a re-ship after a review failure', () => {
+describe('josh ship --detach — a re-ship after a review failure or a followup check stop', () => {
 	it('hands off without the preflight or the pre-detach checks, saying why', async () => {
 		vi.spyOn(run_ship_reship, 'is_due').mockResolvedValue(true)
 

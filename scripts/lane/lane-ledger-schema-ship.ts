@@ -23,8 +23,8 @@ const early_push_schema = z.object({
 // stop and on one recorded before it had them. `findings` names the `<category>:<severity>` of each
 // finding that decided a review or round-2 stop — the blocking ones, else the fixed ones
 // (joshuafolkken/kit#4426), absent where none decided the stop. `base` is the change base a review
-// failure stopped on, so its re-ship can tell a fix-only tree from a moved base (joshuafolkken/kit#6141),
-// absent on every other stop. How long it stayed stopped is derived
+// failure or a followup `check` stopped on, so its re-ship can tell a fix-only tree from a moved base
+// (joshuafolkken/kit#6141, joshuafolkken/kit#6675), absent on every other stop. How long it stayed stopped is derived
 // from the next ship stage, not recorded, so a resumed ship never has to know the stop it ends.
 const stop_schema = z.object({
 	kind: z.literal(KIND.STOP),

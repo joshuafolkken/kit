@@ -92,7 +92,7 @@ describe('run_handoff_launch.argv_of', () => {
 })
 
 describe('run_handoff_launch.request_of', () => {
-	it('clears the Codex session key and hands the child its provider', () => {
+	it('clears the Codex session key and the headless mark, marks the hand-off and hands the child its provider', () => {
 		const built = run_handoff_launch.argv_of(child({ provider: 'openai' }), ENVIRONMENT)
 
 		if (built.kind !== 'argv') throw new Error('expected an argv')
@@ -100,7 +100,12 @@ describe('run_handoff_launch.request_of', () => {
 		const request = run_handoff_launch.request_of(built, CWD, LOG)
 
 		expect(request).toMatchObject({ cwd: CWD, log_path: LOG })
-		expect(request.env).toEqual({ CODEX_THREAD_ID: undefined, JOSH_AGENT_PROVIDER: 'openai' })
+		expect(request.env).toEqual({
+			CODEX_THREAD_ID: undefined,
+			JOSH_AGENT_PROVIDER: 'openai',
+			JOSH_HANDOFF_CHILD: '1',
+			JOSH_RUN_HEADLESS: undefined,
+		})
 	})
 })
 
@@ -109,10 +114,11 @@ describe('run_handoff_launch.log_path / is_waited', () => {
 		expect(run_handoff_launch.log_path('/repo/.git', 'fullrun', 7)).toMatch(/-fullrun-7\.log$/u)
 	})
 
-	it('waits for kickoff only', () => {
+	it('waits for kickoff and retrospective only', () => {
 		expect([
 			run_handoff_launch.is_waited('kickoff'),
+			run_handoff_launch.is_waited('retrospective'),
 			run_handoff_launch.is_waited('fullrun'),
-		]).toEqual([true, false])
+		]).toEqual([true, true, false])
 	})
 })

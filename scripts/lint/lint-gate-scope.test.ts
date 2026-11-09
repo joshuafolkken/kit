@@ -98,4 +98,15 @@ describe('lint_gate_scope.narrowed_run', () => {
 		)
 		expect(narrowed.eslint_cache_file).toBe(ESLINT_CACHE_FILE)
 	})
+
+	// joshuafolkken/kit#6684: a lane's gate skips the whole-tree lint, so each file it changed must
+	// still reach eslint for its violations to fail the gate.
+	it('hands eslint every changed file a lane gate narrows to', () => {
+		const changed = [SOURCE, path.join(ROOT, 'scripts', 'lint', 'lint-related-scope.ts')]
+		const scope = lint_gate_scope.resolve_gate_scope(changed, ROOT, NOT_CI)
+
+		expect(lint_gate_scope.narrowed_run(scope.files).eslint).toStrictEqual(
+			expect.arrayContaining(changed),
+		)
+	})
 })

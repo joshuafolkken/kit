@@ -1,6 +1,6 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import path from 'node:path'
+import { mkdirSync, rmSync } from 'node:fs'
 import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
@@ -31,26 +31,23 @@ function answer(exit_code: number, stdout: string): ExecaResult {
 	return { exitCode: exit_code, stdout, all: stdout } as unknown as ExecaResult
 }
 
-function write_file(relative: string, content: string): void {
-	const file = path.join(project_root, relative)
-
-	mkdirSync(path.dirname(file), { recursive: true })
-	writeFileSync(file, content)
-}
-
 // A checkout with an installed eslint and no daemon running yet.
 function installed(): void {
-	write_file('package.json', '{}')
-	write_file(`${ESLINT_DIRECTORY}/package.json`, '{}')
+	write_file(project_root, 'package.json', '{}')
+	write_file(project_root, `${ESLINT_DIRECTORY}/package.json`, '{}')
 }
 
 // A running daemon recorded under `recorded_under`, or under the fingerprint the checkout has now.
 function running(recorded_under?: string): void {
 	installed()
-	write_file(`${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+	write_file(project_root, `${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
 	const current = recorded_under ?? eslint_daemon.fingerprint(project_root)
 
-	write_file(`${ESLINT_DIRECTORY}/.eslint_d-toolchain`, eslint_daemon.record_text(DAEMON, current))
+	write_file(
+		project_root,
+		`${ESLINT_DIRECTORY}/.eslint_d-toolchain`,
+		eslint_daemon.record_text(DAEMON, current),
+	)
 }
 
 function spawned(): ReadonlyArray<unknown> {

@@ -1,9 +1,11 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { agent_role_profile, type AgentRole } from './agent-role-profile'
 import { claude_agent_argv, type ClaudeArgv } from './claude-agent-argv'
+
+const make_directory = temporary_directory()
 
 const INVOCATION = 'fullrun #2070'
 const CLAUDE_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
@@ -125,7 +127,7 @@ describe('Claude forced-session argv construction', () => {
 const MCP_CONFIG_FILE = '.mcp.json'
 
 function project_directory(has_mcp_config: boolean): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'kit-agent-argv-'))
+	const directory = make_directory('kit-agent-argv-')
 
 	if (has_mcp_config) writeFileSync(path.join(directory, MCP_CONFIG_FILE), '{"mcpServers":{}}\n')
 
