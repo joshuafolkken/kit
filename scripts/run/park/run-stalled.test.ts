@@ -28,6 +28,21 @@ describe('run_stalled.cause_of', () => {
 	})
 })
 
+// joshuafolkken/kit#6864: a park records the ship stop it was taken at, and an older park reads as none.
+describe('run_stalled.stop_of', () => {
+	const PARK = { pos: 1, at: '2026-11-09T00:00:00.000Z', kind: 'park', text: '#4188 parked' }
+
+	it('reads the stage and cause class a park recorded', () => {
+		const stop = { stage: 'followup', cause: 'check' }
+
+		expect(run_stalled.stop_of({ ...PARK, stop })).toStrictEqual(stop)
+	})
+
+	it('reads a park written before it carried a stop as none', () => {
+		expect(run_stalled.stop_of(PARK)).toBeUndefined()
+	})
+})
+
 describe('run_stalled.row_text', () => {
 	it('selects the live retry command from the shared resume source (ac-e988f4c9)', () => {
 		expect(run_stalled.row_text(CHILD, CAUSE, true)).toBe(
