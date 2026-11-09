@@ -90,12 +90,12 @@ async function read_offer(
 	context: DriveContext,
 ): Promise<OfferRead | undefined> {
 	const carry = await backlog_drive_owner.assert_current(context.owner)
-	const named = await backlog_drive_named_offer.read(carry, state, context)
+	const { offer: named, pool } = await backlog_drive_named_offer.read(carry, state, context)
 	// joshuafolkken/kit#6563: the open offer's read waits out a dry core allowance.
 	const answered = named ?? (await backlog_drive_rate_limit.held(state))
 	if (answered !== undefined) return answered
 
-	const argv = backlog_drive_offer_argv.offer_argv(state, carry, context.forwarded)
+	const argv = backlog_drive_offer_argv.offer_argv(pool, carry, context.forwarded)
 	const result = await backlog_drive_rate.offer_run(argv)
 
 	const offer = result.code === SUCCESS_EXIT_CODE ? to_offer(result.out) : undefined

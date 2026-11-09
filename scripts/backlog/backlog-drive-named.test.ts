@@ -61,6 +61,17 @@ test('offers the declared item past an added issue already in flight', () => {
 	expect(backlog_drive_named.offer(CARRY, declared, true)?.verdict).toBe('wait')
 })
 
+// joshuafolkken/kit#6883: with only `run:add`ed issues in flight left, the named side held the free
+// lanes on `wait` and never asked the pool.
+test('names nothing when every issue left is an added one in flight, so the pool is asked', () => {
+	const carry = { ...CARRY, done: [1, 2], added: [{ issue: 9, is_priority: false }] }
+	const running = backlog_drive.initial_state(['9'], ACTIVE)
+
+	expect(backlog_drive_named.offer(carry, running, false)).toBeUndefined()
+	expect(backlog_drive_named.offer(carry, running, true)?.verdict).toBe('wait')
+	expect(backlog_drive_named.next_of(carry, ['9'])).toBeUndefined()
+})
+
 // joshuafolkken/kit#4206: the issue a held one starts after, as `run:board` names it on the queued row.
 test('names the declared issue just before one the declared order holds', () => {
 	const carry = {
