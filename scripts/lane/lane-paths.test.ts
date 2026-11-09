@@ -146,6 +146,28 @@ describe('issue_here', () => {
 	})
 })
 
+// joshuafolkken/kit#6682: a main checkout and its lanes read one lanes root, so both count its lanes.
+describe('lanes_root_of', () => {
+	const lanes_root = lane_paths.lane_root(REPOSITORY_ROOT, {})
+
+	it('reads the root beside a main checkout', () => {
+		expect(lane_paths.lanes_root_of(REPOSITORY_ROOT, {})).toBe(lanes_root)
+	})
+
+	it("reads a lane's parent as its root", () => {
+		const lane = lane_paths.lane_directory(lanes_root, ISSUE)
+
+		expect(lane_paths.lanes_root_of(lane, {})).toBe(lanes_root)
+	})
+
+	it('reads a Claude Code worktree under a lane as that lane', () => {
+		const lane = lane_paths.lane_directory(lanes_root, ISSUE)
+		const worktree = path.join(lane, '.claude', 'worktrees', 'agent-1')
+
+		expect(lane_paths.lanes_root_of(worktree, {})).toBe(lanes_root)
+	})
+})
+
 // joshuafolkken/kit#3370: the stray sweep acts only on the names the lane machinery writes.
 describe('which names in a lanes root belong to the lane machinery', () => {
 	it.each([[ISSUE], ['.1665-lanes'], ['.app-kit-lanes']])('claims %j', (name) => {

@@ -305,37 +305,49 @@ describe('gate_plan.direct_unit_weight — the cores a direct unit run reserves'
 	it('weighs a lone run on the measured machine as the gate weighs its workers, plus vitest itself', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
 
-		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBe(
+		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0, 0)).toBe(
 			gate_plan.check_weight(unit_check(), plan, MEASURED_CORES) +
 				unit_worker_share.MAIN_PROCESS_CORES,
 		)
 	})
 
 	it('never claims the whole machine', () => {
-		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBeLessThan(MEASURED_CORES)
+		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0, 0)).toBeLessThan(MEASURED_CORES)
 	})
 
 	// joshuafolkken/kit#4607: the gate's sibling reservation sized a lone CI run to one worker.
 	it("claims vitest's default workers and vitest itself on a four-core runner", () => {
 		const vitest_default = CI_CORES - unit_worker_share.MAIN_PROCESS_CORES
 
-		expect(gate_plan.direct_unit_weight(CI_CORES, 0)).toBe(
+		expect(gate_plan.direct_unit_weight(CI_CORES, 0, 0)).toBe(
 			vitest_default + unit_worker_share.MAIN_PROCESS_CORES,
 		)
 	})
 
 	it('claims no more on a mid-sized machine than on the measured one', () => {
-		expect(gate_plan.direct_unit_weight(MID_SIZED_CORES, 0)).toBe(
-			gate_plan.direct_unit_weight(MEASURED_CORES, 0),
+		expect(gate_plan.direct_unit_weight(MID_SIZED_CORES, 0, 0)).toBe(
+			gate_plan.direct_unit_weight(MEASURED_CORES, 0, 0),
 		)
 	})
 
 	it('never shrinks as the machine grows', () => {
 		const weights = Array.from({ length: CORE_COUNTS_PROBED }, (_, index) =>
-			gate_plan.direct_unit_weight(index + 1, 0),
+			gate_plan.direct_unit_weight(index + 1, 0, 0),
 		)
 
 		expect(weights).toStrictEqual(weights.toSorted((left, right) => left - right))
+	})
+})
+
+// joshuafolkken/kit#6682: the claim follows the share the run opens, so the ledger holds no cores
+// beside idle lanes that no worker uses.
+describe('gate_plan.direct_unit_weight — dividing by the live lanes', () => {
+	it('claims only its lane share while several lanes are live', () => {
+		const lanes = 3
+
+		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0, lanes)).toBe(
+			Math.floor(MEASURED_CORES / lanes) + unit_worker_share.MAIN_PROCESS_CORES,
+		)
 	})
 })
 
@@ -367,7 +379,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
-			'plan: 6 of 8 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
+			'plan: 6 of 8 checks at once, test:unit at 1 workers (11 cores, 6 unit runs or lanes)',
 		)
 	})
 

@@ -75,9 +75,11 @@ function with_first(body: string, count: number): ReadonlyArray<string> {
 }
 
 const live_runs = vi.spyOn(unit_worker_share, 'live_run_count')
+const live_lanes = vi.spyOn(unit_worker_share, 'live_lane_count')
 
 beforeEach(() => {
 	live_runs.mockReturnValue(0)
+	live_lanes.mockReturnValue(0)
 	RECORDS.clear()
 })
 

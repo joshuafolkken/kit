@@ -89,6 +89,17 @@ function lane_issue_of(
 	return is_lane_root(path.dirname(resolved), environment) ? issue : undefined
 }
 
+// The lanes root a checkout belongs to: a lane's parent, or the root beside a main checkout. Two
+// checkouts of one repository share it. A Claude Code worktree under a checkout reads as that
+// checkout (`checkout_of`).
+function lanes_root_of(checkout: string, environment: LaneEnvironment = process.env): string {
+	const resolved = checkout_of(path.resolve(checkout))
+
+	if (lane_issue_of(resolved, environment) === undefined) return lane_root(resolved, environment)
+
+	return path.dirname(resolved)
+}
+
 // The lane `directory` (this process's own by default) sits in, as a number; `undefined` outside a
 // lane — the `issue` a ledger row written from inside a lane carries.
 function issue_here(
@@ -127,6 +138,7 @@ const lane_paths = {
 	lane_directory,
 	lane_issue_of,
 	lane_root,
+	lanes_root_of,
 }
 
 export type { LaneEnvironment }
