@@ -14,6 +14,11 @@ const WORKFLOW = [
 	'    needs: [static-checks, unit]',
 	'  deploy:',
 	'    needs: build',
+	'  release:',
+	'    name: Release',
+	'    uses: ./.github/workflows/release.yml',
+	'  publish:',
+	'    needs: release',
 ].join('\n')
 
 const SHARD = 'Unit Tests (5/6)'
@@ -47,6 +52,7 @@ describe('followup_job_needs.is_missing_need', () => {
 
 	it.each([
 		['every needed job is in the run', 'Checks', [STATIC_CHECKS, SHARD]],
+		['the needed reusable workflow ran its called job', 'publish', ['Release / pack']],
 		['the job needs nothing', STATIC_CHECKS, []],
 		['no workflow job is named so', 'Lint', []],
 	])('is false when %s', (_label, job_name, run_jobs) => {
