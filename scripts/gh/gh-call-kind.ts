@@ -42,8 +42,8 @@ const NAME_AFTER = new Map([
 	['compare', '{range}'],
 ])
 
-function placeholder_of(segment: string, previous: string | undefined): string {
-	const named = NAME_AFTER.get(previous ?? '')
+function placeholder_of(segment: string, previous = ''): string {
+	const named = NAME_AFTER.get(previous)
 	if (named !== undefined) return named
 	if (NUMBER.test(segment)) return '{n}'
 

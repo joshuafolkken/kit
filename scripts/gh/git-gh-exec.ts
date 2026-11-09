@@ -438,12 +438,12 @@ function exec_gh_api_sync(request: GhApiRequest): string {
 	refuse_credential_body(request)
 	const body_option = request.body === undefined ? {} : { input: request.body }
 	const options = { ...body_option, ...to_spawn_options(request.timeout_ms, request.cwd) }
-	const arguments_ = to_gh_api_args(request)
+	const gh_arguments = to_gh_api_args(request)
 
-	gh_request_tally.count_call(gh_call_kind.of(arguments_))
+	gh_request_tally.count_call(gh_call_kind.of(gh_arguments))
 
 	try {
-		const { stdout } = execaSync('gh', arguments_, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+		const { stdout } = execaSync('gh', gh_arguments, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return stdout.trimEnd()
 	} catch (error) {
