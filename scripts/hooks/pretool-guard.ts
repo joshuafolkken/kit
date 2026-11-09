@@ -13,6 +13,7 @@ import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_revert } from './bash-revert'
 import { batch_outcome } from './batch-guard'
 import { direct_gh_usage } from './direct-gh-usage'
+import { hook_demoted } from './hook-demoted'
 import { hook_ledger } from './hook-ledger'
 import { implementation_authority } from './implementation-authority'
 import { lane_plan_guard } from './lane-plan-guard'
@@ -47,15 +48,22 @@ function is_clear(outcome: GuardOutcome): boolean {
 // separate hooks had: the outcomes in the order given, then the rule guard's reason. When nothing
 // refuses, the first guard that spoke passes its notice or fault through untouched — so a lane child's
 // `notice`-mode guidance reaches the model rather than only spending its stamp (joshuafolkken/kit#3877).
+// A refusal from a demoted rule yields to any other refusal and otherwise speaks as a notice
+// (`hook-demoted.ts`, joshuafolkken/kit#6591).
 function combine_outcomes(
 	outcomes: ReadonlyArray<GuardOutcome>,
 	rule_reason: string | undefined,
+	demoted: ReadonlySet<string> = hook_demoted.rules(),
 ): GuardOutcome {
-	const reason = outcomes.find((outcome) => outcome.reason !== undefined)?.reason ?? rule_reason
+	const reasons = [...outcomes.map((outcome) => outcome.reason), rule_reason].filter(
+		(reason) => reason !== undefined,
+	)
 
-	if (reason !== undefined) return { reason, notice: undefined, fault: undefined }
-
-	return outcomes.find((outcome) => !is_clear(outcome)) ?? CLEAR
+	return (
+		hook_demoted.verdict(reasons, demoted) ??
+		outcomes.find((outcome) => !is_clear(outcome)) ??
+		CLEAR
+	)
 }
 
 // The once-per-session reminders are the last word: asked only where every guard stayed clear, so a
@@ -159,7 +167,7 @@ async function async_reason(raw_payload: string): Promise<string | undefined> {
 async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome> {
 	const base = guard_outcome(raw_payload)
 
-	if (!is_clear(base)) return base
+	if (base.reason !== undefined) return base
 
 	const reason = await async_reason(raw_payload)
 
@@ -229,9 +237,16 @@ function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite)
 }
 
 // The ledger line for a judged call — written by both harnesses' entries, after their verdict. An
-// allowed call also counts the `gh` it launches (`direct-gh-usage.ts`); a refused one never runs.
-async function record_refusal(judged_payload: string, outcome: GuardOutcome): Promise<void> {
-	await hook_ledger.record_reason(HOOK_NAME, outcome.reason, judged_payload)
+// allowed call also counts the `gh` it launches (`direct-gh-usage.ts`); a refused one never runs. A
+// demoted rule's notice is recorded as the refusal it stood for, though its call runs.
+async function record_refusal(
+	judged_payload: string,
+	outcome: GuardOutcome,
+	demoted: ReadonlySet<string> = hook_demoted.rules(),
+): Promise<void> {
+	const refusal = outcome.reason ?? hook_demoted.refusal_of(outcome.notice, demoted)
+
+	await hook_ledger.record_reason(HOOK_NAME, refusal, judged_payload)
 
 	if (outcome.reason === undefined) await direct_gh_usage.record(judged_payload)
 }

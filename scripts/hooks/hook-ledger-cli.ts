@@ -5,22 +5,30 @@ import { lane_stats_request } from '#scripts/lane/lane-stats-request'
 import { lane_transcript_calls, type ToolCall } from '#scripts/lane/lane-transcript-calls'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { hook_demoted } from './hook-demoted'
 import { hook_ledger } from './hook-ledger'
+import { hook_ledger_demote } from './hook-ledger-demote'
 import { hook_ledger_issues, type InterruptIssue } from './hook-ledger-issues'
 import { hook_ledger_read, type LedgerGroup, type LedgerLine } from './hook-ledger-read'
 
 // `josh hook:ledger --period <days>` — the hook ledger's refusals over a trailing period, one row per
 // hook and rule (joshuafolkken/kit#6664): how often the rule refused, how many of those refusals the
 // same session's same call later went through (an approximation of a wrong refusal), and how many
-// `route:interrupt` Issues name the rule.
+// `route:interrupt` Issues name the rule. `--demote [--apply]` and `--restore <rule>` act on those
+// counts instead (joshuafolkken/kit#6591, `hook-ledger-demote.ts`).
 //
 // **A call is matched by its tool and the head the ledger keeps** (`hook_ledger.command_of`, which the
 // transcript reader applies to every call too), the ledger carrying no tool-use id; a later call that came back without `is_error` went through.
 
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh hook:ledger --period <days>'
+const USAGE = 'Usage: josh hook:ledger --period <days> [--demote [--apply]] | --restore <rule>'
 const NO_LEDGER = 'josh hook:ledger: no hook ledger outside a git repository'
-const OPTIONS = { period: { type: 'string' } } as const
+const OPTIONS = {
+	period: { type: 'string' },
+	demote: { type: 'boolean' },
+	apply: { type: 'boolean' },
+	restore: { type: 'string' },
+} as const
 const NO_REFUSALS = 'josh hook:ledger: no refusals in the last'
 const UNKNOWN = 'unknown'
 const ESCAPED_PIPE = String.raw`\|`
@@ -31,16 +39,39 @@ interface LedgerContext {
 	directory: string | undefined
 	now: Date
 	read_issues: (start_ms: number) => Promise<ReadonlyArray<InterruptIssue> | undefined>
+	demoted_file: string
+}
+
+interface LedgerValues {
+	period?: string | undefined
+	demote?: boolean | undefined
+	apply?: boolean | undefined
+	restore?: string | undefined
+}
+
+interface LedgerRequest {
+	period_days: number
+	is_demote: boolean
+	should_apply: boolean
 }
 
 type PassedLines = ReadonlyArray<LedgerLine>
 
-function period_of(argv: ReadonlyArray<string>): number | undefined {
+function values_of(argv: ReadonlyArray<string>): LedgerValues | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
-	if (parsed === undefined || parsed.positionals.length > 0) return undefined
+	return parsed === undefined || parsed.positionals.length > 0 ? undefined : parsed.values
+}
 
-	return lane_stats_request.positive(parsed.values.period)
+// `--apply` only beside `--demote`, which reads the period the table does.
+function request_of(values: LedgerValues): LedgerRequest | undefined {
+	const period_days = lane_stats_request.positive(values.period)
+	const is_demote = values.demote === true
+	const should_apply = values.apply === true
+
+	if (period_days === undefined || (should_apply && !is_demote)) return undefined
+
+	return { period_days, is_demote, should_apply }
 }
 
 // A session whose transcript is gone, or was never named, reads as no calls.
@@ -116,19 +147,41 @@ function table(rows: ReadonlyArray<ReadonlyArray<string>>): string {
 	return [HEADER, rule, ...rows].map((cells) => table_line(cells)).join('\n')
 }
 
-async function report(
-	directory: string,
+async function table_report(
+	lines: ReadonlyArray<LedgerLine>,
 	period_days: number,
 	context: LedgerContext,
 ): Promise<string> {
-	const lines = await hook_ledger_read.read_lines(directory, period_days, context.now)
-
-	if (lines.length === 0) return `${NO_REFUSALS} ${String(period_days)} day(s)`
-
 	const start_ms = hook_ledger_read.period_start(period_days, context.now)
 	const [passed, issues] = await Promise.all([read_passed(lines), context.read_issues(start_ms)])
 
 	return table(hook_ledger_read.group(lines).map((group) => row_of(group, passed, issues)))
+}
+
+async function demote_report(
+	lines: ReadonlyArray<LedgerLine>,
+	should_apply: boolean,
+	context: LedgerContext,
+): Promise<string> {
+	const passed = await read_passed(lines)
+	const rules = hook_ledger_demote.candidates(hook_ledger_read.group(lines), passed)
+
+	return await hook_ledger_demote.report(rules, should_apply, context.demoted_file)
+}
+
+async function report(
+	directory: string,
+	request: LedgerRequest,
+	context: LedgerContext,
+): Promise<string> {
+	const { period_days } = request
+	const lines = await hook_ledger_read.read_lines(directory, period_days, context.now)
+
+	if (lines.length === 0) return `${NO_REFUSALS} ${String(period_days)} day(s)`
+
+	return request.is_demote
+		? await demote_report(lines, request.should_apply, context)
+		: await table_report(lines, period_days, context)
 }
 
 function default_context(): LedgerContext {
@@ -136,24 +189,49 @@ function default_context(): LedgerContext {
 		directory: hook_ledger.ledger_directory(),
 		now: new Date(),
 		read_issues: hook_ledger_issues.read,
+		demoted_file: hook_demoted.DEMOTED_FILE,
 	}
+}
+
+function refused(message: string): number {
+	console.error(message)
+
+	return 1
+}
+
+// `--restore <rule>` stands alone: it reads no ledger, so a period beside it is a usage error.
+async function restore(
+	values: LedgerValues,
+	rule: string,
+	context: LedgerContext,
+): Promise<number> {
+	if (Object.keys(values).length > 1) return refused(USAGE)
+
+	console.info(await hook_ledger_demote.restore(rule, context.demoted_file))
+
+	return 0
+}
+
+async function answer(values: LedgerValues, context: LedgerContext): Promise<number> {
+	if (values.restore !== undefined) return await restore(values, values.restore, context)
+
+	const request = request_of(values)
+
+	if (request === undefined) return refused(USAGE)
+	if (context.directory === undefined) return refused(NO_LEDGER)
+
+	console.info(await report(context.directory, request, context))
+
+	return 0
 }
 
 async function run(
 	argv: ReadonlyArray<string>,
 	context: LedgerContext = default_context(),
 ): Promise<number> {
-	const period_days = period_of(argv)
+	const values = values_of(argv)
 
-	if (period_days === undefined || context.directory === undefined) {
-		console.error(period_days === undefined ? USAGE : NO_LEDGER)
-
-		return 1
-	}
-
-	console.info(await report(context.directory, period_days, context))
-
-	return 0
+	return values === undefined ? refused(USAGE) : await answer(values, context)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

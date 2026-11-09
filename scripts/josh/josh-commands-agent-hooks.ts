@@ -42,15 +42,29 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		// composes loads `.env` through the shared loader instead.
 	},
 	// The hook ledger read per rule (joshuafolkken/kit#6664): which rules refuse, and how often wrongly.
+	// `--apply` / `--restore` write the demoted-rules file (joshuafolkken/kit#6591).
 	'hook:ledger': {
 		script: 'scripts/hooks/hook-ledger-cli.ts',
 		is_read_only: true,
+		write_flags: ['--apply', '--restore'],
 		description:
-			'Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule',
+			'Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule; list, demote or restore rules that mostly refuse allowed work',
 		category: 'Development',
-		reference: ['--period <days>', 'maintainer', ['network']],
+		reference: [
+			'--period <days> [--demote [--apply]] | --restore <rule>',
+			'maintainer',
+			['network', 'files'],
+		],
 		usage: {
-			examples: [{ arguments: '--period 7', note: "a 7-day period's refusals per rule" }],
+			examples: [
+				{ arguments: '--period 7', note: "a 7-day period's refusals per rule" },
+				{ arguments: '--period 7 --demote', note: 'rules to demote from blocking to notice' },
+				{
+					arguments: '--period 7 --demote --apply',
+					note: 'record them in .josh/hook-demoted.json',
+				},
+				{ arguments: '--restore batching', note: 'make a demoted rule block again' },
+			],
 		},
 	},
 	'stop:guard': {

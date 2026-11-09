@@ -11,7 +11,7 @@ draining — the failure guard, `--idle 0` — still prints it at the stop posit
 
 ## The digest is read, not skimmed
 
-The command `run:step` prints folds four existing measurements into one digest — it adds none:
+`run:step`'s digest folds four existing measurements into one — it adds none:
 
 - **Run cost & time by role.** A role whose wall-clock share runs ahead of its cost share is marked
   `waiting-heavy` — a candidate improvement, not a verdict: some roles wait by design.
@@ -22,6 +22,8 @@ The command `run:step` prints folds four existing measurements into one digest �
 
 The two targets are **the run itself** (sections one, three, four) and **the repository** (section two,
 and anything the run surfaced that lives outside it).
+
+Weekly → `pnpm josh hook:ledger --period 7 --demote`.
 
 ## What to file — the digest's `Improvement picks`
 
@@ -43,7 +45,7 @@ with `pnpm josh issue:file`, which scouts — an **open** candidate covering it 
 `- 人の判断: 不要`, so `issue:file` applies the label (with the run label
 `prompts/collaboration-workflow/issue-template.md` requires). **`backlogrun-steps.md` → "What one
 invocation approves" is that judgement's single source.** Every brake still counts these filings: the
-ten-per-origin ceiling (with no origin, counted with the invocation's other no-origin filings), the WIP cap, `--max` and the `pnpm josh cost --cut` session budget.
+ten-per-origin ceiling (no-origin filings counted together), the WIP cap, `--max` and the `pnpm josh cost --cut` session budget.
 
 **Close with `pnpm josh run:carry --retrospective --summary "<result>"`.** It marks the
 carry record so `run:step` prints `stop` from then on; the mark survives a session cut and is removed at
@@ -52,4 +54,4 @@ written as a `retrospective` event, so a zero-filing retrospective differs from 
 the issues filed (or none) and the candidates dropped with why.
 
 **A dispatched lane child never reaches any of this** — the batch runs it at its own end; `run:step`
-answers `stop` for a lane child at the stop position.
+answers a lane child `stop` there.
