@@ -19,7 +19,8 @@ const MINUTE_MS = 60_000
 // joshuafolkken/kit#3439: the board reads the running run, else the one that last ended, and keeps the
 // next run's events off an ended run's board.
 
-const { AFTER, CARRY, ENDED_AT, INSIDE, REPOSITORY, arrange, lane } = run_board_read_fixture
+const { AFTER, CARRY, ENDED_AT, INSIDE, REPOSITORY, arrange, arrange_states, lane } =
+	run_board_read_fixture
 const STARTED_AT = '2026-10-08T09:00:00.000Z'
 const NONE: CarryRead = { kind: 'none' }
 const EPIC_RUN = 'backlogrun #3431 --only'
@@ -132,7 +133,7 @@ describe('run_board_read.read_local', () => {
 			is_stranded: false,
 			operations: { lanes: [], owner: undefined, judgment: undefined },
 			// joshuafolkken/kit#4269: the open lane has no record, so it is unknown.
-			lane_states: { own: new Map(), earlier: new Map(), unknown: ['3432'] },
+			lane_states: { own: new Map(), earlier: new Map(), unknown: ['3432'], ended: new Map() },
 			idle_lanes: [],
 			...LANE_ROOM,
 			usual: new Map(),
@@ -306,12 +307,6 @@ function record_of(issue: string, run_started_at: string): LaneStateRecord {
 		changed_at: run_started_at,
 		changed_by: 'lane:dispatch',
 	}
-}
-
-function arrange_states(records: ReadonlyArray<LaneStateRecord>): void {
-	const by_issue = new Map(records.map((record) => [record.issue, record]))
-
-	vi.mocked(lane_state.read_states).mockResolvedValue(by_issue)
 }
 
 // joshuafolkken/kit#3969, #4269: a lane an earlier run left behind was drawn as this run's child.

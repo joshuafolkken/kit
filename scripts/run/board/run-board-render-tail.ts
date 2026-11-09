@@ -69,14 +69,23 @@ function column_width(header: BoardHeader, age_of: (row: BoardRow) => number | u
 	return Math.max(span_of(0).length, ...spans)
 }
 
+// What a phase is timed up to: now for a running row, the stop for a stopped lane's — so its phase time
+// freezes there (joshuafolkken/kit#6577); `undefined` for any other row.
+function phase_end(row: BoardRow, header: BoardHeader): number | undefined {
+	if (is_live(row)) return header.now_ms
+
+	return row.state === 'stopped' ? row.status?.ended_ms : undefined
+}
+
 // How long the child has stood at its phase, right-aligned to `width` and colored against the phase's
 // usual time; blanks where no event said when it got there, so what follows still starts in its column.
 function phase_time(row: BoardRow, header: BoardHeader, width: number): string {
-	const current = is_live(row) ? current_of(row) : undefined
+	const current = current_of(row)
+	const end = phase_end(row, header)
 
-	if (current === undefined) return ' '.repeat(width)
+	if (current === undefined || end === undefined) return ' '.repeat(width)
 
-	const elapsed = header.now_ms - current.since_ms
+	const elapsed = end - current.since_ms
 	const text = span_of(elapsed).padStart(width)
 
 	return tinted(text, phase_color(elapsed, header.usual?.get(current.phase)))

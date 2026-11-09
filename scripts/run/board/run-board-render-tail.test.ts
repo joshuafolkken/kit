@@ -133,6 +133,19 @@ describe('run_board_render_tail.tail_of phase time', () => {
 	})
 })
 
+// joshuafolkken/kit#6577: a stopped row's phase time stops where its lane stopped.
+describe('run_board_render_tail.phase_time of a stopped row', () => {
+	it('freezes a stopped row at its stop, however far now has moved', () => {
+		const row = running(2)
+		const status = { ...row.status, state: 'stopped' as const, ended_ms: NOW - 5 * MINUTE }
+		const stopped: BoardRow = { ...row, state: 'stopped', status }
+		const frozen = '3′00″'.padStart(TIME_WIDTH)
+
+		expect(time_of(stopped)).toBe(frozen)
+		expect(time_of(stopped, { now_ms: NOW + 60 * MINUTE })).toBe(frozen)
+	})
+})
+
 describe('run_board_render_tail.tail_of activity', () => {
 	it('draws the newest event’s phase icon and its age, and no phase time', () => {
 		expect(tail(running(1))).toStrictEqual([ACTIVITY])
