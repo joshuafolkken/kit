@@ -12,10 +12,13 @@ These replace the corresponding `package.json` scripts; consumers need not add t
 
 <!-- usage: completion -->
 
-Print command names and aliases for shell completion.
+Print command names and aliases, or a shell completion script.
 
 ```bash
 pnpm josh completion --names
+pnpm josh completion zsh
+pnpm josh completion bash
+pnpm josh completion fish
 ```
 
 <!-- /usage -->
@@ -564,6 +567,24 @@ pnpm josh issue:tick 6233 ac-a1f32a2f ac-8647b0dd
 <!-- /usage -->
 
 Use the `ac-…` identifiers printed in the plan's acceptance map. Unknown identifiers refuse the whole update. Repeating a checked criterion is a no-op. Other sections, formatting and line endings are preserved.
+
+### `josh issue:consolidate`
+
+<!-- usage: issue:consolidate -->
+
+Fold duplicates into a target: untrack, close as not planned; a failed write lists the writes done.
+
+```bash
+pnpm josh issue:consolidate 6559 6567 6568 --body-file .josh/tmp/body.md --demote
+```
+
+**Options:**
+
+- `--title <title>` — replace the target's title.
+- `--body-file <path>` — replace the target's body, from a file or stdin (`-`). Target author needs write access.
+- `--demote` — remove the `epic` label and the `## Split into children` sections from the body.
+
+<!-- /usage -->
 
 ### `josh pr:classification`
 
