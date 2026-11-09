@@ -44,7 +44,6 @@ const WORKFLOW = [
 const SHARD = 'Unit Tests (5/6)'
 const STATIC_CHECKS = 'Static Checks'
 const NEEDS_NOTHING = 'the job needs nothing'
-const IS_FALSE_WHEN = 'is false when %s'
 
 describe('followup_job_needs.is_waiting_on', () => {
 	const graph = followup_job_needs.parse_graph(WORKFLOW)
@@ -77,7 +76,7 @@ describe('followup_job_needs.is_missing_need', () => {
 		['the needed reusable workflow ran its called job', 'publish', ['Release / pack']],
 		[NEEDS_NOTHING, STATIC_CHECKS, []],
 		['no workflow job is named so', 'Lint', []],
-	])(IS_FALSE_WHEN, (_label, job_name, run_jobs) => {
+	])('is false when %s', (_label, job_name, run_jobs) => {
 		expect(followup_job_needs.is_missing_need(graph, job_name, run_jobs)).toBe(false)
 	})
 })
@@ -108,7 +107,7 @@ describe('followup_job_needs.is_gate_of_successes', () => {
 		['the run lacks a needed job', sonar, []],
 		['it failed in a step not reading the needs', run_job(SONAR, FAILURE, 'Scan'), [scope]],
 		[NEEDS_NOTHING, run_job(SCOPE, FAILURE, GUARD), [scope]],
-	])(IS_FALSE_WHEN, (_label, job, run_jobs) => {
+	])('is false for a gate when %s', (_label, job, run_jobs) => {
 		expect(followup_job_needs.is_gate_of_successes(graph, job, run_jobs)).toBe(false)
 	})
 })
