@@ -74,6 +74,27 @@ describe('gh_request_tally — per call kind', () => {
 	})
 })
 
+// joshuafolkken/kit#6965: a spawned child's handed tally joins this process's.
+describe('gh_request_tally.absorb', () => {
+	it('adds a handed tally to the totals and to each kind', () => {
+		gh_request_tally.count_call(KIND)
+		gh_request_tally.absorb({
+			calls: 2,
+			not_modified: 1,
+			endpoints: { [KIND]: { calls: 1, not_modified: 1 }, graphql: { calls: 1, not_modified: 0 } },
+		})
+
+		expect(gh_request_tally.snapshot()).toStrictEqual({
+			calls: 3,
+			not_modified: 1,
+			endpoints: {
+				[KIND]: { calls: 2, not_modified: 1 },
+				graphql: { calls: 1, not_modified: 0 },
+			},
+		})
+	})
+})
+
 describe('gh_request_tally.core_delta', () => {
 	it('reads once before the first counted call and answers the difference at the end', async () => {
 		const read = reader_of(START, END)

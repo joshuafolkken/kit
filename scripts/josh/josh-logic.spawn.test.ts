@@ -9,6 +9,8 @@ vi.mock('node:fs', () => ({
 	constants,
 	existsSync: vi.fn().mockReturnValue(false),
 	readFileSync: vi.fn().mockReturnValue('{"version":"0.0.0"}'),
+	// The gh tally handoff removes its file after a spawn (joshuafolkken/kit#6965).
+	rmSync: vi.fn(),
 }))
 
 const { COMMAND_MAP, josh_logic, SPAWN_ERROR_EXIT_CODE, USAGE_ERROR_EXIT_CODE } =
