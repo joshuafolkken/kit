@@ -125,12 +125,21 @@ function missing_context_error(
 const BLOCKED_LEAD = 'BLOCKED: '
 const MERGE_STATE_LEAD = 'mergeStateStatus: '
 
+// The required checks and the base branch's required contexts the snapshot holds no check-run for.
+function absent_required(
+	snapshot: PrStateSnapshot,
+	required_checks: ReadonlyArray<string>,
+): Array<string> {
+	const required = [...new Set([...required_checks, ...(snapshot.required_contexts ?? [])])]
+
+	return absent_from(snapshot.rollup, required)
+}
+
 function blocked_cause(
 	snapshot: PrStateSnapshot,
 	required_checks: ReadonlyArray<string>,
 ): string | undefined {
-	const required = [...new Set([...required_checks, ...(snapshot.required_contexts ?? [])])]
-	const absent = absent_from(snapshot.rollup, required)
+	const absent = absent_required(snapshot, required_checks)
 	if (absent.length > 0) return `${BLOCKED_LEAD}${absent.join(', ')} missing`
 	if (snapshot.merge_state_status === undefined) return undefined
 
@@ -142,6 +151,7 @@ function is_blocked_cause(message: string): boolean {
 }
 
 export {
+	absent_required,
 	blocked_cause,
 	collect_missing_contexts,
 	describe_missing_context,
