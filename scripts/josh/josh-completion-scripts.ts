@@ -28,6 +28,8 @@ compdef _josh_pnpm pnpm`
 
 // bash splits words at the colons in names like \`run:step\`, so the position and the word being
 // completed are read from the line itself, and the part before the last colon is trimmed off each reply.
+// bash-completion 2 loads pnpm's completer only on its first Tab, which josh's own spec would then
+// prevent, so the loader is run first to have a completer to wrap.
 const BASH_SCRIPT = `# josh completion for bash — enable with: eval "$(josh completion bash)"
 _josh_complete_names() {
 	local line=\${COMP_LINE:0:COMP_POINT}
@@ -47,6 +49,9 @@ _josh_pnpm_complete() {
 		"$_josh_pnpm_previous" "$@"
 	fi
 }
+if ! complete -p pnpm >/dev/null 2>&1 && declare -F _completion_loader >/dev/null; then
+	_completion_loader pnpm
+fi
 _josh_pnpm_spec=$(complete -p pnpm 2>/dev/null)
 _josh_pnpm_pattern='-F ([^ ]+)'
 if [[ $_josh_pnpm_spec =~ $_josh_pnpm_pattern && \${BASH_REMATCH[1]} != _josh_pnpm_complete ]]; then

@@ -24,10 +24,17 @@ function has_shell(shell: string): boolean {
 	return !execaSync(shell, ['--version'], { reject: false }).failed
 }
 
-function bash_complete(line: string, completer: string): string {
+// bash-completion 2's lazy loader: no pnpm spec until it runs, then pnpm's own completer.
+const BASH_LAZY_STUBS = `
+josh() { printf '%s\\n' gate; }
+_pnpm_lazy() { COMPREPLY=(lazy); }
+_completion_loader() { [[ $1 == pnpm ]] && complete -F _pnpm_lazy pnpm; }
+`
+
+function bash_complete(line: string, completer: string, stubs = BASH_STUBS): string {
 	const script = josh_completion_scripts.completion_script('bash') ?? ''
 	const call = `COMP_LINE='${line}'; COMP_POINT=\${#COMP_LINE}; ${completer}; printf '%s\\n' "\${COMPREPLY[@]}"`
-	const result = execaSync('bash', ['--norc', '-c', `${BASH_STUBS}\n${script}\n${call}`], {
+	const result = execaSync('bash', ['--norc', '-c', `${stubs}\n${script}\n${call}`], {
 		reject: false,
 	})
 
@@ -35,10 +42,10 @@ function bash_complete(line: string, completer: string): string {
 }
 
 describe('josh_completion_scripts.completion_script', () => {
-	it.each(josh_completion_scripts.SHELLS)(
+	it.for(josh_completion_scripts.SHELLS)(
 		'returns a %s script its shell parses (ac-272accff)',
-		(shell) => {
-			if (!has_shell(shell)) return
+		(shell, { skip }) => {
+			skip(!has_shell(shell), `${shell} is not installed`)
 
 			const script = josh_completion_scripts.completion_script(shell) ?? ''
 			const flags = SYNTAX_CHECK_FLAGS.get(shell) ?? []
@@ -64,5 +71,9 @@ describe('josh_completion_scripts — the bash script', () => {
 	it.runIf(has_shell('bash'))('leaves other pnpm completions to the earlier completer', () => {
 		expect(bash_complete('pnpm ins', '_josh_pnpm_complete')).toBe('delegated')
 		expect(bash_complete('josh gate ', '_josh_complete')).toBe('')
+	})
+
+	it.runIf(has_shell('bash'))('loads a lazily loaded pnpm completer before wrapping it', () => {
+		expect(bash_complete('pnpm ins', '_josh_pnpm_complete', BASH_LAZY_STUBS)).toBe('lazy')
 	})
 })
