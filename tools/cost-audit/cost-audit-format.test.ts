@@ -75,6 +75,7 @@ describe('cost_audit_format.report_lines — the full cache rewrites', () => {
 })
 
 const IMPLEMENT_READ = 'implement: read'
+const OPUS = 'claude-opus-4-6'
 
 // joshuafolkken/kit#5936: the lane requests by phase, the four token kinds beside the cost.
 describe('cost_audit_format.report_lines — the phase table', () => {
@@ -90,9 +91,7 @@ describe('cost_audit_format.report_lines — the phase table', () => {
 	// joshuafolkken/kit#6899: under the row, each model's dollars by the same four token types.
 	it('prints each model of a phase under it with its dollars by token type', () => {
 		const tokens = { input: 0, cache_read: 0, cache_write: 0, output: 0 }
-		const models = [
-			{ model: 'claude-opus-4-6', input: 0.5, cache_read: 1, cache_write: 0.25, output: 0.75 },
-		]
+		const models = [{ model: OPUS, input: 0.5, cache_read: 1, cache_write: 0.25, output: 0.75 }]
 		const lines = cost_audit_format.report_lines(
 			audit_with({ phases: [{ key: IMPLEMENT_READ, tokens, usd: 2.5, models }] }),
 		)
@@ -134,12 +133,32 @@ describe('cost_audit_format.report_lines — the agent type table', () => {
 	})
 })
 
+const FULLRUN_LINE = '  fullrun: $9.0000 (prev $12.0000, -25.0%)'
+
+// joshuafolkken/kit#6913: a kind row carries its current-period model lines, as a phase row does.
+describe('cost_audit_format.report_lines — the session kinds by model', () => {
+	it('prints each model of a session kind under it with its dollars by token type', () => {
+		const models = [{ model: OPUS, input: 4, cache_read: 2, cache_write: 1, output: 2 }]
+		const lines = cost_audit_format.report_lines(
+			audit_with({ kinds: [{ ...row('fullrun', 9, 12), models }] }),
+		)
+		const kind = lines.indexOf(FULLRUN_LINE)
+
+		expect(lines[kind - 1]).toBe(
+			'By session kind (this period per model: cost — input / cache read / cache write / output in dollars)',
+		)
+		expect(lines[kind + 1]).toBe(
+			'    claude-opus-4-6: $9.0000 — $4.0000 / $2.0000 / $1.0000 / $2.0000',
+		)
+	})
+})
+
 describe('cost_audit_format.report_lines — the printed report', () => {
 	it('prints each row with its change against the previous period', () => {
 		const lines = cost_audit_format.report_lines(audit_with({ kinds: [row('fullrun', 9, 12)] }))
 
 		expect(lines).toContain('  total: $12.0000 (prev $10.0000, +20.0%)')
-		expect(lines).toContain('  fullrun: $9.0000 (prev $12.0000, -25.0%)')
+		expect(lines).toContain(FULLRUN_LINE)
 	})
 
 	it('marks a row with no previous figure as new, and an empty section as none', () => {
