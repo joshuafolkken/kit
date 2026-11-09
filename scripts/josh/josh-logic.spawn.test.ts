@@ -142,6 +142,17 @@ describe('josh_logic.run_command — the .env flag', () => {
 		expect(execa_sync_mock).toHaveBeenCalledOnce()
 		expect(execa_sync_mock.mock.calls[0]?.[1]).not.toContain(environment_flag)
 	})
+
+	// joshuafolkken/kit#6965: the spawned child names the file it hands its gh tally back through.
+	it('spawns a script command with the gh tally handoff file in its environment', async () => {
+		const name = Object.keys(COMMAND_MAP).find((key) => COMMAND_MAP[key]?.tsx_arguments)
+
+		await josh_logic.run_command(name ?? '', [])
+
+		expect(execa_sync_mock.mock.calls[0]?.[2]).toMatchObject({
+			env: { JOSH_GH_TALLY_FILE: expect.any(String) },
+		})
+	})
 })
 
 // Direct heavy commands must reserve their declared weight through the common dispatch so they

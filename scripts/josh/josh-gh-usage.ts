@@ -51,8 +51,8 @@ async function recorded<T>(
 
 // A spawned child counts its calls in its own process (joshuafolkken/kit#6965): `run` starts it with
 // the handoff file in its environment, and the child's handed tallies join this process's, so the
-// line `recorded` writes counts them. The child's core readings stay in the child, so the line
-// carries no difference for its calls.
+// line `recorded` writes counts them. The child takes no core reading; the difference covers its
+// calls only when this process called gh before the spawn, and is none otherwise.
 function from_child<T>(run: (environment: Record<string, string>) => T): T {
 	const target = gh_tally_handoff.target_path()
 

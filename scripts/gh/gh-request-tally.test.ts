@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gh_request_tally, type CoreUsage } from './gh-request-tally'
+import { gh_tally_handoff } from './gh-tally-handoff'
 
 // joshuafolkken/kit#6694: the process-wide counts of gh requests and 304 answers.
 // joshuafolkken/kit#6697: the core `used` difference around the process's calls.
@@ -92,6 +93,27 @@ describe('gh_request_tally.absorb', () => {
 				graphql: { calls: 1, not_modified: 0 },
 			},
 		})
+	})
+})
+
+describe('gh_request_tally.count_call — the handoff', () => {
+	it('arms the handoff for a process that does not watch the allowance', () => {
+		const arm = vi.spyOn(gh_tally_handoff, 'arm').mockReturnValue(undefined)
+
+		gh_request_tally.count_call(KIND)
+
+		expect(arm).toHaveBeenCalledTimes(1)
+		arm.mockRestore()
+	})
+
+	it('leaves the handoff unarmed for a process that watches the allowance', () => {
+		const arm = vi.spyOn(gh_tally_handoff, 'arm').mockReturnValue(undefined)
+
+		gh_request_tally.watch_core(reader_of(START, END))
+		gh_request_tally.count_call(KIND)
+
+		expect(arm).not.toHaveBeenCalled()
+		arm.mockRestore()
 	})
 })
 
