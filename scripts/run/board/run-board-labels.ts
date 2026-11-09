@@ -33,7 +33,17 @@ const DEFAULT_FOREGROUND = `${ESC}[39m`
 
 // The words the board draws, English whatever the session language: one set of words reads the same
 // on every board. The board draws most of what it says as a symbol; the words left are the ones a
-// symbol cannot carry, and the legend that names the symbols.
+// symbol cannot carry, and the legend that names the symbols. **How the board spells a word, decided
+// here alone:**
+// - a proper noun or an acronym in its own spelling — `Claude`, `Codex`, `GitHub`, `REST`, `GraphQL`,
+//   `PR`, `CPU`, `CodeRabbit`;
+// - a column heading in capitals — `ACTIVE`, `DONE`, `PEAK`, `NOW`, `CPU`, `MEM`, `CMPRS` — so the
+//   `✅ DONE` column reads apart from the `✅ done 18` section on the same rule;
+// - a section name, a state word or a legend entry in lower case — `throughput`, `usage`, `lanes`,
+//   `queued`, `over budget`;
+// - a command, a repository, a unit or an OS process as it is spelled — `backlogrun`, `kit`, `24h`,
+//   `7d`, `/h`, `node`, the processes line's `claude`;
+// - a marker followed by one space — `▶ GraphQL`, as `▶ backlogrun`.
 const WORDS = {
 	no_run: 'no run',
 	plan: 'plan',
