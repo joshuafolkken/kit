@@ -962,6 +962,8 @@ pnpm josh gh:usage --since 2026-11-08T00:00Z   # the lines at or after an instan
 - Reads the one file each josh process appends to (`scripts/gh/gh-usage-log.ts`, newest 2000 lines); the heading names the period and line count.
 - A hook-recorded direct `gh` call is its own `direct:<subcommand>` row.
 - `core Δ` sums the lines that carry a reading; `—` means none did.
+- Below the command table, the calls and 304s per endpoint, most calls first (`scripts/gh/gh-call-kind.ts`): REST as method and normalized path (`GET repos/{o}/{r}/issues/{n}`), GraphQL as one `graphql` row, other subcommands by name (`gh issue view`).
+- Its totals line splits REST, GraphQL and `gh`. The free `GET rate_limit` keeps its own row, counted as `rate_limit (free)`, not REST. `unrecorded` is the calls on lines written before endpoints were recorded.
 - A line that does not parse is counted in the heading, not tallied.
 - An unreadable `--since` or an unknown flag prints the usage and exits 1.
 

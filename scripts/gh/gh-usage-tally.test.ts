@@ -97,3 +97,49 @@ describe('gh_usage_tally.render', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#6867: the calls per endpoint, beside lines written before kinds were recorded.
+const ISSUE_KIND = 'GET repos/{o}/{r}/issues/{n}'
+
+function endpoint_line(calls: number, endpoints: Record<string, [number, number]>): string {
+	const counts = Object.entries(endpoints).map(([kind, [kind_calls, not_modified]]) => [
+		kind,
+		{ calls: kind_calls, not_modified },
+	])
+
+	return JSON.stringify({
+		...(JSON.parse(line_of(LATE, RUN_STEP, calls)) as object),
+		endpoints: Object.fromEntries(counts),
+	})
+}
+
+const ENDPOINT_LINES = [
+	line_of(EARLY, RUN_STEP, 5),
+	endpoint_line(6, { [ISSUE_KIND]: [3, 1], graphql: [1, 0], 'GET rate_limit': [2, 0] }),
+	endpoint_line(4, { [ISSUE_KIND]: [2, 0], 'gh issue view': [2, 0] }),
+]
+
+describe('gh_usage_tally — endpoints', () => {
+	it('sums each endpoint across lines, most calls first, and reads a line without any', () => {
+		expect(gh_usage_tally.tally(ENDPOINT_LINES).endpoints).toStrictEqual([
+			{ endpoint: ISSUE_KIND, calls: 5, not_modified: 1 },
+			{ endpoint: 'GET rate_limit', calls: 2, not_modified: 0 },
+			{ endpoint: 'gh issue view', calls: 2, not_modified: 0 },
+			{ endpoint: 'graphql', calls: 1, not_modified: 0 },
+		])
+	})
+
+	it('prints the class totals and the endpoint table below the command table', () => {
+		const text = gh_usage_tally.render(gh_usage_tally.tally(ENDPOINT_LINES))
+
+		expect(text.split('\n').slice(3)).toStrictEqual([
+			'',
+			'REST 5 · GraphQL 1 · gh 2 · rate_limit (free) 2 · unrecorded 5',
+			'endpoint                      calls  304',
+			`${ISSUE_KIND}      5    1`,
+			'GET rate_limit                    2    0',
+			'gh issue view                     2    0',
+			'graphql                           1    0',
+		])
+	})
+})

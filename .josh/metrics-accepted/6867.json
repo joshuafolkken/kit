@@ -1,0 +1,7 @@
+{
+	"reason": "gh:usage per-endpoint breakdown: new gh-call-kind module and endpoint table (#6867)",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 161
+	}
+}
