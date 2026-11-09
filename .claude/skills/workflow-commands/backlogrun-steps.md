@@ -97,8 +97,8 @@ excluded children are not read. After recording answers, repeat it with `--exclu
 for decisions left parked in this pass; when none remain it prints `pnpm josh backlog:plan --waves`.
 The reader supplies semantic evidence; the command cannot infer a person's answer or prove a main failure:
 
-- **An answer already in the issue** — record a Tier A answer in the epic and child with
-  `pnpm josh epic --decide <E> <N...> --decision-file .josh/tmp/decision.md`, which clears `needs-decision`.
+- **An answer already in the issue** — `pnpm josh epic --decide <E> <N...> --decision-file .josh/tmp/d.md`
+  records a Tier A answer and clears `needs-decision` (no epic: comment, `run:park <N> --clear`).
   **Never measure in order to decide**: a question needing a benchmark or a run stays labelled.
 - **A recovered mechanical failure** — retry with `pnpm josh run:add <N> --retry`, which clears
   `run:stalled` and the previous attempt; unresolved failures stay parked and excluded from this pass.
@@ -126,7 +126,7 @@ run `run:carry --begin`; act on the row, then end the turn:
 
 | Handed back | What the session does |
 | --- | --- |
-| `triage` | Run `pnpm josh backlog:triage --pass` and follow its next command; record the answers with `--apply` as above |
+| `triage` | Run `pnpm josh backlog:triage --pass` and follow its next command; resolve as above, leaving only genuine human questions parked |
 | `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` |
 | `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** |
 | `launch #N` | Read the lane's log and park `#N` |
@@ -134,6 +134,11 @@ run `run:carry --begin`; act on the row, then end the turn:
 | `epic #N` | A named epic's turn |
 | `watch` | The retrospective is owed (`run:step`): run `pnpm josh run:handoff retrospective` (`retrospective.md`) |
 | `window` | Hand the loop back as is |
+
+**A round starts with the initial plan or a batch of collected children.** A batch containing at least
+one newly parked child hands back `triage` once, after all finished children are collected and before
+another offer. The pass re-reads all parked children; its exclusions last only for that pass. A batch
+with no park adds no triage step; a resumed driver does not repeat it.
 
 **A candidate only in another repository is never a token** — report it with its checkout.
 

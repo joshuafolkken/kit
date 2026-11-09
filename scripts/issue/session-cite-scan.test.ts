@@ -95,7 +95,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The detached driver's stderr, which the supervisor tails into the hand-off; the read that would
 	// resolve the link is the one that just failed.
 	['backlog/backlog-drive-unread.ts', 1],
-	['backlog/backlog-drive.ts', 1],
+	['backlog/backlog-drive-state.ts', 1],
 	['backlog/backlog-plan.ts', 1],
 	['epic/epic-parse.ts', 1],
 	['issue/issue-file-cli.ts', 1],
