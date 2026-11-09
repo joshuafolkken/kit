@@ -48,6 +48,13 @@ function offered(world: World, state: DriveState): OfferRead {
 	}
 }
 
+// The run's own records: nothing added, raised or named.
+const NO_RECORD: Pick<DrivePorts, 'added_since' | 'raised_since' | 'named_left'> = {
+	added_since: async () => false,
+	raised_since: async () => false,
+	named_left: async () => false,
+}
+
 function drive_ports(world: World): DrivePorts {
 	return {
 		is_finished: () => world.started,
@@ -77,8 +84,7 @@ function drive_ports(world: World): DrivePorts {
 		retrospective: async () => true,
 		now: () => NOW,
 		sleep: async () => undefined,
-		added_since: async () => false,
-		named_left: async () => false,
+		...NO_RECORD,
 		on_state: () => undefined,
 		finish: async () => {
 			world.reports += 1
