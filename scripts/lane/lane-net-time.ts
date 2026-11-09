@@ -1,5 +1,6 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_sleep } from './lane-sleep'
 import { lane_spans, type IssueAt, type Span } from './lane-spans'
@@ -12,11 +13,14 @@ import { lane_yield } from './lane-yield'
 // usage-limit stop (joshuafolkken/kit#4745), each until the issue's next ship stage, re-dispatch or
 // another of the two, the wait `josh lane:stats` derives for a stop (`lane-stop-stats.ts`) — and the
 // host's sleeps (joshuafolkken/kit#5032), whatever the issue (`lane-sleep.ts`), and a yield's wait for
-// the issue's next dispatch (joshuafolkken/kit#5216), no lane seat held while the holder runs. A ship
-// stop is not taken out: a relaunched child works through its wait. `josh lane:net` prints it, and a
-// causing-lane line declares it (`issue-priority.ts`).
+// the issue's next dispatch (joshuafolkken/kit#5216), no lane seat held while the holder runs. The
+// ship's followup — CI, CodeRabbit and the merge, waited on by the driver with no lane seat held — is
+// taken out too, counted apart as a driver stage (joshuafolkken/kit#6541). A ship stop is not taken
+// out: a relaunched child works through its wait. `josh lane:net` prints it, and a causing-lane line
+// declares it (`issue-priority.ts`).
 
 const { EVENT_KIND } = run_event_stream
+const { PHASE, STAGE } = run_ship_stage
 
 interface LaneSpan {
 	from_ms: number
@@ -158,9 +162,41 @@ function waits(
 	])
 }
 
+function is_followup_start(event: RunEvent): boolean {
+	const { stage, phase } = run_ship_stage.words_of(event.text)
+
+	return stage === STAGE.FOLLOWUP && phase === PHASE.START
+}
+
+// `issue`'s ship followups inside `span`, each from its start to the issue's next ship stage line, or
+// else the merge — the driver's wait on CI, CodeRabbit and the merge (joshuafolkken/kit#6541).
+function followed(events: ReadonlyArray<RunEvent>, issue: number, span: LaneSpan): Array<LaneSpan> {
+	const lines = events
+		.filter((event) => event.kind === EVENT_KIND.SHIP_STAGE)
+		.filter((event) => lane_stop_stats.issue_of(event) === issue)
+		.map((event) => ({ event, at_ms: Date.parse(event.at) }))
+		.filter((line) => line.at_ms >= span.from_ms && line.at_ms < span.to_ms)
+		.toSorted((left, right) => left.at_ms - right.at_ms)
+
+	return lines
+		.map((line, index) => ({ line, to_ms: lines[index + 1]?.at_ms ?? span.to_ms }))
+		.filter(({ line }) => is_followup_start(line.event))
+		.map(({ line, to_ms }) => ({ from_ms: line.at_ms, to_ms }))
+}
+
+// Every interval `net_ms` leaves out of `span`: the waits and the driver's followups, joined.
+function outside(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	return joined([...waits(entries, events, issue, span), ...followed(events, issue, span)])
+}
+
 /**
  * The net milliseconds of `issue`'s lane, or `undefined` when the ledger holds no dispatch and merge of
- * it. `events` is the run's event stream, read for the parks and outages.
+ * it. `events` is the run's event stream, read for the parks, outages and followups.
  */
 function net_ms(
 	entries: ReadonlyArray<LedgerEntry>,
@@ -171,7 +207,7 @@ function net_ms(
 
 	if (span === undefined) return undefined
 
-	return waits(entries, events, issue, span).reduce(
+	return outside(entries, events, issue, span).reduce(
 		(left, wait) => left - (wait.to_ms - wait.from_ms),
 		span.to_ms - span.from_ms,
 	)
@@ -203,6 +239,7 @@ const lane_net_time = {
 	missing_reason,
 	net_minutes,
 	net_ms,
+	outside,
 	slept,
 	span_of,
 	waits,

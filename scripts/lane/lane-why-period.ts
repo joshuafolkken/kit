@@ -8,9 +8,11 @@ import { lane_why } from './lane-why'
 
 // Evidence groups, not exclusive diagnoses: a lane may have several signals. Each group's total
 // is the full net time of its distinct lanes, never an estimate of time a fix would save (#6475).
+// The followup is outside the net time, so its overrun is the driver's, a row apart from the lane's
+// causes (joshuafolkken/kit#6541).
 const CAUSE = {
 	IMPLEMENT: 'implement (attribution unverified)',
-	CI: 'CI wait',
+	DRIVER: 'driver followup over budget (outside lane net)',
 	PAUSE: 'pause',
 	HUB: 'hub over cap',
 	OTHER: 'other',
@@ -24,7 +26,7 @@ interface CauseLane {
 
 function cause_of(budget: string): string {
 	if (budget === 'implement') return CAUSE.IMPLEMENT
-	if (budget === 'followup') return CAUSE.CI
+	if (budget === 'followup') return CAUSE.DRIVER
 
 	return CAUSE.OTHER
 }
@@ -53,7 +55,8 @@ function causes_of(breakdown: Breakdown, hubs: ReadonlyArray<string>): Map<strin
 	}
 
 	add_signals(groups, breakdown, hubs)
-	if (groups.size === 0) groups.set(CAUSE.OTHER, [])
+	// The driver's overrun explains none of the lane's own net time.
+	if (groups.size === Number(groups.has(CAUSE.DRIVER))) groups.set(CAUSE.OTHER, [])
 
 	return groups
 }
