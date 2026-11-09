@@ -1,10 +1,10 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { josh_command } from '#scripts/josh/josh-run'
 import { lane_yield } from '#scripts/lane/lane-yield'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_park_write } from '#scripts/run/park/run-park-write'
 import type { DriveState } from './backlog-drive'
 
 // The stop on a yield loop (joshuafolkken/kit#6799). A yielded child stays in the run and is offered
@@ -24,7 +24,6 @@ const YIELD_CAP = 3
 const WINDOW_MINUTES = 15
 const WINDOW_MS = WINDOW_MINUTES * MS_PER_MINUTE
 const YIELDED_OUTCOME = 'yielded'
-const should_forward_stderr = true
 const PERSON_PERMISSION = '   - 必要な権限: 人'
 
 interface YieldCapPorts {
@@ -94,13 +93,14 @@ async function yields(issue: string): Promise<ReadonlyArray<string>> {
 	return times_of(await run_event_stream_emit.current_events(), issue)
 }
 
+// A system stop, not a question: `system_stop` writes the park without the answered-question
+// judgment `josh run:park` runs (joshuafolkken/kit#6531).
 async function park(issue: string, body: string): Promise<void> {
-	const argv = ['run:park', issue, '--body', body]
-	const result = await josh_command.josh_run(argv, should_forward_stderr)
+	const code = await run_park_write.system_stop({ issue_number: issue, body }, process.cwd())
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.NOTE,
-		`${trip_text(issue)} · run:park exit: ${String(result.code)}`,
+		`${trip_text(issue)} · run:park exit: ${String(code)}`,
 	)
 }
 

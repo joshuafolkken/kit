@@ -1,3 +1,4 @@
+import { detached_launch } from '#scripts/run/detached-launch'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agent_diagnostics } from './agent-diagnostics'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
@@ -11,7 +12,7 @@ const INVOCATION = 'Judge whether #6452 holds a decision.'
 const { DEFAULT_PROFILES } = agent_role_profile
 const REVIEWER: AgentProfile = DEFAULT_PROFILES.reviewer
 const CODEX: AgentProfile = { ...REVIEWER, provider: 'openai' }
-const TOOLS_FLAG = '--tools'
+const NO_TOOLS_FLAG = '--tools='
 const RESTRICTED_FLAG = '--restricted'
 const BYPASS_FLAGS = ['--permission-mode', 'bypassPermissions']
 const WORKER_ONLY_FLAGS = [...BYPASS_FLAGS, '--mcp-config', '--append-system-prompt-file']
@@ -28,11 +29,17 @@ describe('a judgment launch', () => {
 		const { command, args } = judgment_agent_argv.build(INVOCATION, REVIEWER)
 
 		expect(command).toBe(claude_agent_argv.AGENT_COMMAND)
-		expect(args[args.indexOf(TOOLS_FLAG) + 1]).toBe('')
+		expect(args).toContain(NO_TOOLS_FLAG)
 		expect(args).toEqual(
 			expect.arrayContaining(['--strict-mcp-config', RESTRICTED_FLAG, '--disable-slash-commands']),
 		)
 		expect(args.at(-1)).toBe(INVOCATION)
+	})
+
+	// joshuafolkken/kit#6531: `--tools ''` put an empty element in the vector, which the launch gate
+	// refuses, so every judgment failed before it started.
+	it('passes the launch gate every argv crosses', () => {
+		expect(detached_launch.is_safe_argv(judgment_agent_argv.build(INVOCATION, REVIEWER))).toBe(true)
 	})
 
 	it('carries no flag the worker launch grants', () => {
