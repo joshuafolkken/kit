@@ -12,7 +12,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh check` · `josh c` | `[arguments...]` | developer | processes | Type-check with tsc (skips a basic project with no TypeScript to check) |
 | `josh check:related` · `josh cr` | — | developer | processes | Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes |
 | `josh codex:hook-adapter` | `<pretool\|posttool>` | automation | none | Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin) |
-| `josh completion` | `--names` | automation | none | Print command names and aliases for shell completion |
+| `josh completion` | `--names \| <zsh\|bash\|fish>` | automation | none | Print command names and aliases, or a shell completion script |
 | `josh cspell:dot` · `josh sd` | — | developer | processes | Run spell check including dotfiles |
 | `josh e2e:retry-check` | — | automation | none | Report whether the preview server crashed during a failed E2E attempt (CI) |
 | `josh exports:unused` · `josh eu` | — | developer | none | Report exported namespace members nothing reads (kit only; a consumer project skips it) |
@@ -161,6 +161,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:already-done` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold |
 | `josh issue:cite` | `<issue...> [--repo <owner/repo>]` | automation | network | Print the paste-ready number-link citation line for each issue, in one call |
 | `josh issue:comment` | `<issue> --body <text> \| --body-file <path>` | automation | network | Post one comment to an issue from a file, so no shell expands the body |
+| `josh issue:consolidate` | `<target> <duplicate>... [--title <title>] [--body-file <path>] [--demote]` | automation | network | Fold duplicates into a target: untrack, close as not planned; a failed write lists the writes done |
 | `josh issue:file` | `<title> --body-file <path> \| --batch <dir\|file> [--route <route>] [--label <name>] [--defect yes\|no\|unknown] [--verification yes\|no\|unknown] [--every-run yes\|no\|unknown] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]` | automation | network | File an Issue: filing cap, fold, one pass naming each refusal (lint, Origin, auto-ok, start condition, WIP cap, scout), labels, epic:bundle |
 | `josh issue:fold` | `<title>... [--not-separable] [--json]` | automation | none | Before a second filing: say whether findings from this session fold into one issue |
 | `josh issue:fold-existing` | `<assessment.json> [--json \| --apply <N> [--blocked <M> \| --found-during <M>]] \| --fingerprint <N>` | automation | network | Assess whether a complete draft can join an unstarted issue |
