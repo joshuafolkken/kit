@@ -325,7 +325,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 
 	return {
 		...span_fields(span),
-		scope: run_board_scope.scope_of(span.invocation),
+		scope: run_board_scope.scope_of(span.invocation, carry?.added),
 		...(await span_events_here(events, span, table, carry)),
 		throughput: run_board_throughput.rows_of(events, Date.now()),
 		lanes: lanes.map((lane) => lane.issue),

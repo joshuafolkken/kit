@@ -36,3 +36,25 @@ describe('run_board_scope.scope_of', () => {
 		})
 	})
 })
+
+// joshuafolkken/kit#6836: the board drew none of the issues `run:add` handed an --only run.
+describe('run_board_scope.scope_of added issues', () => {
+	it('joins the added issues in the driver’s order: prioritized, declared, appended, each once', () => {
+		const added = [
+			{ issue: 6812, is_priority: true },
+			{ issue: 3442, is_priority: true },
+			{ issue: 6787, is_priority: false },
+		]
+
+		expect(run_board_scope.scope_of('backlogrun #3442 #3430 --only', added)).toStrictEqual({
+			issues: [6812, 3442, 3430, 6787],
+			only: true,
+		})
+	})
+
+	it('keeps a single fullrun to its own issue whatever the record added', () => {
+		expect(
+			run_board_scope.scope_of('fullrun #12', [{ issue: 6812, is_priority: true }]),
+		).toStrictEqual({ issues: [12], only: true })
+	})
+})
