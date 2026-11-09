@@ -178,7 +178,11 @@ function announce_gate_plan(
 	available_cores: number,
 	static_group?: string,
 ): GatePlan {
-	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
+	// The live lanes divide as well as the runs in flight (joshuafolkken/kit#6682).
+	const concurrent_runs = unit_worker_share.sharing_runs(
+		unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS,
+		unit_worker_share.live_lane_count(),
+	)
 	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
 	const resolved = gate_plan.resolve_gate_plan(
 		available_cores,

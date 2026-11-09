@@ -14,7 +14,10 @@ const {
 	release_mock,
 	lane_note_mock,
 	print_once_mock,
+	refusal_mock,
 } = vi.hoisted(() => ({
+	refusal_mock:
+		vi.fn<(issue: string, question: string, directory: string) => Promise<number | undefined>>(),
 	print_once_mock: vi.fn<(key: string, root?: string) => number>(),
 	lane_note_mock: vi.fn<(body: string, directory: string) => string>(),
 	apply_mock:
@@ -38,6 +41,7 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 vi.mock('./run-park', () => ({ run_park: { record: record_mock, clear: clear_record_mock } }))
 vi.mock('./run-park-release', () => ({ run_park_release: { release: release_mock } }))
 vi.mock('./run-park-lane', () => ({ run_park_lane: { with_lane_note: lane_note_mock } }))
+vi.mock('./run-park-answered', () => ({ run_park_answered: { refusal_of: refusal_mock } }))
 vi.mock('#scripts/run/run-step-section', () => ({
 	run_step_section: { PARK: 'run:park', print_once: print_once_mock },
 }))
@@ -74,6 +78,10 @@ beforeEach(() => {
 	release_mock.mockReset().mockResolvedValue(0)
 	lane_note_mock.mockReset().mockImplementation((body) => body)
 	print_once_mock.mockReset().mockReturnValue(0)
+	refusal_mock.mockReset().mockResolvedValue(undefined)
+})
+
+beforeEach(() => {
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -107,6 +115,39 @@ describe('run:park body schema', () => {
 	it('shows the body schema in the usage', () => {
 		expect(run_park_cli.USAGE).toContain('### 選択肢')
 		expect(run_park_cli.USAGE).toContain('### 推奨')
+	})
+})
+
+// joshuafolkken/kit#6531: the question is judged against the Issue before any write.
+describe('run:park answered question', () => {
+	it('judges the question as written, before the lane note and any write', async () => {
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
+		expect(refusal_mock).toHaveBeenCalledWith(ISSUE, BODY, DIRECTORY)
+		expect(refusal_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			apply_mock.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('writes, records and releases nothing when the judgment stops the park', async () => {
+		refusal_mock.mockResolvedValue(1)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+		expect(apply_mock).not.toHaveBeenCalled()
+		expect(record_mock).not.toHaveBeenCalled()
+		expect(release_mock).not.toHaveBeenCalled()
+	})
+
+	it('does not judge a body off the schema', async () => {
+		writeFileSync(BODY_FILE, `${QUESTION}\n\n${OPTIONS}\n`)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+		expect(refusal_mock).not.toHaveBeenCalled()
+	})
+
+	it('does not judge a clear', async () => {
+		await expect(run_park_cli.run([ISSUE, '--clear'], DIRECTORY)).resolves.toBe(0)
+		expect(refusal_mock).not.toHaveBeenCalled()
+		expect(clear_record_mock).toHaveBeenCalledWith(ISSUE, DIRECTORY)
 	})
 })
 

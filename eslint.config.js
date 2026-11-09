@@ -13,6 +13,10 @@ import {
 	SPEC_FILENAME_ENTRY,
 	SPEC_FILENAME_PATTERNS,
 } from './eslint/rules/test-filename.js'
+import {
+	TEST_HELPER_BAN_ENTRIES,
+	TEST_HELPER_BAN_PATTERNS,
+} from './eslint/rules/test-helper-bans.js'
 
 // Hand-written distributed JS modules: no TS annotations available, so the TS-only style rules
 // that assume a `.ts` source are relaxed exactly as they are for the eslint presets.
@@ -53,6 +57,16 @@ export default [
 			'@typescript-eslint/explicit-function-return-type': 'off',
 			'@typescript-eslint/explicit-module-boundary-types': 'off',
 		},
+	},
+	// Issue #6489: kit's own test-helper bans, composed onto `code-quality.js`'s selectors for the same
+	// reason as the bans below. They sit before those re-statements so a `*.spec.*` or `tests/` file
+	// still reports the rename instruction.
+	{
+		files: TEST_HELPER_BAN_PATTERNS,
+		rules: TEST_HELPER_BAN_ENTRIES.reduce(
+			(rules, entry) => extend_restricted_syntax(rules, entry),
+			code_quality_rules,
+		),
 	},
 	// joshuafolkken/kit#1233: `create_base_config` above wires the test-filename bans in, and the two
 	// blocks before this one switch `no-restricted-syntax` off wholesale — for the export-convention

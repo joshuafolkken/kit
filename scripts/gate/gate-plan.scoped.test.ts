@@ -1,5 +1,5 @@
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_plan } from './gate-plan'
 
 const { MEASURED_CORES } = gate_plan
@@ -9,7 +9,7 @@ const NARROW_FILES = 69
 const SUITE_FILES = 2080
 
 function weight_of(files: number): number {
-	return gate_plan.scoped_unit_weight(files, MEASURED_CORES, 0)
+	return gate_plan.scoped_unit_weight(files, MEASURED_CORES, 0, 0)
 }
 
 // joshuafolkken/kit#5135: a 69-file `josh test:related` claimed the same width as the whole suite, so
@@ -24,12 +24,37 @@ describe('gate_plan.scoped_unit_weight — the cores a narrowed related run rese
 	})
 
 	it('never claims more than a direct unit run does', () => {
-		expect(weight_of(SUITE_FILES)).toBe(gate_plan.direct_unit_weight(MEASURED_CORES, 0))
+		expect(weight_of(SUITE_FILES)).toBe(gate_plan.direct_unit_weight(MEASURED_CORES, 0, 0))
 	})
 
 	it('opens one worker for each FILES_PER_WORKER files between the bounds', () => {
 		const workers = MIN_WORKERS + 1
 
 		expect(weight_of(gate_plan.FILES_PER_WORKER * workers)).toBe(workers + MAIN_PROCESS_CORES)
+	})
+})
+
+// joshuafolkken/kit#6682: a claim left to its defaults divides by the lanes the machine has live.
+describe('gate_plan unit weights — the live lanes read by default', () => {
+	const LANES = 3
+
+	beforeEach(() => {
+		vi.spyOn(unit_worker_share, 'live_lane_count').mockReturnValue(LANES)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('sizes a direct run by the live lanes', () => {
+		expect(gate_plan.direct_unit_weight(MEASURED_CORES, 0)).toBe(
+			gate_plan.direct_unit_weight(MEASURED_CORES, 0, LANES),
+		)
+	})
+
+	it('sizes a scoped run by the live lanes', () => {
+		expect(gate_plan.scoped_unit_weight(SUITE_FILES, MEASURED_CORES, 0)).toBe(
+			gate_plan.scoped_unit_weight(SUITE_FILES, MEASURED_CORES, 0, LANES),
+		)
 	})
 })

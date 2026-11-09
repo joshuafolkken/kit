@@ -382,13 +382,15 @@ function direct_solo_workers(available_cores: number): number {
 // and hold every later claim behind it — the solo bound stops below the core count from seven cores up.
 // One weight for the suite however it is started. **Plus vitest's own process** (joshuafolkken/kit#4362):
 // the workers are the share, and the claim holds the process that drives them on top
-// (`unit_worker_share.cap_to_claim` takes it back off).
+// (`unit_worker_share.cap_to_claim` takes it back off). **Divided by the live lanes as the share is**
+// (joshuafolkken/kit#6682): a claim wider than the share holds cores no worker uses.
 function direct_unit_weight(
 	available_cores: number = availableParallelism(),
 	live_runs: number = unit_worker_share.live_run_count(),
+	live_lanes: number = unit_worker_share.live_lane_count(),
 ): number {
 	const workers =
-		unit_worker_share.current_share(available_cores, live_runs) ??
+		unit_worker_share.current_share(available_cores, live_runs, undefined, live_lanes) ??
 		direct_solo_workers(available_cores)
 
 	return Math.max(unit_worker_share.MIN_WORKERS, workers) + unit_worker_share.MAIN_PROCESS_CORES
@@ -406,9 +408,10 @@ function scoped_unit_weight(
 	files: number,
 	available_cores: number = availableParallelism(),
 	live_runs: number = unit_worker_share.live_run_count(),
+	live_lanes: number = unit_worker_share.live_lane_count(),
 ): number {
 	const { MAIN_PROCESS_CORES, MIN_WORKERS } = unit_worker_share
-	const share = direct_unit_weight(available_cores, live_runs) - MAIN_PROCESS_CORES
+	const share = direct_unit_weight(available_cores, live_runs, live_lanes) - MAIN_PROCESS_CORES
 	const wanted = Math.max(MIN_WORKERS, Math.ceil(files / FILES_PER_WORKER))
 
 	return Math.min(wanted, share) + MAIN_PROCESS_CORES
@@ -480,13 +483,14 @@ function resolve_gate_plan(
 // check body exists — so the printer and the detector build it from the same strings, exactly as they
 // already do for the verdict.
 // A narrowed gate explains its shared-machine allocation so a lane owner can understand the worker
-// count; a solo gate needs no sharing diagnostic.
+// count; a solo gate needs no sharing diagnostic. The count is the larger of the unit runs in flight
+// and the live lanes (joshuafolkken/kit#6682), so the line names both.
 function format_machine(available_cores: number, concurrent_runs: number): string {
 	const cores = `${String(available_cores)} cores`
 
 	if (concurrent_runs <= unit_worker_share.SOLO_RUNS) return cores
 
-	return `${cores}, ${String(concurrent_runs)} unit runs`
+	return `${cores}, ${String(concurrent_runs)} unit runs or lanes`
 }
 
 // **A gate that is not running the unit suite says so where the worker count would go.** The line is

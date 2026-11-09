@@ -46,7 +46,7 @@ describe('josh_gh_usage.recorded — the entry record', () => {
 			'run:step',
 			[String(ISSUE)],
 			async () => {
-				gh_request_tally.count_call()
+				gh_request_tally.count_call('graphql')
 
 				return EXIT_CODE
 			},
@@ -79,7 +79,7 @@ describe('josh_gh_usage.recorded — a throwing command and the watch', () => {
 			'run:board',
 			['--chat'],
 			async () => {
-				gh_request_tally.count_call()
+				gh_request_tally.count_call('graphql')
 				throw new Error('boom')
 			},
 			write,

@@ -124,6 +124,9 @@ describe('git_gh_conditional.read_conditional — everything else', () => {
 		await read()
 
 		expect(gh_request_tally.snapshot().not_modified).toBe(1)
+		expect(gh_request_tally.snapshot().endpoints).toStrictEqual({
+			'GET repos/{o}/{r}/issues/{n}': { calls: 0, not_modified: 1 },
+		})
 	})
 
 	it('answers unreadable on any other failure, carrying gh failure as the cause', async () => {

@@ -22,8 +22,14 @@ import { unit_run_marker } from './unit-run-marker'
 // **The run markers and their division of the machine are `unit-run-marker.ts`**, the part the vitest
 // config imports (joshuafolkken/kit#4572); the capacity and claim bounds and the flag handling are here.
 const { MIN_WORKERS, NESTED_KEY, NESTED_VALUE, SOLO_RUNS } = unit_run_marker
-const { is_nested_run, live_run_count, mark_run_started, marker_path, resolve_unit_workers } =
-	unit_run_marker
+const {
+	is_nested_run,
+	live_run_count,
+	mark_run_started,
+	marker_path,
+	resolve_unit_workers,
+	sharing_runs,
+} = unit_run_marker
 
 // Vitest's own flag, in both spellings its CLI accepts — it normalizes `--max-workers` to the same
 // option, so a run that recognized only one of them would replace a number the caller typed with the
@@ -94,20 +100,31 @@ function cap_to_claim(share: number | undefined, claim: UnitClaim | undefined): 
 	return Math.min(share ?? bound, bound)
 }
 
-// The share this run may take, read from the machine. Separate from `resolve_unit_workers` so that
-// one stays a pure function of two numbers and every test of it can pass them.
-//
 // **A nested run is already counted, and adding one for it would be wrong rather than cautious.**
 // Inside `josh gate` the marker was written by the parent before this process started, so `+ 1` here
 // would count one run twice — and on a machine the gate leaves uncapped, a four-core CI runner among
 // them, that alone would halve a solo run nothing was sharing.
+function own_run(): number {
+	return is_nested_run() ? 0 : SOLO_RUNS
+}
+
+// The share this run may take, read from the machine. Separate from `resolve_unit_workers` so that
+// one stays a pure function of two numbers and every test of it can pass them.
+//
+// **`live_lanes` defaults to this lane alone rather than to a reading** (joshuafolkken/kit#6682), so a
+// caller that does not pass the lanes keeps dividing by the runs only. The share `test-unit-guard.ts`
+// opens and the claim `gate-plan.ts` declares both pass `live_lane_count()`, so the ledger holds what
+// the run uses.
 function current_share(
 	available_cores: number = availableParallelism(),
 	live_runs: number = live_run_count(),
 	free: FreeCapacity = UNREAD_CAPACITY,
+	live_lanes: number = SOLO_RUNS,
 ): number | undefined {
-	const own_run = is_nested_run() ? 0 : SOLO_RUNS
-	const share = resolve_unit_workers(available_cores, live_runs + own_run)
+	const share = resolve_unit_workers(
+		available_cores,
+		sharing_runs(live_runs + own_run(), live_lanes),
+	)
 
 	return cap_to_capacity(share, free, available_cores)
 }

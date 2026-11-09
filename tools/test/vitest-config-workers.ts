@@ -34,7 +34,11 @@ function clear_on_exit(target: string): void {
 	})
 }
 
-function marked_share(available_cores: number, directory: string): number | undefined {
+function marked_share(
+	available_cores: number,
+	directory: string,
+	lanes: number,
+): number | undefined {
 	const target = path.join(directory, path.basename(unit_run_marker.marker_path()))
 
 	unit_run_marker.mark_run_started(target)
@@ -42,21 +46,32 @@ function marked_share(available_cores: number, directory: string): number | unde
 
 	return unit_run_marker.resolve_unit_workers(
 		available_cores,
-		unit_run_marker.live_run_count(directory),
+		unit_run_marker.sharing_runs(unit_run_marker.live_run_count(directory), lanes),
 	)
 }
 
-function config_workers(
-	available_cores: number = availableParallelism(),
-	directory: string = PLATFORM_TEMP_ROOT,
+function guarded_share(
+	available_cores: number,
+	directory: string,
+	lanes: number,
 ): number | undefined {
-	if (unit_run_marker.is_nested_run()) return undefined
-
 	try {
-		return marked_share(available_cores, directory)
+		return marked_share(available_cores, directory, lanes)
 	} catch {
 		return undefined
 	}
+}
+
+// `lanes` is the live lanes on the machine (joshuafolkken/kit#6682): each holds a share before its
+// suite starts, so a direct run beside idle lanes still takes only its own.
+function config_workers(
+	available_cores: number = availableParallelism(),
+	directory: string = PLATFORM_TEMP_ROOT,
+	lanes: number = unit_run_marker.live_lane_count(),
+): number | undefined {
+	if (unit_run_marker.is_nested_run()) return undefined
+
+	return guarded_share(available_cores, directory, lanes)
 }
 
 const vitest_config_workers = { config_workers }

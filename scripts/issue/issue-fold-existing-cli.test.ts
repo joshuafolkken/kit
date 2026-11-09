@@ -143,6 +143,23 @@ describe('issue_fold_existing_cli.run --apply --found-during', () => {
 	})
 })
 
+// joshuafolkken/kit#6643: the rerun takes the written fold as applied and records it.
+describe('issue_fold_existing_cli.run --apply --found-during on a failed record', () => {
+	it.each([
+		[PATH, PATH],
+		['fold assess.json', "'fold assess.json'"],
+	])('names the rerun that records the split child for %s', async (path, quoted) => {
+		applied().mockRejectedValue(new Error(RELATION_FAILURE))
+		const error = vi.mocked(console.error)
+
+		await issue_fold_existing_cli.run([path, APPLY_FLAG, '12', FOUND_DURING_FLAG, '34'])
+
+		expect(error.mock.calls.join('\n')).toContain(
+			`pnpm josh issue:fold-existing ${quoted} ${APPLY_FLAG} 12 ${FOUND_DURING_FLAG} 34`,
+		)
+	})
+})
+
 describe('issue_fold_existing_cli.run --fingerprint', () => {
 	it("prints the issue's comment fingerprint", async () => {
 		vi.spyOn(issue_fold_apply, 'comment_fingerprint').mockResolvedValue(FINGERPRINT)

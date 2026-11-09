@@ -1,5 +1,6 @@
 import { POLL_BACKOFF } from '#scripts/lib/poll'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MAX_CHECK_RERUNS } from './followup-job-rerun'
 import { followup_run_rerun, LATEST_ATTEMPTS, LATEST_INTERVAL_MS } from './followup-run-rerun'
 
 // joshuafolkken/kit#5778: a partial rerun dropped the required `Checks` job from its run's latest
@@ -24,14 +25,18 @@ const CHECKS_JOB = { name: CHECKS, conclusion: 'success' }
 const RERUN_PATH = `${ACTIONS}runs/${String(RUN_ID)}/rerun`
 const MISSING = { contexts: [CHECKS], head_sha: HEAD_SHA }
 const LATEST_FILTER = 'filter=latest'
+const PASSED_RUN = { status: 'completed', conclusion: 'success', run_attempt: 1 }
+const TRUNCATED_RUN = { ...PASSED_RUN, conclusion: 'failure' }
 
 interface World {
 	latest: Array<{ name: string; conclusion: string }>
-	all?: World['latest']
-	run?: { conclusion: string; event: string }
+	all: World['latest']
+	run: typeof PASSED_RUN
 	is_rerun?: boolean
 	after_rerun?: Array<World['latest']>
 }
+
+type WorldInput = Pick<World, 'latest'> & Partial<World>
 
 // After the rerun, each read takes the next of `after_rerun`; the lost job is back once they run out.
 function latest_of(world: World): World['latest'] {
@@ -40,23 +45,22 @@ function latest_of(world: World): World['latest'] {
 	return world.after_rerun?.shift() ?? [UNIT, CHECKS_JOB]
 }
 
-function all_of(world: World): World['latest'] {
-	return world.all ?? [UNIT, CHECKS_JOB]
+function read_of(world: World, path: string): unknown {
+	if (path.includes('runs?head_sha=')) return { workflow_runs: [{ id: RUN_ID, ...world.run }] }
+	if (path.includes('filter=all')) return { jobs: world.all }
+	if (path.includes(LATEST_FILTER)) return { jobs: latest_of(world) }
+
+	return undefined
 }
 
-function answer_actions(world: World): void {
+function answer_actions(input: WorldInput): void {
+	const world: World = { all: [UNIT, CHECKS_JOB], run: PASSED_RUN, ...input }
+
 	api.mockImplementation(async ({ path, method }) => {
 		if (method === 'POST') world.is_rerun = true
+		const read = read_of(world, path)
 
-		if (path.includes('runs?head_sha=')) {
-			return JSON.stringify({ workflow_runs: [{ id: RUN_ID, ...world.run }] })
-		}
-
-		if (path.includes('filter=all')) return JSON.stringify({ jobs: all_of(world) })
-
-		if (path.includes(LATEST_FILTER)) return JSON.stringify({ jobs: latest_of(world) })
-
-		return ''
+		return read === undefined ? '' : JSON.stringify(read)
 	})
 }
 
@@ -127,26 +131,39 @@ describe('recover_missing — the whole run that lost a required job', () => {
 	})
 })
 
-// joshuafolkken/kit#6677: the run ended `failure` with every created job green, and its `Checks`
-// job was never created in any attempt.
-describe('recover_missing — a run that ended failed before creating its jobs', () => {
-	it('reruns the whole run although no attempt ever held the context', async () => {
-		answer_actions({
-			latest: [UNIT],
-			all: [UNIT],
-			run: { conclusion: 'failure', event: 'pull_request' },
-		})
+// joshuafolkken/kit#6922: GitHub ended run 42673194882 as a failure before it created `Checks`.
+describe('recover_missing — a run that ended before it created the required jobs', () => {
+	it('reruns a failed run with no failed job whose required job was never created', async () => {
+		answer_actions({ latest: [UNIT], all: [UNIT], run: TRUNCATED_RUN })
 
 		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('rerun')
 		expect(posts()).toStrictEqual([RERUN_PATH])
 	})
 
-	it('leaves a failed dynamic run, which holds none of the required jobs', async () => {
-		answer_actions({
-			latest: [UNIT],
-			all: [UNIT],
-			run: { conclusion: 'failure', event: 'dynamic' },
-		})
+	it('does not rerun such a run when it holds a failed job', async () => {
+		const failed = [{ name: UNIT.name, conclusion: 'failure' }]
+
+		answer_actions({ latest: failed, all: failed, run: TRUNCATED_RUN })
+
+		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('none')
+		expect(posts()).toStrictEqual([])
+	})
+
+	it.each([
+		{ attempt: MAX_CHECK_RERUNS, outcome: 'rerun', rerun: [RERUN_PATH] },
+		{ attempt: MAX_CHECK_RERUNS + 1, outcome: 'none', rerun: [] },
+	])('reruns attempt $attempt only within the rerun cap', async ({ attempt, outcome, rerun }) => {
+		const run = { ...TRUNCATED_RUN, run_attempt: attempt }
+
+		answer_actions({ latest: [UNIT], all: [UNIT], run })
+
+		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe(outcome)
+		expect(posts()).toStrictEqual(rerun)
+	})
+
+	// A superseded run the concurrency group cancelled before it created any job.
+	it('does not rerun a cancelled run', async () => {
+		answer_actions({ latest: [], all: [], run: { ...TRUNCATED_RUN, conclusion: 'cancelled' } })
 
 		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('none')
 		expect(posts()).toStrictEqual([])
@@ -164,9 +181,7 @@ describe('recover_missing — nothing to recover', () => {
 	})
 
 	it('does not rerun a run whose latest attempt holds a failed job', async () => {
-		const run = { conclusion: 'failure', event: 'pull_request' }
-
-		answer_actions({ latest: [{ name: UNIT.name, conclusion: 'failure' }], run })
+		answer_actions({ latest: [{ name: UNIT.name, conclusion: 'failure' }] })
 
 		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('none')
 		expect(posts()).toStrictEqual([])

@@ -1,8 +1,8 @@
-import { josh_command } from '#scripts/josh/josh-run'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_park_body } from '#scripts/run/park/run-park-body'
+import { run_park_write } from '#scripts/run/park/run-park-write'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_yield_cap } from './backlog-yield-cap'
@@ -86,13 +86,13 @@ describe('backlog_yield_cap.PORTS', () => {
 		await expect(PORTS.yields(ISSUE)).resolves.toStrictEqual([at])
 	})
 
-	it('parks through run:park and notes the trip with its exit code', async () => {
-		const run = vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: '' })
+	it('parks as a system stop and notes the trip with its exit code', async () => {
+		const run = vi.spyOn(run_park_write, 'system_stop').mockResolvedValue(0)
 		const emit = vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 
 		await PORTS.park(ISSUE, 'body')
 
-		expect(run).toHaveBeenCalledWith(['run:park', ISSUE, '--body', 'body'], true)
+		expect(run).toHaveBeenCalledWith({ issue_number: ISSUE, body: 'body' }, process.cwd())
 		expect(emit).toHaveBeenCalledWith(
 			run_event_stream.EVENT_KIND.NOTE,
 			expect.stringContaining(`#${ISSUE} parked by backlog:drive`),

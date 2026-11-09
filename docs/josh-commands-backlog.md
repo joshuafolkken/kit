@@ -203,15 +203,16 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:f
 Assess whether a complete draft can join an unstarted issue.
 
 ```bash
-pnpm josh issue:fold-existing --fingerprint 5848                            # read the comment fingerprint before assessment.
+pnpm josh issue:fold-existing --fingerprint 5848                                 # read the comment fingerprint before assessment.
 pnpm josh issue:fold-existing assessment.json --json
-pnpm josh issue:fold-existing assessment.json --apply 5848                  # apply and verify the assessed fold and priority floor.
-pnpm josh issue:fold-existing assessment.json --apply 5848 --blocked 5849   # record a confirmed duplicate dependency and reconcile its epic.
+pnpm josh issue:fold-existing assessment.json --apply 5848                       # apply and verify the assessed fold and priority floor.
+pnpm josh issue:fold-existing assessment.json --apply 5848 --blocked 5849        # record a confirmed duplicate dependency and reconcile its epic.
+pnpm josh issue:fold-existing assessment.json --apply 5848 --found-during 5849   # record a split fold as lane 5849's split child.
 ```
 
 <!-- /usage -->
 
-Read the issue and draft first. `--apply <N>` writes on `fold`; with `--blocked <M>` on `duplicate`, it records `<M>` blocked by `<N>` and reconciles its epic. Failure exits 1. Display writes nothing; `separate` returns to the ordinary filing path.
+Read the issue and draft first. `--apply <N>` writes on `fold`; with `--blocked <M>` on `duplicate`, it records `<M>` blocked by `<N>` and reconciles its epic. With `--found-during <M>` on `fold`, it records `<N>` as lane `<M>`'s split child. Failure exits 1. Display writes nothing; `separate` returns to the ordinary filing path.
 
 `content`, `has_complete_read`, `existing_body`, `comment_fingerprint`, `draft_body` and `verification` are required; an assessment without one exits 1. Omit other unknown facts: `inspect`.
 
@@ -383,12 +384,11 @@ pnpm josh pkg:scout "date formatting" --size 5
 **Options:**
 
 - `--size <n>` — how many candidates to fetch and rank (default 10).
+- `--issue <n>` — the Issue a close pair reads for reuse (default: the held run).
 
 <!-- /usage -->
 
-It queries the npm registry for npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.
-
-The verdict reads the top two's relative lead `(top − second) / top`: `clear` at 15% or more (select it, Tier A), `close` within it (ask the user, Tier B). A failed per-candidate read leaves that metric blank (`—`).
+Rows come from the npm registry. A top lead of 15%+ is `clear` (Tier A), else `close` (Tier B) unless the Issue decides to reuse existing code: posted there as `Auto-decided:`, Tier A. Else `Reuse check:` says why; a failed read, judgment or comment exits 1.
 
 ### `josh issue:lint`
 
@@ -624,7 +624,7 @@ pnpm josh epic --untrack 893 894                                             # r
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
 - `--rationale-file <path|->` — split rationale prose, written under `.josh/tmp/` (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
-- `--notify` — on create or `--promote`: send the split path's `planning` Telegram (the epic's URL, every child's URL and `Next: backlogrun #<E> --only`), the same send as `issue:plan --planned`; a failed send only warns.
+- `--notify` — on create or `--promote`: send the split path's `planning` Telegram (the epic URL, child URLs and `Next: pnpm josh backlogrun <E> --only`), as `issue:plan --planned` sends; a failed send only warns.
 - `--title <title>` — with `--promote`: rename the issue first.
 - `--before <M>` — with `--add`: insert before `#M`, re-pointing what `#M` was waiting on so the chain is never broken.
 - `--after <M>` — with `--add`: start after `#M`; branches when `#M` already has a successor, extends when it is a tail.
