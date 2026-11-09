@@ -127,6 +127,30 @@ describe('lane_net_time.net_ms -- a yield', () => {
 	})
 })
 
+// The event `run:merge` writes when a child's run ends with its issue split.
+function split(minute: number, issue = ISSUE): RunEvent {
+	return event(minute, 'split', `#${String(issue)} split`)
+}
+
+// joshuafolkken/kit#6678: an issue split, then dispatched again, counts only the run after the split.
+describe('lane_net_time.net_ms — a split', () => {
+	it('takes out the split run and the wait for the redispatch', () => {
+		const entries = [dispatch(0), dispatch(1900), merge(1950)]
+
+		expect(net_minutes(entries, [split(14)])).toBe(50)
+	})
+
+	it('takes out nothing for a split no later dispatch followed', () => {
+		expect(net_minutes([dispatch(0), merge(30)], [split(14)])).toBe(30)
+	})
+
+	it("ignores another issue's split", () => {
+		const entries = [dispatch(0), dispatch(OTHER_REDISPATCH, OTHER), merge(30)]
+
+		expect(net_minutes(entries, [split(10, OTHER)])).toBe(30)
+	})
+})
+
 // joshuafolkken/kit#5032: a host sleep the sampler recorded at the wake, `minutes` long from `minute`.
 function sleep(minute: number, minutes: number): RunEvent {
 	return { ...event(minute + minutes, 'sleep', 'host slept'), elapsed_ms: minutes * MINUTE_MS }

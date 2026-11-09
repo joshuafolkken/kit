@@ -1,9 +1,12 @@
 import { epic_graph, type IssueReference } from '#scripts/epic/epic-graph'
 import { git_gh_issue_alias_graphql } from '#scripts/gh/git-gh-issue-alias-graphql'
 import {
+	COMMENTS,
+	comments_schema,
 	git_gh_issue_graphql,
 	ISSUE_FIELDS,
 	issue_fields_schema,
+	type GraphqlComments,
 	type GraphqlIssueFields,
 } from '#scripts/gh/git-gh-issue-graphql'
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
@@ -101,7 +104,33 @@ function view_loader(): ViewLoader {
 	}
 }
 
-const run_board_decision_graphql = { view_loader }
+// A listing cut at the page answers no comments, so REST reads every page of it.
+function to_comments_json(comments: GraphqlComments): string | undefined {
+	if (comments.pageInfo.hasNextPage) return undefined
+
+	return git_gh_issue_graphql.to_rest_comments(comments.nodes)
+}
+
+// The `needs-decision` children's comments in the REST listing's JSON (joshuafolkken/kit#6857),
+// keyed by number; a number missing from the answer is read through REST.
+async function read_comments(
+	numbers: ReadonlyArray<number>,
+	repo: string,
+): Promise<ReadonlyMap<number, string>> {
+	const read = await git_gh_issue_alias_graphql.read_aliased(
+		numbers,
+		COMMENTS,
+		comments_schema,
+		repo,
+	)
+	const pairs = [...read.answers].map(
+		([number, issue]) => [number, to_comments_json(issue.comments)] as const,
+	)
+
+	return new Map(pairs.filter((pair): pair is readonly [number, string] => pair[1] !== undefined))
+}
+
+const run_board_decision_graphql = { read_comments, view_loader }
 
 export type { ViewLoader }
 export { run_board_decision_graphql }

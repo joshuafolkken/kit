@@ -4,7 +4,6 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_baseline } from '#scripts/lane/lane-baseline'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
-import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_overrun } from '#scripts/lane/lane-overrun'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -13,6 +12,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_auth } from './run-merge-auth'
+import { run_merge_dated } from './run-merge-dated'
 import { run_merge_decision } from './run-merge-decision'
 import { run_merge_driver } from './run-merge-driver'
 import { run_merge_human_review } from './run-merge-human-review'
@@ -211,32 +211,14 @@ function report_count_refused(carry: RunCarry | undefined): MergeVerdict {
 	return emit(MERGE_TOKEN.BUSY, FAILURE_EXIT_CODE)
 }
 
-async function is_on_record(text: string): Promise<boolean> {
-	const events = await run_event_stream_emit.invocation_or_all_events()
-
-	return events.some(
-		(event) => event.kind === run_event_stream.EVENT_KIND.MERGE && event.text === text,
-	)
-}
-
-// **Put on record once, dated to the merge's confirmation**: a pass that collects a child already on
-// record — `run:carry --end` after `run:merge` — writes neither again.
-async function put_merge_on_record(child: string, at: Date): Promise<void> {
-	const text = `${issue_cite.plain_for('program', child)} merged`
-
-	if (await is_on_record(text)) return
-
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, text, at)
-	await lane_ledger_write.record_merge(Number(child), at)
-}
-
 // A merged child counted and its lane closed, the merge put on the stream and in the ledger ahead of the
-// lane close, dated to the ownership check rather than to the end of the sync (joshuafolkken/kit#4734). Returns the
+// lane close, dated to the ownership check rather than to the end of the sync (joshuafolkken/kit#4734), or
+// to the ship's earlier report (`run-merge-dated.ts`). Returns the
 // carry when the ownership check refused it, `undefined` once recorded. `run:carry --end` records the
 // merges a run ended with through it too (`run-merge-collect.ts`). The lane's `ended` record is
 // `lane:close`'s alone: an `incomplete` close leaves the lane open on it (joshuafolkken/kit#4300).
 async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
-	return await run_merge_steps.do_merged(ctx, put_merge_on_record)
+	return await run_merge_steps.do_merged(ctx, run_merge_dated.put_on_record)
 }
 
 // A merge is the only outcome that asks the hand-off check, because it is the only one that returned

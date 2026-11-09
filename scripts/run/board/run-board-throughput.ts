@@ -95,8 +95,12 @@ function span_after(event: RunEvent, end_ms: number): ReadonlyArray<Span> {
 	return is_halt(event) || end_ms - start_ms > MAX_GAP_MS ? [] : [{ start_ms, end_ms }]
 }
 
+// In time order, not stream order: a merge is dated back to its ship's report (`run-merge-dated.ts`), so
+// it lands after lines newer than itself (joshuafolkken/kit#6677).
 function active_spans(events: ReadonlyArray<RunEvent>, now_ms: number): ReadonlyArray<Span> {
-	return events.flatMap((event, index) => span_after(event, next_ms(events, index, now_ms)))
+	const timed = events.toSorted((left, right) => moment(left) - moment(right))
+
+	return timed.flatMap((event, index) => span_after(event, next_ms(timed, index, now_ms)))
 }
 
 function close_entry(event: RunEvent): ReadonlyArray<[string, number]> {

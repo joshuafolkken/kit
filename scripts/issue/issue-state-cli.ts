@@ -1,7 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueReadReason } from '#scripts/gh/git-gh-issue-read'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_report_failures } from './issue-report-failures'
 import { issue_state, type IssueState } from './issue-state'
@@ -30,10 +29,6 @@ const USAGE = 'Usage: josh issue:state <issue-number> [<issue-number> ...] [--re
 // A blank line between the blocks of a multi-number report, so a person sees where one issue ends
 // while a reader matching `issue: ` still finds each block by its first line.
 const BLOCK_SEPARATOR = '\n\n'
-// The same bound `epic:bundle` puts on its reference lookup, for the same reason: every read is a
-// `gh` process, and an unbounded fan-out is answered with secondary rate limiting rather than with
-// states.
-const READ_CONCURRENCY = 8
 // The two fields, under the names `gh issue view --json` gave them. `git-gh-issue-rest.ts` maps them
 // back from REST, which is what keeps `OPEN` / `CLOSED` / `MERGED` out of this file.
 const STATE_FIELDS = 'state,labels'
@@ -115,18 +110,15 @@ async function read_issue(issue_number: string, repo?: string): Promise<StateRea
 		: { kind: 'state', state: parsed }
 }
 
-// Through the shared pool rather than a raw `Promise.all`: each read spawns a `gh` process, and a
-// whole epic's children fired at once draws GitHub's secondary rate limiting — which comes back as
-// `unreadable` for issues that exist and are perfectly readable. Same bound `epic:bundle`'s
-// reference lookup uses, and the pool is shared rather than spelled out again here.
+// Every read requested at once: each spawns a `gh` process, and the `gh` layer's shared spawn limit
+// (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`) keeps a whole epic's children from drawing GitHub's
+// secondary rate limiting — which comes back as `unreadable` for issues that exist.
 async function read_all(request: StateRequest): Promise<ReadonlyArray<IssueReport>> {
-	return await bounded_pool.bounded_map(
-		request.issue_numbers,
-		READ_CONCURRENCY,
-		async (issue_number) => ({
+	return await Promise.all(
+		request.issue_numbers.map(async (issue_number) => ({
 			issue_number,
 			result: await read_issue(issue_number, request.repo),
-		}),
+		})),
 	)
 }
 
@@ -169,7 +161,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 const issue_state_cli = {
-	READ_CONCURRENCY,
 	REPO_OPTIONS: OPTIONS,
 	STATE_FIELDS,
 	USAGE,

@@ -3,6 +3,7 @@ import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-c
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_drive_trace } from './backlog-drive-trace'
 import { backlog_measure_close } from './backlog-measure-close'
 
 const { MEASURED_LAUNCH, UNSAMPLED_LAUNCH } = backlog_drive_launch_pass
@@ -77,7 +78,7 @@ async function measured(issue: string): Promise<DriveLaunch | undefined> {
 	return outcome === 'wait' ? UNSAMPLED_LAUNCH : undefined
 }
 
-async function launch(issue: string, owner: string): Promise<DriveLaunch> {
+async function opened(issue: string, owner: string): Promise<DriveLaunch> {
 	await backlog_drive_owner.assert_current(owner)
 
 	const settled = await measured(issue)
@@ -93,6 +94,15 @@ async function launch(issue: string, owner: string): Promise<DriveLaunch> {
 	}
 
 	return outcome.kind
+}
+
+// The launch opened and closed on the stream (`backlog-drive-trace.ts`).
+async function launch(issue: string, owner: string): Promise<DriveLaunch> {
+	return await backlog_drive_trace.traced(
+		issue,
+		backlog_drive_trace.STEP.LAUNCH,
+		async () => await opened(issue, owner),
+	)
 }
 
 const backlog_drive_launch = { LATEST_STASH_MESSAGE, launch }

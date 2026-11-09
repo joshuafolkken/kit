@@ -9,6 +9,7 @@ import { gh_request_tally } from './gh-request-tally'
 import { check_gh_installed } from './git-gh-check'
 import { gh_failure } from './git-gh-failure'
 import { gh_retry } from './git-gh-retry'
+import { GH_SPAWN_CONCURRENCY } from './git-gh-spawn-width'
 
 const BODY_FROM_STDIN = '-'
 
@@ -155,10 +156,7 @@ function to_gh_error(error: unknown): Error {
 	)
 }
 
-// One width for every asynchronous `gh` spawn, so `Promise.all` fan-outs anywhere (`backlog:next`
-// reads up to hundreds) stay under GitHub's secondary rate limit. Held around the spawn only:
-// `with_retry`'s backoff waits outside a slot.
-const GH_SPAWN_CONCURRENCY = 8
+// Held around the spawn only: `with_retry`'s backoff waits outside a slot.
 const gh_slots = bounded_pool.limiter(GH_SPAWN_CONCURRENCY)
 
 async function spawn_gh_command(
@@ -478,4 +476,6 @@ const git_gh_exec = {
 
 export type { GhApiRequest }
 export { git_gh_exec, has_stderr_field, has_stdout_field }
-export { BODY_FROM_STDIN, GH_REQUEST_TIMEOUT_MESSAGE, GH_REQUEST_TIMEOUT_MS, GH_SPAWN_CONCURRENCY }
+export { BODY_FROM_STDIN, GH_REQUEST_TIMEOUT_MESSAGE, GH_REQUEST_TIMEOUT_MS }
+
+export { GH_SPAWN_CONCURRENCY } from './git-gh-spawn-width'

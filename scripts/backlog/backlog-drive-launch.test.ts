@@ -2,6 +2,7 @@ import { git_stash, type StashEntry } from '#scripts/git/stash/git-stash'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_owner } from './backlog-drive-owner'
@@ -26,6 +27,7 @@ beforeEach(() => {
 	vi.spyOn(lane_launch_cli, 'launch_ready_lane').mockResolvedValue({ kind: 'launched', pid: '1' })
 	// The stage a launch writes goes to the checkout's own stream, which is a live run's: never from a test.
 	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
+	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 	vi.spyOn(backlog_measure_close, 'outcome').mockResolvedValue('launch')
 })
 
