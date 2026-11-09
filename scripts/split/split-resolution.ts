@@ -113,7 +113,7 @@ async function record_fold({ origin, target }: Fold): Promise<void> {
 	try {
 		await lane_ledger_write.record_split_filed({
 			issue: Number(origin),
-			child: issue_cite.plain(target),
+			child: issue_cite.plain_for('program', target),
 		})
 	} catch (error) {
 		throw new Error(

@@ -40,7 +40,7 @@ async function ask_next(epic: string): Promise<ReadonlyArray<string> | undefined
 }
 
 function handed_back(epic: string): OfferRead {
-	return { ...WAIT, verdict: `epic ${issue_cite.plain(epic)}` }
+	return { ...WAIT, verdict: `epic ${issue_cite.plain_for('program', epic)}` }
 }
 
 function failed_offer(epic: string, state: DriveState): OfferRead {

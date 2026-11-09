@@ -82,7 +82,7 @@ function extract_issue_number(branch_name: string): string | undefined {
 }
 
 function create_error_message(issue_number: string, branch: string, message: string): string {
-	const reference = issue_cite.plain(issue_number)
+	const reference = issue_cite.plain_for('github', issue_number)
 
 	return (
 		`🚫 Error: Commit message must include ${reference}\n` +
@@ -105,7 +105,7 @@ async function check_commit_message(): Promise<CheckResult> {
 
 	const commit_message = await get_commit_message()
 
-	if (!commit_message.includes(issue_cite.plain(issue_number))) {
+	if (!commit_message.includes(issue_cite.plain_for('github', issue_number))) {
 		return {
 			success: false,
 			message: create_error_message(issue_number, current_branch, commit_message),
@@ -114,7 +114,7 @@ async function check_commit_message(): Promise<CheckResult> {
 
 	return {
 		success: true,
-		message: `✅ Commit message check passed: Found ${issue_cite.plain(issue_number)}`,
+		message: `✅ Commit message check passed: Found ${issue_cite.plain_for('github', issue_number)}`,
 	}
 }
 

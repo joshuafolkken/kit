@@ -12,8 +12,8 @@ const BAR_WIDTH = 20
 const PERCENT = 100
 const YELLOW_PERCENT = 50
 const RED_PERCENT = 90
-// `▶rest`, the widest label the first cell draws, so ▶ leaves `rest` in the `7d` column.
-const LABEL_WIDTH = 5
+// `▶ REST`, the widest label the first cell draws, so ▶ leaves `REST` in the `7d` column.
+const LABEL_WIDTH = 6
 // `≈999`, the widest count, and `5000`, GitHub's usual limit.
 const COUNT_WIDTH = 4
 // `Sat 10:00`, the widest reset.

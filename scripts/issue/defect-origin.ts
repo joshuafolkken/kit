@@ -95,11 +95,11 @@ function format_candidate(candidate: Candidate): string {
 	const date = candidate.merged_at.slice(0, DATE_LENGTH)
 	const changed = candidate.targets.join(', ')
 
-	return `${issue_cite.plain(candidate.pr)}  ${date}  ${candidate.title}\n  changed: ${changed}`
+	return `${issue_cite.plain_for('linked', candidate.pr)}  ${date}  ${candidate.title}\n  changed: ${changed}`
 }
 
 function format(issue_number: string, candidates: ReadonlyArray<Candidate>): string {
-	const header = `origin candidates for ${issue_cite.plain(issue_number)} (newest first; declare one as ${ORIGIN_HINT}):`
+	const header = `origin candidates for ${issue_cite.plain_for('linked', issue_number)} (newest first; declare one as ${ORIGIN_HINT}):`
 	const lines =
 		candidates.length === 0
 			? [NO_CANDIDATES]

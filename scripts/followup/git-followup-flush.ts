@@ -22,7 +22,7 @@ const COMMIT_MESSAGE_PREFIX = 'Record observation ledger entries'
 function commit_message(issue_number: string | undefined): string {
 	return issue_number === undefined
 		? COMMIT_MESSAGE_PREFIX
-		: `${COMMIT_MESSAGE_PREFIX} ${issue_cite.plain(issue_number)}`
+		: `${COMMIT_MESSAGE_PREFIX} ${issue_cite.plain_for('github', issue_number)}`
 }
 
 // **A broken line refuses the merge rather than riding it**: the branch's

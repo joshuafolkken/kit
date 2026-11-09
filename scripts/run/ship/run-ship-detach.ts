@@ -336,7 +336,7 @@ async function detach(request: DetachRequest): Promise<DetachResult> {
 	if (result.verdict === LAUNCHED) {
 		await run_event_stream_emit.emit(
 			run_event_stream.EVENT_KIND.SHIP_LAUNCH,
-			`${issue_cite.plain(request.number)} ship supervisor launched`,
+			`${issue_cite.plain_for('program', request.number)} ship supervisor launched`,
 		)
 	}
 

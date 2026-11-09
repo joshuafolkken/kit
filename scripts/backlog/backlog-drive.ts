@@ -393,6 +393,8 @@ interface LoopPorts extends DrivePorts {
 	// Whether `run:add` handed the run an issue at or after the given instant —
 	// `backlog_arrival_added.is_added_since` in production.
 	added_since: (since_ms: number) => Promise<boolean>
+	// Whether `lane:limit` raised the limit at or after the given instant — `is_raised_since` in production.
+	raised_since: (since_ms: number) => Promise<boolean>
 	// Whether an issue the run names is still left to dispatch — the run record's remaining in production.
 	named_left: () => Promise<boolean>
 	finish: (end: DriveEnd) => Promise<void>

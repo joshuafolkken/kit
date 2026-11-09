@@ -208,6 +208,15 @@ function next_status(previous: ItemStatus | undefined, event: RunEvent): ItemSta
 	return CONTINUING_KINDS.has(event.kind) ? continued(previous) : advanced(previous, event)
 }
 
+// A yielded lane's close hands its child back to the queue untouched, so its next launch starts it over.
+function fold_event(statuses: Map<number, ItemStatus>, event: RunEvent): void {
+	const issue = Number(run_event_scope.issue_named(event))
+	const status = next_status(statuses.get(issue), event)
+
+	if (run_board_ending_states.is_requeued(event)) statuses.delete(issue)
+	else if (status !== undefined && Number.isSafeInteger(issue)) statuses.set(issue, status)
+}
+
 // `seed` is what each issue is doing before `events` — a lane's record, so a cut or a stage line whose
 // launch rolled off the stream carries the child on.
 function fold_events(
@@ -216,12 +225,7 @@ function fold_events(
 ): Map<number, ItemStatus> {
 	const statuses = new Map(seed)
 
-	for (const event of events) {
-		const issue = Number(run_event_scope.issue_named(event))
-		const status = next_status(statuses.get(issue), event)
-
-		if (status !== undefined && Number.isSafeInteger(issue)) statuses.set(issue, status)
-	}
+	for (const event of events) fold_event(statuses, event)
 
 	return statuses
 }

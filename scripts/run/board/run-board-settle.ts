@@ -5,9 +5,7 @@ import type { ItemState, ItemStatus } from './run-board-status'
 
 // The newest launch carried on, where the child launched more than once.
 function relaunch_of(status: ItemStatus | undefined): Pick<ItemStatus, 'launched_ms'> {
-	const launched_ms = status?.launched_ms
-
-	return launched_ms === undefined ? {} : { launched_ms }
+	return status?.launched_ms === undefined ? {} : { launched_ms: status.launched_ms }
 }
 
 // What a settled child keeps of its run: its newest launch, its spans on a lane, and its track.

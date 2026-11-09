@@ -100,7 +100,7 @@ async function record_failed_relaunch(issue: string, reason: string): Promise<vo
 	note(`the lane child could not be relaunched: ${reason}`)
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.RELAUNCH_FAILED,
-		`${issue_cite.plain(issue)} could not be relaunched: ${reason}`,
+		`${issue_cite.plain_for('program', issue)} could not be relaunched: ${reason}`,
 	)
 }
 

@@ -23,7 +23,7 @@ const OPEN_SETUP_ISSUES_QUERY = `?state=open&labels=${IGNORE_FOR_RELEASE_LABEL}&
 const FIRST_SETUP_ISSUE_FILTER = `[.[] | select(.title == "${SETUP_TITLE}") | .number][0] // empty`
 
 function setup_issue(issue_number: string): IssueInfo {
-	return git_issue.parse(`${SETUP_TITLE} ${issue_cite.plain(issue_number)}`)
+	return git_issue.parse(`${SETUP_TITLE} ${issue_cite.plain_for('github', issue_number)}`)
 }
 
 // The Issue number when `branch` is the branch an earlier `josh start` created for the setup pull

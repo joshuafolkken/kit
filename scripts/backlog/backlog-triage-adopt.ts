@@ -158,7 +158,7 @@ function decision_of(request: AdoptRequest): string {
 	const { issue, option, reason } = request
 	const adopted = `adopted park option ${String(option)} (backlog:triage --adopt)`
 
-	return `${issue_cite.plain(issue)}: ${adopted} — ${reason}`
+	return `${issue_cite.plain_for('github', issue)}: ${adopted} — ${reason}`
 }
 
 async function is_requeued(issue: string): Promise<boolean> {

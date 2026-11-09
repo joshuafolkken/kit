@@ -21,8 +21,8 @@ type PauseResult =
 	| { kind: 'failed'; step: string; reason: string; done: ReadonlyArray<StepReport> }
 
 function aside_of(request: PauseRequest): AsideRequest {
-	const issue = issue_cite.plain(request.issue)
-	const prerequisite = issue_cite.plain(request.prerequisite)
+	const issue = issue_cite.plain_for('program', request.issue)
+	const prerequisite = issue_cite.plain_for('program', request.prerequisite)
 
 	return {
 		issue: request.issue,

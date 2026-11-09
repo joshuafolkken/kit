@@ -65,8 +65,12 @@ function recorded(record: LaneStateRecord, folded: ItemStatus | undefined): Item
 
 // The lane's status: its events from the record's newest launch on, folded over the record's running
 // child, so a cut or a stage line whose launch rolled off the stream carries it on. An ending among
-// them stands; otherwise the record's state does.
-function status_of(events: ReadonlyArray<RunEvent>, record: LaneStateRecord): ItemStatus {
+// them stands; otherwise the record's state does. A child whose yield closed the lane has none: it is
+// back in the queue while the record still says running (joshuafolkken/kit#6886).
+function status_of(
+	events: ReadonlyArray<RunEvent>,
+	record: LaneStateRecord,
+): ItemStatus | undefined {
 	const issue = Number(record.issue)
 	const launched_ms = time_of(record.launched_at)
 	const launched = run_board_status.since_launch(events, record.issue, launched_ms)
@@ -75,7 +79,7 @@ function status_of(events: ReadonlyArray<RunEvent>, record: LaneStateRecord): It
 	])
 	const folded = run_board_status.fold_events(launched, seed).get(issue)
 
-	return folded === undefined || folded.state === 'running' ? recorded(record, folded) : folded
+	return folded?.state === 'running' ? recorded(record, folded) : folded
 }
 
 interface LaneRead {
@@ -91,10 +95,11 @@ interface LaneRead {
 
 // A running lane carries what its transcript says, so a label alone never stops a working child, and
 // when it was last written, so an idle lane's stop is dated no later than that.
-function with_result(status: ItemStatus, read: LaneResult | undefined): ItemStatus {
-	if (read === undefined || status.state !== 'running') return status
+function with_result(status: ItemStatus, read: LaneRead, lane: string): ItemStatus {
+	const transcript = read.results?.get(lane)
+	if (transcript === undefined || status.state !== 'running') return status
 
-	return { ...status, result: read.result, written_ms: read.written_ms }
+	return { ...status, result: transcript.result, written_ms: transcript.written_ms }
 }
 
 function place(read: LaneRead, lane: string, sorted: BoardLanes): BoardLanes {
@@ -103,8 +108,11 @@ function place(read: LaneRead, lane: string, sorted: BoardLanes): BoardLanes {
 	if (record === undefined) return { ...sorted, unknown: [...sorted.unknown, lane] }
 	if (!HELD_STATES.has(record.state)) return sorted
 
-	const status = with_result(status_of(read.events, record), read.results?.get(lane))
-	const entry = [Number(lane), status] as const
+	const status = status_of(read.events, record)
+
+	if (status === undefined) return sorted
+
+	const entry = [Number(lane), with_result(status, read, lane)] as const
 
 	return is_own(record, read.started_ms)
 		? { ...sorted, own: new Map([...sorted.own, entry]) }
