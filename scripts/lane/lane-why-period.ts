@@ -1,10 +1,11 @@
 import path from 'node:path'
 import { lane_breakdown, type Breakdown } from './lane-breakdown'
 import { lane_sinks, type SinkRecords } from './lane-sinks'
-import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
+import type { OpenIssue } from './lane-sinks-issues'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_why } from './lane-why'
+import { lane_why_causes } from './lane-why-causes'
 
 // Evidence groups, not exclusive diagnoses: a lane may have several signals. Each group's total
 // is the full net time of its distinct lanes, never an estimate of time a fix would save (#6475).
@@ -46,14 +47,27 @@ function add_signals(
 	if (names.length > 0) groups.set(CAUSE.HUB, names)
 }
 
+// The driver row also carries the lane's cause keys, so an Issue filed against the cause rather than
+// the stage name is linked (joshuafolkken/kit#6952).
+function add_driver_keys(groups: Map<string, Array<string>>, keys: ReadonlyArray<string>): void {
+	const names = groups.get(CAUSE.DRIVER)
+
+	if (names !== undefined) groups.set(CAUSE.DRIVER, [...names, ...keys])
+}
+
 // An over-budget implement row alone cannot prove misattribution; retain that uncertainty.
-function causes_of(breakdown: Breakdown, hubs: ReadonlyArray<string>): Map<string, Array<string>> {
+function causes_of(
+	breakdown: Breakdown,
+	hubs: ReadonlyArray<string>,
+	driver_keys: ReadonlyArray<string> = [],
+): Map<string, Array<string>> {
 	const groups = new Map<string, Array<string>>()
 
 	for (const { stage, budget } of lane_why.over_stages(breakdown)) {
 		add_name(groups, cause_of(budget), lane_sinks.base_name(stage.name))
 	}
 
+	add_driver_keys(groups, driver_keys)
 	add_signals(groups, breakdown, hubs)
 	// The driver's overrun explains none of the lane's own net time.
 	if (groups.size === Number(groups.has(CAUSE.DRIVER))) groups.set(CAUSE.OTHER, [])
@@ -71,7 +85,11 @@ function collect_lane(
 	if (breakdown === undefined) return
 
 	const ms = breakdown.stages.reduce((sum, stage) => sum + stage.ms, 0)
-	const causes = causes_of(breakdown, lane_sinks.hubs_of(records.entries, [issue]))
+	const causes = causes_of(
+		breakdown,
+		lane_sinks.hubs_of(records.entries, [issue]),
+		lane_why_causes.keys_of(records.entries, issue, undefined),
+	)
 
 	for (const [cause, names] of causes) {
 		groups.set(cause, [...(groups.get(cause) ?? []), { ms, names }])
@@ -80,17 +98,6 @@ function collect_lane(
 
 function total_ms(lanes: ReadonlyArray<CauseLane>): number {
 	return lanes.reduce((sum, lane) => sum + lane.ms, 0)
-}
-
-function issues_cell(
-	lanes: ReadonlyArray<CauseLane>,
-	issues: ReadonlyArray<OpenIssue> | undefined,
-): string {
-	if (issues === undefined) return lane_sinks_issues.UNREAD
-
-	const [name, ...also] = lanes.flatMap((lane) => lane.names)
-
-	return name === undefined ? lane_sinks_issues.NONE : lane_sinks_issues.cell(name, issues, also)
 }
 
 function row_of(
@@ -102,7 +109,10 @@ function row_of(
 		cause,
 		String(lanes.length),
 		lane_stage_stats.cell(total_ms(lanes)),
-		issues_cell(lanes, issues),
+		lane_why_causes.open_cell(
+			lanes.flatMap((lane) => lane.names),
+			issues,
+		),
 	])
 }
 
