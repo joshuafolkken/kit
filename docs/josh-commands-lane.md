@@ -208,7 +208,7 @@ pnpm josh lane:stats --period 7 --pairs     # a 7-day period's scoped pair runs
 
 <!-- /usage -->
 
-The followup row is `followup (driver, outside lane net)`; `--why` groups a followup over budget as `driver followup over budget (outside lane net)`, apart from the lane's own causes (`lane-why-period.ts`).
+The followup row is `followup (driver, outside lane net)`; `--why` groups a followup over budget as `driver followup over budget (outside lane net)`, apart from the lane's own causes (`lane-why-period.ts`). Its `open issues` matches each lane's ledger cause key (the last CI check) as well as the stage names, through `lane:why`'s matcher (`lane-why-causes.ts`).
 
 `--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
 lanes over that many net minutes, the total, the lane count and the median per lane, the longest total first
