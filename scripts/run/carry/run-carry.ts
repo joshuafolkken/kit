@@ -436,21 +436,26 @@ function retrospective_done_of(read: CarryRead): boolean {
 	return read.kind === 'carried' && read.carry.retrospective === true
 }
 
+function left_of(carry: RunCarry, declared: ReadonlyArray<number>): ReadonlyArray<number> {
+	const done = carry.done ?? []
+
+	return run_carry_added.ordered(declared, carry.added).filter((issue) => !done.includes(issue))
+}
+
 // **What the resumed session has to be told, computed rather than stored.** A stored remainder would
 // be a second copy of a subtraction the record already determines, free to disagree with it; computed
 // here, `--json` answers the successor's one question — which issues are left, in the order they were
-// declared — so nothing downstream has to subtract two lists by hand. An invocation that named no
-// issues answers `undefined`, which `JSON.stringify` drops. The issues `run:add` put in are folded in by `run_carry_added.ordered`.
+// declared — so nothing downstream has to subtract two lists by hand. The issues `run:add` put in are
+// folded in by `run_carry_added.ordered`. An invocation that named no issues answers `undefined`, which
+// `JSON.stringify` drops, once no issue `run:add` gave it is left: what is left of it then is the pool,
+// not an empty list a reader would take for a finished run.
 function remaining_of(carry: RunCarry | undefined): ReadonlyArray<number> | undefined {
 	if (carry === undefined) return undefined
 
 	const declared = run_invocation.issue_numbers(carry.invocation)
+	const left = left_of(carry, declared ?? [])
 
-	if (declared === undefined) return undefined
-
-	const done = carry.done ?? []
-
-	return run_carry_added.ordered(declared, carry.added).filter((issue) => !done.includes(issue))
+	return declared === undefined && left.length === 0 ? undefined : left
 }
 
 // The finished issues are named rather than counted, because the reader of a `busy` or `standing`
