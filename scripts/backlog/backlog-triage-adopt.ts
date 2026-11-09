@@ -10,7 +10,8 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_park } from '#scripts/run/park/run-park'
-import { run_park_body } from '#scripts/run/park/run-park-body'
+import { run_park_body, type ApprovalRange } from '#scripts/run/park/run-park-body'
+import { backlog_triage_approval } from './backlog-triage-approval'
 
 // `josh backlog:triage --apply <N> --adopt <k> --reason <text>` — a parent takes option `<k>` of a
 // parked child's park in one call (joshuafolkken/kit#6670): the decision recorded in the tracking
@@ -23,6 +24,7 @@ import { run_park_body } from '#scripts/run/park/run-park-body'
 // the child needs exactly one tracking epic and a backlogrun must hold the carry record here (`run:add`
 // refuses without one), so a refusal leaves nothing written. `epic --decide`
 // skips an entry or a comment already there, so a re-run after a later failure records nothing twice.
+// An option carrying a size-approval range first writes the approval (`backlog-triage-approval.ts`).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -45,6 +47,16 @@ interface AdoptRequest {
 }
 
 type EpicRead = { epic: number } | { problem: string }
+
+interface ParkFound {
+	comments: ReadonlyArray<IssueComment>
+	range: ApprovalRange | undefined
+}
+
+interface AdoptRead {
+	epic: number
+	park: ParkFound
+}
 
 type Values = NonNullable<ReturnType<typeof cli_flags.values_of<typeof OPTIONS>>>
 
@@ -79,16 +91,19 @@ function park_body(comments: ReadonlyArray<IssueComment>): string | undefined {
 		.findLast((body) => run_park_body.problem_of(body) === undefined)
 }
 
-async function option_problem(request: AdoptRequest): Promise<string | undefined> {
+async function park_of(request: AdoptRequest): Promise<ParkFound | { problem: string }> {
 	const json = await git_gh_issue_read.issue_list_comments(request.issue)
 	const comments = await issue_read.parse_comments(json)
 
-	if (comments === undefined) return 'could not read its comments'
+	if (comments === undefined) return { problem: 'could not read its comments' }
 	const body = park_body(comments)
 
-	if (body === undefined) return 'no trusted comment follows the park body schema'
+	if (body === undefined) return { problem: 'no trusted comment follows the park body schema' }
+	const problem = run_park_body.adopt_problem(body, request.option)
 
-	return run_park_body.adopt_problem(body, request.option)
+	if (problem !== undefined) return { problem }
+
+	return { comments, range: run_park_body.approval_range(body, request.option) }
 }
 
 function epics_problem(count: number): string {
@@ -117,6 +132,28 @@ async function run_problem(): Promise<string | undefined> {
 	return read.kind === 'carried' ? undefined : NO_RUN
 }
 
+async function read_of(request: AdoptRequest): Promise<AdoptRead | { problem: string }> {
+	const problem = await run_problem()
+
+	if (problem !== undefined) return { problem }
+	const park = await park_of(request)
+
+	if ('problem' in park) return park
+	const read = await epic_of(request.issue)
+
+	return 'problem' in read ? read : { epic: read.epic, park }
+}
+
+// The size approval the adopted option carries, written first; its json path, or `undefined`.
+async function approval_of(request: AdoptRequest, park: ParkFound): Promise<string | undefined> {
+	const { issue, reason } = request
+	const { comments, range } = park
+
+	if (range === undefined) return undefined
+
+	return await backlog_triage_approval.write({ issue, reason, range, comments })
+}
+
 function decision_of(request: AdoptRequest): string {
 	const { issue, option, reason } = request
 	const adopted = `adopted park option ${String(option)} (backlog:triage --adopt)`
@@ -138,11 +175,10 @@ async function write(
 	directory: string,
 ): Promise<string | undefined> {
 	const { issue } = request
-	const decision = decision_of(request)
 	const decided = await epic_decide.decide({
 		epic_number: epic,
 		children: [Number(issue)],
-		decision,
+		decision: decision_of(request),
 	})
 
 	if (decided !== SUCCESS_EXIT_CODE) return DECIDE_FAILED
@@ -156,19 +192,18 @@ async function write(
 
 async function adopt(request: AdoptRequest, directory: string): Promise<number> {
 	const { issue, option } = request
-	const problem = (await run_problem()) ?? (await option_problem(request))
-
-	if (problem !== undefined) return refused(issue, problem)
-	const read = await epic_of(issue)
+	const read = await read_of(request)
 
 	if ('problem' in read) return refused(issue, read.problem)
+	const approval = await approval_of(request, read.park)
 	const write_problem = await write(request, read.epic, directory)
 
 	if (write_problem !== undefined) return refused(issue, write_problem)
 	const epic = session_cite.issue(String(read.epic))
+	const approved = approval === undefined ? '' : ` · size approval ${approval}`
 
 	console.info(
-		`adopt ${session_cite.issue(issue)} — option ${String(option)} · decided in ${epic} · park cleared · requeued`,
+		`adopt ${session_cite.issue(issue)} — option ${String(option)}${approved} · decided in ${epic} · park cleared · requeued`,
 	)
 
 	return SUCCESS_EXIT_CODE

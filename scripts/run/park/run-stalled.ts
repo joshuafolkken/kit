@@ -1,6 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 
 // What a `run:stalled` park says, written and read in one place (joshuafolkken/kit#4215): the park
 // event carries the cause's short name after the label, the park comment its whole `Why:`, and the
@@ -11,6 +12,8 @@ interface StallCause {
 	short: string
 	why: string
 }
+
+type ParkStop = NonNullable<RunEvent['stop']>
 
 // What `run:merge` judged when it parks a child with no ship stop to name.
 const SESSION_UNFINISHED: StallCause = {
@@ -70,6 +73,12 @@ function cause_of(reason: string): string | undefined {
 	return reason.startsWith(CAUSE_LEAD) ? reason.slice(CAUSE_LEAD.length) : undefined
 }
 
+// The ship stop a park event records — its stage and `Cause` class (joshuafolkken/kit#6864) — or
+// `undefined` for a park written before it carried one, or one no ship stop took.
+function stop_of(event: RunEvent): ParkStop | undefined {
+	return event.stop
+}
+
 // A stalled row leads with its resume action, followed by its recorded cause in parentheses.
 function row_text(child: number | string, cause = '', is_backlog_live = false): string {
 	const resume = `→ resume: ${resume_of(child, is_backlog_live)}`
@@ -93,8 +102,9 @@ const run_stalled = {
 	resume_of,
 	row_text,
 	session_unfinished,
+	stop_of,
 	waiting_text,
 }
 
 export { run_stalled }
-export type { StallCause }
+export type { ParkStop, StallCause }

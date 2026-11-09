@@ -12,6 +12,8 @@
 
 **引き金はシェルのコマンド文字列しか見えない**ので、node 内の REST のように引き金が掛からない経路を持つ規則は、常駐側にトリガ 1 行を残す。各項目の発火しない状態は「規則が守られている状態」と一致させ、一致が取れない規則は常駐に残す。
 
+- 相談スコープのシェルが拒否される → `scripts/hooks/implementation-shell.ts`（拒否リストは `implementation-shell-deny.ts`）。それ以外の runtime 書き込みは `scripts/hooks/bash-revert.ts` が戻す。
+
 ## stop-notify — 途中停止の通知（`confirmation`）
 
 保持中のランが判断待ちで止まるとき、Stop フックの `pnpm josh stop:guard` が `confirmation` を送る — 理由を先頭に、末尾は `Recommended: <choice>`。フックが停止を拒否したときだけ自分で送る:

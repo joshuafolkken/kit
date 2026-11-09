@@ -41,6 +41,18 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		// before every guarded call, where a second ~0.16 s tsx start is not affordable. Each guard it
 		// composes loads `.env` through the shared loader instead.
 	},
+	// The hook ledger read per rule (joshuafolkken/kit#6664): which rules refuse, and how often wrongly.
+	'hook:ledger': {
+		script: 'scripts/hooks/hook-ledger-cli.ts',
+		is_read_only: true,
+		description:
+			'Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule',
+		category: 'Development',
+		reference: ['--period <days>', 'maintainer', ['network']],
+		usage: {
+			examples: [{ arguments: '--period 7', note: "a 7-day period's refusals per rule" }],
+		},
+	},
 	'stop:guard': {
 		script: 'scripts/hooks/stop-guard.ts',
 		description:

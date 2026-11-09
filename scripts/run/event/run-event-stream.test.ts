@@ -49,6 +49,18 @@ describe('run_event_stream.append — positions', () => {
 	})
 })
 
+// joshuafolkken/kit#6864: a park's ship stop is written beside its text and read back whole.
+describe('run_event_stream.append_event — a park stop', () => {
+	it('reads back the stop a park event was appended with', () => {
+		const target = fresh_target()
+		const stop = { stage: 'followup', cause: 'check' }
+
+		run_event_stream.append_event(target, { at: AT, kind: KIND.PARK, text: '#7 parked', stop })
+
+		expect(run_event_stream.read_events(target)[0]?.stop).toStrictEqual(stop)
+	})
+})
+
 describe('run_event_stream.append — the one enumeration', () => {
 	it('refuses a kind the enumeration does not name and appends nothing', () => {
 		const target = fresh_target()
