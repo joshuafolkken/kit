@@ -181,7 +181,7 @@ async function watch(ports: BoardPorts): Promise<void> {
 	}
 }
 
-// The answer to a progress question asked during a `backlogrun`: one frame in the chat's form,
+// The answer to a progress question asked during a `backlogrun`, `fullrun` or `halfrun`: one frame in the chat's form,
 // recorded as the report it is, so the next scheduled one waits a full interval — as
 // `run:progress --once` does.
 async function answer(ports: BoardPorts): Promise<void> {
