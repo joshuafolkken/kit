@@ -1,11 +1,11 @@
-import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { AgentEventState } from '#scripts/agent/agent-event'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { run_liveness } from '#scripts/run/run-liveness'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_read } from './run-board-read'
 import { run_board_read_fixture } from './run-board-read-fixture'
 
@@ -15,7 +15,7 @@ import { run_board_read_fixture } from './run-board-read-fixture'
 const { ENDED_AT, arrange, arrange_states, lane } = run_board_read_fixture
 const STARTED_AT = '2026-10-08T09:00:00.000Z'
 const ISSUE = '3432'
-const DIRECTORY = mkdtempSync(path.join(tmpdir(), 'board-read-result-'))
+const DIRECTORY = temporary_directory('suite')('board-read-result-')
 const STATE: AgentEventState = {
 	provider: 'anthropic',
 	launch: 'pending',
@@ -34,10 +34,6 @@ const RECORD: LaneStateRecord = {
 }
 
 afterEach(() => vi.restoreAllMocks())
-
-afterAll(() => {
-	rmSync(DIRECTORY, { recursive: true, force: true })
-})
 
 describe('run_board_read.read_local lane transcripts', () => {
 	it('carries a running lane’s transcript result and last write onto its lane state', async () => {
