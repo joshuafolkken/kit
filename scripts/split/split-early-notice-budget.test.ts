@@ -37,6 +37,7 @@ vi.mock('./split-relocations', () => ({
 	},
 }))
 
+const { change_base } = await import('#scripts/git/change-base')
 const { git_command } = await import('#scripts/git/git-command')
 const { issue_declared_size } = await import('#scripts/issue/issue-declared-size')
 const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
@@ -65,6 +66,7 @@ beforeEach(() => {
 	vi.mocked(git_command.git_directories).mockResolvedValue([GIT_DIRECTORY])
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
 	vi.mocked(git_command.diff_numstat_since).mockResolvedValue(UNDER_BAR_NUMSTAT)
+	vi.mocked(change_base.resolved_through_merge).mockResolvedValue('base')
 	implement_over.mockResolvedValue(undefined)
 })
 
@@ -121,6 +123,22 @@ describe('split_early_notice.surface past the implement budget', () => {
 		await split_early_notice.surface()
 
 		expect(console.warn).toHaveBeenCalledOnce()
+	})
+})
+
+describe('split_early_notice.surface past the implement budget on an unmeasurable diff', () => {
+	it('still shows it, recorded as an empty diff, when the change base cannot be resolved', async () => {
+		implement_over.mockResolvedValue(OVER_MINUTES)
+		vi.mocked(change_base.resolved_through_merge).mockRejectedValue(new Error('no base'))
+		await split_early_notice.surface()
+
+		expect(console.warn).toHaveBeenCalledOnce()
+		expect(lane_ledger_write.record_split_notice).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE_NUMBER,
+			files: 0,
+			lines: 0,
+			reason: 'budget',
+		})
 	})
 })
 

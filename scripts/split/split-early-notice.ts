@@ -134,6 +134,16 @@ function budget_text(issue_number: number, over: number): string {
 	return `split notice: the implementation is ${String(over)} min over its stage budget — with an acceptance criterion this tree meets: ${run_cut_budget_over.spill_steps(String(issue_number))} With none met yet, go on.`
 }
 
+// The time bar does not depend on the diff, so an unmeasurable one is recorded as empty rather than
+// silencing the notice.
+async function budget_record(issue_number: number): Promise<SplitNoticeRecord> {
+	try {
+		return { ...record_of(issue_number, await split_measure.read_branch()), reason: BUDGET_REASON }
+	} catch {
+		return { issue: issue_number, files: 0, lines: 0, reason: BUDGET_REASON }
+	}
+}
+
 // The time bar (joshuafolkken/kit#6544): a slow implementation crosses its budget with a small diff.
 async function pending_budget_notice(issue_number: number): Promise<string | undefined> {
 	const target = await unclaimed_marker(issue_number, BUDGET_PREFIX)
@@ -142,10 +152,7 @@ async function pending_budget_notice(issue_number: number): Promise<string | und
 	const over = await run_cut_budget_over.implement_over(issue_number)
 
 	if (over === undefined) return undefined
-	const notice: SplitNoticeRecord = {
-		...record_of(issue_number, await split_measure.read_branch()),
-		reason: BUDGET_REASON,
-	}
+	const notice = await budget_record(issue_number)
 
 	return (await claim_notice(target, notice)) ? budget_text(issue_number, over) : undefined
 }

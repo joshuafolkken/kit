@@ -1,8 +1,8 @@
 {
-	"reason": "#6544 adds the split notice's implement-budget bar on its own marker with a budget ledger reason (a time-bar module split out of run:cut's budget check) and pointer lines in pre-gate-cut.md / chain-rule.md / lane-limit-measurement.md",
+	"reason": "The time-bar split notice (#6544) adds a budget-over module, a budget reason and an unmeasurable-diff fallback for the time bar",
 	"date": "2026-11-09",
 	"growth": {
-		"scripts.code_lines": 40,
+		"scripts.code_lines": 44,
 		"ai_cost.on_demand_bytes": 229
 	}
 }
