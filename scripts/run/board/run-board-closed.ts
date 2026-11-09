@@ -48,8 +48,8 @@ interface ClosedAnswer {
 	is_whole: boolean
 }
 
-// The bound `issue:state` reads several issues under, so a run's worth of closed children does not draw
-// GitHub's secondary rate limit.
+// A bound on the closed-issue reads, so a run's worth of closed children does not draw GitHub's
+// secondary rate limit.
 const READ_CONCURRENCY = 4
 
 const closed_schema = z.looseObject({

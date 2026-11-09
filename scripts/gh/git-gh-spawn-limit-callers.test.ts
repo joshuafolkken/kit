@@ -42,8 +42,14 @@ vi.mock('./git-gh-etag-read', () => ({
 const BURST = GH_SPAWN_CONCURRENCY * 3
 const SPAWN_MS = 2
 const REPO = 'o/r'
+const LIST_REQUEST = { json_fields: 'number,blockedBy', limit: BURST }
 
 const flight = { current: 0, peak: 0 }
+
+// What execa throws for a refused request; a 4xx is not retried (`git-gh-retry.ts`).
+function refused(summary: string): Error {
+	return Object.assign(new Error('gh exited 1'), { stderr: `gh: ${summary}` })
+}
 
 function blocked_rows(): Array<Record<string, unknown>> {
 	return Array.from({ length: BURST }, (_, index) => ({
@@ -58,10 +64,7 @@ function blocked_rows(): Array<Record<string, unknown>> {
 function answer(args: ReadonlyArray<string>): string {
 	const line = args.join(' ')
 
-	if (line.includes('graphql')) {
-		throw Object.assign(new Error('gh exited 1'), { stderr: 'gh: Bad Request (HTTP 400)' })
-	}
-
+	if (line.includes('graphql')) throw refused('Bad Request (HTTP 400)')
 	if (line.includes(BLOCKED_BY_SEGMENT)) return rest_blockers('open')
 
 	return rest_issue_page(blocked_rows())
@@ -74,6 +77,11 @@ async function timed_spawn(args: ReadonlyArray<string>): Promise<SpawnResult> {
 	flight.current -= 1
 
 	return { stdout: answer(args) }
+}
+
+function blocker_reads(): number {
+	return mocked_execa.mock.calls.filter(([, args]) => args.join(' ').includes(BLOCKED_BY_SEGMENT))
+		.length
 }
 
 function issue_numbers(): Array<string> {
@@ -109,11 +117,25 @@ describe('callers bounded only by the gh spawn limit', () => {
 	})
 
 	it("the listing's blocker reads never run more gh spawns at once than the width", async () => {
-		await git_gh_issue_list.issue_list({ json_fields: 'number,blockedBy', limit: BURST })
+		await git_gh_issue_list.issue_list(LIST_REQUEST)
 
-		expect(
-			mocked_execa.mock.calls.filter(([, args]) => args.join(' ').includes(BLOCKED_BY_SEGMENT)),
-		).toHaveLength(BURST)
+		expect(blocker_reads()).toBe(BURST)
 		expect(flight.peak).toBe(GH_SPAWN_CONCURRENCY)
+	})
+
+	// The pool `read_relations` keeps: a failed blocker read fails the listing, and no read starts
+	// after it — only those already in flight finish.
+	it('the listing starts no blocker read after one fails', async () => {
+		mocked_execa.mockImplementation(async (_file, args) => {
+			if (args.join(' ').includes(`/${String(ISSUE_NUMBER)}${BLOCKED_BY_SEGMENT}`)) {
+				throw refused('Not Found (HTTP 404)')
+			}
+
+			return await timed_spawn(args)
+		})
+
+		await git_gh_issue_list.issue_list(LIST_REQUEST)
+
+		expect(blocker_reads()).toBeLessThanOrEqual(GH_SPAWN_CONCURRENCY)
 	})
 })

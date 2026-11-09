@@ -1,3 +1,4 @@
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_blocked_by_graphql } from './git-gh-blocked-by-graphql'
 import { git_gh_etag_read } from './git-gh-etag-read'
@@ -10,6 +11,7 @@ import {
 	type BlockedBy,
 	type RestIssue,
 } from './git-gh-issue-rest'
+import { GH_SPAWN_CONCURRENCY } from './git-gh-spawn-width'
 
 // Listing issues through REST, in the JSON shape `gh issue list --json <fields>` answered with.
 //
@@ -201,20 +203,22 @@ async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> 
 // consults the row's `issue_dependencies_summary` first, so an issue GitHub itself reports as
 // unblocked costs no request.
 //
-// The REST reads are requested together rather than one after another: the pass was paced one
-// request at a time, which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a
-// blocker. The `gh` layer's shared spawn limit (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`) bounds the
-// burst, and a rate-limited read still fails the whole listing rather than a row.
+// The REST reads are bounded rather than sequential: the pass was paced one request at a time,
+// which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a blocker. The `gh`
+// layer's shared spawn limit already bounds the burst; the pool stays because `read_blocked_by`
+// throws, and a rate-limited read fails the whole listing — `bounded_map` then starts no further
+// read (`bounded-pool.ts`), where a `Promise.all` would have queued every row's read into the same
+// rate limit for an answer nobody reads. Its width is the layer's, so the pool adds no bound of its own.
 async function read_relations(
 	rows: ReadonlyArray<RestIssue>,
 	repo?: string,
 ): Promise<Array<BlockedBy>> {
 	const answered = await git_gh_blocked_by_graphql.read_answered(rows)
 
-	return await Promise.all(
-		rows.map(
-			async (row) => answered.get(row) ?? (await read_blocked_by(String(row.number), row, repo)),
-		),
+	return await bounded_pool.bounded_map(
+		rows,
+		GH_SPAWN_CONCURRENCY,
+		async (row) => answered.get(row) ?? (await read_blocked_by(String(row.number), row, repo)),
 	)
 }
 
