@@ -7,6 +7,12 @@
 // anything else is a `conversation`. The rules are tried in order: the wake rule first, since a
 // hand-off's carried sections can name `/code-review`, and a review run as a subagent is counted as
 // a review.
+//
+// A `josh run:handoff` child opens with its keyword too, so it is read off the origin its preamble names
+// before the keyword: counted as the keyword, a session handed over from a consultation reads as a
+// typed run's regression (joshuafolkken/kit#6898).
+
+import { run_handoff_launch } from '#scripts/run/handoff/run-handoff-launch'
 
 const RUN_KEYWORDS = ['fullrun', 'halfrun', 'prrun', 'backlogrun', 'kickoff'] as const
 
@@ -27,6 +33,7 @@ const RULES: ReadonlyArray<KindRule> = [
 	{ kind: REVIEW, matches: (prompt) => prompt.includes(REVIEW_MARKER) },
 	{ kind: 'subagent', matches: (_prompt, is_delegated) => is_delegated },
 	{ kind: 'resume', matches: (prompt) => prompt.trimStart().startsWith(RESUME_PREFIX) },
+	{ kind: 'handoff', matches: (prompt) => prompt.includes(run_handoff_launch.ORIGIN_MARKER) },
 ]
 
 function run_keyword(prompt: string): string | undefined {
