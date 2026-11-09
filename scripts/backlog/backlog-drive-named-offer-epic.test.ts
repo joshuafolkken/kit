@@ -71,6 +71,18 @@ test('names nothing in a pool run while its added epic waits, so the pool is ask
 	expect(await offer_of(POOL_RUN)).toBeUndefined()
 })
 
+// The round-2 finding: with no lane of the run's own in flight, a pool that counted nothing running
+// would read the drain while the epic is still open.
+test('counts the passed epic running in the pool, so an idle run does not drain past it', async () => {
+	epic_answers(WAIT)
+	const state = backlog_drive.initial_state([], ACTIVE)
+
+	const { offer, pool } = await backlog_drive_named_offer.read(carry_of(POOL_RUN), state, CONTEXT)
+
+	expect(offer).toBeUndefined()
+	expect(pool.in_flight).toStrictEqual([String(EPIC)])
+})
+
 test('still waits on an added epic whose read failed, so its retries count', async () => {
 	const failed = { ...WAIT, retries: 1 }
 

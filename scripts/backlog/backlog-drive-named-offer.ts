@@ -32,6 +32,11 @@ interface NamedRead {
 	pool: DriveState
 }
 
+interface NamedPass {
+	offer: OfferRead | undefined
+	passed: ReadonlyArray<string>
+}
+
 const NO_RETRIES = 0
 
 function max_of(forwarded: ReadonlyArray<string>): number | undefined {
@@ -205,8 +210,9 @@ async function launch(
 
 // An epic `run:add` put in that waits on its children holds nothing up, like an added issue in flight
 // (joshuafolkken/kit#6883): its children are what runs, so the offer passes it as in flight and the
-// issues behind it, or the pool, fill the free lanes (joshuafolkken/kit#6840). A failed read still
-// waits (`retries`), so the epic's retry count reaches its hand-back.
+// issues behind it, or the pool, fill the free lanes (joshuafolkken/kit#6840). The pool counts it
+// running, so with no lane of the run's own in flight it does not read the drain while the epic is
+// open. A failed read still waits (`retries`), so the epic's retry count reaches its hand-back.
 function is_passed(
 	carry: RunCarry,
 	issue: string | undefined,
@@ -222,17 +228,22 @@ async function offer_of(
 	state: DriveState,
 	waiting: DriveState,
 	context: NamedContext,
-): Promise<OfferRead | undefined> {
+): Promise<NamedPass> {
 	const named = backlog_drive_named.offer(carry, waiting, context.is_only)
-	if (named?.verdict !== 'run') return await not_run(carry, named)
+	if (named?.verdict !== 'run') return { offer: await not_run(carry, named), passed: [] }
 	const budget = budget_offer(carry, state, context.forwarded)
-	if (budget.verdict !== 'run') return budget
+	if (budget.verdict !== 'run') return { offer: budget, passed: [] }
 	const [issue] = named.issues
 	const offered = await launch(issue, named, state, context.owner)
-	if (!is_passed(carry, issue, offered)) return offered
-	const past = { ...waiting, in_flight: [...waiting.in_flight, issue] }
+	if (!is_passed(carry, issue, offered)) return { offer: offered, passed: [] }
+	const past = await offer_of(
+		carry,
+		state,
+		{ ...waiting, in_flight: [...waiting.in_flight, issue] },
+		context,
+	)
 
-	return await offer_of(carry, state, past, context)
+	return { ...past, passed: [issue, ...past.passed] }
 }
 
 // A named issue the yield holds while none of the run's own lanes runs — its holder is outside the run
@@ -247,12 +258,17 @@ function held_alone(state: DriveState, waiting: DriveState): OfferRead | undefin
 // The named offer, and the state the pool's offer reads when it names nothing: a named issue the yield
 // still holds is excluded there too, so the pool does not relaunch it into the same yield
 // (joshuafolkken/kit#4926, joshuafolkken/kit#6883). It is excluded, not counted running: no lane holds it.
+// An added epic the offer passed is counted running there (`is_passed`).
 // joshuafolkken/kit#6865: each offer first retries the mechanical parks whose stop has cleared.
 async function read(carry: RunCarry, state: DriveState, context: NamedContext): Promise<NamedRead> {
 	await backlog_drive_stalled_retry.sweep()
 	const waiting = { ...state, in_flight: await holding(carry, state.in_flight) }
-	const pool = { ...state, exclude: [...state.exclude, ...waiting.in_flight] }
-	const offer = await offer_of(carry, state, waiting, context)
+	const { offer, passed } = await offer_of(carry, state, waiting, context)
+	const pool = {
+		...state,
+		in_flight: [...state.in_flight, ...passed],
+		exclude: [...state.exclude, ...waiting.in_flight],
+	}
 
 	return { offer: offer ?? held_alone(state, waiting), pool }
 }
