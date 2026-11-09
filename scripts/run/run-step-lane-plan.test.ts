@@ -2,10 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const uncleared_mock = vi.hoisted(() => vi.fn(() => true))
 const plan_paths_mock = vi.hoisted(() => vi.fn(async (): Promise<ReadonlyArray<string>> => []))
+const approval_file_mock = vi.hoisted(() =>
+	vi.fn(async (): Promise<string | undefined> => undefined),
+)
 
 vi.mock('#scripts/lane/lane-plan', () => ({ lane_plan: { is_uncleared: uncleared_mock } }))
 vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { plan_paths: plan_paths_mock },
+}))
+vi.mock('#scripts/backlog/backlog-triage-approval', () => ({
+	backlog_triage_approval: { existing_file: approval_file_mock },
 }))
 
 const { run_step_lane_plan } = await import('./run-step-lane-plan')
@@ -20,6 +26,7 @@ const PLANNED = ['scripts/lane/lane-overrun-mechanisms-cli.ts', 'docs/josh-comma
 beforeEach(() => {
 	uncleared_mock.mockReturnValue(true)
 	plan_paths_mock.mockResolvedValue([])
+	approval_file_mock.mockResolvedValue(undefined)
 })
 
 async function command_line(): Promise<string | undefined> {
@@ -66,5 +73,20 @@ describe('run_step_lane_plan.lines_for', () => {
 	it('names nothing outside a lane child', async () => {
 		expect(await run_step_lane_plan.lines_for(ISSUE, false)).toStrictEqual([])
 		expect(uncleared_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6776: the json `backlog:triage --adopt` wrote reaches the requeued child here.
+describe('run_step_lane_plan.lines_for with a size approval', () => {
+	it('names the size approval the parent wrote (ac-65c53234)', async () => {
+		const file = '/repo/.josh/tmp/size-approval-4910.json'
+
+		plan_paths_mock.mockResolvedValue(PLANNED)
+		approval_file_mock.mockResolvedValue(file)
+
+		expect(await command_line()).toBe(
+			`pnpm josh lane:plan ${ISSUE} ${PLANNED.join(' ')} --size-approval ${file}`,
+		)
+		expect(approval_file_mock).toHaveBeenCalledWith(ISSUE)
 	})
 })

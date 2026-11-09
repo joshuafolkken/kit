@@ -38,6 +38,15 @@ vi.mock('#scripts/run/park/run-park', () => ({
 		}),
 	},
 }))
+vi.mock('./backlog-triage-approval', () => ({
+	backlog_triage_approval: {
+		write: vi.fn(async () => {
+			order.push('approval')
+
+			return '/repo/.josh/tmp/size-approval-6670.json'
+		}),
+	},
+}))
 vi.mock('#scripts/josh/josh-run', () => ({
 	josh_command: {
 		josh_run: vi.fn(async () => {
@@ -52,6 +61,7 @@ const { issue_read } = await import('#scripts/issue/issue-read')
 const { epic_blocked_by } = await import('#scripts/epic/epic-blocked-by')
 const { epic_decide } = await import('#scripts/epic/epic-decide')
 const { josh_command } = await import('#scripts/josh/josh-run')
+const { backlog_triage_approval } = await import('./backlog-triage-approval')
 const { backlog_triage_cli } = await import('./backlog-triage-cli')
 
 const ISSUE = '6670'
@@ -185,6 +195,43 @@ describe('backlog:triage --apply --adopt — reads and failures', () => {
 		expect(console.error).toHaveBeenCalledWith(
 			expect.stringContaining('decision recorded and park cleared'),
 		)
+	})
+})
+
+// joshuafolkken/kit#6776: an option carrying a size-approval range writes the approval first.
+const RANGE_LINES = [
+	'   - 規模承認のパス: `scripts/a.ts`',
+	'   - 規模承認の行数: 150 / 260',
+	'   - 規模承認のファイル数: 4 / 6',
+]
+const APPROVAL_PARK = PARK.replace('2. Rotate', () => `${RANGE_LINES.join('\n')}\n2. Rotate`)
+
+describe('backlog:triage --apply --adopt — a size-approval option', () => {
+	it('writes the approval before the decision and names its json (ac-65c53234)', async () => {
+		vi.mocked(issue_read.trusted_bodies).mockReturnValue([APPROVAL_PARK])
+
+		await expect(adopt()).resolves.toBe(0)
+
+		expect(order).toStrictEqual(['approval', 'decide', 'clear', 'run:add'])
+		expect(backlog_triage_approval.write).toHaveBeenCalledWith({
+			issue: ISSUE,
+			reason: REASON,
+			range: {
+				paths: ['scripts/a.ts'],
+				lines: { declared: 150, max: 260 },
+				files: { declared: 4, max: 6 },
+			},
+			comments: [],
+		})
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining('size approval /repo/.josh/tmp/size-approval-6670.json'),
+		)
+	})
+
+	it('writes no approval for an option that carries no range', async () => {
+		await expect(adopt()).resolves.toBe(0)
+
+		expect(backlog_triage_approval.write).not.toHaveBeenCalled()
 	})
 })
 
