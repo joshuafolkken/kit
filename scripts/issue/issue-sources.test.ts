@@ -66,6 +66,14 @@ describe('the trusted sources of an issue', () => {
 		})
 	})
 
+	it('names a comment with no URL by its place among the comments', () => {
+		const read = issue_sources.to_sources(content([comment({ html_url: undefined })]))
+
+		expect(read.kind === 'sources' && read.sources.at(-1)?.id).toBe('comment-1')
+	})
+})
+
+describe('an untrusted text', () => {
 	it('drops an untrusted comment and counts it, so its text is never handed over', () => {
 		const untrusted = comment({ author: STRANGER, body: UNTRUSTED_TEXT, is_trusted: false })
 		const read = issue_sources.to_sources(content([untrusted]))
@@ -74,10 +82,19 @@ describe('the trusted sources of an issue', () => {
 		expect(JSON.stringify(read)).not.toContain(UNTRUSTED_TEXT)
 	})
 
-	it('names a comment with no URL by its place among the comments', () => {
-		const read = issue_sources.to_sources(content([comment({ html_url: undefined })]))
+	it('drops an untrusted body, so the first trusted comment comes first', () => {
+		const untrusted_body = {
+			fields: { ...FIELDS, is_body_trusted: false },
+			comments: [comment({})],
+		}
 
-		expect(read.kind === 'sources' && read.sources.at(-1)?.id).toBe('comment-1')
+		expect(issue_sources.to_sources(untrusted_body)).toEqual({
+			kind: 'sources',
+			sources: [
+				{ id: FIRST_URL, order: 0, author: OWNER, created_at: FIRST_TIME, text: FIRST_TEXT },
+			],
+			untrusted_count: 1,
+		})
 	})
 })
 

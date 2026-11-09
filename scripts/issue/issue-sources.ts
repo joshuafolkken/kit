@@ -9,6 +9,9 @@ import { issue_read_cli, type IssueContent } from './issue-read-cli'
 
 const BODY_ID = 'body'
 
+// `order` is the place among the sources handed over, in written order — an untrusted text leaves no
+// gap, so the body is told by its `id`, never by `order === 0`. A comment's `author` and `created_at`
+// carry `issue-read.ts`'s placeholders when GitHub gave none; only the body has neither.
 interface IssueSource {
 	id: string
 	order: number
