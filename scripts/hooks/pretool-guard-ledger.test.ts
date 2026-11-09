@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hook_ledger } from './hook-ledger'
 
 // joshuafolkken/kit#6587: the one hook process hands the ledger what it denied. A separate suite from
@@ -25,7 +25,7 @@ vi.mock('#scripts/issue/issue-watch-hook', () => ({
 
 const { pretool_guard } = await import('./pretool-guard')
 
-const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'pretool-guard-ledger-'))
+const WORK_DIRECTORY = temporary_directory('suite')('pretool-guard-ledger-')
 const TRANSCRIPT = path.join(WORK_DIRECTORY, 'session.jsonl')
 const HOOK = 'pretool-guard'
 
@@ -33,10 +33,6 @@ writeFileSync(TRANSCRIPT, '')
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(WORK_DIRECTORY, { force: true, recursive: true })
 })
 
 function bash_payload(command: string): string {

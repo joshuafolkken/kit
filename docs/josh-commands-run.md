@@ -982,7 +982,9 @@ pnpm josh run:handoff backlogrun <E> --only                         # josh backl
 
 <!-- /usage -->
 
-Consultation main (Fable / Astra): uses its provider's role profile (`kickoff` scheduler, else worker). Background `kickoff`. Lane children cannot use `run:handoff`: exit 1 before launch; continue in the current session.
+Consultation main (Fable / Astra): uses its provider's role profile (`kickoff` / `retrospective` scheduler, else worker). Background `kickoff`. Lane children cannot use `run:handoff`: exit 1 before launch; continue in the current session.
+
+`run:handoff retrospective` starts the end-of-run unit on a generated brief and waits; the brief's close names the calling session as `--owner`, since the carry is that session's. It exits 0 only once the carry holds the unit's `run:carry --retrospective` mark, and exits 1 without starting when the mark is already there.
 
 **Output / exit codes:** exits 0 once the child starts (`kickoff`: once it exits 0); `backlogrun` exits with `josh backlogrun`'s code. A bad argument, an unreadable brief, an unresolvable profile, no git repository, a failed start, or a tree hold that blocks the child's `run:entry` claim exits 1.
 
@@ -1425,7 +1427,7 @@ A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-r
 
 A `--single` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply.
 
-`--size-approval <json-file>` (optional; a re-plan never needs one): `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain.
+`--size-approval <json-file>` (optional; a re-plan never needs one): `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain. Steps: [Approve a lane plan past its size guide](./how-to/lane-size-approval.md).
 
 `--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
 

@@ -115,13 +115,19 @@ function is_newest_run(run: RollupElement, newest: Map<string, RollupElement>): 
 	return newest.get(key) === run
 }
 
-function to_check_run_items(check_runs_json: string): Array<RollupElement> {
-	const pages = read_pages(check_runs_json, check_runs_page_schema, NOT_A_CHECK_RUNS_LISTING)
-	const runs = pages.flatMap((page) => page.check_runs)
+// Each run in the REST spelling — `id`, `app.id`, `check_suite.id` — which the GraphQL snapshot
+// (`git-gh-pr-graphql-snapshot.ts`) also answers in, so both paths keep the same runs.
+function newest_check_runs<T extends RollupElement>(runs: ReadonlyArray<T>): Array<T> {
 	const newest = new Map<string, RollupElement>()
 	for (const run of runs) remember_newest_run(run, newest)
 
 	return runs.filter((run) => is_newest_run(run, newest))
+}
+
+function to_check_run_items(check_runs_json: string): Array<RollupElement> {
+	const pages = read_pages(check_runs_json, check_runs_page_schema, NOT_A_CHECK_RUNS_LISTING)
+
+	return newest_check_runs(pages.flatMap((page) => page.check_runs))
 }
 
 function to_status_context_items(status_json: string): Array<RollupElement> {
@@ -145,6 +151,7 @@ function to_status_check_rollup(input: {
 }
 
 const git_gh_pr_rollup = {
+	newest_check_runs,
 	to_status_check_rollup,
 }
 

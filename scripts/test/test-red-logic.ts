@@ -94,6 +94,39 @@ function failed_files(report: string, roots: ReadonlyArray<string>): Array<strin
 		.flatMap((result) => relative_in(roots, result.name))
 }
 
+// joshuafolkken/kit#6814: a probe that outruns its timeout writes no JSON report, so a reporter of its
+// own appends one line per test file vitest queued and ended. The files queued and never ended are the
+// ones still running when the probe was killed — the names the timeout failure carries.
+const QUEUED_EVENT = 'queued'
+const END_EVENT = 'end'
+
+function progress_reporter(progress: string): string {
+	const target = JSON.stringify(progress)
+
+	return [
+		"import { appendFileSync } from 'node:fs'",
+		'export default class {',
+		`\tonTestModuleQueued(module) { appendFileSync(${target}, \`${QUEUED_EVENT} \${module.moduleId}\\n\`) }`,
+		`\tonTestModuleEnd(module) { appendFileSync(${target}, \`${END_EVENT} \${module.moduleId}\\n\`) }`,
+		'}',
+		'',
+	].join('\n')
+}
+
+function files_of(lines: ReadonlyArray<string>, event: string): Array<string> {
+	const prefix = `${event} `
+
+	return lines.filter((line) => line.startsWith(prefix)).map((line) => line.slice(prefix.length))
+}
+
+function unfinished_files(progress: string, roots: ReadonlyArray<string>): Array<string> {
+	const lines = progress.split('\n')
+	const ended = new Set(files_of(lines, END_EVENT))
+	const running = files_of(lines, QUEUED_EVENT).filter((file) => !ended.has(file))
+
+	return [...new Set(running)].flatMap((file) => relative_in(roots, file))
+}
+
 // `no-test` when nothing ran and vitest passed with no tests; `stopped` when nothing ran and it failed
 // anyway — its config could not load, so no test was ever asked (joshuafolkken/kit#5043). Otherwise a
 // failing run is `red` — the test caught the pre-fix tree — and a passing one is `green`.
@@ -117,7 +150,9 @@ const test_red_logic = {
 	is_bug_fix,
 	is_refused,
 	is_test_only,
+	progress_reporter,
 	ran_file_count,
+	unfinished_files,
 	unit_test_files,
 	verdict_for,
 }

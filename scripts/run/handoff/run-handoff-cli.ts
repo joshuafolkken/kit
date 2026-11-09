@@ -5,6 +5,7 @@ import {
 	type AgentEnvironment,
 	type AgentProvider,
 } from '#scripts/agent/agent-provider'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { cli_body } from '#scripts/josh/cli-body'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -21,6 +22,7 @@ import { execa } from 'execa'
 import { run_handoff_args, type WorkflowHandoff } from './run-handoff-args'
 import { run_handoff_final } from './run-handoff-final'
 import { run_handoff_launch, type BuiltArgv } from './run-handoff-launch'
+import { run_handoff_retrospective } from './run-handoff-retrospective'
 
 // `josh run:handoff <keyword> [N|new ...] --brief-file <path>` — hand a workflow keyword typed in a
 // consultation session to a child session on the kit role profile's model, on the main session's own
@@ -35,7 +37,7 @@ const AGENT_FLAG = '--agent'
 const LONE_FLAGS: ReadonlySet<string> = new Set(['--stop', '--restart'])
 const ISSUE_TOKEN = /#(\d+)/u
 const USAGE =
-	'Usage: josh run:handoff kickoff|fullrun|halfrun|prrun [N|new ...] --brief-file <path> | backlogrun [...]'
+	'Usage: josh run:handoff kickoff|fullrun|halfrun|prrun [N|new ...] --brief-file <path> | retrospective | backlogrun [...]'
 // `josh backlogrun --agent` names a provider by its CLI.
 const AGENT_NAMES: Readonly<Record<AgentProvider, string>> = {
 	anthropic: 'claude',
@@ -52,6 +54,8 @@ interface HandoffPorts {
 	launch: (request: LaunchRequest) => LaunchResult
 	launch_attached: (request: LaunchRequest) => Promise<AttachedLaunchResult>
 	backlogrun: (argv: ReadonlyArray<string>) => Promise<number>
+	// Whether the carry record under this git directory marks the retrospective as run.
+	is_retrospective_done: (git_directory: string) => boolean
 	write: (line: string) => void
 }
 
@@ -67,6 +71,7 @@ interface Started {
 	built: BuiltArgv
 	request: LaunchRequest
 	log: string
+	git_directory: string
 }
 
 type StartResult = { kind: 'started'; started: Started } | { kind: 'refused'; note: string }
@@ -106,6 +111,8 @@ const LIVE_PORTS: HandoffPorts = {
 	launch_attached: async (request) =>
 		await detached_launch.launch_attached(request, note_to_stderr),
 	backlogrun: josh_backlogrun,
+	is_retrospective_done: (git_directory) =>
+		run_carry.retrospective_done_of(run_carry.read_carry(run_carry.carry_path(git_directory))),
 	write: (line) => process.stdout.write(`${line}\n`),
 }
 
@@ -138,6 +145,22 @@ function result_lines(log: string): ReadonlyArray<string> {
 	return ['final message:', message, ...urls.map((url) => `created: ${url}`)]
 }
 
+// The retrospective unit succeeded only if its `run:carry --retrospective` mark is on the record; its own
+// exit code cannot say so, since a session that never wrote the mark still ends cleanly.
+function closed_retrospective(started: Started, ports: HandoffPorts): number {
+	if (ports.is_retrospective_done(started.git_directory)) return SUCCESS_EXIT_CODE
+
+	return refuse('the retrospective unit ended without run:carry --retrospective', ports)
+}
+
+function waited_exit(started: Started, exit_code: number | null, ports: HandoffPorts): number {
+	if (started.handoff.keyword === run_handoff_args.RETROSPECTIVE_KEYWORD) {
+		return closed_retrospective(started, ports)
+	}
+
+	return exit_code === SUCCESS_EXIT_CODE ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+}
+
 async function waited(started: Started, ports: HandoffPorts): Promise<number> {
 	const result = await ports.launch_attached(started.request)
 
@@ -149,7 +172,7 @@ async function waited(started: Started, ports: HandoffPorts): Promise<number> {
 
 	ports.write(`exit: ${String(result.exit_code)}`)
 
-	return result.exit_code === SUCCESS_EXIT_CODE ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return waited_exit(started, result.exit_code, ports)
 }
 
 // The issue the child's `run:entry` claims under: the line's first `#N`, else an unnumbered run.
@@ -202,7 +225,36 @@ function started_of(input: StartInput, ports: HandoffPorts): StartResult {
 	const log = run_handoff_launch.log_path(git_directory, handoff.keyword, ports.now())
 	const request = run_handoff_launch.request_of(built, ports.cwd, log)
 
-	return { kind: 'started', started: { handoff, built, request, log } }
+	return { kind: 'started', started: { handoff, built, request, log, git_directory } }
+}
+
+// A brief file is read as written; none means the generated retrospective brief, whose close names
+// this session — the backlogrun parent that owns the carry — as the mark's owner.
+function brief_of(
+	brief_file: string | undefined,
+	ports: HandoffPorts,
+): { text: string } | { problem: string } {
+	if (brief_file === undefined) {
+		const owner = agent_session_environment.own_session_pid(ports.environment)
+
+		return { text: run_handoff_retrospective.brief(owner) }
+	}
+
+	const read = cli_body.read_result(brief_file)
+
+	return 'problem' in read ? { problem: `could not read ${brief_file}: ${read.problem}` } : read
+}
+
+// A mark already on the record would read as the unit's own close after it ends, so a retrospective
+// no longer owed is refused before any unit starts.
+function is_already_closed(
+	handoff: WorkflowHandoff,
+	git_directory: string,
+	ports: HandoffPorts,
+): boolean {
+	if (handoff.keyword !== run_handoff_args.RETROSPECTIVE_KEYWORD) return false
+
+	return ports.is_retrospective_done(git_directory)
 }
 
 async function handed(
@@ -210,17 +262,19 @@ async function handed(
 	provider: AgentProvider,
 	ports: HandoffPorts,
 ): Promise<number> {
-	const read = cli_body.read_result(handoff.brief_file)
+	const read = brief_of(handoff.brief_file, ports)
 
-	if ('problem' in read) {
-		return refuse(`could not read ${handoff.brief_file}: ${read.problem}`, ports)
-	}
+	if ('problem' in read) return refuse(read.problem, ports)
 
 	const brief = read.text
 
 	const git_directory = await ports.repository_directory()
 
 	if (git_directory === undefined) return refuse('not inside a git repository', ports)
+
+	if (is_already_closed(handoff, git_directory, ports)) {
+		return refuse('the carry already marks the retrospective as run; nothing is owed', ports)
+	}
 
 	const result = started_of({ handoff, provider, brief, git_directory }, ports)
 
