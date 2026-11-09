@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { fake_result } from '#tools/test/execa-result'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { project_checks } from './project-checks'
@@ -10,8 +11,6 @@ const { TSC_ARGS, type_check_command } = await import('./type-check-command')
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-
 const make_directory = temporary_directory()
 const NODE_MANIFEST = '{"name":"app"}'
 
@@ -21,12 +20,6 @@ function fixture(manifest: string): string {
 	writeFileSync(path.join(root, 'package.json'), manifest)
 
 	return root
-}
-
-function fake_result(exit_code: number): ExecaResult {
-	const result: unknown = { exitCode: exit_code }
-
-	return result as ExecaResult
 }
 
 afterEach(() => {

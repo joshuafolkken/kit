@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { fake_result } from '#tools/test/execa-result'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,18 +10,12 @@ vi.mock('execa', () => ({ execa: vi.fn() }))
 
 const mocked_execa = vi.mocked(execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa>>
-
 const NODE_TEST = 'node --test'
 const COMMAND_LABEL = 'test:unit'
 const REENTRANT_ENVIRONMENT = { [project_test_script.REENTRY_KEY]: '1' }
 
 const ctx = { project_directory: '' }
 const make_directory = temporary_directory()
-
-function fake_result(exit_code: number | undefined): ExecaResult {
-	return { exitCode: exit_code } as unknown as ExecaResult
-}
 
 function write_manifest(manifest: unknown): void {
 	writeFileSync(path.join(ctx.project_directory, 'package.json'), JSON.stringify(manifest))
