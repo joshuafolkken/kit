@@ -103,6 +103,7 @@ function ports(world_state: World): LoopPorts {
 			world_state.clock += milliseconds
 		},
 		added_since: async () => false,
+		raised_since: async () => false,
 		named_left: async () => false,
 		on_state: () => undefined,
 		finish: async (end) => {
