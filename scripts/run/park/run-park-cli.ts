@@ -4,14 +4,14 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_comment_cli, type CommentRequest } from '#scripts/issue/issue-comment-cli'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { issue_park } from '#scripts/issue/issue-park'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_park } from './run-park'
+import { run_park_answered } from './run-park-answered'
 import { run_park_body } from './run-park-body'
-import { run_park_lane } from './run-park-lane'
 import { run_park_release } from './run-park-release'
+import { run_park_write } from './run-park-write'
 
 // `josh run:park <N> --body-file <path>` — park a lane child for a person's decision in one call: the
 // question as a comment, `needs-decision`, and the local record the `lane-park` guard reads.
@@ -38,18 +38,6 @@ const CLEAR_FLAG = '--clear'
 const USAGE = `Usage: josh run:park <issue-number> --body-file <path> | <issue-number> ${CLEAR_FLAG}\n\n${run_park_body.FORMAT}`
 const CLEAR_OPTIONS = { clear: { type: 'boolean' } } as const
 
-// **A park carries the child's recommendation** (joshuafolkken/kit#6669): a body off the schema is
-// refused before any write, naming the missing piece and the schema.
-function is_refused(body: string): boolean {
-	const problem = run_park_body.problem_of(body)
-
-	if (problem === undefined) return false
-
-	console.error(`Park refused: ${problem}.\n${run_park_body.FORMAT}`)
-
-	return true
-}
-
 function clear_issue(argv: ReadonlyArray<string>): string | undefined {
 	const parsed = cli_flags.arguments_of(argv, CLEAR_OPTIONS)
 
@@ -67,21 +55,22 @@ async function release(issue_number: string, directory: string): Promise<number>
 	return run_step_section.print_once(run_step_section.PARK, directory)
 }
 
+// **A park asks only what the Issue has not answered** (joshuafolkken/kit#6531): after the schema,
+// `run_park_answered` judges the question against the Issue before any write.
+async function stop_of(request: CommentRequest, directory: string): Promise<number | undefined> {
+	if (run_park_write.is_refused(request.body)) return FAILURE_EXIT_CODE
+
+	return await run_park_answered.refusal_of(request.issue_number, request.body, directory)
+}
+
 async function park(request: CommentRequest, directory: string): Promise<number> {
-	const { issue_number, body } = request
+	const stop = await stop_of(request, directory)
 
-	if (is_refused(body)) return FAILURE_EXIT_CODE
+	if (stop !== undefined) return stop
 
-	const lane_body = run_park_lane.with_lane_note(body, directory)
-	const write = await issue_park.apply(issue_number, NEEDS_DECISION_LABEL, lane_body)
-	const is_parked = write.is_labelled && write.is_commented
-	const is_recorded = is_parked && run_park.record(issue_number, directory)
+	const is_parked = await run_park_write.write(request, directory)
 
-	console.info(
-		`park ${session_cite.issue(issue_number)} — label: ${String(write.is_labelled)} · comment: ${String(write.is_commented)} · recorded: ${String(is_recorded)}`,
-	)
-
-	return is_parked ? await release(issue_number, directory) : FAILURE_EXIT_CODE
+	return is_parked ? await release(request.issue_number, directory) : FAILURE_EXIT_CODE
 }
 
 // **The record goes whatever the label answers**: the decision is a person's and already made, so a

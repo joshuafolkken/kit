@@ -7,6 +7,8 @@ import { gh_request_tally, type CoreUsage } from './gh-request-tally'
 const RESET_MS = 1_793_000_000_000
 const START: CoreUsage = { used: 679, reset_ms: RESET_MS }
 const END: CoreUsage = { used: 712, reset_ms: RESET_MS }
+const KIND = 'GET repos/{o}/{r}/issues/{n}'
+const ZERO = { calls: 0, not_modified: 0, endpoints: {} }
 
 function reader_of(
 	...readings: Array<CoreUsage | undefined>
@@ -24,31 +26,51 @@ beforeEach(() => {
 
 describe('gh_request_tally', () => {
 	it('starts at zero', () => {
-		expect(gh_request_tally.snapshot()).toStrictEqual({ calls: 0, not_modified: 0 })
+		expect(gh_request_tally.snapshot()).toStrictEqual(ZERO)
 	})
 
-	it('adds one per counted call and per counted 304', () => {
-		gh_request_tally.count_call()
-		gh_request_tally.count_call()
-		gh_request_tally.count_not_modified()
+	it('adds one per counted call and per counted 304, in the total and under its kind', () => {
+		gh_request_tally.count_call(KIND)
+		gh_request_tally.count_call(KIND)
+		gh_request_tally.count_call('graphql')
+		gh_request_tally.count_not_modified(KIND)
 
-		expect(gh_request_tally.snapshot()).toStrictEqual({ calls: 2, not_modified: 1 })
+		expect(gh_request_tally.snapshot()).toStrictEqual({
+			calls: 3,
+			not_modified: 1,
+			endpoints: {
+				[KIND]: { calls: 2, not_modified: 1 },
+				graphql: { calls: 1, not_modified: 0 },
+			},
+		})
 	})
 
 	it('hands out a copy, so a held snapshot does not move with later counts', () => {
 		const held = gh_request_tally.snapshot()
 
-		gh_request_tally.count_call()
+		gh_request_tally.count_call(KIND)
 
 		expect(held.calls).toBe(0)
 	})
+})
 
-	it('reset returns both counts to zero', () => {
-		gh_request_tally.count_call()
-		gh_request_tally.count_not_modified()
+// joshuafolkken/kit#6867: the same counts per call kind.
+describe('gh_request_tally — per call kind', () => {
+	it('hands out a copy of the per-kind counts too', () => {
+		gh_request_tally.count_call(KIND)
+		const held = gh_request_tally.snapshot()
+
+		gh_request_tally.count_call(KIND)
+
+		expect(held.endpoints[KIND]?.calls).toBe(1)
+	})
+
+	it('reset returns both counts and the kinds to zero', () => {
+		gh_request_tally.count_call(KIND)
+		gh_request_tally.count_not_modified(KIND)
 		gh_request_tally.reset()
 
-		expect(gh_request_tally.snapshot()).toStrictEqual({ calls: 0, not_modified: 0 })
+		expect(gh_request_tally.snapshot()).toStrictEqual(ZERO)
 	})
 })
 
@@ -57,8 +79,8 @@ describe('gh_request_tally.core_delta', () => {
 		const read = reader_of(START, END)
 
 		gh_request_tally.watch_core(read)
-		gh_request_tally.count_call()
-		gh_request_tally.count_call()
+		gh_request_tally.count_call(KIND)
+		gh_request_tally.count_call(KIND)
 
 		expect(read).toHaveBeenCalledTimes(1)
 		await expect(gh_request_tally.core_delta()).resolves.toBe(END.used - START.used)
@@ -76,7 +98,7 @@ describe('gh_request_tally.core_delta', () => {
 	})
 
 	it('reads nothing for a process that never watched the allowance', async () => {
-		gh_request_tally.count_call()
+		gh_request_tally.count_call(KIND)
 
 		await expect(gh_request_tally.core_delta()).resolves.toBeUndefined()
 	})
@@ -89,7 +111,7 @@ describe('gh_request_tally.core_delta — readings that answer none', () => {
 		['the window refilled between the readings', START, { used: 3, reset_ms: RESET_MS + 1 }],
 	])('answers none without throwing when %s', async (_case, start, end) => {
 		gh_request_tally.watch_core(reader_of(start, end))
-		gh_request_tally.count_call()
+		gh_request_tally.count_call(KIND)
 
 		await expect(gh_request_tally.core_delta()).resolves.toBeUndefined()
 	})
@@ -98,7 +120,7 @@ describe('gh_request_tally.core_delta — readings that answer none', () => {
 		const read = vi.fn<() => Promise<CoreUsage | undefined>>().mockRejectedValue(new Error('spawn'))
 
 		gh_request_tally.watch_core(read)
-		gh_request_tally.count_call()
+		gh_request_tally.count_call(KIND)
 
 		await expect(gh_request_tally.core_delta()).resolves.toBeUndefined()
 	})

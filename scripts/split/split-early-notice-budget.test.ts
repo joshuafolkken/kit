@@ -1,8 +1,7 @@
-import { mkdtempSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#6544: an implementation past its stage budget shows the split notice with a diff
 // under the size bar — once per Issue on its own marker, with the `issue:spill` way out `run:cut`'s
@@ -56,7 +55,7 @@ const OVER_BAR_NUMSTAT = Array.from(
 	(_unused, index) => `${String(LINES_PER_FILE)}\t0\tscripts/thing-${String(index)}.ts`,
 ).join('\n')
 
-const GIT_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'split-early-notice-budget-'))
+const GIT_DIRECTORY = temporary_directory('suite')('split-early-notice-budget-')
 
 beforeEach(() => {
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
@@ -82,10 +81,6 @@ afterEach(async () => {
 			rm(path.join(GIT_DIRECTORY, `${prefix}${String(ISSUE_NUMBER)}`), { force: true }),
 		),
 	)
-})
-
-afterAll(async () => {
-	await rm(GIT_DIRECTORY, { recursive: true, force: true })
 })
 
 describe('split_early_notice.surface past the implement budget', () => {

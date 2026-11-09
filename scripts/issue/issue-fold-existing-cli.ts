@@ -5,6 +5,7 @@ import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { z } from 'zod'
 import { issue_fold_apply, type ApplyResult } from './issue-fold-apply'
@@ -106,8 +107,12 @@ function report_apply(issue_number: string, result: ApplyResult): void {
 }
 
 // joshuafolkken/kit#6630: `--found-during <N>` records the fold as lane N's split child, so the
-// fold `issue:file`'s duplicate refusal points to answers the split notice too.
-async function record_split_fold({ issue_number, found_during }: ApplyMode): Promise<number> {
+// fold `issue:file`'s duplicate refusal points to answers the split notice too. joshuafolkken/kit#6643:
+// a failed record names the same command, whose rerun takes the written fold as applied and records it.
+async function record_split_fold(
+	{ issue_number, found_during }: ApplyMode,
+	path: string,
+): Promise<number> {
 	if (found_during === undefined) return SUCCESS_EXIT_CODE
 
 	try {
@@ -119,12 +124,15 @@ async function record_split_fold({ issue_number, found_during }: ApplyMode): Pro
 		return SUCCESS_EXIT_CODE
 	} catch (error) {
 		console.error(error_text.message_of(error))
+		console.error(
+			`Rerun \`pnpm josh issue:fold-existing ${shell_quote.word(path)} ${APPLY_FLAG} ${issue_number} ${FOUND_DURING_FLAG} ${found_during}\` to record it.`,
+		)
 
 		return FAILURE_EXIT_CODE
 	}
 }
 
-async function apply_fold(input: Assessment, mode: ApplyMode): Promise<number> {
+async function apply_fold(input: Assessment, mode: ApplyMode, path: string): Promise<number> {
 	const body = folded_body(input)
 
 	if (body === undefined) {
@@ -142,7 +150,7 @@ async function apply_fold(input: Assessment, mode: ApplyMode): Promise<number> {
 
 	report_apply(mode.issue_number, result)
 
-	return result === 'applied' ? await record_split_fold(mode) : FAILURE_EXIT_CODE
+	return result === 'applied' ? await record_split_fold(mode, path) : FAILURE_EXIT_CODE
 }
 
 async function read_assessment(path: string): Promise<Assessment | undefined> {
@@ -198,7 +206,7 @@ async function assess(path: string, mode: Mode): Promise<number> {
 	}
 
 	if (mode.kind === 'duplicate') return await apply_duplicate(input, mode)
-	if (mode.kind === 'apply') return await apply_fold(input, mode)
+	if (mode.kind === 'apply') return await apply_fold(input, mode, path)
 
 	return print_assessment(input, mode.should_json)
 }

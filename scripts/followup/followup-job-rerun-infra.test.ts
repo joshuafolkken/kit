@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { followup_job_rerun, RERUN_BACKOFF_MS } from './followup-job-rerun'
-import { followup_job_rerun_fixture, UNIT_ID } from './followup-job-rerun-fixture'
+import {
+	followup_job_rerun_fixture,
+	SUCCESS,
+	UNIT_ID,
+	WORKFLOW_PATH,
+} from './followup-job-rerun-fixture'
 
 // joshuafolkken/kit#6834: a download outage outlasts the first rerun, so a download failure is rerun on
 // any attempt, each later rerun waits longer, and the jobs a spent cap leaves are read without a rerun.
@@ -47,11 +52,13 @@ const { followup_main_move } = await import('./followup-main-move')
 
 const read_changed = vi.mocked(changed_paths.read_changed_paths)
 const assess = vi.mocked(observation_record.assess)
+const read_graph = vi.mocked(followup_job_needs.read_graph)
 const { answer_actions, answer_checks, as_check, job, rerun_paths } = followup_job_rerun_fixture
 const { read_rerun_names, rerun_failed_jobs } = followup_job_rerun
 
 const BRANCH_NAME = '6834-lane'
 const UNIT_NAME = 'Unit Tests'
+const CHECKS_NAME = 'Checks'
 const FAILURE = 'failure'
 const FAILED_STEPS = ['success', FAILURE]
 const OUTSIDE_TEST = 'scripts/run/board/run-board-frame-budget.test.ts'
@@ -100,7 +107,7 @@ beforeEach(() => {
 	vi.mocked(git_gh_exec.exec_gh_api).mockReset()
 	assess.mockReset()
 	read_changed.mockReset().mockResolvedValue([])
-	vi.mocked(followup_job_needs.read_graph).mockReset().mockResolvedValue([])
+	read_graph.mockReset().mockResolvedValue([])
 	vi.mocked(followup_main_move.should_merge_first).mockReset().mockResolvedValue(false)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
@@ -158,6 +165,116 @@ describe('rerun_failed_jobs — the wait before a later rerun', () => {
 		const { waited_ms } = await rerun_with_timers(THIRD_ROUND)
 
 		expect(waited_ms).toBe(0)
+	})
+})
+
+// PR #5158: the aggregator `Checks` failed beside the shard, its log naming no test.
+describe('rerun_failed_jobs — a job red only for waiting on a job red outside the change', () => {
+	const checks = job({ id: 104, name: CHECKS_NAME, conclusion: FAILURE, steps: FAILED_STEPS })
+	const lint = job({ id: 105, name: 'Lint', conclusion: SUCCESS })
+
+	function answer_waiting(needs: string, log = UNIT_LOG): void {
+		const graph = `jobs:\n  unit:\n    name: ${UNIT_NAME}\n  lint:\n    name: Lint\n  checks:\n    name: ${CHECKS_NAME}\n    needs: [${needs}]\n`
+
+		read_graph.mockResolvedValue(followup_job_needs.parse_graph(graph))
+		answer_checks([as_check(failed_unit(1)), as_check(checks)])
+		answer_actions({ jobs: [failed_unit(1), lint, checks], log })
+	}
+
+	it('reruns it with a job it waits on that failed on a download', async () => {
+		answer_waiting('unit', CURL_504)
+
+		expect(await rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([UNIT_NAME, CHECKS_NAME])
+		expect(assess).not.toHaveBeenCalled()
+	})
+
+	it('reruns it with the job it waits on, reading the run workflow', async () => {
+		answer_waiting('lint, unit')
+
+		expect(await rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([UNIT_NAME, CHECKS_NAME])
+		expect(read_graph).toHaveBeenCalledWith(WORKFLOW_PATH)
+		expect(assess.mock.calls[0]?.[0].entry.what).toContain(`followup reran ${UNIT_NAME};`)
+	})
+
+	it('does not rerun when it waits on no such job', async () => {
+		answer_waiting('lint')
+
+		expect(await rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([])
+		expect(rerun_paths()).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#6923: SonarQube ran without its `change-scope`, so only its guard step failed.
+describe('rerun_failed_jobs — a job whose needed job the run lacks', () => {
+	const SONAR_NAME = 'SonarQube'
+	const GUARD_LOG = '2026-11-10T01:00:00.0000000Z ##[error]Process completed with exit code 1.\n'
+	const sonar = job({ id: UNIT_ID, name: SONAR_NAME, conclusion: FAILURE, steps: FAILED_STEPS })
+	const graph = `jobs:\n  change-scope:\n    name: Change scope\n  sonarqube:\n    name: ${SONAR_NAME}\n    needs: change-scope\n`
+
+	beforeEach(() => {
+		read_graph.mockResolvedValue(followup_job_needs.parse_graph(graph))
+		answer_checks([as_check(sonar)])
+	})
+
+	it('reruns the job when the run never created the job it needs', async () => {
+		answer_actions({ jobs: [sonar], log: GUARD_LOG })
+
+		expect(await rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([SONAR_NAME])
+		expect(rerun_paths()).toHaveLength(1)
+	})
+
+	it('does not rerun the job when the job it needs ran and failed', async () => {
+		const scope = job({ id: 106, name: 'Change scope', conclusion: FAILURE, steps: FAILED_STEPS })
+
+		answer_actions({ jobs: [scope, sonar], log: GUARD_LOG })
+
+		expect(await rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([])
+		expect(rerun_paths()).toStrictEqual([])
+	})
+})
+
+const GATE_STEP = 'Require both halves of the verification gate'
+const GATE_LOG = '2026-11-10T01:00:00.0000000Z ##[error]the Node build matrix did not pass\n'
+const GATE_GRAPH = `jobs:\n  lint:\n    name: Lint\n  checks:\n    name: ${CHECKS_NAME}\n    needs: lint\n    steps:\n      - name: ${GATE_STEP}\n        env:\n          LINT_RESULT: \${{ needs.lint.result }}\n`
+
+function answer_gate(lint_conclusion: string, run_attempt = 1): void {
+	const checks = {
+		...job({ id: UNIT_ID, name: CHECKS_NAME, conclusion: FAILURE, run_attempt }),
+		steps: [
+			{ name: 'Set up job', conclusion: SUCCESS },
+			{ name: GATE_STEP, conclusion: FAILURE },
+		],
+	}
+
+	read_graph.mockResolvedValue(followup_job_needs.parse_graph(GATE_GRAPH))
+	answer_checks([as_check(checks)])
+	answer_actions({
+		jobs: [
+			job({ id: 105, name: 'Lint', conclusion: lint_conclusion, steps: [lint_conclusion] }),
+			checks,
+		],
+		log: GATE_LOG,
+	})
+}
+
+// joshuafolkken/kit#6924: `Checks` read `abandoned` for needs that had succeeded and failed its gate.
+describe('rerun_failed_jobs — a gate failed though every job it needs succeeded', () => {
+	it.each([
+		[SUCCESS, 1],
+		[SUCCESS, SECOND_ATTEMPT],
+		['skipped', 1],
+	])('reruns the gate whose need ended %s on attempt %i', async (lint_conclusion, run_attempt) => {
+		answer_gate(lint_conclusion, run_attempt)
+
+		expect(await rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([CHECKS_NAME])
+		expect(rerun_paths()).toHaveLength(1)
+	})
+
+	it('does not rerun the gate when a job it needs failed', async () => {
+		answer_gate(FAILURE)
+
+		expect(await rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([])
+		expect(rerun_paths()).toStrictEqual([])
 	})
 })
 

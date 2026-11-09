@@ -17,6 +17,8 @@ import { run_board_tick } from './run-board-tick'
 const ISSUE = 6221
 const PR = 6225
 const READ_FAILED = 'read failed'
+const MERGE_TAIL = '→ merge PR #6225'
+const FIND_TAIL = '→ find its PR for #6221'
 const REPO = 'joshuafolkken/kit'
 const LABELS = [IN_PROGRESS_LABEL, NEEDS_HUMAN_MERGE_LABEL]
 const CHILD: EpicChild = {
@@ -93,7 +95,11 @@ describe('run board human merge layout', () => {
 		expect(layout.active).toEqual([])
 		expect(layout.queued).toEqual([])
 		expect(layout.unreached).toMatchObject([
-			{ number: ISSUE, state: 'waiting', reason: { icon: '🔏', value: 'PR 6225' } },
+			{
+				number: ISSUE,
+				state: 'waiting',
+				reason: { icon: '🔏', value: 'PR 6225', tail: MERGE_TAIL },
+			},
 		])
 	})
 
@@ -122,6 +128,28 @@ describe('run board human merge layout', () => {
 	})
 })
 
+describe('run board human merge actions', () => {
+	it('tells the person to find the PR when the read listing holds none for the issue', () => {
+		const plan = { ...plan_of(), human_merge_prs: new Map<number, number>() }
+
+		expect(layout_of(plan).unreached[0]?.reason).toEqual({
+			icon: '🔏',
+			value: undefined,
+			tail: FIND_TAIL,
+		})
+	})
+})
+
+async function rendered(plan: BoardPlan, form: 'chat' | 'screen'): Promise<Array<string>> {
+	const { LOCAL, harness } = run_board_fixture
+	const { ports, frames } = harness(LOCAL, [plan])
+
+	await run_board_tick.tick(run_board_tick.FRESH_STATE, { ...ports, form })
+	const lines = stripVTControlCharacters(frames.at(-1) ?? '').split('\n')
+
+	return lines.filter((line) => line.includes('🔏') || line.includes('🔗 waiting'))
+}
+
 describe('run board human merge rows', () => {
 	it('keeps a simultaneous decision label in waiting instead of people', () => {
 		const layout = layout_of(plan_of([...LABELS, NEEDS_DECISION_LABEL]))
@@ -131,17 +159,23 @@ describe('run board human merge rows', () => {
 	})
 
 	it.each(['screen', 'chat'] as const)('renders the waiting row and legend in %s', async (form) => {
-		const { LOCAL, harness } = run_board_fixture
-		const { ports, frames } = harness(LOCAL, [plan_of()])
-
-		await run_board_tick.tick(run_board_tick.FRESH_STATE, { ...ports, form })
-		const lines = stripVTControlCharacters(frames.at(-1) ?? '').split('\n')
-		const relevant = lines.filter((line) => line.includes('🔏') || line.includes('🔗 waiting'))
+		const relevant = await rendered(plan_of(), form)
 
 		expect(relevant).toMatchSnapshot()
 		expect(relevant.join('\n')).toContain('PR 6225')
+		expect(relevant.join('\n')).toContain(MERGE_TAIL)
 		expect(relevant.join('\n')).toContain('🔏 human merge')
 	})
+
+	it.each(['screen', 'chat'] as const)(
+		'renders the find action with no open PR in %s',
+		async (form) => {
+			const relevant = await rendered({ ...plan_of(), human_merge_prs: new Map() }, form)
+
+			expect(relevant).toMatchSnapshot()
+			expect(relevant.join('\n')).toContain(FIND_TAIL)
+		},
+	)
 })
 
 describe('run board human merge earlier lanes', () => {
