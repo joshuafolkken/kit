@@ -49,6 +49,11 @@ describe('run_handoff_launch.prompt_of', () => {
 		expect(prompt.startsWith(`${KICKOFF_LINE}\n\n`)).toBe(true)
 		expect(prompt.endsWith(BRIEF)).toBe(true)
 	})
+
+	// joshuafolkken/kit#6898: `josh cost:audit` reads a handed-over run off this origin.
+	it('names the child’s origin', () => {
+		expect(run_handoff_launch.prompt_of(KICKOFF, BRIEF)).toContain(run_handoff_launch.ORIGIN_MARKER)
+	})
 })
 
 describe('run_handoff_launch.argv_of', () => {
