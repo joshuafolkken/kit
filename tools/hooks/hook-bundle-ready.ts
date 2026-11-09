@@ -1,9 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { error_text } from '#scripts/lib/error-message'
+import { bundle_rebuild_lock } from '#tools/hooks/bundle-rebuild-lock'
 
 // The launch of each of kit's own hook commands in kit's checkout (`scripts/hooks/run-hook.sh`):
 //`node hook-bundle-ready.ts <name> <josh command> [arguments...]` checks
@@ -31,7 +32,7 @@ import { error_text } from '#scripts/lib/error-message'
 // (no installed dependencies, or a source that does not compile), and that case is announced on stderr.
 //
 // Run by plain `node` (type stripping), so every import resolves without `tsx`: `node:` built-ins and
-// `#scripts/*` subpaths only. The build is imported on the rebuild path alone — esbuild is the one
+// `#scripts/*` / `#tools/*` subpaths only. The build is imported on the rebuild path alone — esbuild is the one
 // expensive load, and a launch never pays it. Nothing is written to stdout and stdin is never
 // read: both belong to the hook.
 
@@ -44,8 +45,6 @@ const FALLBACK_FAILED_EXIT = 1
 // `process.argv` is node, this script, then the hook name, its josh command and its arguments.
 const LAUNCH_ARGUMENTS_START = 2
 const REBUILD_FLAG = '--rebuild'
-// A rebuild takes well under a second, so a lock this old was left by a build that died.
-const ABANDONED_LOCK_MS = 60_000
 const REBUILT_NOTICE = 'kit hooks: dist/hooks was stale against the source and has been rebuilt'
 const STALE_NOTICE =
 	'kit hooks: dist/hooks is stale against the source, so this call runs the previous build while it is rebuilt in the background'
@@ -81,44 +80,17 @@ async function rebuild_from_source(out_directory: string): Promise<void> {
 	await build_hooks(out_directory)
 }
 
-// Beside the bundles, not among them: a build prunes every file in its directory it did not emit.
-function beside_bundles(out_directory: string, suffix: string): string {
-	return path.join(path.dirname(out_directory), `.${path.basename(out_directory)}-${suffix}`)
-}
-
-function rebuild_lock(out_directory: string): string {
-	return beside_bundles(out_directory, 'rebuild.lock')
-}
+const rebuild_lock = bundle_rebuild_lock.lock_path
 
 // Written by a background build that failed and removed by one that succeeds, so a source esbuild
 // rejects is reported on every call instead of passing as a rebuild in progress.
 function rebuild_failure(out_directory: string): string {
-	return beside_bundles(out_directory, 'rebuild.failed')
-}
-
-function is_lock_free(lock: string): boolean {
-	const stats = statSync(lock, { throwIfNoEntry: false })
-
-	return stats === undefined || Date.now() - stats.mtimeMs > ABANDONED_LOCK_MS
-}
-
-// An exclusive create, so of the launches that find the bundles stale at once only one starts a build.
-function claim_rebuild(lock: string): boolean {
-	if (!is_lock_free(lock)) return false
-	rmSync(lock, { force: true })
-
-	try {
-		writeFileSync(lock, '', { flag: 'wx' })
-
-		return true
-	} catch {
-		return false
-	}
+	return bundle_rebuild_lock.beside_bundles(out_directory, 'rebuild.failed')
 }
 
 function start_background_rebuild(out_directory: string): void {
 	const lock = rebuild_lock(out_directory)
-	if (!claim_rebuild(lock)) return
+	if (!bundle_rebuild_lock.claim(lock)) return
 	const child = spawn(
 		process.execPath,
 		[...process.execArgv, LAUNCH_SCRIPT, REBUILD_FLAG, out_directory],

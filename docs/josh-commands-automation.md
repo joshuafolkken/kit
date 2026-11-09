@@ -20,6 +20,15 @@ pnpm josh completion --names
 
 <!-- /usage -->
 
+`josh completion <zsh|bash|fish>` prints a script that completes the name after `josh` and `pnpm josh` from `--names`. Enable it after pnpm's own completion, which keeps the rest:
+
+```bash
+eval "$(josh completion zsh)"  # or bash
+josh completion fish | source
+```
+
+Flags are not completed: `CommandEntry` defines none.
+
 ### `josh refactor:scan`
 
 <!-- usage: refactor:scan -->

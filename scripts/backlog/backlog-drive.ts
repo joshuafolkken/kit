@@ -123,6 +123,8 @@ interface DrivePorts extends YieldCapPorts {
 	// or `measured` / `unsampled`, the issue closed by its declaration or waiting for its sample, with
 	// no lane taken.
 	launch: (issue: string) => Promise<DriveLaunch>
+	// Parks a launch the pass hands back with `run:stalled` — `backlog_drive_record.record_ports` in production.
+	stall: (issue: string, outcome: DriveLaunch) => Promise<void>
 	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
 	// open lanes.
 	free_lanes: () => Promise<number>

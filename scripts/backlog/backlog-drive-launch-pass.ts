@@ -21,7 +21,18 @@ interface Settled {
 	unsampled: Array<string>
 }
 
-function handed_back(issue: string, state: DriveState): PassResult {
+// **A refused launch is a mechanical failure, not a question** (joshuafolkken/kit#6878): it is parked
+// with `run:stalled` before it is handed back, so no session parks it as `needs-decision` and the next
+// offer does not hand it straight back. A seat probe that could not read the lanes' processes or ports
+// refuses `lane:open` too, so it reaches here as `unopened` with lanes free.
+async function handed_back(
+	issue: string,
+	outcome: DriveLaunch,
+	state: DriveState,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	await ports.stall(issue, outcome)
+
 	return { kind: 'end', end: { reason: 'launch', token: undefined, issue }, state }
 }
 
@@ -35,10 +46,10 @@ async function refused(
 	ports: DrivePorts,
 ): Promise<PassResult> {
 	if (outcome === 'waiting') return { kind: 'continue', state }
-	if (outcome !== UNOPENED) return handed_back(issue, state)
+	if (outcome !== UNOPENED) return await handed_back(issue, outcome, state, ports)
 	if ((await ports.free_lanes()) <= NO_FREE_LANES) return { kind: 'continue', state }
 
-	return handed_back(issue, state)
+	return await handed_back(issue, outcome, state, ports)
 }
 
 // **Only a launch or a measured close is activity**: a pass that started nothing — every lane taken

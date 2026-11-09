@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_step_section_driver } from './run-step-section-driver'
 import { run_step_section_table } from './run-step-section-table'
 
+const STEPS = 'backlogrun-steps.md'
+
 afterEach(() => {
 	vi.restoreAllMocks()
 })
@@ -32,9 +34,21 @@ describe('run_step_section_driver — the sections a driver hand-off carries', (
 		)
 	})
 
+	// joshuafolkken/kit#6878: the driver parked the refused launch `run:stalled`, so its hand-off carries the retry.
+	it('carries the stalled retry, not "park and continue", for a launch hand-off', () => {
+		const sections = run_step_section_driver.driver_sections('launch #6878')
+
+		expect(sections).toContain(
+			document_section_cli.section_text(STEPS, 'Resolve what the plan can resolve'),
+		)
+		expect(sections).not.toContain(
+			document_section_cli.section_text('backlogrun-park.md', 'park and continue'),
+		)
+	})
+
 	it('carries "The loop" for a verdict with no row of its own', () => {
 		expect(run_step_section_driver.driver_sections('offer')).toBe(
-			document_section_cli.section_text('backlogrun-steps.md', 'The loop'),
+			document_section_cli.section_text(STEPS, 'The loop'),
 		)
 	})
 })
