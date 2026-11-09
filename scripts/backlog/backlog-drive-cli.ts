@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url'
 import { auto_ok_judge_read, type JudgedCache } from '#scripts/auto-ok/auto-ok-judge-read'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { hook_decision } from '#scripts/josh/hook-decision'
-import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -12,8 +11,6 @@ import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
 import { json_value } from '#scripts/lib/json-value'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
-import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
 import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { z } from 'zod'
 import { backlog_budget } from './backlog-budget'
@@ -26,9 +23,9 @@ import {
 	type OfferRead,
 } from './backlog-drive'
 import { backlog_drive_adopt } from './backlog-drive-adopt'
-import { backlog_drive_after_merge } from './backlog-drive-after-merge'
 import { backlog_drive_args, type DriveContext } from './backlog-drive-args'
 import { backlog_drive_carried } from './backlog-drive-carried'
+import { backlog_drive_collect } from './backlog-drive-collect'
 import { backlog_drive_finish } from './backlog-drive-finish'
 import { backlog_drive_hold, type HoldRecorder } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
@@ -61,7 +58,6 @@ import { backlog_ready } from './backlog-ready'
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const should_forward_stderr = true
 const POLL_MS = 5000
 const FIRST_LINE = 0
 
@@ -113,27 +109,6 @@ function merge_token(out: string, code: number): string {
 	if (code === SUCCESS_EXIT_CODE || backlog_drive.HANDOFF_TOKENS.has(token)) return token
 
 	return ''
-}
-
-// A `run:merge` that printed no result — a crash before its verdict — answers no token, which the loop
-// never reads as a collection.
-function unprinted(code: number): MergeResult {
-	return { token: '', code, is_offer: true, outcome: 'unresolved' }
-}
-
-// The child's transcript, where its lane recorded one, so `run:merge` can tell an API outage from a
-// failure exactly as it does for the parent that passes `--output` by hand. Run as its own process
-// (`run-merge-driver.ts`), so a fix merged since this loop started is the code that decides the child.
-async function merge(issue: string, owner: string): Promise<MergeResult> {
-	await backlog_drive_owner.assert_current(owner)
-	const lane = await lane_registry.find_open_lane(issue)
-	const argv = run_merge_driver.argv_of({ child: issue, owner, output: lane?.output })
-	const ran = await josh_command.josh_run(argv, should_forward_stderr)
-	const result = run_merge_driver.read(ran.out) ?? unprinted(ran.code)
-
-	await backlog_drive_after_merge.after_merge(issue, result, owner)
-
-	return result
 }
 
 // `lane:await`'s re-confirmed check, one state per child. A child already gone when the loop starts —
@@ -225,7 +200,7 @@ function child_ports(
 
 	return {
 		is_finished: finished_checker(known),
-		merge: async (issue) => await merge(issue, owner),
+		merge: async (issue) => await backlog_drive_collect.merge(issue, owner),
 		adoptable: async (in_flight) => {
 			const adopting = await backlog_drive_adopt.adoptable(in_flight)
 
@@ -383,7 +358,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const backlog_drive_cli = {
 	end_line,
 	loop_config,
-	merge,
+	merge: backlog_drive_collect.merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse: backlog_drive_args.parse,

@@ -4,6 +4,7 @@ import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
@@ -149,6 +150,7 @@ function arrange_merge(out: string, code = 0): MockInstance<typeof josh_command.
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
 	vi.spyOn(backlog_drive_retry, 'after_merge').mockResolvedValue()
+	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 
 	return vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code, out })
 }

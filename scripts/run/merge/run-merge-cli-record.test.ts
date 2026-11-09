@@ -50,6 +50,7 @@ const { run_merge_steps } = await import('./run-merge-steps')
 const CHILD = '4734'
 const MERGE_TEXT = `#${CHILD} merged`
 const { CONFIRMED_AT } = run_merge_steps_fixture
+const REPORT_LEAD_MS = 180_000
 
 function context(): NonNullable<ReturnType<typeof run_merge_cli.parse>> {
 	const ctx = run_merge_cli.parse([CHILD])
@@ -112,5 +113,22 @@ describe('run_merge_cli.merge_child — putting a merged child on record', () =>
 		await run_merge_cli.merge_child(context())
 
 		expect(record_merge_mock).toHaveBeenCalledWith(Number(CHILD), CONFIRMED_AT)
+	})
+
+	// joshuafolkken/kit#6677: both writes carry the ship's earlier report, not the confirmation.
+	it('dates both writes to the child’s ship report before the confirmation', async () => {
+		const reported = new Date(CONFIRMED_AT.getTime() - REPORT_LEAD_MS)
+		const report = {
+			at: reported.toISOString(),
+			kind: 'ship-stage',
+			text: `#${CHILD} report done report`,
+		}
+
+		recorded_mock.mockResolvedValue([report])
+
+		await run_merge_cli.merge_child(context())
+
+		expect(emit_mock).toHaveBeenCalledWith('merge', MERGE_TEXT, reported)
+		expect(record_merge_mock).toHaveBeenCalledWith(Number(CHILD), reported)
 	})
 })

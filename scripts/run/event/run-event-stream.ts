@@ -133,8 +133,10 @@ const EVENT_KIND = {
 	// same section.
 	NOTE: 'note',
 	// A lane child reached a phase no other event marks — its first implementation edit, written by the
-	// PreToolUse hook — so `run:board` draws how far the child has got. A trace,
-	// like `SHIP_STAGE`: it says where the child's work is, not where the run is.
+	// PreToolUse hook — so `run:board` draws how far the child has got. The backlog driver writes its own
+	// `collect` / `launch` steps on a child as this kind too, which no reader draws as a phase
+	// (`backlog-drive-trace.ts`). A trace, like `SHIP_STAGE`: it says where the child's work is, not where
+	// the run is.
 	LANE_PHASE: 'lane-phase',
 	// An issue `run:add` put into the live run. The parent's `--wait` watcher
 	// ends on it, so the issue takes the next free lane without waiting out the arrival probe's minute. A
@@ -219,7 +221,8 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
 // `note` line is a trace to the position readers but is the board's record of what the run found, so
-// it rolls off only with the positions. A ship-stage `start` is disposable but goes last of them:
+// it rolls off only with the positions; so does a `lane-phase` line, the driver's `collect` / `launch`
+// steps included. A ship-stage `start` is disposable but goes last of them:
 // `run:board` draws from that line. Only the newest `setup` line is the stage the run stands at,
 // so every one but the newest goes; likewise only each child's newest `pr-checks` is drawn.
 const DISPOSABLE_KINDS: ReadonlySet<string> = new Set([
