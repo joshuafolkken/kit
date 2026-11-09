@@ -1,3 +1,4 @@
+import { codex_hooks } from '#scripts/agent/codex-hooks'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
@@ -16,7 +17,8 @@ import { lane_stage_budget } from './lane-stage-budget'
 // the size estimate times the period's files ratio is refused, not recorded, and the lane splits the rest
 // off rather than writing why it stays one. Two lanes declared at 4 files planned 9 with that comment
 // and shipped 16 and 18, their implement step twice the median. Files count as the declaration counts
-// them (`size-estimate.ts`): tests excluded, documents and snapshots included. An Issue with no
+// them (`size-estimate.ts`): tests excluded, documents and snapshots included, and a generated artifact
+// planned beside its source (`codex_hooks.GENERATED_SOURCES`) excluded. An Issue with no
 // declaration — an epic — or one declaring 0 files, as `lane:stats` skips it, is never refused.
 //
 // **Two more axes answer `split`** (joshuafolkken/kit#5568), since declarations run short — merged lanes
@@ -159,6 +161,22 @@ function files_approved(
 	)
 }
 
+// An artifact a build regenerates from one of `sources` (joshuafolkken/kit#6666): its edit is its source's,
+// so it is not counted and stays or splits off with its source — apart, the parity test fails.
+function is_generated_from(file: string, sources: ReadonlyArray<string>): boolean {
+	const source = codex_hooks.GENERATED_SOURCES.get(file)
+
+	return source !== undefined && sources.includes(source)
+}
+
+function is_counted(file: string, paths: ReadonlyArray<string>): boolean {
+	return !test_declared_logic.is_test_file(file) && !is_generated_from(file, paths)
+}
+
+function with_artifacts(files: ReadonlyArray<string>, paths: ReadonlyArray<string>): Array<string> {
+	return [...files, ...paths.filter((file) => is_generated_from(file, files))]
+}
+
 function files_over(
 	plan: LanePlan,
 	declared: number,
@@ -166,7 +184,7 @@ function files_over(
 	signals: PlanSignals,
 ): FilesOver | undefined {
 	const limit = declared * declared_growth.factor(ratios_of(signals), 'files')
-	const counted = plan.paths.filter((file) => !test_declared_logic.is_test_file(file))
+	const counted = plan.paths.filter((file) => is_counted(file, plan.paths))
 	const units = units_of(ordered(counted, recorded?.paths ?? []), signals)
 
 	if (units.length <= limit || files_approved(plan, declared, recorded, units.length)) {
@@ -174,9 +192,10 @@ function files_over(
 	}
 
 	const tests = plan.paths.filter((file) => test_declared_logic.is_test_file(file))
-	const kept = units.slice(0, limit).flat()
+	const kept = with_artifacts(units.slice(0, limit).flat(), plan.paths)
+	const split_off = with_artifacts(units.slice(limit).flat(), plan.paths)
 
-	return { reason: 'files', declared, limit, kept, split_off: units.slice(limit).flat(), tests }
+	return { reason: 'files', declared, limit, kept, split_off, tests }
 }
 
 // The files an earlier clear held — the recorded history, else, for a cleared record that predates it,
@@ -308,8 +327,9 @@ function bar_tail(): string {
 }
 
 function files_text(issue: number, over: FilesOver): string {
-	const counted = over.kept.length + over.split_off.length
-	const bar = `${String(counted)} files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`- 規模見積もり:\` declares`
+	const planned = [...over.kept, ...over.split_off]
+	const counted = planned.filter((file) => is_counted(file, planned)).length
+	const bar = `${String(counted)} files (tests and generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`- 規模見積もり:\` declares`
 	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
 
 	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`

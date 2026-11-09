@@ -203,15 +203,16 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:f
 Assess whether a complete draft can join an unstarted issue.
 
 ```bash
-pnpm josh issue:fold-existing --fingerprint 5848                            # read the comment fingerprint before assessment.
+pnpm josh issue:fold-existing --fingerprint 5848                                 # read the comment fingerprint before assessment.
 pnpm josh issue:fold-existing assessment.json --json
-pnpm josh issue:fold-existing assessment.json --apply 5848                  # apply and verify the assessed fold and priority floor.
-pnpm josh issue:fold-existing assessment.json --apply 5848 --blocked 5849   # record a confirmed duplicate dependency and reconcile its epic.
+pnpm josh issue:fold-existing assessment.json --apply 5848                       # apply and verify the assessed fold and priority floor.
+pnpm josh issue:fold-existing assessment.json --apply 5848 --blocked 5849        # record a confirmed duplicate dependency and reconcile its epic.
+pnpm josh issue:fold-existing assessment.json --apply 5848 --found-during 5849   # record a split fold as lane 5849's split child.
 ```
 
 <!-- /usage -->
 
-Read the issue and draft first. `--apply <N>` writes on `fold`; with `--blocked <M>` on `duplicate`, it records `<M>` blocked by `<N>` and reconciles its epic. Failure exits 1. Display writes nothing; `separate` returns to the ordinary filing path.
+Read the issue and draft first. `--apply <N>` writes on `fold`; with `--blocked <M>` on `duplicate`, it records `<M>` blocked by `<N>` and reconciles its epic. With `--found-during <M>` on `fold`, it records `<N>` as lane `<M>`'s split child. Failure exits 1. Display writes nothing; `separate` returns to the ordinary filing path.
 
 `content`, `has_complete_read`, `existing_body`, `comment_fingerprint`, `draft_body` and `verification` are required; an assessment without one exits 1. Omit other unknown facts: `inspect`.
 
