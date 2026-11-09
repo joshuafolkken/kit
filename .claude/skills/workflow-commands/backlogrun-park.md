@@ -78,6 +78,19 @@ It never carries:
 applied** (a failed or abandoned child, a lost merge race) is read against this list once its reason is
 known, and removed when the reason is not on it.
 
+### A park the parent session resolves
+
+A recommendation the child lacked the permission to take → the parent runs
+`pnpm josh backlog:triage --apply <N> --adopt <k> --reason <text>` (tiers: `operating-rules.md` →
+"decision-autonomy"): a scoped size approval, a premise the body constrains, a run-tooling defect to
+file. A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
+decision, `run:park <N> --clear`, `run:add <N> --retry`.
+
+### A park left for a person
+
+`推奨なし`, a trust or security setting, an upstream defect, a third-party write, a destructive
+operation, or web-only information.
+
 ## `in-progress` is removed by whoever finds it stale
 
 **A session that detects a stale `in-progress` on any open issue in the repository — not only this

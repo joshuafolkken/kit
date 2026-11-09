@@ -352,6 +352,8 @@ The body follows one schema (`scripts/run/park/run-park-body.ts`): numbered opti
 
 A body off the schema is refused before any write, naming the missing piece and printing the schema; the usage prints it too.
 
+The parent reads the tiers and the recommendation with `backlog:triage --apply <N> --adopt <k>` (`docs/josh-commands-backlog.md` → "`josh backlog:triage`"): a tier A or B option of a recommending park is the parent's; `推奨なし` or a tier C option stays a person's (`backlogrun-park.md` → "A park left for a person").
+
 The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
 
 A park from inside a lane appends the lane directory, its held seat and `pnpm josh lane:close <N>` to the comment.

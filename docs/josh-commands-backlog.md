@@ -919,21 +919,19 @@ The parent follows `--pass`'s stdout command; diagnostics go to stderr. Apply pr
 The pass reads local `needs-decision`, `run:stalled` and remaining judgments once per issue.
 Foreign-repository and excluded children are not read. With none left it prints `backlog:plan --waves`.
 
-For Tier A answers, `pnpm josh epic --decide <E> <N...> --decision-file .josh/tmp/decision.md`
-records the answer in the epic and child and clears `needs-decision`. For recovered mechanical
-failures, `pnpm josh run:add <N> --retry` clears `run:stalled` and retries the previous attempt.
-Record prerequisites with `--apply <N> --blocked-by <M> --reason <text>`; questions needing a person
-or measurement stay parked and excluded from this pass. Recovery guidance prints only when a read is due.
+`--adopt` reads the latest trusted park comment on `run:park`'s schema; any listed option but tier C
+is adoptable. Recovery guidance prints only when a read is due.
 
 Run the pass at the initial plan and after each collection batch that parked a child. The driver
 hands back `triage` once per such batch before its next offer; a batch without parks adds no step,
 nor does a resume. Read each parked child's body and comments, then route:
 
-- Tier A answer already present: `pnpm josh epic --decide <E> <N...> --decision-file <path>` records
-  the answer on the epic and children and removes `needs-decision` in one command.
+- A park's recommendation: `pnpm josh backlog:triage --apply <N> --adopt <k> --reason "<why>"`;
+  no tracking epic: comment, `run:park <N> --clear`, `run:add <N> --retry`.
+- A Tier A answer outside a park: `pnpm josh epic --decide <E> <N...> --decision-file <path>`.
 - Recovered API, rate-limit or authentication outage: `pnpm josh run:add <N> --retry`.
 - Dependency: `pnpm josh backlog:triage --apply <N> --blocked-by <M> --reason "<why>" --clear`.
-- Genuine Tier B / C question: keep it parked and excluded for this pass; it stays on the board's
+- No recommendation, a tier C option, or a measurement: keep it parked and excluded for this pass; it stays on the board's
   human-waiting list.
 
 ### `josh backlog:budget`
