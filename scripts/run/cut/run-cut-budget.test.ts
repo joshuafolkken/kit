@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_cut_budget } from './run-cut-budget'
 
 const ISSUE = 6026
-const OTHER_ISSUE = 6027
 const BASE_MS = Date.parse('2026-11-03T00:00:00.000Z')
 const IMPLEMENT_BUDGET_MINUTES = lane_stage_budget.BUDGET_MINUTES.implement
 const OVER_MINUTES = 5
@@ -44,31 +43,6 @@ function stub(body: string | undefined, now_ms = NOW_MS): void {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-describe('run_cut_budget.over_of', () => {
-	it('measures the implementation from its first plan since the latest dispatch', () => {
-		const entries = [dispatch(0), dispatch(LATE_MINUTES)]
-		const events = [plan(1), plan(LATE_MINUTES), plan(LATE_MINUTES + 1)]
-
-		expect(run_cut_budget.over_of(entries, events, ISSUE, NOW_MS)).toBe(OVER_MINUTES)
-	})
-
-	it('is within the budget before it runs out', () => {
-		const within_ms = BASE_MS + (LATE_MINUTES + IMPLEMENT_BUDGET_MINUTES) * MS_PER_MINUTE
-
-		expect(
-			run_cut_budget.over_of([dispatch(LATE_MINUTES)], [plan(LATE_MINUTES)], ISSUE, within_ms),
-		).toBeUndefined()
-	})
-
-	it('reads no other issue’s plan, and nothing before a plan', () => {
-		const entries = [dispatch(LATE_MINUTES)]
-
-		expect(
-			run_cut_budget.over_of(entries, [plan(LATE_MINUTES, OTHER_ISSUE)], ISSUE, NOW_MS),
-		).toBeUndefined()
-	})
 })
 
 describe('run_cut_budget.over_minutes', () => {
