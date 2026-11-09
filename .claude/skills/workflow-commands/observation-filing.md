@@ -21,7 +21,7 @@ report. Drop an observation nobody would act on.
 
 **Below the filing bar, a line that could still change a person's judgement is a board note**:
 `pnpm josh run:event --append note "#<N> <text>"`, shown by `pnpm josh run:board`
-(`docs/josh-commands-run.md` → "`josh run:board`").
+(`docs/josh-commands-board.md` → "`josh run:board`").
 
 **The filing ceilings still apply.** It counts toward the per-origin cap of ten (`prerequisite.md`); above the target
 repository's WIP cap, close one first or do not file (`prompts/collaboration-workflow/wip-cap.md`).

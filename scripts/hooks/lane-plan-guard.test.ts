@@ -34,6 +34,13 @@ describe('lane_plan_guard.reason', () => {
 		expect(reason).toContain(`pnpm josh lane:plan ${ISSUE}`)
 	})
 
+	// joshuafolkken/kit#6676: `lane:plan` is documented on the lane page, split out of the run page.
+	it('points the refusal at the lane command page', () => {
+		const reason = lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)
+
+		expect(reason).toContain('`docs/josh-commands-lane.md` → "`josh lane:plan`"')
+	})
+
 	// The review of #4864: the plan is recorded before `lane:plan` checks, so a `wait` lifted the hold;
 	// joshuafolkken/kit#4926: a `yield` ends the session instead of polling.
 	it('keeps refusing while the recorded plan is uncleared, naming the yield', () => {

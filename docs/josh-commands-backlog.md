@@ -177,7 +177,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    A split child with a plain `--found-during <N>` is refused when a code span in `#N`'s `## 期待結果` / `## 受け入れ条件` names the module of a file the child declares. `#N` depends on that part, so the refusal points to a prerequisite and `josh run:split <N> --prerequisite <P>`; an unreadable body refuses nothing.
 3. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem, including a `- 優先度:` declaration that names no basis or sits below its floor (`issue-template.md`); a typed `--label priority:*` skips this judgement.
    A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets that floor, and so do `- 原因の損失:` lines summing to 30 minutes or more (`josh issue:priority <N>` re-applies it after a recurrence); `- 原因のレーン:` only ranks, and no reduction percentage is asked for or judged. A malformed one is refused; a body with no declaration is filed at the floor.
-   A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-run.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
+   A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
    A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) or projected past the implement stage budget at the measured rate is refused the same way.
 4. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件: #<PR> のマージ後 <K> マージ` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
@@ -313,7 +313,7 @@ A plan without `### 影響を受ける既存の利用者` (entries, or `なし�
 
 When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split). On `wait` (`1`), re-run the printed command, not `issue:plan`.
 
-Run both with Bash `timeout` 600000: a bounded wait blocks up to 9 minutes (`docs/josh-commands-run.md` → "`josh lane:plan`").
+Run both with Bash `timeout` 600000: a bounded wait blocks up to 9 minutes (`docs/josh-commands-lane.md` → "`josh lane:plan`").
 
 A plan naming no path prints `pnpm josh lane:plan <N> <path>...` for the child to finish (`scripts/lane/lane-plan-auto.ts`). Outside a lane child, `kickoff`'s plan records no lane plan.
 
@@ -903,7 +903,7 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 
 **Options:**
 
-- `--pass [--exclude <N>]` — settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Failed or incomplete reads exit 1.
+- `--pass [--exclude <N>]` — settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Each park's recommendation and tier go to stderr, with its `--adopt` command unless no pick or a tier C pick. Failed or incomplete reads exit 1.
 - `--decide --defect <answer> --verification <answer> --every-run <answer>` — yes/no/unknown evidence: three yes → run:solo; any no → run:lane; otherwise judge. Read-only.
 - `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label (`auto-ok:judge --apply`).
 - `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.

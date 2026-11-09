@@ -10,7 +10,7 @@ import { step_zero_notice } from './step-zero-notice'
 // **A dispatched lane child only**, the trust condition `lane-phase.ts` applies: a person's session, or
 // one carrying a mark leaked from a parent, runs no lanes beside it to wait on.
 
-const COMMAND_DOC = '`docs/josh-commands-run.md` → "`josh lane:plan`"'
+const COMMAND_DOC = '`docs/josh-commands-lane.md` → "`josh lane:plan`"'
 const OUTCOMES =
 	'on `yield` end the session with no edit (its lane is given back); on `wait` run it again'
 

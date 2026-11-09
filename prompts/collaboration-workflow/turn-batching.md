@@ -27,4 +27,4 @@ round trip は 1 ターンがまとめて出した呼び出しのかたまり 1 
 
 ## 実装中の独立編集に効く合成コマンド（joshuafolkken/kit#2202）
 
-**Step 0 が対象ファイルを列挙したら、`pnpm josh read:files <path> …` で読み取りを 1 回に畳み、続く独立した編集は `pnpm josh edit:files` の 1 呼び出しで送る**（`old` が 1 箇所に一致しなければ拒否される）。ガードが `read:files` / `edit:files` を手渡したら、その 1 呼び出しで出し直す。形式は `docs/josh-commands-run.md` →「`josh read:files`」と「`josh edit:files`」。
+**Step 0 が対象ファイルを列挙したら、`pnpm josh read:files <path> …` で読み取りを 1 回に畳み、続く独立した編集は `pnpm josh edit:files` の 1 呼び出しで送る**（`old` が 1 箇所に一致しなければ拒否される）。ガードが `read:files` / `edit:files` を手渡したら、その 1 呼び出しで出し直す。形式は `docs/josh-commands-session.md` →「`josh read:files`」と「`josh edit:files`」。

@@ -45,7 +45,7 @@ keep running: a flake costs another lane one rerun, less than every lane stopped
 
 `pnpm josh epic:next <E> --repo <owner/repo> --lanes` answers **one issue number per line**, up to the
 free lanes. Each child runs in a **lane**: a linked work tree with its own branch, `.env` and ports
-(`docs/josh-commands-run.md` → "`josh lane:open` / `josh lane:close` / `josh lane:list` / `josh
+(`docs/josh-commands-lane.md` → "`josh lane:open` / `josh lane:close` / `josh lane:list` / `josh
 lane:prune`"). **Implementation, the verification gate and the review run in parallel; the merges
 stay serial.**
 

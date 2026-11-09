@@ -96,7 +96,7 @@
   - fires: `pnpm josh pretool:guard` — a broad shell investigation on Codex Astra. Every occurrence
   - silent: a main line on any other model, or a narrow check (`Read` of a file or an `offset` / `limit` range <= 200 lines, `grep -n <pattern> <one file>`)
   - not automated: which reading is narrow enough to keep is the author’s call
-- **Consultation main line hands a run to run:handoff** (`consultation-handoff`, `docs/josh-commands-run.md` → "josh run:handoff")
+- **Consultation main line hands a run to run:handoff** (`consultation-handoff`, `docs/josh-commands-board.md` → "josh run:handoff")
   - fires: `pnpm josh pretool:guard` — `pnpm josh run:entry` / `run:hold` on Fable or Codex Astra. Every occurrence
   - silent: a lane child, a main line on any other model, an unnamed model, a delegated unit, or filing and operating (`issue:file`, `issue:plan`, `epic`)
   - not automated: the right act is another command, whose arguments the call does not carry
