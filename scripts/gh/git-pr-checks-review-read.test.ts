@@ -160,12 +160,13 @@ describe('default_fetch_pr_state — requests per poll', () => {
 	})
 
 	// The branch lookup is the one extra request of the first poll; the memo absorbs it after that.
+	// The snapshot query this fixture cannot answer (joshuafolkken/kit#6786) is GraphQL's, not REST core's.
 	it('adds only the branch lookup on the first poll', async () => {
 		arrange({ is_green: false })
 
 		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
 
-		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS + FIRST_POLL_LOOKUP)
+		expect(rest_requests()).toBe(CHECKS_ONLY_REQUESTS + FIRST_POLL_LOOKUP)
 	})
 
 	it('costs the fourth request on the poll that could conclude a merge', async () => {
