@@ -76,17 +76,9 @@ describe('shell implementation authority', () => {
 		'printf changed > scripts/example.ts',
 		'printf changed>scripts/example.ts',
 		'echo changed | tee scripts/example.ts',
-		'sed -i s/old/new/ scripts/example.ts',
-		"node -e \"require('fs').writeFileSync('scripts/example.ts', 'changed')\"",
-		"python3 -c \"open('scripts/example.ts', 'w').write('changed')\"",
-		'cp /tmp/replacement scripts/example.ts',
 		'bash -c "echo changed > scripts/example.ts"',
 		'printf changed > "$TARGET"',
-		'custom-editor scripts/example.ts',
-		'git diff --out{put,put}=app.ts',
-		'gh api repos/owner/repo --out?ut=app.ts',
-		'rg --p[r]e custom-editor pattern app.ts',
-	])('refuses an implementation or unverifiable shell path: %s', (command) => {
+	])('refuses a visible write to a runtime path: %s', (command) => {
 		vi.stubEnv(agent_session_role.KEY, 'scheduler')
 
 		const first = implementation_authority.reason(shell_payload(command))
@@ -94,14 +86,27 @@ describe('shell implementation authority', () => {
 		expect(first).toContain('lane:dispatch')
 		expect(implementation_authority.reason(shell_payload(command))).toBe(first)
 	})
+
+	// joshuafolkken/kit#6586: a write the spelling hides is restored after the call (`bash-revert.ts`).
+	it.each([
+		'sed -i s/old/new/ scripts/example.ts',
+		"node -e \"require('fs').writeFileSync('scripts/example.ts', 'changed')\"",
+		'cp /tmp/replacement scripts/example.ts',
+		'custom-editor scripts/example.ts',
+		'git diff --out{put,put}=app.ts',
+	])('runs a write the post-call revert takes back: %s', (command) => {
+		vi.stubEnv(agent_session_role.KEY, 'scheduler')
+
+		expect(implementation_authority.reason(shell_payload(command))).toBeUndefined()
+	})
 })
 
 // joshuafolkken/kit#5793: the refusal names the rule it matched, so a false refusal is diagnosable.
 describe('the named refusal rule', () => {
 	it.each([
-		['custom-editor notes.md', '`custom-editor` is neither a read-only program'],
-		['ls scripts/*.ts | xargs custom-editor', '`xargs` is neither a read-only program'],
-		['pnpm josh gate', '`josh gate` is not read-only'],
+		['git push origin main', '`git push`, a git write'],
+		['ls scripts/*.ts | xargs pnpm josh git -y', '`josh git`, a shared-state write'],
+		['pnpm install', '`install`, a dependency change'],
 	])('names the rule %s matched', (command, rule) => {
 		vi.stubEnv(agent_session_role.KEY, 'scheduler')
 
@@ -144,15 +149,14 @@ describe('review findings piped through a single-quoted argument', () => {
 		},
 	)
 
-	it.each([
-		`${FINDING} > ${RUNTIME_FILE}`,
-		`${FINDING} | tee ${RUNTIME_FILE}`,
-		`${FINDING} | custom-editor ${RUNTIME_FILE}`,
-	])('still refuses the same finding written elsewhere: %s', (command) => {
-		vi.stubEnv(agent_session_role.KEY, REVIEWER)
+	it.each([`${FINDING} > ${RUNTIME_FILE}`, `${FINDING} | tee ${RUNTIME_FILE}`])(
+		'still refuses the same finding written elsewhere: %s',
+		(command) => {
+			vi.stubEnv(agent_session_role.KEY, REVIEWER)
 
-		expect(implementation_authority.reason(shell_payload(command))).toContain(REFUSED)
-	})
+			expect(implementation_authority.reason(shell_payload(command))).toContain(REFUSED)
+		},
+	)
 })
 
 describe('operational shell authority', () => {

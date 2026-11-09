@@ -45,6 +45,11 @@ describe('tree status declaration', () => {
 		expect(josh_read_only.refusal(['tree:status'])).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#6664: the hook ledger's per-rule table only reads.
+	it('passes hook:ledger (ac-e8d487a7)', () => {
+		expect(josh_read_only.refusal(['hook:ledger', '--period', '7'])).toBeUndefined()
+	})
+
 	it.each([[['run:pause', '1091', '--for', '1102']], [['run:split', '1091']], [['run:stale']]])(
 		'refuses the writing command %j beside it (ac-5f5c93b1)',
 		(args) => {

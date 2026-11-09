@@ -5,7 +5,7 @@ import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_stalled } from '#scripts/run/park/run-stalled'
+import { run_stalled, type ParkStop } from '#scripts/run/park/run-stalled'
 import { run_ship_stage } from './run-ship-stage'
 import { run_ship_stop_text } from './run-ship-stop-text'
 
@@ -76,6 +76,14 @@ interface ParkNotice {
 	body: string
 }
 
+// The stop being parked: its reason (the stage, or `conflict`) the comment names, the ship stop the
+// park event records, and what a timed-out merge wait was still blocked on.
+interface ParkedStop {
+	reason: string
+	stop: ParkStop
+	blocked?: string | undefined
+}
+
 // `blocked` is what a timed-out merge wait was still blocked on (`run-ship-stop-cause.ts` →
 // `blocked_cause_of`); it leads the comment and replaces the generic cause, so `run:board` names it.
 function park_comment(issue: string, lead: string, blocked: string | undefined): string {
@@ -89,17 +97,18 @@ function park_comment(issue: string, lead: string, blocked: string | undefined):
 
 // The label is what keeps the issue from being re-dispatched; without it the stop stays a plain stop,
 // which `run:merge` books as an unanswered ship stop under its own outage cap.
-async function park_with(
-	issue: string,
-	notice: ParkNotice,
-	blocked: string | undefined,
-): Promise<boolean> {
+// The park event keeps the ship stop beside its text (joshuafolkken/kit#6864), read back with
+// `run_stalled.stop_of`; the text, which `run:board` reads, is unchanged.
+async function park_with(issue: string, notice: ParkNotice, parked: ParkedStop): Promise<boolean> {
+	const { blocked, stop } = parked
 	const comment = park_comment(issue, notice.lead, blocked)
 	const park_write = await issue_park.apply(issue, RUN_STALLED_LABEL, comment)
 
 	if (!park_write.is_labelled) return false
 
-	await run_event_stream_emit.emit(PARK, run_stalled.park_event(issue, blocked ?? notice.cause))
+	const text = run_stalled.park_event(issue, blocked ?? notice.cause)
+
+	await run_event_stream_emit.emit(PARK, text, new Date(), { stop })
 	await telegram_notify.warn({
 		issue_title: `${notice.title} ${issue_cite.plain(issue)}`,
 		body: notice.body,
@@ -109,7 +118,8 @@ async function park_with(
 	return true
 }
 
-async function park(issue: string, reason: string, blocked?: string): Promise<boolean> {
+async function park(issue: string, parked: ParkedStop): Promise<boolean> {
+	const { reason } = parked
 	const kind = kind_of(reason)
 	const relaunches = String(MAX_SHIP_STOP_RELAUNCHES)
 
@@ -121,13 +131,15 @@ async function park(issue: string, reason: string, blocked?: string): Promise<bo
 			title: 'Ship stop cap reached',
 			body: `The lane child's ${kind} stops passed their cap of ${relaunches} relaunches since its dispatch, the last at ${reason}, so it was not relaunched and the issue is parked.`,
 		},
-		blocked,
+		parked,
 	)
 }
 
 // A timed-out merge wait parks at once: a relaunch waits the same timeout on the same blocked merge
 // (joshuafolkken/kit#5775).
-async function park_timed_out(issue: string, reason: string, blocked?: string): Promise<boolean> {
+async function park_timed_out(issue: string, parked: ParkedStop): Promise<boolean> {
+	const { reason } = parked
+
 	return await park_with(
 		issue,
 		{
@@ -136,7 +148,7 @@ async function park_timed_out(issue: string, reason: string, blocked?: string): 
 			title: 'Merge wait timed out',
 			body: `The merge wait at ${reason} timed out, so the lane child was not relaunched and the issue is parked.`,
 		},
-		blocked,
+		parked,
 	)
 }
 
@@ -151,3 +163,4 @@ const run_ship_relaunch_cap = {
 }
 
 export { run_ship_relaunch_cap }
+export type { ParkedStop }
