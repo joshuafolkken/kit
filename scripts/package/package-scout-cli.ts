@@ -6,14 +6,17 @@ import { z } from 'zod'
 import {
 	package_scout,
 	type PackageMetrics,
+	type RankedTable,
 	type RegistryFacts,
 	type SearchCandidate,
 } from './package-scout'
 import { package_scout_format } from './package-scout-format'
+import { package_scout_reuse, type ReuseOutcome } from './package-scout-reuse'
 
-// `josh pkg:scout <keywords> [--size <n>]` — before the Package-First tier decision, rank the
-// candidate packages by measured metrics so "clearly best (Tier A)" and "genuine toss-up (Tier B)"
-// are read off the output rather than judged.
+// `josh pkg:scout <keywords> [--size <n>] [--issue <n>]` — before the Package-First tier decision,
+// rank the candidate packages by measured metrics so "clearly best (Tier A)" and "genuine toss-up
+// (Tier B)" are read off the output rather than judged. A toss-up the target Issue already settled by
+// reusing existing code is recorded there and read as Tier A (`package-scout-reuse.ts`).
 //
 // The registry answers in three reads: one search for the candidates, then per candidate a downloads
 // point and the latest version metadata (bundled types, license, unpacked size). A per-candidate read
@@ -26,7 +29,7 @@ const ARGV_OFFSET = 2
 const DEFAULT_SIZE = 10
 const REGISTRY = 'https://registry.npmjs.org'
 const DOWNLOADS_API = 'https://api.npmjs.org/downloads/point/last-week'
-const USAGE = 'Usage: josh pkg:scout <keywords> [--size <n>]'
+const USAGE = 'Usage: josh pkg:scout <keywords> [--size <n>] [--issue <n>]'
 const SEARCH_FAILED_MESSAGE =
 	'Could not read the npm registry search, so no candidates can be ranked — check the network and try again.'
 
@@ -112,6 +115,7 @@ async function search(keywords: string, size: number): Promise<Array<SearchCandi
 interface ScoutArguments {
 	keywords: string
 	size: number
+	issue: string | undefined
 }
 
 function parse_size(raw: string | undefined): number {
@@ -125,17 +129,32 @@ function parse_size(raw: string | undefined): number {
 function read_arguments(argv: ReadonlyArray<string>): ScoutArguments | undefined {
 	const parsed = cli_flags.parse_or_undefined({
 		args: [...argv],
-		options: { size: { type: 'string' } },
+		options: { size: { type: 'string' }, issue: { type: 'string' } },
 		allowPositionals: true,
 	})
 	const keywords = parsed?.positionals.join(' ').trim() ?? ''
 
 	if (parsed === undefined || keywords === '') return undefined
 
-	return { keywords, size: parse_size(parsed.values.size) }
+	return { keywords, size: parse_size(parsed.values.size), issue: parsed.values.issue }
 }
 
-async function report(args: ScoutArguments): Promise<number> {
+// Only a close pair asks a question the Issue may already have answered; a clear pick, a lone
+// candidate or no candidate never reads the Issue.
+async function reuse_of(
+	args: ScoutArguments,
+	table: RankedTable,
+	directory: string,
+): Promise<ReuseOutcome | undefined> {
+	const [first] = table.ranked
+	if (first === undefined || table.verdict !== 'close') return undefined
+
+	const request = { issue: args.issue, keywords: args.keywords, rejected: first.name, directory }
+
+	return await package_scout_reuse.check(request)
+}
+
+async function report(args: ScoutArguments, directory: string): Promise<number> {
 	const candidates = await search(args.keywords, args.size)
 
 	if (candidates === undefined) {
@@ -145,14 +164,21 @@ async function report(args: ScoutArguments): Promise<number> {
 	}
 
 	const metrics = await Promise.all(candidates.map(async (candidate) => await gather(candidate)))
+	const table = package_scout.build_table(metrics)
+	const reuse = await reuse_of(args, table, directory)
 
 	console.info(`Candidates for "${args.keywords}" (ranked by npm score):`)
-	console.info(package_scout_format.format_table(package_scout.build_table(metrics)))
+	console.info(package_scout_format.format_table(table, reuse))
 
-	return SUCCESS_EXIT_CODE
+	return reuse !== undefined && package_scout_reuse.is_failure(reuse)
+		? FAILURE_EXIT_CODE
+		: SUCCESS_EXIT_CODE
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
+async function run(
+	argv: ReadonlyArray<string>,
+	directory: string = process.cwd(),
+): Promise<number> {
 	const args = read_arguments(argv)
 
 	if (args === undefined) {
@@ -161,7 +187,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await report(args)
+	return await report(args, directory)
 }
 
 // `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to

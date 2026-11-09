@@ -37,7 +37,7 @@ Naming, exports, file names and content rules are enforced by `eslint/rules/`; t
 
 ## Package-First Development
 
-Before building a feature, run `pnpm josh pkg:scout <keywords>`: `clear` → use it (Tier A), `close` → ask (Tier B).
+Before building a feature, run `pnpm josh pkg:scout <keywords>` and act on its `Tier:` line (A: use it, B: ask).
 
 ## Code Change Rules
 

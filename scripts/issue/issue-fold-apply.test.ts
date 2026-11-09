@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { issue_fold_apply } from './issue-fold-apply'
+import { issue_fold_apply, type ApplyResult } from './issue-fold-apply'
 import { issue_priority_raise, type RaiseResult } from './issue-priority-raise'
 
 // joshuafolkken/kit#5848: the fold's write half — the gh reads and the PATCH are mocked so each refusal
@@ -18,6 +18,8 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 const ISSUE = '12'
 const EXISTING = 'Original criterion'
 const FOLDED = `${EXISTING}\n\n## 追加要件\n\nAdditional criterion\n`
+const EDITED = `${EXISTING}\n\nA decision added later`
+const FLOOR_FAILED: ApplyResult = 'priority-failed'
 const ASSESSED_AT = '2026-11-02T12:00:00Z'
 const ASSESSED_THREAD = JSON.stringify([{ id: 1, updated_at: ASSESSED_AT, body: 'Decision' }])
 
@@ -59,7 +61,7 @@ describe('issue_fold_apply.apply after the write', () => {
 			reads(EXISTING, FOLDED)
 			raise.mockResolvedValue(answer)
 
-			expect(await issue_fold_apply.apply(FOLD)).toBe('priority-failed')
+			expect(await issue_fold_apply.apply(FOLD)).toBe(FLOOR_FAILED)
 		},
 	)
 
@@ -72,10 +74,17 @@ describe('issue_fold_apply.apply after the write', () => {
 
 describe('issue_fold_apply.apply before the write', () => {
 	it('refuses to write a body that changed since the assessment', async () => {
-		reads(`${EXISTING}\n\nA decision added later`)
+		reads(EDITED)
 
 		expect(await issue_fold_apply.apply(FOLD)).toBe('changed')
 		expect(issue_edit_body).not.toHaveBeenCalled()
+	})
+
+	it('refuses a body that reads as neither the assessment nor the fold', async () => {
+		reads(EDITED, EDITED)
+
+		expect(await issue_fold_apply.apply(FOLD)).toBe('changed')
+		expect(raise).not.toHaveBeenCalled()
 	})
 
 	it('refuses to write a body it cannot read', async () => {
@@ -91,6 +100,24 @@ describe('issue_fold_apply.apply before the write', () => {
 
 		expect(await issue_fold_apply.apply(FOLD)).toBe('write-failed')
 		expect(raise).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6643: a rerun after the split-child record failed finds its own fold written.
+describe('issue_fold_apply.apply on a body that already carries the fold', () => {
+	it('takes the earlier write as applied and only raises the floor', async () => {
+		reads(FOLDED, `${FOLDED.trimEnd()}\r\n`)
+
+		expect(await issue_fold_apply.apply(FOLD)).toBe('applied')
+		expect(issue_edit_body).not.toHaveBeenCalled()
+		expect(raise).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('reports a failed floor as incomplete', async () => {
+		reads(FOLDED, FOLDED)
+		raise.mockResolvedValue('failed')
+
+		expect(await issue_fold_apply.apply(FOLD)).toBe(FLOOR_FAILED)
 	})
 })
 

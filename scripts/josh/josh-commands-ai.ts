@@ -45,13 +45,17 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Rank package candidates by measured metrics so the Package-First tier decision is read, not judged',
 		category: 'AI tools',
-		reference: ['<keywords> [--size <n>]', 'automation', ['network']],
+		reference: ['<keywords> [--size <n>] [--issue <n>]', 'automation', ['network']],
 		usage: {
 			examples: [{ arguments: '"date formatting" --size 5' }],
 			flags: [
 				{
 					names: ['--size <n>'],
 					description: 'how many candidates to fetch and rank (default 10).',
+				},
+				{
+					names: ['--issue <n>'],
+					description: 'the Issue a close pair reads for reuse (default: the held run).',
 				},
 			],
 		},

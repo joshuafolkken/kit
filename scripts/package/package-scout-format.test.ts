@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { package_scout, type PackageMetrics } from './package-scout'
 import { package_scout_format } from './package-scout-format'
+import type { ReuseOutcome } from './package-scout-reuse'
 
 // The printed shape: one line per candidate with each metric, and a verdict line whose wording keys
 // off the tier vocabulary (joshuafolkken/kit#2216).
@@ -97,5 +98,51 @@ describe('the verdict line follows the tier vocabulary', () => {
 		const empty = package_scout_format.format_table(package_scout.build_table([]))
 
 		expect(empty).toBe(package_scout_format.NO_CANDIDATES_LINE)
+	})
+})
+
+// joshuafolkken/kit#6510: a close pair the Issue settled reads Tier A only once recorded.
+const CLOSE = package_scout.build_table(pair(0.9, 0.88))
+const RECORDED: ReuseOutcome = {
+	kind: 'recorded',
+	note: '#6510 decides to reuse existing code (Reuse issue_sources.read_sources)',
+	url: 'https://github.com/joshuafolkken/kit/issues/6510#issuecomment-9',
+}
+
+describe('the close verdict reads the reuse outcome', () => {
+	it('names Tier A with no dependency added and the recorded comment when recorded', () => {
+		const verdict = package_scout_format.format_verdict(CLOSE, RECORDED)
+
+		expect(verdict).toContain(`${RECORDED.note} — no dependency added (Tier A)`)
+		expect(verdict).toContain(RECORDED.url)
+		expect(verdict).not.toContain('Tier B')
+	})
+
+	it.each(['unknown', 'unreadable', 'failed', 'undecided', 'record-failed'] as const)(
+		'keeps Tier B and prints the note on %s',
+		(kind) => {
+			const note = `Reuse check: ${kind}`
+			const verdict = package_scout_format.format_verdict(CLOSE, { kind, note })
+
+			expect(verdict).toContain('ask the user (Tier B)')
+			expect(verdict).toContain(note)
+			expect(verdict).not.toContain('Tier A')
+		},
+	)
+
+	it('leaves a clear pick, a lone candidate and no candidates as they were', () => {
+		const clear = package_scout.build_table(pair(0.9, 0.7))
+		const lone = package_scout.build_table([metrics({ name: 'only' })])
+		const none = package_scout.build_table([])
+
+		expect(package_scout_format.format_table(clear, RECORDED)).toBe(
+			package_scout_format.format_table(clear),
+		)
+		expect(package_scout_format.format_verdict(lone, RECORDED)).toBe(
+			package_scout_format.format_verdict(lone),
+		)
+		expect(package_scout_format.format_table(none, RECORDED)).toBe(
+			package_scout_format.NO_CANDIDATES_LINE,
+		)
 	})
 })
