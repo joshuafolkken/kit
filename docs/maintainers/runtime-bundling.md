@@ -5,17 +5,20 @@ kit ships `scripts/` as TypeScript and uses pre-built bundles where available. I
 for every script command — about 0.16 s per call on top of the command's own work
 (joshuafolkken/kit#3328).
 
-## kit's own checkout — fresh bundles, source fallback
+## kit's own checkout — fresh bundles, rebuilt when stale
 
 kit's `pnpm josh` script starts `tools/josh/josh-ready.ts` under plain node. The launcher shares
 `hook_bundle_stamp.is_fresh` with `run-hook.sh`'s launcher and checks both `dist/` and
 `dist/commands/`. Each build records the bytes it bundled, its toolchain inputs and emitted files.
-A fresh build runs `dist/josh.js`; missing inputs or outputs and edited inputs select the source dispatcher,
-registering tsx in the same process. Arguments and exit codes follow the selected dispatcher.
+A fresh build runs `dist/josh.js` with no TS loader. Missing inputs or outputs and edited inputs
+rebuild `dist/` first — `pnpm build`, its progress on stderr — and then run the new `dist/josh.js`, so
+a command never runs a bundle older than the source (joshuafolkken/kit#6769). A lock beside
+`dist/commands/` keeps concurrent launches to one build; the others wait for it. Only a failed
+build, or a source edited during the build, selects the source dispatcher, registering tsx in the
+same process. Arguments and exit codes follow the selected dispatcher.
 
 The gate's steps and lefthook's commands are `pnpm josh <command>` calls, so they take the
-same path. With fresh bundles, commands not yet pre-built still spawn a tsx child. Run `pnpm build`
-to refresh the bundles after editing source.
+same path. With fresh bundles, commands not yet pre-built still spawn a tsx child.
 
 Measured on 2026-11-01 (node 26.12.1, macOS), `pnpm josh doc:section CLAUDE.md Communication`, 15
 runs interleaved between the two scripts:
