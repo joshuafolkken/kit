@@ -7,11 +7,28 @@ import { markdown_section } from '#scripts/issue/markdown-section'
 //
 // **The one parser of the schema**: `run:park` refuses a body `problem_of` names, and a reader of a
 // park comment summarizes it through `summary_of` — `run:board`'s park rows (joshuafolkken/kit#6688).
+//
+// An option that is a size approval carries its range in three more lines (joshuafolkken/kit#6776) —
+// the paths and both axes of `lane-plan-approval.ts`'s json, which `backlog:triage --adopt` writes.
+
+interface ParkBound {
+	declared: number
+	max: number
+}
+
+interface ParkApproval {
+	paths?: ReadonlyArray<string>
+	lines?: ParkBound
+	files?: ParkBound
+}
+
+type ApprovalRange = Required<ParkApproval>
 
 interface ParkOption {
 	number: number
 	tier?: string | undefined
 	permission?: string | undefined
+	approval?: ParkApproval | undefined
 }
 
 interface ParkPick {
@@ -31,6 +48,15 @@ const ANY_HEADING = /^#{1,6} /u
 const ITEM = /^(\d+)\. +\S/u
 const TIER = /^- 層: ?([ABC])$/u
 const PERMISSION = /^- 必要な権限: ?(\S.*)$/u
+const APPROVAL_PATHS = /^- 規模承認のパス: ?(\S.*)$/u
+const APPROVAL_LINES = /^- 規模承認の行数: ?([1-9]\d*) *\/ *([1-9]\d*)$/u
+const APPROVAL_FILES = /^- 規模承認のファイル数: ?([1-9]\d*) *\/ *([1-9]\d*)$/u
+const PATH_SEPARATOR = /[\s,、]+/u
+const APPROVAL_PARTS = [
+	['paths', '- 規模承認のパス: <path> …'],
+	['lines', '- 規模承認の行数: <declared> / <max>'],
+	['files', '- 規模承認のファイル数: <declared> / <max>'],
+] as const
 const PICK = /^(\d+)[\s:：.、]+\S/u
 const NO_PICK = /^推奨なし[\s:：—-]+\S/u
 const AUTO_TIER = 'A'
@@ -48,6 +74,8 @@ const FORMAT = [
 	'2. <option>',
 	TIER_LINE,
 	'   - 必要な権限: …',
+	'   (a size-approval option adds all three:)',
+	...APPROVAL_PARTS.map(([, line]) => `   ${line}`),
 	PICK_HEADING,
 	`<option number> <reason>   (or: ${NO_PICK_WORD} <reason>)`,
 ].join('\n')
@@ -70,10 +98,44 @@ function permission_of(option: ParkOption, line: string): string | undefined {
 	return option.permission ?? PERMISSION.exec(line)?.[1]?.trim()
 }
 
+function bound_of(pattern: RegExp, line: string): ParkBound | undefined {
+	const [, declared, max] = pattern.exec(line) ?? []
+
+	return max === undefined ? undefined : { declared: Number(declared), max: Number(max) }
+}
+
+function paths_of(line: string): ReadonlyArray<string> | undefined {
+	const text = APPROVAL_PATHS.exec(line)?.[1]
+	const paths = text
+		?.split(PATH_SEPARATOR)
+		.map((path) => path.replaceAll('`', ''))
+		.filter(Boolean)
+
+	return paths?.length === 0 ? undefined : paths
+}
+
+function approval_of(approval: ParkApproval | undefined, line: string): ParkApproval | undefined {
+	const paths = paths_of(line)
+
+	if (paths !== undefined) return { ...approval, paths }
+	const lines = bound_of(APPROVAL_LINES, line)
+
+	if (lines !== undefined) return { ...approval, lines }
+	const files = bound_of(APPROVAL_FILES, line)
+
+	return files === undefined ? approval : { ...approval, files }
+}
+
 function with_detail(option: ParkOption, raw_line: string): ParkOption {
 	const line = raw_line.trim()
+	const approval = approval_of(option.approval, line)
 
-	return { ...option, tier: tier_of(option, line), permission: permission_of(option, line) }
+	return {
+		...option,
+		tier: tier_of(option, line),
+		permission: permission_of(option, line),
+		approval,
+	}
 }
 
 // Each numbered item opens an option; the lines under it fill in its tier and permission.
@@ -116,12 +178,21 @@ function parse(body: string): ParkBody {
 	}
 }
 
+// A size-approval option missing one line of its range: the json it becomes needs every one.
+function approval_problem(approval: ParkApproval | undefined, name: string): string | undefined {
+	if (approval === undefined) return undefined
+	const missing = APPROVAL_PARTS.find(([key]) => approval[key] === undefined)
+
+	return missing === undefined ? undefined : `${name} has no "${missing[1]}" line`
+}
+
 function option_problem(option: ParkOption): string | undefined {
 	const name = `option ${String(option.number)}`
 
 	if (option.tier === undefined) return `${name} has no "- 層: A|B|C" line`
+	if (option.permission === undefined) return `${name} has no "- 必要な権限: …" line`
 
-	return option.permission === undefined ? `${name} has no "- 必要な権限: …" line` : undefined
+	return approval_problem(option.approval, name)
 }
 
 function is_listed(park: ParkBody, number: number | undefined): boolean {
@@ -194,13 +265,26 @@ function adopt_problem(body: string, number: number): string | undefined {
 		: undefined
 }
 
+function is_complete(approval: ParkApproval | undefined): approval is ApprovalRange {
+	return APPROVAL_PARTS.every(([key]) => approval?.[key] !== undefined)
+}
+
+// The size-approval range option `number` carries; `undefined` for an option that is no size approval.
+function approval_range(body: string, number: number): ApprovalRange | undefined {
+	const option = parse(body).options.find((candidate) => candidate.number === number)
+
+	return is_complete(option?.approval) ? option.approval : undefined
+}
+
 const run_park_body = {
 	FORMAT,
 	HEADINGS: [OPTIONS_HEADING, PICK_HEADING],
 	adopt_problem,
+	approval_range,
 	auto_pick,
 	problem_of,
 	summary_of,
 }
 
+export type { ApprovalRange }
 export { run_park_body }
