@@ -14,7 +14,8 @@ import { git_gh_transport } from './git-gh-transport'
 // (`git-gh-transport.ts`), an unresolved node, or a row without a `node_id`. An empty `nodes` would let `backlog:next` start a dependent before its
 // prerequisite.
 
-// `nodes(ids:)` accepts at most a hundred ids.
+// `nodes(ids:)` accepts at most a hundred ids; the epic children's aliased read keeps to the same
+// hundred per query (`git-gh-issue-batch-graphql.ts`).
 const IDS_PER_QUERY = 100
 
 const BLOCKED_BY_QUERY = `query($ids: [ID!]!) {
@@ -101,6 +102,6 @@ async function read_answered(rows: ReadonlyArray<RestIssue>): Promise<Map<RestIs
 	return answered
 }
 
-const git_gh_blocked_by_graphql = { read_answered }
+const git_gh_blocked_by_graphql = { chunks_of, read_answered }
 
 export { git_gh_blocked_by_graphql, IDS_PER_QUERY }

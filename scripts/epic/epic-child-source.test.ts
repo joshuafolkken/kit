@@ -1,5 +1,6 @@
 import { backlog_pool } from '#scripts/backlog/backlog-pool'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
 import type { IssueRead } from '#scripts/gh/git-gh-issue-read'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { shared_cache_fixture } from '#scripts/josh/shared-cache-fixture'
@@ -112,6 +113,10 @@ async function scan(source?: ChildSource): Promise<EpicSnapshot> {
 
 beforeEach(() => {
 	vi.restoreAllMocks()
+	// The children's batched GraphQL read answers nothing, so every read is the REST one counted here.
+	vi.spyOn(git_gh_issue_batch_graphql, 'read_many').mockResolvedValue(
+		git_gh_issue_batch_graphql.empty_batch(),
+	)
 
 	return shared_cache_fixture.isolate_shared_cache(epic_child_source.CLOSED_CACHE)
 })
