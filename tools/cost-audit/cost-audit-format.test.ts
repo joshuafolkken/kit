@@ -74,15 +74,33 @@ describe('cost_audit_format.report_lines — the full cache rewrites', () => {
 	})
 })
 
+const IMPLEMENT_READ = 'implement: read'
+
 // joshuafolkken/kit#5936: the lane requests by phase, the four token kinds beside the cost.
 describe('cost_audit_format.report_lines — the phase table', () => {
 	it('prints each phase with its cost and four token kinds', () => {
 		const tokens = { input: 1200, cache_read: 3_400_000, cache_write: 56_000, output: 7800 }
 		const lines = cost_audit_format.report_lines(
-			audit_with({ phases: [{ key: 'implement: read', tokens, usd: 2.5 }] }),
+			audit_with({ phases: [{ key: IMPLEMENT_READ, tokens, usd: 2.5, models: [] }] }),
 		)
 
 		expect(lines).toContain('  implement: read: $2.5000 — 1,200 / 3,400,000 / 56,000 / 7,800')
+	})
+
+	// joshuafolkken/kit#6899: under the row, each model's dollars by the same four token types.
+	it('prints each model of a phase under it with its dollars by token type', () => {
+		const tokens = { input: 0, cache_read: 0, cache_write: 0, output: 0 }
+		const models = [
+			{ model: 'claude-opus-4-6', input: 0.5, cache_read: 1, cache_write: 0.25, output: 0.75 },
+		]
+		const lines = cost_audit_format.report_lines(
+			audit_with({ phases: [{ key: IMPLEMENT_READ, tokens, usd: 2.5, models }] }),
+		)
+		const phase = lines.indexOf('  implement: read: $2.5000 — 0 / 0 / 0 / 0')
+
+		expect(lines[phase + 1]).toBe(
+			'    claude-opus-4-6: $2.5000 — $0.5000 / $1.0000 / $0.2500 / $0.7500',
+		)
 	})
 
 	it('says none for a period with no lane request', () => {
@@ -100,7 +118,7 @@ describe('cost_audit_format.report_lines — the agent type table', () => {
 	it('prints each agent type with its cost and four token kinds', () => {
 		const tokens = { input: 10, cache_read: 2000, cache_write: 300, output: 40 }
 		const lines = cost_audit_format.report_lines(
-			audit_with({ agents: [{ key: 'subagent: reviewer', tokens, usd: 1.25 }] }),
+			audit_with({ agents: [{ key: 'subagent: reviewer', tokens, usd: 1.25, models: [] }] }),
 		)
 		const title = lines.findIndex((line) => line.startsWith(AGENT_TITLE))
 
