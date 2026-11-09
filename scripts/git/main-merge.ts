@@ -48,7 +48,7 @@ function merge_message(default_branch: string, current_branch: string): string |
 
 	if (issue_number === undefined) return undefined
 
-	return `Merge ${default_branch} into ${current_branch} ${issue_cite.plain(issue_number)}`
+	return `Merge ${default_branch} into ${current_branch} ${issue_cite.plain_for('github', issue_number)}`
 }
 
 // What one merge of the default branch came to. `josh ship` merges it again

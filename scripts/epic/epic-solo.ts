@@ -78,14 +78,14 @@ const WAITING_MARK = `carries \`${RUN_SOLO_LABEL}\` and waits for`
 
 function held_message(holder: number, repo: string): string {
 	return issue_citation.linkify(
-		`${issue_cite.plain(holder)} ${HELD_MARK} ${repo}; nothing else starts until it merges or is parked.`,
+		`${issue_cite.plain_for('linked', holder)} ${HELD_MARK} ${repo}; nothing else starts until it merges or is parked.`,
 		repo,
 	)
 }
 
 function waiting_message(solo: number, repo: string): string {
 	return issue_citation.linkify(
-		`${issue_cite.plain(solo)} ${WAITING_MARK} ${repo}'s running lanes to finish; nothing ranked below it is offered past it.`,
+		`${issue_cite.plain_for('linked', solo)} ${WAITING_MARK} ${repo}'s running lanes to finish; nothing ranked below it is offered past it.`,
 		repo,
 	)
 }

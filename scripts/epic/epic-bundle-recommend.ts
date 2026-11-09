@@ -33,7 +33,9 @@ function recommend_epic(
 
 function format_counts(epics: ReadonlyArray<number>, members: ReadonlyArray<BacklogIssue>): string {
 	return epics
-		.map((epic) => `${issue_cite.plain(epic)}: ${String(tracked_count(epic, members))}`)
+		.map(
+			(epic) => `${issue_cite.plain_for('github', epic)}: ${String(tracked_count(epic, members))}`,
+		)
 		.join(', ')
 }
 
@@ -41,8 +43,8 @@ function format_counts(epics: ReadonlyArray<number>, members: ReadonlyArray<Back
 function placement_record(input: PlacementInput, date: string): string {
 	const rejected = input.epics
 		.filter((epic) => epic !== input.epic)
-		.map((epic) => issue_cite.plain(epic))
-	const placed = `placed ${issue_cite.plain(input.subject)} in ${issue_cite.plain(input.epic)}`
+		.map((epic) => issue_cite.plain_for('github', epic))
+	const placed = `placed ${issue_cite.plain_for('github', input.subject)} in ${issue_cite.plain_for('github', input.epic)}`
 	const counts = format_counts(input.epics, input.members)
 
 	return `Auto-decided (${date}, \`epic:bundle --apply\`): ${placed} over ${rejected.join(', ')} because it tracks the most related issues (${counts}); a tie goes to the older epic.`

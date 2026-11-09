@@ -23,9 +23,13 @@ async function is_named_left(): Promise<boolean> {
 	return remaining.length > 0
 }
 
-function record_ports(): Pick<LoopPorts, 'added_since' | 'named_left' | 'yields' | 'park'> {
+function record_ports(): Pick<
+	LoopPorts,
+	'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park'
+> {
 	return {
 		added_since: async (since_ms) => await backlog_arrival_added.is_added_since(since_ms),
+		raised_since: async (since_ms) => await backlog_arrival_added.is_raised_since(since_ms),
 		named_left: is_named_left,
 		...backlog_yield_cap.PORTS,
 	}

@@ -65,7 +65,7 @@ function classify(children: ReadonlyArray<EpicChild>, repo: string): WaitCauses 
 }
 
 function cited(numbers: ReadonlyArray<number>): string {
-	return numbers.map((number) => issue_cite.plain(number)).join(' ')
+	return numbers.map((number) => issue_cite.plain_for('program', number)).join(' ')
 }
 
 function lines_of(causes: WaitCauses): ReadonlyArray<string> {

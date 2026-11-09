@@ -42,7 +42,7 @@ function untriaged(children: ReadonlyArray<EpicChild>): ReadonlyArray<EpicChild>
 
 // The untriaged numbers and the labels they lack, the opening both messages share.
 function lacking_labels(children: ReadonlyArray<EpicChild>, repo: string): string {
-	const numbers = children.map((child) => issue_cite.plain(child.number)).join(', ')
+	const numbers = children.map((child) => issue_cite.plain_for('linked', child.number)).join(', ')
 
 	return `${numbers} carry neither \`${RUN_SOLO_LABEL}\` nor \`${RUN_LANE_LABEL}\` in ${repo}`
 }

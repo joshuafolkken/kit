@@ -15,7 +15,7 @@ const DEPENDENCY_ARROW = ' -> '
 const REFERENCE_SEPARATOR = ', '
 
 function to_issue_reference(issue_number: number): string {
-	return issue_cite.plain(issue_number)
+	return issue_cite.plain_for('linked', issue_number)
 }
 
 function format_dependency_link(link: DependencyLink): string {

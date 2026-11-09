@@ -127,11 +127,11 @@ async function file_follow_up(issue: SpillIssue, estimate: string): Promise<numb
 }
 
 async function create_epic(issue: SpillIssue, follow_up: number): Promise<number> {
-	const origin = issue_cite.plain(issue.issue_number)
+	const origin = issue_cite.plain_for('github', issue.issue_number)
 	const epic_number = await epic_run.create_epic_number({
 		title: `Split of ${origin}: ${issue.title}`,
 		children: [issue.issue_number, follow_up],
-		rationale: `${origin} の未チェックの受け入れ条件を ${issue_cite.plain(follow_up)} に切り出した。`,
+		rationale: `${origin} の未チェックの受け入れ条件を ${issue_cite.plain_for('github', follow_up)} に切り出した。`,
 		is_ordered: true,
 	})
 

@@ -111,7 +111,9 @@ function next_commands(command: StageCommand): ReadonlyArray<StageCommand> {
 
 // The `Next:` line a stop's Telegram and report carry, e.g. `Next: prrun #<N> | fullrun #<N>`.
 function next_line(command: StageCommand, issue: string): string {
-	const commands = next_commands(command).map((next) => `${next} ${issue_cite.plain(issue)}`)
+	const commands = next_commands(command).map(
+		(next) => `${next} ${issue_cite.plain_for('linked', issue)}`,
+	)
 
 	return `${NEXT_PREFIX}${commands.join(NEXT_SEPARATOR)}`
 }
@@ -119,7 +121,7 @@ function next_line(command: StageCommand, issue: string): string {
 function format_decision(issue: string, decision: StageDecision): string {
 	const fields = [`at: ${decision.state}`, `to: ${decision.command}`, `start: ${decision.start}`]
 
-	return `stage ${issue_cite.plain(issue)} — ${fields.join(' · ')}`
+	return `stage ${issue_cite.plain_for('linked', issue)} — ${fields.join(' · ')}`
 }
 
 function cell(state: StageState, command: StageCommand): string {

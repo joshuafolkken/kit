@@ -121,7 +121,7 @@ function withdraw_comment({ reason, by, is_closed }: Withdrawal): string {
 async function record_withdraw(issue: string, { reason, by }: Withdrawal): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.WITHDRAW,
-		`${issue_cite.plain(issue)} withdrawn by ${WITHDRAWER_TEXT[by].name}: ${reason}`,
+		`${issue_cite.plain_for('program', issue)} withdrawn by ${WITHDRAWER_TEXT[by].name}: ${reason}`,
 	)
 }
 

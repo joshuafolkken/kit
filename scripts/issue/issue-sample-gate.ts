@@ -185,7 +185,7 @@ function wait_of(body?: string): SampleWait | undefined {
 }
 
 function subject_of({ cited, via }: SampleWait): string {
-	const plain = issue_cite.plain(cited)
+	const plain = issue_cite.plain_for('linked', cited)
 
 	return via === 'pull' ? plain : `the pull request closing ${plain}`
 }
