@@ -23,7 +23,9 @@ function is_waiting_on(edge: IssueReference, source: WaitSource): boolean {
 }
 
 function reference_of(edge: IssueReference, repo: string): string {
-	return edge.repo === repo ? String(edge.number) : issue_cite.plain(edge.number, edge.repo)
+	return edge.repo === repo
+		? String(edge.number)
+		: issue_cite.plain_for('terminal', edge.number, edge.repo)
 }
 
 function waits_of(child: EpicChild, source: WaitSource): Array<string> {

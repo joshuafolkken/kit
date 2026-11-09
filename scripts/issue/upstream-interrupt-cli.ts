@@ -77,7 +77,7 @@ function parse(argv: ReadonlyArray<string>): Interrupt | undefined {
 }
 
 function stash_message(interrupt: Interrupt): string {
-	return `upstream-interrupt: paused ${issue_cite.plain(interrupt.finder)}`
+	return `upstream-interrupt: paused ${issue_cite.plain_for('program', interrupt.finder)}`
 }
 
 function blocks_finder_flag(interrupt: Interrupt): ReadonlyArray<string> {
@@ -140,7 +140,7 @@ async function file(interrupt: Interrupt): Promise<string | undefined> {
 
 	console.info(`file: ${String(url)}`)
 
-	return issue_cite.plain(target.issue_number, target.name_with_owner)
+	return issue_cite.plain_for('github', target.issue_number, target.name_with_owner)
 }
 
 function resume_line(interrupt: Interrupt): string {
@@ -148,7 +148,7 @@ function resume_line(interrupt: Interrupt): string {
 }
 
 function backlink_body(interrupt: Interrupt, reference: string): string {
-	const reason = `${issue_cite.plain(interrupt.finder)} stopped on this upstream defect; its work is stashed.`
+	const reason = `${issue_cite.plain_for('github', interrupt.finder)} stopped on this upstream defect; its work is stashed.`
 
 	return `## Upstream issues\n\n- ${reference}\n\n${reason} ${resume_line(interrupt)}`
 }

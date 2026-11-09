@@ -60,8 +60,12 @@ function recorded(record: LaneStateRecord, folded: ItemStatus | undefined): Item
 
 // The lane's status: its events from the record's newest launch on, folded over the record's running
 // child, so a cut or a stage line whose launch rolled off the stream carries it on. An ending among
-// them stands; otherwise the record's state does.
-function status_of(events: ReadonlyArray<RunEvent>, record: LaneStateRecord): ItemStatus {
+// them stands; otherwise the record's state does. A child whose yield closed the lane has none: it is
+// back in the queue while the record still says running (joshuafolkken/kit#6886).
+function status_of(
+	events: ReadonlyArray<RunEvent>,
+	record: LaneStateRecord,
+): ItemStatus | undefined {
 	const issue = Number(record.issue)
 	const launched_ms = time_of(record.launched_at)
 	const launched = run_board_status.since_launch(events, record.issue, launched_ms)
@@ -70,7 +74,7 @@ function status_of(events: ReadonlyArray<RunEvent>, record: LaneStateRecord): It
 	])
 	const folded = run_board_status.fold_events(launched, seed).get(issue)
 
-	return folded === undefined || folded.state === 'running' ? recorded(record, folded) : folded
+	return folded?.state === 'running' ? recorded(record, folded) : folded
 }
 
 interface LaneRead {
@@ -87,7 +91,11 @@ function place(read: LaneRead, lane: string, sorted: BoardLanes): BoardLanes {
 	if (record === undefined) return { ...sorted, unknown: [...sorted.unknown, lane] }
 	if (!HELD_STATES.has(record.state)) return sorted
 
-	const entry = [Number(lane), status_of(read.events, record)] as const
+	const status = status_of(read.events, record)
+
+	if (status === undefined) return sorted
+
+	const entry = [Number(lane), status] as const
 
 	return is_own(record, read.started_ms)
 		? { ...sorted, own: new Map([...sorted.own, entry]) }

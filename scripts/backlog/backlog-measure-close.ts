@@ -97,7 +97,7 @@ async function close_passed(issue: string, measurement: Measurement): Promise<bo
 	if (is_closed) {
 		await run_event_stream_emit.emit(
 			run_event_stream.EVENT_KIND.MEASURED,
-			`${issue_cite.plain(issue)} measured by backlog:drive: ${value} ${bound}`,
+			`${issue_cite.plain_for('program', issue)} measured by backlog:drive: ${value} ${bound}`,
 		)
 	}
 
@@ -108,7 +108,7 @@ async function close_passed(issue: string, measurement: Measurement): Promise<bo
 async function waited(issue: string): Promise<MeasureOutcome> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.SAMPLE_WAIT,
-		`${issue_cite.plain(issue)} waiting: sample condition not met`,
+		`${issue_cite.plain_for('program', issue)} waiting: sample condition not met`,
 	)
 
 	return 'wait'

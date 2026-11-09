@@ -37,7 +37,7 @@ interface Handoff {
 function issue_list(issues: ReadonlyArray<number>, labels: HandoffLabels): string {
 	if (issues.length === 0) return labels.none
 
-	return issues.map((issue) => issue_cite.plain(issue)).join(LIST_SEPARATOR)
+	return issues.map((issue) => issue_cite.plain_for('linked', issue)).join(LIST_SEPARATOR)
 }
 
 // The children that parked in this invocation and never merged — named apart from the remaining list,

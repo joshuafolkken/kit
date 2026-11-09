@@ -44,7 +44,7 @@ const YIELD_AT_MARK = ' · at: '
 async function record_yield(issue: number, reason: string, at: YieldAt): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.NOTE,
-		`${issue_cite.plain(String(issue))}${YIELD_MARK}${reason}${YIELD_AT_MARK}${at}`,
+		`${issue_cite.plain_for('program', String(issue))}${YIELD_MARK}${reason}${YIELD_AT_MARK}${at}`,
 	)
 }
 
@@ -97,7 +97,7 @@ function withdraw_reason(events: ReadonlyArray<RunEvent>, issue: string): string
 	const note = latest_yield(events, issue)
 	const holder = note === undefined ? undefined : holder_of(note)
 	// Stored in the withdrawal event; its renderer supplies session citations.
-	const holding_issue = issue_cite.plain(holder ?? '')
+	const holding_issue = issue_cite.plain_for('program', holder ?? '')
 
 	return holder === undefined
 		? YIELD_REASON

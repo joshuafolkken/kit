@@ -153,7 +153,7 @@ function reading(issue: number, cite: string, minutes: number): string {
 // One line: `detached_launch` lets a prompt break lines, but a single line keeps the log header whole.
 // The breakdown leads, so the search starts from the longest stage (joshuafolkken/kit#4995).
 function prompt(issue: number, minutes: number, report: Report): string {
-	const reads = reading(issue, issue_cite.plain(issue), minutes)
+	const reads = reading(issue, issue_cite.plain_for('program', issue), minutes)
 	const stages = lane_breakdown_text.line(report)
 
 	return `${stages} ${reads} ${lane_overrun_prompt.handling(issue, minutes)}`

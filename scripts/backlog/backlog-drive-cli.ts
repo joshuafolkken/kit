@@ -174,7 +174,7 @@ async function open_lanes(): Promise<ReadonlyArray<LaneInfo>> {
 
 function end_line(end: DriveEnd): string {
 	const token = end.token === undefined || end.token === end.reason ? [] : [end.token]
-	const issue = end.issue === undefined ? [] : [issue_cite.plain(end.issue)]
+	const issue = end.issue === undefined ? [] : [issue_cite.plain_for('program', end.issue)]
 	const base = [end.reason, ...token, ...issue].join(' ')
 
 	return end.detail === undefined ? base : `${base} ${end.detail}`

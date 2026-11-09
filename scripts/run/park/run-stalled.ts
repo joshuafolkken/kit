@@ -35,7 +35,7 @@ const CAUSE_LEAD = `${RUN_STALLED_LABEL}: `
 function resume_of(child: number | string, is_backlog_live = false): string {
 	return is_backlog_live
 		? `pnpm josh run:add ${String(child)} --retry`
-		: `${RESUME_COMMAND} ${issue_cite.plain(child)}`
+		: `${RESUME_COMMAND} ${issue_cite.plain_for('program', child)}`
 }
 
 function recovery_of(cause: string): string {
@@ -62,7 +62,7 @@ function session_unfinished(message: string): StallCause {
 }
 
 function park_event(child: number | string, cause: string): string {
-	return `${issue_cite.plain(child)} parked (${CAUSE_LEAD}${cause})`
+	return `${issue_cite.plain_for('program', child)} parked (${CAUSE_LEAD}${cause})`
 }
 
 // The cause a park event's reason carries: `''` for a bare `run:stalled` (written before the event
@@ -89,7 +89,7 @@ function row_text(child: number | string, cause = '', is_backlog_live = false): 
 // A stalled child an open blocker still holds resumes after that blocker, not on a retry: `#6474`
 // for a board wait of this repository, `owner/repo#N` as it is for another's.
 function waiting_text(waits: ReadonlyArray<string>): string {
-	return `waiting on ${waits.map((wait) => (wait.includes('#') ? wait : issue_cite.plain(wait))).join(', ')}`
+	return `waiting on ${waits.map((wait) => (wait.includes('#') ? wait : issue_cite.plain_for('program', wait))).join(', ')}`
 }
 
 const run_stalled = {

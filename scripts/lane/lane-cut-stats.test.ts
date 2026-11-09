@@ -22,7 +22,7 @@ function cut(issue: number, phase: string, minutes_before = 10): RunEvent {
 		pos: 1,
 		at: minutes_before_now(minutes_before),
 		kind: 'cut',
-		text: `${issue_cite.plain(issue)} cut (${phase})`,
+		text: `${issue_cite.plain_for('program', issue)} cut (${phase})`,
 	}
 }
 
@@ -39,7 +39,7 @@ const EVENTS: ReadonlyArray<RunEvent> = [
 		pos: 2,
 		at: minutes_before_now(5),
 		kind: 'park',
-		text: `${issue_cite.plain(ISSUE)} parked (cap)`,
+		text: `${issue_cite.plain_for('program', ISSUE)} parked (cap)`,
 	},
 	cut(QUIET, 'pre-gate', OLD_MINUTES),
 ]

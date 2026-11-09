@@ -152,7 +152,7 @@ function report_reviewer(): number {
 // person is watching, so the run is handed on the way `fullrun`'s entry `over` stop hands it on.
 function report_held_cut(issue: string): number {
 	console.error(
-		`The cut is recorded for ${session_cite.issue(issue)} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun ${issue_cite.plain(issue)}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
+		`The cut is recorded for ${session_cite.issue(issue)} outside a lane, so nothing was relaunched. Keep the hold, send a \`confirmation\` Telegram whose body names the resume command \`fullrun ${issue_cite.plain_for('terminal', issue)}\`, and end the turn; the fresh session's \`pnpm josh run:cut --resume ${issue}\` answers \`resume-impl\` with the handoff.`,
 	)
 
 	return report(CUT_VERDICT, SUCCESS_EXIT_CODE)

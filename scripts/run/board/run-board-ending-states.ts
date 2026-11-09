@@ -1,3 +1,4 @@
+import { lane_yield } from '#scripts/lane/lane-yield'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import type { ItemState } from './run-board-status'
 
@@ -22,6 +23,12 @@ function is_close(event: Pick<RunEvent, 'kind'>): boolean {
 	return STATES[event.kind] === CLOSED_STATE
 }
 
-const run_board_ending_states = { STATES, is_close }
+// joshuafolkken/kit#6886: the withdrawal `run:merge` closes a yielded lane with is no ending for its
+// child — the issue goes back to the queue, to wait on the lane that now holds its file (`lane-yield.ts`).
+function is_requeued(event: RunEvent): boolean {
+	return lane_yield.is_yield(event)
+}
+
+const run_board_ending_states = { STATES, is_close, is_requeued }
 
 export { run_board_ending_states }

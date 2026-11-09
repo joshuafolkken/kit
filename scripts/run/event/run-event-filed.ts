@@ -55,7 +55,7 @@ function text_of(filed: Filed): string {
 	const suffix =
 		filed.found_during === undefined
 			? ''
-			: ` (found during ${issue_cite.plain(filed.found_during)})`
+			: ` (found during ${issue_cite.plain_for('program', filed.found_during)})`
 
 	return `${filed.reference}${kind} ${filed.title}${suffix}`
 }

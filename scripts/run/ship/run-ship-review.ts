@@ -149,7 +149,7 @@ function findings_instruction(
 // (joshuafolkken/kit#3875).
 function issue_read_instruction(issue: string): string {
 	return [
-		`Read Issue ${issue_cite.plain(issue)} with \`pnpm josh issue:read ${issue}\`, which prints the body and every`,
+		`Read Issue ${issue_cite.plain_for('program', issue)} with \`pnpm josh issue:read ${issue}\`, which prints the body and every`,
 		`comment together — never a body-only \`gh api …/issues/${issue}\` read.`,
 	].join(' ')
 }

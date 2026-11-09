@@ -300,7 +300,7 @@ async function open_blockers(child: string): Promise<ReadonlyArray<string>> {
 
 		return references
 			.filter((blocker) => blocker.state === OPEN_STATE)
-			.map((blocker) => issue_cite.plain(blocker.number, blocker.repo))
+			.map((blocker) => issue_cite.plain_for('github', blocker.number, blocker.repo))
 	} catch {
 		return NO_WAITS
 	}

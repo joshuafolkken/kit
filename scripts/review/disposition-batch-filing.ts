@@ -26,7 +26,7 @@ interface Filing {
 
 // The issue as GitHub renders it — the title, the body and the `parent:` line all name it this way.
 function cite(issue: number): string {
-	return issue_cite.plain(issue)
+	return issue_cite.plain_for('github', issue)
 }
 
 function title_of(finding: BatchFinding, issue: number): string {

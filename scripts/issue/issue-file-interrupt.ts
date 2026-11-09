@@ -107,7 +107,7 @@ function kept_line(finder: string, decision: string): string {
 // question unanswered; either failure keeps the park and names the re-run.
 async function convert_park(pair: BlockedPair): Promise<void> {
 	const finder = String(pair.blocked)
-	const decision = `${DECISION_PREFIX} ${issue_cite.plain(pair.blocker)} ${CONVERTED_NOTE}`
+	const decision = `${DECISION_PREFIX} ${issue_cite.plain_for('github', pair.blocker)} ${CONVERTED_NOTE}`
 	const is_cleared =
 		(await git_gh_issue_write.issue_try_comment(finder, decision)) &&
 		(await git_gh_issue_write.issue_clear_label(finder, NEEDS_DECISION_LABEL))

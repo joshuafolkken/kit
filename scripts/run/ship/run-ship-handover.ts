@@ -52,7 +52,7 @@ function ports_of(repository: string, number: string): TakeoverPorts {
 async function note(number: string, text: string): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.NOTE,
-		`${issue_cite.plain(number)} ${text}`,
+		`${issue_cite.plain_for('program', number)} ${text}`,
 	)
 }
 
