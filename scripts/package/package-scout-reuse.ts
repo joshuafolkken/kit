@@ -37,11 +37,23 @@ const UNKNOWN: ReuseOutcome = {
 	note: 'Reuse check: no target Issue (no run held here, no --issue), so no Issue decision was read.',
 }
 
+const AUTO_DECIDED_REUSE = 'Auto-decided: reuse existing code'
+
 type Answered = Extract<AnswerVerdict, { kind: 'answered' }>
 type ReadFailure = Exclude<SourcesRead, { kind: 'sources' }>
+type ReadSources = Extract<SourcesRead, { kind: 'sources' }>['sources']
+
+// Outside a git work tree there is no held run to read: the unknown outcome, not a crash.
+async function held_directory(): Promise<string | undefined> {
+	try {
+		return await run_hold.worktree_directory()
+	} catch {
+		return undefined
+	}
+}
 
 async function held_issue(): Promise<string | undefined> {
-	const target = await run_hold.worktree_directory()
+	const target = await held_directory()
 	if (target === undefined) return undefined
 	const read = run_hold.read_hold(run_hold.hold_path(target))
 
@@ -74,10 +86,14 @@ function evidence_line(evidence: Evidence): string {
 	return `- ${evidence.source.id}: "${evidence.quote}"`
 }
 
+function scout_mark(keywords: string): string {
+	return `\`pkg:scout ${keywords}\` ranked a close pair`
+}
+
 function comment_body(request: ReuseRequest, verdict: Answered): string {
 	const decision = [
-		`Auto-decided: reuse existing code (${verdict.decision}) over adding ${request.rejected}`,
-		`because this Issue decides it — \`pkg:scout ${request.keywords}\` ranked a close pair,`,
+		`${AUTO_DECIDED_REUSE} (${verdict.decision}) over adding ${request.rejected}`,
+		`because this Issue decides it — ${scout_mark(request.keywords)},`,
 		'so no dependency is added (Tier A).',
 	].join(' ')
 
@@ -139,12 +155,34 @@ async function outcome_of(
 	return await record(issue, request, verdict)
 }
 
+// A re-run reads its own earlier record as trusted evidence, so an Issue already carrying this scout's
+// Auto-decided comment is settled by it — no second judgment and no second comment.
+function recorded_before(
+	issue: string,
+	request: ReuseRequest,
+	sources: ReadSources,
+): ReuseOutcome | undefined {
+	const mark = scout_mark(request.keywords)
+	const prior = sources.find(
+		(source) => source.text.startsWith(AUTO_DECIDED_REUSE) && source.text.includes(mark),
+	)
+	if (prior === undefined) return undefined
+
+	return {
+		kind: 'recorded',
+		note: `${session_cite.issue(issue)} already records this reuse decision`,
+		url: prior.id,
+	}
+}
+
 async function check(request: ReuseRequest): Promise<ReuseOutcome> {
 	const issue = await target_issue(request.issue)
 	if (issue === undefined) return UNKNOWN
 	const read = await issue_sources.read_sources(issue)
 
 	if (read.kind !== 'sources') return unreadable(issue, read)
+	const prior = recorded_before(issue, request, read.sources)
+	if (prior !== undefined) return prior
 
 	const question = question_of(request.keywords)
 	const verdict = await answer_judge.judge({

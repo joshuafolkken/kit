@@ -81,6 +81,10 @@ describe('package_scout_cli.run — refusals', () => {
 		expect(console.error).toHaveBeenCalledWith(package_scout_cli.USAGE)
 		expect(fetch_spy).not.toHaveBeenCalled()
 	})
+
+	it('names the --issue flag in the usage it prints', () => {
+		expect(package_scout_cli.USAGE).toContain('[--issue <n>]')
+	})
 })
 
 // joshuafolkken/kit#6510: only a close pair reads the Issue, and a check that stopped fails the command.

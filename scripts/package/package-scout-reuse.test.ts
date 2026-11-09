@@ -8,7 +8,8 @@ import { package_scout_reuse, type ReuseRequest } from './package-scout-reuse'
 // joshuafolkken/kit#6510: the pkg:scout half of the shared judgment — which outcome each read, verdict
 // and write gives. The judgment is a fake here; `answer-judge.test.ts` covers its launch.
 
-const { read_mock, judge_mock, comment_mock, hold_mock } = vi.hoisted(() => ({
+const { read_mock, judge_mock, comment_mock, hold_mock, worktree_mock } = vi.hoisted(() => ({
+	worktree_mock: vi.fn<() => Promise<string | undefined>>(),
 	read_mock: vi.fn<(issue: string) => Promise<SourcesRead>>(),
 	judge_mock: vi.fn<(request: JudgeRequest) => Promise<AnswerVerdict>>(),
 	comment_mock: vi.fn<(issue: string, body: string) => Promise<string>>(),
@@ -21,7 +22,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({ git_gh_command: { issue_comment: 
 vi.mock('#scripts/run/hold/run-hold', () => ({
 	run_hold: {
 		UNNUMBERED_ISSUE: 'new',
-		worktree_directory: async (): Promise<string> => '/git/6510',
+		worktree_directory: worktree_mock,
 		hold_path: (directory: string): string => `${directory}/hold.json`,
 		read_hold: hold_mock,
 	},
@@ -70,6 +71,7 @@ beforeEach(() => {
 	judge_mock.mockReset().mockResolvedValue(answered(BODY, 'issue_sources.read_sources'))
 	comment_mock.mockReset().mockResolvedValue(URL)
 	hold_mock.mockReset().mockReturnValue({ kind: 'free' })
+	worktree_mock.mockReset().mockResolvedValue('/git/6510')
 })
 
 describe('package_scout_reuse.check — a reuse the Issue decides', () => {
@@ -113,6 +115,41 @@ describe('package_scout_reuse.check — a reuse the Issue decides', () => {
 	})
 })
 
+// The earlier record a re-run finds on the Issue, written by an earlier `check` for `keywords`.
+function prior_record(keywords: string): IssueSource {
+	const text = [
+		'Auto-decided: reuse existing code (x) over adding y because this Issue decides it —',
+		`\`pkg:scout ${keywords}\` ranked a close pair, so no dependency is added (Tier A).`,
+	].join(' ')
+
+	return { ...COMMENT, id: URL, text }
+}
+
+describe('package_scout_reuse.check — a re-run on an Issue it already recorded', () => {
+	it('settles on the earlier Auto-decided comment, with no second judgment or comment', async () => {
+		const sources = [BODY, prior_record(REQUEST.keywords)]
+
+		read_mock.mockResolvedValue({ kind: 'sources', sources, untrusted_count: 0 })
+
+		const outcome = await package_scout_reuse.check(REQUEST)
+
+		expect(outcome).toMatchObject({ kind: 'recorded', url: URL })
+		expect(judge_mock).not.toHaveBeenCalled()
+		expect(comment_mock).not.toHaveBeenCalled()
+	})
+
+	it('judges again when the earlier Auto-decided comment names other keywords', async () => {
+		const sources = [BODY, prior_record('other')]
+
+		read_mock.mockResolvedValue({ kind: 'sources', sources, untrusted_count: 0 })
+
+		await package_scout_reuse.check(REQUEST)
+
+		expect(judge_mock).toHaveBeenCalledOnce()
+		expect(comment_mock).toHaveBeenCalledOnce()
+	})
+})
+
 describe('package_scout_reuse.check — no decision keeps the question', () => {
 	it.each<[string, AnswerVerdict]>([
 		['an unanswered verdict', { kind: 'unanswered', reason: 'only background' }],
@@ -139,6 +176,15 @@ describe('package_scout_reuse.check — each stop is its own outcome', () => {
 
 		expect(outcome.kind).toBe('unknown')
 		expect(package_scout_reuse.is_failure(outcome)).toBe(false)
+		expect(read_mock).not.toHaveBeenCalled()
+	})
+
+	it('reads a failed work-tree lookup with no --issue as an unknown target, not a throw', async () => {
+		worktree_mock.mockRejectedValue(new Error('not a git repository'))
+
+		const outcome = await package_scout_reuse.check({ ...REQUEST, issue: undefined })
+
+		expect(outcome.kind).toBe('unknown')
 		expect(read_mock).not.toHaveBeenCalled()
 	})
 
