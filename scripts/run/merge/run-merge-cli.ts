@@ -184,7 +184,7 @@ interface OfferVerdict {
 	is_offer: true
 }
 
-type MergeVerdict = ControlVerdict | OfferVerdict
+type MergeVerdict = (ControlVerdict | OfferVerdict) & { is_parked?: boolean | undefined }
 
 // The verdict together with the outcome it was handled as, which the token alone does not carry — a
 // merged, a parked and a failed child all answer with the next offer.
@@ -285,7 +285,7 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 		return emit(MERGE_TOKEN.STOP, SUCCESS_EXIT_CODE)
 	}
 
-	return await offered(ctx)
+	return { ...(await offered(ctx)), is_parked: true }
 }
 
 async function on_failed(ctx: MergeContext, cause?: StallCause): Promise<MergeVerdict> {

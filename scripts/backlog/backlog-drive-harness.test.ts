@@ -133,13 +133,13 @@ it('dispatches and merges every child, then reports and ends', async () => {
 	])
 })
 
-it('records a parked child and continues to the next child', async () => {
+it('hands a parked child back for parent triage before starting the next child', async () => {
 	const fixture = world([FIRST, SECOND], [FIRST])
 	const end = await backlog_drive.run_loop(initial(), NO_WINDOW, ports(fixture))
 
-	expect(end.reason).toBe('stop')
-	expect(fixture.calls).toContain(`launch ${SECOND}`)
-	expect(fixture.merged).toBe(1)
+	expect(end.reason).toBe('triage')
+	expect(fixture.calls).not.toContain(`launch ${SECOND}`)
+	expect(fixture.merged).toBe(0)
 })
 
 it('restores only this invocation’s active lane after a kill', async () => {

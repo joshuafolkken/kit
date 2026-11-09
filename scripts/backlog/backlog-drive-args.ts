@@ -22,6 +22,7 @@ const OPTIONS = {
 	only: { type: 'boolean' },
 	owner: { type: 'string' },
 	stopped: { type: 'string' },
+	'triage-owed': { type: 'boolean' },
 	window: { type: 'string' },
 } as const
 
@@ -37,9 +38,15 @@ interface DriveContext {
 	is_only: boolean
 	// The child whose merge answered `stop` before the hand-back: the resumed run starts already stopping.
 	stopped: string | undefined
+	is_triage_owed?: boolean
 }
 
-type Values = Partial<Record<Exclude<keyof typeof OPTIONS, 'only'>, string>> & { only?: boolean }
+type Values = Partial<Record<Exclude<keyof typeof OPTIONS, 'only' | 'triage-owed'>, string>> &
+	Partial<Record<'only' | 'triage-owed', boolean>>
+
+function triage_flag(is_owed: boolean | undefined): Pick<DriveContext, 'is_triage_owed'> {
+	return is_owed ? { is_triage_owed: true } : {}
+}
 
 function read_values(argv: ReadonlyArray<string>): Values | undefined {
 	return cli_flags.parse_or_undefined({ args: [...argv], options: OPTIONS, strict: true })?.values
@@ -106,6 +113,7 @@ function to_context(values: Values, owner: string): DriveContext | undefined {
 		window: values.window,
 		is_only: values.only === true,
 		stopped: values.stopped,
+		...triage_flag(values['triage-owed']),
 	}
 }
 
@@ -123,6 +131,7 @@ function resume_line(state: DriveState, context: DriveContext): string {
 	if (exclude.length > 0) flags.push('--exclude', exclude.join(LIST_SEPARATOR))
 	if (context.window !== undefined) flags.push('--window', context.window)
 	if (state.stopped_by !== undefined) flags.push('--stopped', state.stopped_by)
+	if (state.is_triage_owed) flags.push('--triage-owed')
 
 	return `resume: ${flags.join(' ')}`
 }
