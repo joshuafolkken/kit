@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import type { IssueComment } from '#scripts/issue/issue-read'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const root_mock = vi.hoisted(() => vi.fn(async (): Promise<string> => ''))
 const comment_mock = vi.hoisted(() => vi.fn(async (): Promise<string> => ''))
@@ -30,7 +30,7 @@ const RANGE = {
 }
 
 const REASON = 'one --adopt path'
-const root = mkdtempSync(path.join(tmpdir(), 'triage-approval-'))
+const root = temporary_directory('suite')('triage-approval-')
 
 beforeEach(() => {
 	root_mock.mockResolvedValue(root)
@@ -40,10 +40,6 @@ beforeEach(() => {
 
 afterEach(() => {
 	rmSync(path.join(root, '.josh'), { recursive: true, force: true })
-})
-
-afterAll(() => {
-	rmSync(root, { recursive: true, force: true })
 })
 
 function comment(body: string, is_trusted: boolean): IssueComment {

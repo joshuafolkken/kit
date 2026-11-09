@@ -84,6 +84,19 @@ When tests leave persistent state behind:
 - **Mock the whole read**: a stub of one call leaving a second on its default still passes, slowly and against the remote (joshuafolkken/kit#1353: a 10-second CI timeout).
 - kit's `vitest.config.ts` fails such a run, listing the `gh` invocations (`docs/josh-commands.md` → `josh test:unit`); elsewhere the rule holds unguarded.
 
+### What not to test (テストしないもの)
+
+Writing an assertion → it must check behavior the code computes. Skip it when it only restates:
+
+- a re-export existing (barrel, `index.ts`)
+- raw text of a document or config — test the code that reads it
+- a mock's echo — a stub returning what the test set, or called with what the test passed through
+- a source literal re-typed into the test — import it, or assert what it drives
+
+### Use the shared test helpers (kit only)
+
+Creating a temp directory, a fixture file or an execa stub in a test → `#tools/test/temporary-directory`, `#tools/test/write-file`, `#tools/test/execa-result`. `mkdtempSync` and `vi.clearAllMocks()` in `beforeEach` are lint errors (`eslint/rules/test-helper-bans.js`).
+
 ### A josh command that writes state runs through the integration harness (kit only)
 
 - A new or changed state-writing josh command needs a test in all three environments of `tools/test/josh-harness.ts` — kit, a consumer without `docs/`, a lane worktree (joshuafolkken/kit#2402). Packed suite: `vitest.harness.config.ts`
