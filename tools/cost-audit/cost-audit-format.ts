@@ -17,6 +17,8 @@ const FILING_PREFIX = 'File a cost regression: '
 const FILING_ROW_SEPARATOR = ', '
 const FILING_SUFFIX = ' — reproduce with `pnpm josh cost:audit`'
 // Each row's model lines follow it, indented: the same four token types in dollars.
+const KIND_TITLE =
+	'By session kind (this period per model: cost — input / cache read / cache write / output in dollars)'
 const PHASE_TITLE =
 	'Lane children by phase (this period: cost — billed input / cache read / cache write / output tokens; per model in dollars)'
 const AGENT_TITLE =
@@ -45,7 +47,7 @@ function row_line(row: AuditRow): string {
 
 function sections_of(audit: Audit): Array<AuditSection> {
 	return [
-		{ name: 'kind', title: 'By session kind', rows: audit.kinds },
+		{ name: 'kind', title: KIND_TITLE, rows: audit.kinds },
 		{ name: 'tool', title: 'By tool category', rows: audit.tools },
 		{ name: 'guard', title: 'By guard (refusal and Stop round trips)', rows: audit.guards },
 	]
@@ -146,8 +148,14 @@ function phase_lines(audit: Audit): Array<string> {
 	]
 }
 
+// A row and, on the kind rows, its current-period model lines.
+function row_lines(row: AuditRow): Array<string> {
+	return [row_line(row), ...(row.models ?? []).map((spend) => spend_line(spend))]
+}
+
 function section_lines(section: AuditSection): Array<string> {
-	const body = section.rows.length === 0 ? ['  none'] : section.rows.map((row) => row_line(row))
+	const body =
+		section.rows.length === 0 ? ['  none'] : section.rows.flatMap((row) => row_lines(row))
 
 	return ['', section.title, ...body]
 }

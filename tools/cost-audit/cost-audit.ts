@@ -6,6 +6,7 @@ import { cost_audit_density, type Density } from './cost-audit-density'
 import { cost_audit_phase, type PhaseRow } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
+import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import { cost_audit_tool } from './cost-audit-tool'
 
 // The aggregation half of `josh cost:audit`: one period's cost broken down by session kind, tool
@@ -40,6 +41,8 @@ interface AuditRow {
 	current: number
 	previous: number
 	is_regression: boolean
+	// The current period's spend per model, on the session-kind rows (joshuafolkken/kit#6913).
+	models?: ReadonlyArray<ModelSpend>
 }
 
 interface LaneDensity {
@@ -169,6 +172,30 @@ function rewrites_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWin
 	return cost_audit_rewrite.rewrites_in(sessions, (at_ms) => is_inside(at_ms, window))
 }
 
+function records_by_kind(sessions: ReadonlyArray<AuditSession>): Map<string, Array<UsageRecord>> {
+	const records = new Map<string, Array<UsageRecord>>()
+
+	for (const session of sessions) {
+		records.set(session.kind, [...(records.get(session.kind) ?? []), ...session.records])
+	}
+
+	return records
+}
+
+// The kind rows, each carrying its current-period requests' spend per model and token type.
+function kind_rows(
+	current: PeriodCost,
+	previous: PeriodCost,
+	cut: ReadonlyArray<AuditSession>,
+): Array<AuditRow> {
+	const records = records_by_kind(cut)
+
+	return rows_of(current.kinds, previous.kinds).map((kind) => ({
+		...kind,
+		models: cost_audit_spend.spend_of(records.get(kind.key) ?? []),
+	}))
+}
+
 function phases_inside(input: AuditInput, window: AuditWindow): Array<PhaseRow> {
 	const breakdowns = input.breakdowns ?? new Map<number, Breakdown>()
 
@@ -193,7 +220,7 @@ function audit(input: AuditInput): Audit {
 		total: row('total', current.total, previous.total),
 		merges: input.merges,
 		per_merge: per_merge(current, previous, input.merges),
-		kinds: rows_of(current.kinds, previous.kinds),
+		kinds: kind_rows(current, previous, inside(input.sessions, current_window)),
 		tools: rows_of(current.tools, previous.tools),
 		guards: rows_of(current.guards, previous.guards),
 		rewrites: {
