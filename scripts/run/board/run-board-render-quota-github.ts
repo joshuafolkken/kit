@@ -7,7 +7,7 @@ import { run_board_render_quota_cell, type Cell } from './run-board-render-quota
 
 // The `⛽ usage` section's github row (joshuafolkken/kit#6559, joshuafolkken/kit#6822): GitHub's REST
 // core allowance and its GraphQL one, each with its own limit and reset, as two gauges on one row in
-// the usage rows' columns, each with what is left — `rest   4% ■──┊── 4787     10:55  ▶graphql   1%
+// the usage rows' columns, each with what is left — `REST   4% ■──┊── 4787     10:55  ▶ GraphQL   1%
 // ┊──── 4952     11:02` (joshuafolkken/kit#6828). ▶ marks the transport the session reads through.
 // ▶ (U+25B6) is kept although some terminals draw it two columns wide: the board's ↻, ┊ and ■ are
 // ambiguous-width already, so a `>` fallback would mend one symbol of four.
@@ -21,6 +21,8 @@ const RESET_MARK = '↻'
 const TRANSPORT_MARK = '▶'
 const SEPARATOR = ' · '
 const LEGEND_ENTRY = `${TRANSPORT_MARK} transport`
+// The transports' names as drawn, in their proper case; the keys stay lower case.
+const TRANSPORT_NAMES: Readonly<Record<Transport, string>> = { rest: 'REST', graphql: 'GraphQL' }
 
 // The allowances with the session's transport; no transport where it could not be read.
 interface GithubRateLimit extends RateLimitResources {
@@ -38,7 +40,9 @@ interface Allowance {
 }
 
 function label_of(resource: Transport, transport: Transport | undefined): string {
-	return resource === transport ? `${TRANSPORT_MARK}${resource}` : resource
+	const name = TRANSPORT_NAMES[resource]
+
+	return resource === transport ? `${TRANSPORT_MARK} ${name}` : name
 }
 
 // How far through the hour-long window the clock is, 0 to 1.
@@ -81,14 +85,14 @@ function cell_of({ label, used_percent, pace, left, reset }: Allowance): Cell {
 	return { label, used_percent, pace, count: String(left), reset }
 }
 
-// `rest   4% ■──┊── 4787     10:55  ▶graphql …`: the row after the github name.
+// `REST   4% ■──┊── 4787     10:55  ▶ GraphQL …`: the row after the GitHub name.
 function row_text(github: GithubRateLimit, now_ms: number): string {
 	const allowances = allowances_of(github, now_ms)
 
 	return run_board_render_quota_cell.row_text(allowances.map((allowance) => cell_of(allowance)))
 }
 
-// `rest 4% 213/5000 ↻10:55 · ▶graphql 1% 48/5000 ↻11:02`: the folded line's github part.
+// `REST 4% 213/5000 ↻10:55 · ▶ GraphQL 1% 48/5000 ↻11:02`: the folded line's GitHub part.
 function summary_text(github: GithubRateLimit, now_ms: number): string {
 	return allowances_of(github, now_ms)
 		.map(({ label, used_percent, spent, reset }) =>
