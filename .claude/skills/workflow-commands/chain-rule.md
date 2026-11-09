@@ -40,7 +40,7 @@ Review results and successful pushes are never turn boundaries.
    `followup` → `run:tail`, stopping at the first failure. With a due round 2, use `ship --review`:
    after sync and round 1, round 2 runs beside the gate and joins before the commit opens the PR.
 
-A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
+A lane child session ends at step 0, a pre-gate cut (`pre-gate-cut.md`) or a review-fix cut; never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
 `run:tail` returned to the default branch, or when user judgment is required by an unverifiable
 CodeRabbit/Claude Review finding or a CI failure. In a lane the parent closes it. Managed config claims are reported by `followup` and do not stop the merge.
 
@@ -51,7 +51,7 @@ Recommendations are informational; severity decides. A CodeRabbit rate-limit war
 0. **A lane child** (no `main:merge`: ship's sync merges main, stopping `conflict`): the self-check (`prompts/review.md` → "Before round 1 —
    the implementer's self-check"; 1: `--join`'s `test:pinned`, 2/4/10: `review:selfcheck`), `pnpm josh run:chain <N>` (a metrics notice → its verdict line) —
    the ship body draft's rows a green `test:related` left pending filled in beside the gate (`report-format.md` → "PR
-   本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --from-slot --interaction --issue <N>` before the join that ships — not backgrounded — a turn end kills it — then `pnpm josh run:chain <N> --join --ship "<title> #<N>"` (step 2; clean records and ships with `--detach --review`; every finding holds before recording or shipping), the
+   本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --from-slot --interaction --issue <N>` before the join that ships — not backgrounded — a turn end kills it — then `pnpm josh run:chain <N> --join --ship "<title> #<N>"` (step 2; clean records and ships with `--detach --review`; every finding holds before recording or shipping, fixed in a fresh session: the hold's `run:cut --impl`), the
    round's fixes, no `check:related` after them unless a brief follows (one before `--join` is refused, `round-one-check-related`), on a held finding `pnpm josh review:record --from-slot --issue <N>` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; a `lane:plan` widened after round 1 → the ship, whose `--review` reads the widened files (`review-lane-handover.ts`); on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
    only after that hold is settled; use plain `--join` then this ship when additional ship options are needed
    (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it; `timeout` 600000 for either shipping call). On either shipping path, `launched` runs
