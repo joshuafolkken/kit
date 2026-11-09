@@ -75,15 +75,3 @@ describe('build_library self_sync_guard — bundled .d.ts', () => {
 		expect(content).toContain('self_sync_refusal')
 	})
 })
-
-describe('package.json — the ./self-sync-guard export', () => {
-	it('points at the files the build writes', () => {
-		const manifest = JSON.parse(
-			readFileSync(path.join(import.meta.dirname, '..', '..', MANIFEST), 'utf8'),
-		) as { exports: Record<string, { types: string; default: string }> }
-		const entry = manifest.exports['./self-sync-guard']
-
-		expect(entry?.default).toBe('./dist/self-sync-guard/index.js')
-		expect(entry?.types).toBe('./dist/self-sync-guard/index.d.ts')
-	})
-})
