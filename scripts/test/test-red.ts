@@ -74,7 +74,8 @@ async function prepare_outputs(parent: string, outputs: ReadonlyArray<string>): 
 // The run is detached so its pid leads a process group holding vitest and its fork workers: a worker
 // spinning in a test never answers its parent, so only signalling the whole group stops it. A detached
 // run sits outside its caller's group and execa's exit cleanup, so every group still running is killed
-// when this process exits — a stopped `test:pinned` ends through `process.exit` (`base-tree.ts`).
+// when this process exits — a `test:pinned` or `test:red` stopped by SIGTERM, SIGINT or SIGHUP ends
+// through `process.exit` (`base-tree.ts`).
 const live_groups = new Set<number | undefined>()
 
 function kill_group(pid: number | undefined): void {

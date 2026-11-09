@@ -213,7 +213,8 @@ describe('test_red.run when nothing runs', () => {
 
 // joshuafolkken/kit#6814: a test file spinning in a fork worker never lets vitest write its report,
 // so the probe's own timeout kills the run and names the file instead of leaving it to the harness cap.
-const PROBE_TIMEOUT = 8000
+// Room for vitest to start and finish the passing file on a loaded machine, still inside `SPIN_MS`.
+const PROBE_TIMEOUT = 15_000
 const SPIN_FILE = 'spins.test.ts'
 const PROGRESS_FILE = 'progress.log'
 const PASS_FILE = 'passes.test.ts'
