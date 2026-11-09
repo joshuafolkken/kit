@@ -46,7 +46,7 @@ function record_name(common: string, issue: string): string {
 	)
 }
 
-// The issue's record in `state_root`, or nothing when it is missing, unreadable or not a record.
+// The record at `source`, or nothing when it is missing, unreadable or not a record.
 function read_record_file(source: string): LaneStateRecord | undefined {
 	const raw = stamp_file.read_stamp_text(source)
 

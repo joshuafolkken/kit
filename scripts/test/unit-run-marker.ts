@@ -155,8 +155,14 @@ function is_idle_lane(lanes_root: string, issue: string, environment: LaneEnviro
 	return lane_state_record.is_idle(state_root, common, issue)
 }
 
+// The lane `checkout` sits in, if any: it is about to open a suite, whatever its record says.
+function own_lane(checkout: string, environment: LaneEnvironment): string | undefined {
+	return lane_paths.lane_issue_of(lane_paths.checkout_of(path.resolve(checkout)), environment)
+}
+
 // The lanes open on this machine: the issue-number directories under the lanes root `checkout`
-// belongs to (joshuafolkken/kit#6682), less those whose lane-state record says they are idle. A stray
+// belongs to (joshuafolkken/kit#6682), less those whose lane-state record says they are idle — never
+// the asking lane itself, which a person may gate while its record still says `human-review`. A stray
 // directory or one with no record is still counted, an upper bound. **Unreadable counts none**, which
 // leaves the division to the run count as it was — a lanes root that does not exist, as on CI, among them.
 function live_lane_count(
@@ -165,11 +171,13 @@ function live_lane_count(
 ): number {
 	try {
 		const lanes_root = lane_paths.lanes_root_of(checkout, environment)
+		const own = own_lane(checkout, environment)
 		const issues = readdirSync(lanes_root).filter((name) =>
 			issue_number_shape.ISSUE_NUMBER_PATTERN.test(name),
 		)
 
-		return issues.filter((issue) => !is_idle_lane(lanes_root, issue, environment)).length
+		return issues.filter((issue) => issue === own || !is_idle_lane(lanes_root, issue, environment))
+			.length
 	} catch {
 		return 0
 	}

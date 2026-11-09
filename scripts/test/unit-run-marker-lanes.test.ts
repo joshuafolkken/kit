@@ -99,3 +99,16 @@ describe('unit_run_marker.live_lane_count — lane-state records', () => {
 		expect(unit_run_marker.live_lane_count(checkout, { JOSH_TEMP_ROOT: override })).toBe(0)
 	})
 })
+
+describe('unit_run_marker.live_lane_count — the asking lane', () => {
+	it('counts the lane it is asked from whatever its record says', () => {
+		const { common } = linked_lanes([FIRST, SECOND])
+		const inside = path.join(path.dirname(path.dirname(common)), LANES_ROOT, FIRST)
+		const idle = record_of(FIRST, lane_state_record.HUMAN_REVIEW)
+
+		write_record(run_state(common), common, FIRST, idle)
+		write_record(run_state(common), common, SECOND, record_of(SECOND, 'ended'))
+
+		expect(unit_run_marker.live_lane_count(inside, {})).toBe(1)
+	})
+})
