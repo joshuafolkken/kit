@@ -6,6 +6,7 @@ import type { LaunchRequest } from '#scripts/run/detached-launch'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_handoff_cli, type HandoffPorts } from './run-handoff-cli'
+import { run_handoff_retrospective } from './run-handoff-retrospective'
 
 const make_directory = temporary_directory('suite')
 
@@ -54,6 +55,7 @@ function fake(overrides: Partial<HandoffPorts> = {}): Fake {
 			return { kind: 'completed', pid: PID, exit_code: 0 }
 		},
 		backlogrun,
+		is_retrospective_done: () => true,
 		write: (line) => {
 			lines.push(line)
 		},
@@ -147,6 +149,54 @@ describe('run_handoff_cli.run', () => {
 	})
 })
 
+// The carry as read before the launch and then after the unit ends.
+function marks_of(before: boolean, after: boolean): () => boolean {
+	const reads = [before, after]
+
+	return () => reads.shift() ?? after
+}
+
+// joshuafolkken/kit#6743: the retrospective unit is waited for and judged by its carry mark.
+describe('run_handoff_cli.run retrospective', () => {
+	it('hands the unit the generated brief and exits 0 once the carry marks it', async () => {
+		const { ports, requests } = fake({ is_retrospective_done: marks_of(false, true) })
+		const code = await run_handoff_cli.run(['retrospective'], ports)
+
+		expect(code).toBe(0)
+		expect(requests[0]?.profile).toMatchObject({ role: 'scheduler' })
+		expect(JSON.stringify(requests[0]?.argv)).toContain(run_handoff_retrospective.DIGEST_COMMAND)
+	})
+
+	it('names the calling session as the close owner, since the carry is its record', async () => {
+		const { ports, requests } = fake({
+			environment: { ...CLAUDE_SESSION, CLAUDE_PID: '777' },
+			is_retrospective_done: marks_of(false, true),
+		})
+
+		await run_handoff_cli.run(['retrospective'], ports)
+
+		expect(JSON.stringify(requests[0]?.argv)).toContain(
+			`${run_handoff_retrospective.CLOSE_COMMAND} ${run_handoff_retrospective.OWNER_FLAG} 777`,
+		)
+	})
+
+	it('exits 1 when the unit ended cleanly without the carry mark', async () => {
+		const { ports, lines } = fake({ is_retrospective_done: marks_of(false, false) })
+		const code = await run_handoff_cli.run(['retrospective'], ports)
+
+		expect(code).toBe(1)
+		expect(lines.at(-1)).toContain('without run:carry --retrospective')
+	})
+
+	it('refuses without starting a unit when the carry is already marked', async () => {
+		const { ports, lines, requests } = fake()
+		const code = await run_handoff_cli.run(['retrospective'], ports)
+
+		expect([code, requests]).toEqual([1, []])
+		expect(lines.at(-1)).toContain('already marks the retrospective')
+	})
+})
+
 describe('run_handoff_cli.run backlogrun', () => {
 	it('hands backlogrun on with the main session provider as --agent', async () => {
 		const { ports, backlogrun } = fake({ environment: { CODEX_THREAD_ID: 'thread' } })
@@ -214,6 +264,15 @@ describe('run_handoff_cli.run refusals', () => {
 		expect(lines.at(-1)).toMatch(/^run:handoff: /u)
 		expect(lines.some((line) => line.startsWith('log: '))).toBe(why === FAILED_START)
 		expect(requests).toEqual([])
+	})
+
+	// joshuafolkken/kit#6743: the usage a bad argument prints names the retrospective keyword too.
+	it('names retrospective in the usage it prints for a bad argument', async () => {
+		const { ports, lines } = fake()
+
+		await run_handoff_cli.run(['unknown'], ports)
+
+		expect(lines.at(-1)).toContain('| retrospective |')
 	})
 
 	// joshuafolkken/kit#6056: the brief read is `cli_body`'s, so a brief in the work tree is refused.
