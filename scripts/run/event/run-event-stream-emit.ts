@@ -63,32 +63,43 @@ async function ending_fields(
  * of an ending — `emit` and `run:event --append` — appends through here, so the time is computed once,
  * as the ending is written, with the board's own count.
  */
-async function append_at(
+async function append_with(
 	target: string,
-	kind: string,
-	text: string,
-	at: Date,
+	event: Omit<RunEvent, 'pos' | 'elapsed_ms'>,
 ): Promise<AppendResult> {
-	const event = { kind, text, at: at.toISOString() }
-
 	return run_event_stream.append_event(target, {
 		...event,
 		...(await ending_fields(target, event)),
 	})
 }
 
+async function append_at(
+	target: string,
+	kind: string,
+	text: string,
+	at: Date,
+): Promise<AppendResult> {
+	return await append_with(target, { kind, text, at: at.toISOString() })
+}
+
 /**
  * Append one session-facing event, best-effort. A kind outside the enumeration is refused by `append`;
  * every error is swallowed, because the reporting path must never fail the work it reports on.
- * `at` is the caller's instant where another record must carry the same one.
+ * `at` is the caller's instant where another record must carry the same one; `fields` the event's
+ * structured fields beside its text — a park's ship stop.
  */
-async function emit(kind: string, text: string, at: Date = new Date()): Promise<void> {
+async function emit(
+	kind: string,
+	text: string,
+	at: Date = new Date(),
+	fields: Pick<RunEvent, 'stop'> = {},
+): Promise<void> {
 	try {
 		const target = await stream_target()
 
 		if (target === undefined) return
 
-		await append_at(target, kind, text, at)
+		await append_with(target, { ...fields, kind, text, at: at.toISOString() })
 	} catch {
 		// Reporting is best-effort: a failed append is dropped rather than raised into the caller's work.
 	}

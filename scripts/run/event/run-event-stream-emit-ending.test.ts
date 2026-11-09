@@ -24,6 +24,7 @@ const TEMPORARY = make_directory('josh-run-event-ending-')
 const LAUNCHED_AT = new Date('2026-10-22T07:09:38.000Z')
 const ENDED_AT = new Date('2026-10-22T07:17:30.000Z')
 const MERGED_TEXT = '#4430 merged'
+const PARKED_TEXT = '#4430 parked'
 const IN_LANE_MS = ENDED_AT.getTime() - LAUNCHED_AT.getTime()
 const RECORD = {
 	issue: '4430',
@@ -98,8 +99,18 @@ describe('run_event_stream_emit -- an ending with no time, or appended by hand',
 
 	it('records nothing for a child with no lane record', async () => {
 		read_state_mock.mockResolvedValue(undefined)
-		await run_event_stream_emit.emit(KIND.PARK, '#4430 parked', ENDED_AT)
+		await run_event_stream_emit.emit(KIND.PARK, PARKED_TEXT, ENDED_AT)
 
 		expect(await newest_event()).not.toHaveProperty('elapsed_ms')
+	})
+
+	// joshuafolkken/kit#6864: a park's ship stop rides on the event `emit` writes.
+	it('writes the fields it is given beside the text', async () => {
+		read_state_mock.mockResolvedValue(undefined)
+		const stop = { stage: 'followup', cause: 'check' }
+
+		await run_event_stream_emit.emit(KIND.PARK, PARKED_TEXT, ENDED_AT, { stop })
+
+		expect(await newest_event()).toMatchObject({ kind: KIND.PARK, text: PARKED_TEXT, stop })
 	})
 })
