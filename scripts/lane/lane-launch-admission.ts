@@ -3,11 +3,11 @@ import { core_wait } from '#scripts/gate/core-wait'
 import type { LaunchContext, LaunchOutcome } from './lane-launch-cli'
 import { lane_paths } from './lane-paths'
 
-// Reserve the per-process RSS median for the parent and its reviewer / investigator children
-// before any of them starts (joshuafolkken/kit#5409, #6229).
-const PROCESS_MEMORY_MB = 270
-const CHILD_PROCESSES = 2
-const LANE_MEMORY_MB = PROCESS_MEMORY_MB * (1 + CHILD_PROCESSES)
+// Reserve one lane's share of the claude RSS peak `lane:stats` measured once the gate
+// reservations were honest (#6684): the peak summed over every claude process, divided by the
+// effective lanes plus the driver session. Reviewer / investigator subagents run inside the
+// parent process, so that sum already holds them (joshuafolkken/kit#5409, #6229, #6685).
+const LANE_MEMORY_MB = 470
 
 function checkout_of(issue: string): string {
 	const cwd = process.cwd()

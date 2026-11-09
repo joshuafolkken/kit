@@ -12,8 +12,7 @@ const make_directory = temporary_directory()
 const CONTEXT: LaunchContext = { issue: '17', stash: undefined }
 const LAUNCHED: LaunchOutcome = { kind: 'launched', pid: String(process.pid) }
 const WAIT_MS = 200_000
-const PARENT_MEMORY_MB = 270
-const MEMORY_MB = 810
+const MEMORY_MB = 470
 const { reserve } = core_budget
 const LAUNCH_COMMAND = 'lane:launch'
 const HELD_ERROR = 'still held'
@@ -77,9 +76,9 @@ async function launches_after_memory_recovers(): Promise<void> {
 }
 
 describe('lane_launch_admission.launch — memory admission', () => {
-	it('reserves the parent and both child agents before launching', async () => {
+	it('reserves the measured per-lane claude share and holds the launch one megabyte short of it', async () => {
 		stub_machine(
-			async () => ({ available_mb: PARENT_MEMORY_MB, busy_cores: 0 }),
+			async () => ({ available_mb: MEMORY_MB - 1, busy_cores: 0 }),
 			async () => {
 				throw new Error(HELD_ERROR)
 			},
