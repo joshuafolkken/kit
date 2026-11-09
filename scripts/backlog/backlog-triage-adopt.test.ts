@@ -89,7 +89,6 @@ async function adopt(option = '1'): Promise<number> {
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
 	order.length = 0
 	requeue.code = 0
 	carry.kind = 'carried'

@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { AgentEventState } from '#scripts/agent/agent-event'
 import type { LaneInfo } from '#scripts/lane/lane-registry'
 import { run_liveness } from '#scripts/run/run-liveness'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { temporary_directory } from '#tools/test/temporary-directory'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_lane_result } from './run-board-lane-result'
 
 // joshuafolkken/kit#6577: the board reads each open lane's transcript every second, so it parses one
@@ -20,7 +20,7 @@ const STATE: AgentEventState = {
 	reason: undefined,
 	usage: undefined,
 }
-const DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-result-'))
+const DIRECTORY = temporary_directory('suite')('lane-result-')
 
 function lane_of(output: string | undefined): LaneInfo {
 	return {
@@ -37,10 +37,6 @@ function lane_of(output: string | undefined): LaneInfo {
 
 afterEach(() => {
 	vi.restoreAllMocks()
-})
-
-afterAll(() => {
-	rmSync(DIRECTORY, { recursive: true, force: true })
 })
 
 describe('run_board_lane_result.results_of', () => {
