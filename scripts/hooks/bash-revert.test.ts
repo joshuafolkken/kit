@@ -10,9 +10,11 @@ import { pretool_guard } from './pretool-guard'
 
 const ORIGINAL = 'export const value = 1\n'
 const WRITTEN = 'export const value = 2\n'
+const SHELL_WRITTEN = 'export const value = 3\n'
 const APP = 'src/app.ts'
 const CREATED = 'src/new.ts'
 const SCRATCH = '.josh/tmp/plan.json'
+const BEFORE_CALL = '.josh/tmp/bash-revert/before-call'
 const OBSERVATION = '.josh/observations/2026-11-07.json'
 const DOC = 'docs/guide.md'
 const TRANSCRIPT = 'transcript.jsonl'
@@ -113,6 +115,62 @@ describe('bash_revert reverting a consultation shell', () => {
 	})
 })
 
+describe('bash_revert restoring a runtime file dirty before the call', () => {
+	it('puts the shell write back to the content before the call, not HEAD', () => {
+		write(APP, WRITTEN)
+		stamp()
+		write(APP, SHELL_WRITTEN)
+
+		const reason = String(JSON.parse(revert() ?? '{}').reason)
+		const backup = /(\.josh\/tmp\/bash-revert\/\S+)\/\./u.exec(reason)?.[1] ?? ''
+
+		expect(reason).toContain(`Restored to their content before the call: ${APP}.`)
+		expect(reason).not.toContain('Reverted:')
+		expect(read(APP)).toBe(WRITTEN)
+		expect(read(path.join(backup, APP))).toBe(SHELL_WRITTEN)
+	})
+
+	it('restores the edit a shell discarded by resetting the file to HEAD', () => {
+		write(APP, WRITTEN)
+		stamp()
+		write(APP, ORIGINAL)
+
+		expect(revert()).toContain(`Restored to their content before the call: ${APP}.`)
+		expect(read(APP)).toBe(WRITTEN)
+	})
+
+	it('removes again a file absent before the call that the shell recreated', () => {
+		rmSync(in_workspace(APP))
+		stamp()
+		write(APP, SHELL_WRITTEN)
+
+		expect(revert()).toContain(`Restored to their content before the call: ${APP}.`)
+		expect(existsSync(in_workspace(APP))).toBe(false)
+	})
+})
+
+describe('bash_revert without the content a dirty file had before the call', () => {
+	it('names a dirty runtime file whose saved content no longer matches its stamp', () => {
+		write(APP, WRITTEN)
+		stamp()
+		rmSync(in_workspace(BEFORE_CALL), { recursive: true, force: true })
+		write(APP, SHELL_WRITTEN)
+
+		expect(revert()).toContain(`kept as dirty before the call: ${APP}`)
+		expect(read(APP)).toBe(SHELL_WRITTEN)
+	})
+
+	it('judges the call by its own stamp when saving the dirty content fails', () => {
+		stamp()
+		write(APP, WRITTEN)
+		write(BEFORE_CALL, '')
+		stamp()
+
+		expect(revert()).toBeUndefined()
+		expect(read(APP)).toBe(WRITTEN)
+	})
+})
+
 describe('bash_revert leaving a consultation shell alone', () => {
 	it('keeps a runtime file that was already dirty and the shell left alone', () => {
 		write(APP, WRITTEN)
@@ -122,16 +180,15 @@ describe('bash_revert leaving a consultation shell alone', () => {
 		expect(read(APP)).toBe(WRITTEN)
 	})
 
-	it('names a runtime file dirty before the call without discarding its edit', () => {
+	it('keeps a dirty runtime file the shell left alone while restoring one it wrote', () => {
 		write(APP, WRITTEN)
+		write(CREATED, ORIGINAL)
 		stamp()
-		write(APP, ORIGINAL.replace('1', '3'))
+		write(CREATED, WRITTEN)
 
-		const envelope = revert() ?? ''
-
-		expect(JSON.parse(envelope)).toMatchObject({ decision: 'block' })
-		expect(envelope).toContain(`kept as dirty before the call: ${APP}`)
-		expect(read(APP)).toBe(ORIGINAL.replace('1', '3'))
+		expect(revert()).toContain(`Restored to their content before the call: ${CREATED}.`)
+		expect(read(APP)).toBe(WRITTEN)
+		expect(read(CREATED)).toBe(ORIGINAL)
 	})
 
 	it('leaves writes under .josh/ and to docs in place', () => {
