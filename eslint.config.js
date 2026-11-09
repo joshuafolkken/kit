@@ -63,7 +63,10 @@ export default [
 	// still reports the rename instruction.
 	{
 		files: TEST_HELPER_BAN_PATTERNS,
-		rules: TEST_HELPER_BAN_ENTRIES.reduce(extend_restricted_syntax, code_quality_rules),
+		rules: TEST_HELPER_BAN_ENTRIES.reduce(
+			(rules, entry) => extend_restricted_syntax(rules, entry),
+			code_quality_rules,
+		),
 	},
 	// joshuafolkken/kit#1233: `create_base_config` above wires the test-filename bans in, and the two
 	// blocks before this one switch `no-restricted-syntax` off wholesale — for the export-convention
