@@ -69,21 +69,22 @@ An exported value takes precedence over `.env`; `--agent claude|codex` takes pre
 
 Detached launchers also hand this variable to processes without an agent session. A detected session keeps determining its own provider.
 
-| Variable                            | Required | Default                                            | Used when                                                                  |
-| ----------------------------------- | -------- | -------------------------------------------------- | -------------------------------------------------------------------------- |
-| `JOSH_AGENT_PROVIDER`               | No       | `anthropic`                                        | The default provider for a new `josh backlogrun`: `anthropic` or `openai`. |
-| `JOSH_SCHEDULER_MODEL`              | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.                             |
-| `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch.                            |
-| `JOSH_WORKER_MODEL`                 | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue, outside the ship phase.   |
-| `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.                          |
-| `JOSH_WORKER_SHIP_MODEL`            | No       | `claude-sonnet-5-5`                                | The model a lane relaunches on once it reaches the gate (the ship phase).  |
-| `JOSH_REVIEWER_MODEL`               | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.                              |
-| `JOSH_REVIEWER_EFFORT`              | No       | `medium`                                           | The effort of the review a lane's change gets.                             |
-| `JOSH_REVIEWER_VERIFICATION_MODEL`  | No       | `claude-sonnet-5-5`                                | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_MODEL`.  |
-| `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_EFFORT`. |
-| `JOSH_INVESTIGATION_MODEL`          | No       | `claude-sonnet-5-5`                                | The model a Fable main line hands broad investigation to.                  |
-| `JOSH_LANE_MODEL`                   | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.                 |
-| `JOSH_LANE_EFFORT`                  | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead.                |
+| Variable                            | Required | Default                                            | Used when                                                                                                                                     |
+| ----------------------------------- | -------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_AGENT_PROVIDER`               | No       | `anthropic`                                        | The default provider for a new `josh backlogrun`: `anthropic` or `openai`.                                                                    |
+| `JOSH_SCHEDULER_MODEL`              | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.                                                                                                |
+| `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch.                                                                                               |
+| `JOSH_WORKER_MODEL`                 | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue, outside the ship phase.                                                                      |
+| `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.                                                                                             |
+| `JOSH_WORKER_SHIP_MODEL`            | No       | `claude-sonnet-5-5`                                | The model a lane relaunches on once it reaches the gate (the ship phase).                                                                     |
+| `JOSH_REVIEWER_MODEL`               | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.                                                                                                 |
+| `JOSH_REVIEWER_EFFORT`              | No       | `medium`                                           | The effort of the review a lane's change gets.                                                                                                |
+| `JOSH_REVIEWER_VERIFICATION_MODEL`  | No       | `claude-sonnet-5-5`                                | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_MODEL`.                                                                     |
+| `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_EFFORT`.                                                                    |
+| `JOSH_REVIEWER_PAIRED`              | No       | off                                                | `1` pairs a `josh run:review` round 1 with a Sonnet reviewer, recorded by `josh review:pair` only; a round 1 `josh ship` opens is not paired. |
+| `JOSH_INVESTIGATION_MODEL`          | No       | `claude-sonnet-5-5`                                | The model a Fable main line hands broad investigation to.                                                                                     |
+| `JOSH_LANE_MODEL`                   | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.                                                                                    |
+| `JOSH_LANE_EFFORT`                  | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead.                                                                                   |
 
 ### Runs
 
@@ -209,6 +210,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_SHIP_LAP_SCOPE`       | `josh ship`                    | The lap scope a child process times its steps under, so `lane:breakdown` names the `josh git` step or hook that spent a stage's minutes. |
 | `JOSH_INIT_HANDED_OFF`      | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                      |
 | `JOSH_ESLINT_MEMORY_CHILD`  | the ESLint memory preload      | `1` marks the ESLint child whose peak RSS is measured, so the preload does not launch another observer.                                  |
+| `JOSH_ESLINT_UNTYPED`       | the edit-time `eslint_d`       | `1`: `create_base_config` drops the TypeScript program, so the daemon holds none; the gate's cold lint never sets it.                    |
 | `JOSH_WORKFLOW`             | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                    |
 | `JOSH_UNIT_RUN_MARKED`      | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.                                                                         |
 | `JOSH_UNIT_GUARD_LOG`       | the unit suite's network guard | Where the guard logs blocked calls.                                                                                                      |

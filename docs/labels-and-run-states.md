@@ -27,6 +27,8 @@ Issue labels and entry states. Procedures: [`workflow-commands`](../.claude/skil
 | `measured:unmet` | Set with `measured` by `josh issue:measured --unmet`: the measurement fell short of the expected effect it checked. `josh effect:audit` reads it.                                                                             |
 | `epic`           | The Issue tracks child Issues and the order they land in.                                                                                                                                                                     |
 
+A live backlogrun retries a `run:stalled` `followup` park itself once its PR is mergeable with all required checks green, 2 times at most; then its row shows `auto-retry cap 2 reached`.
+
 ### `needs-human-review` — the opposite label
 
 The inverse of `auto-ok`: implemented and taken through the verification gate as usual, then nothing is committed, pushed, opened as a PR or merged — the working tree is left uncommitted, a `confirmation` notification carries the resume command, and the run stops. For work no test can judge. Only a person applies or removes it.

@@ -16,6 +16,7 @@ import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
+import { backlog_drive_stalled_retry } from './backlog-drive-stalled-retry'
 import { backlog_drive_unread } from './backlog-drive-unread'
 import type { Declared } from './backlog-overlap'
 import { backlog_plan_comment, type PoolIssue } from './backlog-plan-comment'
@@ -229,7 +230,9 @@ function held_alone(state: DriveState, waiting: DriveState): OfferRead | undefin
 // The named offer, and the state the pool's offer reads when it names nothing: a named issue the yield
 // still holds is excluded there too, so the pool does not relaunch it into the same yield
 // (joshuafolkken/kit#4926, joshuafolkken/kit#6883). It is excluded, not counted running: no lane holds it.
+// joshuafolkken/kit#6865: each offer first retries the mechanical parks whose stop has cleared.
 async function read(carry: RunCarry, state: DriveState, context: NamedContext): Promise<NamedRead> {
+	await backlog_drive_stalled_retry.sweep()
 	const waiting = { ...state, in_flight: await holding(carry, state.in_flight) }
 	const pool = { ...state, exclude: [...state.exclude, ...waiting.in_flight] }
 	const offer = await offer_of(carry, state, waiting, context)

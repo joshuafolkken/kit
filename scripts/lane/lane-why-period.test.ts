@@ -22,24 +22,37 @@ function entries_of(issue: number, minutes: number): Array<LedgerEntry> {
 	]
 }
 
-function breakdown_of(names: ReadonlyArray<string>): Breakdown {
+function breakdown_of(names: ReadonlyArray<string>, followup_ms = 0): Breakdown {
 	const breakdown = lane_breakdown.of(entries_of(ISSUE, 60), [], ISSUE)
 
 	if (breakdown === undefined) throw new Error('fixture lane missing')
 
-	return { ...breakdown, stages: names.map((name) => ({ name, ms: 40 * MINUTE_MS })) }
+	const stages = names.map((name) => ({ name, ms: 40 * MINUTE_MS }))
+	const driver = [{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: followup_ms }]
+
+	return { ...breakdown, stages, driver }
 }
 
 describe('lane_why_period.causes_of', () => {
 	it('uses shared budgets and keeps implement attribution uncertain', () => {
-		const breakdown = breakdown_of(['implement', lane_breakdown.FOLLOWUP_STAGE, 'ship gate'])
+		const breakdown = breakdown_of(['implement', 'ship gate'], 40 * MINUTE_MS)
 
 		expect([...lane_why_period.causes_of(breakdown, []).keys()]).toStrictEqual([
 			CAUSE.IMPLEMENT,
-			CAUSE.CI,
 			CAUSE.OTHER,
+			CAUSE.DRIVER,
 		])
 		expect(CAUSE.IMPLEMENT).toContain('unverified')
+	})
+
+	// joshuafolkken/kit#6541: the driver's followup explains none of the lane's net time.
+	it('adds other beside a driver followup over budget that is the only signal', () => {
+		const breakdown = breakdown_of([], 40 * MINUTE_MS)
+
+		expect([...lane_why_period.causes_of(breakdown, []).keys()]).toStrictEqual([
+			CAUSE.DRIVER,
+			CAUSE.OTHER,
+		])
 	})
 
 	it('groups repeated stages once and names pause and hub evidence independently', () => {

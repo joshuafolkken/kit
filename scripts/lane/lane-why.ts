@@ -64,9 +64,12 @@ function over_of(stage: Stage): OverStage | undefined {
 		: { stage, budget }
 }
 
-// Shared by the single-lane explanation and the period-wide triage.
+// Shared by the single-lane explanation and the period-wide triage; the driver's followup, outside the
+// net time, last.
 function over_stages(breakdown: Breakdown): Array<OverStage> {
-	return breakdown.stages.map((stage) => over_of(stage)).filter((row) => row !== undefined)
+	return [...breakdown.stages, ...(breakdown.driver ?? [])]
+		.map((stage) => over_of(stage))
+		.filter((row) => row !== undefined)
 }
 
 function is_stop(entry: LedgerEntry, issue: number): entry is StopRow {

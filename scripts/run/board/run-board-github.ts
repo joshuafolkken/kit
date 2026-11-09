@@ -28,7 +28,7 @@ const { is_due } = run_board_state
 const STOPPED_STATE: ItemState = 'stopped'
 const RUNNING_STATE: ItemState = 'running'
 // A child waiting on a person, drawn in 🙋 decision until a closed read settles it.
-const WAITING_STATES: ReadonlySet<ItemState> = new Set(['parked', 'human'])
+const { WAITING_STATES } = run_board_status
 const ALWAYS_ASKED_STATES: ReadonlySet<ItemState> = new Set([STOPPED_STATE, ...WAITING_STATES])
 
 // What a step of the GitHub reads works against.
