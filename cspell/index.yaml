@@ -49,6 +49,9 @@ ignorePaths:
 words:
   - curlrc
   - mktemp
+  # safe-chain's release asset name for its static Linux binary, which the distributed
+  # `setup-pnpm` action fetches (joshuafolkken/kit#6849).
+  - linuxstatic
   # pnpm's `.pnpmfile.mjs` hook file that strips the safe-chain preinstall at pack time
   # (joshuafolkken/kit#2693). Distributed, because `josh init` / `josh sync` copy that file, which
   # names itself, into a published consumer (joshuafolkken/kit#3110).
