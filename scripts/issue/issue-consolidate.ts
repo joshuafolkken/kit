@@ -55,8 +55,11 @@ async function read_target(request: ConsolidateRequest): Promise<Target> {
 	)
 
 	if (target === undefined) throw new Error(`Could not read ${cite} — ${NOTHING_WRITTEN}.`)
-	if (request.body === undefined) return target
-	if (await issue_body_or_comment.is_author_trusted(target)) return target
+
+	if (request.body === undefined || (await issue_body_or_comment.is_author_trusted(target))) {
+		return target
+	}
+
 	throw new Error(`${cite} was filed by an author without write access — ${NOTHING_WRITTEN}.`)
 }
 

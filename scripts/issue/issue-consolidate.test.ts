@@ -166,7 +166,9 @@ describe('issue_consolidate partial failures', () => {
 
 		expect(outcome).toBe(1)
 		expect(errors()).toMatch(new RegExp(`Failed: .*${String(OTHER_DUPLICATE)}`, 'u'))
-		expect(errors()).toMatch(new RegExp(`Already written[\\s\\S]*${String(DUPLICATE)}`, 'u'))
+		expect(errors()).toMatch(
+			new RegExp(String.raw`Already written[\s\S]*${String(DUPLICATE)}`, 'u'),
+		)
 	})
 
 	it('leaves the duplicate open when its untrack fails', async () => {
