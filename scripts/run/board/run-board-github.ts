@@ -105,7 +105,7 @@ function fold_plan(state: BoardState): BoardState {
 }
 
 function statuses_for(state: BoardState, local: LocalRead): ReadonlyMap<number, ItemStatus> {
-	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
+	const stopped = run_board_idle.stopped_since(state.idle_since, state.read_ms)
 
 	return run_board_status.statuses_of(local.events, local.lane_states, stopped)
 }

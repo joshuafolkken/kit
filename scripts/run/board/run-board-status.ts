@@ -1,9 +1,4 @@
-import {
-	has_label_name,
-	NEEDS_DECISION_LABEL,
-	RUN_STALLED_LABEL,
-} from '#scripts/issue/issue-labels'
-import { issue_run_hold } from '#scripts/issue/issue-run-hold'
+import type { AgentResult } from '#scripts/agent/agent-event'
 import type { Span } from '#scripts/lane/lane-spans'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
@@ -14,10 +9,13 @@ import { run_board_checks } from './run-board-checks'
 import { run_board_closed, type ClosedIssue, type ListingRead } from './run-board-closed'
 import { run_board_ending_reason } from './run-board-ending-reason'
 import { run_board_ending_states } from './run-board-ending-states'
+import { run_board_idle, type IdleSince } from './run-board-idle'
 import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import type { BoardLanes } from './run-board-lane-state'
+import { run_board_lane_stop } from './run-board-lane-stop'
 import { run_board_lane_time } from './run-board-lane-time'
 import { run_board_phase, type Phase } from './run-board-phase'
+import { run_board_settle } from './run-board-settle'
 import { run_board_setup, type SetupRead } from './run-board-setup'
 
 // What each issue of a run is doing now, read from the run's own event stream and what each open lane's
@@ -63,6 +61,13 @@ interface ItemStatus {
 	reason?: string | undefined
 	// The command that paused a paused lane, read off its lane state record (`run-board-lane-state.ts`).
 	paused_by?: string | undefined
+	// What stopped the lane or its ship — the command its record or its labels name
+	// (`run-board-lane-stop.ts`).
+	stop_reason?: string | undefined
+	// A running lane's transcript result (`run_liveness.read_agent_state`); `undefined` where unread.
+	result?: AgentResult | undefined
+	// When a running lane's transcript was last written — the latest an idle lane can have stopped.
+	written_ms?: number | undefined
 }
 
 interface LatestEvent {
@@ -103,13 +108,10 @@ const UNSETTLED_STATES: ReadonlySet<ItemState> = new Set(['running', 'paused', '
 // it again, so one still open stays parked whatever its labels say (joshuafolkken/kit#3958).
 const PARKED_STATE: ItemState = 'parked'
 
+const { relaunch_of, settled_as } = run_board_settle
+
 function moment(event: RunEvent): number {
 	return Date.parse(event.at)
-}
-
-// The newest launch carried on, where the child launched more than once.
-function relaunch_of(status: ItemStatus | undefined): Pick<ItemStatus, 'launched_ms'> {
-	return status?.launched_ms === undefined ? {} : { launched_ms: status.launched_ms }
 }
 
 // joshuafolkken/kit#3971: a launch keeps the start of the child's first one in this run.
@@ -132,26 +134,6 @@ function moved(previous: ItemStatus, track: ReadonlyArray<Phase>, event: RunEven
 	const is_same = previous.phase_ms !== undefined && track.at(-1) === previous.track?.at(-1)
 
 	return { ...previous, track, phase_ms: is_same ? previous.phase_ms : moment(event) }
-}
-
-// The status a child settles into: its start and the track it had reached, so a settled row still
-// draws how it got there.
-// What a settled child keeps of its run: its newest launch, its spans on a lane, and its track.
-function kept_of(
-	previous: ItemStatus | undefined,
-): Pick<ItemStatus, 'launched_ms' | 'spans' | 'track'> {
-	const spans = previous?.spans
-	const track = previous?.track
-
-	return {
-		...relaunch_of(previous),
-		...(spans !== undefined && { spans }),
-		...(track !== undefined && { track }),
-	}
-}
-
-function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemStatus {
-	return { state, started_ms: previous?.started_ms, ...kept_of(previous) }
 }
 
 // A bare ending that repeats the one before keeps that one's reason: `run:merge` writes a bare park
@@ -282,34 +264,24 @@ function with_spans(statuses: Map<number, ItemStatus>, events: ReadonlyArray<Run
 	}
 }
 
-// A running lane no child is working in is stopped whatever the stream last said: a child that died
-// writes no ending, so its row would otherwise run — and its phase time grow — for as long as the lane
-// stays.
-function lane_status(status: ItemStatus, is_idle: boolean): ItemStatus {
-	if (!is_idle || status.state !== 'running') return status
-
-	return { ...settled_as(status, 'stopped'), lane: status.lane }
-}
-
 // Every child the run has touched, with what each of this run's open lanes is doing laid over it. An
 // earlier run's lane and one with no record are drawn apart (`run-board-earlier.ts`), so what the span
-// says of their issues is not this run's. A lane in `idle` has no child working in it (`lane-spent.ts`).
+// says of their issues is not this run's. A lane in `idle` has had no child working in it since the
+// time it maps to (`lane-spent.ts`); one this run's record ended is stopped too, though no longer open
+// (`run-board-lane-stop.ts`).
 function statuses_of(
 	events: ReadonlyArray<RunEvent>,
 	lanes: BoardLanes,
-	idle: ReadonlyArray<string> = [],
+	idle: IdleSince = run_board_idle.NO_IDLE,
 ): ReadonlyMap<number, ItemStatus> {
 	const statuses = new Map(remembered(FOLDED, events, fold_events))
 	const apart = [...lanes.earlier.keys(), ...lanes.unknown.map(Number)]
 
 	for (const issue of apart) statuses.delete(issue)
 
-	for (const [issue, status] of lanes.own) {
-		const is_idle = idle.includes(String(issue))
+	for (const [issue, status] of lanes.own) statuses.set(issue, status)
 
-		statuses.set(issue, lane_status(status, is_idle))
-	}
-
+	run_board_lane_stop.stop_lanes(statuses, lanes, idle)
 	with_spans(statuses, events)
 
 	return statuses
@@ -350,23 +322,13 @@ function is_read_after_launch(status: ItemStatus, read: OpenRead): boolean {
 	return read.read_ms !== undefined && (launch_ms(status) ?? 0) <= read.read_ms
 }
 
-// What a running child's labels say it is doing, `undefined` where they agree it is running: the child
-// applies `needs-decision` and drops `in-progress` itself when it stops, while the stream's park is
-// written by a parent that may no longer be there.
-function labelled_state(labels: ReadonlyArray<string> | undefined): ItemState | undefined {
-	if (labels === undefined) return undefined
-	if (has_label_name(labels, NEEDS_DECISION_LABEL)) return 'human'
-	if (has_label_name(labels, RUN_STALLED_LABEL)) return 'stopped'
-
-	return issue_run_hold.is_held(labels) ? undefined : 'stopped'
-}
-
+// A running child's labels, read after its launch, settle it (`run-board-lane-stop.ts`).
 function labelled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
-	const state = is_read_after_launch(status, read)
-		? labelled_state(read.labels.get(issue))
+	const stop = is_read_after_launch(status, read)
+		? run_board_lane_stop.label_stop(read.labels.get(issue))
 		: undefined
 
-	return state === undefined ? status : settled_as(status, state)
+	return stop === undefined ? status : run_board_lane_stop.label_settled(status, stop)
 }
 
 // A close dated before the launch is an earlier life of the issue, not how this run's child ended.

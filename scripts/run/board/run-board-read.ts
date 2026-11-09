@@ -6,7 +6,7 @@ import { lane_held_stats } from '#scripts/lane/lane-held-stats'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
-import { lane_state } from '#scripts/lane/lane-state'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
@@ -16,6 +16,7 @@ import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { run_board_found, type FoundOf } from './run-board-found'
+import { run_board_lane_result } from './run-board-lane-result'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import {
 	run_board_operation_read,
@@ -190,23 +191,27 @@ function sources_of(
 }
 
 // The open lanes sorted by their records, each folded from the whole stream, not the run's span: an
-// earlier run's lane launched before the span began.
-async function lanes_here(
+// earlier run's lane launched before the span began. A closed lane's record is read too, for its end.
+function sorted_here(
 	lanes: ReadonlyArray<LaneInfo>,
-	repository: string,
+	records: ReadonlyArray<LaneStateRecord>,
 	events: ReadonlyArray<RunEvent>,
 	started_ms: number,
-): Promise<BoardLanes> {
-	const issues = lanes.map((lane) => lane.issue)
-	const records = await lane_state.read_states(issues, repository)
-
-	return run_board_lane_state.lanes_of({ events, lanes: issues, records, started_ms })
+): BoardLanes {
+	return run_board_lane_state.lanes_of({
+		events,
+		lanes: lanes.map((lane) => lane.issue),
+		records: new Map(records.map((record) => [record.issue, record])),
+		started_ms,
+		results: run_board_lane_result.results_of(lanes),
+	})
 }
 
 // The lanes not yet ended and the processes their closes could not end, off their records — once a
 // retried close ends the lane, its survivors are gone.
-async function unfinished_here(repository: string): Promise<Pick<LocalRead, 'closing' | 'stuck'>> {
-	const records = await lane_state.read_records(repository)
+function unfinished_here(
+	records: ReadonlyArray<LaneStateRecord>,
+): Pick<LocalRead, 'closing' | 'stuck'> {
 	const unfinished = records.filter((record) => record.state !== 'ended')
 
 	return {
@@ -214,6 +219,21 @@ async function unfinished_here(repository: string): Promise<Pick<LocalRead, 'clo
 		stuck: new Map(
 			unfinished.flatMap(({ stuck = [] }) => stuck.map(({ pid, reason }) => [pid, reason])),
 		),
+	}
+}
+
+// Every lane record, read once for the lanes' states and the closes still unfinished.
+async function lanes_here(
+	lanes: ReadonlyArray<LaneInfo>,
+	repository: string,
+	events: ReadonlyArray<RunEvent>,
+	started_ms: number,
+): Promise<Pick<LocalRead, 'lane_states' | 'closing' | 'stuck'>> {
+	const records = await lane_state.read_records(repository)
+
+	return {
+		lane_states: sorted_here(lanes, records, events, started_ms),
+		...unfinished_here(records),
 	}
 }
 
@@ -327,7 +347,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 
 	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
 	const lanes = await lane_registry.list_lanes(await main_root())
-	const lane_states = await lanes_here(lanes, repository, events, span.started_ms)
+	const lane_read = await lanes_here(lanes, repository, events, span.started_ms)
 
 	return {
 		...span_fields(span),
@@ -335,14 +355,13 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		...(await span_events_here(events, span, table, carry)),
 		throughput: run_board_throughput.rows_of(events, Date.now()),
 		lanes: lanes.map((lane) => lane.issue),
-		lane_states,
+		...lane_read,
 		resume,
 		roots,
-		...(await unfinished_here(repository)),
 		carry,
 		is_stranded,
 		operations: run_board_operation_read.read(sources_of(repository, lanes, transcript)),
-		...(await lane_room_of(lanes, lane_states, table)),
+		...(await lane_room_of(lanes, lane_read.lane_states, table)),
 		...ledger_here(repository),
 	}
 }

@@ -43,7 +43,7 @@ describe('run_board_status.activity_of the same stream twice', () => {
 describe('run_board_status.statuses_of the same stream twice', () => {
 	it('lays each call its own lanes over the fold', () => {
 		const events = [LAUNCH]
-		const stopped = run_board_status.statuses_of(events, OWN, [LANE])
+		const stopped = run_board_status.statuses_of(events, OWN, new Map([[LANE, Date.parse(T1)]]))
 		const running = run_board_status.statuses_of(events, OWN)
 
 		expect(stopped.get(ISSUE)?.state).toBe('stopped')

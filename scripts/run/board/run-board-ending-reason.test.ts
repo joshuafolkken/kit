@@ -77,6 +77,27 @@ describe('run_board_ending_reason.reason_of — other ending events', () => {
 	})
 })
 
+// joshuafolkken/kit#6577: a stopped lane, or a working child's stopped ship, names what stopped it.
+describe('run_board_ending_reason.row_reason — a stop reason', () => {
+	const read = { titles: new Map(), labels: new Map() }
+
+	it('names the command that stopped the lane, or the ship of a child still working', () => {
+		const stopped = { state: 'stopped', stop_reason: 'lane:close' } as const
+		const running = { state: 'running', stop_reason: 'run:release' } as const
+
+		expect(run_board_ending_reason.row_reason(13, stopped, read)).toStrictEqual({
+			reason: { tail: 'stopped by lane:close' },
+		})
+		expect(run_board_ending_reason.row_reason(13, running, read)).toStrictEqual({
+			reason: { tail: 'ship stopped by run:release' },
+		})
+	})
+
+	it('draws no reason where nothing recorded one', () => {
+		expect(run_board_ending_reason.row_reason(13, { state: 'stopped' }, read)).toStrictEqual({})
+	})
+})
+
 // joshuafolkken/kit#4916: `run:merge` withdraws a child whose issue closed without a merge.
 describe('run_board_ending_reason.reason_of — a run:merge withdrawal', () => {
 	it('reads the reason after the run:merge driver prefix', () => {

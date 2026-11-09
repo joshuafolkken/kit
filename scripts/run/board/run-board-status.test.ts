@@ -306,10 +306,14 @@ describe('run_board_status.settle_closed with the listing’s labels', () => {
 		expect(settled.get(3409)?.state).toBe(state)
 	})
 
-	it('keeps the launch time of a stopped child and draws no end', () => {
+	it('keeps the launch time of a stopped child, names its release and draws no end', () => {
 		const settled = run_board_status.settle_closed(RUNNING, read_labelled(['bug']))
 
-		expect(settled.get(3409)).toStrictEqual({ state: 'stopped', started_ms: Date.parse(T0) })
+		expect(settled.get(3409)).toStrictEqual({
+			state: 'stopped',
+			started_ms: Date.parse(T0),
+			stop_reason: 'run:release',
+		})
 	})
 
 	it.each<[string, OpenRead]>([

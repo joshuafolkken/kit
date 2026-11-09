@@ -2,7 +2,7 @@ import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_spent } from '#scripts/lane/lane-spent'
-import { lane_state } from '#scripts/lane/lane-state'
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
@@ -76,6 +76,14 @@ function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(lane_vacant, 'vacant_issues').mockResolvedValue([])
 }
 
+// The open lanes' records feed the lane room; every record, the board's lane states.
+function arrange_states(records: ReadonlyArray<LaneStateRecord>): void {
+	vi.mocked(lane_state.read_states).mockResolvedValue(
+		new Map(records.map((one) => [one.issue, one])),
+	)
+	vi.mocked(lane_state.read_records).mockResolvedValue([...records])
+}
+
 const run_board_read_fixture = {
 	AFTER,
 	CARRY,
@@ -85,6 +93,7 @@ const run_board_read_fixture = {
 	MAIN_ROOT,
 	REPOSITORY,
 	arrange,
+	arrange_states,
 	lane,
 }
 

@@ -112,6 +112,22 @@ function tail_of(status: ItemStatus): string | undefined {
 	return status.reason
 }
 
+// joshuafolkken/kit#6577: what stopped a lane, or the ship of a child still working, by the command its
+// record or labels name (`run-board-lane-stop.ts`).
+function stop_reason_of(status: ItemStatus): RowReason | undefined {
+	if (status.stop_reason === undefined) return undefined
+
+	const subject = status.state === 'running' ? 'ship stopped' : 'stopped'
+
+	return { tail: `${subject} by ${status.stop_reason}` }
+}
+
+function stop_row_reason(status: ItemStatus): Pick<BoardRow, 'reason'> {
+	const reason = stop_reason_of(status)
+
+	return reason === undefined ? {} : { reason }
+}
+
 // Raw event reasons remain cacheable; only drawing selects an action from the current live state.
 function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<BoardRow, 'reason'> {
 	const reason = tail_of(status)
@@ -125,7 +141,7 @@ function row_reason(number: number, status: ItemStatus, read: RowRead): Pick<Boa
 
 	return is_stalled(status, read.labels.get(number))
 		? { reason: stalled_reason(number, read, waits) }
-		: {}
+		: stop_row_reason(status)
 }
 
 const run_board_ending_reason = {
