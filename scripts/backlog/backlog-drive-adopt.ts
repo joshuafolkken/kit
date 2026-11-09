@@ -25,7 +25,7 @@ async function active_lanes(): Promise<ReadonlyArray<LaneInfo>> {
 }
 
 function adopted_note(issue: string): string {
-	return `${issue_cite.plain(issue)} adopted by backlog:drive: its lane was launched outside the loop`
+	return `${issue_cite.plain_for('program', issue)} adopted by backlog:drive: its lane was launched outside the loop`
 }
 
 async function note_adopted(issue: string): Promise<void> {

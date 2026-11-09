@@ -116,7 +116,7 @@ function record_of(input: ApplyInput, epic_number: number): string | undefined {
 // The title is the subject's, since the subject is what the bundle was asked about; the rationale is
 // the verdict's own reason, which already names the signal that grouped them.
 function title_of(subject: BacklogIssue): string {
-	const title = subject.title ?? `bundle with ${issue_cite.plain(subject.number)}`
+	const title = subject.title ?? `bundle with ${issue_cite.plain_for('github', subject.number)}`
 
 	return `Epic: ${title}`
 }

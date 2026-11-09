@@ -184,7 +184,7 @@ interface CutRequest {
 async function emit_cut_event(request: CutRequest): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.CUT,
-		`${issue_cite.plain(request.issue)} cut (${request.phase})`,
+		`${issue_cite.plain_for('terminal', request.issue)} cut (${request.phase})`,
 	)
 }
 

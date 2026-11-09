@@ -15,7 +15,7 @@ async function lines_of(
 	const minutes = await lane_net_read.net_minutes_of(Number(found_during))
 
 	if (minutes === undefined) return []
-	const line = `${issue_priority.LANE_PREFIX} ${String(minutes)} 分（${issue_cite.plain(found_during)}）`
+	const line = `${issue_priority.LANE_PREFIX} ${String(minutes)} 分（${issue_cite.plain_for('github', found_during)}）`
 
 	return [
 		`↳ the causing lane from \`josh lane:net ${found_during}\`, to paste under \`## 背景\` when it caused this Issue:`,

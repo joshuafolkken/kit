@@ -45,7 +45,7 @@ interface EpicView {
 // Written exactly as it was typed. A bare number stays bare, because qualifying it here would name
 // this repository in an answer about an epic the caller referred to without one.
 function format_reference(reference: EpicReference): string {
-	return issue_cite.plain(reference.number, reference.repo)
+	return issue_cite.plain_for('linked', reference.number, reference.repo)
 }
 
 // What the candidate confirmation reads with. The blockers come from `epic_fetch`'s own reader, so

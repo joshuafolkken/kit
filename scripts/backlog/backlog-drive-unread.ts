@@ -28,7 +28,7 @@ function cause_of(read: UnreadState): string {
 }
 
 function note_of(issue: string, read: UnreadState): string {
-	return `The state of named issue ${issue_cite.plain(issue)} could not be read (${cause_of(read)})`
+	return `The state of named issue ${issue_cite.plain_for('terminal', issue)} could not be read (${cause_of(read)})`
 }
 
 function handed_back(note: string): OfferRead {

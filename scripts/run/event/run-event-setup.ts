@@ -40,22 +40,22 @@ const LANE_STAGE = { OPENING, INSTALLING, DISPATCHING } as const
 
 // The driver is about to open a lane for `issue` — for every child, not only the first.
 function opening_lane(issue: string): string {
-	return `${OPENING} ${issue_cite.plain(issue)}`
+	return `${OPENING} ${issue_cite.plain_for('terminal', issue)}`
 }
 
 // The lane's work tree exists and its dependencies are about to be installed into it.
 function installing(issue: string): string {
-	return `${INSTALLING} ${issue_cite.plain(issue)}`
+	return `${INSTALLING} ${issue_cite.plain_for('terminal', issue)}`
 }
 
 // The lane is ready and its child is about to be dispatched; the child's own `child-launch` follows.
 function dispatching(issue: string): string {
-	return `${DISPATCHING} ${issue_cite.plain(issue)}`
+	return `${DISPATCHING} ${issue_cite.plain_for('terminal', issue)}`
 }
 
 // The launch for `issue` returned without a child.
 function no_child(issue: string): string {
-	return `${STAGE.NO_CHILD} ${issue_cite.plain(issue)}`
+	return `${STAGE.NO_CHILD} ${issue_cite.plain_for('terminal', issue)}`
 }
 
 // Best-effort, as every append to this stream is: a stage that could not be written is a board that

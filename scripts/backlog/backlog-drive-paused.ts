@@ -112,7 +112,8 @@ async function held_by(ports: PausedPorts): Promise<Array<LaneStateRecord>> {
 
 function describe(records: ReadonlyArray<LaneStateRecord>): string {
 	const lines = records.map(
-		(record) => `- ${issue_cite.plain(record.issue)} — ${lane_state.paused_note(record) ?? ''}`,
+		(record) =>
+			`- ${issue_cite.plain_for('telegram', record.issue)} — ${lane_state.paused_note(record) ?? ''}`,
 	)
 
 	return [PAUSED_HEAD, ...lines].join('\n')

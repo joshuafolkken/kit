@@ -63,7 +63,7 @@ function cite_of(reference: IssueReference, repo: string, title: string | undefi
 
 	return reference.repo === repo
 		? issue_cite.reference(repo, number, title)
-		: issue_cite.plain(number, reference.repo)
+		: issue_cite.plain_for('terminal', number, reference.repo)
 }
 
 function reference_of(reference: IssueReference, repo: string): string {

@@ -82,7 +82,7 @@ function unqualified(text: string, repo: string | undefined): string {
 	if (repo === undefined) return text
 
 	return text.replaceAll(QUALIFIED_REFERENCE, (whole, named: string, number: string) =>
-		named === repo ? issue_cite.plain(number) : whole,
+		named === repo ? issue_cite.plain_for('terminal', number) : whole,
 	)
 }
 

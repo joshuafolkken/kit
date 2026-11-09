@@ -89,7 +89,9 @@ function build_completion_comment_body(input: {
 }): string {
 	const base_lines = [`✅ ${input.message}`]
 	const issue_lines =
-		input.issue_number === undefined ? [] : [`Issue: ${issue_cite.plain(input.issue_number)}`]
+		input.issue_number === undefined
+			? []
+			: [`Issue: ${issue_cite.plain_for('telegram', input.issue_number)}`]
 	const pr_lines = input.pr_url === undefined ? [] : [`PR: ${input.pr_url}`]
 	const note_lines = note_section(input.notes)
 	const mention_lines = input.mentions.length === 0 ? [] : ['', input.mentions.join(' ')]

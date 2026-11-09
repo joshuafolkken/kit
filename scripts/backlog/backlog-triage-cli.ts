@@ -154,12 +154,16 @@ function verdict_of(request: TriageRequest, cite: (issue: string) => string): st
 	return [...label_part, ...blocker_part, ...unblock_part].join(' · ')
 }
 
+function github_cite(issue: string): string {
+	return issue_cite.plain_for('github', issue)
+}
+
 async function comment(request: TriageRequest): Promise<boolean> {
 	try {
 		await git_gh_command.issue_comment(
 			request.issue,
 			issue_run_verdict.comment_with_answers(
-				`triaged by backlogrun: ${verdict_of(request, issue_cite.plain)}\n\n${request.reason}`,
+				`triaged by backlogrun: ${verdict_of(request, github_cite)}\n\n${request.reason}`,
 				request.answers,
 			),
 		)

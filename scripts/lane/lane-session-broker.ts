@@ -362,7 +362,7 @@ function withdraw(pending: string, nonce: string): void {
 async function record_failure(issue: string, answer: BrokerAnswer): Promise<void> {
 	if (answer.is_success) return
 
-	const text = `${issue_cite.plain(issue)} lane broker: ${answer.reason}`
+	const text = `${issue_cite.plain_for('program', issue)} lane broker: ${answer.reason}`
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.NOTE, text)
 }

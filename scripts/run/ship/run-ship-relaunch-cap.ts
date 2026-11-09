@@ -110,7 +110,7 @@ async function park_with(issue: string, notice: ParkNotice, parked: ParkedStop):
 
 	await run_event_stream_emit.emit(PARK, text, new Date(), { stop })
 	await telegram_notify.warn({
-		issue_title: `${notice.title} ${issue_cite.plain(issue)}`,
+		issue_title: `${notice.title} ${issue_cite.plain_for('telegram', issue)}`,
 		body: notice.body,
 		recovery: `Read pnpm josh ship --log ${issue}, then fix the cause and remove ${RUN_STALLED_LABEL} to offer it again.`,
 	})

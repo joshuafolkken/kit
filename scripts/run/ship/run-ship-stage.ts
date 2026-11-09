@@ -230,7 +230,7 @@ function event_text(
 	phase: Phase,
 	started: ReadonlyArray<string> = [],
 ): string {
-	const words = [issue_cite.plain(issue), stage, phase]
+	const words = [issue_cite.plain_for('program', issue), stage, phase]
 	const listed = [...new Set(started)].join(STARTED_SEPARATOR)
 
 	const full = started.length > 0 ? [...words, listed] : words

@@ -18,7 +18,7 @@ const LOCK_WAIT_MS = 5000
 // **A dispatched lane child only.** A person's own session, or one carrying a mark leaked from a parent,
 // is not a lane the board draws a row for, so it writes nothing.
 function implement_text(issue: string): string {
-	return `${issue_cite.plain(issue)} implement`
+	return `${issue_cite.plain_for('terminal', issue)} implement`
 }
 
 async function has_implement(issue: string): Promise<boolean> {

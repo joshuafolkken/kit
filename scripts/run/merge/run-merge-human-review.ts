@@ -15,7 +15,7 @@ async function retain(issue: string): Promise<boolean> {
 
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.HUMAN_REVIEW,
-		`${issue_cite.plain(issue)} waiting for human review`,
+		`${issue_cite.plain_for('program', issue)} waiting for human review`,
 	)
 
 	return true

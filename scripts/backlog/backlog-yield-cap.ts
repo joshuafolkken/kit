@@ -50,7 +50,7 @@ function times_of(events: ReadonlyArray<RunEvent>, issue: string): ReadonlyArray
 }
 
 function trip_text(issue: string): string {
-	return `${issue_cite.plain(issue)} parked by backlog:drive: it gave its lane back ${String(YIELD_CAP)} times within ${String(WINDOW_MINUTES)} minutes`
+	return `${issue_cite.plain_for('program', issue)} parked by backlog:drive: it gave its lane back ${String(YIELD_CAP)} times within ${String(WINDOW_MINUTES)} minutes`
 }
 
 // A person's park (`run_park_body`): no option is the parent's own, so `backlog:drive` never takes one.
