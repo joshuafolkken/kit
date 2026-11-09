@@ -173,8 +173,9 @@ function read_answer(root: string, { pid, token, start }: Launch): PinnedSummary
 	)
 }
 
-// The launch is detached, so its pid leads a process group holding the `josh` process and its Vitest
-// workers; signalling the group stops them all, and `base-tree.ts` removes the trees they held.
+// The launch is detached, so its pid leads a process group holding the `josh` process; signalling the
+// group stops it, `base-tree.ts` removes the trees it held, and its exit kills the Vitest probes, which
+// run in groups of their own (`test-red.ts`).
 function signal_group(pid: number): void {
 	try {
 		process.kill(-pid, STOP_SIGNAL)

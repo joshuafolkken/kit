@@ -15,6 +15,9 @@ const CHANGED_NOTE = 'changed\n'
 const PORCELAIN = '--porcelain'
 const FAILURE = 'the callback failed'
 const TERMINATED_EXIT_CODE = 143
+const INTERRUPTED_EXIT_CODE = 130
+const HUNG_UP_EXIT_CODE = 129
+const STOP_SIGNALS = ['SIGTERM', 'SIGINT', 'SIGHUP'] as const
 
 const fixture: { current?: FixtureWorkspace } = {}
 
@@ -109,29 +112,37 @@ describe('base_tree.with_tree — a terminated run', () => {
 		vi.restoreAllMocks()
 	})
 
-	it('removes the tree it holds and exits as SIGTERM would have', async () => {
+	// joshuafolkken/kit#6814: Ctrl-C or a closed terminal stops an interactive run as SIGTERM does.
+	it.each([
+		['SIGTERM', TERMINATED_EXIT_CODE],
+		['SIGINT', INTERRUPTED_EXIT_CODE],
+		['SIGHUP', HUNG_UP_EXIT_CODE],
+	] as const)(
+		'removes the tree it holds on %s and exits as the signal would have',
+		async (signal, code) => {
+			const commit = await build_repository()
+			const exit = vi.spyOn(process, 'exit').mockImplementation(vi.fn() as never)
+
+			const is_left_after_signal = await base_tree.with_tree(PREFIX, commit, async ({ parent }) => {
+				process.emit(signal, signal)
+
+				return existsSync(parent)
+			})
+
+			expect(is_left_after_signal).toBe(false)
+			expect(exit).toHaveBeenCalledWith(code)
+		},
+	)
+
+	it.each(STOP_SIGNALS)('leaves no %s listener once its trees are removed', async (signal) => {
 		const commit = await build_repository()
-		const exit = vi.spyOn(process, 'exit').mockImplementation(vi.fn() as never)
-
-		const is_left_after_signal = await base_tree.with_tree(PREFIX, commit, async ({ parent }) => {
-			process.emit('SIGTERM')
-
-			return existsSync(parent)
-		})
-
-		expect(is_left_after_signal).toBe(false)
-		expect(exit).toHaveBeenCalledWith(TERMINATED_EXIT_CODE)
-	})
-
-	it('leaves no SIGTERM listener once its trees are removed', async () => {
-		const commit = await build_repository()
-		const before = process.listenerCount('SIGTERM')
+		const before = process.listenerCount(signal)
 
 		const during = await base_tree.with_tree(PREFIX, commit, async () =>
-			process.listenerCount('SIGTERM'),
+			process.listenerCount(signal),
 		)
 
 		expect(during).toBe(before + 1)
-		expect(process.listenerCount('SIGTERM')).toBe(before)
+		expect(process.listenerCount(signal)).toBe(before)
 	})
 })
