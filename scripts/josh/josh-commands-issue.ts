@@ -171,7 +171,7 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Assess whether a complete draft can join an unstarted issue',
 		category: 'AI tools',
 		reference: [
-			'<assessment.json> [--json | --apply <N> [--blocked <M>]] | --fingerprint <N>',
+			'<assessment.json> [--json | --apply <N> [--blocked <M> | --found-during <M>]] | --fingerprint <N>',
 			'automation',
 			['network'],
 		],
@@ -189,6 +189,10 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: 'assessment.json --apply 5848 --blocked 5849',
 					note: 'record a confirmed duplicate dependency and reconcile its epic.',
+				},
+				{
+					arguments: 'assessment.json --apply 5848 --found-during 5849',
+					note: "record a split fold as lane 5849's split child.",
 				},
 			],
 		},
