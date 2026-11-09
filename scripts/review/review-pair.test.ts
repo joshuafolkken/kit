@@ -36,12 +36,31 @@ describe('review_pair.offer', () => {
 		const { brief, findings } = review_pair.paths(directory)
 		const written = readFileSync(brief, 'utf8')
 
-		expect(written.startsWith(BRIEF)).toBe(true)
-		expect(written).toContain('do not run `review:attest` or `review:submit`')
+		expect(written).toContain('never run `review:attest` or `review:submit`')
 		expect(written).toContain(findings)
 		expect(note).toContain(`paired brief: ${brief}`)
 		expect(note).toContain('paired model: claude-sonnet-5-5 · effort high')
 		expect(note).toContain('review:pair')
+	})
+
+	it('puts the override under the level line, ahead of the steps it cancels', () => {
+		const directory = fresh_directory()
+
+		review_pair.offer(BRIEF, ON, directory)
+		const written = readFileSync(review_pair.paths(directory).brief, 'utf8')
+		const [level, , heading] = written.split('\n', 3)
+
+		expect(level).toBe('medium — review brief')
+		expect(heading).toBe('## Paired comparison run — recorded only, never gating')
+		expect(written.indexOf('Review round: 1')).toBeGreaterThan(written.indexOf('## Paired'))
+	})
+
+	it('launches the paired reviewer with a prompt that never names the attest step as one to follow', () => {
+		const note = review_pair.offer(BRIEF, ON, fresh_directory()) ?? ''
+		const prompt = note.split('\n').find((line) => line.startsWith('paired prompt: ')) ?? ''
+
+		expect(prompt).toContain('never run review:attest or review:submit')
+		expect(prompt).not.toContain('its review:attest step')
 	})
 
 	it('never pairs round 2', () => {

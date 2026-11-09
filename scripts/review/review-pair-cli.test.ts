@@ -59,7 +59,7 @@ describe('review_pair_cli.run', () => {
 		])
 	})
 
-	it('only reads the code slot, so a Sonnet finding leaves attest and the merge gate as they were', () => {
+	it('reads the code slot once and writes only the pair ledger', () => {
 		const opus_text = vi.fn(() => OPUS_TEXT)
 		const log = fresh_log()
 

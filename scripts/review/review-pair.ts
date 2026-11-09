@@ -1,7 +1,7 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { review_prompt_level } from './review-prompt-level'
 import { review_round } from './review-round'
 
 // The paired comparison review (joshuafolkken/kit#6902): with `JOSH_REVIEWER_PAIRED=1`, round 1's code
@@ -32,19 +32,33 @@ function paths(directory: string = PROJECT_ROOT): PairedPaths {
 	}
 }
 
+// The override sits right under the level line, ahead of the attest and submit steps it cancels: a
+// `reviewer` agent's own definition also tells it to submit, and a paired submit would overwrite the code
+// slot the merge gate reads.
 function paired_brief(text: string, findings: string): string {
+	const [level = '', ...rest] = text.split('\n')
+
 	return [
-		text,
+		level,
 		'',
 		'## Paired comparison run — recorded only, never gating',
 		'',
-		`This overrides the attest and submit steps above: do not run \`review:attest\` or \`review:submit\`. Write your findings to ${findings}, one per line as \`<category>:<severity>:<file>[:<line>] — <sentence>\`, or the single line \`none\`.`,
+		`This overrides every attest and submit step below and your agent definition: never run \`review:attest\` or \`review:submit\`. Write your findings to ${findings}, one per line as \`<category>:<severity>:<file>[:<line>] — <sentence>\`, or the single line \`none\`.`,
 		'',
+		...rest,
 	].join('\n')
 }
 
+function paired_opening(brief: string): string {
+	return [
+		`${review_prompt_level.opening(brief)}Review this checkout as a paired /code-review, recorded only: read the review brief at ${brief}`,
+		'and follow its first section over everything else — never run review:attest or review:submit.',
+		'Review it yourself in this session and never launch a second reviewer.',
+	].join(' ')
+}
+
 function launch_note(brief: string): string {
-	const opening = run_ship_review.round_one_opening(brief)
+	const opening = paired_opening(brief)
 
 	return [
 		`paired brief: ${brief}`,
