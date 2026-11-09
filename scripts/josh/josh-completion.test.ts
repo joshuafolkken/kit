@@ -1,6 +1,7 @@
 import { execaSync } from 'execa'
 import { describe, expect, it } from 'vitest'
 import { josh_cli_fixture } from './josh-cli-fixture'
+import { COMMAND_MAP } from './josh-command-map'
 import { josh_completion_scripts } from './josh-completion-scripts'
 import { josh_logic } from './josh-logic'
 
@@ -42,6 +43,14 @@ describe('josh completion <shell>', () => {
 			expect(embedded).toStrictEqual([])
 		},
 	)
+})
+
+describe('josh completion registration', () => {
+	it('lists --names and every shell as usage examples (ac-723a7b03)', () => {
+		const examples = COMMAND_MAP['completion']?.usage?.examples.map((example) => example.arguments)
+
+		expect(examples).toStrictEqual(['--names', ...josh_completion_scripts.SHELLS])
+	})
 })
 
 describe('josh completion arguments', () => {

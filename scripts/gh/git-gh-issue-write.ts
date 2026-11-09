@@ -26,6 +26,8 @@ import { gh_failure } from './git-gh-failure'
 const PATCH_METHOD = 'PATCH'
 const DELETE_METHOD = 'DELETE'
 
+type CloseReason = 'completed' | 'not_planned' | 'duplicate'
+
 // `gh issue edit`, `gh issue comment` and `gh issue create` each printed one URL, and the callers
 // read it — `epic-run.ts` parses the epic's number back out of it. REST answers the whole
 // object, so the same value is unwrapped out of it rather than the shape being changed.
@@ -136,8 +138,16 @@ async function close_with(
 	})
 }
 
-async function issue_close(issue_number: string, comment: string | undefined): Promise<boolean> {
-	return await close_with(issue_number, comment, { state: CLOSED_STATE })
+// `reason` is GitHub's `state_reason`, the field `git-gh-issue-rest.ts` reads back as `stateReason`;
+// left out, GitHub records `completed`.
+async function issue_close(
+	issue_number: string,
+	comment: string | undefined,
+	reason?: CloseReason,
+): Promise<boolean> {
+	const state = reason === undefined ? {} : { state_reason: reason }
+
+	return await close_with(issue_number, comment, { state: CLOSED_STATE, ...state })
 }
 
 // REST answers 422 `{"resource":"Label","code":"invalid","field":"color"}` for a color carrying a
@@ -413,4 +423,4 @@ const git_gh_issue_write = {
 }
 
 export { git_gh_issue_write }
-export type { LabelWrite }
+export type { CloseReason, LabelWrite }

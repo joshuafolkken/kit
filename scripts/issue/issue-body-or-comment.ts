@@ -68,7 +68,7 @@ async function post(issue_number: string, text: string, repo?: string): Promise<
 	}
 }
 
-const issue_body_or_comment = { post }
+const issue_body_or_comment = { is_author_trusted, post }
 
 export { issue_body_or_comment }
 export type { Destination, PostOutcome }
