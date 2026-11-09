@@ -8,7 +8,7 @@ import type { TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_state } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
-import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -26,6 +26,7 @@ import type { ProcessRoots } from './run-board-process-groups'
 import type { QuotaProvider } from './run-board-quota-read'
 import { run_board_roots } from './run-board-roots'
 import { run_board_scope } from './run-board-scope'
+import { run_board_single } from './run-board-single'
 import { run_board_span, type BoardSpan } from './run-board-span'
 import { run_board_throughput, type ThroughputRow } from './run-board-throughput'
 import { run_board_usual, type UsualTimes } from './run-board-usual'
@@ -37,6 +38,8 @@ interface LocalRead {
 	started_ms: number
 	// Set only once the run has ended; the board then draws its end-of-run screen.
 	ended_ms: number | undefined
+	// The single run's name the header draws; `undefined` for a `backlogrun` (`run-board-single.ts`).
+	run_name?: string | undefined
 	// What the run was asked to do, from its invocation.
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
@@ -132,8 +135,11 @@ async function main_root(): Promise<string> {
 
 // Every process the run's record names is asked of `table`, the redraw's own `ps` snapshot — only once
 // a run is found, so a repository with no run waits on no `ps`.
-async function span_here(repository: string, table: TableRead | undefined): Promise<SpanHere> {
-	const read = run_carry.read_carry(run_carry.carry_path(repository))
+async function recorded_span_here(
+	repository: string,
+	table: TableRead | undefined,
+	read: CarryRead,
+): Promise<SpanHere> {
 	const ended = run_carry_ended.read_ended(run_carry_ended.ended_path(repository))
 	const launch = backlogrun_launch.pending_launch(repository)
 	const span = run_board_span.span_of(read, ended, launch)
@@ -151,6 +157,17 @@ async function span_here(repository: string, table: TableRead | undefined): Prom
 		carry: read.kind === 'carried' ? read.carry : undefined,
 		is_stranded: run_stranded_detect.is_stranded_at(repository, stranded_ports),
 	}
+}
+
+// A single run this checkout holds is the one drawn (`run-board-single.ts`), before the ended run and,
+// outside a lane, before the carried one; it names no process.
+async function span_here(repository: string, table: TableRead | undefined): Promise<SpanHere> {
+	const read = run_carry.read_carry(run_carry.carry_path(repository))
+	const single = await run_board_single.span_here(read.kind !== 'none')
+
+	return single === undefined
+		? await recorded_span_here(repository, table, read)
+		: { ...NO_SPAN, span: single }
 }
 
 // Where each session of the run writes what it does: a lane's child to its dispatch log, in the lane's
@@ -266,7 +283,7 @@ async function span_events_here(
 	table: TableRead | undefined,
 	carry: RunCarry | undefined,
 ): Promise<Pick<LocalRead, 'events' | 'found' | 'usage_reset_ms' | 'usage_parked'>> {
-	const spanned = run_board_span.events_of(events, span)
+	const spanned = run_board_single.events_of(span, run_board_span.events_of(events, span))
 	// An overrun session outlives the run that launched it, so its notes and filings are read past the
 	// run's end too (joshuafolkken/kit#4818); the next run starts a span of its own.
 	const since = run_board_span.events_of(events, { ...span, ended_ms: undefined })
@@ -280,8 +297,14 @@ async function span_events_here(
 
 function span_fields(
 	span: BoardSpan,
-): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider'> {
-	const times = { started_ms: span.started_ms, ended_ms: span.ended_ms }
+): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider' | 'run_name'> {
+	const run_name = run_board_single.name_of(span.invocation)
+	const times = {
+		started_ms: span.started_ms,
+		ended_ms: span.ended_ms,
+		...(run_name !== undefined && { run_name }),
+	}
+
 	if (span.scheduler_provider === undefined) return times
 
 	return { ...times, scheduler_provider: span.scheduler_provider === 'openai' ? 'codex' : 'claude' }
@@ -302,7 +325,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 
 	return {
 		...span_fields(span),
-		scope: run_board_scope.scope_of(span.invocation),
+		scope: run_board_scope.scope_of(span.invocation, carry?.added),
 		...(await span_events_here(events, span, table, carry)),
 		throughput: run_board_throughput.rows_of(events, Date.now()),
 		lanes: lanes.map((lane) => lane.issue),

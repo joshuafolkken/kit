@@ -7,8 +7,9 @@ import { run_board_render_quota, type QuotaView } from './run-board-render-quota
 import type { GithubRateLimit } from './run-board-render-quota-github'
 
 // joshuafolkken/kit#6822: the github row draws the REST core and GraphQL allowances as two 20-wide
-// gauges on one row, each with its own used/limit and reset, ▶ marking the session's transport in
-// place of the former `(auto)` setting, and the usage legend names ▶.
+// gauges on one row, each with its own calls left and reset time (joshuafolkken/kit#6828), two spaces
+// apart, ▶ marking the session's transport in place of the former `(auto)` setting, and the usage
+// legend names ▶.
 
 const { LEGEND, usage_part } = run_board_render_quota
 const MINUTE_MS = 60_000
@@ -33,10 +34,13 @@ function summary_of(rate_limit: GithubRateLimit): string {
 }
 
 describe('run_board_render_quota.usage_part github row gauges', () => {
-	it('draws rest and graphql apart, each with its own used/limit and reset', () => {
-		expect(row_of({ rate_limit: BOTH })).toMatch(
-			/^ {2}github {2}rest {2}38% \S{20} 1877\/5000 ↻12:33 · graphql {3}1% \S{20} 48\/5000 ↻12:40$/u,
+	it('draws rest and graphql two spaces apart, each with its own calls left and bare reset time', () => {
+		const row = row_of({ rate_limit: BOTH })
+
+		expect(row).toMatch(
+			/^ {2}github {5}rest {2}38% \S{20} 3123 {5}12:33 {2}graphql {3}1% \S{20} 4952 {5}12:40$/u,
 		)
+		expect(row).not.toMatch(/↻| · /u)
 	})
 
 	it('keeps both gauges 20 wide and the widest row within the board', () => {
@@ -57,15 +61,15 @@ describe('run_board_render_quota.usage_part github row transport', () => {
 	it('marks graphql with ▶ while the session reads through it', () => {
 		const row = row_of({ rate_limit: { ...BOTH, transport: 'graphql' } })
 
-		expect(row).toContain('  github  rest  38% ')
-		expect(row).toContain(' · ▶graphql   1% ')
+		expect(row).toContain('  github     rest  38% ')
+		expect(row).toContain('12:33  ▶graphql   1% ')
 	})
 
 	it('moves ▶ to rest once the session falls back to it', () => {
 		const row = row_of({ rate_limit: { ...BOTH, transport: 'rest' } })
 
-		expect(row).toContain('  github  ▶rest  38% ')
-		expect(row).toContain(' · graphql   1% ')
+		expect(row).toContain('  github    ▶rest  38% ')
+		expect(row).toContain('12:33  graphql   1% ')
 	})
 
 	it('names the transport setting nowhere, `(auto)` included', () => {
