@@ -5,13 +5,14 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
 // GitHub's REST core rate limit, read before and after each `backlog:drive` offer cycle, so the run's
 // events carry what the account spent across a cycle (joshuafolkken/kit#6558). The cycle measured is
-// the `backlog:offer` read: a named offer answers from the carry record without it, and is left
+// the `lane:prune` and `backlog:offer` read: a named offer answers from the carry record without it, and is left
 // unmeasured so a drive with nothing to read spends no `gh` spawn either. `used` is account-wide:
 // lanes and other processes on the same account add to it, so a cycle's delta is an upper bound on
 // what the cycle itself spent. `gh api rate_limit` spends none of it.
 // **A failed read never stops the offer**: the cycle's event is written as missing instead.
 
 const { EVENT_KIND } = run_event_stream
+const PRUNE_COMMAND = 'lane:prune'
 
 interface CycleRecord {
 	used_delta: number
@@ -53,9 +54,18 @@ async function measured<T>(cycle: () => Promise<T>): Promise<T> {
 	return result
 }
 
-/** The drive's `backlog:offer` read, run as the measured cycle. */
+/**
+ * The drive's `backlog:offer` read, run as the measured cycle. `lane:prune` runs first, inside the
+ * cycle, since it reads each open lane's issue (joshuafolkken/kit#6547): leftover lanes are cleared,
+ * and kept or foreign ones are named with why on stderr, before the offer counts free lanes. Its stdout
+ * stays off the drive's, whose first line is the hand-back; a failed prune never stops the offer.
+ */
 async function offer_run(argv: ReadonlyArray<string>): Promise<JoshResult> {
-	return await measured(async () => await josh_command.josh_run(argv, true))
+	return await measured(async () => {
+		await josh_command.josh_run([PRUNE_COMMAND], true)
+
+		return await josh_command.josh_run(argv, true)
+	})
 }
 
 const backlog_drive_rate = { measured, offer_run }
