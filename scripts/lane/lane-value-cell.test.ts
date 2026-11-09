@@ -26,6 +26,21 @@ const CHECK = [
 const CLAIM = ['| check | claim | runs |', DIVIDER, '| lint | 2.0 | 428 |'].join('\n')
 const TABLES = [TEST_RELATED, CHECK, CLAIM]
 
+// joshuafolkken/kit#6503: an address matching several numeric cells is told apart from one matching none.
+describe('lane_value_cell.is_several', () => {
+	it('answers true for an address two tables of one title both hold', () => {
+		expect(
+			lane_value_cell.is_several(TABLES, { table: 'check', row: 'lint', column: 'runs' }),
+		).toBe(true)
+	})
+
+	it('answers false for an address matching no cell', () => {
+		expect(
+			lane_value_cell.is_several(TABLES, { table: SCOPE, row: 'touched', column: 'runs' }),
+		).toBe(false)
+	})
+})
+
 describe('lane_value_cell.value', () => {
 	it('reads the addressed cell as a number', () => {
 		const address = { table: SCOPE, row: RELATED, column: MEDIAN }

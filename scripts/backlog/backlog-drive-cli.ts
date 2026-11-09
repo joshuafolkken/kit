@@ -42,7 +42,7 @@ import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_rate } from './backlog-drive-rate'
 import { backlog_drive_rate_limit } from './backlog-drive-rate-limit'
 import { backlog_drive_record } from './backlog-drive-record'
-import { backlog_drive_restore } from './backlog-drive-restore'
+import { backlog_drive_restore, type LeftOut } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_retrospective_unit } from './backlog-drive-retrospective-unit'
 import { backlog_drive_seats } from './backlog-drive-seats'
@@ -270,10 +270,10 @@ function ports_of(
 
 // The lanes still in flight, and the children this run withdrew: a withdrawal while the drive was
 // handed back is never collected by this invocation, so its exclusion is read from the stream
-// (joshuafolkken/kit#4365).
+// (joshuafolkken/kit#4365). The sample waits are read back the same way (joshuafolkken/kit#6503).
 interface Seeded {
 	lanes: ReadonlyArray<string>
-	withdrawn: ReadonlyArray<string>
+	left_out: LeftOut
 }
 
 async function seeded_lanes(context: DriveContext): Promise<Seeded | undefined> {
@@ -292,7 +292,7 @@ async function seeded_lanes(context: DriveContext): Promise<Seeded | undefined> 
 
 	return {
 		lanes: backlog_drive_restore.restore(lanes, events, carry.merged_issues ?? [], dispatched),
-		withdrawn: backlog_drive_restore.withdrawn_issues(events),
+		left_out: backlog_drive_restore.left_out(events, context.exclude),
 	}
 }
 
@@ -328,7 +328,7 @@ function seeded_state(seeded: Seeded, context: DriveContext): DriveState {
 
 	initial.is_triage_owed = context.is_triage_owed
 
-	return { ...initial, exclude: [...new Set([...context.exclude, ...seeded.withdrawn])] }
+	return { ...initial, ...seeded.left_out }
 }
 
 async function drive(context: DriveContext): Promise<number> {

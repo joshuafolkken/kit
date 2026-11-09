@@ -69,8 +69,10 @@ it('excludes from the offer the merged children and the ones still in flight', (
 })
 
 // joshuafolkken/kit#6503: a child waiting for its measurement sample is no ready work to a stream reader.
+const SAMPLE_WAITED = event(1, 'sample-wait', '#2509 waiting: sample condition not met')
+
 it('excludes from the offer a child waiting for its measurement sample', () => {
-	const events = [event(1, 'sample-wait', '#2509 waiting: sample condition not met')]
+	const events = [SAMPLE_WAITED]
 
 	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual(['2509'])
 })
@@ -187,4 +189,15 @@ it('excludes a child a person withdrew after a yield of an earlier launch', () =
 
 it('offers a child withdrawn in another run', () => {
 	expect(backlog_drive_restore.offer_exclude([])).toStrictEqual([])
+})
+
+// joshuafolkken/kit#6503: a drive resumed after a hand-back reads its sample waits back apart from the
+// resume line and withdrawal exclusion, which it unites without repeats.
+it('seeds the sample waits apart from the resume line and withdrawal exclusion', () => {
+	const events = [...WITHDRAWN, SAMPLE_WAITED, SAMPLE_WAITED]
+
+	expect(backlog_drive_restore.left_out(events, ['2400', CHILD])).toStrictEqual({
+		exclude: ['2400', CHILD],
+		waiting: ['2509'],
+	})
 })

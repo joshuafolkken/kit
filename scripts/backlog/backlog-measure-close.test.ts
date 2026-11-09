@@ -93,7 +93,7 @@ describe('backlog_measure_close.outcome — handed to the lane with the result',
 // joshuafolkken/kit#6503: a `lane:value` with no sample in its period is a wait, not a lane.
 describe('backlog_measure_close.outcome — no sample yet', () => {
 	it.each([
-		['a cell', `josh lane:value cell: no single numeric cell ${SINCE}`],
+		['a cell', `josh lane:value cell: no numeric cell ${SINCE}`],
 		['a metric', `josh lane:value merges: no sample ${SINCE}`],
 	])('comments the unmet sample condition of %s and waits on the stream', async (_case, stderr) => {
 		given(DECLARED, { kind: 'failed', message: `Command failed: pnpm josh lane:value\n${stderr}` })

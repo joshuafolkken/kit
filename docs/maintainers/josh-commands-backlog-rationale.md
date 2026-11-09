@@ -115,7 +115,7 @@ An open carry record supplies the start time, merged count and remaining named i
 
 Before a launch the driver runs the issue's measurement declaration (`backlog-measure-close.ts`). A value within the bound closes the issue without a lane; a value out of bound, or any other failed or unreadable result, goes to a lane with the result commented.
 
-A `lane:value` with no sample (`no sample`, `no single numeric cell`) is a sample condition not yet met (joshuafolkken/kit#6503). The comment and a `sample-wait` event say `sample condition not met`; the run offers the issue no more, and a later run measures it again.
+A `lane:value` with no sample (`no sample`, `no numeric cell`) is a sample condition not yet met (joshuafolkken/kit#6503); a cell address matching `several numeric cells` goes to a lane. The comment and a `sample-wait` event say `sample condition not met`; the run offers the issue no more, and a later run measures it again.
 
 The drive keeps a waiting issue in `waiting`, not in the merged `exclude` the idle Telegram counts; a stream reader excludes it by its `sample-wait` event.
 

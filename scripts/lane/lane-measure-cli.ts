@@ -263,34 +263,45 @@ function value_request(rest: ReadonlyArray<string>): ValueRequest | undefined {
 	return address === undefined ? undefined : { ...request, address }
 }
 
+// A value read, or the words `lane:value` fails with when there is none.
+interface Measured {
+	value: number | undefined
+	missing: string
+}
+
 // The value alone on its line, so a measurement declaration reads it as the output's last line; a
 // period with no sample prints nothing there and fails, which the drive reads as a wait
 // (`lane-value-missing.ts`).
-function print_value(request: ValueRequest, measured: number | undefined): number {
-	if (measured === undefined) {
+function print_value(request: ValueRequest, measured: Measured): number {
+	const { value, missing } = measured
+
+	if (value === undefined) {
 		const since = new Date(request.since_ms).toISOString()
-		const { MISSING } = lane_value_missing
-		const missing = request.address === undefined ? MISSING.SAMPLE : MISSING.CELL
 
 		console.error(`josh lane:value ${request.metric}: ${missing} since ${since}`)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	console.info(measured.toFixed(VALUE_DIGITS))
+	console.info(value.toFixed(VALUE_DIGITS))
 
 	return 0
 }
 
-// The addressed cell of the tables `lane:stats` would print for `window`.
+// The addressed cell of the tables `lane:stats` would print for `window`, and why there is none.
 async function cell_value(
 	address: CellAddress,
 	window: StatsWindow,
 	context: MeasureContext,
-): Promise<number | undefined> {
+): Promise<Measured> {
 	const tables = lane_stats_tables.tables_of(await period_records(context, window), window)
+	const { MISSING } = lane_value_missing
+	const is_several = lane_value_cell.is_several(tables, address)
 
-	return lane_value_cell.value(tables, address)
+	return {
+		value: lane_value_cell.value(tables, address),
+		missing: is_several ? MISSING.SEVERAL : MISSING.CELL,
+	}
 }
 
 async function value_command(
@@ -312,7 +323,9 @@ async function value_command(
 		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
 	}
 
-	return print_value(request, lane_value.value(request.metric, records, window))
+	const value = lane_value.value(request.metric, records, window)
+
+	return print_value(request, { value, missing: lane_value_missing.MISSING.SAMPLE })
 }
 
 // The lane's net minutes, whole, alone on the line a causing-lane declaration copies

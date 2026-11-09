@@ -64,9 +64,7 @@ describe('lane_measure_cli.run — value cell', () => {
 	it('fails with no value when the period holds no sample for the cell', async () => {
 		await expect(lane_measure_cli.run(argv, fresh_context())).resolves.toBe(FAILURE)
 		expect(console.info).not.toHaveBeenCalled()
-		expect(console.error).toHaveBeenCalledWith(
-			expect.stringContaining('no single numeric cell since'),
-		)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no numeric cell since'))
 	})
 
 	it.each([

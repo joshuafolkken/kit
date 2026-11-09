@@ -1015,7 +1015,7 @@ A measurement declaration with no sample yet waits, not a lane (`sample conditio
 
 Merged causes use guarded `run:add --retry` for parked dependents.
 
-A watch with no child running sends one `💤` Telegram per idle episode; the next dispatch ends the episode.
+A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
 
 The `needs-human-review` and `already-done` labels a backlog run reads are in [Labels and run states](./labels-and-run-states.md).
 

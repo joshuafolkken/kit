@@ -18,7 +18,9 @@ function restored_state(current: DriveState): DriveState {
 
 	if (resumed === undefined) throw new Error('Invalid resume line')
 
-	return backlog_drive_cli.seeded_state({ lanes: current.in_flight, withdrawn: [] }, resumed)
+	const left_out = { exclude: [...resumed.exclude], waiting: [] }
+
+	return backlog_drive_cli.seeded_state({ lanes: current.in_flight, left_out }, resumed)
 }
 
 async function interrupted_state(token: string): Promise<DriveState> {
