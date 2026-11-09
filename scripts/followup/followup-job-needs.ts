@@ -75,15 +75,30 @@ function parse_graph(workflow: string): NeedsGraph {
 	}))
 }
 
+function needs_of(graph: NeedsGraph, job_name: string): ReadonlyArray<RegExp> {
+	return graph.filter(({ pattern }) => pattern.test(job_name)).flatMap((job) => job.needs)
+}
+
 // **Whether the job named `job_name` needs one of the jobs named in `upstream`.**
 function is_waiting_on(
 	graph: NeedsGraph,
 	job_name: string,
 	upstream: ReadonlyArray<string>,
 ): boolean {
-	const needs = graph.filter(({ pattern }) => pattern.test(job_name)).flatMap((job) => job.needs)
+	const needs = needs_of(graph, job_name)
 
 	return upstream.some((name) => needs.some((pattern) => pattern.test(name)))
+}
+
+// **Whether a job the job named `job_name` needs is absent from the run**, whose jobs are named in
+// `run_jobs`. GitHub Actions once ran SonarQube without creating its `change-scope`, so the guard step
+// reading `needs.change-scope.result` failed with nothing wrong in the change (joshuafolkken/kit#6923).
+function is_missing_need(
+	graph: NeedsGraph,
+	job_name: string,
+	run_jobs: ReadonlyArray<string>,
+): boolean {
+	return needs_of(graph, job_name).some((pattern) => run_jobs.every((name) => !pattern.test(name)))
 }
 
 async function read_graph(workflow_path: string): Promise<NeedsGraph> {
@@ -94,7 +109,7 @@ async function read_graph(workflow_path: string): Promise<NeedsGraph> {
 	}
 }
 
-const followup_job_needs = { is_waiting_on, parse_graph, read_graph }
+const followup_job_needs = { is_missing_need, is_waiting_on, parse_graph, read_graph }
 
 export type { NeedsGraph }
 export { followup_job_needs }

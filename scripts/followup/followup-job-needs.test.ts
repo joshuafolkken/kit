@@ -17,6 +17,7 @@ const WORKFLOW = [
 ].join('\n')
 
 const SHARD = 'Unit Tests (5/6)'
+const STATIC_CHECKS = 'Static Checks'
 
 describe('followup_job_needs.is_waiting_on', () => {
 	const graph = followup_job_needs.parse_graph(WORKFLOW)
@@ -30,10 +31,26 @@ describe('followup_job_needs.is_waiting_on', () => {
 	})
 
 	it.each([
-		['a job that needs nothing', 'Static Checks'],
+		['a job that needs nothing', STATIC_CHECKS],
 		['a job no workflow job is named', 'Lint'],
 	])('is false for %s', (_label, job_name) => {
 		expect(followup_job_needs.is_waiting_on(graph, job_name, [SHARD])).toBe(false)
+	})
+})
+
+describe('followup_job_needs.is_missing_need', () => {
+	const graph = followup_job_needs.parse_graph(WORKFLOW)
+
+	it('is true for a job whose needed job the run never created', () => {
+		expect(followup_job_needs.is_missing_need(graph, 'Checks', [STATIC_CHECKS])).toBe(true)
+	})
+
+	it.each([
+		['every needed job is in the run', 'Checks', [STATIC_CHECKS, SHARD]],
+		['the job needs nothing', STATIC_CHECKS, []],
+		['no workflow job is named so', 'Lint', []],
+	])('is false when %s', (_label, job_name, run_jobs) => {
+		expect(followup_job_needs.is_missing_need(graph, job_name, run_jobs)).toBe(false)
 	})
 })
 

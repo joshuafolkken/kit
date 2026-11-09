@@ -1,0 +1,7 @@
+{
+	"reason": "is_missing_need predicate and its settle_unnamed wiring for runs lacking a needs job (#6923)",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 22
+	}
+}
