@@ -13,6 +13,9 @@ const SECOND_PAGE = 2
 // The search API serves at most this many results, so a window past it holds no further page.
 const SEARCH_RESULT_CEILING = 1000
 // The search API allows 30 requests a minute, so this bounds only how many are in flight at once.
+// Kept below the `gh` layer's shared spawn limit (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`), which
+// is sized for the core REST budget: the search endpoint's own budget is the narrower one, so a
+// search does not spend it in one burst while other `gh` reads hold the remaining slots.
 const PAGE_CONCURRENCY = 4
 
 const search_item_schema = z.object({

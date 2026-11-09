@@ -1,4 +1,3 @@
-import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_blocked_by_graphql } from './git-gh-blocked-by-graphql'
 import { git_gh_etag_read } from './git-gh-etag-read'
@@ -202,22 +201,20 @@ async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> 
 // consults the row's `issue_dependencies_summary` first, so an issue GitHub itself reports as
 // unblocked costs no request.
 //
-// The REST reads are bounded rather than sequential: the pass was paced one request at a time,
-// which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a blocker. The width
-// is the one `epic:bundle`'s referenced reads use, so the burst stays bounded while a
-// rate-limited read still fails the whole listing rather than a row (`bounded-pool.ts`).
-const RELATION_CONCURRENCY = 8
-
+// The REST reads are requested together rather than one after another: the pass was paced one
+// request at a time, which made every `backlog:plan` wait about 0.7 s per opted-in issue declaring a
+// blocker. The `gh` layer's shared spawn limit (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`) bounds the
+// burst, and a rate-limited read still fails the whole listing rather than a row.
 async function read_relations(
 	rows: ReadonlyArray<RestIssue>,
 	repo?: string,
 ): Promise<Array<BlockedBy>> {
 	const answered = await git_gh_blocked_by_graphql.read_answered(rows)
 
-	return await bounded_pool.bounded_map(
-		rows,
-		RELATION_CONCURRENCY,
-		async (row) => answered.get(row) ?? (await read_blocked_by(String(row.number), row, repo)),
+	return await Promise.all(
+		rows.map(
+			async (row) => answered.get(row) ?? (await read_blocked_by(String(row.number), row, repo)),
+		),
 	)
 }
 

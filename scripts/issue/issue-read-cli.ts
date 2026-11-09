@@ -3,7 +3,6 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { IssueReadFailure } from '#scripts/gh/git-gh-issue-read'
 import { gh_rate_limit } from '#scripts/gh/git-gh-rate-limit'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { issue_read, type IssueComment, type IssueFields } from './issue-read'
 import { issue_report_failures, type ReadFailureKind } from './issue-report-failures'
@@ -30,9 +29,6 @@ import { issue_state_cli } from './issue-state-cli'
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh issue:read <issue-number> [<issue-number> ...] [--repo <owner/repo>]'
 const BLOCK_SEPARATOR = '\n\n---\n\n'
-// The same bound `issue:state` puts on its batch read, for the same reason: every read is a `gh`
-// process, and an unbounded fan-out is answered with secondary rate limiting rather than with issues.
-const READ_CONCURRENCY = 8
 const ISSUE_FIELDS = `title,state,body,${gh_author_association.AUTHOR_FIELDS}`
 const FAILURE_TERMS = { success_kind: 'issue', misreading: 'the issue is empty' } as const
 
@@ -154,14 +150,14 @@ async function read_block(issue_number: string): Promise<BlockRead> {
 	return { kind: 'ok', block: issue_read.format_issue(issue_number, fields, comments), trust }
 }
 
+// Every read requested at once: each is a `gh` process, and the `gh` layer's shared spawn limit
+// (`GH_SPAWN_CONCURRENCY`, `git-gh-exec.ts`) keeps the fan-out from drawing secondary rate limiting.
 async function read_all(request: ReadRequest): Promise<ReadonlyArray<IssueReport>> {
-	return await bounded_pool.bounded_map(
-		request.issue_numbers,
-		READ_CONCURRENCY,
-		async (issue_number) => ({
+	return await Promise.all(
+		request.issue_numbers.map(async (issue_number) => ({
 			issue_number,
 			result: await read_issue(issue_number, request.repo),
-		}),
+		})),
 	)
 }
 
