@@ -1078,6 +1078,14 @@ Unreadable `.env`: report lane/reason on stderr; check ports before allocating o
 
 `lane:prune` names each lane it keeps, with why, on stderr.
 
+Codex hooks in a lane: Codex runs the main checkout's `.codex/hooks.json` in every lane.
+
+- Its trust is the main path and definition hash in `~/.codex/config.toml` `[hooks.state]`.
+- Each command finds the lane's scripts through `git rev-parse --show-toplevel`.
+- No per-lane trust; `--dangerously-bypass-hook-trust` is never passed.
+- A lane's own `.codex/hooks.json` edit takes effect only after it reaches the main checkout.
+- A changed hook definition reads `modified` and Codex skips it in every checkout until a person re-approves it in Codex's hook review.
+
 **Settings:**
 
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.

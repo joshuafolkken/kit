@@ -21,16 +21,26 @@ vi.mock('#scripts/issue/issue-watch-gate', () => ({
 	issue_watch_gate: { assert_read_here: vi.fn() },
 }))
 
-vi.mock('./followup-job-rerun', () => ({
-	followup_job_rerun: { rerun_failed_jobs: vi.fn() },
-}))
+vi.mock(import('./followup-job-rerun'), async (import_original) => {
+	const original = await import_original()
+
+	return {
+		...original,
+		followup_job_rerun: {
+			...original.followup_job_rerun,
+			rerun_failed_jobs: vi.fn(),
+			read_rerun_names: vi.fn(),
+		},
+	}
+})
 
 vi.mock('./followup-run-rerun', () => ({
 	followup_run_rerun: { recover_missing: vi.fn() },
 }))
 
 const { git_pr_checks } = await import('#scripts/gh/git-pr-checks')
-const { followup_job_rerun } = await import('./followup-job-rerun')
+const { followup_job_rerun, MAX_CHECK_RERUNS, RERUNS_SPENT_MESSAGE } =
+	await import('./followup-job-rerun')
 const { followup_run_rerun } = await import('./followup-run-rerun')
 
 const BRANCH_NAME = '4813-lane'
@@ -42,6 +52,7 @@ const SNAPSHOT = { rollup: [], merge_state_status: undefined, review_decision: u
 
 const wait = vi.mocked(git_pr_checks.wait_for_pr_success)
 const rerun = vi.mocked(followup_job_rerun.rerun_failed_jobs)
+const read_names = vi.mocked(followup_job_rerun.read_rerun_names)
 const recover = vi.mocked(followup_run_rerun.recover_missing)
 
 async function run(reran: Array<string> = []): Promise<unknown> {
@@ -55,6 +66,7 @@ function missing_error(): MissingContextError {
 beforeEach(() => {
 	wait.mockReset()
 	rerun.mockReset()
+	read_names.mockReset()
 	recover.mockReset()
 })
 
@@ -101,7 +113,7 @@ describe('run_checks — a required context the whole-run rerun cannot recover',
 		rerun.mockResolvedValue(RERUN_NAMES)
 
 		await expect(run()).resolves.toStrictEqual(SNAPSHOT)
-		expect(rerun).toHaveBeenCalledExactlyOnceWith(BRANCH_NAME)
+		expect(rerun).toHaveBeenCalledExactlyOnceWith(BRANCH_NAME, 0)
 	})
 
 	it('does not recover a second time when the context is missing again', async () => {
@@ -113,13 +125,13 @@ describe('run_checks — a required context the whole-run rerun cannot recover',
 	})
 })
 
-describe('run_checks — a stalled job is rerun once', () => {
+describe('run_checks — a stalled job is rerun', () => {
 	it('waits again and passes when the rerun went green', async () => {
 		wait.mockRejectedValueOnce(new Error(CHECKS_FAILURE)).mockResolvedValueOnce(SNAPSHOT)
 		rerun.mockResolvedValue(RERUN_NAMES)
 
 		await expect(run()).resolves.toStrictEqual(SNAPSHOT)
-		expect(rerun).toHaveBeenCalledExactlyOnceWith(BRANCH_NAME)
+		expect(rerun).toHaveBeenCalledExactlyOnceWith(BRANCH_NAME, 0)
 		expect(wait).toHaveBeenCalledTimes(2)
 	})
 
@@ -135,12 +147,16 @@ describe('run_checks — a stalled job is rerun once', () => {
 		expect(reran).toStrictEqual(RERUN_NAMES)
 	})
 
-	it('fails as before when the rerun failed again, without a second rerun', async () => {
+	it('fails as before when the red after a rerun no longer qualifies', async () => {
 		wait.mockRejectedValue(new Error(CHECKS_FAILURE))
-		rerun.mockResolvedValue(RERUN_NAMES)
+		rerun.mockResolvedValueOnce(RERUN_NAMES).mockResolvedValueOnce([])
 
 		await expect(run()).rejects.toThrow(CHECKS_FAILURE)
-		expect(rerun).toHaveBeenCalledOnce()
+		expect(rerun.mock.calls).toStrictEqual([
+			[BRANCH_NAME, 0],
+			[BRANCH_NAME, 1],
+		])
+		expect(read_names).not.toHaveBeenCalled()
 	})
 
 	it('fails with the original failure when no job qualified', async () => {
@@ -149,6 +165,44 @@ describe('run_checks — a stalled job is rerun once', () => {
 
 		await expect(run()).rejects.toThrow(CHECKS_FAILURE)
 		expect(wait).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#6834: a download outage outlasting the reruns stops on a message naming it.
+describe('run_checks — reruns spent on a CI outage', () => {
+	it('reruns each round up to the cap, then stops on the spent message', async () => {
+		const reran: Array<string> = []
+
+		wait.mockRejectedValue(new Error(CHECKS_FAILURE))
+		rerun.mockResolvedValue(RERUN_NAMES)
+		read_names.mockResolvedValue(RERUN_NAMES)
+
+		await expect(run(reran)).rejects.toThrow(
+			`${RERUNS_SPENT_MESSAGE} (${String(MAX_CHECK_RERUNS)} reruns; still failing: Detect E2E)`,
+		)
+		expect(rerun.mock.calls.map(([, round]) => round)).toStrictEqual([0, 1, 2])
+		expect(wait).toHaveBeenCalledTimes(MAX_CHECK_RERUNS + 1)
+		expect(reran).toHaveLength(MAX_CHECK_RERUNS)
+	})
+
+	it('keeps the checks failure when the red at the cap is not one a rerun retries', async () => {
+		wait.mockRejectedValue(new Error(CHECKS_FAILURE))
+		rerun.mockResolvedValue(RERUN_NAMES)
+		read_names.mockResolvedValue([])
+
+		await expect(run()).rejects.toThrow(CHECKS_FAILURE)
+		expect(read_names).toHaveBeenCalledExactlyOnceWith(BRANCH_NAME)
+	})
+
+	it('passes once a later rerun goes green', async () => {
+		wait
+			.mockRejectedValueOnce(new Error(CHECKS_FAILURE))
+			.mockRejectedValueOnce(new Error(CHECKS_FAILURE))
+			.mockResolvedValueOnce(SNAPSHOT)
+		rerun.mockResolvedValue(RERUN_NAMES)
+
+		await expect(run()).resolves.toStrictEqual(SNAPSHOT)
+		expect(rerun).toHaveBeenCalledTimes(2)
 	})
 })
 
