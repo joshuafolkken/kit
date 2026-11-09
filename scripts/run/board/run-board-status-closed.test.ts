@@ -1,9 +1,11 @@
+import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
 // joshuafolkken/kit#3451: a child read closed from GitHub ends when it closed, merged or not.
 // joshuafolkken/kit#3958: a parked child a person closed afterwards is settled again by that read.
+// joshuafolkken/kit#6891: so is a child stopped for human review that a person merged.
 
 const T0 = Date.parse('2026-10-08T09:00:00.000Z')
 const T1 = Date.parse('2026-10-08T09:05:00.000Z')
@@ -134,5 +136,47 @@ describe('run_board_status.settle_closed with a parked child reopened', () => {
 			state: 'parked',
 			started_ms: T2 + 1,
 		})
+	})
+})
+
+const KIND = run_event_stream.EVENT_KIND
+
+function event_of(pos: number, at_ms: number, kind: string): RunEvent {
+	return { pos, at: new Date(at_ms).toISOString(), kind, text: `#${String(ISSUE)}` }
+}
+
+// A child launched at T0 that stopped for human review at T1, as the event stream draws it.
+const HUMAN_REVIEWED = run_board_status.fold_events([
+	event_of(1, T0, KIND.CHILD_LAUNCH),
+	event_of(2, T1, KIND.HUMAN_REVIEW),
+])
+
+function settle_human(read: OpenRead): ItemStatus | undefined {
+	return run_board_status.settle_closed(HUMAN_REVIEWED, read).get(ISSUE)
+}
+
+describe('run_board_status.settle_closed with a child stopped for human review', () => {
+	it('folds the human-review event into a human child', () => {
+		expect(HUMAN_REVIEWED.get(ISSUE)).toMatchObject({ state: 'human', started_ms: T0 })
+	})
+
+	it('draws one a person merged as merged, timed to its close', () => {
+		const read = read_closed(closed_issue({ is_merged: true }))
+
+		expect(settle_human(read)).toMatchObject({ state: 'merged', started_ms: T0, ended_ms: T2 })
+	})
+
+	it('keeps one human once a listing read after its close holds it again', () => {
+		const read = read_closed(closed_issue({ is_merged: true }))
+
+		expect(
+			settle_human({ ...read, open_numbers: new Set([ISSUE]), read_ms: T2 + 1 }),
+		).toMatchObject({ state: 'human' })
+	})
+
+	it('keeps one human when its close is dated before the launch', () => {
+		const read = read_closed(closed_issue({ closed_ms: T0 - 1, is_merged: true }))
+
+		expect(settle_human(read)).toMatchObject({ state: 'human' })
 	})
 })

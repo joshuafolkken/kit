@@ -104,9 +104,10 @@ const { LAUNCH_KINDS } = run_board_lane_time
 // What the GitHub read may still settle: a running child, and one whose lane has no child left in it —
 // a child that merged and then died is drawn merged, not stopped.
 const UNSETTLED_STATES: ReadonlySet<ItemState> = new Set(['running', 'paused', 'stopped'])
-// A parked child waits on a person, who may close its issue after the park; only a closed read settles
-// it again, so one still open stays parked whatever its labels say (joshuafolkken/kit#3958).
-const PARKED_STATE: ItemState = 'parked'
+// A child waiting on a person — parked, or stopped for human review — is drawn in 🙋 decision. The
+// person may close its issue after the stop; only a closed read settles it again, so one still open
+// keeps waiting whatever its labels say (joshuafolkken/kit#3958).
+const WAITING_STATES: ReadonlySet<ItemState> = new Set(['parked', 'human'])
 
 const { relaunch_of, settled_as } = run_board_settle
 
@@ -360,10 +361,11 @@ function unsettled(issue: number, status: ItemStatus, read: OpenRead): ItemStatu
 	return from_closed ?? labelled(issue, status, read)
 }
 
-// The closed read is kept for the run, so a parked child a person reopened since is told apart by a
-// listing read after the close holding it again. Once a listing has landed, that — not the launch —
-// dates the close, so a closed child never waits in 🙋 decision (joshuafolkken/kit#6535).
-function parked_settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
+// The closed read is kept for the run, so a waiting child (parked or human) a person reopened since is
+// told apart by a listing read after the close holding it again. Once a listing has landed, that — not
+// the launch — dates the close, so a closed child never waits in 🙋 decision (joshuafolkken/kit#6535,
+// joshuafolkken/kit#6891).
+function waiting_settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
 	const closed = read.closed.get(issue)
 	// `undefined` too for a close dated before this launch — an earlier life's close never settles it.
 	const settled_closed = closed_status(status, closed)
@@ -374,7 +376,7 @@ function parked_settled(issue: number, status: ItemStatus, read: OpenRead): Item
 }
 
 function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus {
-	if (status.state === PARKED_STATE) return parked_settled(issue, status, read)
+	if (WAITING_STATES.has(status.state)) return waiting_settled(issue, status, read)
 
 	return UNSETTLED_STATES.has(status.state) ? unsettled(issue, status, read) : status
 }
@@ -384,7 +386,7 @@ function settled(issue: number, status: ItemStatus, read: OpenRead): ItemStatus 
 // finished instead — merged, withdrawn or done, and timed. Absence from the open listing alone settles
 // nothing: a listing that came back short would draw live children finished (joshuafolkken/kit#4537).
 // One the listing holds is drawn as its labels say, so a child that stopped with no parent to record it
-// does not read as running. A parked child is settled again only by a closed read; one a person
+// does not read as running. A waiting child is settled again only by a closed read; one a person
 // released is dropped after it (`run-board-released.ts`).
 function settle_closed(
 	statuses: ReadonlyMap<number, ItemStatus>,
@@ -438,7 +440,14 @@ function activity_of(events: ReadonlyArray<RunEvent>, is_ended = false): RunActi
 	return is_ended ? { ...activity, is_stopped: true } : activity
 }
 
-const run_board_status = { activity_of, fold_events, settle_closed, since_launch, statuses_of }
+const run_board_status = {
+	WAITING_STATES,
+	activity_of,
+	fold_events,
+	settle_closed,
+	since_launch,
+	statuses_of,
+}
 
 export { run_board_status }
 export type { ItemState, ItemStatus, LatestEvent, OpenRead, RunActivity }
