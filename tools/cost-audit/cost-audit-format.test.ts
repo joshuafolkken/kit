@@ -144,6 +144,9 @@ describe('cost_audit_format.report_lines — the session kinds by model', () => 
 		)
 		const kind = lines.indexOf(FULLRUN_LINE)
 
+		expect(lines[kind - 1]).toBe(
+			'By session kind (this period per model: cost — input / cache read / cache write / output in dollars)',
+		)
 		expect(lines[kind + 1]).toBe(
 			'    claude-opus-4-6: $9.0000 — $4.0000 / $2.0000 / $1.0000 / $2.0000',
 		)
