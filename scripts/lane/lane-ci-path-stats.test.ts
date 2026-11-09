@@ -82,3 +82,12 @@ describe('lane_ci_path_stats.last_check_text', () => {
 		expect(lane_ci_path_stats.last_check_text([ci_wait('e2e', { e2e: 1 })], ISSUE)).toBe('')
 	})
 })
+
+describe('lane_ci_path_stats.last_check_name', () => {
+	it("names the last check of the lane's latest ci-wait row, undefined where none does", () => {
+		const entries = [ci_wait('lint', { lint: 10_000 }, ISSUE), ci_wait('e2e', { e2e: 1 }, ISSUE)]
+
+		expect(lane_ci_path_stats.last_check_name(entries, ISSUE)).toBe('e2e')
+		expect(lane_ci_path_stats.last_check_name(entries, ISSUE + 1)).toBeUndefined()
+	})
+})

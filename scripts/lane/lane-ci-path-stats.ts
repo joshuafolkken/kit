@@ -57,17 +57,26 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 
 // `issue`'s followup line detail for `lane:breakdown`: the last check its latest `ci-wait` row names,
 // `''` where none does.
-function last_check_text(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
-	const last = entries
+function latest_check(entries: ReadonlyArray<LedgerEntry>, issue: number): LastCheck | undefined {
+	return entries
 		.filter((entry) => entry.kind === lane_ledger.KIND.STAGE && entry.issue === issue)
 		.map((entry) => last_check_of(entry))
 		.findLast((found) => found !== undefined)
+}
+
+// The check `issue`'s latest `ci-wait` row settled last on — its longest — `undefined` where none names one.
+function last_check_name(entries: ReadonlyArray<LedgerEntry>, issue: number): string | undefined {
+	return latest_check(entries, issue)?.name
+}
+
+function last_check_text(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
+	const last = latest_check(entries, issue)
 
 	return last === undefined
 		? ''
 		: ` (last check: ${last.name} ${lane_check_stats.cell(last.elapsed_ms)}s)`
 }
 
-const lane_ci_path_stats = { last_check_text, table }
+const lane_ci_path_stats = { last_check_name, last_check_text, table }
 
 export { lane_ci_path_stats }

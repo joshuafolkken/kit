@@ -7,20 +7,35 @@ import { lane_ci_path_stats } from './lane-ci-path-stats'
 import type { ImplementRate } from './lane-implement-rate'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_sinks } from './lane-sinks'
-import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
+import type { OpenIssue } from './lane-sinks-issues'
 import type { SizeRatios } from './lane-size-stats'
 import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 import { lane_stats } from './lane-stats'
+import { lane_why_causes } from './lane-why-causes'
 import { lane_why_ci } from './lane-why-ci'
 
 // `josh lane:why <issue>` (joshuafolkken/kit#6120): one row per stage of a merged lane that ran past
 // its budget, each beside the records that say why — the join a person made by hand over
 // `lane:breakdown`, the filing's projection, the followup's last check, the ship's stops and
-// `lane:stats --sinks`. A record that is missing leaves its cell blank.
+// `lane:stats --sinks`. A record that is missing leaves its cell blank; an unread Issue listing
+// prints `unread`.
 
-const COLUMNS = ['stage', 'min', 'budget', 'projected', 'CI', 'ship', 'open issues']
+const COLUMNS = [
+	'stage',
+	'min',
+	'budget',
+	'projected',
+	'CI',
+	'ship',
+	'causes',
+	'open issues',
+	'unfiled',
+]
 const BLANK = ''
 const SHIP_SEPARATOR = '; '
+const KEY_SEPARATOR = ', '
+// The budgets whose overrun the ship's cause keys explain (joshuafolkken/kit#6679).
+const SHIP_BUDGETS: ReadonlySet<BudgetStage> = new Set(['ship', 'followup'])
 
 interface WhyRecords {
 	issue: number
@@ -32,6 +47,8 @@ interface WhyRecords {
 	issues: ReadonlyArray<OpenIssue> | undefined
 	// The lane branch's CI timing, `undefined` when `ci:timing` was unreadable.
 	timing: TimingAnswer | undefined
+	// The ship log's last launch, `undefined` when it is gone.
+	log: string | undefined
 }
 
 type StopRow = Extract<LedgerEntry, { kind: typeof lane_ledger.KIND.STOP }>
@@ -99,11 +116,29 @@ function projected_cell(records: WhyRecords): string {
 	return records.projected === undefined ? BLANK : `${records.projected.toFixed(1)} min`
 }
 
-function issues_cell(name: string, issues: WhyRecords['issues']): string {
-	return issues === undefined ? BLANK : lane_sinks_issues.cell(lane_sinks.base_name(name), issues)
+// A ship row's cause keys, its open Issues and the keys none names; any other row's open Issues
+// name its stage (joshuafolkken/kit#6679).
+function cause_cells({ stage, budget }: OverStage, records: WhyRecords): Array<string> {
+	if (!SHIP_BUDGETS.has(budget)) {
+		return [
+			BLANK,
+			lane_why_causes.open_cell([lane_sinks.base_name(stage.name)], records.issues),
+			BLANK,
+		]
+	}
+
+	const keys = lane_why_causes.keys_of(records.entries, records.issue, records.log)
+
+	return [
+		keys.join(KEY_SEPARATOR),
+		lane_why_causes.open_cell(keys, records.issues),
+		lane_why_causes.unfiled_cell(keys, records.issues),
+	]
 }
 
-function row_of({ stage, budget }: OverStage, records: WhyRecords): string {
+function row_of(over: OverStage, records: WhyRecords): string {
+	const { stage, budget } = over
+
 	return lane_stats.to_row([
 		stage.name,
 		lane_breakdown.minutes_text(stage.ms),
@@ -111,7 +146,7 @@ function row_of({ stage, budget }: OverStage, records: WhyRecords): string {
 		budget === 'implement' ? projected_cell(records) : BLANK,
 		budget === 'followup' ? ci_cell(records) : BLANK,
 		budget === 'ship' ? ship_cell(records) : BLANK,
-		issues_cell(stage.name, records.issues),
+		...cause_cells(over, records),
 	])
 }
 
