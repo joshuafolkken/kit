@@ -569,7 +569,7 @@ pnpm josh issue:consolidate 6559 6567 6568 --body-file .josh/tmp/body.md --demot
 **Options:**
 
 - `--title <title>` — replace the target's title.
-- `--body-file <path>` — replace the target's body, from a file or stdin (`-`). Its author must have write access.
+- `--body-file <path>` — replace the target's body, from a file or stdin (`-`). Target author needs write access.
 - `--demote` — remove the `epic` label and the `## Split into children` sections from the body.
 
 <!-- /usage -->

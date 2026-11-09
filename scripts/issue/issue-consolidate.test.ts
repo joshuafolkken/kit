@@ -114,6 +114,16 @@ describe('issue_consolidate target', () => {
 		expect(gh.issue_remove_label).toHaveBeenCalledExactlyOnceWith(String(TARGET), 'Epic')
 	})
 
+	it('removes a duplicate from the target epic before demoting the target', async () => {
+		build_tracking_index.mockReturnValue(new Map([[DUPLICATE, [TARGET]]]))
+
+		expect(await issue_consolidate.consolidate(request({ is_demote: true }))).toBe(0)
+		expect(untrack).toHaveBeenCalledExactlyOnceWith(TARGET, [DUPLICATE])
+		expect(untrack.mock.invocationCallOrder[0]).toBeLessThan(
+			gh.issue_edit_body.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
 	it('writes neither body nor label when there is nothing to change', async () => {
 		gh.issue_view_json.mockResolvedValue(JSON.stringify({ body: ORIGINAL, labels: [] }))
 

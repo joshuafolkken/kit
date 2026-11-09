@@ -38,7 +38,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [BODY_FILE],
 					description:
-						"replace the target's body, from a file or stdin (`-`). Its author must have write access.",
+						"replace the target's body, from a file or stdin (`-`). Target author needs write access.",
 				},
 				{
 					names: ['--demote'],

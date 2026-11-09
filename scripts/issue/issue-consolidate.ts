@@ -165,9 +165,7 @@ async function rewrite_target(
 	await demote_label(request, target, done)
 }
 
-// The epic rows go first: a failed untrack leaves the duplicate open, so a re-run finds it again.
-async function fold_duplicate(
-	target: number,
+async function untrack_duplicate(
 	duplicate: number,
 	tracking: Tracking,
 	done: Array<string>,
@@ -181,23 +179,37 @@ async function fold_duplicate(
 			return (await epic_untrack.untrack(epic, [duplicate])) === SUCCESS
 		})
 	}
+}
 
+async function close_duplicate(
+	target: number,
+	duplicate: number,
+	done: Array<string>,
+): Promise<void> {
 	const comment = `Consolidated into ${session_cite.issue(target)}.`
 
-	await write(done, `${cite} closed as not planned`, async () => {
+	await write(done, `${session_cite.issue(duplicate)} closed as not planned`, async () => {
 		return await git_gh_command.issue_close(String(duplicate), comment, 'not_planned')
 	})
 }
 
+// The epic rows go first, before the target is rewritten: a demoted or rewritten target epic no
+// longer tracks its duplicates, so its untrack would refuse. A failed untrack leaves every duplicate
+// open, so a re-run finds them again.
 async function apply(request: ConsolidateRequest, done: Array<string>): Promise<void> {
 	const target = await read_target(request)
 	const tracking = await read_tracking()
+
+	for (const duplicate of request.duplicates) {
+		// eslint-disable-next-line no-await-in-loop -- a failed write stops the run before the next one
+		await untrack_duplicate(duplicate, tracking, done)
+	}
 
 	await rewrite_target(request, target, done)
 
 	for (const duplicate of request.duplicates) {
 		// eslint-disable-next-line no-await-in-loop -- a failed write stops the run before the next one
-		await fold_duplicate(request.target, duplicate, tracking, done)
+		await close_duplicate(request.target, duplicate, done)
 	}
 }
 
