@@ -210,6 +210,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_SHIP_LAP_SCOPE`       | `josh ship`                    | The lap scope a child process times its steps under, so `lane:breakdown` names the `josh git` step or hook that spent a stage's minutes. |
 | `JOSH_INIT_HANDED_OFF`      | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                      |
 | `JOSH_ESLINT_MEMORY_CHILD`  | the ESLint memory preload      | `1` marks the ESLint child whose peak RSS is measured, so the preload does not launch another observer.                                  |
+| `JOSH_ESLINT_UNTYPED`       | the edit-time `eslint_d`       | `1`: `create_base_config` drops the TypeScript program, so the daemon holds none; the gate's cold lint never sets it.                    |
 | `JOSH_WORKFLOW`             | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                    |
 | `JOSH_UNIT_RUN_MARKED`      | `josh gate`                    | The gate already claimed its place for the unit suite it spawns.                                                                         |
 | `JOSH_UNIT_GUARD_LOG`       | the unit suite's network guard | Where the guard logs blocked calls.                                                                                                      |
