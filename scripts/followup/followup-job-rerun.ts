@@ -201,8 +201,13 @@ async function judge_job(job: Job, changed: ReadonlySet<string>): Promise<Judged
 	return { job, verdict: followup_failed_tests.verdict_of(tests, changed), tests }
 }
 
-// A job red with no test named qualifies only as one waiting on a job that is itself rerun.
-function settle_unnamed(judged: ReadonlyArray<Judged>, graph: NeedsGraph): Array<Judged> {
+// A job red with no test named qualifies only as one waiting on a job that is itself rerun, or on one
+// the run never created (`run_jobs` names every job of the run).
+function settle_unnamed(
+	judged: ReadonlyArray<Judged>,
+	graph: NeedsGraph,
+	run_jobs: ReadonlyArray<string>,
+): Array<Judged> {
 	const reruns = judged
 		.filter(({ verdict }) => verdict === RERUN_VERDICT)
 		.map(({ job }) => job.name)
@@ -210,9 +215,12 @@ function settle_unnamed(judged: ReadonlyArray<Judged>, graph: NeedsGraph): Array
 	return judged.map((entry) => {
 		if (entry.verdict !== UNNAMED_VERDICT) return entry
 
-		const is_waiting = followup_job_needs.is_waiting_on(graph, entry.job.name, reruns)
+		const { name } = entry.job
+		const is_infra =
+			followup_job_needs.is_waiting_on(graph, name, reruns) ||
+			followup_job_needs.is_missing_need(graph, name, run_jobs)
 
-		return is_waiting ? { job: entry.job, verdict: RERUN_VERDICT } : entry
+		return is_infra ? { job: entry.job, verdict: RERUN_VERDICT } : entry
 	})
 }
 
@@ -241,7 +249,12 @@ async function read_rerun_jobs(
 	)
 	const failed = jobs.filter((job) => FAILED_JOB_CONCLUSIONS.has(job.conclusion ?? ''))
 	const judged = await Promise.all(failed.map(async (job) => await judge_job(job, changed)))
-	const settled = settle_unnamed(judged, await read_needs_graph(run_id, judged))
+	const graph = await read_needs_graph(run_id, judged)
+	const settled = settle_unnamed(
+		judged,
+		graph,
+		jobs.map((job) => job.name),
+	)
 
 	return settled.every(({ verdict }) => verdict === RERUN_VERDICT) ? settled : undefined
 }

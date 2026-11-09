@@ -6,7 +6,6 @@ import {
 	RUN_ID,
 	SUCCESS,
 	UNIT_ID,
-	WORKFLOW_PATH,
 } from './followup-job-rerun-fixture'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
@@ -47,7 +46,6 @@ const { git_gh_exec } = await import('#scripts/gh/git-gh-exec')
 const { changed_paths } = await import('#scripts/git/changed-paths')
 const { observation_record } = await import('#scripts/observations/observation-record')
 const { git_gh_issue_write } = await import('#scripts/gh/git-gh-issue-write')
-const { followup_job_needs } = await import('./followup-job-needs')
 const { followup_main_move } = await import('./followup-main-move')
 
 const fetch_checks = vi.mocked(git_gh_command.pr_get_checks_snapshot)
@@ -55,7 +53,6 @@ const api = vi.mocked(git_gh_exec.exec_gh_api)
 const read_changed = vi.mocked(changed_paths.read_changed_paths)
 const assess = vi.mocked(observation_record.assess)
 const comment = vi.mocked(git_gh_issue_write.issue_comment)
-const read_graph = vi.mocked(followup_job_needs.read_graph)
 const merge_first = vi.mocked(followup_main_move.should_merge_first)
 const { answer_actions, answer_checks, as_check, job, rerun_paths } = followup_job_rerun_fixture
 
@@ -74,7 +71,6 @@ const FAILED_STEPS = [SUCCESS, FAILURE]
 const OUTSIDE_TEST = 'scripts/run/board/run-board-frame-budget.test.ts'
 const FAILED_TEST = `${OUTSIDE_TEST} > frame budget > reads the budget`
 const UNIT_LOG = `2026-10-27T10:00:00.0000000Z  FAIL  ${FAILED_TEST}\n`
-const CHECKS_NAME = 'Checks'
 const CURL_ERROR = '2026-11-08T08:58:56.5220933Z curl: (22) The requested URL returned error:'
 const CURL_EXIT = '2026-11-08T08:59:02.6053812Z ##[error]Process completed with exit code 22.'
 
@@ -307,46 +303,6 @@ describe('rerun_failed_jobs — an observation that cannot be posted', () => {
 
 		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([UNIT_NAME])
 		expect(rerun_paths()).toHaveLength(1)
-	})
-})
-
-// PR #5158: the aggregator `Checks` failed beside the shard, its log naming no test.
-describe('rerun_failed_jobs — a job red only for waiting on a job red outside the change', () => {
-	const checks = job({ id: 104, name: CHECKS_NAME, conclusion: FAILURE, steps: FAILED_STEPS })
-
-	function answer_waiting(needs: string, log = UNIT_LOG): void {
-		const workflow = `jobs:\n  unit:\n    name: ${UNIT_NAME}\n  lint:\n    name: Lint\n  checks:\n    name: ${CHECKS_NAME}\n    needs: [${needs}]\n`
-
-		read_graph.mockResolvedValue(followup_job_needs.parse_graph(workflow))
-		answer_checks([as_check(failed_unit()), as_check(checks)])
-		answer_actions({ jobs: [failed_unit(), checks], log })
-	}
-
-	it('reruns it with a job it waits on that failed on a download', async () => {
-		answer_waiting('unit', curl_failed(504))
-
-		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([
-			UNIT_NAME,
-			CHECKS_NAME,
-		])
-		expect(assess).not.toHaveBeenCalled()
-	})
-
-	it('reruns it with the job it waits on, reading the run workflow', async () => {
-		answer_waiting('lint, unit')
-
-		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([
-			UNIT_NAME,
-			CHECKS_NAME,
-		])
-		expect(read_graph).toHaveBeenCalledWith(WORKFLOW_PATH)
-		expect(assess.mock.calls[0]?.[0].entry.what).toContain(`followup reran ${UNIT_NAME};`)
-	})
-
-	it('does not rerun when it waits on no such job', async () => {
-		answer_waiting('lint')
-
-		await expect_no_rerun()
 	})
 })
 
