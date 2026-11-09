@@ -1,0 +1,7 @@
+{
+	"reason": "#6768: untyped switch env wiring in eslint-daemon and format-edited hook (+daemon_environment helper)",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

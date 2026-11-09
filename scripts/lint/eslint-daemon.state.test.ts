@@ -1,4 +1,5 @@
 import { mkdirSync, rmSync } from 'node:fs'
+import { untyped_lint } from '#eslint/untyped.js'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -139,5 +140,26 @@ describe('eslint_daemon.run_or_cold heap', () => {
 		expect(spawned_environment()).toMatchObject({
 			NODE_OPTIONS: COLD_OPTIONS,
 		})
+	})
+})
+
+// joshuafolkken/kit#6768: the daemon holds no type program; the cold run — the gate's own lint
+// route — stays typed.
+describe('eslint_daemon.run_or_cold type program', () => {
+	it('starts the daemon forwarder with the untyped switch', async () => {
+		installed()
+
+		await eslint_daemon.run_or_cold(PNPM_ESLINT)
+
+		expect(spawned_environment()).toMatchObject(untyped_lint.environment())
+	})
+
+	it('leaves the untyped switch out of the cold fallback', async () => {
+		installed()
+		mocked_resolve.mockReturnValue(undefined)
+
+		await eslint_daemon.run_or_cold(PNPM_ESLINT)
+
+		expect(spawned_environment()).not.toHaveProperty(untyped_lint.ENVIRONMENT_VARIABLE)
 	})
 })
