@@ -15,7 +15,7 @@ import { MissingContextError } from '#scripts/gh/git-pr-checks-missing'
 import { CHECK_STATUS_PASS, type PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
 import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { json_value } from '#scripts/lib/json-value'
-import { followup_job_rerun } from './followup-job-rerun'
+import { followup_job_rerun, MAX_CHECK_RERUNS } from './followup-job-rerun'
 import { followup_run_rerun } from './followup-run-rerun'
 
 // The check wait and the notes read off its snapshot — split out of `git-pr-followup.ts` when it
@@ -154,20 +154,48 @@ async function rejudge_missing(
 	return await wait_for_checks(input)
 }
 
+// A spent cap stops on its own message only while the red is still one a rerun would retry; any
+// other red keeps its own failure.
+async function stop_reruns_spent(branch_name: string, error: unknown): Promise<never> {
+	const names = await followup_job_rerun.read_rerun_names(branch_name)
+	if (names.length === 0) throw error
+
+	throw new Error(followup_job_rerun.reruns_spent_message(names))
+}
+
+// The wait after a rerun: its snapshot, or the checks failure the next round reruns.
+type RerunWait = { snapshot: PrStateSnapshot } | { failure: unknown }
+
+async function wait_after_rerun(input: RunChecksInput): Promise<RerunWait> {
+	try {
+		return { snapshot: await wait_for_checks(input) }
+	} catch (error) {
+		if (!is_checks_failure(error)) throw error
+
+		return { failure: error }
+	}
+}
+
+// `round` counts the reruns already made; a wait that fails on checks again goes to the next round.
 async function rejudge_failed_jobs(
 	input: RunChecksInput,
 	error: unknown,
+	round: number,
 ): Promise<PrStateSnapshot> {
-	const rerun = await followup_job_rerun.rerun_failed_jobs(input.branch_name)
+	if (round >= MAX_CHECK_RERUNS) return await stop_reruns_spent(input.branch_name, error)
+	const rerun = await followup_job_rerun.rerun_failed_jobs(input.branch_name, round)
 	if (rerun.length === 0) throw error
 	input.reran?.push(...rerun)
+	const waited = await wait_after_rerun(input)
+	if ('snapshot' in waited) return waited.snapshot
 
-	return await wait_for_checks(input)
+	return await rejudge_failed_jobs(input, waited.failure, round + 1)
 }
 
-// **A job the runner stopped after every step passed, or one red only on tests outside the change, is
-// rerun once and the wait judged again** (`followup-job-rerun.ts`). The second wait has no rerun of its own, so a job that stops the same way
-// twice — or any other failure — ends the run as before.
+// **A job the runner stopped after every step passed, one red only on tests outside the change, or one
+// red on a download is rerun and the wait judged again** (`followup-job-rerun.ts`). Only a download
+// failure qualifies past the first attempt, so a test that fails the same way twice — or any other
+// failure — ends the run as before; a download outage is rerun up to `MAX_CHECK_RERUNS` times.
 async function rejudge_after_rerun(
 	input: RunChecksInput,
 	error: unknown,
@@ -176,7 +204,7 @@ async function rejudge_after_rerun(
 	const recovered =
 		error instanceof MissingContextError ? await rejudge_missing(input, error) : undefined
 
-	return recovered ?? (await rejudge_failed_jobs(input, error))
+	return recovered ?? (await rejudge_failed_jobs(input, error, 0))
 }
 
 async function run_checks(input: RunChecksInput): Promise<PrStateSnapshot> {
