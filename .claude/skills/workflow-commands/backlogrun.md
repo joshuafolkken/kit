@@ -13,7 +13,7 @@ governs it. With no `<N>` it answers for the parent itself, from the carry recor
 
 **A named item may be a single issue or an epic.** A single-issue item is one `fullrun`; **a named epic runs its children in
 dependency order across the free lanes, and the run does not advance to the next named item until
-every one of that epic's children has been processed — merged or parked.** `backlogrun #E --only`
+every one of that epic's children has been processed — merged or parked.** `pnpm josh backlogrun <E> --only`
 therefore runs exactly one epic's children and stops.
 
 ## Explicit invocation required (MANDATORY)

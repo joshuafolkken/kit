@@ -104,7 +104,7 @@ Issue, where the split creates the epic (`backlogrun-child.md` → "When `#N` is
 `fullrun` and `halfrun` **stop** after filing the children and the epic — typing `fullrun` approved
 **one** Issue. Report what was filed and end with:
 
-> Please run `backlogrun #<E> --only` to execute this epic.
+> Please run `pnpm josh backlogrun <E> --only` to execute this epic.
 
 ## There is no `kickoff epic`
 
