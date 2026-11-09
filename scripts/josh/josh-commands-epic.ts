@@ -52,7 +52,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--notify'],
 					description:
-						"on create or `--promote`: send the split path's `planning` Telegram (the epic's URL, every child's URL and `Next: backlogrun #<E> --only`), the same send as `issue:plan --planned`; a failed send only warns.",
+						"on create or `--promote`: send the split path's `planning` Telegram (the epic URL, child URLs and `Next: pnpm josh backlogrun <E> --only`), as `issue:plan --planned` sends; a failed send only warns.",
 				},
 				{
 					names: ['--title <title>'],

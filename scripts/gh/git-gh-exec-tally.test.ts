@@ -29,6 +29,7 @@ const VALIDATION_SUMMARY = 'gh: Validation Failed (HTTP 422)'
 const VALIDATION_BODY = '{"message":"Validation Failed","status":"422"}'
 const VALIDATION_STATUS = 422
 const RETRY_ATTEMPTS = 3
+const ISSUE_KIND = 'GET repos/{o}/{r}/issues/{n}'
 const RATE_LIMIT_ARGS = ['api', 'rate_limit', '--jq', '.resources.core']
 
 // execa's Result types are large interfaces; these tests only read `stdout`.
@@ -50,6 +51,10 @@ function core_reading(used: number): string {
 
 function calls(): number {
 	return gh_request_tally.snapshot().calls
+}
+
+function kinds(): Array<string> {
+	return Object.keys(gh_request_tally.snapshot().endpoints)
 }
 
 async function rejection_of(request: Promise<unknown>): Promise<unknown> {
@@ -105,6 +110,43 @@ describe('gh_request_tally — one count per spawn on each entry', () => {
 		gh_spawn.get_repo_name_with_owner()
 
 		expect(calls()).toBe(2)
+	})
+})
+
+// joshuafolkken/kit#6867: each entry counts its call under the call's kind.
+describe('gh_request_tally — the kind each entry counts under', () => {
+	it('counts a command and a stdin write under their method and normalized path', async () => {
+		mocked_execa.mockResolvedValue(async_result('ok'))
+
+		await git_gh_exec.exec_gh_command(['api', PATH])
+		await git_gh_exec.exec_gh_command_with_stdin({
+			args: ['api', PATH, '--method', 'PATCH', '--input', '-'],
+			stdin_body: '{}',
+		})
+
+		expect(kinds()).toStrictEqual([ISSUE_KIND, 'PATCH repos/{o}/{r}/issues/{n}'])
+	})
+
+	it('counts both status probes as a GET of their path', async () => {
+		mocked_execa.mockResolvedValueOnce(async_result(STATUS_OK))
+		mocked_execa_sync.mockReturnValueOnce(sync_result(STATUS_OK))
+
+		await git_gh_exec.exec_gh_api_status(PATH)
+		git_gh_exec.exec_gh_api_status_sync(PATH)
+
+		expect(gh_request_tally.snapshot().endpoints).toStrictEqual({
+			[ISSUE_KIND]: { calls: 2, not_modified: 0 },
+		})
+	})
+
+	it('counts a sync request with a body as a POST, and a subcommand by its name', async () => {
+		mocked_execa_sync.mockReturnValueOnce(sync_result('{}'))
+		mocked_execa.mockResolvedValueOnce(async_result('{}'))
+
+		git_gh_exec.exec_gh_api_sync({ path: 'repos/o/r/issues/1/comments', body: '{}' })
+		await git_gh_exec.exec_gh_command(['issue', 'view', '1', '--json', 'title'])
+
+		expect(kinds()).toStrictEqual(['POST repos/{o}/{r}/issues/{n}/comments', 'gh issue view'])
 	})
 })
 

@@ -207,7 +207,9 @@ function is_owner_placeholder(owner: string): boolean {
 
 const gh_api = {
 	API_VALUE_TAKING_FLAGS,
+	FIELD_FLAGS,
 	GH_FLAGS,
+	METHOD_FLAGS,
 	field_sources,
 	is_gh_api,
 	is_owner_placeholder,

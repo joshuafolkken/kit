@@ -1,6 +1,6 @@
 import { error_text } from '#scripts/lib/error-message'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { gh_request_tally } from './gh-request-tally'
+import { gh_request_tally, type CallCount } from './gh-request-tally'
 import { gh_usage_log } from './gh-usage-log'
 
 // One line per josh process with its GitHub usage, written as the process ends (joshuafolkken/kit#6695):
@@ -27,6 +27,9 @@ interface GhUsageLine {
 	not_modified: number
 	core_used_delta?: number | undefined
 	elapsed_ms: number
+	// The calls and 304s per call kind (`gh-call-kind.ts`); a line written before
+	// joshuafolkken/kit#6867 has none.
+	endpoints: Record<string, CallCount>
 }
 
 type UsageAppend = (line: GhUsageLine) => Promise<void>
@@ -42,7 +45,7 @@ async function append_to_log(line: GhUsageLine): Promise<void> {
 
 async function append_usage(context: GhUsageContext, append: UsageAppend): Promise<void> {
 	const core_used_delta = await gh_request_tally.core_delta()
-	const { calls, not_modified } = gh_request_tally.snapshot()
+	const { calls, not_modified, endpoints } = gh_request_tally.snapshot()
 	const ended_ms = Date.now()
 
 	await append({
@@ -53,6 +56,7 @@ async function append_usage(context: GhUsageContext, append: UsageAppend): Promi
 		not_modified,
 		core_used_delta,
 		elapsed_ms: ended_ms - context.started_ms,
+		endpoints,
 	})
 }
 
