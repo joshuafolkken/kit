@@ -12,10 +12,18 @@ import { step_zero_notice } from './step-zero-notice'
 // `implementation-shell-deny.ts` names — in a segment, a substitution or a program another one launches.
 const FILE_PROGRAMS: ReadonlySet<string> = new Set(['tee', 'touch', 'rm', 'truncate'])
 // The other programs that write the files their arguments name. `bash-revert.ts` restores only the
-// session's own checkout, so one aimed at a runtime file outside it is refused. `cp` / `ln` write only
-// their last argument unless `-t` names the directory; `sed` / `perl` write only in place.
-const MOVE_PROGRAMS: ReadonlySet<string> = new Set(['cp', 'ln', 'mv'])
-const COPY_PROGRAMS: ReadonlySet<string> = new Set(['cp', 'ln'])
+// session's own checkout, so one aimed at a runtime file outside it is refused. A copy writes only its
+// last argument unless `-t` names the directory; `sed` / `perl` write only in place; an `of=` value is
+// a path.
+const COPY_PROGRAMS: ReadonlySet<string> = new Set(['cp', 'ln', 'install', 'rsync', 'scp'])
+const MOVE_PROGRAMS: ReadonlySet<string> = new Set([
+	...COPY_PROGRAMS,
+	'mv',
+	'dd',
+	'patch',
+	'tar',
+	'unzip',
+])
 const TARGET_DIRECTORY = /^-(?:[A-Za-z]*t|-target-directory)/u
 const IN_PLACE_PROGRAMS: ReadonlySet<string> = new Set(['sed', 'perl'])
 const IN_PLACE = /^-(?:[A-Za-z]*i|-in-place)/u
@@ -28,6 +36,9 @@ const DYNAMIC_PATH = /[$`*?{}\\]/u
 const COMPOUND_HEAD = /^\s*(?:[({!]\s*|(?:if|then|else|elif|while|until|do)\s+)+/u
 const COMPOUND_CLOSERS = new Set([')', '}', ' ', '\t', '\n'])
 const KEYWORDS: ReadonlySet<string> = new Set(['for', 'do', 'done', 'then', 'else', 'fi', 'esac'])
+// A `case` arm or a function body sits behind a pattern or a name the cut does not read, so the line is
+// refused rather than guessed.
+const UNREAD_BODY = /^(?:case|select|function)\s|^[\w.:-]+\s*\(\s*\)/u
 const ARGUMENT_QUOTES = /['"\\]/gu
 const TIME_PROGRAM = /(?:^|\/)time$/u
 const TIME_WRITE = /^-(?:[A-Za-z]*o|-o)/u
@@ -94,7 +105,9 @@ function is_copy_to_last(call: ProgramCall): boolean {
 }
 
 function written_args(call: ProgramCall): Array<string> {
-	return is_copy_to_last(call) ? call.args.slice(-1) : call.args
+	const written = is_copy_to_last(call) ? call.args.slice(-1) : call.args
+
+	return written.map((argument) => argument.slice(argument.indexOf('=') + 1))
 }
 
 function is_outside(target: string, root: string): boolean {
@@ -107,7 +120,15 @@ function file_write_refusal(call: ProgramCall, root: string): Refusal {
 	return write_args_are_unsafe(call.args, root) ? `\`${call.name}\` to a runtime path` : undefined
 }
 
+function writes_elsewhere(call: ProgramCall): boolean {
+	if (MOVE_PROGRAMS.has(call.name)) return true
+
+	return IN_PLACE_PROGRAMS.has(call.name) && call.args.some((argument) => IN_PLACE.test(argument))
+}
+
 function outside_write_refusal(call: ProgramCall, root: string): Refusal {
+	if (!writes_elsewhere(call)) return undefined
+
 	const target = written_args(call).find(
 		(argument) => is_outside(argument, root) && unsafe_path(argument, root),
 	)
@@ -117,21 +138,16 @@ function outside_write_refusal(call: ProgramCall, root: string): Refusal {
 		: `\`${call.name}\` to a runtime path outside this checkout`
 }
 
-function writes_elsewhere(call: ProgramCall): boolean {
-	if (MOVE_PROGRAMS.has(call.name)) return true
-
-	return IN_PLACE_PROGRAMS.has(call.name) && call.args.some((argument) => IN_PLACE.test(argument))
-}
-
 function call_refusal(segment: string, call: ProgramCall, root: string): Refusal {
 	if (FILE_PROGRAMS.has(call.name)) return file_write_refusal(call, root)
-	if (writes_elsewhere(call)) return outside_write_refusal(call, root)
 	if (implementation_shell_nested.reads_stdin(call)) return STDIN_SHELL
 
 	const args = call.args.map((argument) => argument.replaceAll(ARGUMENT_QUOTES, ''))
 	const name = call.name.replaceAll(ARGUMENT_QUOTES, '')
+	// `pnpm install` reaches here as the program `install`, so a writer still meets the deny-list.
+	const outside = outside_write_refusal(call, root)
 
-	return implementation_shell_deny.refusal(segment, { name, args })
+	return outside ?? implementation_shell_deny.refusal(segment, { name, args })
 }
 
 function body_of(segment: string): string {
@@ -160,6 +176,7 @@ function command_refusal(segment: string, root: string): Refusal {
 
 function segment_refusal(segment: string, root: string): Refusal {
 	if (wrapper_writes(segment)) return 'a time output file'
+	if (UNREAD_BODY.test(body_of(segment))) return 'a `case` arm or function body'
 
 	const target = redirected_paths(segment).find((redirected) => unsafe_path(redirected, root))
 

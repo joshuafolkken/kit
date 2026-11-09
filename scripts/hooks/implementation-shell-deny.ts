@@ -283,21 +283,40 @@ function gh_refusal(args: ReadonlyArray<string>): Refusal {
 	return is_dynamic(group) ? expansion_refusal('gh', group) : verb_refusal(group, args)
 }
 
-// The manager's first word is its action; `yarn` alone installs.
-function package_action(call: ProgramCall): string | undefined {
-	if (!PACKAGE_MANAGERS.has(call.name)) return call.name
+function is_flag(argument: string): boolean {
+	return argument.startsWith('-')
+}
 
-	const action = call.args.find((argument) => !argument.startsWith('-'))
+// A word after a bare flag may be that flag's value (`npm --prefix web install`), so it does not end
+// the walk for the action.
+function is_action_word(args: ReadonlyArray<string>, index: number): boolean {
+	const previous = args[index - 1] ?? ''
 
-	return action ?? (call.name === 'yarn' ? 'install' : undefined)
+	return !is_flag(args[index] ?? '-') && (!is_flag(previous) || previous.includes('='))
+}
+
+// The words that may be the manager's action, up to the first no flag precedes; `yarn` with none
+// installs.
+function package_actions(call: ProgramCall): Array<string> {
+	if (!PACKAGE_MANAGERS.has(call.name)) return [call.name]
+
+	const end = call.args.findIndex((_argument, index) => is_action_word(call.args, index))
+	const read = end === -1 ? call.args : call.args.slice(0, end + 1)
+	const actions = read.filter((word) => !is_flag(word))
+
+	return end === -1 && call.name === 'yarn' ? [...actions, 'install'] : actions
+}
+
+function action_refusal(manager: string, action: string): Refusal {
+	if (is_dynamic(action)) return expansion_refusal(manager, action)
+
+	return PACKAGE_WRITES.has(action) ? `\`${action}\`, a dependency change` : undefined
 }
 
 function package_refusal(call: ProgramCall): Refusal {
-	const action = package_action(call)
-	if (action === undefined) return undefined
-	if (is_dynamic(action)) return expansion_refusal(call.name, action)
-
-	return PACKAGE_WRITES.has(action) ? `\`${action}\`, a dependency change` : undefined
+	return package_actions(call)
+		.map((action) => action_refusal(call.name, action))
+		.find((rule) => rule !== undefined)
 }
 
 function josh_refusal(args: ReadonlyArray<string>): Refusal {

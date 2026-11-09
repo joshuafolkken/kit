@@ -7,6 +7,7 @@ const REDIRECT_APP = 'redirect to `app.ts`'
 const GH_API_WRITE = 'a `gh api` call other than GET'
 const INSTALL = '`install`, a dependency change'
 const STDIN_SHELL = 'a shell running the commands its standard input spells'
+const UNREAD_BODY = 'a `case` arm or function body'
 
 // joshuafolkken/kit#6586: the investigation spellings the old allowlist refused now run.
 const ISSUE_REPRODUCTIONS = [
@@ -43,6 +44,8 @@ const RUNS = [
 	'cp scripts/a.ts /tmp/notes.md',
 	"sed -i '' 's/a/b/' scripts/a.ts",
 	'mv /tmp/notes.md scripts/a.ts',
+	'rsync -a ../6688/scripts/ scripts/',
+	'tar -czf notes.tgz scripts',
 	'echo plan > "notes.md"',
 	'echo plan >> /tmp/issue-body.md',
 	'echo plan | tee -a notes.md',
@@ -98,6 +101,16 @@ const OTHER_REFUSED: ReadonlyArray<readonly [string, string]> = [
 	["sed -i '' 's/a/b/' ../6688/scripts/a.ts", '`sed` to a runtime path outside'],
 	["perl -pi -e 's/a/b/' /tmp/6688/scripts/a.ts", '`perl` to a runtime path outside'],
 	["cd ../6688 && sed -i '' 's/a/b/' notes.md", CD_WRITE],
+	// joshuafolkken/kit#6586 review round 2: an unread compound body and the other outside writers.
+	['case x in a) git push ;; esac', UNREAD_BODY],
+	['f() { git push; }; f', UNREAD_BODY],
+	['function f { git push; }; f', UNREAD_BODY],
+	['rsync -a /tmp/x/ ../6688/scripts/', '`rsync` to a runtime path outside'],
+	['install /tmp/a ../6688/scripts/a.ts', '`install` to a runtime path outside'],
+	['dd if=/tmp/a of=../6688/scripts/a.ts', '`dd` to a runtime path outside'],
+	['patch -d ../6688 -p1 -i /tmp/x.diff', '`patch` to a runtime path outside'],
+	['tar -xf /tmp/a.tar -C ../6688', '`tar` to a runtime path outside'],
+	['cd ../6688 && rsync -a /tmp/x/ scripts/', CD_WRITE],
 ]
 
 const WRITE_REFUSED: ReadonlyArray<readonly [string, string]> = [

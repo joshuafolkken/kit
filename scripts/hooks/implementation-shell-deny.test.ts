@@ -8,6 +8,7 @@ const GIT_STASH = '`git stash`'
 const GH_ISSUE_CLOSE = '`gh issue close`'
 const GH_API_WRITE = 'a `gh api` call other than GET'
 const INSTALL = '`install`, a dependency change'
+const ADD = '`add`, a dependency change'
 const JOSH_GIT = '`josh git`'
 const GIT_REFLOG = '`git reflog`'
 const EXPANSION = 'an expansion that may spell a write'
@@ -36,7 +37,7 @@ const REFUSED: ReadonlyArray<readonly [string, string]> = [
 	['gh api repos/owner/repo/issues -f title=x', GH_API_WRITE],
 	['gh api graphql -f query=mutation{x}', GH_API_WRITE],
 	['pnpm install', INSTALL],
-	['pnpm -s add -D left-pad', '`add`, a dependency change'],
+	['pnpm -s add -D left-pad', ADD],
 	['pnpm update', '`update`, a dependency change'],
 	['npm install left-pad', INSTALL],
 	['pnpm josh git -y', `${JOSH_GIT}, a shared-state write`],
@@ -61,6 +62,10 @@ const REFUSED: ReadonlyArray<readonly [string, string]> = [
 	['gh $group close 1', EXPANSION],
 	['pnpm josh $command', EXPANSION],
 	['npm $action', EXPANSION],
+	// joshuafolkken/kit#6586 review round 2: a manager flag's value read as the action.
+	['npm --prefix web install', INSTALL],
+	['yarn --cwd web add left-pad', ADD],
+	['yarn --cwd web', INSTALL],
 ]
 
 function refusal(segment: string): string | undefined {
@@ -105,6 +110,7 @@ const RUNS: ReadonlyArray<string> = [
 	'gh api graphql -f query={viewer{login}}',
 	'pnpm view typescript version',
 	'npm view typescript',
+	'npm --prefix web test',
 	'pnpm josh tree:status',
 	'pnpm josh ship --log 1',
 	'pnpm josh check',
