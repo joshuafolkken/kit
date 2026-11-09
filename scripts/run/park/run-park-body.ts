@@ -265,6 +265,14 @@ function adopt_problem(body: string, number: number): string | undefined {
 		: undefined
 }
 
+// The recommended option a parent may adopt (`adopt_problem` passes it) — what `backlog:triage --pass`
+// prints an `--adopt` line for (joshuafolkken/kit#6777). `undefined` for no pick or a tier C pick.
+function adoptable_pick(body: string): number | undefined {
+	const number = picked_option(body)?.number
+
+	return number !== undefined && adopt_problem(body, number) === undefined ? number : undefined
+}
+
 function is_complete(approval: ParkApproval | undefined): approval is ApprovalRange {
 	return APPROVAL_PARTS.every(([key]) => approval?.[key] !== undefined)
 }
@@ -280,6 +288,7 @@ const run_park_body = {
 	FORMAT,
 	HEADINGS: [OPTIONS_HEADING, PICK_HEADING],
 	adopt_problem,
+	adoptable_pick,
 	approval_range,
 	auto_pick,
 	problem_of,

@@ -903,7 +903,7 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 
 **Options:**
 
-- `--pass [--exclude <N>]` — settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Failed or incomplete reads exit 1.
+- `--pass [--exclude <N>]` — settles mechanical lane candidates and prints one next command; exclude decisions kept parked. Each park's recommendation and tier go to stderr, with its `--adopt` command unless no pick or a tier C pick. Failed or incomplete reads exit 1.
 - `--decide --defect <answer> --verification <answer> --every-run <answer>` — yes/no/unknown evidence: three yes → run:solo; any no → run:lane; otherwise judge. Read-only.
 - `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label (`auto-ok:judge --apply`).
 - `--clear` — clears the park (`run:park <N> --clear`) only when the issue answers its decision question.

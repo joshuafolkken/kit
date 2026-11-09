@@ -7,10 +7,14 @@ import { backlog_auto_triage } from './backlog-auto-triage'
 import type { PoolContext } from './backlog-gate-scope'
 import { backlog_next } from './backlog-next'
 import { backlog_pool } from './backlog-pool'
+import { backlog_triage_park } from './backlog-triage-park'
 import { backlog_triage_pass } from './backlog-triage-pass'
 
 vi.mock('./backlog-next', () => ({ backlog_next: { context_of: vi.fn(), resolve: vi.fn() } }))
 vi.mock('./backlog-auto-triage', () => ({ backlog_auto_triage: { untriaged_of: vi.fn() } }))
+vi.mock('./backlog-triage-park', () => ({
+	backlog_triage_park: { lines_of: vi.fn(async () => []) },
+}))
 
 const REPO = 'owner/repo'
 const PARKED = 901
@@ -74,6 +78,37 @@ describe('the parent triage pass', () => {
 		await backlog_triage_pass.run(['--exclude', String(PARKED)])
 
 		expect(read_context).toHaveBeenCalledWith(expect.objectContaining({ kind: 'read' }), [PARKED])
+	})
+})
+
+// joshuafolkken/kit#6777: each park's recommendation and `--adopt` line, before the read.
+describe('park recommendations', () => {
+	it('prints each park line on stderr beside the one next command (ac-6a5178a8)', async () => {
+		const snapshot = result()
+		const lines = [
+			'#901 推奨: 1（層 A）',
+			'pnpm josh backlog:triage --apply 901 --adopt 1 --reason <text>',
+		]
+
+		snapshot.blocked_on_people = [child(PARKED, [NEEDS_DECISION_LABEL])]
+		classify.mockResolvedValue(snapshot)
+		vi.mocked(backlog_triage_park.lines_of).mockResolvedValueOnce(lines)
+		await backlog_triage_pass.run([])
+
+		expect(backlog_triage_park.lines_of).toHaveBeenCalledExactlyOnceWith(PARKED)
+		expect(error.mock.calls.slice(-lines.length)).toStrictEqual(lines.map((line) => [line]))
+		expect(info).toHaveBeenCalledExactlyOnceWith(`pnpm josh issue:read ${String(PARKED)}`)
+	})
+
+	it('reads no park of a stalled child, whose recovery is run:add --retry', async () => {
+		classify.mockResolvedValue({
+			...result(),
+			blocked_on_people: [child(STALLED, [RUN_STALLED_LABEL])],
+		})
+		await backlog_triage_pass.run([])
+
+		expect(backlog_triage_park.lines_of).not.toHaveBeenCalled()
+		expect(info).toHaveBeenCalledExactlyOnceWith(`pnpm josh issue:read ${String(STALLED)}`)
 	})
 })
 
