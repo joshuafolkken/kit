@@ -67,8 +67,9 @@ words:
   - numer
   # The macOS `sysctl` memory-pressure key the core budget reads available memory from (#3371).
   - memorystatus
-  # British spelling a review finding records verbatim (#6577).
+  # British spellings review findings record verbatim (#6577).
   - memoising
+  - behaviour
   - purgeable
   # The swap counters `run:board`'s machine line reads: macOS `sysctl` and Linux `/proc/vmstat` (#3450).
   - swapins
