@@ -5,6 +5,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { git_gh_conditional } from '#scripts/gh/git-gh-conditional'
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import {
 	IN_PROGRESS_LABEL,
@@ -87,7 +88,9 @@ beforeEach(() => {
 		waves: [result.waiting],
 		unreached: [],
 	}))
-	// The decision read's ETag requests (joshuafolkken/kit#6700) stay offline, answering nothing.
+	// The decision read's ETag requests (joshuafolkken/kit#6700) stay offline, answering nothing, and
+	// its GraphQL read (joshuafolkken/kit#6819) is not sent.
+	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
 	vi.spyOn(git_gh_conditional, 'read_conditional').mockResolvedValue({ kind: 'unreadable' })
 })
 
