@@ -9,13 +9,13 @@ import { followup_job_rerun, MAX_CHECK_RERUNS } from './followup-job-rerun'
 // leaves no failed job for `rerun-failed-jobs` to retry, so the wait's `MissingContextError` is
 // answered by rerunning the whole run that lost it — the run whose `filter=all` jobs hold the context
 // and whose `filter=latest` jobs do not. A context no job of the head's runs ever had (an outside
-// app's check) is not ours to recover, unless a run ended red before GitHub created every job
-// (joshuafolkken/kit#6922): that run is rerun whole, up to `MAX_CHECK_RERUNS` reruns. A run with a
+// app's check) is not ours to recover, unless a run failed before GitHub created every job
+// (joshuafolkken/kit#6922): that run is rerun whole, up to `MAX_CHECK_RERUNS` reruns. A cancelled run
+// is not: the concurrency group cancels a superseded run before it creates any job. A run with a
 // failed latest job is not rerun, or a test the change broke could be retried into a merge.
 
 const PAGE = 'per_page=100'
 const FAILED_CONCLUSIONS: ReadonlySet<string> = new Set(['failure', 'cancelled', 'timed_out'])
-const TRUNCATED_CONCLUSIONS: ReadonlySet<string> = new Set(['failure', 'cancelled'])
 
 // A `needs:`-gated job appears only once its prerequisites finish, and the longest `timeout-minutes`
 // in `ci.yml` is 10. The poll backs off while the latest jobs stay the same (`poll.ts`).
@@ -84,11 +84,11 @@ function is_rerun_target(run: RunJobs, lost: ReadonlyArray<string>): boolean {
 	return lost.some((context) => holds(run.all, context) && !holds(run.latest, context))
 }
 
-// A run GitHub ended red with no failed job, before it created the jobs that carry the contexts.
+// A run GitHub failed with no failed job, before it created the jobs that carry the contexts.
 function is_truncated(run: RunJobs): boolean {
 	if (run.run.status !== 'completed' || run.run.run_attempt > MAX_CHECK_RERUNS) return false
 
-	return TRUNCATED_CONCLUSIONS.has(run.run.conclusion ?? '') && !has_failed_job(run)
+	return run.run.conclusion === 'failure' && !has_failed_job(run)
 }
 
 async function await_latest_jobs(

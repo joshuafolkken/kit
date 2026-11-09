@@ -149,10 +149,21 @@ describe('recover_missing — a run that ended before it created the required jo
 		expect(posts()).toStrictEqual([])
 	})
 
-	it('stops rerunning such a run once its attempts pass the rerun cap', async () => {
-		const run = { ...TRUNCATED_RUN, run_attempt: MAX_CHECK_RERUNS + 1 }
+	it.each([
+		{ attempt: MAX_CHECK_RERUNS, outcome: 'rerun', rerun: [RERUN_PATH] },
+		{ attempt: MAX_CHECK_RERUNS + 1, outcome: 'none', rerun: [] },
+	])('reruns attempt $attempt only within the rerun cap', async ({ attempt, outcome, rerun }) => {
+		const run = { ...TRUNCATED_RUN, run_attempt: attempt }
 
 		answer_actions({ latest: [UNIT], all: [UNIT], run })
+
+		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe(outcome)
+		expect(posts()).toStrictEqual(rerun)
+	})
+
+	// A superseded run the concurrency group cancelled before it created any job.
+	it('does not rerun a cancelled run', async () => {
+		answer_actions({ latest: [], all: [], run: { ...TRUNCATED_RUN, conclusion: 'cancelled' } })
 
 		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('none')
 		expect(posts()).toStrictEqual([])
