@@ -5,7 +5,7 @@ import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { backlog_drive, type OfferRead } from './backlog-drive'
+import { backlog_drive, type DriveState, type OfferRead } from './backlog-drive'
 import type { DriveContext } from './backlog-drive-args'
 import { backlog_drive_cli } from './backlog-drive-cli'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
@@ -112,9 +112,12 @@ const CARRY: RunCarry = {
 	outages: 0,
 }
 
-function stub_offer_path(named: OfferRead | undefined): ReturnType<typeof vi.spyOn> {
+function stub_offer_path(
+	named: OfferRead | undefined,
+	pool: DriveState = STATE,
+): ReturnType<typeof vi.spyOn> {
 	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
-	vi.spyOn(backlog_drive_named_offer, 'read').mockResolvedValue(named)
+	vi.spyOn(backlog_drive_named_offer, 'read').mockResolvedValue({ offer: named, pool })
 	vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
 
 	return vi.spyOn(backlog_drive_rate, 'offer_run').mockResolvedValue({ code: 1, out: '', err: '' })
@@ -134,6 +137,14 @@ describe('backlog_drive_cli.read_offer', () => {
 
 		await expect(backlog_drive_cli.read_offer(STATE, CONTEXT)).resolves.toBe(named)
 		expect(offer_run).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#6883: a named issue the yield holds is no lane, so the pool must not relaunch it.
+	it('excludes the named issues the yield holds from the pool offer', async () => {
+		const offer_run = stub_offer_path(undefined, { ...STATE, exclude: ['9'] })
+
+		await backlog_drive_cli.read_offer(STATE, CONTEXT)
+		expect(offer_run).toHaveBeenCalledWith(expect.arrayContaining(['--exclude', '9']))
 	})
 })
 
