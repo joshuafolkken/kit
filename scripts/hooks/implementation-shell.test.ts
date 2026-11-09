@@ -1,299 +1,164 @@
 import { describe, expect, it } from 'vitest'
 import { implementation_shell } from './implementation-shell'
 
-describe('visible shell write scope', () => {
-	it.each([
-		'echo changed >> app.ts',
-		'echo changed >|app.ts',
-		'printf changed > notes.md > app.ts',
-		'printf changed > "$DESTINATION"',
-		'printf changed > "notes.md".ts',
-		'printf changed > /tmp/other-repo/app.ts',
-		'cat <<EOF > app.ts\nchanged\nEOF',
-		'echo $(custom-editor app.ts)',
-		'echo "$(custom-editor app.ts)"',
-		'echo "`custom-editor app.ts`"',
-		'echo "$(printf changed > app.ts)"',
-		'cat <(custom-editor app.ts)',
-		'cat app.ts > >(custom-editor app.ts)',
-		'echo changed >& app.ts',
-		'cat <>app.ts',
-		'gh pr checkout 123',
-		'gh issue develop 123 --checkout',
-		'gh api repos/owner/repo --output app.ts',
-		'rg --pre custom-editor pattern app.ts',
-		'git -c core.fsmonitor=custom-editor status',
-		'git diff --output=app.ts',
-		'git diff "--output=app.ts"',
-		'git diff --out\\put=app.ts',
-		'git diff $FLAGS',
-		'GIT_EXTERNAL_DIFF=custom-editor git diff',
-		'gh api repos/owner/repo "--output=app.ts"',
-	])('refuses a runtime or unverified destination: %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(true)
-	})
-})
+const GIT_PUSH = '`git push`'
+const CD_WRITE = 'a write beside `cd`'
+const REDIRECT_APP = 'redirect to `app.ts`'
+const GH_API_WRITE = 'a `gh api` call other than GET'
+const INSTALL = '`install`, a dependency change'
+const STDIN_SHELL = 'a shell running the commands its standard input spells'
+const UNREAD_BODY = 'a `case` arm or function body'
 
-// joshuafolkken/kit#5534: only a single-quoted span is literal; an expansion beside it still refuses.
-describe('expansion outside a single-quoted span', () => {
-	it.each([
-		'echo \'text\' "`custom-editor app.ts`"',
-		"echo 'it'$(custom-editor app.ts)",
-		"echo 'it'`custom-editor app.ts`",
-		"echo 'a' FOO=1",
-		"echo 'a' $PPID",
-	])('refuses an expansion beside quoted text: %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(true)
-	})
-})
+// joshuafolkken/kit#6586: the investigation spellings the old allowlist refused now run.
+const ISSUE_REPRODUCTIONS = [
+	'F=/path/to/notes.md; cat "$F"',
+	'git diff --shortstat "$(git rev-list -1 --before=\'7 days ago\' main)" HEAD',
+	"find prompts -name '*.md' -print0 | xargs -0 cat | wc -l",
+	"find prompts -name '*.md' -exec cat {} + | wc -l",
+	'pnpm josh tree:status',
+]
 
-// joshuafolkken/kit#5498: the documented `run:carry` spelling carries no `$`, so it passes, while any
-// command expanding a variable stays refused — the session pid comes from the command, not the shell.
-describe('variable expansion beside the run:carry spelling', () => {
-	it.each(['echo $PPID', 'pnpm josh run:carry --cut --owner "$PPID"'])('refuses %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(true)
-	})
+const RUNS = [
+	'git status --short',
+	'git -C /tmp/repo diff --stat',
+	'grep -rn is_carry_candidate scripts/review',
+	'ls .git/josh/run-state/ | grep 5757',
+	'cat scripts/hooks/*.ts',
+	'echo $(git log -1 --format=%H)',
+	'GIT_PAGER=cat git log -1',
+	'node scripts/probe.ts',
+	'time node scripts/probe.ts',
+	'pnpm josh check',
+	'pnpm josh lint:related',
+	'pnpm josh ship --log 5757',
+	'pnpm view typescript version',
+	"gh api graphql -f query='{ viewer { login } }'",
+	'gh api repos/owner/repo/issues -f state=open -X GET',
+	'cd /tmp/other-repo && grep -n pattern notes.md',
+	'for f in a.md b.md; do grep -n pattern $f; done',
+	'for f in a.md b.md\ndo\n\tgrep -n pattern $f\ndone',
+	'npx done',
+	'if git diff --quiet; then echo same; fi',
+	'(cd /tmp/other-repo && git log -1)',
+	"sed -n '1,5p' scripts/a.ts",
+	'cp scripts/a.ts /tmp/notes.md',
+	"sed -i '' 's/a/b/' scripts/a.ts",
+	'mv /tmp/notes.md scripts/a.ts',
+	'rsync -a ../6688/scripts/ scripts/',
+	'tar -czf notes.tgz scripts',
+	'echo plan > "notes.md"',
+	'echo plan >> /tmp/issue-body.md',
+	'echo plan | tee -a notes.md',
+	'cat app.ts 2>&1',
+	"printf '%s' 'run `josh gate` with $(cmd) and FOO=1'",
+]
 
-	it.each([
-		'pnpm josh run:carry --begin "backlogrun --max 5"',
-		'pnpm josh run:carry --resume "backlogrun --max 5"',
-		'pnpm josh run:carry --cut',
-	])('lets %s through', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(false)
-	})
-})
+const REFUSED: ReadonlyArray<readonly [string, string]> = [
+	['git push --force', GIT_PUSH],
+	['gh api -X PATCH repos/owner/repo/issues/1', GH_API_WRITE],
+	['rm -rf scripts/', '`rm` to a runtime path'],
+	['pnpm josh git -y', '`josh git`, a shared-state write'],
+	['pnpm install', INSTALL],
+	['gh pr checkout 123', '`gh pr checkout`'],
+	['git diff --output=app.ts', 'writes a file'],
+	['git -c core.fsmonitor=custom-editor status', 'rewrites its configuration'],
+	['echo git push | sh', STDIN_SHELL],
+	['cat notes.sh | bash -s arg', STDIN_SHELL],
+]
 
-describe('unverified shell argument expansion', () => {
-	it.each([
-		'git diff --out{put,put}=app.ts',
-		'git diff --out{p,"p"}ut=app.ts',
-		'git diff --out?ut=app.ts',
-		'git diff --out*ut=app.ts',
-		'git diff --out[p]ut=app.ts',
-		'gh api repos/owner/repo --out{put,put}=app.ts',
-		'gh api repos/owner/repo --out[p]ut=app.ts',
-		'rg --p{re,re} custom-editor pattern app.ts',
-		'rg --p[r]e custom-editor pattern app.ts',
-	])('refuses expansion before classifying arguments: %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(true)
-	})
-})
+const NESTED_REFUSED = [
+	'echo "$(git push)"',
+	'echo `git push`',
+	'echo "$(echo "$(git push)")"',
+	'echo x | xargs git push',
+	'find . -exec git push \\;',
+	"sh -c 'git push'",
+	'bash -c "git push origin main"',
+	'eval git push',
+	'for b in a; do git push; done',
+	'true && git push',
+	'if git diff --quiet; then git push; fi',
+	'if true; then true; else git push; fi',
+	'{ git push; }',
+	'! git push',
+	'(cd ../x && git push)',
+	"git 'push' origin main",
+	'"git" push',
+	'env -i git push',
+	'while true; do git push; done',
+]
 
-// joshuafolkken/kit#5497: the bare `epic` subcommand records decisions, adds children and files an
-// epic — operations like every `epic:*` — and `rule:list` is the read `delegation.md` asks for.
-describe('josh epic operations and rule:list', () => {
-	it.each([
-		'pnpm josh epic --decide 5392 5389 --decision-file .git/josh/decision-5389.md',
-		'pnpm josh epic --add 5392 5389',
-		'pnpm josh epic "Bring every lane under 30 minutes" 5502 5503',
-		'pnpm josh epic:check 5392',
-		'pnpm josh rule:list',
-		// joshuafolkken/kit#5818: the consultation session removes a dependency a person dropped.
-		'pnpm josh backlog:triage --apply 5767 --unblock 5562 --reason x',
-		// joshuafolkken/kit#5849: the read-only tag SHA check a CodeRabbit bypass cites.
-		'pnpm josh pin:verify actions/checkout v4.2.2 11bd71901bbe5b1630ceea73d27597364c9af683',
-	])('passes the operation %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(false)
-	})
+const OTHER_REFUSED: ReadonlyArray<readonly [string, string]> = [
+	["pnpm 'install'", INSTALL],
+	['npm version patch', '`version`, a dependency change'],
+	['gh ssh-key add key.pub', '`gh ssh-key add`'],
+	['gh pr revert 12', '`gh pr revert`'],
+	['gh project item-add 1 --owner o', '`gh project item-add`'],
+	['gh api graphql -F query=@q.graphql', GH_API_WRITE],
+	['gh api graphql --input q.json', GH_API_WRITE],
+	['cp /tmp/x.ts ../6688/scripts/hooks/foo.ts', '`cp` to a runtime path'],
+	['mv notes.md ../6688/scripts/a.ts', '`mv` to a runtime path outside'],
+	["sed -i '' 's/a/b/' ../6688/scripts/a.ts", '`sed` to a runtime path outside'],
+	["perl -pi -e 's/a/b/' /tmp/6688/scripts/a.ts", '`perl` to a runtime path outside'],
+	["cd ../6688 && sed -i '' 's/a/b/' notes.md", CD_WRITE],
+	// joshuafolkken/kit#6586 review round 2: an unread compound body and the other outside writers.
+	['case x in a) git push ;; esac', UNREAD_BODY],
+	['f() { git push; }; f', UNREAD_BODY],
+	['function f { git push; }; f', UNREAD_BODY],
+	['rsync -a /tmp/x/ ../6688/scripts/', '`rsync` to a runtime path outside'],
+	['install /tmp/a ../6688/scripts/a.ts', '`install` to a runtime path outside'],
+	['dd if=/tmp/a of=../6688/scripts/a.ts', '`dd` to a runtime path outside'],
+	['patch -d ../6688 -p1 -i /tmp/x.diff', '`patch` to a runtime path outside'],
+	['tar -xf /tmp/a.tar -C ../6688', '`tar` to a runtime path outside'],
+	['cd ../6688 && rsync -a /tmp/x/ scripts/', CD_WRITE],
+]
 
-	it.each([
-		'pnpm josh epics 5392',
-		'pnpm josh gate',
-		'pnpm josh rule:other',
-		'pnpm josh rule:list-all',
-		'pnpm josh pin:verify-all',
-	])('still refuses %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(true)
-	})
-})
+const WRITE_REFUSED: ReadonlyArray<readonly [string, string]> = [
+	['echo changed > notes.ts', 'redirect to `notes.ts`'],
+	['echo changed >> app.ts', REDIRECT_APP],
+	['echo changed >|app.ts', REDIRECT_APP],
+	['printf changed > notes.md > app.ts', REDIRECT_APP],
+	['printf changed > "$DESTINATION"', 'redirect to `"$DESTINATION"`'],
+	['echo changed >& app.ts', REDIRECT_APP],
+	['cat <>app.ts', REDIRECT_APP],
+	['echo "$(printf changed > app.ts)"', REDIRECT_APP],
+	['echo changed | tee notes.ts', '`tee` to a runtime path'],
+	['touch app.ts', '`touch` to a runtime path'],
+	['cat <<EOT > notes.ts\nchanged\nEOT', 'a heredoc'],
+	['', 'an empty command'],
+	['cd scripts && echo changed > notes.md', CD_WRITE],
+	['cd scripts && echo changed | tee notes.md', CD_WRITE],
+	['for f in app.ts; do echo x > $f; done', 'redirect to `$f`'],
+	['for f in a; do grep -n x $f; done > app.ts', REDIRECT_APP],
+	['time -o app.ts grep -n x notes.md', 'a time output file'],
+]
 
-// joshuafolkken/kit#5706: `kickoff` drafts its consumers section with `plan:consumers`, a `git grep`
-// read, before `issue:plan` — so the consultation session passes it, and no other `plan:` command.
-describe('josh plan:consumers', () => {
-	it('passes pnpm josh plan:consumers run:board', () => {
-		expect(implementation_shell.is_unsafe('pnpm josh plan:consumers run:board')).toBe(false)
-	})
-
-	it.each(['pnpm josh plan:other', 'pnpm josh plan:consumers-all run:board'])(
-		'refuses the other plan command %s',
-		(command) => {
-			expect(implementation_shell.is_unsafe(command)).toBe(true)
-		},
-	)
-})
-
-// joshuafolkken/kit#5614: `auto-ok:judge` lists issues and records a judgement as an Issue comment
-// and label — the `judge` hand-back of `backlog:drive` a consultation session has to answer.
-describe('josh auto-ok operations', () => {
-	it.each([
-		'pnpm josh auto-ok:judge',
-		'pnpm josh auto-ok:judge --apply 5614 --lane',
-		'pnpm josh auto-ok:judge --apply 5614 --solo',
-		'pnpm josh auto-ok:judge --decline 5614 --reason "needs a human decision"',
-	])('passes the auto-ok operation %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(false)
-	})
-
-	it.each(['pnpm josh auto-okay', 'pnpm josh auto-ok'])('refuses the near miss %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(true)
-	})
-})
-
-// joshuafolkken/kit#5793: the reads a consultation investigation needs pass on one read-only rule —
-// `grep`, a glob into a read-only program, and a josh command the registry declares read-only.
-describe('read-only investigation shell', () => {
-	it.each([
-		'grep -rn is_carry_candidate scripts/review',
-		'grep -n "is_carry_candidate" scripts/review/review-reviewed-tree.ts',
-		'grep -n is_carry_candidate /tmp/other-repo/notes.md',
-		'ls .git/josh/run-state/ | grep 5757',
-		'ls .git/josh/josh-lane-dispatch-5757-*',
-		'ls .claude/agents/ && grep -n "^tools\\|^model" .claude/agents/investigator.md',
-		'grep -rl 5757 .josh',
-		'cat scripts/hooks/*.ts',
-		'pnpm josh',
-		'pnpm josh --help',
-		'pnpm josh -h --all',
-		'pnpm josh help ship',
-		'pnpm josh ship --log 5757',
-		'pnpm josh cost:audit --period 14',
-		'pnpm josh read:set fullrun',
-		'pnpm josh lbd 5757',
-		'pnpm josh effect:audit',
-		'pnpm josh effect:audit --days 7',
-		'pnpm josh effect:audit --days=7',
-	])('passes %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(false)
-	})
-})
-
-describe('read-only investigation shell refusals', () => {
-	it.each([
-		'grep -n pattern app.ts > app.ts',
-		'sed -i s/a/b/ app.ts',
-		'echo changed | tee app.ts',
-		'ls * > app.ts',
-		'rg pattern scripts/*.ts',
-		'git diff scripts/*.ts',
-		'cat app.ts | tee scripts/*.ts',
-		'pnpm josh check',
-		'pnpm josh rename',
-		'pnpm josh ship "Title #5757"',
-		'pnpm josh constructor',
-		'pnpm josh edit:files plan.json',
-		'pnpm josh edit:files - < plan.json',
-		'pnpm josh stop:guard',
-		'pnpm josh effect:audit --draft 6476',
-		'pnpm josh effect:audit --draft=6476',
-		'pnpm josh effect:audit --days 7 --draft 6476',
-	])('refuses the write or unregistered read %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(true)
-	})
-})
-
-describe('the named refusal rule', () => {
-	it.each([
-		['cat <<EOT > notes.ts\nchanged\nEOT', 'a heredoc'],
-		['echo $(custom-editor notes.ts)', 'a command or process substitution'],
-		['echo changed > notes.ts', 'redirect to `notes.ts`'],
-		['sed -i s/x/y/ notes.ts', '`sed` is neither a read-only program nor a consultation operation'],
-		['echo changed | tee notes.ts', '`tee` to a runtime path'],
-		['git log scripts/*.ts', 'glob, brace or variable expansion in `git`'],
-		['pnpm josh rename old new notes.ts', 'pnpm josh help rename'],
-	])('names the rule %s matched', (command, rule) => {
-		expect(implementation_shell.refusal(command)).toContain(rule)
-	})
-
-	it('names no rule for a read', () => {
-		expect(implementation_shell.refusal('grep -n pattern app.ts')).toBeUndefined()
-	})
-})
-
-// joshuafolkken/kit#5638: a read with no write target passes in every spelling a consultation uses.
-describe('read-only consultation shell spellings', () => {
-	it.each([
-		'pnpm view typescript version',
-		'pnpm view typescript',
-		'npm view typescript version',
-		"gh api graphql -f query='{ viewer { login } }'",
-		'gh api repos/owner/repo/issues -f state=open -X GET',
-		'gh api repos/owner/repo --method=GET',
-		'gh api repos/owner/repo -F per_page=5',
-		'pnpm -s josh issue:read 5642',
-		'cd /tmp/other-repo && grep -n pattern notes.md',
-		'cd scripts && ls',
-		'for f in a.md b.md; do grep -n pattern $f; done',
-		'for f in /tmp/notes/*.md; do wc -l "$f"; done',
-		'for f in a.md b.md\ndo\n\tgrep -n pattern $f\ndone',
-		'wc -l scripts/hooks/implementation-shell.ts',
-		"find scripts -name '*.ts' -type f",
-		'time grep -rn pattern scripts',
-		'gh api "repos/owner/repo/issues?state=open&per_page=5"',
-		'grep -n "a|b=c" notes.md',
-	])('passes %s', (command) => {
+describe('implementation_shell — the calls that run', () => {
+	it.each(ISSUE_REPRODUCTIONS)('runs the issue reproduction %s', (command) => {
 		expect(implementation_shell.refusal(command)).toBeUndefined()
 	})
+
+	it.each(RUNS)('runs %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(false)
+	})
 })
 
-const NEITHER = 'is neither a read-only program nor a consultation operation'
-const CD_WRITE = 'a write beside `cd`'
-const GIT_LOOP_EXPANSION = 'variable expansion in `git`'
-const ENV_ASSIGNMENT = 'an environment assignment'
-const VARIABLE_EXPANSION = 'a variable expansion'
+describe('implementation_shell — the irreversible calls', () => {
+	it.each(REFUSED)('refuses %s, naming %s', (command, rule) => {
+		expect(implementation_shell.refusal(command)).toContain(rule)
+	})
 
-describe('read-only consultation shell spelling refusals', () => {
-	it.each([
-		['gh api -X DELETE repos/owner/repo/issues/1', NEITHER],
-		['gh api --method PATCH repos/owner/repo -f title=x', NEITHER],
-		['gh api --method=put repos/owner/repo', NEITHER],
-		['gh api repos/owner/repo/issues/1 -X GET --method DELETE', NEITHER],
-		['gh api repos/owner/repo/issues/1 -iX DELETE', NEITHER],
-		['gh api repos/owner/repo/issues/1 -iX\tPATCH', NEITHER],
-		['grep -n "x;for f in y" $f', VARIABLE_EXPANSION],
-		['npx done', NEITHER],
-		['pnpm -s for x', NEITHER],
-		['true;GIT_EXTERNAL_DIFF=/tmp/x git diff', ENV_ASSIGNMENT],
-		["find . -name x -exec rm '{}' +", NEITHER],
-		['find . -delete', NEITHER],
-		['find . -fprint notes.ts', NEITHER],
-		['FOO=1 gh api repos/owner/repo', ENV_ASSIGNMENT],
-		['cd scripts && echo changed > notes.md', CD_WRITE],
-		['cd scripts && echo changed | tee notes.md', CD_WRITE],
-		['for f in --output=app.ts; do git diff $f; done', GIT_LOOP_EXPANSION],
-		['for f in --output=app.ts; do git diff "$f"; done', GIT_LOOP_EXPANSION],
-		['for p in rm; do $p app.ts; done', 'variable expansion in `$p`'],
-		['for f in app.ts; do echo x > $f; done', 'redirect to `$f`'],
-		['for f in a; do echo $HOME; done', VARIABLE_EXPANSION],
-		['for f in a; do grep -n x $f; done > app.ts', 'redirect to `app.ts`'],
-		['time node scripts/probe.ts', '`node` is neither'],
-		['pnpm josh lint:related', 'pnpm josh help lint:related'],
-		['pnpm exec view notes.md', NEITHER],
-	])('refuses %s on %s', (command, rule) => {
+	it.each(NESTED_REFUSED)('refuses the nested push in %s', (command) => {
+		expect(implementation_shell.refusal(command)).toContain(GIT_PUSH)
+	})
+
+	it.each(OTHER_REFUSED)('refuses the bypass %s, naming %s', (command, rule) => {
 		expect(implementation_shell.refusal(command)).toContain(rule)
 	})
 })
 
-describe('operational shell reads and records', () => {
-	it.each([
-		'printf "example > app.ts"',
-		'echo plan > "notes.md"',
-		'echo plan >> /tmp/issue-body.md',
-		'echo plan | tee -a notes.md',
-		'git status',
-		'git status --short',
-		'git -C /tmp/repo diff --stat',
-		'git diff -- app.ts',
-		'pnpm josh review:attest nonce',
-		'pnpm josh review:brief',
-		'pnpm josh backlog:plan --waves',
-		'gh pr view 123',
-		'cat app.ts 2>&1',
-		'git diff -- "*.ts"',
-		"git diff -- 'app[12].ts'",
-		'printf "{plan,record} * ? [literal]"',
-		"printf '%s' 'run `josh gate` with $(cmd) and FOO=1'",
-		"echo 'cost \\$5' \\`literal",
-	])('allows a visible read or record write: %s', (command) => {
-		expect(implementation_shell.is_unsafe(command)).toBe(false)
+describe('implementation_shell — a visible write to a runtime path', () => {
+	it.each(WRITE_REFUSED)('refuses the write %s, naming %s', (command, rule) => {
+		expect(implementation_shell.refusal(command)).toContain(rule)
 	})
 })

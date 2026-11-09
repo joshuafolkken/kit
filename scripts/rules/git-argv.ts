@@ -28,9 +28,9 @@ const WRAPPER_WORDS: ReadonlySet<string> = new Set([
 	'env',
 	'time',
 ])
-// The wrappers whose own flags stand between them and the program (`time -p`, `pnpm -s`), skipped
-// with them.
-const FLAGGED_WRAPPERS: ReadonlySet<string> = new Set(['time', 'pnpm'])
+// The wrappers whose own flags stand between them and the program (`time -p`, `pnpm -s`, `env -i`),
+// skipped with them.
+const FLAGGED_WRAPPERS: ReadonlySet<string> = new Set(['time', 'pnpm', 'env'])
 // Their flags that consume a separate following value (`time -o <file>`, `time -f <format>`,
 // `pnpm -C <dir>`), so the value is not read as the program.
 const WRAPPER_VALUE_FLAGS: ReadonlySet<string> = new Set([
@@ -41,6 +41,8 @@ const WRAPPER_VALUE_FLAGS: ReadonlySet<string> = new Set([
 	'-C',
 	'--dir',
 	'--filter',
+	'-u',
+	'--unset',
 ])
 const SUBSHELL_OPEN = '('
 
