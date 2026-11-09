@@ -2,6 +2,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { git_gh_issue_graphql, PAGE } from './git-gh-issue-graphql'
 import { REVIEW_APPROVED, REVIEW_CHANGES_REQUESTED, REVIEW_NONE } from './git-gh-pr-review'
+import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 import { git_gh_transport } from './git-gh-transport'
 
 // The merge gate's snapshot in one GraphQL query where the session's transport allows it
@@ -10,8 +11,9 @@ import { git_gh_transport } from './git-gh-transport'
 // status, review and branch-rule reads the REST path spends core quota on.
 //
 // **The answer is spelled the way the REST path spells it** (`git-gh-pr-snapshot.ts`): check runs then
-// status contexts, lower-case enums, `merged` only once true, and a review decision of `APPROVED`,
-// `CHANGES_REQUESTED` or the empty string. `parse_pr_state_snapshot` reads both alike.
+// status contexts, the newest check suite's run of each name, lower-case enums, `merged` only once
+// true, and a review decision of `APPROVED`, `CHANGES_REQUESTED` or the empty string.
+// `parse_pr_state_snapshot` reads both alike.
 //
 // **`undefined` hands the read back to REST**: a session on REST (`git-gh-transport.ts`), a failed
 // query or page, a repository the checkout cannot name, a branch with no pull request (REST then
@@ -29,7 +31,9 @@ const CONTEXTS = `contexts(${PAGE}, after: $after) {
 	pageInfo { hasNextPage endCursor }
 	nodes {
 		__typename
-		... on ${CHECK_RUN} { name status conclusion }
+		... on ${CHECK_RUN} {
+			databaseId name status conclusion checkSuite { databaseId app { databaseId } }
+		}
 		... on ${STATUS_CONTEXT} { context state description }
 	}
 }`
@@ -61,11 +65,16 @@ const REVIEW_DECISION_QUERY = `query($owner: String!, $name: String!, $number: I
 }`
 
 const rate_limit_schema = z.object({ cost: z.number(), remaining: z.number() })
+const database_id_schema = z.number().nullish()
+const app_schema = z.looseObject({ databaseId: database_id_schema }).nullish()
+const check_suite_schema = z.looseObject({ databaseId: database_id_schema, app: app_schema })
 const check_run_schema = z.looseObject({
 	[TYPE_NAME_KEY]: z.literal(CHECK_RUN),
+	databaseId: database_id_schema,
 	name: z.string(),
 	status: z.string(),
 	conclusion: z.string().nullable(),
+	checkSuite: check_suite_schema.nullish(),
 })
 const status_context_schema = z.looseObject({
 	[TYPE_NAME_KEY]: z.literal(STATUS_CONTEXT),
@@ -132,12 +141,12 @@ type ContextsPage = z.infer<typeof contexts_page_schema>
 type GraphqlPull = z.infer<typeof pull_schema>
 
 // The snapshot's fields bar the review decision, which travels beside them as the REST path's
-// `pr_get_review_decision` does, and what the queries cost: `cost` sums every page's points,
-// `remaining` is the GraphQL budget the last one left.
+// `pr_get_review_decision` does (`undefined` where GraphQL has none to give), and what the queries
+// cost: `cost` sums every page's points, `remaining` is the GraphQL budget the last one left.
 interface GraphqlSnapshot {
 	pr_number: number
 	fields: Record<string, unknown>
-	review_decision: string
+	review_decision: string | undefined
 	rate_limit: RateLimit
 }
 
@@ -229,12 +238,35 @@ function to_rest_context(context: RollupContext): Record<string, unknown> {
 	return { name, status: status.toLowerCase(), conclusion: lower_case_of(conclusion) }
 }
 
-// Check runs first, then status contexts, as the REST path merges its two endpoints.
-function to_rest_rollup(contexts: ReadonlyArray<RollupContext>): Array<Record<string, unknown>> {
-	const check_runs = contexts.filter((context) => context.__typename === CHECK_RUN)
-	const statuses = contexts.filter((context) => context.__typename === STATUS_CONTEXT)
+// An `{ id }` holder, as REST nests one, or nothing where GraphQL has no database id.
+function id_holder_of(database_id: number | null | undefined): { id: number } | undefined {
+	return database_id === null || database_id === undefined ? undefined : { id: database_id }
+}
 
-	return [...check_runs, ...statuses].map((context) => to_rest_context(context))
+// The ids `newest_check_runs` ranks a run by, spelled as REST nests them.
+function to_rest_ids(context: RollupContext): Record<string, unknown> {
+	if (context.__typename === STATUS_CONTEXT) return {}
+
+	const suite = context.checkSuite
+
+	return {
+		...id_holder_of(context.databaseId),
+		check_suite: id_holder_of(suite?.databaseId),
+		app: id_holder_of(suite?.app?.databaseId),
+	}
+}
+
+// Check runs first, then status contexts, as the REST path merges its two endpoints. The rollup holds
+// a run from every check suite, so only the newest suite's run of a name is kept, as REST keeps it.
+function to_rest_rollup(contexts: ReadonlyArray<RollupContext>): Array<Record<string, unknown>> {
+	const check_runs = contexts
+		.filter((context) => context.__typename === CHECK_RUN)
+		.map((context) => ({ ...to_rest_ids(context), ...to_rest_context(context) }))
+	const statuses = contexts
+		.filter((context) => context.__typename === STATUS_CONTEXT)
+		.map((context) => to_rest_context(context))
+
+	return [...git_gh_pr_rollup.newest_check_runs(check_runs), ...statuses]
 }
 
 function to_required_contexts(base_reference: GraphqlPull['baseRef']): Array<string> {
@@ -244,9 +276,13 @@ function to_required_contexts(base_reference: GraphqlPull['baseRef']): Array<str
 		.map((check) => check.context)
 }
 
-// `REVIEW_REQUIRED` and `null` both say no decision stands, which the REST fold answers as empty.
-function to_review_decision(decision: string | null): string {
-	return decision !== null && DECISIONS.has(decision) ? decision : REVIEW_NONE
+// `REVIEW_REQUIRED` says no decision stands, which the REST fold answers as empty. **`null` is no
+// answer**: GitHub leaves it unset where the base branch requires no review, even beside a standing
+// change request, so the decision is handed to the REST review fold.
+function to_review_decision(decision: string | null): string | undefined {
+	if (decision === null) return undefined
+
+	return DECISIONS.has(decision) ? decision : REVIEW_NONE
 }
 
 function to_checks_fields(

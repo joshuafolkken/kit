@@ -65,6 +65,18 @@ function check_run_node(name: string, status: string, conclusion?: string): Grap
 	return { [TYPE_NAME]: 'CheckRun', name, status, conclusion: conclusion ?? JSON.parse('null') }
 }
 
+const ACTIONS_APP = 15_368
+
+function suite_run_node(conclusion: string, suite: number, run: number): GraphqlNode {
+	const check_suite = { databaseId: suite, app: { databaseId: ACTIONS_APP } }
+
+	return {
+		...check_run_node(E2E, 'COMPLETED', conclusion),
+		databaseId: run,
+		checkSuite: check_suite,
+	}
+}
+
 function status_node(context: string, state: string): GraphqlNode {
 	return { [TYPE_NAME]: 'StatusContext', context, state, description: REVIEWING }
 }
@@ -182,6 +194,16 @@ const MIXED_NODES = [
 ]
 const MIXED_ANSWER = snapshot_answer(graphql_pull({}, contexts_page(MIXED_NODES)))
 const PAGED_ANSWER = snapshot_answer(graphql_pull({}, contexts_page(PASSING_NODES, NEXT_CURSOR)))
+// PR #2717's shape: the older suite's run was cancelled, the newer suite's passed.
+const NEWER_SUITE = { suite: 2, run: 20 }
+const TWO_SUITE_NODES = [
+	suite_run_node('SUCCESS', NEWER_SUITE.suite, NEWER_SUITE.run),
+	suite_run_node('CANCELLED', 1, 30),
+]
+// GitHub leaves `reviewDecision` unset where the base branch requires no review.
+const UNSET_DECISION_ANSWER = snapshot_answer(graphql_pull({ reviewDecision: JSON.parse('null') }))
+const CHANGE_REQUEST = { state: 'CHANGES_REQUESTED', user: { login: 'bob' } }
+const TWO_SUITE_ANSWER = snapshot_answer(graphql_pull({}, contexts_page(TWO_SUITE_NODES)))
 
 beforeEach(() => {
 	mocked_api.mockReset()
@@ -235,6 +257,25 @@ describe('pr_get_state_snapshot — one GraphQL query', () => {
 	})
 })
 
+describe('pr_get_state_snapshot — check runs of more than one check suite', () => {
+	it("keeps only the newest check suite's run of a name, as the REST rollup does", async () => {
+		stub_graphql({ [SNAPSHOT_QUERY]: TWO_SUITE_ANSWER })
+
+		const read = await git_gh_pr_graphql_snapshot.read_snapshot(PR_BRANCH)
+
+		expect(read?.fields['statusCheckRollup']).toEqual([
+			{
+				id: NEWER_SUITE.run,
+				check_suite: { id: NEWER_SUITE.suite },
+				app: { id: ACTIONS_APP },
+				name: E2E,
+				status: 'completed',
+				conclusion: 'success',
+			},
+		])
+	})
+})
+
 describe('pr_get_state_snapshot — the review decision and merged state from GraphQL', () => {
 	it.each([
 		['REVIEW_REQUIRED', ''],
@@ -245,6 +286,18 @@ describe('pr_get_state_snapshot — the review decision and merged state from Gr
 		const json = await pr_get_state_snapshot(PR_BRANCH)
 
 		expect(JSON.parse(json)).toMatchObject({ reviewDecision: expected })
+	})
+
+	it('reads a standing change request from REST where GraphQL leaves the decision unset', async () => {
+		stub_graphql(
+			{ [SNAPSHOT_QUERY]: UNSET_DECISION_ANSWER },
+			{ [pr_reviews_path()]: JSON.stringify([CHANGE_REQUEST]) },
+		)
+
+		const json = await pr_get_state_snapshot(PR_BRANCH)
+
+		expect(new Set(rest_calls())).toEqual(new Set([pr_reviews_path()]))
+		expect(JSON.parse(json)).toMatchObject({ reviewDecision: 'CHANGES_REQUESTED' })
 	})
 
 	it('carries merged only once the pull request is in', async () => {

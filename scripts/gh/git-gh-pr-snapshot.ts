@@ -46,13 +46,16 @@ async function read_status_check_rollup(commit_sha: string): Promise<Array<objec
 
 // The review history, folded into GraphQL's `reviewDecision`. One request, and the only one of the
 // four the merge gate does not need on every poll — see `is_review_decision_decisive`.
-async function pr_get_review_decision(pr_number: number): Promise<string> {
-	const graphql_decision = await git_gh_pr_graphql_snapshot.read_review_decision(pr_number)
-	if (graphql_decision !== undefined) return graphql_decision
-
+async function read_rest_review_decision(pr_number: number): Promise<string> {
 	const path = git_gh_api_path.pull_reviews_api_path(String(pr_number))
 
 	return git_gh_pr_review.to_review_decision(await git_gh_poll_read.read_array_pages(path))
+}
+
+async function pr_get_review_decision(pr_number: number): Promise<string> {
+	const graphql_decision = await git_gh_pr_graphql_snapshot.read_review_decision(pr_number)
+
+	return graphql_decision ?? (await read_rest_review_decision(pr_number))
 }
 
 // `mergeStateStatus` is upper-cased because that is the spelling `gh` uses and the spelling
@@ -162,7 +165,10 @@ async function pr_get_state_snapshot(branch_name: string): Promise<string> {
 	const graphql = await git_gh_pr_graphql_snapshot.read_snapshot(branch_name)
 
 	if (graphql !== undefined) {
-		return JSON.stringify({ ...graphql.fields, reviewDecision: graphql.review_decision })
+		const review_decision =
+			graphql.review_decision ?? (await read_rest_review_decision(graphql.pr_number))
+
+		return JSON.stringify({ ...graphql.fields, reviewDecision: review_decision })
 	}
 
 	const { pr_number, pull } = await resolve_pull(branch_name)
