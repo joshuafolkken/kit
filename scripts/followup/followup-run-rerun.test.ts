@@ -27,6 +27,8 @@ const LATEST_FILTER = 'filter=latest'
 
 interface World {
 	latest: Array<{ name: string; conclusion: string }>
+	all?: World['latest']
+	run?: { conclusion: string; event: string }
 	is_rerun?: boolean
 	after_rerun?: Array<World['latest']>
 }
@@ -38,11 +40,20 @@ function latest_of(world: World): World['latest'] {
 	return world.after_rerun?.shift() ?? [UNIT, CHECKS_JOB]
 }
 
+function all_of(world: World): World['latest'] {
+	return world.all ?? [UNIT, CHECKS_JOB]
+}
+
 function answer_actions(world: World): void {
 	api.mockImplementation(async ({ path, method }) => {
 		if (method === 'POST') world.is_rerun = true
-		if (path.includes('runs?head_sha=')) return JSON.stringify({ workflow_runs: [{ id: RUN_ID }] })
-		if (path.includes('filter=all')) return JSON.stringify({ jobs: [UNIT, CHECKS_JOB] })
+
+		if (path.includes('runs?head_sha=')) {
+			return JSON.stringify({ workflow_runs: [{ id: RUN_ID, ...world.run }] })
+		}
+
+		if (path.includes('filter=all')) return JSON.stringify({ jobs: all_of(world) })
+
 		if (path.includes(LATEST_FILTER)) return JSON.stringify({ jobs: latest_of(world) })
 
 		return ''
@@ -116,6 +127,32 @@ describe('recover_missing — the whole run that lost a required job', () => {
 	})
 })
 
+// joshuafolkken/kit#6677: the run ended `failure` with every created job green, and its `Checks`
+// job was never created in any attempt.
+describe('recover_missing — a run that ended failed before creating its jobs', () => {
+	it('reruns the whole run although no attempt ever held the context', async () => {
+		answer_actions({
+			latest: [UNIT],
+			all: [UNIT],
+			run: { conclusion: 'failure', event: 'pull_request' },
+		})
+
+		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('rerun')
+		expect(posts()).toStrictEqual([RERUN_PATH])
+	})
+
+	it('leaves a failed dynamic run, which holds none of the required jobs', async () => {
+		answer_actions({
+			latest: [UNIT],
+			all: [UNIT],
+			run: { conclusion: 'failure', event: 'dynamic' },
+		})
+
+		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('none')
+		expect(posts()).toStrictEqual([])
+	})
+})
+
 describe('recover_missing — nothing to recover', () => {
 	it('leaves a context no job of the head ever had', async () => {
 		answer_actions({ latest: [UNIT] })
@@ -127,7 +164,9 @@ describe('recover_missing — nothing to recover', () => {
 	})
 
 	it('does not rerun a run whose latest attempt holds a failed job', async () => {
-		answer_actions({ latest: [{ name: UNIT.name, conclusion: 'failure' }] })
+		const run = { conclusion: 'failure', event: 'pull_request' }
+
+		answer_actions({ latest: [{ name: UNIT.name, conclusion: 'failure' }], run })
 
 		await expect(followup_run_rerun.recover_missing(MISSING)).resolves.toBe('none')
 		expect(posts()).toStrictEqual([])
