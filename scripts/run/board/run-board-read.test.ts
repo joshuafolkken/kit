@@ -137,6 +137,7 @@ describe('run_board_read.read_local', () => {
 			...LANE_ROOM,
 			usual: new Map(),
 			is_memory_held: false,
+			launch_hold: undefined,
 			usage_reset_ms: undefined,
 		})
 	})

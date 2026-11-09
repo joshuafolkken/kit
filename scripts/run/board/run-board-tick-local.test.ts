@@ -76,6 +76,50 @@ describe('run_board_tick.tick capacity', () => {
 	})
 })
 
+// joshuafolkken/kit#6538: an empty seat's reason follows the local read — a later launch drops the
+// refusal and the ledger's open hold is named.
+const REFUSAL = {
+	pos: 1,
+	at: LAUNCH.at,
+	kind: 'setup',
+	text: 'no child launched #6242: lane:open refused',
+}
+const HOLD = 'offer:wait:blocked'
+const SEATED = { ...LOCAL, events: [REFUSAL], occupied_count: 0, lane_limit: 2 }
+
+describe('run_board_tick.tick empty lane seats', () => {
+	it('redraws each seat’s reason from the next local read', async () => {
+		const local = SEATED
+		const { ports, frames, read_local, clock } = harness(local, [long_plan(0)])
+		const state = await tick(FRESH_STATE, ports)
+
+		read_local.mockResolvedValue({
+			...local,
+			events: [REFUSAL, { ...LAUNCH, pos: 2 }],
+			occupied_count: 1,
+			launch_hold: HOLD,
+		})
+		clock.now_ms += LOCAL_READ_MS
+		await tick(state, ports)
+
+		expect(frames[0]).toContain('💺 blocked: #6242: lane:open refused')
+		expect(frames.at(-1)).not.toContain('blocked: #6242')
+		expect(frames.at(-1)).toContain(`💺 no runnable candidate (${HOLD})`)
+	})
+
+	it.each([
+		{ name: 'before the plan is read', local: SEATED, plan: never },
+		{ name: 'once the run stopped', local: { ...SEATED, is_stranded: true }, plan: undefined },
+	])('draws no seat line $name', async ({ local, plan }) => {
+		const { ports, frames } = harness(local, [long_plan(0)])
+
+		if (plan === undefined) await tick(FRESH_STATE, ports)
+		else await tick(FRESH_STATE, { ...ports, read_plan: plan }, 'background')
+
+		expect(frames.at(-1)).not.toContain('💺')
+	})
+})
+
 describe('run_board_tick.tick before the plan is read', () => {
 	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
 		const lines = await loading([LAUNCH])

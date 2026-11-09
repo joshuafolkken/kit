@@ -368,11 +368,14 @@ function numbers_of(plan: BoardPlan): ReadonlySet<number> {
 	return new Set([...children_of(plan), ...running].map((child) => child.number))
 }
 
+// The queued rows, an epic's children among them.
+function queued_rows(layout: BoardLayout): Array<BoardRow> {
+	return layout.queued.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
+}
+
 // Every row the layout draws, an epic's children among them — what the header counts and the legend reads.
 function rows_of(layout: BoardLayout): Array<BoardRow> {
-	const queued = layout.queued.flatMap((entry) => (entry.kind === 'row' ? [entry.row] : entry.rows))
-
-	return [...layout.active, ...queued, ...layout.people, ...layout.unreached]
+	return [...layout.active, ...queued_rows(layout), ...layout.people, ...layout.unreached]
 }
 
 // Every row the frame draws — the counted ones and the earlier run's lanes — what the legend reads.
@@ -425,6 +428,7 @@ const run_board_layout = {
 	local_layout_of,
 	people_of,
 	numbers_of,
+	queued_rows,
 	rows_of,
 	waiting_children,
 }

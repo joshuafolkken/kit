@@ -16,6 +16,7 @@ import type { ProcessGroups } from './run-board-process-groups'
 import type { QuotaHold, QuotaView } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_title } from './run-board-render-title'
+import type { SeatRead } from './run-board-seat'
 import type { RunActivity } from './run-board-status'
 import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
@@ -103,6 +104,8 @@ interface BoardHeader extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 
 	lane_limit?: number | undefined
 	// The slots occupied according to the same capacity read that supplies the limit.
 	occupied_count?: number | undefined
+	// What explains the seats no lane holds (`run-board-seat.ts`).
+	seats?: SeatRead | undefined
 	// What each done row says after its time (`run-board-found.ts`); none where nothing was read.
 	found?: FoundOf | undefined
 	// Whether `JOSH_LANE_INVESTIGATION` is on; off, a merged row hides its minutes and investigation
