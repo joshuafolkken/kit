@@ -1,4 +1,5 @@
 import { api_auth } from '#scripts/agent/api-auth'
+import { RERUNS_SPENT_MESSAGE } from '#scripts/followup/followup-job-rerun'
 import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
 import { gh_retry } from '#scripts/gh/git-gh-retry'
 import { PR_CHECKS_TIMEOUT_MESSAGE } from '#scripts/gh/git-pr-checks'
@@ -24,6 +25,9 @@ import { run_ship_stage, type Stage } from './run-ship-stage'
 //
 // **A merge wait that timed out is its own cause** (joshuafolkken/kit#5775): a relaunch waits the same
 // timeout on the same blocked merge, so it parks at once rather than spending the stop cap.
+//
+// **A followup whose CI-infrastructure reruns ran out is its own cause** (joshuafolkken/kit#6848): it
+// stops on `RERUNS_SPENT_MESSAGE`, a relaunch meets the same outage, so it parks at once like a timeout.
 
 const CAUSE = {
 	FINDING: 'finding',
@@ -33,6 +37,7 @@ const CAUSE = {
 	AUTH: 'auth',
 	ATTEST: 'attest',
 	TIMEOUT: 'timeout',
+	CI_INFRA: 'ci-infra',
 } as const
 
 type Cause = (typeof CAUSE)[keyof typeof CAUSE]
@@ -124,6 +129,18 @@ function is_wait_timeout(body: string): boolean {
 	return final_failures(body).includes(PR_CHECKS_TIMEOUT_MESSAGE)
 }
 
+// The message carries the spent reruns and the checks still failing after it, so it is matched as a prefix.
+function is_reruns_spent(body: string): boolean {
+	return final_failures(body).some((message) => message.startsWith(RERUNS_SPENT_MESSAGE))
+}
+
+// The cause the stage's own last failure names — no relaunch clears either.
+function ended_cause(body: string): Cause | undefined {
+	if (is_wait_timeout(body)) return CAUSE.TIMEOUT
+
+	return is_reruns_spent(body) ? CAUSE.CI_INFRA : undefined
+}
+
 function is_infra_stop(failed: StoppedOutput): boolean {
 	return is_infra(infra_text(failed)) || is_spent_stop(failed.body)
 }
@@ -132,7 +149,8 @@ function is_infra_stop(failed: StoppedOutput): boolean {
 // a title naming a rate limit is no outage (joshuafolkken/kit#4825).
 function stage_cause(stage: Stage, failed: StoppedOutput): Cause {
 	if (failed.cause === CAUSE.CHECK || !INFRA_STAGES.has(stage)) return CAUSE.CHECK
-	if (is_wait_timeout(failed.body)) return CAUSE.TIMEOUT
+	const ended = ended_cause(failed.body)
+	if (ended !== undefined) return ended
 
 	return is_infra_stop(failed) ? CAUSE.INFRA : CAUSE.CHECK
 }
@@ -188,9 +206,11 @@ function blocked_cause_of(body: string): string | undefined {
 	return final_failures(body).find(is_blocked_cause)
 }
 
-// Whether the stop parks at once: no relaunch clears it (joshuafolkken/kit#5775).
+const AT_ONCE_CAUSES: ReadonlySet<Cause> = new Set([CAUSE.TIMEOUT, CAUSE.CI_INFRA])
+
+// Whether the stop parks at once: no relaunch clears it (joshuafolkken/kit#5775, joshuafolkken/kit#6848).
 function parks_at_once(stage: Stage, failed: StoppedOutput): boolean {
-	return cause_of(stage, failed) === CAUSE.TIMEOUT
+	return AT_ONCE_CAUSES.has(cause_of(stage, failed))
 }
 
 const run_ship_stop_cause = {

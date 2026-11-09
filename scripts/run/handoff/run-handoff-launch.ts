@@ -40,10 +40,14 @@ const ROLES: Readonly<Record<WorkflowKeyword, AgentRole>> = {
 	retrospective: agent_role_profile.SCHEDULER,
 }
 
+// Names the child's origin in its opening prompt, which is how `josh cost:audit` tells a handed-over run
+// from a typed one (`cost-audit-kind.ts`); every past wording of the preamble carries it.
+const ORIGIN_MARKER = 'through `josh run:handoff`'
+
 // The child is started headless: no person answers it, so a stop that needs one ends its session, and
 // what it says last is all the session that handed it over reads back.
 const PREAMBLE = [
-	'Handed over by another session through `josh run:handoff`; the brief below is the work it hands over.',
+	`Handed over by another session ${ORIGIN_MARKER}; the brief below is the work it hands over.`,
 	'Nobody answers this session: a question for the person ends it, written as the final message.',
 	'End the final message with the URL of every Issue and pull request this run created.',
 ].join(' ')
@@ -95,7 +99,15 @@ function is_waited(keyword: WorkflowKeyword): boolean {
 	return keyword === 'kickoff' || keyword === 'retrospective'
 }
 
-const run_handoff_launch = { argv_of, is_waited, log_path, prompt_of, request_of, role_of }
+const run_handoff_launch = {
+	ORIGIN_MARKER,
+	argv_of,
+	is_waited,
+	log_path,
+	prompt_of,
+	request_of,
+	role_of,
+}
 
 export type { BuiltArgv, HandoffChild }
 export { run_handoff_launch }

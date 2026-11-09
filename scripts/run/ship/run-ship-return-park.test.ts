@@ -5,7 +5,7 @@ const relaunch_mock = vi.hoisted(() => vi.fn())
 const request_mock = vi.hoisted(() => vi.fn())
 const is_over_mock = vi.hoisted(() => vi.fn())
 const park_mock = vi.hoisted(() => vi.fn())
-const park_timed_out_mock = vi.hoisted(() => vi.fn())
+const park_at_once_mock = vi.hoisted(() => vi.fn())
 const ISSUE = vi.hoisted(() => '3999')
 const LANE = vi.hoisted(() => ({ issue: ISSUE, directory: `/lanes/${ISSUE}`, profile: undefined }))
 
@@ -14,7 +14,7 @@ vi.mock('./run-ship-relaunch-cap', () => ({
 	run_ship_relaunch_cap: {
 		is_over: is_over_mock,
 		park: park_mock,
-		park_timed_out: park_timed_out_mock,
+		park_at_once: park_at_once_mock,
 	},
 }))
 vi.mock('./run-ship-probe', () => ({
@@ -43,6 +43,7 @@ vi.mock('node:timers/promises', () => ({ setTimeout: async (): Promise<void> => 
 
 const { run_ship_return } = await import('./run-ship-return')
 const { PR_CHECKS_TIMEOUT_MESSAGE } = await import('#scripts/gh/git-pr-checks')
+const { RERUNS_SPENT_MESSAGE } = await import('#scripts/followup/followup-job-rerun')
 
 const RESUME = { title: `Park a stopped ship #${ISSUE}`, flags: [], is_review: true }
 const OUTPUT = 'FAIL scripts/run/ship/run-ship.test.ts'
@@ -56,7 +57,7 @@ beforeEach(() => {
 	request_mock.mockReset().mockResolvedValue({ is_success: true })
 	is_over_mock.mockReset().mockResolvedValue(false)
 	park_mock.mockReset().mockResolvedValue(true)
-	park_timed_out_mock.mockReset().mockResolvedValue(true)
+	park_at_once_mock.mockReset().mockResolvedValue(true)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
 
@@ -103,7 +104,7 @@ describe('run_ship_return.return_control on a merge wait that timed out', () => 
 			'parked',
 		)
 		// joshuafolkken/kit#6864: the park carries the stop's stage and cause class.
-		expect(park_timed_out_mock).toHaveBeenCalledWith(ISSUE, {
+		expect(park_at_once_mock).toHaveBeenCalledWith(ISSUE, {
 			reason: 'followup',
 			stop: { stage: 'followup', cause: 'timeout' },
 			blocked: BLOCKED,
@@ -114,7 +115,7 @@ describe('run_ship_return.return_control on a merge wait that timed out', () => 
 	})
 
 	it('records the timed-out stop when its park label was refused', async () => {
-		park_timed_out_mock.mockResolvedValue(false)
+		park_at_once_mock.mockResolvedValue(false)
 		const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
 		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, WAIT_TIMED_OUT)).toBe(
@@ -123,6 +124,23 @@ describe('run_ship_return.return_control on a merge wait that timed out', () => 
 		expect(write).toHaveBeenCalledWith(
 			'the lane child was not relaunched, and the park label was refused\n',
 		)
+		expect(relaunch_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6848: a relaunch meets the same CI outage, so a followup whose reruns ran out spent
+// every relaunch of the cap before it parked.
+describe('run_ship_return.return_control on CI-infrastructure reruns spent', () => {
+	it('parks the issue at once on the CI infrastructure, and relaunches nothing', async () => {
+		const spent = `❌ Error: ${RERUNS_SPENT_MESSAGE} (3 reruns; still failing: Detect E2E).`
+
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, spent)).toBe('parked')
+		expect(park_at_once_mock).toHaveBeenCalledWith(ISSUE, {
+			reason: 'followup',
+			stop: { stage: 'followup', cause: 'ci-infra' },
+			blocked: undefined,
+		})
+		expect(is_over_mock).not.toHaveBeenCalled()
 		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
 })
