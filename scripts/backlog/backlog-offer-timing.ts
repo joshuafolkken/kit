@@ -35,7 +35,7 @@ function interval_of(state: DriveState, config: LoopConfig, is_named_left: boole
 	return is_named_left && state.in_flight.length === 0 ? config.idle_offer_ms : config.offer_ms
 }
 
-type DuePorts = Pick<LoopPorts, 'added_since' | 'memory_held' | 'named_left'>
+type DuePorts = Pick<LoopPorts, 'added_since' | 'raised_since' | 'memory_held' | 'named_left'>
 
 async function interval_for(run: LoopRun, config: LoopConfig, ports: DuePorts): Promise<number> {
 	const is_named_left = run.state.in_flight.length === 0 && (await ports.named_left())
@@ -44,7 +44,8 @@ async function interval_for(run: LoopRun, config: LoopConfig, ports: DuePorts): 
 }
 
 // Whether the pass asks now: a dated wait at its deadline, other waits at the interval — or at once
-// when a memory hold cleared or `run:add` handed the run an issue since the last ask.
+// when a memory hold cleared, `run:add` handed the run an issue, or `lane:limit` raised the limit since
+// the last ask.
 async function is_due(
 	run: LoopRun,
 	config: LoopConfig,
@@ -56,7 +57,8 @@ async function is_due(
 
 	return (
 		(await backlog_drive_memory.is_cleared(run.state, ports)) ||
-		(await ports.added_since(run.offered_ms))
+		(await ports.added_since(run.offered_ms)) ||
+		(await ports.raised_since(run.offered_ms))
 	)
 }
 

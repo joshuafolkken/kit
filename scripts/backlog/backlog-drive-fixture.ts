@@ -74,6 +74,8 @@ interface Script {
 	retrospective?: boolean
 	// When `run:add` handed the run an issue, in ms from the start; unset reads as never.
 	added_at_ms?: number
+	// When `lane:limit` raised the limit, in ms from the start; unset reads as never.
+	raised_at_ms?: number
 	// Whether a named issue is left to dispatch; unset reads as none.
 	is_named_left?: boolean
 }
@@ -227,18 +229,20 @@ function retrospective_port(script: Script, calls: Array<string>): LoopPorts['re
 	}
 }
 
-// The run's own records: a `run:add` reads as added once the clock reaches it.
-function record_ports(
-	script: Script,
-	now: () => Date,
-): Pick<LoopPorts, 'added_since' | 'named_left'> {
-	return {
-		added_since: async (since_ms) => {
-			if (script.added_at_ms === undefined) return false
-			const added_ms = START_MS + script.added_at_ms
+function is_seen_since(at_ms: number | undefined, since_ms: number, now: () => Date): boolean {
+	if (at_ms === undefined) return false
+	const event_ms = START_MS + at_ms
 
-			return added_ms >= since_ms && added_ms <= now().getTime()
-		},
+	return event_ms >= since_ms && event_ms <= now().getTime()
+}
+
+type RecordPorts = Pick<LoopPorts, 'added_since' | 'raised_since' | 'named_left'>
+
+// The run's own records: a `run:add` or a `lane:limit` raise reads as written once the clock reaches it.
+function record_ports(script: Script, now: () => Date): RecordPorts {
+	return {
+		added_since: async (since_ms) => is_seen_since(script.added_at_ms, since_ms, now),
+		raised_since: async (since_ms) => is_seen_since(script.raised_at_ms, since_ms, now),
 		named_left: async () => script.is_named_left === true,
 	}
 }
@@ -248,7 +252,7 @@ function loop_ports(
 	script: Script,
 	calls: Array<string>,
 	states: Array<DriveState>,
-): Pick<LoopPorts, 'now' | 'sleep' | 'finish' | 'on_state' | 'added_since' | 'named_left'> {
+): Pick<LoopPorts, 'now' | 'sleep' | 'finish' | 'on_state'> & RecordPorts {
 	let now_ms = START_MS
 
 	function now(): Date {
