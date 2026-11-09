@@ -82,14 +82,18 @@ function can_cut_sync(issue: string): boolean {
 	return !run_cut_decline.is_declined_sync(issue) && run_cut_ready.is_ready_sync()
 }
 
-// A relaunched Claude hook names its transcript even when no session id is exported.
-// OpenAI already identifies its rollout by thread id; conflicting providers remain unmeasurable.
-function environment_for(transcript: string, source: AgentEnvironment): AgentEnvironment {
-	const thread_id = source[agent_provider.CODEX_SESSION_KEY]
+function is_named(value: string | undefined): boolean {
+	return value !== undefined && value !== ''
+}
 
+// A relaunched Claude hook names its transcript even when no session id is exported. An exported id
+// (a unit prices its parent's session) and an OpenAI thread id already identify the session;
+// conflicting providers remain unmeasurable.
+function environment_for(transcript: string, source: AgentEnvironment): AgentEnvironment {
 	if (
 		agent_provider.resolve_provider(source).kind === 'rejected' ||
-		(thread_id !== undefined && thread_id !== '')
+		is_named(source[agent_provider.CODEX_SESSION_KEY]) ||
+		is_named(source[agent_session_environment.SESSION_ID_KEY])
 	) {
 		return source
 	}
@@ -280,8 +284,10 @@ function decide_for_session(
 	)
 }
 
-function is_edit_call(call: GuardedCall): boolean {
-	return is_edit_tool(call.name)
+// The candidate half, priced on nothing: an edit an uncut run could be refused for. Outside a run no
+// edit is a candidate, so the row claims nothing another rule delivers.
+function is_refusable_edit(call: GuardedCall, state: LaneCostState = current_state()): boolean {
+	return is_edit_tool(call.name) && refusable_issue(call, state) !== undefined
 }
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing
@@ -291,7 +297,7 @@ function is_edit_call(call: GuardedCall): boolean {
 // `keeps` predicate is reported as unmeasured").
 const ROW = {
 	id: 'implementation-cut',
-	is_trigger: is_edit_call,
+	is_trigger: is_refusable_edit,
 	reason: IMPLEMENTATION_CUT_REASON,
 	decide: decide_for_session,
 	// The opening the reason carried before it was cut to the action and the next command.

@@ -19,6 +19,7 @@ const OLD_TRANSCRIPT = path.join(CWD, `${OLD_SESSION}.jsonl`)
 const NEW_TRANSCRIPT = path.join(CWD, `${NEW_SESSION}.jsonl`)
 const OPENAI_TRANSCRIPT = path.join(CWD, 'openai.jsonl')
 const SOURCE = { JOSH_AGENT_PROVIDER: 'anthropic' }
+const EDIT_CALL = { name: 'Edit', input: { file_path: 'scripts/x.ts' } }
 
 cost_cli_fixture.capture_console()
 
@@ -75,10 +76,19 @@ describe('implementation cut session identity', () => {
 		expect(read).toHaveBeenCalledWith(CWD, source)
 	})
 
+	it('preserves an exported Claude session id, as a unit pricing its parent has', () => {
+		const source = { ...SOURCE, CLAUDE_CODE_SESSION_ID: OLD_SESSION }
+		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('under')
+
+		implementation_cut.session_verdict(NEW_TRANSCRIPT, CWD, source)
+
+		expect(read).toHaveBeenCalledWith(CWD, source)
+	})
+
 	it('prices the hook transcript when deciding whether an edit needs a cut', () => {
 		stub_cuttable_lane()
 		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('over')
-		const call = { name: 'Edit', input: { file_path: 'scripts/x.ts' } }
+		const call = EDIT_CALL
 		const run = { transcript: NEW_TRANSCRIPT, now_ms: implementation_cut.REISSUE_WINDOW_MS }
 
 		expect(implementation_cut.ROW.decide(call, run, true, 0)).toBe(true)
@@ -86,5 +96,24 @@ describe('implementation cut session identity', () => {
 			CWD,
 			expect.objectContaining({ CLAUDE_CODE_SESSION_ID: NEW_SESSION }),
 		)
+	})
+})
+
+describe('implementation cut candidate', () => {
+	const call = EDIT_CALL
+
+	it('takes a run edit as a candidate without pricing any session', () => {
+		stub_cuttable_lane()
+		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('under')
+
+		expect(implementation_cut.ROW.is_trigger(call)).toBe(true)
+		expect(read).not.toHaveBeenCalled()
+	})
+
+	it("leaves an edit in a person's tree to the other rules", () => {
+		stub_cuttable_lane()
+		vi.spyOn(run_cut, 'held_issue_sync').mockReturnValue(undefined)
+
+		expect(implementation_cut.ROW.is_trigger(call)).toBe(false)
 	})
 })
