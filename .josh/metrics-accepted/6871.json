@@ -1,0 +1,7 @@
+{
+	"reason": "backlog:drive fills free lanes before a park-owed triage end (#6871): the triaged() helper and the park-triage offer trigger",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

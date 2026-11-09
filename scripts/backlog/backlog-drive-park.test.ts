@@ -1,8 +1,9 @@
+import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
-import { backlog_drive_fixture } from './backlog-drive-fixture'
+import { backlog_drive_fixture, type Harness, type Script } from './backlog-drive-fixture'
 
-const { FIRST_CHILD, SECOND_CHILD, harness, offer, state } = backlog_drive_fixture
+const { FIRST_CHILD, OFFERED, SECOND_CHILD, harness, offer, state } = backlog_drive_fixture
 
 it('launches the next child in a free lane after collecting a human-review stop', async () => {
 	const { ports, calls } = harness({
@@ -25,7 +26,7 @@ describe('backlog_drive — a parked child is not excluded', () => {
 		const { ports, offers } = harness({ finished: [FIRST_CHILD], parked: [FIRST_CHILD] })
 		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
 
-		expect(offers).toStrictEqual([])
+		expect(offers[0]?.exclude).toStrictEqual([])
 		expect(result.state.exclude).toStrictEqual([])
 		expect(result.state.in_flight).toStrictEqual([])
 		expect(result.kind === 'end' && result.end.reason).toBe('triage')
@@ -42,13 +43,13 @@ describe('backlog_drive — a parked child is not excluded', () => {
 		const { ports, calls, offers } = harness({
 			finished: [FIRST_CHILD],
 			parked: [FIRST_CHILD],
-			offers: [offer('run', [FIRST_CHILD])],
+			offers: [offer('wait'), offer('run', [FIRST_CHILD])],
 		})
 		const parked = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
 		const released = await backlog_drive.run_pass(parked.state, true, ports)
 
-		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', `launch ${FIRST_CHILD}`])
-		expect(offers[0]?.exclude).toStrictEqual([])
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', 'offer', `launch ${FIRST_CHILD}`])
+		expect(offers[1]?.exclude).toStrictEqual([])
 		expect(released.kind === 'continue' && released.state.in_flight).toStrictEqual([FIRST_CHILD])
 	})
 })
@@ -59,7 +60,7 @@ describe('backlog_drive — parked-child triage rounds', () => {
 		const { ports, calls } = harness({ finished: children, parked: children })
 		const result = await backlog_drive.run_pass(state(children), true, ports)
 
-		expect(calls).toStrictEqual(children.map((issue) => `merge ${issue}`))
+		expect(calls).toStrictEqual([...children.map((issue) => `merge ${issue}`), 'offer'])
 		expect(result.state.in_flight).toStrictEqual([])
 		expect(result.kind === 'end' && result.end.token).toBe('triage')
 	})
@@ -90,6 +91,66 @@ describe('backlog_drive — parked-child triage rounds', () => {
 		}))
 		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
 
+		expect(result.kind === 'end' && result.end.reason).toBe('triage')
+	})
+})
+
+// joshuafolkken/kit#6871: a park ended the pass with `triage` before the offer, so a free lane stayed
+// empty through the judgment session while triaged candidates waited.
+function parked_harness(script: Partial<Script>): Harness {
+	return harness({ finished: [FIRST_CHILD], parked: [FIRST_CHILD], ...script })
+}
+
+describe('backlog_drive — a parked child fills free lanes before triage', () => {
+	it('launches the triaged candidate before handing triage back', async () => {
+		const { ports, calls } = parked_harness({ offers: [offer('run', [OFFERED])] })
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', `launch ${OFFERED}`])
+		expect(result.kind === 'end' && result.end.token).toBe('triage')
+		expect(result.state).toMatchObject({ in_flight: [OFFERED], is_triage_owed: false })
+	})
+
+	it('does not relaunch the parked child in the same pass', async () => {
+		const { ports, calls, offers } = parked_harness({ offers: [offer('run', [OFFERED])] })
+
+		await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(offers[0]?.in_flight).toStrictEqual([])
+		expect(calls).not.toContain(`launch ${FIRST_CHILD}`)
+	})
+
+	it('offers on a pass whose only park was a resumed cut', async () => {
+		const { ports, calls } = parked_harness({
+			merges: new Map([[FIRST_CHILD, run_merge_token.MERGE_TOKEN.RESUMED]]),
+			offers: [offer('run', [OFFERED])],
+		})
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', `launch ${OFFERED}`])
+		expect(result.kind === 'end' && result.end.reason).toBe('triage')
+	})
+})
+
+describe('backlog_drive — a parked child with nothing to launch', () => {
+	it('hands triage back with no offer hold when nothing is runnable', async () => {
+		const pool = parked_harness({ offers: [offer('watch')] })
+		const result = await backlog_drive.run_pass(
+			state([FIRST_CHILD, SECOND_CHILD]),
+			false,
+			pool.ports,
+		)
+
+		expect(pool.calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer'])
+		expect(pool.holds).toStrictEqual([])
+		expect(result.kind === 'end' && result.end.reason).toBe('triage')
+	})
+
+	it('hands triage back without an offer when no lane is free', async () => {
+		const { ports, calls } = parked_harness({ free_lanes: [0] })
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
+
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`])
 		expect(result.kind === 'end' && result.end.reason).toBe('triage')
 	})
 })
