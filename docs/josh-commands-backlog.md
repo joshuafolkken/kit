@@ -637,7 +637,7 @@ pnpm josh epic --untrack 893 894                                             # r
 
 It satisfies all four mechanical requirements by construction: `epic` label, task-list child rows, machine-readable `Dependencies`, an `Execution` run command.
 
-`Execution` prints `backlogrun #<E> --only`. A failed `blocked-by` write is reported as a count; the epic stays correct.
+`Execution` prints `pnpm josh backlogrun <E> --only`. A failed `blocked-by` write is reported as a count; the epic stays correct.
 
 #### `josh epic --promote` — turn an existing issue into an epic
 

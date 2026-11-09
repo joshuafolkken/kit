@@ -15,9 +15,13 @@ interface CoreRateLimit {
 	limit: number
 	// When the window refills, in epoch milliseconds — GitHub answers epoch seconds.
 	reset_ms: number
-	// The session's transport (`git-gh-transport.ts`) the board names beside the allowance; `read_core`
-	// leaves it to the caller.
-	transport?: string
+}
+
+// The REST core allowance beside the GraphQL one, which has its own limit and reset
+// (joshuafolkken/kit#6822); a misshapen GraphQL resource reads as none and leaves the core.
+interface RateLimitResources {
+	core: CoreRateLimit
+	graphql: CoreRateLimit | undefined
 }
 
 interface CoreAllowance extends CoreUsage {
@@ -33,25 +37,59 @@ const core_schema = z.object({
 	reset: z.number().int().nonnegative(),
 })
 
+// jq answers `null` for a resource the reply lacks, which reads as none like a misshapen one.
+const resources_schema = z.object({
+	core: core_schema,
+	graphql: core_schema.optional().catch(undefined),
+})
+
 type Core = z.infer<typeof core_schema>
 
 const CORE_REQUEST = { path: 'rate_limit', jq_filter: '.resources.core', should_retry: false }
+const RESOURCES_REQUEST = {
+	path: 'rate_limit',
+	jq_filter: '.resources | {core, graphql}',
+	should_retry: false,
+}
 
-async function read_parsed(exec: CoreExec): Promise<Core | undefined> {
+async function read_with<T>(
+	exec: CoreExec,
+	request: GhApiRequest,
+	schema: z.ZodType<T>,
+): Promise<T | undefined> {
 	try {
-		return json_value.parse_with(await exec(CORE_REQUEST), core_schema)
+		return json_value.parse_with(await exec(request), schema)
 	} catch {
 		return undefined
 	}
+}
+
+async function read_parsed(exec: CoreExec): Promise<Core | undefined> {
+	return await read_with(exec, CORE_REQUEST, core_schema)
+}
+
+function limit_of(core: Core): CoreRateLimit {
+	return { remaining: core.remaining, limit: core.limit, reset_ms: core.reset * MS_PER_SECOND }
 }
 
 async function read_core(
 	exec: CoreExec = git_gh_exec.exec_gh_api,
 ): Promise<CoreRateLimit | undefined> {
 	const core = await read_parsed(exec)
-	if (core === undefined) return undefined
 
-	return { remaining: core.remaining, limit: core.limit, reset_ms: core.reset * MS_PER_SECOND }
+	return core === undefined ? undefined : limit_of(core)
+}
+
+// Both allowances off the one `rate_limit` reply, so the GraphQL one costs no further request.
+async function read_resources(
+	exec: CoreExec = git_gh_exec.exec_gh_api,
+): Promise<RateLimitResources | undefined> {
+	const resources = await read_with(exec, RESOURCES_REQUEST, resources_schema)
+	if (resources === undefined) return undefined
+
+	const { core, graphql } = resources
+
+	return { core: limit_of(core), graphql: graphql === undefined ? undefined : limit_of(graphql) }
 }
 
 // The tally's reading goes through the uncounted spawn: it is the measurement, not a measured call.
@@ -75,7 +113,7 @@ async function read_allowance(
 	return { used: core.used, remaining: core.remaining, reset_ms: core.reset * MS_PER_SECOND }
 }
 
-const gh_core_rate_limit = { read_allowance, read_core, read_usage }
+const gh_core_rate_limit = { read_allowance, read_core, read_resources, read_usage }
 
 export { gh_core_rate_limit }
-export type { CoreAllowance, CoreRateLimit }
+export type { CoreAllowance, CoreRateLimit, RateLimitResources }

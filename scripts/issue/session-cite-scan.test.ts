@@ -37,7 +37,6 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// GitHub renders it: a commit message, a PR or Issue title or body, a comment, a search query.
 	['backlog/backlog-triage-adopt.ts', 1],
 	['epic/epic-audit-orphans.ts', 1],
-	['epic/epic-body.ts', 1],
 	['epic/epic-bundle-apply.ts', 1],
 	['epic/epic-bundle-recommend.ts', 4],
 	['epic/epic-close-comment.ts', 2],

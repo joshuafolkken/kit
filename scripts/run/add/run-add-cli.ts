@@ -31,7 +31,7 @@ const RETRY_FLAG = '--retry'
 const RETRY_FAILED = 'Could not record the retry boundary.'
 const USAGE = `Usage: josh run:add <issue...> [${NO_PRIORITY_FLAG}] [${RETRY_FLAG}]`
 const NO_RUN_MESSAGE =
-	'No backlogrun is running here, so nothing was added. Start one with `backlogrun #N`.'
+	'No backlogrun is running here, so nothing was added. Start one with `pnpm josh backlogrun N`.'
 
 interface AddRequest {
 	issues: ReadonlyArray<number>

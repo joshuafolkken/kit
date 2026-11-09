@@ -135,22 +135,33 @@ async function query(body: GraphqlBody, now_ms: number = Date.now()): Promise<st
 	return await sent_or_failed(body, now_ms)
 }
 
+async function kept(now_ms: number): Promise<Transport | undefined> {
+	return shared_cache.read(TRANSPORT_CACHE, await key_of(), transport_schema, now_ms)
+}
+
+// The session's transport as far as it is known without a probe: the explicit setting, the kept
+// answer under `auto`, or `undefined` (not probed this hour, or an invalid setting).
+async function known(now_ms: number = Date.now()): Promise<Transport | undefined> {
+	const chosen = parse_setting(process.env[TRANSPORT_ENV_VAR])
+	if (chosen === undefined) return undefined
+
+	return chosen === 'auto' ? await kept(now_ms) : chosen
+}
+
 // The session's transport for a display, read without a probe: `graphql (auto)`, `not probed (auto)`.
 async function label(now_ms: number = Date.now()): Promise<string> {
 	const chosen = parse_setting(process.env[TRANSPORT_ENV_VAR])
 	if (chosen === undefined) return `invalid ${TRANSPORT_ENV_VAR}`
 	if (chosen !== 'auto') return chosen
 
-	const kept = shared_cache.read(TRANSPORT_CACHE, await key_of(), transport_schema, now_ms)
-
-	return `${kept ?? NOT_PROBED} (auto)`
+	return `${(await kept(now_ms)) ?? NOT_PROBED} (auto)`
 }
 
 function forget_logins(): void {
 	logins.clear()
 }
 
-const git_gh_transport = { current, forget_logins, label, query, TRANSPORT_CACHE }
+const git_gh_transport = { current, forget_logins, known, label, query, TRANSPORT_CACHE }
 
 export type { GraphqlBody, Transport }
 export { git_gh_transport, GRAPHQL_PATH, PROBE_QUERY, REFUSED_MESSAGE, TRANSPORT_ENV_VAR }

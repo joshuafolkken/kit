@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { styleText } from 'node:util'
-import { gh_core_rate_limit, type CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
+import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { git_gh_transport } from '#scripts/gh/git-gh-transport'
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
@@ -17,6 +17,7 @@ import { run_board_gather_thread } from './run-board-gather-thread'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan_shared } from './run-board-plan-shared'
+import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_screen, type Screen } from './run-board-screen'
 import { run_board_snapshot } from './run-board-snapshot'
 import { run_board_spin } from './run-board-spin'
@@ -51,12 +52,14 @@ function on_exit(leave: () => void): void {
 	process.once('SIGTERM', () => process.exit(SIGTERM_EXIT_CODE))
 }
 
-// The allowance with the session's transport, which the github row names beside it.
-async function read_rate_limit_with_transport(): Promise<CoreRateLimit | undefined> {
-	const rate_limit = await gh_core_rate_limit.read_core()
-	if (rate_limit === undefined) return undefined
+// The allowances with the session's transport, which the github row marks with ▶. The transport is
+// read without a probe, so the board spends none of the GraphQL allowance it draws; one not known
+// yet (or an invalid setting) leaves the allowances unmarked.
+async function read_rate_limit_with_transport(): Promise<GithubRateLimit | undefined> {
+	const resources = await gh_core_rate_limit.read_resources()
+	if (resources === undefined) return undefined
 
-	return { ...rate_limit, transport: await git_gh_transport.label() }
+	return { ...resources, transport: await git_gh_transport.known() }
 }
 
 const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {

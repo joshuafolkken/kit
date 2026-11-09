@@ -3,6 +3,7 @@ import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Quotas } from './run-board-quota-read'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
+import type { GithubRateLimit } from './run-board-render-quota-github'
 
 // joshuafolkken/kit#6559, joshuafolkken/kit#6621: GitHub's core rate limit is drawn as a usage gauge
 // after the usage-limit rows and summed up in the folded line; where it could not be read, the usage
@@ -25,8 +26,8 @@ const CORE: CoreRateLimit = {
 	limit: 5000,
 	reset_ms: NOW_MS + RESET_MINUTES * MINUTE_MS,
 }
-const PASSED: CoreRateLimit = { ...CORE, reset_ms: NOW_MS - 1 }
-const TRANSPORT = 'rest (auto)'
+const REST_ONLY: GithubRateLimit = { core: CORE, graphql: undefined }
+const PASSED: GithubRateLimit = { core: { ...CORE, reset_ms: NOW_MS - 1 }, graphql: undefined }
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -41,33 +42,34 @@ function part_of(view: Partial<QuotaView>): { rows: Array<string>; summary: stri
 
 // The color escape the gauge's bar opens its filled cells with.
 function shade_of(remaining: number, reset_minutes: number): string {
-	const rate_limit = { ...CORE, remaining, reset_ms: NOW_MS + reset_minutes * MINUTE_MS }
+	const core = { ...CORE, remaining, reset_ms: NOW_MS + reset_minutes * MINUTE_MS }
+	const rate_limit = { core, graphql: undefined }
 	const row = String(usage_part({ quotas: QUOTAS, now_ms: NOW_MS, rate_limit })?.lines[2]?.text)
 
 	return row.slice(row.indexOf('%') + 1, row.indexOf('■'))
 }
 
 describe('run_board_render_quota.usage_part rate limit row', () => {
-	it('draws the calls spent as a gauge, its reset and the spent count after the usage limits', () => {
-		const { rows } = part_of({ rate_limit: CORE })
+	it('draws the rest calls spent as a gauge, the spent count and its reset after the usage limits', () => {
+		const { rows } = part_of({ rate_limit: REST_ONLY })
 
 		expect(rows).toHaveLength(3)
-		expect(rows[2]).toBe(
-			`  github        38% ${'■'.repeat(8)}─┊${'─'.repeat(10)}  ↻ 12:33      1877/5000`,
-		)
+		expect(rows[2]).toBe(`  github  rest  38% ${'■'.repeat(8)}─┊${'─'.repeat(10)} 1877/5000 ↻12:33`)
 	})
 
 	it('starts the github name at the codex name column while a scheduler is marked', () => {
-		const { rows } = part_of({ rate_limit: CORE, scheduler_provider: 'claude' })
+		const { rows } = part_of({ rate_limit: REST_ONLY, scheduler_provider: 'claude' })
 
 		expect(rows[2]?.indexOf('github')).toBe(rows[1]?.indexOf('codex'))
-		expect(rows[2]).toMatch(/^ {5}github\s+38% .*↻ 12:33\s+1877\/5000$/u)
+		expect(rows[2]).toMatch(/^ {5}github {2}rest {2}38% .* 1877\/5000 ↻12:33$/u)
 	})
 
 	it('puts the pace mark where the clock is through the hour-long window', () => {
-		const rate_limit = { ...CORE, remaining: 5000, reset_ms: NOW_MS + 15 * MINUTE_MS }
+		const core = { ...CORE, remaining: 5000, reset_ms: NOW_MS + 15 * MINUTE_MS }
 
-		expect(part_of({ rate_limit }).rows[2]).toContain(`  0% ${'─'.repeat(15)}┊${'─'.repeat(4)}`)
+		expect(part_of({ rate_limit: { core, graphql: undefined } }).rows[2]).toContain(
+			`  0% ${'─'.repeat(15)}┊${'─'.repeat(4)}`,
+		)
 	})
 
 	it('shades the gauge yellow from half, red from nine tenths, a step up past the pace mark', () => {
@@ -81,7 +83,7 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 
 	it('draws the allowance unspent, empty and without a reset once its reset has passed', () => {
 		expect(part_of({ rate_limit: PASSED }).rows[2]).toBe(
-			`  github         0% ┊${'─'.repeat(19)}               0/5000`,
+			`  github  rest   0% ┊${'─'.repeat(19)} 0/5000`,
 		)
 	})
 
@@ -93,19 +95,11 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 	})
 })
 
-describe('run_board_render_quota.usage_part rate limit row transport', () => {
-	it("names the session's transport after the spent count", () => {
-		const { rows } = part_of({ rate_limit: { ...CORE, transport: TRANSPORT } })
-
-		expect(rows[2]).toMatch(/↻ 12:33\s+1877\/5000 · rest \(auto\)$/u)
-	})
-})
-
 describe('run_board_render_quota.usage_part rate limit row beside 7d-only rows', () => {
-	it('starts the 7d-only gauges and the github gauge at one column, github without `1h`', () => {
+	it('starts the 7d-only gauges and the github rest gauge at one column, github without `1h`', () => {
 		const week = { minutes: 10_080, used_percent: 46, resets_ms: NOW_MS + 24 * HOUR_MS }
 		const reading = { windows: [week], taken_ms: NOW_MS }
-		const { rows } = part_of({ quotas: { claude: reading, codex: reading }, rate_limit: CORE })
+		const { rows } = part_of({ quotas: { claude: reading, codex: reading }, rate_limit: REST_ONLY })
 
 		expect(rows.map((row) => row.indexOf('%'))).toStrictEqual([18, 18, 18])
 		expect(rows.join('\n')).not.toMatch(/ {2}—|1h|7d/u)
@@ -114,18 +108,14 @@ describe('run_board_render_quota.usage_part rate limit row beside 7d-only rows',
 
 describe('run_board_render_quota.usage_part rate limit summary', () => {
 	it('sums the allowance up in the folded line', () => {
-		expect(part_of({ rate_limit: CORE }).summary).toBe(
-			'claude 42 · codex — · github 38% 1877/5000 ↻ 12:33',
+		expect(part_of({ rate_limit: REST_ONLY }).summary).toBe(
+			'claude 42 · codex — · github rest 38% 1877/5000 ↻12:33',
 		)
 	})
 
 	it('sums the allowance up without a reset once it has passed', () => {
-		expect(part_of({ rate_limit: PASSED }).summary).toBe('claude 42 · codex — · github 0% 0/5000')
-	})
-
-	it("names the session's transport after the allowance", () => {
-		expect(part_of({ rate_limit: { ...CORE, transport: TRANSPORT } }).summary).toBe(
-			`claude 42 · codex — · github 38% 1877/5000 ↻ 12:33 · ${TRANSPORT}`,
+		expect(part_of({ rate_limit: PASSED }).summary).toBe(
+			'claude 42 · codex — · github rest 0% 0/5000',
 		)
 	})
 

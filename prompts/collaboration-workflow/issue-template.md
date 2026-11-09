@@ -140,6 +140,6 @@
 
 ### 複数 Issue に分割するときの epic Issue
 
-**1 つの要望を 2 件以上の Issue に分割したら、件数や順序の有無にかかわらず常に epic を作る。** 作成は `pnpm josh epic`、点検は `pnpm josh epic:check <E>`、子の追加は `pnpm josh epic --add` で行い、本文を手で編集しない。epic 自体を実装ランに渡さない（`backlogrun #<E> --only` が子を回す）。記法は `epic-commands` スキル →「Creating an epic」。
+**1 つの要望を 2 件以上の Issue に分割したら、件数や順序の有無にかかわらず常に epic を作る。** 作成は `pnpm josh epic`、点検は `pnpm josh epic:check <E>`、子の追加は `pnpm josh epic --add` で行い、本文を手で編集しない。epic 自体を実装ランに渡さない（`pnpm josh backlogrun <E> --only` が子を回す）。記法は `epic-commands` スキル →「Creating an epic」。
 
 本文の形（`Split rationale`・`Dependencies`・`Execution`・`Progress`）と、`--ordered` のときの `blocked-by` 依存は `pnpm josh epic` が組み立てる（`docs/josh-commands-backlog.md` → "josh epic"）。

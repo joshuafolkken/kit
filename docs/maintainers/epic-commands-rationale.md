@@ -128,7 +128,7 @@ rejected because it also fires when a batch fails midway.
 
 ## Execution
 
-backlogrun #<E> --only
+pnpm josh backlogrun <E> --only
 
 ## Progress
 
