@@ -107,11 +107,11 @@ function merge_outcome(script: Script, issue: string): MergeOutcome {
 }
 
 // The yield notes on the stream: each `yielded` merge notes one at the clock's time, as the child's own
-// `lane:plan` does, and a park is recorded in `calls`.
+// `lane:plan` does, and a park — a trip's or a refused launch's `run:stalled` — is recorded in `calls`.
 function yield_ports(
 	calls: Array<string>,
 	now: () => Date,
-): Pick<LoopPorts, 'yields' | 'park'> & { note: (issue: string) => void } {
+): Pick<LoopPorts, 'yields' | 'park' | 'stall'> & { note: (issue: string) => void } {
 	const notes = new Map<string, Array<string>>()
 
 	return {
@@ -121,6 +121,9 @@ function yield_ports(
 		yields: async (issue) => notes.get(issue) ?? [],
 		park: async (issue) => {
 			calls.push(`park ${issue}`)
+		},
+		stall: async (issue, outcome) => {
+			calls.push(`stall ${issue} ${outcome}`)
 		},
 	}
 }
@@ -295,7 +298,7 @@ function report_ports(
 
 type ClockedPorts = ReturnType<typeof loop_ports> &
 	ReturnType<typeof child_ports> &
-	Pick<LoopPorts, 'yields' | 'park'>
+	Pick<LoopPorts, 'yields' | 'park' | 'stall'>
 
 // The clock and the ports that read it: a yield note is stamped with the clock's time.
 function clocked_ports(

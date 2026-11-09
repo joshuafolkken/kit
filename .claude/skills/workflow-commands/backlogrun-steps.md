@@ -129,7 +129,7 @@ run `run:carry --begin`; act on the row, then end the turn:
 | `triage` | Run `pnpm josh backlog:triage --pass` and follow its next command; resolve as above, leaving only genuine human questions parked |
 | `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` |
 | `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** |
-| `launch #N` | Read the lane's log and park `#N` |
+| `launch #N` | The driver parked `#N` `run:stalled`: "Resolve what the plan can resolve" → "A recovered mechanical failure" |
 | `merge [<token>] #N` | `environment` ends the run; the others re-read the child |
 | `epic #N` | A named epic's turn |
 | `watch` | The retrospective is owed (`run:step`): run `pnpm josh run:handoff retrospective` (`retrospective.md`) |

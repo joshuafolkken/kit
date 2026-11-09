@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
+import { git_directory } from './git-directory'
 import { repo_map_logic, type DiscoveredRepo, type RepoMap } from './repo-map-logic'
 import { repo_origin } from './repo-origin'
 
@@ -11,54 +12,9 @@ import { repo_origin } from './repo-origin'
 // repository's parent one level deep produces the same map from whichever of them the command runs
 // in. `JOSH_REPO_PATHS` exists only for the exceptions.
 
-const GIT_DIRECTORY = '.git'
+const { GIT_DIRECTORY, resolve_git_directory } = git_directory
 const GIT_CONFIG = 'config'
-// A `.git` *file* points at the real git directory (`gitdir: …`), which is how worktrees and
-// submodules are laid out. The pointer is relative to the work tree when it is not absolute.
-const GITDIR_PREFIX = 'gitdir:'
-// A linked worktree's git directory is `<main>/.git/worktrees/<name>`, which holds no `config` of
-// its own — the shared one lives in the common directory that its `commondir` file names, relative
-// to the worktree's git directory. A submodule's git directory has no `commondir` and holds its
-// own `config`, which is why following the pointer alone appeared to work.
-const COMMON_DIRECTORY_FILE = 'commondir'
 const OVERRIDE_ENV_KEY = 'JOSH_REPO_PATHS'
-
-// The directory a git directory's `config` actually lives in: itself, or the common directory a
-// linked worktree points at.
-function resolve_common_directory(git_directory: string): string {
-	const pointer = path.join(git_directory, COMMON_DIRECTORY_FILE)
-	if (!existsSync(pointer)) return git_directory
-
-	try {
-		return path.resolve(git_directory, readFileSync(pointer, 'utf8').trim())
-	} catch {
-		return git_directory
-	}
-}
-
-// Where a `.git` file points. Relative pointers resolve against the work tree holding the file.
-function follow_git_file(repository_path: string, git_file: string): string | undefined {
-	const pointer = readFileSync(git_file, 'utf8').trim()
-	if (!pointer.startsWith(GITDIR_PREFIX)) return undefined
-
-	return path.resolve(repository_path, pointer.slice(GITDIR_PREFIX.length).trim())
-}
-
-// The directory holding the `config` for a work tree: `.git` itself, or — through a `.git` file and
-// then through `commondir` — the shared git directory a linked worktree borrows its remotes from.
-function resolve_git_directory(repository_path: string): string | undefined {
-	const candidate = path.join(repository_path, GIT_DIRECTORY)
-	if (!existsSync(candidate)) return undefined
-
-	try {
-		if (statSync(candidate).isDirectory()) return candidate
-		const linked = follow_git_file(repository_path, candidate)
-
-		return linked === undefined ? undefined : resolve_common_directory(linked)
-	} catch {
-		return undefined
-	}
-}
 
 function read_text(file: string): string | undefined {
 	try {
@@ -77,14 +33,12 @@ const configs = stamped_memo.create<string | undefined>()
 // The work tree's git config text, or nothing when it is unreadable or not a work tree.
 function read_config(repository_path: string): string | undefined {
 	const git_entry = path.join(repository_path, GIT_DIRECTORY)
-	const git_directory = git_directories.of(
-		repository_path,
-		stamped_memo.file_stamp(git_entry),
-		() => resolve_git_directory(repository_path),
+	const resolved = git_directories.of(repository_path, stamped_memo.file_stamp(git_entry), () =>
+		resolve_git_directory(repository_path),
 	)
-	if (git_directory === undefined) return undefined
+	if (resolved === undefined) return undefined
 
-	const config = path.join(git_directory, GIT_CONFIG)
+	const config = path.join(resolved, GIT_CONFIG)
 
 	return configs.of(config, stamped_memo.file_stamp(config), () => read_text(config))
 }
@@ -155,13 +109,11 @@ function resolve_current_owner(repository_path: string): string | undefined {
 // a work tree for a parent, so taking one would hand discovery a directory that is not a checkout at
 // all — the very failure this function exists to close, moved somewhere else.
 function main_worktree(repository_path: string): string {
-	const git_directory = resolve_git_directory(repository_path)
+	const resolved = resolve_git_directory(repository_path)
 
-	if (git_directory === undefined || path.basename(git_directory) !== GIT_DIRECTORY) {
-		return repository_path
-	}
+	if (resolved === undefined || path.basename(resolved) !== GIT_DIRECTORY) return repository_path
 
-	return path.dirname(git_directory)
+	return path.dirname(resolved)
 }
 
 // The map for the repository at `repository_path`. Empty when that repository's own owner cannot be

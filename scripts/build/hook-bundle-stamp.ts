@@ -6,8 +6,8 @@ import { atomic_write } from '#scripts/lib/atomic-write'
 import { json_value } from '#scripts/lib/json-value'
 
 // What a hook build was made from, so a later launch can tell whether `dist/hooks/` still matches the
-// source it runs beside. `dist/` is git-ignored and rebuilt only by
-// `pnpm build`, so without this record an edited guard keeps running its old bundle with nothing to
+// source it runs beside. `dist/` is git-ignored and rebuilt only by `pnpm build` and kit's own
+// launchers (`tools/hooks/hook-bundle-ready.ts`, `tools/josh/josh-ready.ts`), so without this record an edited guard keeps running its old bundle with nothing to
 // say so — and a lane's bundles are copied from the main checkout, whose source can differ.
 //
 // **The record is a content digest, not a timestamp.** A copy (`lane-cache.ts`) or a fresh checkout

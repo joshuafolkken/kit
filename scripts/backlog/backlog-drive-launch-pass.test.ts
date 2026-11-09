@@ -126,3 +126,41 @@ describe('backlog_drive.run_pass — launches side by side', () => {
 		expect(ended).toStrictEqual([OFFERED_TOO])
 	})
 })
+
+// joshuafolkken/kit#6878: a refused launch is a mechanical failure — parked `run:stalled` by the driver
+// before the hand-back, never left for a session to park as `needs-decision`.
+describe('backlog_drive.run_pass — a refused launch is parked run:stalled', () => {
+	it('parks a launch that failed after its lane opened before handing it back', async () => {
+		const { ports, calls } = harness({
+			offers: [offer('run', [OFFERED])],
+			failed_launches: [OFFERED],
+		})
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind === 'end' && result.end.reason).toBe('launch')
+		expect(calls).toContain(`stall ${OFFERED} failed`)
+	})
+
+	it('parks an unopened launch with lanes free, as a seat probe that could not read refuses', async () => {
+		const { ports, calls } = harness({
+			offers: [offer('run', [OFFERED])],
+			unopened_launches: [OFFERED],
+		})
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind === 'end' && result.end.issue).toBe(OFFERED)
+		expect(calls).toContain(`stall ${OFFERED} unopened`)
+	})
+
+	it('parks nothing when every lane was taken and the unopened launch waits', async () => {
+		const { ports, calls } = harness({
+			offers: [offer('run', [OFFERED])],
+			unopened_launches: [OFFERED],
+			free_lanes: [1, 0],
+		})
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind).toBe('continue')
+		expect(calls.filter((call) => call.startsWith('stall'))).toStrictEqual([])
+	})
+})
