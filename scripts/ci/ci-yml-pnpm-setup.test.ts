@@ -40,6 +40,8 @@ const COREPACK_PREPARE = 'corepack prepare'
 const TROUBLESHOOTING_MD = 'docs/troubleshooting.md'
 const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs.steps
 const CACHE_ACTION = 'actions/cache'
+const SHA_PINNED_CACHE_ACTION = /^actions\/cache@[\da-f]{40}$/u
+const SAFE_CHAIN_CACHE_STEP = 'Restore safe-chain'
 // The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
 // distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
 const ACTION_CALLERS = [
@@ -137,7 +139,32 @@ describe('the setup-pnpm composite action', () => {
 	it('leaves the store cache to pnpm/setup, which restores it before the runtime', () => {
 		const cache_steps = ACTION_STEPS.filter((step) => step.uses?.startsWith(CACHE_ACTION))
 
-		expect(cache_steps).toEqual([])
+		expect(cache_steps.map((step) => step.name)).toEqual([SAFE_CHAIN_CACHE_STEP])
+	})
+})
+
+// joshuafolkken/kit#6833: a GitHub Releases outage turned every job red before its tests.
+describe('the setup-pnpm safe-chain cache', () => {
+	it('restores the safe-chain download keyed on the pin, only when asked to', () => {
+		expect(action_step(SAFE_CHAIN_CACHE_STEP)).toMatchObject({
+			uses: expect.stringMatching(SHA_PINNED_CACHE_ACTION),
+			if: `${WHEN_INSTALLING} && inputs.cache == 'true'`,
+			with: {
+				path: expect.not.stringContaining('pnpm'),
+				key: expect.stringMatching(
+					/steps\.safe-chain-pin\.outputs\.version.*steps\.safe-chain-pin\.outputs\.sha256/u,
+				),
+			},
+		})
+	})
+
+	it('hands the cache hit to the safe-chain setup that follows', () => {
+		const names = ACTION_STEPS.map((step) => step.name)
+
+		expect(names.indexOf(SAFE_CHAIN_CACHE_STEP)).toBeLessThan(names.indexOf(SAFE_CHAIN_STEP))
+		expect(action_step(SAFE_CHAIN_STEP)).toMatchObject({
+			env: { SAFE_CHAIN_CACHE_HIT: '${{ steps.safe-chain-cache.outputs.cache-hit }}' },
+		})
 	})
 })
 
