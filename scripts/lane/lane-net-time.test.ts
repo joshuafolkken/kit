@@ -11,6 +11,7 @@ const ISSUE = 4695
 const OTHER = 4696
 const MINUTE_MS = 60_000
 const OTHER_REDISPATCH = 20
+const FOLLOWUP_START = 'followup start'
 const START = Date.parse('2026-10-24T03:00:00.000Z')
 
 function at(minute: number): string {
@@ -36,6 +37,10 @@ function stage(minute: number): LedgerEntry {
 
 function event(minute: number, kind: string, text: string): RunEvent {
 	return { pos: minute, at: at(minute), kind, text }
+}
+
+function ship(minute: number, words: string, issue = ISSUE): RunEvent {
+	return event(minute, 'ship-stage', `#${String(issue)} ${words}`)
 }
 
 function net_minutes(
@@ -181,6 +186,27 @@ describe('lane_net_time.net_ms — where a wait ends', () => {
 
 		expect(net_minutes(entries)).toBeUndefined()
 		expect(lane_net_time.span_of(entries, ISSUE)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6541: the followup is the driver's wait on CI, CodeRabbit and the merge.
+describe('lane_net_time.net_ms — the followup', () => {
+	const lane = [dispatch(0), merge(30)]
+
+	it('takes out the followup from its start to the next ship stage line', () => {
+		expect(net_minutes(lane, [ship(20, FOLLOWUP_START), ship(28, 'followup done')])).toBe(22)
+	})
+
+	it('takes out a followup no line ended until the merge', () => {
+		expect(net_minutes(lane, [ship(20, FOLLOWUP_START)])).toBe(20)
+	})
+
+	it("keeps another issue's followup and the lane's other ship stages", () => {
+		expect(net_minutes(lane, [ship(10, FOLLOWUP_START, OTHER), ship(12, 'gate start')])).toBe(30)
+	})
+
+	it('takes out a host sleep inside the followup once', () => {
+		expect(net_minutes(lane, [ship(20, FOLLOWUP_START), sleep(22, 3)])).toBe(20)
 	})
 })
 

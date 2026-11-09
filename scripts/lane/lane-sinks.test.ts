@@ -4,6 +4,7 @@ import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_breakdown } from './lane-breakdown'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
@@ -24,6 +25,7 @@ const SHORT = 103
 const HUB_LANE = 104
 const THRESHOLD = 30
 const FOLLOWUP_CI = 'followup CI'
+const SHIP_STAGE = 'ship-stage'
 
 const scratch = make_directory('lane-sinks-test-')
 
@@ -57,7 +59,7 @@ function lane_events({ issue, plan, followup }: LaneShape): Array<RunEvent> {
 	return [
 		event(plan, 'plan', `${cite} plan`),
 		event(plan, 'lane-phase', `${cite} implement`),
-		event(followup, 'ship-stage', `${cite} followup start`),
+		event(followup, SHIP_STAGE, `${cite} followup start`),
 	]
 }
 
@@ -77,7 +79,7 @@ function followup_lap(issue: number, ended: number, minutes: number): LedgerEntr
 // Two lanes over the threshold, one under it.
 const LANES: ReadonlyArray<LaneShape> = [
 	{ issue: LONG, from: 0, plan: 10, followup: 40, merge: 50 },
-	{ issue: LONGER, from: 100, plan: 105, followup: 125, merge: 145 },
+	{ issue: LONGER, from: 100, plan: 105, followup: 140, merge: 145 },
 	{ issue: SHORT, from: 200, plan: 205, followup: 215, merge: 220 },
 ]
 
@@ -85,7 +87,7 @@ const RECORDS = {
 	entries: [
 		...LANES.flatMap((lane) => lane_entries(lane)),
 		followup_lap(LONG, 45, 4),
-		{ ...followup_lap(LONGER, 130, 3), rerun: 'flake', runs: 2 },
+		{ ...followup_lap(LONGER, 144, 3), rerun: 'flake', runs: 2 },
 	],
 	events: LANES.flatMap((lane) => lane_events(lane)),
 }
@@ -112,11 +114,17 @@ describe('lane_sinks.sinks_of', () => {
 
 	it('sums each stage over the lanes, the longest total first', () => {
 		expect(sinks.map((sink) => [sink.name, minutes_of(sink.per_lane_ms)])).toStrictEqual([
-			['implement', [30, 20]],
-			['ship followup', [10, 20]],
+			['implement', [30, 35]],
 			['start to plan', [10, 5]],
-			[FOLLOWUP_CI, [4, 3]],
 		])
+	})
+
+	// joshuafolkken/kit#6541: the followup is the driver's wait, outside the lanes' net time.
+	it('leaves out the driver followup and its laps', () => {
+		const names = sinks.map((sink) => sink.name)
+
+		expect(names).not.toContain(lane_breakdown.FOLLOWUP_STAGE)
+		expect(names).not.toContain(FOLLOWUP_CI)
 	})
 })
 
@@ -125,15 +133,15 @@ describe('lane_sinks.table', () => {
 		const rows = lane_sinks.table(RECORDS, WINDOW, THRESHOLD, []).split('\n')
 
 		expect(rows[0]).toBe('| stage | total min | lanes | median min | open issues |')
-		expect(rows[2]).toBe('| implement | 50.0 | 2 | 25.0 | none |')
-		expect(rows).toHaveLength(6)
+		expect(rows[2]).toBe('| implement | 65.0 | 2 | 32.5 | none |')
+		expect(rows).toHaveLength(4)
 	})
 
 	it('names the open Issues whose title carries the stage on its row', () => {
 		const issues = [{ number: 7, title: 'Trim the Implement stage' }]
 		const rows = lane_sinks.table(RECORDS, WINDOW, THRESHOLD, issues).split('\n')
 
-		expect(rows[2]).toBe('| implement | 50.0 | 2 | 25.0 | #7 |')
+		expect(rows[2]).toBe('| implement | 65.0 | 2 | 32.5 | #7 |')
 	})
 })
 
@@ -165,10 +173,17 @@ function scoped_pair_lap(issue: number, ended: number, minutes: number): LedgerE
 		kind: 'ship-lap',
 		at: at(ended),
 		issue,
-		stage: 'followup',
+		stage: 'gate',
 		step: SCOPED_PAIR,
 		elapsed_ms: minutes * MINUTE_MS,
 	}
+}
+
+// The ship gate the scoped pair ran in, before the followup outside the net time.
+function gate_events(issue: number, from: number, to: number): Array<RunEvent> {
+	const cite = `#${String(issue)}`
+
+	return [event(from, SHIP_STAGE, `${cite} gate start`), event(to, SHIP_STAGE, `${cite} gate done`)]
 }
 
 // joshuafolkken/kit#6198: the scoped pair row also cites the Issues naming the period's over-cap hubs.
@@ -176,11 +191,11 @@ describe('lane_sinks.table — the scoped pair row', () => {
 	const records = {
 		entries: [
 			...RECORDS.entries,
-			scoped_pair_lap(LONG, 46, 1),
+			scoped_pair_lap(LONG, 39, 1),
 			test_related(LONG, 20, ALIASES_HUB),
 			test_related(SHORT, 210, 'scripts/lane/short-hub.ts'),
 		],
-		events: RECORDS.events,
+		events: [...RECORDS.events, ...gate_events(LONG, 38, 39)],
 	}
 	const rows = lane_sinks.table(records, WINDOW, THRESHOLD, HUB_ISSUES).split('\n')
 
@@ -194,14 +209,14 @@ describe('lane_sinks.table — the scoped pair row', () => {
 	})
 
 	it('matches a lane whose top stage is the scoped pair the same way under --over', () => {
-		const lane = { issue: HUB_LANE, from: 300, plan: 301, followup: 302, merge: 352 }
+		const lane = { issue: HUB_LANE, from: 300, plan: 301, followup: 351.5, merge: 352 }
 		const lane_records = {
 			entries: [
 				...lane_entries(lane),
 				scoped_pair_lap(HUB_LANE, 351, 60),
 				test_related(HUB_LANE, 301, ALIASES_HUB),
 			],
-			events: lane_events(lane),
+			events: [...lane_events(lane), ...gate_events(HUB_LANE, 340, 351.5)],
 		}
 
 		expect(lane_over.table(lane_records, WINDOW, THRESHOLD, HUB_ISSUES)).toContain(

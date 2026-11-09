@@ -28,6 +28,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 const DECIMALS = 1
 const NOT_MEASURED = 'not measured'
 const IMPLEMENT = 'implement'
+const DRIVER_NOTE = '(driver, outside lane net)'
 const COLUMNS = ['stage', 'median (min)', 'max (min)', 'runs'] as const
 const { STAGE } = run_ship_stage
 const STAGES = [
@@ -154,11 +155,17 @@ function cell(milliseconds: number | undefined): string {
 		: (milliseconds / MS_PER_MINUTE).toFixed(DECIMALS)
 }
 
+// The row's name: the followup is the driver's wait, outside the lane's net time
+// (joshuafolkken/kit#6541).
+function label_of(stage: string): string {
+	return stage === STAGE.FOLLOWUP ? `${stage} ${DRIVER_NOTE}` : stage
+}
+
 function stage_row(stage: string, measured: Measured): string {
 	const durations = durations_of(stage, measured)
 
 	return lane_stats.to_row([
-		stage,
+		label_of(stage),
 		cell(lane_stats.median(durations)),
 		cell(lane_stats.peak(durations)),
 		String(durations.length),

@@ -12,7 +12,7 @@ import { lane_yield_split, type YieldShare } from './lane-yield-split'
 // its dispatch to its `plan`, the implementation from the `plan` (or `lane-phase implement`, or else
 // the first edit) to the first ship stage, each ship stage from its start to its end, and the time
 // between ship stages — a stopped stage's fix included. The waits `lane:net` takes out are taken out of the stage they fell in and
-// counted apart, so the stages add up to the net time. A cut and its resume open no stage: the
+// counted apart, so the stages add up to the net time; the ship's followup is a driver stage outside it. A cut and its resume open no stage: the
 // implementation stays one stage across them.
 
 const { EVENT_KIND } = run_event_stream
@@ -27,6 +27,8 @@ const SHIP_LEAD = 'ship '
 const PRE_DETACH_STAGE = `${SHIP_LEAD}${lane_ledger.PRE_DETACH_STAGE}`
 const FOLLOWUP_STAGE = `${SHIP_LEAD}${run_ship_stage.STAGE.FOLLOWUP}`
 const ROUND_TWO_STAGE = `${SHIP_LEAD}${run_ship_stage.STAGE.ROUND_TWO}`
+// The ship's followup, outside the lane's net time (joshuafolkken/kit#6541).
+const DRIVER_FOLLOWUP_STAGE = `driver ${run_ship_stage.STAGE.FOLLOWUP}`
 
 // One stage's net milliseconds.
 interface Stage {
@@ -35,8 +37,11 @@ interface Stage {
 }
 
 interface Breakdown {
-	// Longest first, the waits taken out.
+	// Longest first, the waits and the driver's followup taken out.
 	stages: ReadonlyArray<Stage>
+	// The driver's followup outside the waits — CI, CodeRabbit and the merge, no lane seat held — or
+	// empty without one.
+	driver?: ReadonlyArray<Stage>
 	// The waits taken out, together.
 	excluded_ms: number
 	// The host's sleeps among them (joshuafolkken/kit#5032).
@@ -289,10 +294,28 @@ function yields_of(
 	}
 }
 
+// Each segment less what `outside` covers of it, longest first. The followup stage is all driver
+// time, so it is left out rather than listed at zero.
+function stages_of(
+	segments: ReadonlyArray<Segment>,
+	outside: ReadonlyArray<LaneSpan>,
+): Array<Stage> {
+	const parts = segments.map((segment) => ({
+		name: segment.stage,
+		ms: segment.to_ms - segment.from_ms - covered_ms(segment, outside),
+	}))
+
+	return ranked(parts.filter((part) => part.name !== FOLLOWUP_STAGE))
+}
+
+function driver_of(ms: number): Array<Stage> {
+	return ms > 0 ? [{ name: DRIVER_FOLLOWUP_STAGE, ms }] : []
+}
+
 /**
  * `issue`'s lane by stage, or `undefined` when the ledger holds no dispatch and merge of it — the same
- * span and waits `lane_net_time.net_ms` reads, so the stages add up to it. `edit_ms`, the lane's first
- * edit, opens the implementation where no event did.
+ * span and intervals `lane_net_time.net_ms` reads, so the stages add up to it and the driver's followup
+ * stands apart. `edit_ms`, the lane's first edit, opens the implementation where no event did.
  */
 function of(
 	entries: ReadonlyArray<LedgerEntry>,
@@ -305,14 +328,12 @@ function of(
 	if (span === undefined) return undefined
 
 	const waits = lane_net_time.waits(entries, events, issue, span)
+	const outside = lane_net_time.outside(entries, events, issue, span)
 	const segments = lane_segments({ entries, events }, issue, span, edit_ms)
-	const parts = segments.map((segment) => ({
-		name: segment.stage,
-		ms: segment.to_ms - segment.from_ms - covered_ms(segment, waits),
-	}))
 
 	return {
-		stages: ranked(parts),
+		stages: stages_of(segments, outside),
+		driver: driver_of(spans_ms(outside) - spans_ms(waits)),
 		excluded_ms: spans_ms(waits),
 		slept_ms: spans_ms(lane_net_time.slept(events, span)),
 		...yields_of(entries, events, issue, span),
@@ -349,6 +370,7 @@ function longest_of(breakdown: Breakdown): { name: string; minutes: number } | u
 
 const lane_breakdown = {
 	BETWEEN_STAGE,
+	DRIVER_FOLLOWUP_STAGE,
 	FOLLOWUP_STAGE,
 	IMPLEMENT_STAGE,
 	PLAN_STAGE,

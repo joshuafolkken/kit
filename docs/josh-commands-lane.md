@@ -208,6 +208,8 @@ pnpm josh lane:stats --period 7 --pairs     # a 7-day period's scoped pair runs
 
 <!-- /usage -->
 
+The followup row is `followup (driver, outside lane net)`; `--why` groups a followup over budget as `driver followup over budget (outside lane net)`, apart from the lane's own causes (`lane-why-period.ts`).
+
 `--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
 lanes over that many net minutes, the total, the lane count and the median per lane, the longest total first
 (`lane-sinks.ts`).
@@ -304,7 +306,7 @@ pnpm josh lane:value cell --table "measured lanes" --column "measured lanes" --s
 
 <!-- usage: lane:net -->
 
-Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood and the host's sleeps.
+Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood, the host's sleeps and the ship's followup.
 
 ```bash
 pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
@@ -313,6 +315,8 @@ pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
 <!-- /usage -->
 
 The whole minutes are what an Issue's `- 原因のレーン:` line declares; a lane the ledger holds no dispatch and merge of exits non-zero.
+
+The followup — each `followup start` ship stage to the lane's next ship stage or its merge — is the driver's CI, CodeRabbit and merge wait with no lane seat held, so it is outside the net time (`lane-net-time.ts`).
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` in detail".
 
@@ -346,7 +350,7 @@ The label is the josh commands a Bash call chains, a `reserved-run` as what it w
 
 The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs, hub <file>` — `<N>` the widest run's count, the hub the most capped runs recorded, left off where none did — and none when no run capped a file (`lane-breakdown-related.ts`).
 
-The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
+The followup is no stage: a `driver followup <minutes> (outside lane net)` line after the waits taken out holds it, with its laps and its own budget. It names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
 Each ship stage lists its inner steps under it, longest first: the `ship-lap` rows `josh ship` writes and the lane's core-budget waits (`lane-breakdown-laps.ts`).
 `lane:stats` prints each step's median and maximum under the stage table (`lane-ship-lap-stats.ts`).
@@ -367,7 +371,7 @@ pnpm josh lane:why 6050   # the cause table an overrun investigation joins by ha
 
 <!-- /usage -->
 
-One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`: a lane's 25 minutes as plan 3, implement 9, ship 8 and followup 5), longest first, no model run.
+One table row per `lane:breakdown` stage over its budget (`lane-stage-budget.ts`: a lane's 25 minutes as plan 3, implement 9, ship 8 and followup 5, the followup outside the net time), longest first, no model run.
 
 The implement row carries the filing's projected implement minutes (`size-estimate.ts`), the followup row the check its CI wait waited on last and the lane branch's longest CI job and that job's longest step (`ci:timing`, the branch's latest commit), a ship row the lane's stop reasons and its `test:related` cap overrun, every row the open Issues whose title names the stage (`lane:stats --sinks`).
 

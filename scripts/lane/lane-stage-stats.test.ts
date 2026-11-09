@@ -52,7 +52,12 @@ describe('lane_stage_stats.table — the recorded stages', () => {
 			.slice(2)
 			.map((line) => line.slice(2, -2).split(' | ', 1)[0])
 
-		expect(names).toStrictEqual([...lane_stage_stats.STAGES])
+		// joshuafolkken/kit#6541: the followup row is named the driver's, outside the net time.
+		const expected = lane_stage_stats.STAGES.map((name) =>
+			name === 'followup' ? 'followup (driver, outside lane net)' : name,
+		)
+
+		expect(names).toStrictEqual(expected)
 	})
 
 	it('reduces a stage to its median, its maximum and its run count, in minutes', () => {

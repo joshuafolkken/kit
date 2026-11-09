@@ -3,6 +3,7 @@ import type { UsageRecord, UsageTotals } from '#scripts/cost-runtime/cost-usage'
 import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
 import { cost_audit_kind } from './cost-audit-kind'
 import type { AuditSession } from './cost-audit-read'
+import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import type { ToolCategory } from './cost-audit-tool'
 
 // The lane children's tokens and cost by the phase each request fell in, for `josh cost:audit`
@@ -48,6 +49,8 @@ interface PhaseRow {
 	key: string
 	tokens: PhaseTokens
 	usd: number
+	// The row's dollars by model and token type (joshuafolkken/kit#6899), summing to `usd`.
+	models: ReadonlyArray<ModelSpend>
 }
 
 interface Placed {
@@ -128,11 +131,27 @@ function review_from_ms(sessions: ReadonlyArray<AuditSession>, issue: number): n
 	return instants.length === 0 ? undefined : Math.min(...instants)
 }
 
-function add_record(rows: Map<string, PhaseRow>, key: string, record: UsageRecord): void {
-	const row = rows.get(key) ?? { key, tokens: NO_TOKENS, usd: 0 }
-	const usd = row.usd + cost_pricing.cost_of([record])
+type RecordGroups = Map<string, Array<UsageRecord>>
 
-	rows.set(key, { key, tokens: summed(row.tokens, tokens_of(record.totals)), usd })
+function add_record(groups: RecordGroups, key: string, record: UsageRecord): void {
+	groups.set(key, [...(groups.get(key) ?? []), record])
+}
+
+function tokens_sum(records: ReadonlyArray<UsageRecord>): PhaseTokens {
+	let tokens = NO_TOKENS
+
+	for (const record of records) tokens = summed(tokens, tokens_of(record.totals))
+
+	return tokens
+}
+
+function row_of(key: string, records: ReadonlyArray<UsageRecord>): PhaseRow {
+	return {
+		key,
+		tokens: tokens_sum(records),
+		usd: cost_pricing.cost_of(records),
+		models: cost_audit_spend.spend_of(records),
+	}
 }
 
 interface PhaseInput {
@@ -142,7 +161,7 @@ interface PhaseInput {
 	breakdowns: ReadonlyMap<number, Breakdown>
 }
 
-function add_session(rows: Map<string, PhaseRow>, input: PhaseInput, session: AuditSession): void {
+function add_session(rows: RecordGroups, input: PhaseInput, session: AuditSession): void {
 	const { issue } = session
 
 	if (issue === undefined) return
@@ -155,13 +174,15 @@ function add_session(rows: Map<string, PhaseRow>, input: PhaseInput, session: Au
 	}
 }
 
-function sorted(rows: Map<string, PhaseRow>): Array<PhaseRow> {
-	return [...rows.values()].toSorted((left, right) => right.usd - left.usd)
+function sorted(groups: RecordGroups): Array<PhaseRow> {
+	return [...groups]
+		.map(([key, records]) => row_of(key, records))
+		.toSorted((left, right) => right.usd - left.usd)
 }
 
 // Every lane session's requests (already windowed) summed by phase, the costliest first.
 function rows_of(input: PhaseInput): Array<PhaseRow> {
-	const rows = new Map<string, PhaseRow>()
+	const rows: RecordGroups = new Map()
 
 	for (const session of input.sessions) add_session(rows, input, session)
 
@@ -173,7 +194,7 @@ function agent_key(session: AuditSession): string {
 }
 
 // A lane's delegated unit — in the lane's directory, yet not the lane child's own session.
-function add_unit(rows: Map<string, PhaseRow>, session: AuditSession): void {
+function add_unit(rows: RecordGroups, session: AuditSession): void {
 	if (session.issue === undefined || session.is_lane) return
 
 	for (const record of session.records) add_record(rows, agent_key(session), record)
@@ -182,7 +203,7 @@ function add_unit(rows: Map<string, PhaseRow>, session: AuditSession): void {
 // The lane children's delegated units' requests (already windowed) summed by agent type, a unit with no
 // `meta.json` under its kind (joshuafolkken/kit#5971), the costliest first.
 function agent_rows_of(sessions: ReadonlyArray<AuditSession>): Array<PhaseRow> {
-	const rows = new Map<string, PhaseRow>()
+	const rows: RecordGroups = new Map()
 
 	for (const session of sessions) add_unit(rows, session)
 

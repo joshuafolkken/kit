@@ -36,19 +36,19 @@ const ISSUE = 4970
 const FAILURE = 1
 const START = Date.parse('2026-10-26T05:43:00.000Z')
 const MINUTE_MS = 60_000
-const FOLLOWUP_CI = 'followup CI'
+const JOSH_GATE = 'josh gate'
 const SHIP_STAGE = 'ship-stage'
 
 function at(minute: number): string {
 	return new Date(START + minute * MINUTE_MS).toISOString()
 }
 
-function followup_lap(ended: number, minutes: number, step: string): LedgerEntry {
+function gate_lap(ended: number, minutes: number, step: string): LedgerEntry {
 	return {
 		kind: 'ship-lap',
 		at: at(ended),
 		issue: ISSUE,
-		stage: 'followup',
+		stage: 'gate',
 		step,
 		elapsed_ms: minutes * MINUTE_MS,
 	}
@@ -193,12 +193,13 @@ describe('lane_breakdown_cli.run time sinks', () => {
 	it('prints the largest three sinks descending after aggregating repeated lap names', async () => {
 		mocks.all_events.mockResolvedValue([
 			{ pos: 1, at: at(10), kind: 'plan', text: `#${String(ISSUE)} plan` },
-			{ pos: 2, at: at(31), kind: SHIP_STAGE, text: `#${String(ISSUE)} followup start` },
+			{ pos: 2, at: at(31), kind: SHIP_STAGE, text: `#${String(ISSUE)} gate start` },
+			{ pos: 3, at: at(61), kind: SHIP_STAGE, text: `#${String(ISSUE)} gate done` },
 		])
 		mocks.read_entries.mockReturnValue([
 			{ kind: 'dispatch', at: at(0), issue: ISSUE },
-			followup_lap(51, 20, FOLLOWUP_CI),
-			followup_lap(56, 5, `${FOLLOWUP_CI} (reused)`),
+			gate_lap(51, 20, JOSH_GATE),
+			gate_lap(56, 5, `${JOSH_GATE} (reused)`),
 			{ kind: 'merge', at: at(61), issue: ISSUE },
 		])
 
@@ -206,7 +207,7 @@ describe('lane_breakdown_cli.run time sinks', () => {
 
 		expect(console.info).toHaveBeenCalledWith(
 			expect.stringContaining(
-				'\n- Largest time sinks (stages and laps overlap): ship followup 30.0 min; followup CI 25.0 min; implement 21.0 min',
+				'\n- Largest time sinks (stages and laps overlap): ship gate 30.0 min; josh gate 25.0 min; implement 21.0 min',
 			),
 		)
 		expect(String(vi.mocked(console.info).mock.calls[0]?.[0]).split('\n').at(-1)).not.toContain(
