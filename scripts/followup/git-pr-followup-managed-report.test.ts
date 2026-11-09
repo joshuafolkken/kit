@@ -71,9 +71,14 @@ vi.mock('./git-followup-flush', () => ({
 	git_followup_flush: { flush_ledger_step: vi.fn() },
 }))
 
-vi.mock('./followup-job-rerun', () => ({
-	followup_job_rerun: { rerun_failed_jobs: vi.fn() },
-}))
+vi.mock(import('./followup-job-rerun'), async (import_original) => {
+	const original = await import_original()
+
+	return {
+		...original,
+		followup_job_rerun: { ...original.followup_job_rerun, rerun_failed_jobs: vi.fn() },
+	}
+})
 
 // The real one resolves the tip with `git fetch origin main`, which the network guard refuses and
 // which nothing here asserts on.

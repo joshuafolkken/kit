@@ -1,6 +1,7 @@
-import { mkdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, symlinkSync, utimesSync } from 'node:fs'
 import path from 'node:path'
 import { temporary_directory } from '#tools/test/temporary-directory'
+import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
@@ -47,20 +48,13 @@ function answer(exit_code: number, stdout: string): ExecaResult {
 	return { exitCode: exit_code, stdout, all: stdout } as unknown as ExecaResult
 }
 
-function write_file(relative: string, content: string = JSON_BODY): void {
-	const file = path.join(project_root, relative)
-
-	mkdirSync(path.dirname(file), { recursive: true })
-	writeFileSync(file, content)
-}
-
 // A checkout with an installed eslint whose daemon runs, recorded under nothing yet.
 function checkout(): void {
 	for (const input of ['package.json', `${ESLINT_DIRECTORY}/package.json`, RULE_MODULE]) {
-		write_file(input)
+		write_file(project_root, input, JSON_BODY)
 	}
 
-	write_file(`${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+	write_file(project_root, `${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
 }
 
 // git under one commit, listing `files` as the ones the type program can resolve.
@@ -78,6 +72,7 @@ function recorded_text(): string {
 function current_checkout(): void {
 	checkout()
 	write_file(
+		project_root,
 		`${ESLINT_DIRECTORY}/.eslint_d-toolchain`,
 		eslint_daemon.record_text(DAEMON, eslint_daemon.fingerprint(project_root)),
 	)
@@ -124,7 +119,7 @@ describe('eslint_daemon.fingerprint', () => {
 			checkout()
 			const before = eslint_daemon.fingerprint(project_root)
 
-			write_file(input, CHANGED)
+			write_file(project_root, input, CHANGED)
 
 			expect(eslint_daemon.fingerprint(project_root)).not.toBe(before)
 		},
@@ -134,7 +129,7 @@ describe('eslint_daemon.fingerprint', () => {
 		checkout()
 		const before = eslint_daemon.fingerprint(project_root)
 
-		write_file(TARGET, CHANGED)
+		write_file(project_root, TARGET, CHANGED)
 		utimesSync(path.join(project_root, RULE_MODULE), NEWER_S, NEWER_S)
 
 		expect(eslint_daemon.fingerprint(project_root)).toBe(before)
@@ -250,7 +245,7 @@ describe('eslint_daemon.run', () => {
 describe('eslint_daemon.run — a stale daemon', () => {
 	it('stops a daemon whose config moved since it started before linting', async () => {
 		current_checkout()
-		write_file(RULE_MODULE, CHANGED)
+		write_file(project_root, RULE_MODULE, CHANGED)
 		mocked_execa.mockResolvedValue(answer(0, ''))
 
 		await eslint_daemon.run(PNPM_ESLINT, { project_root })
