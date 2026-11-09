@@ -26,6 +26,7 @@ const CORE: CoreRateLimit = {
 	reset_ms: NOW_MS + RESET_MINUTES * MINUTE_MS,
 }
 const PASSED: CoreRateLimit = { ...CORE, reset_ms: NOW_MS - 1 }
+const TRANSPORT = 'rest (auto)'
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -92,6 +93,14 @@ describe('run_board_render_quota.usage_part rate limit row', () => {
 	})
 })
 
+describe('run_board_render_quota.usage_part rate limit row transport', () => {
+	it("names the session's transport after the spent count", () => {
+		const { rows } = part_of({ rate_limit: { ...CORE, transport: TRANSPORT } })
+
+		expect(rows[2]).toMatch(/↻ 12:33\s+1877\/5000 · rest \(auto\)$/u)
+	})
+})
+
 describe('run_board_render_quota.usage_part rate limit row beside 7d-only rows', () => {
 	it('starts the 7d-only gauges and the github gauge at one column, github without `1h`', () => {
 		const week = { minutes: 10_080, used_percent: 46, resets_ms: NOW_MS + 24 * HOUR_MS }
@@ -112,6 +121,12 @@ describe('run_board_render_quota.usage_part rate limit summary', () => {
 
 	it('sums the allowance up without a reset once it has passed', () => {
 		expect(part_of({ rate_limit: PASSED }).summary).toBe('claude 42 · codex — · github 0% 0/5000')
+	})
+
+	it("names the session's transport after the allowance", () => {
+		expect(part_of({ rate_limit: { ...CORE, transport: TRANSPORT } }).summary).toBe(
+			`claude 42 · codex — · github 38% 1877/5000 ↻ 12:33 · ${TRANSPORT}`,
+		)
 	})
 
 	it('sums the usage limits up as before where the allowance could not be read', () => {

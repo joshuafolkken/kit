@@ -1,9 +1,8 @@
-import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
-import { git_gh_exec } from './git-gh-exec'
 import { BLOCKER, blocker_node_schema, git_gh_issue_graphql, PAGE } from './git-gh-issue-graphql'
 import { git_gh_issue_rest, type BlockedBy, type RestIssue } from './git-gh-issue-rest'
-import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
+import { git_gh_transport } from './git-gh-transport'
 
 // A listing's blocker relations in one GraphQL query per hundred rows (joshuafolkken/kit#6634).
 // REST serves them from each issue's own dependencies endpoint, so a `backlog:next` scan cost one
@@ -11,8 +10,8 @@ import { GRAPHQL_PATH } from './git-gh-pr-graphql-state'
 // already carries, with no repository to resolve.
 //
 // **A row missing from the answer is read through REST**, never as "no blockers": a failed query
-// (one unresolvable id fails the whole document, and `gh` exits non-zero), an unresolved node, or a
-// row without a `node_id`. An empty `nodes` would let `backlog:next` start a dependent before its
+// (one unresolvable id fails the whole document, and `gh` exits non-zero), a session on REST
+// (`git-gh-transport.ts`), an unresolved node, or a row without a `node_id`. An empty `nodes` would let `backlog:next` start a dependent before its
 // prerequisite.
 
 // `nodes(ids:)` accepts at most a hundred ids.
@@ -62,16 +61,10 @@ function to_blocked_by(row: RestIssue, node: IssueNode): BlockedBy {
 }
 
 async function query_nodes(ids: ReadonlyArray<string>): Promise<Array<IssueNode | null>> {
-	try {
-		const json = await git_gh_exec.exec_gh_api({
-			path: GRAPHQL_PATH,
-			body: JSON.stringify({ query: BLOCKED_BY_QUERY, variables: { ids } }),
-		})
+	const json = await git_gh_transport.query({ query: BLOCKED_BY_QUERY, variables: { ids } })
+	if (json === undefined) return []
 
-		return parse_json_object_or_undefined(json, response_schema)?.data.nodes ?? []
-	} catch {
-		return []
-	}
+	return json_value.parse_with(json, response_schema)?.data.nodes ?? []
 }
 
 // An unresolved id answers `null` in its slot; it is left out, so its row falls to REST.

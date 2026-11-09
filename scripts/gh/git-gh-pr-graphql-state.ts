@@ -1,7 +1,7 @@
-import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
-import { git_gh_exec } from './git-gh-exec'
 import type { RestPull } from './git-gh-pr-rest'
+import { git_gh_transport } from './git-gh-transport'
 
 // `mergeStateStatus` for a pull request whose single-pull REST read GitHub refuses as too many files
 // changed (`git-gh-pr-too-large.ts`). The listing row that stands in for that read carries no
@@ -9,10 +9,9 @@ import type { RestPull } from './git-gh-pr-rest'
 // whole budget. GraphQL still answers for the same pull request, so the state is read there. It also
 // refreshes the state of a detail answered 304 (`try_read_merge_state`, joshuafolkken/kit#6721).
 //
-// **For a too-large pull request, a failure is a stop with its reason, never a guess.** A cloud session
-// is answered 403 for GraphQL; the merge gate then has no way to judge the pull request, and says so.
-
-const GRAPHQL_PATH = 'graphql'
+// **For a too-large pull request, a failure is a stop with its reason, never a guess.** A session on
+// REST (`git-gh-transport.ts`) sends no GraphQL; the merge gate then has no way to judge the pull
+// request, and says so.
 
 const MERGE_STATE_QUERY =
 	'query($id: ID!) { node(id: $id) { ... on PullRequest { mergeStateStatus } } }'
@@ -24,25 +23,17 @@ const merge_state_node_schema = z.looseObject({ mergeStateStatus: z.string() })
 const merge_state_data_schema = z.looseObject({ node: merge_state_node_schema })
 const merge_state_response_schema = z.looseObject({ data: merge_state_data_schema })
 
-async function query_merge_state(node_id: string): Promise<string | undefined> {
-	const json = await git_gh_exec.exec_gh_api({
-		path: GRAPHQL_PATH,
-		body: JSON.stringify({ query: MERGE_STATE_QUERY, variables: { id: node_id } }),
-	})
-
-	return parse_json_object_or_undefined(json, merge_state_response_schema)?.data.node
-		.mergeStateStatus
-}
-
 // The state alone, `undefined` where GraphQL did not answer — for a caller with a fallback of its own.
 async function try_read_merge_state(node_id: string | undefined): Promise<string | undefined> {
 	if (node_id === undefined) return undefined
 
-	try {
-		return await query_merge_state(node_id)
-	} catch {
-		return undefined
-	}
+	const json = await git_gh_transport.query({
+		query: MERGE_STATE_QUERY,
+		variables: { id: node_id },
+	})
+	if (json === undefined) return undefined
+
+	return json_value.parse_with(json, merge_state_response_schema)?.data.node.mergeStateStatus
 }
 
 // `detail_error` is the 422 that sent the read here, kept as the cause so the stop names it.
@@ -55,4 +46,6 @@ async function read_merge_state_status(listed: RestPull, detail_error: unknown):
 
 const git_gh_pr_graphql_state = { read_merge_state_status, try_read_merge_state }
 
-export { git_gh_pr_graphql_state, GRAPHQL_PATH, MERGE_STATE_QUERY, NO_MERGE_STATE_MESSAGE }
+export { git_gh_pr_graphql_state, MERGE_STATE_QUERY, NO_MERGE_STATE_MESSAGE }
+
+export { GRAPHQL_PATH } from './git-gh-transport'

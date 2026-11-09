@@ -83,6 +83,14 @@ describe('gh_usage_tally.render', () => {
 		expect(text.split('\n', 1)[0]).toBe(`gh:usage — ${EARLY} … ${LATE} · 4 lines · 1 malformed`)
 	})
 
+	it("names the session's transport after the heading's period", () => {
+		const text = gh_usage_tally.render(gh_usage_tally.tally(LINES), 'rest (auto)')
+
+		expect(text.split('\n', 1)[0]).toBe(
+			`gh:usage — ${EARLY} … ${LATE} · 4 lines · transport: rest (auto)`,
+		)
+	})
+
 	it('prints one line when no usage line is left', () => {
 		expect(gh_usage_tally.render(gh_usage_tally.tally(['not json']))).toBe(
 			'gh:usage — no usage lines · 1 malformed',

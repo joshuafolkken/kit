@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forget_branch_rules } from './git-gh-branch-rules'
 import { git_gh_conditional } from './git-gh-conditional'
 import { git_gh_exec } from './git-gh-exec'
@@ -24,6 +24,7 @@ import {
 import { GRAPHQL_PATH, MERGE_STATE_QUERY, NO_MERGE_STATE_MESSAGE } from './git-gh-pr-graphql-state'
 import { forget_pr_numbers } from './git-gh-pr-read'
 import { pr_get_state_snapshot } from './git-gh-pr-snapshot'
+import { TRANSPORT_ENV_VAR } from './git-gh-transport'
 import { evaluate_pr_state } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot } from './git-pr-checks-parse'
 
@@ -85,6 +86,10 @@ beforeEach(() => {
 	git_gh_poll_read.forget_poll_reads()
 })
 
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
 describe('pr_get_state_snapshot — a detail refused as too many files changed', () => {
 	it('reads mergeStateStatus from GraphQL, which lets a clean pull request reach success', async () => {
 		stub_too_large({ graphql: CLEAN_ANSWER })
@@ -117,6 +122,14 @@ describe('pr_get_state_snapshot — no merge state to judge from', () => {
 		stub_too_large(input)
 
 		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toThrow(NO_MERGE_STATE_MESSAGE)
+	})
+
+	it('throws with the reason on a REST session, which sends no GraphQL', async () => {
+		stub_too_large({ graphql: CLEAN_ANSWER })
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+
+		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toThrow(NO_MERGE_STATE_MESSAGE)
+		expect(asked_graphql()).toBe(false)
 	})
 
 	it('keeps any other detail failure as it was, without asking GraphQL', async () => {

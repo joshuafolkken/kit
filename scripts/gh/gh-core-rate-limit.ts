@@ -15,6 +15,9 @@ interface CoreRateLimit {
 	limit: number
 	// When the window refills, in epoch milliseconds — GitHub answers epoch seconds.
 	reset_ms: number
+	// The session's transport (`git-gh-transport.ts`) the board names beside the allowance; `read_core`
+	// leaves it to the caller.
+	transport?: string
 }
 
 interface CoreAllowance extends CoreUsage {

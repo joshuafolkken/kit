@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { gh_core_rate_limit, type CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
+import { git_gh_transport } from '#scripts/gh/git-gh-transport'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture } from './run-board-fixture'
@@ -15,6 +16,7 @@ const QUOTAS: Quotas = {
 }
 const HOUR_MS = 3_600_000
 const CORE: CoreRateLimit = { remaining: 4321, limit: 5000, reset_ms: START + HOUR_MS }
+const TRANSPORT = 'graphql (auto)'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -33,11 +35,24 @@ async function once_frame(read_rate_limit: () => Promise<CoreRateLimit | undefin
 }
 
 describe('run_board_cli.LIVE_PORTS rate limit', () => {
-	it('reads the core rate limit through the shared reader', async () => {
+	it('reads the core rate limit through the shared reader, with the session transport', async () => {
 		const read_core = vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(CORE)
 
-		await expect(run_board_cli.LIVE_PORTS.read_rate_limit?.()).resolves.toStrictEqual(CORE)
+		vi.spyOn(git_gh_transport, 'label').mockResolvedValue(TRANSPORT)
+
+		await expect(run_board_cli.LIVE_PORTS.read_rate_limit?.()).resolves.toStrictEqual({
+			...CORE,
+			transport: TRANSPORT,
+		})
 		expect(read_core).toHaveBeenCalledOnce()
+	})
+
+	it('asks no transport when the read finds no allowance', async () => {
+		vi.spyOn(gh_core_rate_limit, 'read_core').mockResolvedValue(undefined)
+		const label = vi.spyOn(git_gh_transport, 'label')
+
+		await expect(run_board_cli.LIVE_PORTS.read_rate_limit?.()).resolves.toBeUndefined()
+		expect(label).not.toHaveBeenCalled()
 	})
 })
 
