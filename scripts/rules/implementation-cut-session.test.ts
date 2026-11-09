@@ -52,7 +52,20 @@ describe('implementation cut after resume', () => {
 		vi.advanceTimersByTime(implementation_cut_verdict.VERDICT_REUSE_MS)
 		expect(implementation_cut.session_verdict(NEW_TRANSCRIPT, CWD, SOURCE)).toBe('over')
 	})
+})
 
+// A held, cuttable lane with no session id exported — the relaunched hook's environment.
+function stub_cuttable_lane(): void {
+	vi.stubEnv('CODEX_THREAD_ID', undefined)
+	vi.stubEnv('CLAUDE_CODE_SESSION_ID', undefined)
+	vi.spyOn(process, 'cwd').mockReturnValue(CWD)
+	vi.spyOn(run_cut, 'held_issue_sync').mockReturnValue('6565')
+	vi.spyOn(run_cut, 'carried_cut_sync').mockReturnValue(undefined)
+	vi.spyOn(run_cut_decline, 'is_declined_sync').mockReturnValue(false)
+	vi.spyOn(run_cut_ready, 'is_ready_sync').mockReturnValue(true)
+}
+
+describe('implementation cut session identity', () => {
 	it('preserves the OpenAI thread identity', () => {
 		const source = { CODEX_THREAD_ID: 'resumed-thread' }
 		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('under')
@@ -63,13 +76,7 @@ describe('implementation cut after resume', () => {
 	})
 
 	it('prices the hook transcript when deciding whether an edit needs a cut', () => {
-		vi.stubEnv('CODEX_THREAD_ID', undefined)
-		vi.stubEnv('CLAUDE_CODE_SESSION_ID', undefined)
-		vi.spyOn(process, 'cwd').mockReturnValue(CWD)
-		vi.spyOn(run_cut, 'held_issue_sync').mockReturnValue('6565')
-		vi.spyOn(run_cut, 'carried_cut_sync').mockReturnValue(undefined)
-		vi.spyOn(run_cut_decline, 'is_declined_sync').mockReturnValue(false)
-		vi.spyOn(run_cut_ready, 'is_ready_sync').mockReturnValue(true)
+		stub_cuttable_lane()
 		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('over')
 		const call = { name: 'Edit', input: { file_path: 'scripts/x.ts' } }
 		const run = { transcript: NEW_TRANSCRIPT, now_ms: implementation_cut.REISSUE_WINDOW_MS }

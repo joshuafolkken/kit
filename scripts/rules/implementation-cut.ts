@@ -82,6 +82,37 @@ function can_cut_sync(issue: string): boolean {
 	return !run_cut_decline.is_declined_sync(issue) && run_cut_ready.is_ready_sync()
 }
 
+// A relaunched Claude hook names its transcript even when no session id is exported.
+// OpenAI already identifies its rollout by thread id; conflicting providers remain unmeasurable.
+function environment_for(transcript: string, source: AgentEnvironment): AgentEnvironment {
+	const thread_id = source[agent_provider.CODEX_SESSION_KEY]
+
+	if (
+		agent_provider.resolve_provider(source).kind === 'rejected' ||
+		(thread_id !== undefined && thread_id !== '')
+	) {
+		return source
+	}
+
+	return {
+		...source,
+		[agent_session_environment.SESSION_ID_KEY]: path.basename(transcript, '.jsonl'),
+	}
+}
+
+// The verdict of the hook's own transcript, cached per transcript so a resumed session never reads
+// the verdict its predecessor left.
+function session_verdict(
+	transcript: string,
+	directory: string = process.cwd(),
+	source: AgentEnvironment = process.env,
+): CostVerdict {
+	return implementation_cut_verdict.reused_verdict(
+		() => cost_cli.session_verdict(directory, environment_for(transcript, source)),
+		transcript,
+	)
+}
+
 function current_state(transcript?: string): LaneCostState {
 	return {
 		directory: process.cwd(),
@@ -234,35 +265,6 @@ function decide(
 	delivered_at_ms: number,
 ): boolean {
 	return !is_reissued_refusal(run.now_ms, delivered_at_ms)
-}
-
-// A relaunched Claude hook names its transcript even when no session id is exported.
-// OpenAI already identifies its rollout by thread id; conflicting providers remain unmeasurable.
-function environment_for(transcript: string, source: AgentEnvironment): AgentEnvironment {
-	const thread_id = source[agent_provider.CODEX_SESSION_KEY]
-
-	if (
-		agent_provider.resolve_provider(source).kind === 'rejected' ||
-		(thread_id !== undefined && thread_id !== '')
-	) {
-		return source
-	}
-
-	return {
-		...source,
-		[agent_session_environment.SESSION_ID_KEY]: path.basename(transcript, '.jsonl'),
-	}
-}
-
-function session_verdict(
-	transcript: string,
-	directory: string = process.cwd(),
-	source: AgentEnvironment = process.env,
-): CostVerdict {
-	return implementation_cut_verdict.reused_verdict(
-		() => cost_cli.session_verdict(directory, environment_for(transcript, source)),
-		transcript,
-	)
 }
 
 // Delivery has the calling transcript; candidate selection has only the tool call.
