@@ -124,7 +124,7 @@ describe('run_board_render_drawn.drawn_of usage', () => {
 		const text = lines_of(header({ quotas, form: 'chat' })).join('\n')
 
 		expect(text).toContain('⛽ usage')
-		expect(text).toMatch(/claude {7}5h {2}42%/u)
+		expect(text).toMatch(/Claude {8}5h {2}42%/u)
 		expect(text).toContain('┊ pace')
 	})
 })

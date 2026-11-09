@@ -40,7 +40,7 @@ const FINDINGS = '📌 findings'
 const PROCESSES = '💻 processes'
 const GROUPS = '▶ 1.0 ── 🌐 2.0'
 const USAGE = '⛽ usage'
-const USAGE_SUMMARY = 'claude 42/68 · codex 45'
+const USAGE_SUMMARY = 'Claude 42/68 · Codex 45'
 const THROUGHPUT = '📈 throughput'
 const THROUGHPUT_SUMMARY = '24h 4.0/h · 7d 2.9/h'
 
