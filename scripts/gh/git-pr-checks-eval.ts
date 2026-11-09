@@ -300,6 +300,7 @@ export {
 	CODERABBIT_CHECK_NAME,
 	is_required_check,
 	is_merge_conflict,
+	is_mergeable_state,
 	matches_any,
 }
 export type { PrEvaluation }

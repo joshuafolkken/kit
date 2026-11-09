@@ -1011,7 +1011,7 @@ A pass launches every free lane it seats side by side. A refused launch is answe
 
 A measurement declaration with no sample yet waits, not a lane (`sample condition not met`).
 
-Merged causes use guarded `run:add --retry` for parked dependents.
+Merged causes use guarded `run:add --retry` for dependents; each offer, for cleared `followup` parks.
 
 A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
 
