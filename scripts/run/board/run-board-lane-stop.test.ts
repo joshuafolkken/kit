@@ -1,6 +1,8 @@
 import {
+	ALREADY_DONE_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_MERGE_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import { describe, expect, it } from 'vitest'
@@ -103,6 +105,16 @@ describe('run_board_lane_stop.label_stop', () => {
 		expect(run_board_lane_stop.label_stop([NEEDS_DECISION_LABEL])).toStrictEqual({ state: 'human' })
 		expect(run_board_lane_stop.label_stop(undefined)).toBeUndefined()
 	})
+
+	it.each([NEEDS_HUMAN_MERGE_LABEL, ALREADY_DONE_LABEL])(
+		'names %s, not run:release, for a child still holding in-progress',
+		(parked) => {
+			expect(run_board_lane_stop.label_stop([IN_PROGRESS_LABEL, parked])).toStrictEqual({
+				state: STOPPED,
+				reason: parked,
+			})
+		},
+	)
 })
 
 describe('run_board_lane_stop.label_settled', () => {

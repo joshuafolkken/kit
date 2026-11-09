@@ -1,8 +1,4 @@
-import {
-	has_label_name,
-	NEEDS_DECISION_LABEL,
-	RUN_STALLED_LABEL,
-} from '#scripts/issue/issue-labels'
+import { has_label_name, NEEDS_DECISION_LABEL, parked_label_of } from '#scripts/issue/issue-labels'
 import { issue_run_hold } from '#scripts/issue/issue-run-hold'
 import type { IdleSince } from './run-board-idle'
 import type { BoardLanes } from './run-board-lane-state'
@@ -77,9 +73,8 @@ function label_stop(labels: ReadonlyArray<string> | undefined): LabelStop | unde
 	if (labels === undefined) return undefined
 	if (has_label_name(labels, NEEDS_DECISION_LABEL)) return { state: 'human' }
 
-	if (has_label_name(labels, RUN_STALLED_LABEL)) {
-		return { state: 'stopped', reason: RUN_STALLED_LABEL }
-	}
+	const parked = parked_label_of(labels)
+	if (parked !== undefined) return { state: 'stopped', reason: parked }
 
 	return issue_run_hold.is_held(labels) ? undefined : { state: 'stopped', reason: RELEASE_REASON }
 }
