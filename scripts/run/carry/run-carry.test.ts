@@ -409,6 +409,7 @@ describe('the issues a backlogrun has finished', () => {
 	// "This invocation named no issues" and "this run has no issues left" are different facts.
 	it('is not reported for an invocation that declared none', () => {
 		expect(run_carry.remaining_of(begun())).toBeUndefined()
+		expect(run_carry.remaining_of({ ...begun(), added: [] })).toBeUndefined()
 	})
 
 	it('is named in the description a refusal message carries', () => {
