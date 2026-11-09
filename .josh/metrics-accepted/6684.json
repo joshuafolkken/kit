@@ -1,5 +1,5 @@
 {
-	"reason": "The eslint heap cap moves into core-weights.ts with its byte conversion so the lint reservation derives from it (#6684)",
+	"reason": "The lint and eslint_scan reservations rise from 2400 MB to the 8590 MB eslint heap cap, so under concurrent lanes' memory pressure the gate's checks wait longer for the core budget (#6684)",
 	"date": "2026-11-09",
 	"growth": {
 		"scripts.code_lines": 5
