@@ -31,6 +31,8 @@ const WORKFLOW = [
 	'    steps:',
 	`      - name: ${GUARD}`,
 	"        if: needs.change-scope.result != 'success'",
+	'      - name: Install',
+	"        if: needs.change-scope.outputs.runtime == 'true'",
 	'      - name: Scan',
 	'  deploy:',
 	'    needs: build',
@@ -93,6 +95,8 @@ describe('followup_job_needs.is_gate_of_successes', () => {
 
 	it.each([
 		['its `if` reads the needs', sonar, [scope]],
+		['its `if` reads the needs, one skipped', sonar, [run_job(SCOPE, 'skipped')]],
+		['its `if` reads the needs, one the run never listed', sonar, []],
 		[
 			'its `env` reads the needs',
 			run_job('Checks', FAILURE, GATE),
@@ -104,8 +108,8 @@ describe('followup_job_needs.is_gate_of_successes', () => {
 
 	it.each([
 		['a needed job failed', sonar, [run_job(SCOPE, FAILURE)]],
-		['the run lacks a needed job', sonar, []],
 		['it failed in a step not reading the needs', run_job(SONAR, FAILURE, 'Scan'), [scope]],
+		['it failed in a step reading a needs output', run_job(SONAR, FAILURE, 'Install'), [scope]],
 		[NEEDS_NOTHING, run_job(SCOPE, FAILURE, GUARD), [scope]],
 	])('is false for a gate when %s', (_label, job, run_jobs) => {
 		expect(followup_job_needs.is_gate_of_successes(graph, job, run_jobs)).toBe(false)

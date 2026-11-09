@@ -20,8 +20,8 @@ const ANY_TEXT = '.+'
 const MATRIX_SUFFIX = String.raw`(?: \(.+\))?`
 const CALLED_JOB_SUFFIX = ' / .+'
 const REGEX_SPECIAL = /[$()*+.?[\\\]^{|}]/gu
-const NEEDS_READ = /\bneeds\./u
-const SUCCESS_CONCLUSION = 'success'
+const RESULT_READ = /\bneeds\.[\w-]+\.result\b/u
+const PASSED_CONCLUSIONS: ReadonlySet<string> = new Set(['success', 'skipped'])
 const FAILURE_CONCLUSION = 'failure'
 
 const needs_schema = z.array(z.string())
@@ -45,7 +45,7 @@ type WorkflowJobs = z.infer<typeof workflow_schema>['jobs']
 
 type WorkflowStep = z.infer<typeof step_schema>
 
-// `gates` names the job's steps that read `needs` — the step a gate job fails in.
+// `gates` names the job's steps that read a `needs` result — the step a gate job fails in.
 interface JobNeeds {
 	pattern: RegExp
 	needs: ReadonlyArray<RegExp>
@@ -87,7 +87,7 @@ function pattern_of(jobs: WorkflowJobs, id: string): RegExp {
 
 function gate_steps(steps: ReadonlyArray<WorkflowStep> = []): ReadonlyArray<string> {
 	return steps
-		.filter((step) => NEEDS_READ.test(JSON.stringify([step.if, step.env])))
+		.filter((step) => RESULT_READ.test(JSON.stringify([step.if, step.env])))
 		.flatMap((step) => step.name ?? [])
 }
 
@@ -133,13 +133,15 @@ function is_missing_need(
 	return needs_of(graph, job_name).some((pattern) => run_jobs.every((name) => !pattern.test(name)))
 }
 
-function has_succeeded(pattern: RegExp, run_jobs: ReadonlyArray<RunJob>): boolean {
-	const matched = run_jobs.filter(({ name }) => pattern.test(name))
-
-	return matched.length > 0 && matched.every(({ conclusion }) => conclusion === SUCCESS_CONCLUSION)
+// A need the run skipped or never listed passes: `Checks` needs `reuse-pr-checks`, which runs on a push
+// only, and a change without code skips the unit shards.
+function has_passed(pattern: RegExp, run_jobs: ReadonlyArray<RunJob>): boolean {
+	return run_jobs.every(
+		({ name, conclusion }) => !pattern.test(name) || PASSED_CONCLUSIONS.has(conclusion ?? ''),
+	)
 }
 
-// **Whether `job` failed in a step reading `needs` while every job it needs succeeded** among
+// **Whether `job` failed in a step reading a `needs` result while no job it needs failed** among
 // `run_jobs`. GitHub Actions once handed `Checks` and SonarQube's guard `abandoned` for needs that had
 // succeeded, so the gate failed with nothing wrong in the change (joshuafolkken/kit#6924).
 function is_gate_of_successes(
@@ -153,7 +155,7 @@ function is_gate_of_successes(
 
 	if (entries.every(({ gates }) => gates.every((gate) => gate !== failed))) return false
 
-	return needs.length > 0 && needs.every((pattern) => has_succeeded(pattern, run_jobs))
+	return needs.length > 0 && needs.every((pattern) => has_passed(pattern, run_jobs))
 }
 
 async function read_graph(workflow_path: string): Promise<NeedsGraph> {
