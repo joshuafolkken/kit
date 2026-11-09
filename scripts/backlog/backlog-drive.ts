@@ -16,7 +16,6 @@
 // **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
 // without a process, a network or a clock.
 
-import { epic_triage } from '#scripts/epic/epic-triage'
 import { poll } from '#scripts/lib/poll'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token } from '#scripts/run/merge/run-merge-token'
@@ -26,6 +25,7 @@ import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_judge } from './backlog-drive-judge'
 import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_memory } from './backlog-drive-memory'
+import { backlog_drive_park_triage as park_triage } from './backlog-drive-park-triage'
 import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_state } from './backlog-drive-state'
@@ -48,7 +48,6 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 	'wait',
 ])
 const JUDGE_REASON = 'judge'
-const TRIAGE_TOKEN = epic_triage.TRIAGE_VERDICT
 // The `hold` reason a pass held by a Claude usage limit records.
 const USAGE_LIMIT_REASON = 'usage-limit'
 const { launch_all } = backlog_drive_launch_pass
@@ -232,14 +231,6 @@ async function collect(issue: string, state: DriveState, ports: DrivePorts): Pro
 	}
 }
 
-function after_collection(state: DriveState): PassResult {
-	if (state.is_triage_owed && !state.is_stopping) {
-		return ended(TRIAGE_TOKEN, { ...state, is_triage_owed: false }, TRIAGE_TOKEN)
-	}
-
-	return { kind: 'continue', state }
-}
-
 async function collect_finished(state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const finished = state.in_flight.filter((item) => ports.is_finished(item))
 	let current = state
@@ -255,7 +246,7 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 
 	await backlog_drive_hold.stopped(state, current, ports)
 
-	return after_collection(current)
+	return { kind: 'continue', state: current }
 }
 
 // A watch with nothing in flight is the drain: `run:step` owes the retrospective there, so it is the
@@ -301,8 +292,9 @@ async function run_offered(
 	return await launch_all(issues, state, ports)
 }
 
-// A `run` that held an untriaged candidate back ends the pass with `triage` once its lanes are open — a
-// pass the launch itself ended keeps that end, and the next offer owes the judgment again.
+// A `run` that held an untriaged candidate back, or that follows a collected park, ends the pass with
+// `triage` once its lanes are open — a pass the launch itself ended keeps that end, and the next offer
+// owes the judgment again.
 async function run_then_judge(
 	read: OfferRead,
 	state: DriveState,
@@ -310,16 +302,25 @@ async function run_then_judge(
 ): Promise<PassResult> {
 	const result = await run_offered(read.issues, state, ports)
 
-	if (result.kind !== 'continue' || read.is_judgment_owed !== true) return result
+	return park_triage.triaged(result, read.is_judgment_owed === true || park_triage.is_owed(state))
+}
 
-	return ended(TRIAGE_TOKEN, result.state, TRIAGE_TOKEN)
+// An answer other than `run`, read by the judge, the verdict, the retrospective, the idle and the pause.
+async function answered(read: OfferRead, next: DriveState, ports: DrivePorts): Promise<PassResult> {
+	if (await backlog_drive_judge.is_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
+
+	const verdict = await backlog_drive_retrospective.ran(on_verdict(read, next), read, ports)
+	const idle = await backlog_drive_idle.noticed(verdict, read, ports)
+	const result = await backlog_drive_paused.noticed(idle, read, ports)
+
+	return await backlog_drive_hold.held(result, read, ports)
 }
 
 // Every offer answers the memory hold afresh: one that is not `run` leaves nothing held for memory.
 async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const read = await ports.offer(state)
 
-	if (read === undefined) return ended('offer', state)
+	if (read === undefined) return park_triage.hand_back(state) ?? ended('offer', state)
 
 	const next = {
 		...state,
@@ -330,19 +331,25 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 	}
 
 	if (read.verdict === RUN_VERDICT) return await run_then_judge(read, next, ports)
-	if (await backlog_drive_judge.is_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
-	const verdict = await backlog_drive_retrospective.ran(on_verdict(read, next), read, ports)
-	const idle = await backlog_drive_idle.noticed(verdict, read, ports)
-	const result = await backlog_drive_paused.noticed(idle, read, ports)
-
-	return await backlog_drive_hold.held(result, read, ports)
+	return park_triage.hand_back(next) ?? (await answered(read, next, ports))
 }
 
 // One pass: collect every child that ended, then — unless a `stop` has been read — ask what to start.
-// `should_offer` throttles the network read; a collection can ask immediately if a seat is free.
+// `should_offer` throttles the network read; a collection, or a park owing triage, asks immediately.
 function is_offering(before: DriveState, after: DriveState, should_offer: boolean): boolean {
-	return !after.is_stopping && (should_offer || after.in_flight.length !== before.in_flight.length)
+	const is_collected = after.in_flight.length !== before.in_flight.length
+
+	return !after.is_stopping && (should_offer || is_collected || after.is_triage_owed === true)
+}
+
+// No free lane hands any owed triage back unasked.
+async function offered(state: DriveState, ports: DrivePorts): Promise<PassResult> {
+	if ((await ports.free_lanes()) === 0) {
+		return park_triage.hand_back(state) ?? { kind: 'continue', state }
+	}
+
+	return await ask_offer(state, ports)
 }
 
 // A stopping run with nothing left in flight has ended.
@@ -365,9 +372,7 @@ async function run_pass(
 	if (collected.kind === 'end') return collected
 	if (!is_offering(held, collected.state, should_offer)) return settle(collected)
 
-	const free_lanes = await ports.free_lanes()
-
-	return settle(free_lanes === 0 ? collected : await ask_offer(collected.state, ports))
+	return settle(await offered(collected.state, ports))
 }
 
 interface LoopConfig {

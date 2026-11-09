@@ -164,6 +164,21 @@ which is not triage-gated, so a session woken on it would launch the untriaged c
 session labels each child standard error names and cuts (`backlogrun-steps.md` → "The loop"), and the
 next pass offers them; a child already running is left running.
 
+A pass that collected a parked child fills its free lanes before it hands `triage` back
+(joshuafolkken/kit#6871). It asks `backlog:offer` and, on `run`, launches the triaged candidates
+through `run_then_judge`, the path of a `run` that held an untriaged candidate back; then it ends with
+`triage`.
+
+Any other answer, a failed offer, or no free lane ends it with `triage` at once, before the judge,
+the drain or the retrospective reads that answer. That offer counts the parked child as still running
+(`--running`), so a pool with nothing runnable reads as `blocked`, never as the drain that would owe
+the run's retrospective before the triage.
+
+The parked child is not relaunched in that pass: `run:merge` writes its park label before it returns,
+so `backlog:next` no longer offers it. The judgment session runs after the driver ends, never beside
+it — the carry and `--exclude` stay the driver's. A launch that fills the lanes records the ledger's
+release; a lane still free records `hand-back:triage` (`scripts/backlog/backlog-drive-hold.ts`).
+
 ## Waiting while something is in flight
 
 **The numbers in `backlogrun-progress.md` → "Waiting, and never waiting forever" are floors between
