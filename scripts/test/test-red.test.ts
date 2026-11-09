@@ -1,5 +1,6 @@
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import type { BaseTree } from '#scripts/git/base-tree'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { test_red } from './test-red'
@@ -24,6 +25,8 @@ const NESTED_DIRECTORY = 'nested'
 const NESTED_TEST_FILE = `${NESTED_DIRECTORY}/report.test.ts`
 const NODE_MODULES = 'node_modules'
 const PROJECT_NODE_MODULES = path.resolve(NODE_MODULES)
+const PACKAGE_FILE = 'package.json'
+const MODULE_PACKAGE = '{ "type": "module" }\n'
 
 const PORCELAIN = '--porcelain'
 const CONFLICT_FILE = 'conflict.txt'
@@ -62,7 +65,7 @@ async function write(name: string, content: string): Promise<void> {
 }
 
 async function write_base(vitest_config: string | undefined): Promise<void> {
-	await write('package.json', '{ "type": "module" }\n')
+	await write(PACKAGE_FILE, MODULE_PACKAGE)
 	if (vitest_config !== undefined) await write(VITEST_CONFIG_FILE, vitest_config)
 	await write('.gitignore', `${NODE_MODULES}\n`)
 	await write(REPORT_FILE, BUGGY_REPORT)
@@ -202,6 +205,54 @@ describe('test_red.run when nothing runs', () => {
 			const { verdict } = await test_red.run()
 
 			expect(verdict).toBe('no-test')
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#6814: a test file spinning in a fork worker never lets vitest write its report,
+// so the probe's own timeout kills the run and names the file instead of leaving it to the harness cap.
+const PROBE_TIMEOUT = 8000
+const SPIN_FILE = 'spins.test.ts'
+const PASS_FILE = 'passes.test.ts'
+const SPIN_TEST = "import { it } from 'vitest'\nit('spins', () => {\n\tfor (;;) {}\n})\n"
+const PASS_TEST =
+	"import { expect, it } from 'vitest'\nit('passes', () => {\n\texpect(1).toBe(1)\n})\n"
+
+async function probe_tree(): Promise<BaseTree> {
+	const tree = path.join(process.cwd(), 'tree')
+
+	await mkdir(tree)
+	await writeFile(path.join(tree, PACKAGE_FILE), MODULE_PACKAGE)
+	await writeFile(path.join(tree, SPIN_FILE), SPIN_TEST)
+	await writeFile(path.join(tree, PASS_FILE), PASS_TEST)
+	await symlink(PROJECT_NODE_MODULES, path.join(tree, NODE_MODULES), 'dir')
+
+	return { parent: process.cwd(), tree }
+}
+
+describe('test_red.probe_in with a timeout', () => {
+	it(
+		'kills a run past its timeout and fails naming the test file still running',
+		async () => {
+			const base = await probe_tree()
+			const probe = test_red.probe_in(base, ['run', SPIN_FILE, PASS_FILE], PROBE_TIMEOUT)
+
+			await expect(probe).rejects.toThrow(new RegExp(`still running: ${SPIN_FILE}$`, 'u'))
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'reads a run that ends inside its timeout as before',
+		async () => {
+			const base = await probe_tree()
+
+			expect(await test_red.probe_in(base, ['run', PASS_FILE], PROBE_TIMEOUT)).toEqual({
+				verdict: 'green',
+				failed: [],
+				ran: 1,
+			})
 		},
 		RUN_TIMEOUT,
 	)

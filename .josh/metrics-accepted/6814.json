@@ -1,0 +1,7 @@
+{
+	"reason": "test:pinned probe timeout naming the still-running test file (#6814)",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 86
+	}
+}
