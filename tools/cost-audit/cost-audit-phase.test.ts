@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { cost_audit_fixture } from './cost-audit-fixture'
 import { cost_audit_phase } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
+import { cost_audit_spend } from './cost-audit-spend'
 import type { ToolCategory } from './cost-audit-tool'
 
 // joshuafolkken/kit#5936: a lane request's tokens go to the phase its instant fell in, by the stage
@@ -130,6 +131,24 @@ describe('cost_audit_phase.rows_of — a lane request placed by its stage', () =
 		})
 
 		expect(row?.tokens).toStrictEqual({ input: 1, cache_read: 2, cache_write: 7, output: 5 })
+	})
+})
+
+// joshuafolkken/kit#6899: each row carries its dollars by model and token type, summing to its cost.
+describe('cost_audit_phase.rows_of — the per-model breakdown', () => {
+	it("breaks each row's cost down by model, the terms summing to the row's cost", () => {
+		const rows = cost_audit_phase.rows_of({
+			sessions: [CHILD, REVIEW, UNMERGED, OUTSIDE],
+			reviews: [CHILD, REVIEW, UNMERGED, OUTSIDE],
+			breakdowns: new Map([[ISSUE, BREAKDOWN]]),
+		})
+
+		for (const row of rows) {
+			const sum = row.models.reduce((total, spend) => total + cost_audit_spend.total_of(spend), 0)
+
+			expect(row.models.map((spend) => spend.model)).toStrictEqual(['claude-haiku-4-5'])
+			expect(sum).toBeCloseTo(row.usd)
+		}
 	})
 })
 
