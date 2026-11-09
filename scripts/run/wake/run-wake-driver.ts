@@ -1,15 +1,15 @@
 import { epic_triage } from '#scripts/epic/epic-triage'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
-import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
+import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { run_step_section_driver } from '#scripts/run/run-step-section-driver'
 import type { DriveResult } from './run-wake-loop'
+import { run_wake_resume } from './run-wake-resume'
 import { run_wake_window } from './run-wake-window'
 
 const SUCCESS = 0
 const FIRST_LINE = 0
-const RESUME_PREFIX = 'resume: '
 const DETAILS_TAIL_LENGTH = 2048
 const TRUNCATION_MARK = '... '
 // The prefix `backlog-drive-cli.ts` gives the exception it catches.
@@ -90,18 +90,28 @@ function handoff_material(verdict: string, resume: string, details: string): str
 	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict)}${sections}${context}`
 }
 
+// A resume line the next pass could not parse is refused here rather than handed on, so neither a
+// session nor the supervisor's re-drive runs with an owner or a budget nobody validated.
+function judged(verdict: string, resume: string, details: string): DriveResult {
+	if (!run_wake_resume.is_valid(resume)) {
+		return { kind: 'failed', note: `backlog:drive returned an invalid resume line: ${resume}` }
+	}
+
+	return { kind: 'judgment', material: handoff_material(verdict, resume, details) }
+}
+
 function driver_result(out: string, read: CarryRead, details = ''): DriveResult {
 	const lines = out.split('\n')
 	const verdict = lines[FIRST_LINE]
 
 	if (is_final_stop(verdict, read)) return { kind: 'finished' }
-	const resume = lines.find((line) => line.startsWith(RESUME_PREFIX))
+	const resume = run_wake_resume.resume_of(out)
 
 	if (verdict === undefined || resume === undefined) {
 		return { kind: 'failed', note: `backlog:drive returned an incomplete result: ${out}` }
 	}
 
-	return { kind: 'judgment', material: handoff_material(verdict, resume, details) }
+	return judged(verdict, resume, details)
 }
 
 // **The cause is the driver's stdout `error …` line, so it leads the note.** `backlog:drive` prints an
@@ -176,20 +186,47 @@ function is_verdict(result: JoshResult, entries: ReadonlyArray<string>): boolean
 //
 // **A spent window answers `undefined` too**, so the supervisor's next pass checks its code before it
 // drives again; the restarted driver adopts the lanes still in flight.
+//
+// **Every completed run's resume line is kept, and the re-drive runs from it** (joshuafolkken/kit#6530):
+// the state an earlier child left — a park still to sort out — would otherwise be lost to a later
+// child's `merge busy`. A line the re-drive cannot use ends the re-drive, and `driver_result` refuses it.
+interface DrivePass {
+	target: string
+	carry: RunCarry
+	base: ReadonlyArray<string>
+	wait: Pause
+}
+
+// A `remaining` that is not a positive count is spent, so a call site that drifts from the signature
+// ends the re-drive instead of running it without bound.
+function rerun_args(
+	pass: DrivePass,
+	result: JoshResult,
+	remaining: number,
+): ReadonlyArray<string> | undefined {
+	const is_left = remaining > 0
+
+	if (!is_left || !is_verdict(result, RERUN_VERDICTS)) return undefined
+
+	return run_wake_resume.resumed_args(pass.base, run_wake_resume.resume_of(result.out))
+}
+
 async function run_driver(
-	target: string,
+	pass: DrivePass,
 	args: ReadonlyArray<string>,
-	wait: Pause,
 	remaining: number,
 ): Promise<JoshResult | undefined> {
 	const result = await josh_command.josh_run(args, true)
+
+	run_wake_resume.remember(pass.target, pass.carry, result)
 	if (is_verdict(result, [WINDOW_VERDICT])) return undefined
-	if (remaining === 0 || !is_verdict(result, RERUN_VERDICTS)) return result
+	const next = rerun_args(pass, result, remaining)
+	if (next === undefined) return result
 
-	await wait(RERUN_PAUSE_MS)
-	if (run_carry.read_carry(target).kind !== 'carried') return undefined
+	await pass.wait(RERUN_PAUSE_MS)
+	if (run_carry.read_carry(pass.target).kind !== 'carried') return undefined
 
-	return await run_driver(target, args, wait, remaining - 1)
+	return await run_driver(pass, next, remaining - 1)
 }
 
 // **Triage waits for the launched parent while it plans** (joshuafolkken/kit#5516): `josh backlogrun`
@@ -223,25 +260,45 @@ function never_planning(): boolean {
 	return false
 }
 
+type Prepared =
+	{ kind: 'failed'; note: string } | { kind: 'ready'; pass: DrivePass; args: ReadonlyArray<string> }
+
+function refused(note: string): Prepared {
+	return { kind: 'failed', note }
+}
+
+// The pass after a hand-back starts from the line the last run of this record left, if any; a kept
+// line that no longer parses is a failure, never a silent fall-back to the invocation's state.
+function prepare(target: string, wait: Pause): Prepared {
+	const read = run_carry.read_carry(target)
+	if (read.kind !== 'carried') return refused('The carry record changed.')
+
+	const base = driver_args(read.carry.invocation)
+	if (base === undefined) return refused('The carried invocation is invalid.')
+
+	const kept = run_wake_resume.stored(target, read.carry)
+	const args = kept === undefined ? base : run_wake_resume.resumed_args(base, kept)
+	if (args === undefined) return refused('The kept driver resume line is invalid.')
+
+	return { kind: 'ready', pass: { target, carry: read.carry, base, wait }, args }
+}
+
 async function drive_with(
 	target: string,
 	wait: Pause,
 	is_parent_planning: () => boolean,
 ): Promise<DriveResult> {
-	const read = run_carry.read_carry(target)
-	if (read.kind !== 'carried') return { kind: 'failed', note: 'The carry record changed.' }
+	const prepared = prepare(target, wait)
+	if (prepared.kind === 'failed') return prepared
 
-	const args = driver_args(read.carry.invocation)
-	if (args === undefined) return { kind: 'failed', note: 'The carried invocation is invalid.' }
-
-	if (!claim_record(target, read.carry.invocation)) {
+	if (!claim_record(target, prepared.pass.carry.invocation)) {
 		return { kind: 'failed', note: 'The driver could not claim the carry record.' }
 	}
 
 	await run_event_setup.emit(run_event_setup.STAGE.HANDING_OFF)
 
 	const result = await deferred_triage(
-		await run_driver(target, args, wait, RERUN_LIMIT),
+		await run_driver(prepared.pass, prepared.args, RERUN_LIMIT),
 		wait,
 		is_parent_planning,
 	)
