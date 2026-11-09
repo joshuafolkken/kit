@@ -35,6 +35,8 @@ interface RowYield {
 interface PlanLine {
 	text: string
 	row: RowYield | undefined
+	// An empty lane seat's reason: it gives way as a row does but is no issue, so no count names it.
+	is_seat?: boolean | undefined
 }
 
 // A section a person folds and unfolds with one key on a live board (`run-board-fold.ts`).
@@ -192,12 +194,12 @@ function section_lines(section: PlanSection, cut: ReadonlySet<PlanLine>): Array<
 	return [...section.head, ...kept, ...fold_lines(section, cut)]
 }
 
-// The cut rows no folding section counts.
+// The cut rows no folding section counts; a seat line is no row.
 function unfolded(plan: ReadonlyArray<PlanSection>, cut: ReadonlySet<PlanLine>): number {
 	const folding = plan.filter((section) => is_folding(section, cut))
 	const folded = new Set(folding.flatMap((section) => section.lines))
 
-	return [...cut].filter((line) => !folded.has(line)).length
+	return [...cut].filter((line) => !folded.has(line) && line.is_seat !== true).length
 }
 
 // The notes give way from the oldest shown; with none left the section goes, heading and all.

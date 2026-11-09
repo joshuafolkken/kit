@@ -54,9 +54,9 @@ function plan_section(
 	return [{ head: heading_lines(heading), lines, label: heading }]
 }
 
-// The issue rows among a section's lines — an epic's own line is none.
+// The issue rows among a section's lines — an epic's own line and an empty seat's are none.
 function row_count(lines: ReadonlyArray<PlanLine>): number {
-	return lines.filter((line) => line.row !== undefined).length
+	return lines.filter((line) => line.row !== undefined && line.is_seat !== true).length
 }
 
 // A label saying how many its section holds: `⏳ queued 10`.

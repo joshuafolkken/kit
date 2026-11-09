@@ -66,6 +66,7 @@ describe('lane_split_stats.table', () => {
 			'| lines | 0 | 0 |',
 			NO_HUB_ROW,
 			'| diff | 0 | 0 |',
+			'| budget | 0 | 0 |',
 		])
 	})
 })
@@ -78,15 +79,17 @@ describe('lane_split_stats.table by reason', () => {
 			notice(2, 10, 'lines'),
 			notice(2, 8, 'hunks'),
 			notice(3),
+			notice(4, 10, 'budget'),
 		]
 
 		expect(rows_of(entries)).toStrictEqual([
-			'| all | 3 | 1 |',
+			'| all | 4 | 1 |',
 			NO_FILES_ROW,
 			'| hunks | 2 | 1 |',
 			'| lines | 1 | 0 |',
 			NO_HUB_ROW,
 			'| diff | 1 | 0 |',
+			'| budget | 1 | 0 |',
 		])
 	})
 

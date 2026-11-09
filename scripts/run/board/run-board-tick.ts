@@ -13,6 +13,7 @@ import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
 import { run_board_render } from './run-board-render'
+import { run_board_seat, type SeatRead } from './run-board-seat'
 import type { Known } from './run-board-snapshot'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
@@ -256,6 +257,13 @@ function gauges_of(state: BoardState, local: LocalRead): Gauges {
 	}
 }
 
+// The empty seats' read once the plan names the rows that could take them, and while the run drives.
+function seats_of(state: BoardState, local: LocalRead): SeatRead | undefined {
+	if (state.plan === undefined || activity_here(local).is_stopped) return undefined
+
+	return run_board_seat.read_of(local.events, local.launch_hold)
+}
+
 function header_of(
 	state: BoardState,
 	local: LocalRead,
@@ -265,6 +273,7 @@ function header_of(
 	return {
 		now_ms: redraw.now_ms,
 		...local_header(local),
+		seats: seats_of(state, local),
 		layout,
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,

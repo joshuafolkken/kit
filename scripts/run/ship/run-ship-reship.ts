@@ -19,6 +19,9 @@ import { run_ship_stop_cause } from './run-ship-stop-cause'
 // A re-ship after a review failure passes over the detached ship's preflight and fast pre-detach
 // checks (joshuafolkken/kit#6141): the tree they would read differs from the one they passed by the
 // review's fix commits alone, and the supervised preflight and gate ask those again after the sync.
+// **A followup that stopped on a check counts as one** (joshuafolkken/kit#6675): the followup stage
+// already merged a moved default branch and gated it (`run-ship-sync.ts` `merge_again`), so the stop
+// is a red the lane fixes on that merged tree, and a full re-detach only repeated those checks.
 // **A `--review` ship keeps its `test:pinned`**: the round 1 it reuses after its own stop launches none,
 // and no later stage runs it, so the fix's hunks would reach the merge with no test pinning them.
 //
@@ -31,20 +34,27 @@ const { CAUSE } = run_ship_stop_cause
 const SUCCESS_EXIT_CODE = 0
 const REVIEW_REASONS: ReadonlySet<string> = new Set([STAGE.REVIEW, STAGE.ROUND_TWO])
 const FIX_CAUSES: ReadonlySet<string> = new Set([CAUSE.CHECK, CAUSE.FINDING])
+const FOLLOWUP_CHECK = { reason: STAGE.FOLLOWUP, cause: CAUSE.CHECK }
 const SHIP_STAGES: ReadonlySet<string> = new Set([
 	...Object.values(STAGE),
 	lane_ledger_write.PRE_DETACH_STAGE,
 ])
-const SKIP_REASON = 're-ship after review failure'
+const SKIP_REASON = 're-ship after review or followup failure'
 const SKIP_NOTE = `${lane_ledger_write.PRE_DETACH_STAGE}: skipped (${SKIP_REASON})`
 
-function is_review_failure(stop: Pick<StopRecord, 'reason' | 'cause'>): boolean {
+function is_followup_check(stop: Pick<StopRecord, 'reason' | 'cause'>): boolean {
+	return stop.reason === FOLLOWUP_CHECK.reason && stop.cause === FOLLOWUP_CHECK.cause
+}
+
+function is_fix_failure(stop: Pick<StopRecord, 'reason' | 'cause'>): boolean {
+	if (is_followup_check(stop)) return true
+
 	return REVIEW_REASONS.has(stop.reason) && FIX_CAUSES.has(stop.cause ?? '')
 }
 
-// The stop as the ledger takes it, a review failure's with the base it stopped on.
+// The stop as the ledger takes it, a fix failure's with the base it stopped on.
 async function with_base(stop: StopRecord): Promise<StopRecord> {
-	if (!is_review_failure(stop)) return stop
+	if (!is_fix_failure(stop)) return stop
 	const base = await change_base.resolved_through_merge()
 
 	return base === undefined ? stop : { ...stop, base }
@@ -71,11 +81,11 @@ async function last_stop(issue: string, path?: string): Promise<StopEntry | unde
 	return last?.kind === lane_ledger.KIND.STOP ? last : undefined
 }
 
-// Whether this ship of `issue` follows a review failure on the base it stands on now.
+// Whether this ship of `issue` follows a fix failure on the base it stands on now.
 async function is_due(issue: string, path?: string): Promise<boolean> {
 	const last = await last_stop(issue, path)
 
-	if (last?.base === undefined || !is_review_failure(last)) return false
+	if (last?.base === undefined || !is_fix_failure(last)) return false
 
 	return last.base === (await change_base.resolved_through_merge())
 }
