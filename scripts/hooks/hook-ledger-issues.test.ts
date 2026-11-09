@@ -61,4 +61,10 @@ describe('hook_ledger_issues.count', () => {
 
 		expect(hook_ledger_issues.count('investigation', issues)).toBe(2)
 	})
+
+	it('does not count a rule from another rule it opens', () => {
+		const issues = [{ body: '⛔ batching: 1.19 calls per round trip', createdAt: '' }]
+
+		expect(hook_ledger_issues.count('batch', issues)).toBe(0)
+	})
 })

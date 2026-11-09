@@ -40,10 +40,11 @@ async function read(start_ms: number): Promise<ReadonlyArray<InterruptIssue> | u
 	return [...open, ...closed].filter((issue) => Date.parse(issue.createdAt) >= start_ms)
 }
 
-// Whether `body` names `rule` the way a refusal is quoted — its `⛔ <rule>` opening or the rule in
-// backticks — so a rule that is a common word (`investigation`) is not counted from plain prose.
+// Whether `body` names `rule` the way a refusal is quoted — its `⛔ <rule>:` opening or the rule in
+// backticks — so a rule that is a common word (`investigation`) is not counted from plain prose, nor
+// one rule from another it opens (`batch` in `⛔ batching:`).
 function names_rule(body: string, rule: string): boolean {
-	return body.includes(`⛔ ${rule}`) || body.includes(`\`${rule}\``)
+	return body.includes(`⛔ ${rule}:`) || body.includes(`\`${rule}\``)
 }
 
 // How many of `issues` name `rule` in their body; `undefined` for an unread or capped listing.
