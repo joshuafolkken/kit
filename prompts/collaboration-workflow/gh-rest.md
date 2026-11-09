@@ -1,14 +1,21 @@
-# `gh` は REST（`gh api`）で書く — 散文の指示も含む
+# `gh` は `gh api` で書く — 散文の指示も含む
 
 ## 規則
 
-**GitHub への操作は `gh api`（REST）で書く。** `gh issue …` / `gh pr …` / `gh repo …` のサブコマンド形は使わない —
-クラウドセッションでは GraphQL への egress が `403` で拒否される。
+**GitHub への操作は `gh api` で書く。** `gh issue …` / `gh pr …` / `gh repo …` のサブコマンド形は使わない —
+`scripts/gh/` の exec 層（ETag・回数の記録・transport）を迂回する。
 
 例外は 2 つだけ:
 
 - `gh auth token` — ローカルの認証情報を返すだけで、どのエンドポイントにも接続しない。スクリプトが自分のプロセス内で読む形に限る。エージェントの `Bash` からは `egress` 行が拒否する（`scripts/rules/egress-guard.ts`）
 - GitHub Actions のワークフロー — ランナー上では `gh` が動き、`gh pr merge --auto` の API は GraphQL にしか無い
+
+## API コールを減らす
+
+`scripts/gh/` に読みを足すとき → ETag の条件付き GET（`304` は REST core を消費しない、`git-gh-etag-read.ts`）、
+バッチ（N 件を 1 回、`git-gh-issue-batch-graphql.ts`）、transport（`git-gh-transport.ts`）のどれかに乗せる。
+GraphQL の読みは `git_gh_transport.query` だけが送る。`JOSH_GH_TRANSPORT`（既定 `auto`）の `auto` では、
+`403` で拒否されたセッションの読みが 1 時間 REST に戻る。GraphQL の mutation は対象外。
 
 ## 認証は環境によって別物である
 
