@@ -26,16 +26,27 @@ beforeEach(() => {
 	vi.spyOn(lane_launch_cli, 'launch_ready_lane').mockResolvedValue({ kind: 'launched', pid: '1' })
 	// The stage a launch writes goes to the checkout's own stream, which is a live run's: never from a test.
 	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
-	vi.spyOn(backlog_measure_close, 'closed').mockResolvedValue(false)
+	vi.spyOn(backlog_measure_close, 'outcome').mockResolvedValue('launch')
 })
 
 // joshuafolkken/kit#4621: an issue its measurement declaration closed takes no lane.
 describe('backlog_drive_launch.launch — a measured close', () => {
 	it('answers measured without opening a lane or a stage', async () => {
-		vi.mocked(backlog_measure_close.closed).mockResolvedValue(true)
+		vi.mocked(backlog_measure_close.outcome).mockResolvedValue('closed')
 
 		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('measured')
-		expect(backlog_measure_close.closed).toHaveBeenCalledWith(FIRST)
+		expect(backlog_measure_close.outcome).toHaveBeenCalledWith(FIRST)
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6503: an issue whose declaration has no sample yet waits without a lane.
+describe('backlog_drive_launch.launch — no sample yet', () => {
+	it('answers unsampled without opening a lane or a stage', async () => {
+		vi.mocked(backlog_measure_close.outcome).mockResolvedValue('wait')
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('unsampled')
 		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
 		expect(run_event_setup.emit).not.toHaveBeenCalled()
 	})

@@ -19,6 +19,7 @@ import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
 import { lane_value_cell, type CellAddress, type CellFilter } from './lane-value-cell'
+import { lane_value_missing } from './lane-value-missing'
 import { lane_why_period } from './lane-why-period'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement; `josh lane:value` and
@@ -263,12 +264,13 @@ function value_request(rest: ReadonlyArray<string>): ValueRequest | undefined {
 }
 
 // The value alone on its line, so a measurement declaration reads it as the output's last line; a
-// period with no sample prints nothing there and fails, which the drive reads as unreadable.
+// period with no sample prints nothing there and fails, which the drive reads as a wait
+// (`lane-value-missing.ts`).
 function print_value(request: ValueRequest, measured: number | undefined): number {
 	if (measured === undefined) {
 		const since = new Date(request.since_ms).toISOString()
-
-		const missing = request.address === undefined ? 'no sample' : 'no single numeric cell'
+		const { MISSING } = lane_value_missing
+		const missing = request.address === undefined ? MISSING.SAMPLE : MISSING.CELL
 
 		console.error(`josh lane:value ${request.metric}: ${missing} since ${since}`)
 

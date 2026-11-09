@@ -54,6 +54,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	'lane-state': { ja: 'レーンの状態', en: 'lane state' },
 	'paused-notice': { ja: '一時停止の通知', en: 'paused notice' },
 	measured: { ja: '計測で完了', en: 'measured' },
+	'sample-wait': { ja: '標本条件未達', en: 'sample condition not met' },
 	sleep: { ja: 'ホストのスリープ', en: 'host sleep' },
 	'plan-wait': { ja: '計画の重なり待ち', en: 'plan wait' },
 	'rate-limit': { ja: 'GitHub API の消費', en: 'GitHub rate limit' },

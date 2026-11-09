@@ -9,12 +9,16 @@ const LAUNCHED = 'launched'
 const UNOPENED = 'unopened'
 // The launch port's answer for an issue its measurement declaration closed (`backlog-measure-close.ts`).
 const MEASURED_LAUNCH = 'measured' as const
+// Its answer for an issue whose declaration has no sample yet: it waits, so this drive re-offers it no
+// more and a later drive measures it again (joshuafolkken/kit#6503).
+const UNSAMPLED_LAUNCH = 'unsampled' as const
 
-type DriveLaunch = LaunchOutcome['kind'] | typeof MEASURED_LAUNCH
+type DriveLaunch = LaunchOutcome['kind'] | typeof MEASURED_LAUNCH | typeof UNSAMPLED_LAUNCH
 
 interface Settled {
 	in_flight: Array<string>
 	measured: Array<string>
+	unsampled: Array<string>
 }
 
 function handed_back(issue: string, state: DriveState): PassResult {
@@ -40,25 +44,27 @@ async function refused(
 // **Only a launch or a measured close is activity**: a pass that started nothing — every lane taken
 // — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good. A
 // measured issue is closed but may still read OPEN to `backlog:next`, so it is excluded as a merge is.
+// An unsampled issue started nothing: it goes to `waiting`, kept out of the offer but not counted merged.
 function launched(state: DriveState, settled: Settled, ports: DrivePorts): DriveState {
-	const { in_flight, measured } = settled
+	const { in_flight, measured, unsampled } = settled
+	const exclude = [...state.exclude, ...measured]
+	const waiting = [...(state.waiting ?? []), ...unsampled]
 
 	if (in_flight.length === state.in_flight.length && measured.length === 0) {
-		return { ...state, in_flight }
+		return { ...state, in_flight, exclude, waiting }
 	}
 
-	const exclude = [...state.exclude, ...measured]
-
-	return { ...state, in_flight, exclude, active: ports.now().toISOString() }
+	return { ...state, in_flight, exclude, waiting, active: ports.now().toISOString() }
 }
 
-// Whether the launch settled the issue — into flight, or closed by its measurement.
+// Whether the launch settled the issue — into flight, closed by its measurement, or waiting for a sample.
 function is_settled(outcome: DriveLaunch): boolean {
-	return outcome === MEASURED_LAUNCH || outcome === LAUNCHED
+	return outcome === MEASURED_LAUNCH || outcome === LAUNCHED || outcome === UNSAMPLED_LAUNCH
 }
 
 function settle(settled: Settled, issue: string, outcome: DriveLaunch): void {
 	if (outcome === MEASURED_LAUNCH) settled.measured.push(issue)
+	if (outcome === UNSAMPLED_LAUNCH) settled.unsampled.push(issue)
 	if (outcome === LAUNCHED) settled.in_flight.push(issue)
 }
 
@@ -96,7 +102,7 @@ async function launch_all(
 	state: DriveState,
 	ports: DrivePorts,
 ): Promise<PassResult> {
-	const settled: Settled = { in_flight: [...state.in_flight], measured: [] }
+	const settled: Settled = { in_flight: [...state.in_flight], measured: [], unsampled: [] }
 	const launching = await backlog_drive_seats.seated(issues, ports)
 	const outcomes = await launch_each(launching, ports)
 	for (const { issue, outcome } of outcomes) settle(settled, issue, outcome)
@@ -109,7 +115,7 @@ async function launch_all(
 	return await refused(refusal.issue, refusal.outcome, next, ports)
 }
 
-const backlog_drive_launch_pass = { MEASURED_LAUNCH, launch_all }
+const backlog_drive_launch_pass = { MEASURED_LAUNCH, UNSAMPLED_LAUNCH, launch_all }
 
 export type { DriveLaunch }
 export { backlog_drive_launch_pass }

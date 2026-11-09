@@ -1,0 +1,7 @@
+{
+	"reason": "Round 1 review fixes: a sample-wait event and a waiting list keep unsampled issues out of offers without counting them merged (#6503)",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 44
+	}
+}

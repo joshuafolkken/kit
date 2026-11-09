@@ -78,7 +78,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-drive-epic.ts', 1],
 	['backlog/backlog-drive-named-offer.ts', 1],
 	['backlog/backlog-drive-retry.ts', 2],
-	['backlog/backlog-measure-close.ts', 1],
+	['backlog/backlog-measure-close.ts', 2],
 	['backlog/backlog-wait-cause.ts', 1],
 	// The run event stream's trip note, and the park comment GitHub renders.
 	['backlog/backlog-yield-cap.ts', 1],

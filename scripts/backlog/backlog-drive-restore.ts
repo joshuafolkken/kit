@@ -74,12 +74,13 @@ function withdrawn_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string
 	)
 }
 
-// The offer's exclusion as the stream records it: the merged and withdrawn children and the ones still
-// in flight — the list the drive keeps in memory, read by a reader that has only the stream
-// (joshuafolkken/kit#4349).
+// The offer's exclusion as the stream records it: the merged and withdrawn children, the ones waiting
+// for a sample (joshuafolkken/kit#6503) and the ones still in flight — the lists the drive keeps in
+// memory, read by a reader that has only the stream (joshuafolkken/kit#4349).
 function offer_exclude(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
-	const merged = issues_of_kind(events, run_event_stream.EVENT_KIND.MERGE)
-	const settled = [...merged, ...withdrawn_issues(events)]
+	const { MERGE, SAMPLE_WAIT } = run_event_stream.EVENT_KIND
+	const merged = issues_of_kind(events, MERGE)
+	const settled = [...merged, ...issues_of_kind(events, SAMPLE_WAIT), ...withdrawn_issues(events)]
 
 	return backlog_offer_exclude.exclude_of(settled, active_issues(events))
 }

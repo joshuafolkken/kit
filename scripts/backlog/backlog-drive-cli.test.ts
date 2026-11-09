@@ -130,6 +130,16 @@ describe('backlog_drive_cli.offer_argv', () => {
 	})
 })
 
+// joshuafolkken/kit#6503: an issue waiting for its measurement sample is not offered again this run.
+describe('backlog_drive_cli.offer_argv — a sample wait', () => {
+	it('never offers a child waiting for its measurement sample', () => {
+		const state = { ...backlog_drive.initial_state([], ACTIVE), waiting: ['2502'] }
+		const argv = backlog_drive_cli.offer_argv(state, CARRY, [])
+
+		expect(argv.slice(argv.indexOf('--exclude'))).toStrictEqual(['--exclude', '2502'])
+	})
+})
+
 // joshuafolkken/kit#4102: each merge runs `run:merge --driver` as its own process, so a fix merged
 // after the loop started is the code that decides the child.
 const MERGED: MergeResult = { token: '2600', code: 0, outcome: 'merged', is_offer: true }

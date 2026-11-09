@@ -68,6 +68,13 @@ it('excludes from the offer the merged children and the ones still in flight', (
 	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual(['2509', CHILD])
 })
 
+// joshuafolkken/kit#6503: a child waiting for its measurement sample is no ready work to a stream reader.
+it('excludes from the offer a child waiting for its measurement sample', () => {
+	const events = [event(1, 'sample-wait', '#2509 waiting: sample condition not met')]
+
+	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual(['2509'])
+})
+
 it('restores only live lanes launched by this invocation', () => {
 	const events = [
 		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),

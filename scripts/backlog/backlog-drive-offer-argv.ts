@@ -10,7 +10,8 @@ function offer_argv(
 	carry: RunCarry,
 	forwarded: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
-	const exclude = backlog_offer_exclude.exclude_of(state.exclude, state.in_flight)
+	const settled = [...state.exclude, ...(state.waiting ?? [])]
+	const exclude = backlog_offer_exclude.exclude_of(settled, state.in_flight)
 
 	return [
 		'backlog:offer',

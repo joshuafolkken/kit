@@ -171,6 +171,10 @@ const EVENT_KIND = {
 	// closed the issue through `issue:measured` — no lane was launched for it (joshuafolkken/kit#4621).
 	// `run:board` draws it merged. A trace: the parent's position is the drive's, not this close.
 	MEASURED: 'measured',
+	// `backlog:drive` ran a due issue's measurement declaration and found no sample to read yet, so the
+	// issue waits without a lane (joshuafolkken/kit#6503). A trace: `offer_exclude` keeps it out of the
+	// run's offers, the way the drive's own `waiting` list does.
+	SAMPLE_WAIT: 'sample-wait',
 	// The host slept while `backlog:drive` sampled its load (joshuafolkken/kit#5032): the sampler's timer
 	// ran late by more than a few intervals. `at` is the wake and `elapsed_ms` how long the sleep
 	// lasted; every lane's net time takes it out (`lane-sleep.ts`). A trace.
@@ -206,6 +210,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.LANE_STATE,
 	EVENT_KIND.PAUSED_NOTICE,
 	EVENT_KIND.MEASURED,
+	EVENT_KIND.SAMPLE_WAIT,
 	EVENT_KIND.RELAUNCH_FAILED,
 	EVENT_KIND.SLEEP,
 	EVENT_KIND.PLAN_WAIT,
