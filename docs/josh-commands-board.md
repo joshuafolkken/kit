@@ -51,9 +51,9 @@ Keyed to the common git directory `run:carry` uses, so parent and lane children 
 and after a cut. `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
 `<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `usage-limit`, `cut`,
-`resume`, `stop`, `pr-opened`, `review-round`, `filed`, `note`, `lane-phase`, `setup`, `pr-checks`); a kind outside it is refused.
+`resume`, `stop`, `pr-opened`, `review-round`, `filed`, `note`, `lane-phase`, `step`, `setup`, `pr-checks`); a kind outside it is refused.
 `lane-phase` is a child's first implementation edit (PreToolUse hook) or a driver step.
-`pr-checks` is `josh followup`'s poll of a PR's checks, written only on change.
+`pr-checks` is `josh followup`'s poll of a PR's checks, written on change.
 `setup` is one stage the run works through (`planning`, `dispatching #<N>`, …) — a trace `run:board` times, never a position.
 `filed` is an Issue `issue:file` created, and `note` a one-line
 observation below the filing bar (`run:board` shows both). `run:merge` appends `merge`, `park`,
