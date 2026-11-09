@@ -1,5 +1,4 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
-import type { CoreRateLimit } from '#scripts/gh/gh-core-rate-limit'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
 import type { SectionKey, TerminalSize } from './run-board-fit'
@@ -9,6 +8,7 @@ import { run_board_idle } from './run-board-idle'
 import type { KeyInput } from './run-board-keys'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
+import type { GithubRateLimit } from './run-board-render-quota-github'
 import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
 import type { Spot } from './run-board-spin'
 import type { Thanks } from './run-board-thanks-csv'
@@ -46,8 +46,9 @@ interface BoardPorts {
 	mark: () => Promise<void>
 	// The reviewers' roster (`run-board-thanks-read.ts`); none where the frame thanks nobody — the chat.
 	read_thanks?: (() => Promise<Thanks>) | undefined
-	// GitHub's core REST allowance (`gh-core-rate-limit.ts`); none where the frame shows none.
-	read_rate_limit?: (() => Promise<CoreRateLimit | undefined>) | undefined
+	// GitHub's REST core and GraphQL allowances with the transport (`gh-core-rate-limit.ts`); none where
+	// the frame shows none.
+	read_rate_limit?: (() => Promise<GithubRateLimit | undefined>) | undefined
 	// Sends one chat frame off-screen, for `--every` alone.
 	push: (frame: string) => Promise<void>
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
@@ -86,10 +87,10 @@ interface BoardState extends GatherRead {
 	thanks: Thanks
 	thanks_fetch: Fetch<Thanks> | undefined
 	thanks_attempted_ms: number | undefined
-	// The core allowance drawn on the usage row — none once a read fails — the read in flight, and when
+	// The allowances drawn on the usage row — none once a read fails — the read in flight, and when
 	// it was last launched.
-	rate_limit: CoreRateLimit | undefined
-	rate_limit_fetch: Fetch<CoreRateLimit | undefined> | undefined
+	rate_limit: GithubRateLimit | undefined
+	rate_limit_fetch: Fetch<GithubRateLimit | undefined> | undefined
 	rate_limit_attempted_ms: number | undefined
 }
 

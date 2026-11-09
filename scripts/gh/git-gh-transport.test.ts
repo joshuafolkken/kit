@@ -155,3 +155,25 @@ describe('git_gh_transport.label', () => {
 		await expect(git_gh_transport.label(NOW_MS + 1)).resolves.toBe('graphql (auto)')
 	})
 })
+
+describe('git_gh_transport.known', () => {
+	it('answers the kept transport under auto, and none before the probe, without probing', async () => {
+		await expect(git_gh_transport.known(NOW_MS)).resolves.toBeUndefined()
+		expect(mocked_api).not.toHaveBeenCalled()
+
+		await git_gh_transport.current(NOW_MS)
+
+		await expect(git_gh_transport.known(NOW_MS + 1)).resolves.toBe('graphql')
+		expect(probes()).toBe(1)
+	})
+
+	it('answers the explicit setting, and none for a value it does not know', async () => {
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+
+		await expect(git_gh_transport.known(NOW_MS)).resolves.toBe('rest')
+
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'soap')
+
+		await expect(git_gh_transport.known(NOW_MS)).resolves.toBeUndefined()
+	})
+})
