@@ -9,6 +9,8 @@ const ACTION_YML = ci_yml_fixture.SETUP_PNPM_ACTION
 const WORKFLOWS = [ACTION_YML]
 const LEGACY_SETUP = 'pnpm dlx @aikidosec/safe-chain'
 const SAFE_CHAIN_STEP = 'Setup safe-chain'
+// joshuafolkken/kit#6833: the pin sits on its own step so the cache key can read it too.
+const PIN_STEP = 'Pin safe-chain'
 const SHA256_RE = /^[0-9a-f]{64}$/u
 const VERSION_VARIABLE = 'SAFE_CHAIN_INSTALLER_VERSION'
 const SHA256_VARIABLE = 'SAFE_CHAIN_INSTALLER_SHA256'
@@ -31,11 +33,11 @@ function safe_chain_steps(relative_path: string): Array<string> {
 		.map((step) => ci_yml_fixture.step_run(step))
 }
 
-// Where the pin is declared: the action's safe-chain step, or the workflow-level env.
+// Where the pin is declared: the action's pin step, or the workflow-level env.
 function pin_environment(relative_path: string): Record<string, string> {
 	if (!is_action(relative_path)) return ci_yml_fixture.load_workflow(relative_path).env ?? {}
 
-	return all_steps(relative_path).find((step) => step.name === SAFE_CHAIN_STEP)?.env ?? {}
+	return all_steps(relative_path).find((step) => step.name === PIN_STEP)?.env ?? {}
 }
 
 // joshuafolkken/kit#2711: `pnpm dlx … setup-ci` left shims whose `safe-chain` binary was gone by
@@ -60,7 +62,6 @@ describe.each(WORKFLOWS)('safe-chain setup in %s', (relative_path) => {
 	})
 
 	it('never sets safe-chain up through pnpm dlx', () => {
-		expect(ci_yml_fixture.read_workflow(relative_path)).not.toContain('safe-chain setup-ci')
 		expect(ci_yml_fixture.read_workflow(relative_path)).not.toMatch(
 			/pnpm dlx @aikidosec\/safe-chain/u,
 		)
@@ -71,6 +72,15 @@ describe.each(WORKFLOWS)('safe-chain setup in %s', (relative_path) => {
 
 		expect(environment[VERSION_VARIABLE]).toMatch(/^\d+\.\d+\.\d+$/u)
 		expect(environment[SHA256_VARIABLE]).toMatch(SHA256_RE)
+	})
+
+	it('installs the release the pin step declares', () => {
+		const setup = all_steps(relative_path).find((step) => step.name === SAFE_CHAIN_STEP)
+
+		expect(setup?.env).toMatchObject({
+			[VERSION_VARIABLE]: '${{ steps.safe-chain-pin.outputs.version }}',
+			[SHA256_VARIABLE]: '${{ steps.safe-chain-pin.outputs.sha256 }}',
+		})
 	})
 })
 
