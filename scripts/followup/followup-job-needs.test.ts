@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { followup_job_needs } from './followup-job-needs'
+import { followup_job_needs, type RunJob } from './followup-job-needs'
+
+const GATE = 'Require the gate'
+const GUARD = 'Require change classification'
+const SCOPE = 'Change scope'
+const SONAR = 'SonarQube'
+const SUCCESS = 'success'
+const FAILURE = 'failure'
 
 const WORKFLOW = [
 	'jobs:',
@@ -12,6 +19,19 @@ const WORKFLOW = [
 	'  checks:',
 	'    name: Checks',
 	'    needs: [static-checks, unit]',
+	'    steps:',
+	`      - name: ${GATE}`,
+	'        env:',
+	'          UNIT_RESULT: ${{ needs.unit.result }}',
+	'  change-scope:',
+	`    name: ${SCOPE}`,
+	'  sonarqube:',
+	`    name: ${SONAR}`,
+	'    needs: change-scope',
+	'    steps:',
+	`      - name: ${GUARD}`,
+	"        if: needs.change-scope.result != 'success'",
+	'      - name: Scan',
 	'  deploy:',
 	'    needs: build',
 	'  release:',
@@ -23,6 +43,8 @@ const WORKFLOW = [
 
 const SHARD = 'Unit Tests (5/6)'
 const STATIC_CHECKS = 'Static Checks'
+const NEEDS_NOTHING = 'the job needs nothing'
+const IS_FALSE_WHEN = 'is false when %s'
 
 describe('followup_job_needs.is_waiting_on', () => {
 	const graph = followup_job_needs.parse_graph(WORKFLOW)
@@ -53,10 +75,41 @@ describe('followup_job_needs.is_missing_need', () => {
 	it.each([
 		['every needed job is in the run', 'Checks', [STATIC_CHECKS, SHARD]],
 		['the needed reusable workflow ran its called job', 'publish', ['Release / pack']],
-		['the job needs nothing', STATIC_CHECKS, []],
+		[NEEDS_NOTHING, STATIC_CHECKS, []],
 		['no workflow job is named so', 'Lint', []],
-	])('is false when %s', (_label, job_name, run_jobs) => {
+	])(IS_FALSE_WHEN, (_label, job_name, run_jobs) => {
 		expect(followup_job_needs.is_missing_need(graph, job_name, run_jobs)).toBe(false)
+	})
+})
+
+function run_job(name: string, conclusion: string, failed_step?: string): RunJob {
+	return { name, conclusion, steps: [{ name: failed_step, conclusion: FAILURE }] }
+}
+
+// joshuafolkken/kit#6924: a gate handed `abandoned` for needs that had succeeded.
+describe('followup_job_needs.is_gate_of_successes', () => {
+	const graph = followup_job_needs.parse_graph(WORKFLOW)
+	const scope = run_job(SCOPE, SUCCESS)
+	const sonar = run_job(SONAR, FAILURE, GUARD)
+
+	it.each([
+		['its `if` reads the needs', sonar, [scope]],
+		[
+			'its `env` reads the needs',
+			run_job('Checks', FAILURE, GATE),
+			[run_job(STATIC_CHECKS, SUCCESS), run_job(SHARD, SUCCESS)],
+		],
+	])('is true for a gate failed in a step whose %s', (_label, job, run_jobs) => {
+		expect(followup_job_needs.is_gate_of_successes(graph, job, run_jobs)).toBe(true)
+	})
+
+	it.each([
+		['a needed job failed', sonar, [run_job(SCOPE, FAILURE)]],
+		['the run lacks a needed job', sonar, []],
+		['it failed in a step not reading the needs', run_job(SONAR, FAILURE, 'Scan'), [scope]],
+		[NEEDS_NOTHING, run_job(SCOPE, FAILURE, GUARD), [scope]],
+	])(IS_FALSE_WHEN, (_label, job, run_jobs) => {
+		expect(followup_job_needs.is_gate_of_successes(graph, job, run_jobs)).toBe(false)
 	})
 })
 

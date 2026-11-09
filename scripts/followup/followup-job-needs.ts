@@ -20,25 +20,46 @@ const ANY_TEXT = '.+'
 const MATRIX_SUFFIX = String.raw`(?: \(.+\))?`
 const CALLED_JOB_SUFFIX = ' / .+'
 const REGEX_SPECIAL = /[$()*+.?[\\\]^{|}]/gu
+const NEEDS_READ = /\bneeds\./u
+const SUCCESS_CONCLUSION = 'success'
+const FAILURE_CONCLUSION = 'failure'
 
 const needs_schema = z.array(z.string())
+
+const step_schema = z.looseObject({
+	name: z.string().optional(),
+	if: z.unknown().optional(),
+	env: z.unknown().optional(),
+})
 
 const job_schema = z.looseObject({
 	name: z.string().optional(),
 	needs: z.union([z.string(), needs_schema]).optional(),
 	uses: z.string().optional(),
+	steps: z.array(step_schema).optional(),
 })
 
 const workflow_schema = z.looseObject({ jobs: z.record(z.string(), job_schema) })
 
 type WorkflowJobs = z.infer<typeof workflow_schema>['jobs']
 
+type WorkflowStep = z.infer<typeof step_schema>
+
+// `gates` names the job's steps that read `needs` — the step a gate job fails in.
 interface JobNeeds {
 	pattern: RegExp
 	needs: ReadonlyArray<RegExp>
+	gates: ReadonlyArray<string>
 }
 
 type NeedsGraph = ReadonlyArray<JobNeeds>
+
+// A job of the run as the Actions API reports it.
+interface RunJob {
+	name: string
+	conclusion?: string | null | undefined
+	steps: ReadonlyArray<{ name?: string | undefined; conclusion?: string | null | undefined }>
+}
 
 function escape(text: string): string {
 	return text.replaceAll(REGEX_SPECIAL, String.raw`\$&`)
@@ -64,6 +85,12 @@ function pattern_of(jobs: WorkflowJobs, id: string): RegExp {
 	return new RegExp(`^${name_source(job?.name ?? id)}${suffix}$`, 'u')
 }
 
+function gate_steps(steps: ReadonlyArray<WorkflowStep> = []): ReadonlyArray<string> {
+	return steps
+		.filter((step) => NEEDS_READ.test(JSON.stringify([step.if, step.env])))
+		.flatMap((step) => step.name ?? [])
+}
+
 // The jobs of a workflow, each with the names of the jobs it needs; a workflow of another shape has
 // none. YAML that does not parse throws, which `read_graph` answers as none.
 function parse_graph(workflow: string): NeedsGraph {
@@ -76,6 +103,7 @@ function parse_graph(workflow: string): NeedsGraph {
 	return Object.entries(jobs).map(([id, job]) => ({
 		pattern: pattern_of(jobs, id),
 		needs: needs_list(job.needs).map((need) => pattern_of(jobs, need)),
+		gates: gate_steps(job.steps),
 	}))
 }
 
@@ -105,6 +133,29 @@ function is_missing_need(
 	return needs_of(graph, job_name).some((pattern) => run_jobs.every((name) => !pattern.test(name)))
 }
 
+function has_succeeded(pattern: RegExp, run_jobs: ReadonlyArray<RunJob>): boolean {
+	const matched = run_jobs.filter(({ name }) => pattern.test(name))
+
+	return matched.length > 0 && matched.every(({ conclusion }) => conclusion === SUCCESS_CONCLUSION)
+}
+
+// **Whether `job` failed in a step reading `needs` while every job it needs succeeded** among
+// `run_jobs`. GitHub Actions once handed `Checks` and SonarQube's guard `abandoned` for needs that had
+// succeeded, so the gate failed with nothing wrong in the change (joshuafolkken/kit#6924).
+function is_gate_of_successes(
+	graph: NeedsGraph,
+	job: RunJob,
+	run_jobs: ReadonlyArray<RunJob>,
+): boolean {
+	const failed = job.steps.find(({ conclusion }) => conclusion === FAILURE_CONCLUSION)?.name
+	const entries = graph.filter(({ pattern }) => pattern.test(job.name))
+	const needs = entries.flatMap((entry) => entry.needs)
+
+	if (entries.every(({ gates }) => gates.every((gate) => gate !== failed))) return false
+
+	return needs.length > 0 && needs.every((pattern) => has_succeeded(pattern, run_jobs))
+}
+
 async function read_graph(workflow_path: string): Promise<NeedsGraph> {
 	try {
 		return parse_graph(await readFile(workflow_path, 'utf8'))
@@ -113,7 +164,13 @@ async function read_graph(workflow_path: string): Promise<NeedsGraph> {
 	}
 }
 
-const followup_job_needs = { is_missing_need, is_waiting_on, parse_graph, read_graph }
+const followup_job_needs = {
+	is_gate_of_successes,
+	is_missing_need,
+	is_waiting_on,
+	parse_graph,
+	read_graph,
+}
 
-export type { NeedsGraph }
+export type { NeedsGraph, RunJob }
 export { followup_job_needs }
