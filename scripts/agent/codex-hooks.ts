@@ -33,6 +33,14 @@ const CODEX_SHELL_TOOLS = 'exec_command|functions.exec_command|exec|functions.ex
 const TOOL_EVENTS: ReadonlySet<string> = new Set(['PreToolUse', 'PostToolUse'])
 const UNMATCHED_EVENTS: ReadonlySet<string> = new Set(['UserPromptSubmit'])
 const JSON_INDENT = '\t'
+const CLAUDE_SETTINGS_FILE = '.claude/settings.json'
+const CODEX_HOOKS_FILE = '.codex/hooks.json'
+
+// Each committed artifact a build regenerates, keyed to the file it is generated from (repo-relative):
+// `lane:plan` does not count one planned beside its source (`lane-plan-size.ts`).
+const GENERATED_SOURCES: ReadonlyMap<string, string> = new Map([
+	[CODEX_HOOKS_FILE, CLAUDE_SETTINGS_FILE],
+])
 
 function adapter_command(mode: string): string {
 	return hook_launch.hook_launch_command(`codex-hook-adapter ${mode}`, hook_launch.CODEX_ROOT)
@@ -85,7 +93,14 @@ function codex_hooks_text(claude_settings_text: string): string {
 	return `${JSON.stringify(codex_hook_config(claude), undefined, JSON_INDENT)}\n`
 }
 
-const codex_hooks = { adapter_command, codex_hook_config, codex_hooks_text }
+const codex_hooks = {
+	adapter_command,
+	codex_hook_config,
+	codex_hooks_text,
+	CLAUDE_SETTINGS_FILE,
+	CODEX_HOOKS_FILE,
+	GENERATED_SOURCES,
+}
 
 export { codex_hooks }
 export type { HookConfig }
