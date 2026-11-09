@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_fixture } from './backlog-drive-fixture'
 
@@ -25,9 +25,10 @@ describe('backlog_drive — a parked child is not excluded', () => {
 		const { ports, offers } = harness({ finished: [FIRST_CHILD], parked: [FIRST_CHILD] })
 		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
 
-		expect(offers[0]?.exclude).toStrictEqual([])
+		expect(offers).toStrictEqual([])
 		expect(result.state.exclude).toStrictEqual([])
-		expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([])
+		expect(result.state.in_flight).toStrictEqual([])
+		expect(result.kind === 'end' && result.end.reason).toBe('triage')
 	})
 
 	it('still excludes a merged child beside a parked one', async () => {
@@ -41,14 +42,55 @@ describe('backlog_drive — a parked child is not excluded', () => {
 		const { ports, calls, offers } = harness({
 			finished: [FIRST_CHILD],
 			parked: [FIRST_CHILD],
-			offers: [offer('wait'), offer('run', [FIRST_CHILD])],
+			offers: [offer('run', [FIRST_CHILD])],
 		})
 		const parked = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
 		const released = await backlog_drive.run_pass(parked.state, true, ports)
 
-		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', 'offer', `launch ${FIRST_CHILD}`])
-		expect(offers[1]?.exclude).toStrictEqual([])
+		expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', `launch ${FIRST_CHILD}`])
+		expect(offers[0]?.exclude).toStrictEqual([])
 		expect(released.kind === 'continue' && released.state.in_flight).toStrictEqual([FIRST_CHILD])
+	})
+})
+
+describe('backlog_drive — parked-child triage rounds', () => {
+	it('hands back one triage after collecting every parked child in the round', async () => {
+		const children = [FIRST_CHILD, SECOND_CHILD]
+		const { ports, calls } = harness({ finished: children, parked: children })
+		const result = await backlog_drive.run_pass(state(children), true, ports)
+
+		expect(calls).toStrictEqual(children.map((issue) => `merge ${issue}`))
+		expect(result.state.in_flight).toStrictEqual([])
+		expect(result.kind === 'end' && result.end.token).toBe('triage')
+	})
+
+	it('does not repeat a completed triage when the parent resumes', async () => {
+		const { ports } = harness({ finished: [FIRST_CHILD], parked: [FIRST_CHILD] })
+		const round = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
+		const resumed = await backlog_drive.run_pass(round.state, true, ports)
+
+		expect(resumed.kind).toBe('continue')
+	})
+
+	it('does not request triage when no child parked', async () => {
+		const { ports } = harness({ finished: [FIRST_CHILD] })
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
+
+		expect(result.kind).toBe('continue')
+	})
+
+	it('triages a failure newly parked by collection rather than already labelled', async () => {
+		const { ports } = harness({ finished: [FIRST_CHILD] })
+
+		ports.merge = vi.fn(async (): ReturnType<typeof ports.merge> => ({
+			token: 'deferred',
+			is_offer: true,
+			outcome: 'failed',
+			is_parked: true,
+		}))
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
+
+		expect(result.kind === 'end' && result.end.reason).toBe('triage')
 	})
 })
 

@@ -925,6 +925,17 @@ failures, `pnpm josh run:add <N> --retry` clears `run:stalled` and retries the p
 Record prerequisites with `--apply <N> --blocked-by <M> --reason <text>`; questions needing a person
 or measurement stay parked and excluded from this pass. Recovery guidance prints only when a read is due.
 
+Run the pass at the initial plan and after each collection batch that parked a child. The driver
+hands back `triage` once per such batch before its next offer; a batch without parks adds no step,
+nor does a resume. Read each parked child's body and comments, then route:
+
+- Tier A answer already present: `pnpm josh epic --decide <E> <N...> --decision-file <path>` records
+  the answer on the epic and children and removes `needs-decision` in one command.
+- Recovered API, rate-limit or authentication outage: `pnpm josh run:add <N> --retry`.
+- Dependency: `pnpm josh backlog:triage --apply <N> --blocked-by <M> --reason "<why>" --clear`.
+- Genuine Tier B / C question: keep it parked and excluded for this pass; it stays on the board's
+  human-waiting list.
+
 ### `josh backlog:budget`
 
 <!-- usage: backlog:budget -->

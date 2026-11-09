@@ -326,6 +326,8 @@ function seeded_state(seeded: Seeded, context: DriveContext): DriveState {
 	const initial =
 		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
 
+	initial.is_triage_owed = context.is_triage_owed
+
 	return { ...initial, exclude: [...new Set([...context.exclude, ...seeded.withdrawn])] }
 }
 

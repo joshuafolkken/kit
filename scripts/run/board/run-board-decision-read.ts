@@ -5,6 +5,7 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_read } from '#scripts/issue/issue-read'
 import { run_board_decision } from './run-board-decision'
+import { run_board_decision_graphql, type ViewLoader } from './run-board-decision-graphql'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
 
 interface DecisionNode extends EpicChild {
@@ -14,18 +15,25 @@ interface DecisionNode extends EpicChild {
 interface DecisionRead {
 	plan: BoardPlan
 	nodes: Map<string, Promise<DecisionNode | undefined>>
+	load_view: ViewLoader
 }
 
-// The board re-reads these every two minutes, so the issue and its comments go with the previous
-// process's ETag (joshuafolkken/kit#6700): an unchanged answer costs no core request. A blocked
-// node's relations follow-up is still read unconditionally.
-async function read_node(reference: IssueReference): Promise<DecisionNode | undefined> {
-	const json = await git_gh_issue_read.issue_view_json(
-		String(reference.number),
-		'number,title,body,state,labels,blockedBy',
-		reference.repo,
-		git_gh_etag_read.read,
-	)
+// The board re-reads these every two minutes, so a node goes through GraphQL where the transport
+// allows (`run-board-decision-graphql.ts`, joshuafolkken/kit#6819), and otherwise the issue and its
+// comments go with the previous process's ETag (joshuafolkken/kit#6700): an unchanged answer costs
+// no core request. A blocked node's relations follow-up is still read unconditionally.
+async function read_node(
+	reference: IssueReference,
+	load_view: ViewLoader,
+): Promise<DecisionNode | undefined> {
+	const json =
+		(await load_view(reference)) ??
+		(await git_gh_issue_read.issue_view_json(
+			String(reference.number),
+			'number,title,body,state,labels,blockedBy',
+			reference.repo,
+			git_gh_etag_read.read,
+		))
 	const issue = epic_issue.parse_epic_issue(json)
 
 	if (issue === undefined) return undefined
@@ -45,7 +53,7 @@ async function node_of(
 	read: DecisionRead,
 ): Promise<DecisionNode | undefined> {
 	const key = epic_graph.key_of(reference)
-	const node = read.nodes.get(key) ?? read_node(reference)
+	const node = read.nodes.get(key) ?? read_node(reference, read.load_view)
 
 	read.nodes.set(key, node)
 
@@ -143,13 +151,8 @@ async function wait_of(
 	return [child.number, run_board_decision.waiting_tail(reference, blocker.title, blocker.body)]
 }
 
-async function with_decisions(plan: BoardPlan | undefined): Promise<BoardPlan | undefined> {
-	if (plan === undefined) return undefined
-	const children = [
-		...plan.waves.waves.flat(),
-		...plan.waves.unreached,
-		...(plan.waves.running ?? []),
-	]
+// The plan's own children are seeded as read, so the walk reads only the nodes outside it.
+function read_of(plan: BoardPlan, children: ReadonlyArray<EpicChild>): DecisionRead {
 	const nodes = children.map(
 		(child) =>
 			[
@@ -157,7 +160,18 @@ async function with_decisions(plan: BoardPlan | undefined): Promise<BoardPlan | 
 				Promise.resolve({ ...child, title: plan.context.titles.get(child.number) ?? '' }),
 			] as const,
 	)
-	const read = { plan, nodes: new Map(nodes) }
+
+	return { plan, nodes: new Map(nodes), load_view: run_board_decision_graphql.view_loader() }
+}
+
+async function with_decisions(plan: BoardPlan | undefined): Promise<BoardPlan | undefined> {
+	if (plan === undefined) return undefined
+	const children = [
+		...plan.waves.waves.flat(),
+		...plan.waves.unreached,
+		...(plan.waves.running ?? []),
+	]
+	const read = read_of(plan, children)
 	const [decision_questions, waits] = await Promise.all([
 		questions_of(plan),
 		Promise.all(children.map(async (child) => await wait_of(child, read))),
