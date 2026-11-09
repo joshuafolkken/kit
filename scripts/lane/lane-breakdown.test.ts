@@ -25,7 +25,6 @@ const STAGES_4970: ReadonlyArray<readonly [string, number]> = [
 	[START_TO_PLAN, 10],
 	[SHIP_REVIEW, 8],
 	['ship commit', 3.5],
-	['ship followup', 3.5],
 	['ship round-2', 1.5],
 	['ship preflight', 1],
 	['between ship stages', 1],
@@ -105,12 +104,16 @@ describe('lane_breakdown.of — #4970', () => {
 		expect(minutes_of(breakdown_of_lane)).toStrictEqual(STAGES_4970)
 	})
 
-	// joshuafolkken/kit#5294: the windows a ship stage's laps and the fixes between stages are read in.
+	// joshuafolkken/kit#5294: the windows a ship stage's laps and the fixes between stages are read in;
+	// the followup's window stays among them for its laps though its time is the driver's (#6541).
 	it('keeps the ship stages and the time between them as its ship segments', () => {
 		const names = new Set(breakdown?.ship.map((segment) => segment.stage))
-		const expected = STAGES_4970.map(([name]) => name).filter(
-			(name) => name !== IMPLEMENT && name !== START_TO_PLAN,
-		)
+		const expected = [
+			...STAGES_4970.map(([name]) => name).filter(
+				(name) => name !== IMPLEMENT && name !== START_TO_PLAN,
+			),
+			lane_breakdown.FOLLOWUP_STAGE,
+		]
 
 		expect(names).toStrictEqual(new Set(expected))
 	})
@@ -125,6 +128,24 @@ describe('lane_breakdown.of — #4970', () => {
 
 // joshuafolkken/kit#5835: a docs-only lane writes no `plan` event, so its first edit opens the
 // implementation; a lane whose `plan` event did keeps the stages it had.
+// joshuafolkken/kit#6541: the followup is the driver's wait, outside the lane's net time.
+describe('lane_breakdown.of — the driver followup', () => {
+	it('counts the followup apart from the stages, which still add up to the net time', () => {
+		const breakdown = lane_breakdown.of(lane(), events_4970(), ISSUE)
+
+		expect(breakdown?.driver).toStrictEqual([
+			{ name: lane_breakdown.DRIVER_FOLLOWUP_STAGE, ms: 3.5 * MINUTE_MS },
+		])
+		expect(total_ms(breakdown)).toBe((MERGE_MINUTE - 3.5) * MINUTE_MS)
+	})
+
+	it('leaves the driver stage empty for a lane with no followup', () => {
+		const events = events_4970().filter((line) => !line.text.includes('followup'))
+
+		expect(lane_breakdown.of(lane(), events, ISSUE)?.driver).toStrictEqual([])
+	})
+})
+
 describe('lane_breakdown.of — the first edit', () => {
 	const unplanned = events_4970().slice(2)
 
