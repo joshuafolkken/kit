@@ -12,7 +12,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh check` · `josh c` | `[arguments...]` | developer | processes | Type-check with tsc (skips a basic project with no TypeScript to check) |
 | `josh check:related` · `josh cr` | — | developer | processes | Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes |
 | `josh codex:hook-adapter` | `<pretool\|posttool>` | automation | none | Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin) |
-| `josh completion` | `--names` | automation | none | Print command names and aliases for shell completion |
+| `josh completion` | `--names \| <zsh\|bash\|fish>` | automation | none | Print command names and aliases, or a shell completion script |
 | `josh cspell:dot` · `josh sd` | — | developer | processes | Run spell check including dotfiles |
 | `josh e2e:retry-check` | — | automation | none | Report whether the preview server crashed during a failed E2E attempt (CI) |
 | `josh exports:unused` · `josh eu` | — | developer | none | Report exported namespace members nothing reads (kit only; a consumer project skips it) |

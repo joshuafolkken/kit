@@ -12,10 +12,13 @@ These replace the corresponding `package.json` scripts; consumers need not add t
 
 <!-- usage: completion -->
 
-Print command names and aliases for shell completion.
+Print command names and aliases, or a shell completion script.
 
 ```bash
 pnpm josh completion --names
+pnpm josh completion zsh
+pnpm josh completion bash
+pnpm josh completion fish
 ```
 
 <!-- /usage -->
