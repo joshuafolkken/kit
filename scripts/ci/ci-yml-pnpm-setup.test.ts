@@ -43,6 +43,7 @@ const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION
 const CACHE_ACTION = 'actions/cache'
 const SAFE_CHAIN_CACHE_STEP = 'Restore safe-chain'
 const SAFE_CHAIN_SAVE_STEP = 'Save safe-chain'
+const SAFE_CHAIN_FETCH_STEP = 'Fetch safe-chain'
 // The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
 // distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
 const ACTION_CALLERS = [
@@ -162,13 +163,16 @@ describe('the setup-pnpm safe-chain cache', () => {
 		})
 	})
 
-	it('hands the cache hit to the safe-chain setup that follows', () => {
+	// joshuafolkken/kit#6849: what the cache restores goes through the setup's hash checks too.
+	it('fetches only on a cache miss, before the setup that verifies either', () => {
 		const names = ACTION_STEPS.map((step) => step.name)
 
-		expect(names.indexOf(SAFE_CHAIN_CACHE_STEP)).toBeLessThan(names.indexOf(SAFE_CHAIN_STEP))
-		expect(action_step(SAFE_CHAIN_STEP)).toMatchObject({
-			env: { SAFE_CHAIN_CACHE_HIT: '${{ steps.safe-chain-cache.outputs.cache-hit }}' },
-		})
+		expect(names.indexOf(SAFE_CHAIN_CACHE_STEP)).toBe(names.indexOf(SAFE_CHAIN_FETCH_STEP) - 1)
+		expect(names.indexOf(SAFE_CHAIN_FETCH_STEP)).toBe(names.indexOf(SAFE_CHAIN_STEP) - 1)
+		expect(action_step(SAFE_CHAIN_FETCH_STEP)?.if).toBe(
+			`${WHEN_INSTALLING} && steps.safe-chain-cache.outputs.cache-hit != 'true'`,
+		)
+		expect(action_step(SAFE_CHAIN_STEP)?.if).toBe(WHEN_INSTALLING)
 	})
 
 	// Saved in the post-job step, the binary could carry what a later step's code wrote over it.
