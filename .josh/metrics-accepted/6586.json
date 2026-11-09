@@ -1,0 +1,10 @@
+{
+	"reason": "Round-1 review fixes: compound/quoted command parsing, outside-checkout write refusal, extra gh/package write verbs and their tests",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 259,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 478,
+		"prose.long_paragraphs": 1
+	}
+}

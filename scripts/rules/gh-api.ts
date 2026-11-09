@@ -52,6 +52,10 @@ const API_VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set([
 	'--preview',
 	'--cache',
 ])
+// `-i` (`--include`) is `gh api`'s one boolean short flag, so it can lead a cluster whose last letter
+// takes the value (`-iX DELETE`, `-iXPUT`); the cluster is read as that last flag
+// (joshuafolkken/kit#6586).
+const INCLUDE_CLUSTER = /^-i+(?=[A-Za-z])/u
 
 // `repos/<owner>/<repo>` from an api path, with both halves captured. The path may carry a leading
 // slash, a query string, or further segments (`…/issues/5/comments`), so the owner and repo are taken
@@ -78,7 +82,9 @@ function is_gh_api(segment: string): boolean {
 // Each flag of the call with the word after it — a word that is a value-taking flag's value is not
 // a flag itself.
 function flags_of(segment: string): Array<[string, string]> {
-	const words = git_argv.arguments_of(segment, GH_COMMAND) ?? []
+	const words = (git_argv.arguments_of(segment, GH_COMMAND) ?? []).map((word) =>
+		word.replace(INCLUDE_CLUSTER, '-'),
+	)
 	let has_value_pending = false
 
 	return words
