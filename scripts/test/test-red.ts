@@ -72,24 +72,38 @@ async function prepare_outputs(parent: string, outputs: ReadonlyArray<string>): 
 }
 
 // The run is detached so its pid leads a process group holding vitest and its fork workers: a worker
-// spinning in a test never answers its parent, so only signalling the whole group stops it.
+// spinning in a test never answers its parent, so only signalling the whole group stops it. A detached
+// run sits outside its caller's group and execa's exit cleanup, so every group still running is killed
+// when this process exits — a stopped `test:pinned` ends through `process.exit` (`base-tree.ts`).
+const live_groups = new Set<number | undefined>()
+
 function kill_group(pid: number | undefined): void {
 	if (pid === undefined) return
 
 	try {
 		process.kill(-pid, KILL_SIGNAL)
 	} catch {
-		// It ended between the timeout and the signal; there is nothing left to stop.
+		// It ended before the signal; there is nothing left to stop.
 	}
 }
 
-async function vitest_in(
+function stop_live_probes(): void {
+	for (const pid of live_groups) kill_group(pid)
+}
+
+process.on('exit', stop_live_probes)
+
+// What `vitest_in` reads of the run: the group leader's pid and how the run ended.
+type VitestProcess = Promise<{
+	exitCode?: number | undefined
+	signal?: NodeJS.Signals | undefined
+}> & { pid?: number | undefined }
+
+function spawn_vitest(
 	{ parent, tree }: BaseTree,
 	vitest_args: ReadonlyArray<string>,
-	timeout_ms: number,
-): Promise<VitestRun> {
-	const state = { timed_out: false }
-	const subprocess = execa(path.join(tree, VITEST_BIN), vitest_args, {
+): VitestProcess {
+	return execa(path.join(tree, VITEST_BIN), vitest_args, {
 		cwd: tree,
 		detached: true,
 		env: {
@@ -99,6 +113,19 @@ async function vitest_in(
 		extendEnv: true,
 		reject: false,
 	})
+}
+
+// A timeout counts only when its kill ended the run: one that finished just as the timer fired is read
+// by its own exit code.
+async function vitest_in(
+	base: BaseTree,
+	vitest_args: ReadonlyArray<string>,
+	timeout_ms: number,
+): Promise<VitestRun> {
+	const state = { timed_out: false }
+	const subprocess = spawn_vitest(base, vitest_args)
+
+	live_groups.add(subprocess.pid)
 	const timer = setTimeout(() => {
 		state.timed_out = true
 		kill_group(subprocess.pid)
@@ -106,8 +133,12 @@ async function vitest_in(
 	const result = await subprocess
 
 	clearTimeout(timer)
+	live_groups.delete(subprocess.pid)
 
-	return { is_failed: result.exitCode !== 0, timed_out: state.timed_out }
+	return {
+		is_failed: result.exitCode !== 0,
+		timed_out: state.timed_out && result.signal === KILL_SIGNAL,
+	}
 }
 
 async function timeout_error(
@@ -203,7 +234,7 @@ function has_runner(): boolean {
 	return existsSync(VITEST_BIN)
 }
 
-const test_red = { has_runner, main, probe_in, run }
+const test_red = { has_runner, main, probe_in, run, stop_live_probes }
 
 export type { RedRun }
 export { test_red }

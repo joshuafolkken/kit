@@ -1,8 +1,9 @@
+import { existsSync } from 'node:fs'
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { BaseTree } from '#scripts/git/base-tree'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_red } from './test-red'
 
 // Drives `josh test:red` against a real git repository, modelled on joshuafolkken/kit#2308 →
@@ -214,8 +215,12 @@ describe('test_red.run when nothing runs', () => {
 // so the probe's own timeout kills the run and names the file instead of leaving it to the harness cap.
 const PROBE_TIMEOUT = 8000
 const SPIN_FILE = 'spins.test.ts'
+const PROGRESS_FILE = 'progress.log'
 const PASS_FILE = 'passes.test.ts'
-const SPIN_TEST = "import { it } from 'vitest'\nit('spins', () => {\n\tfor (;;) {}\n})\n"
+// The spin outlasts the probe's timeout but ends well inside the test's own, so a tree whose probe
+// cannot kill it (the pre-fix tree test:red runs, a hunk test:pinned reverts) leaves no worker behind.
+const SPIN_MS = 20_000
+const SPIN_TEST = `import { it } from 'vitest'\nit('spins', () => {\n\tconst end = Date.now() + ${String(SPIN_MS)}\n\twhile (Date.now() < end) {}\n})\n`
 const PASS_TEST =
 	"import { expect, it } from 'vitest'\nit('passes', () => {\n\texpect(1).toBe(1)\n})\n"
 
@@ -230,6 +235,35 @@ async function probe_tree(): Promise<BaseTree> {
 
 	return { parent: process.cwd(), tree }
 }
+
+// The run's own reporter writes the progress file once vitest has started, so the probe is live.
+async function until_started(base: BaseTree): Promise<void> {
+	await vi.waitFor(
+		() => {
+			expect(existsSync(path.join(base.parent, PROGRESS_FILE))).toBe(true)
+		},
+		{ timeout: PROBE_TIMEOUT },
+	)
+}
+
+// A detached probe sits outside the group `run:review --join` signals, so the exit handler that runs
+// `stop_live_probes` is what stops it.
+describe('test_red.probe_in when the process that started it exits', () => {
+	it(
+		'kills the running probe, which reads stopped',
+		async () => {
+			const base = await probe_tree()
+			const probe = test_red.probe_in(base, ['run', SPIN_FILE], RUN_TIMEOUT)
+
+			await until_started(base)
+			test_red.stop_live_probes()
+			const { verdict } = await probe
+
+			expect(verdict).toBe('stopped')
+		},
+		RUN_TIMEOUT,
+	)
+})
 
 describe('test_red.probe_in with a timeout', () => {
 	it(
