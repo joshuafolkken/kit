@@ -10,6 +10,7 @@ import {
 	RUN_LANE_LABEL,
 	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
+import { issue_priority } from '#scripts/issue/issue-priority'
 import { issue_run_hold } from '#scripts/issue/issue-run-hold'
 import type { CarryAddition } from '#scripts/run/carry/run-carry-added'
 
@@ -56,10 +57,17 @@ type AddOutcome =
 const ISSUE_PREFIX = '#'
 const BLOCKER_SEPARATOR = ', '
 
-function labels_for(is_priority: boolean): ReadonlyArray<string> {
+// A priority label already on the issue wins, as `issue:file` keeps one (`issue_priority.is_typed`);
+// the queue position is the carry record's `is_priority`, not this label.
+function labels_for(
+	is_priority: boolean,
+	existing: ReadonlyArray<string> = [],
+): ReadonlyArray<string> {
 	const opted_in = [AUTO_OK_LABEL, RUN_LANE_LABEL]
 
-	return is_priority ? [...opted_in, PRIORITY_HIGH_LABEL] : opted_in
+	return is_priority && !issue_priority.is_typed(existing)
+		? [...opted_in, PRIORITY_HIGH_LABEL]
+		: opted_in
 }
 
 // The first label that would not apply, or `undefined` once every one landed. Sequential, so a
@@ -118,11 +126,11 @@ function refusal(issue: number, view: IssueView, context: AddContext): string | 
 
 async function label_one(
 	issue: number,
-	is_priority: boolean,
+	labels: ReadonlyArray<string>,
 	ports: AddPorts,
 	context: AddContext,
 ): Promise<AddOutcome> {
-	const label = await first_unapplied(issue, labels_for(is_priority), ports)
+	const label = await first_unapplied(issue, labels, ports)
 
 	if (label !== undefined) return { kind: 'unlabeled', issue, label }
 
@@ -148,7 +156,7 @@ async function add_one(
 
 	if (reason !== undefined) return { kind: 'refused', issue, reason }
 
-	const outcome = await label_one(issue, is_priority, ports, context)
+	const outcome = await label_one(issue, labels_for(is_priority, view.labels), ports, context)
 
 	return outcome.kind === 'queued' ? { ...outcome, blockers: view.blockers } : outcome
 }
