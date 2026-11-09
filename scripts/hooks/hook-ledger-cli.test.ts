@@ -86,7 +86,12 @@ function context_of(issues: ReadonlyArray<InterruptIssue> | undefined): LedgerCo
 	mkdirSync(directory)
 	writeFileSync(path.join(directory, `${DAY}.jsonl`), `${lines.join('\n')}\n`)
 
-	return { directory, now: NOW, read_issues: async () => await issues }
+	return {
+		directory,
+		now: NOW,
+		read_issues: async () => await issues,
+		demoted_file: path.join(root, 'hook-demoted.json'),
+	}
 }
 
 async function printed(argv: ReadonlyArray<string>, context: LedgerContext): Promise<string> {
