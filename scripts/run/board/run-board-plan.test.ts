@@ -14,6 +14,7 @@ import {
 import { issue_read } from '#scripts/issue/issue-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_plan, type PlanPorts } from './run-board-plan'
+import { run_board_scope } from './run-board-scope'
 
 // joshuafolkken/kit#3442: the board drew the whole opted-in backlog whatever the run was asked to do. The
 // classification and the wave play-forward are `backlog:next`'s and `backlog_waves`'s own, tested there;
@@ -23,7 +24,8 @@ const REPO = 'joshuafolkken/kit'
 const SINGLE = 3441
 const EPIC = 3406
 const EPIC_CHILDREN = [3407, 3408]
-const POOL = [3412, 3407]
+const POOL_ONLY = 3412
+const POOL = [POOL_ONLY, 3407]
 
 function row(number: number): OpenIssueData {
 	return { number, title: `issue ${String(number)}`, createdAt: '2026-10-08T00:00:00Z' }
@@ -137,6 +139,28 @@ describe('run_board_plan.read_plan', () => {
 		const read = { ...ports(), fetch_open: vi.fn(async () => ({ rows: [], is_capped: false })) }
 
 		expect(await run_board_plan.read_plan({ issues: [], only: false }, read)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#6836: an `--only` run drew none of the issues `run:add` handed it.
+describe('run_board_plan.read_plan added issues', () => {
+	// The rows keep the classification's order, as the declared ones do; `run_board_scope` pins the scope's.
+	it('draws the issues run:add handed an --only run, an epic as its children', async () => {
+		const scope = run_board_scope.scope_of(`backlogrun #${String(SINGLE)} --only`, [
+			{ issue: EPIC, is_priority: true },
+		])
+		const plan = await run_board_plan.read_plan(scope, ports())
+
+		expect(wave_numbers(plan?.waves.waves)).toStrictEqual([[SINGLE, ...EPIC_CHILDREN]])
+	})
+
+	it('draws an added issue of a run without --only once, among the named ones', async () => {
+		const scope = run_board_scope.scope_of(`backlogrun #${String(SINGLE)}`, [
+			{ issue: POOL_ONLY, is_priority: false },
+		])
+		const plan = await run_board_plan.read_plan(scope, ports())
+
+		expect(wave_numbers(plan?.waves.waves)).toStrictEqual([[SINGLE, POOL_ONLY], [3407]])
 	})
 })
 
