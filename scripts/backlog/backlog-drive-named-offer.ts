@@ -26,6 +26,11 @@ interface NamedContext {
 	owner: string
 }
 
+interface NamedRead {
+	offer: OfferRead | undefined
+	pool: DriveState
+}
+
 const NO_RETRIES = 0
 
 function max_of(forwarded: ReadonlyArray<string>): number | undefined {
@@ -197,12 +202,12 @@ async function launch(
 	return held ?? (await classify(issue, named, state, owner))
 }
 
-async function read(
+async function offer_of(
 	carry: RunCarry,
 	state: DriveState,
+	waiting: DriveState,
 	context: NamedContext,
 ): Promise<OfferRead | undefined> {
-	const waiting = { ...state, in_flight: await holding(carry, state.in_flight) }
 	const named = backlog_drive_named.offer(carry, waiting, context.is_only)
 	if (named?.verdict !== 'run') return await not_run(carry, named)
 	const budget = budget_offer(carry, state, context.forwarded)
@@ -210,6 +215,26 @@ async function read(
 	const [issue] = named.issues
 
 	return await launch(issue, named, state, context.owner)
+}
+
+// A named issue the yield holds while none of the run's own lanes runs — its holder is outside the run
+// (joshuafolkken/kit#6800). The pool's offer would read nothing running as the drain and end the run
+// before the issue is offered again (`backlog-offer-cli.ts` → `mark_drain`), so the run waits on it.
+function held_alone(state: DriveState, waiting: DriveState): OfferRead | undefined {
+	if (state.in_flight.length > 0 || waiting.in_flight.length === 0) return undefined
+
+	return { verdict: 'wait', issues: [], retries: NO_RETRIES }
+}
+
+// The named offer, and the state the pool's offer reads when it names nothing: a named issue the yield
+// still holds is excluded there too, so the pool does not relaunch it into the same yield
+// (joshuafolkken/kit#4926, joshuafolkken/kit#6883). It is excluded, not counted running: no lane holds it.
+async function read(carry: RunCarry, state: DriveState, context: NamedContext): Promise<NamedRead> {
+	const waiting = { ...state, in_flight: await holding(carry, state.in_flight) }
+	const pool = { ...state, exclude: [...state.exclude, ...waiting.in_flight] }
+	const offer = await offer_of(carry, state, waiting, context)
+
+	return { offer: offer ?? held_alone(state, waiting), pool }
 }
 
 export const backlog_drive_named_offer = { read }

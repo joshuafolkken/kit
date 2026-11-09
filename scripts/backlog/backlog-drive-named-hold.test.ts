@@ -48,7 +48,11 @@ afterEach(() => {
 function named_ports(harness: Harness): LoopPorts {
 	return {
 		...harness.ports,
-		offer: async (state) => await backlog_drive_named_offer.read(CARRY, state, CONTEXT),
+		offer: async (state) => {
+			const { offer } = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+
+			return offer
+		},
 	}
 }
 
@@ -65,7 +69,7 @@ test('waits on a declared issue whose yielded plan a lane in flight still holds'
 	const declared = vi.spyOn(backlog_plan_comment, 'declared_of').mockResolvedValue(DECLARED)
 	const held = vi.spyOn(lane_plan, 'is_yield_held').mockImplementation((issue) => issue === 1)
 
-	const offer = await backlog_drive_named_offer.read(
+	const { offer } = await backlog_drive_named_offer.read(
 		CARRY,
 		backlog_drive.initial_state(['3'], ACTIVE),
 		CONTEXT,
@@ -146,6 +150,62 @@ test('offers a yielded named issue again once its holder lane ends', async () =>
 
 	expect(pass).toMatchObject({ kind: 'continue', state: { in_flight: ['1'] } })
 	expect(harness.calls).toEqual(['merge 1', 'launch 1'])
+})
+
+const ADDED_CARRY = { ...CARRY, done: [1, 2], added: [{ issue: 9, is_priority: false }] }
+
+// The listing the hold reads, with the added #9 yielded on a plan the running #3 holds while `is_held`.
+function hold_added(is_held: boolean): void {
+	vi.spyOn(lane_plan, 'is_yielded').mockImplementation((issue) => issue === 9)
+	vi.spyOn(auto_ok_cli, 'fetch_opted_in').mockResolvedValue({
+		kind: 'read',
+		issues: [RUNNING],
+		cutoff: cutoff_of(1, LISTING_LIMIT, false),
+	})
+	vi.spyOn(backlog_plan_comment, 'declared_of').mockResolvedValue(DECLARED)
+	vi.spyOn(lane_plan, 'is_yield_held').mockReturnValue(is_held)
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue(OPEN_STATE)
+}
+
+// joshuafolkken/kit#6883: every issue left was an added one the yield held, so the named side waited and
+// the free lanes stayed empty. It names nothing now, and the pool's offer excludes the held one.
+test('names nothing and excludes the held issue from the pool when only a yielded added one is left', async () => {
+	hold_added(true)
+
+	const { offer, pool } = await backlog_drive_named_offer.read(
+		ADDED_CARRY,
+		backlog_drive.initial_state(['3'], ACTIVE),
+		CONTEXT,
+	)
+
+	expect(offer).toBeUndefined()
+	expect(pool).toMatchObject({ in_flight: ['3'], exclude: ['3', '9'] })
+})
+
+// The holder runs outside the run, so nothing of the run's own is in flight: the pool would read the
+// drain and end the run before the held issue is offered again.
+test('waits on a yielded added issue held by a lane outside the run rather than asking the pool', async () => {
+	hold_added(true)
+
+	const { offer } = await backlog_drive_named_offer.read(
+		ADDED_CARRY,
+		backlog_drive.initial_state([], ACTIVE),
+		CONTEXT,
+	)
+
+	expect(offer).toMatchObject({ verdict: 'wait', issues: [] })
+})
+
+test('runs an added issue whose yield hold ended before the pool is asked', async () => {
+	hold_added(false)
+
+	const { offer } = await backlog_drive_named_offer.read(
+		ADDED_CARRY,
+		backlog_drive.initial_state(['3'], ACTIVE),
+		{ ...CONTEXT, forwarded: ['--max', '2'] },
+	)
+
+	expect(offer).toMatchObject({ verdict: 'run', issues: ['9'] })
 })
 
 test('reads no listing while no declared issue yielded', async () => {
