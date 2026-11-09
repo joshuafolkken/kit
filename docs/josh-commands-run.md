@@ -1084,6 +1084,8 @@ Unreadable `.env`: report lane/reason on stderr; check ports before allocating o
 
 `lane:prune` names each lane it keeps, with why, on stderr.
 
+`backlog:drive` runs `lane:prune` before each open `backlog:offer` read (`backlog-drive-rate.ts`): leftover lanes are cleared, foreign ones are kept and named with why on the driver's stderr. A failed prune never stops the offer.
+
 Codex hooks in a lane: Codex runs the main checkout's `.codex/hooks.json` in every lane.
 
 - Its trust is the main path and definition hash in `~/.codex/config.toml` `[hooks.state]`.
