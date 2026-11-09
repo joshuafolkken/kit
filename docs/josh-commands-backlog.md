@@ -383,12 +383,11 @@ pnpm josh pkg:scout "date formatting" --size 5
 **Options:**
 
 - `--size <n>` — how many candidates to fetch and rank (default 10).
+- `--issue <n>` — the Issue a close pair reads for reuse (default: the held run).
 
 <!-- /usage -->
 
-It queries the npm registry for npm score, weekly downloads, last publish, bundled-types mark, license and unpacked install size.
-
-The verdict reads the top two's relative lead `(top − second) / top`: `clear` at 15% or more (select it, Tier A), `close` within it (ask the user, Tier B). A failed per-candidate read leaves that metric blank (`—`).
+Rows come from the npm registry. A top lead of 15%+ is `clear` (Tier A), else `close` (Tier B) unless the Issue decides to reuse existing code: posted there as `Auto-decided:`, Tier A. Else `Reuse check:` says why; a failed read, judgment or comment exits 1.
 
 ### `josh issue:lint`
 
