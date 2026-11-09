@@ -129,6 +129,17 @@ describe('gh_usage_tally — endpoints', () => {
 		])
 	})
 
+	it('counts a line whose endpoint counts are not numbers as malformed, not tallied', () => {
+		const broken = JSON.stringify({
+			...(JSON.parse(line_of(LATE, RUN_STEP, 1)) as object),
+			endpoints: { [ISSUE_KIND]: { calls: 'one', not_modified: 0 } },
+		})
+		const result = gh_usage_tally.tally([broken])
+
+		expect(result.malformed).toBe(1)
+		expect(result.endpoints).toStrictEqual([])
+	})
+
 	it('prints the class totals and the endpoint table below the command table', () => {
 		const text = gh_usage_tally.render(gh_usage_tally.tally(ENDPOINT_LINES))
 
