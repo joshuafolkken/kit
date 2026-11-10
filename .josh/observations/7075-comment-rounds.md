@@ -1,0 +1,4 @@
+- rf:assumptions | low | scripts/lib/stdin-text.ts:172 | 2026-11-10 | #7075
+- rf:tests | low | scripts/lib/stdin-text.test.ts:106 | 2026-11-10 | #7075
+- rf:assumptions | low | scripts/lib/stdin-text.ts:172 | 2026-11-10 | #7075
+- rf:tests | low | scripts/lib/stdin-text.test.ts:106 | 2026-11-10 | #7075

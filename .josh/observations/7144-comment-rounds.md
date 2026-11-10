@@ -1,0 +1,4 @@
+- rf:none | none | - | 2026-11-10 | #7144
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/hooks/pretool-guard-ledger.test.ts | followup reran Unit Tests (4/6); failed outside the change: isolated scripts/hooks/pretool-guard-ledger.test.ts > pretool_guard.respond — the hook ledger > hands the ledger no reason for a call it let through
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/hooks/pretool-guard-ledger.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/hooks/pretool-guard-ledger.test.ts > pretool_guard.respond — the hook ledger > hands the ledger no reason for a call it let through
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/hooks/pretool-guard-ledger.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/hooks/pretool-guard-ledger.test.ts > pretool_guard.respond — the hook ledger > hands the ledger no reason for a call it let through

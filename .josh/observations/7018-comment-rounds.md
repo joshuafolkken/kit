@@ -1,0 +1,2 @@
+- rf:none | none | - | 2026-11-10 | #7018
+- rf:bug-risks | low | scripts/gate/gate-static-group.ts:60 | 2026-11-10 | #7018

@@ -1,0 +1,2 @@
+- rf:none | none | - | 2026-11-10 | #7148
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/gh/gh-usage-log.test.ts | followup reran Unit Tests (6/6); failed outside the change: pure scripts/gh/gh-usage-log.test.ts > gh_usage_log.append — the lines > keeps only the newest lines past its cap
