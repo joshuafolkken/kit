@@ -15,6 +15,7 @@ import { lane_breakdown_text, type Report } from './lane-breakdown-text'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_investigation_switch } from './lane-investigation-switch'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_net_time } from './lane-net-time'
 import { lane_overrun_prompt } from './lane-overrun-prompt'
 import { lane_tail_stats } from './lane-tail-stats'
@@ -104,7 +105,7 @@ function is_commented(events: ReadonlyArray<RunEvent>, issue: number): boolean {
 }
 
 function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): LaneNet {
-	const entries = lane_ledger.read_entries(path)
+	const entries = lane_ledger_archive.history_at(path)
 	const minutes = lane_net_time.net_minutes(entries, events, issue)
 	const breakdown = lane_breakdown.of(entries, events, issue)
 

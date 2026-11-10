@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 	closing: vi.fn(),
 	all_events: vi.fn(),
 	read_entries: vi.fn<(path: string) => ReadonlyArray<LedgerEntry>>(),
+	read_archive: vi.fn<(path: string) => ReadonlyArray<LedgerEntry>>(),
 	target: vi.fn<() => Promise<string | undefined>>(),
 }))
 
@@ -21,7 +22,12 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 vi.mock(import('./lane-ledger'), async (import_original) => {
 	const { lane_ledger } = await import_original()
 
-	return { lane_ledger: { ...lane_ledger, read_entries: mocks.read_entries, target: mocks.target } }
+	// The archive beside the ledger (`lane-ledger-archive.ts`) is read apart.
+	function read_entries(file: string): ReadonlyArray<LedgerEntry> {
+		return file.endsWith('-archive.jsonl') ? mocks.read_archive(file) : mocks.read_entries(file)
+	}
+
+	return { lane_ledger: { ...lane_ledger, read_entries, target: mocks.target } }
 })
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { all_events: mocks.all_events },
@@ -60,6 +66,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockReturnValue(undefined)
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
 	mocks.target.mockResolvedValue('/ledger.jsonl')
+	mocks.read_archive.mockReturnValue([])
 	mocks.all_events.mockResolvedValue([
 		{ pos: 1, at: at(10), kind: 'plan', text: `#${String(ISSUE)} plan` },
 	])
@@ -83,6 +90,15 @@ describe('lane_breakdown_cli.run', () => {
 			].join('\n'),
 		)
 		expect(mocks.evidence).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#7038: a dispatch a rotation moved into the archive still starts the lane.
+	it('reads a lane whose dispatch only the archive holds', async () => {
+		mocks.read_archive.mockReturnValue([{ kind: 'dispatch', at: at(0), issue: ISSUE }])
+		mocks.read_entries.mockReturnValue([{ kind: 'merge', at: at(61), issue: ISSUE }])
+
+		await expect(lane_breakdown_cli.run([String(ISSUE)])).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('61 min of net time'))
 	})
 
 	it('refuses a lane the ledger holds no dispatch and merge of', async () => {
