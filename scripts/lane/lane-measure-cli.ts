@@ -6,6 +6,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_limit_history } from './lane-limit-history'
 import { lane_net_read } from './lane-net-read'
 import { lane_over_causes } from './lane-over-causes'
@@ -121,13 +122,14 @@ function transcript_directories(context: MeasureContext): ReadonlyArray<string> 
 	return cost_transcript.lane_transcript_directories(main_cwd, cost_transcript.home_directory())
 }
 
-// The whole ledger, every run event and the window's lane calls — what the `lane:stats` tables read.
+// The whole ledger with its archive, every run event and the window's lane calls — what the
+// `lane:stats` tables read.
 async function period_records(
 	context: MeasureContext,
 	window: StatsWindow,
 ): Promise<PeriodRecords> {
 	return {
-		entries: await lane_net_read.read_ledger(context),
+		entries: await lane_ledger_archive.read_history(context),
 		events: await lane_net_read.read_events(context),
 		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
 	}
@@ -151,7 +153,10 @@ async function threshold_text(
 	context: MeasureContext,
 	window: StatsWindow,
 ): Promise<string> {
-	const sources = await lane_net_read.read_records(context)
+	const sources = {
+		entries: await lane_ledger_archive.read_history(context),
+		events: await lane_net_read.read_events(context),
+	}
 	const issues = await lane_sinks_issues.read()
 
 	return session_cite.text(choice.table(sources, window, choice.minutes, issues))
@@ -165,7 +170,10 @@ async function stats_text(
 	const choice = table_choice(request)
 
 	if (choice !== undefined) return await threshold_text(choice, context, window)
-	if (request.is_pairs) return lane_pairs.table(await lane_net_read.read_ledger(context), window)
+
+	if (request.is_pairs) {
+		return lane_pairs.table(await lane_ledger_archive.read_history(context), window)
+	}
 
 	const records = await period_records(context, window)
 	const limit = await lane_limit_history.label(request.limit, records.entries, window)
@@ -324,7 +332,7 @@ async function value_command(
 	}
 
 	const records = {
-		entries: await lane_net_read.read_ledger(context),
+		entries: await lane_ledger_archive.read_history(context),
 		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
 	}
 
