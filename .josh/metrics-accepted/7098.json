@@ -1,0 +1,7 @@
+{
+	"reason": "#7098 moves the earlier-run mark after the title: earlier_marked/marks_of plus the legend lead (+19 code lines)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 21
+	}
+}

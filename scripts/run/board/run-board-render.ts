@@ -1,3 +1,4 @@
+import { run_board_earlier } from './run-board-earlier'
 import {
 	run_board_fit,
 	type FrameParts,
@@ -176,9 +177,15 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 	return joined([lead, time])
 }
 
-// A row up to what was filed during it: its head, then its tail where it draws one.
+// What a row draws after its title: its tail, an earlier run's row's led by 🧳 — so an earlier run's row
+// draws one even where its tail is empty.
+function drawn_tail(row: BoardRow, frame: RowFrame): Array<string> {
+	return run_board_earlier.earlier_marked(row, run_board_render_tail.tail_of(row, frame.header))
+}
+
+// A row up to what was filed during it: its head, then what it draws after its title.
 function tailed_head(row: BoardRow, frame: RowFrame): string {
-	return joined([head_text(row, frame), ...run_board_render_tail.tail_of(row, frame.header)])
+	return joined([head_text(row, frame), ...drawn_tail(row, frame)])
 }
 
 // The columns the pane leaves after `head` and its gap, where the frame is kept within one and the
@@ -228,7 +235,7 @@ function row_draw(
 // what was filed during it instead (`run-board-render-found.ts` found_fitted), unless that end is
 // squeezed out.
 function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
-	const is_tailed = run_board_render_tail.tail_of(row, frame.header).length > 0
+	const is_tailed = drawn_tail(row, frame).length > 0
 
 	return {
 		is_line_kept: is_tailed || is_found_squeezed(indent, row, frame),

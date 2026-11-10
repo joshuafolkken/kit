@@ -31,6 +31,17 @@ describe('run_board_render_icon.state_icon', () => {
 		expect(state_icon(row('merged', { state: 'merged', track }))).toBe('✅')
 	})
 
+	// joshuafolkken/kit#7098: an earlier run's lane keeps its phase; its 🧳 follows its title.
+	it('leads an earlier run’s running row with its last phase, or its state with no track', () => {
+		const earlier = {
+			...row('running', { state: 'running', track: ['implement'] }),
+			is_earlier: true,
+		}
+
+		expect(state_icon(earlier)).toBe('🔨')
+		expect(state_icon({ ...row('running', { state: 'running' }), is_earlier: true })).toBe('🔄')
+	})
+
 	// joshuafolkken/kit#4288: every wait leads with its own icon in place of ⏳.
 	it.each(['📅', '🧵', '📂', '❓'])('leads a row whose wait leads with %s with it', (icon) => {
 		expect(state_icon(row('waiting', undefined, { icon }))).toBe(icon)
