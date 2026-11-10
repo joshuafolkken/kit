@@ -168,6 +168,22 @@ describe('lanes_root_of', () => {
 	})
 })
 
+// joshuafolkken/kit#7137: one file read from several lanes keys one `cost:audit` row.
+describe('main_checkout_path', () => {
+	const main_file = '/home/u/kit/docs/x.md'
+	const seat_lock = '/home/u/.kit-lanes/.seat-locks/a'
+
+	it.each([
+		['/home/u/.kit-lanes/7137/docs/x.md', main_file],
+		['/home/u/.app-kit-lanes/12/src/a.ts', '/home/u/app-kit/src/a.ts'],
+		[main_file, main_file],
+		[seat_lock, seat_lock],
+		['', ''],
+	])('reads %j as %j', (file, expected) => {
+		expect(lane_paths.main_checkout_path(file)).toBe(expected)
+	})
+})
+
 // joshuafolkken/kit#3370: the stray sweep acts only on the names the lane machinery writes.
 describe('which names in a lanes root belong to the lane machinery', () => {
 	it.each([[ISSUE], ['.1665-lanes'], ['.app-kit-lanes']])('claims %j', (name) => {

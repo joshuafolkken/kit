@@ -120,7 +120,10 @@ const FLAG_AND_VALUE = 2
 // charged `git commit -m "ran pnpm josh gate"` to `josh gate`, and this repository's own commit
 // messages and issue comments name josh subcommands constantly. Only the first match counts: a
 // compound command naming two would otherwise charge its whole duration to each.
-const JOSH_PATTERN = /^(?:(?:pnpm|npx)\s+(?:exec\s+)?)?josh\s+([a-z][\w:-]*)/u
+const JOSH_LAUNCHER = String.raw`^(?:(?:pnpm|npx)\s+(?:exec\s+)?)?josh`
+const JOSH_PATTERN = new RegExp(String.raw`${JOSH_LAUNCHER}\s+([a-z][\w:-]*)`, 'u')
+// A josh call with or without a subcommand — `pnpm josh`, `josh --help` (joshuafolkken/kit#7137).
+const JOSH_LAUNCHER_PATTERN = new RegExp(String.raw`${JOSH_LAUNCHER}(?:\s|$)`, 'u')
 const JOSH_PREFIX = 'josh '
 const COMMAND_KEY = 'command'
 
@@ -320,6 +323,10 @@ function josh_command_of_segment(segment: string): string {
 	return name === undefined ? '' : `${JOSH_PREFIX}${name}`
 }
 
+function runs_josh(segment: string): boolean {
+	return JOSH_LAUNCHER_PATTERN.test(command_words(segment).join(' '))
+}
+
 function josh_command_of(command: string): string {
 	return josh_command_of_segment(command_segment(command))
 }
@@ -428,9 +435,11 @@ const time_shell = {
 	bash_label,
 	blanked,
 	command_segment,
+	command_words,
 	discarded_commands,
 	has_heredoc,
 	josh_arguments,
+	runs_josh,
 	josh_command_of,
 	josh_command_of_segment,
 	josh_commands_of,
