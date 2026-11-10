@@ -21,7 +21,7 @@ import { core_weights } from './core-weights'
 //
 // **The estimate is the largest tool's, not the sum**: the commands of one line run one after another,
 // so only one of them is resident at a time. A line with no known tool is `undefined`:
-// `reserved-run 1 -- pnpm josh audit` reserves its own, and is not counted twice.
+// `reserved-run 2 -- pnpm install` reserves no memory beside its cores.
 
 interface ToolCall extends ProgramCall {
 	// Inside a `pnpm josh reserved-run … --`, the budgeted path.
