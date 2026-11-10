@@ -1,0 +1,7 @@
+{
+	"reason": "review:findings --period: the period-and-severity reader over the review-finding ledger and its CLI flag (#7130)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 92
+	}
+}

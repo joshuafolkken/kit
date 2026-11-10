@@ -12,6 +12,7 @@ const SKIP_PUSH = '--skip-push'
 
 const GIT_WORKFLOW_SCRIPT = 'scripts/git/git-workflow.ts'
 const GIT_MESSAGE_ARGUMENTS = '[-y] <message>'
+const PERIOD_ARGUMENTS = '[--period <days>]'
 
 const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 	git: {
@@ -225,7 +226,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'List the review findings that stopped a josh ship over a period, by kind, file:line and first sentence',
 		category: 'Workflow',
-		reference: ['[--period <days>]', 'developer', ['none']],
+		reference: [PERIOD_ARGUMENTS, 'developer', ['none']],
 		usage: { examples: [{ arguments: '--period 30', note: 'the last 30 days (default 7)' }] },
 	},
 	// The reader over what `review:record` wrote: each recurring category’s
@@ -234,8 +235,13 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/review/review-findings-cli.ts',
 		description: 'Count review findings by category from the observation ledger',
 		category: 'Workflow',
-		reference: ['', 'developer', ['files']],
-		usage: { examples: [{ arguments: '' }] },
+		reference: [PERIOD_ARGUMENTS, 'developer', ['files']],
+		usage: {
+			examples: [
+				{ arguments: '' },
+				{ arguments: '--period 7', note: 'the last 7 days, by category and severity' },
+			],
+		},
 	},
 	// After a behavior-change Issue merges, re-run its declared baseline and print before/after; a value
 	// that did not move appends a refuted-premise line to the observation ledger.
