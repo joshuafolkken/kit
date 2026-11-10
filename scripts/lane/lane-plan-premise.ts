@@ -18,15 +18,15 @@ interface Measured {
 	value: string
 }
 
-// The listing only skips the read when it shows the issue with no premise line; an issue it does not
-// carry (not opted in, past the cutoff, or an unread listing) is read in full.
-function is_listed_without_premise(
+// How many premise lines the listing shows for `issue`, or `undefined` when it does not carry the issue
+// (not opted in, past the cutoff, or an unread listing), so only the full read can tell.
+function listed_premises(
 	issue: number,
 	issues: ReadonlyArray<OpenIssueData> | undefined,
-): boolean {
+): number | undefined {
 	const listed = issues?.find((candidate) => candidate.number === issue)
 
-	return listed !== undefined && measure_declaration.premises(listed.body ?? '').length === 0
+	return listed === undefined ? undefined : measure_declaration.premises(listed.body ?? '').length
 }
 
 // A failed command keeps its message, so the stop says why the premise could not be measured.
@@ -48,16 +48,18 @@ function checked(declaration: MeasureDeclaration, source: TrustedBody): string |
 	return result.holds ? undefined : line
 }
 
-// The premises are read from the trusted body; a body that cannot be trusted runs nothing, so its
-// premises are not confirmed either.
+// The premises are read from the trusted body. A body that cannot be trusted runs nothing: it stops
+// the lane when the listing shows premises, and leaves an issue whose premises are unknown as before.
 async function failed_premises(
 	issue: number,
 	issues: ReadonlyArray<OpenIssueData> | undefined,
 ): Promise<ReadonlyArray<string>> {
-	if (is_listed_without_premise(issue, issues)) return []
+	const listed = listed_premises(issue, issues)
+
+	if (listed === 0) return []
 	const read = await trusted_measure.read_trusted_body(String(issue))
 
-	if (read.kind === 'refused') return [`not re-run: ${read.reason}`]
+	if (read.kind === 'refused') return listed === undefined ? [] : [`not re-run: ${read.reason}`]
 
 	return measure_declaration
 		.premises(read.body)

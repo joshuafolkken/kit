@@ -125,6 +125,17 @@ describe('lane:plan premise source', () => {
 		expect(code).toBe(lane_plan_check.PREMISE_EXIT_CODE)
 		expect(printed()).toContain(`\`${COMMAND}\` <= 5 measured 9`)
 	})
+
+	it('answers as before when an unlisted issue’s body cannot be read', async () => {
+		fetch_opted_in.mockResolvedValue({ kind: 'unreadable' })
+		read_trusted_body.mockResolvedValue({ kind: 'refused', reason: 'could not read issue' })
+
+		const code = await lane_plan_cli.run([String(ISSUE), FILE], directory)
+
+		expect(code).not.toBe(lane_plan_check.PREMISE_EXIT_CODE)
+		expect(info).toHaveBeenCalledWith('wait')
+		expect(run_command).not.toHaveBeenCalled()
+	})
 })
 
 describe('lane:plan without a premise to re-run', () => {
