@@ -51,6 +51,21 @@ function listing(cutoff: string, index: Map<number, number>): void {
 	build_epic_index_mock.mockReturnValue(index)
 }
 
+// The follow-up body `issue:file` was handed, read while its temporary file still exists.
+async function filed_body(argv: ReadonlyArray<string>): Promise<string> {
+	let body = ''
+
+	file_issue_mock.mockImplementation(async (filing: ReadonlyArray<string>) => {
+		body = await readFile(filing[filing.indexOf('--body-file') + 1] ?? '', 'utf8')
+
+		return FOLLOW_UP_URL
+	})
+	listing('none', new Map([[ISSUE, EPIC]]))
+	await issue_spill_cli.run(argv)
+
+	return body
+}
+
 beforeEach(() => {
 	for (const mock of [
 		classified_mock,
@@ -120,17 +135,22 @@ describe('issue_spill_cli.run --distinct', () => {
 	})
 
 	it('writes the given estimate into the filed body', async () => {
-		let body = ''
-
-		file_issue_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
-			body = await readFile(argv[argv.indexOf('--body-file') + 1] ?? '', 'utf8')
-
-			return FOLLOW_UP_URL
-		})
-		listing('none', new Map([[ISSUE, EPIC]]))
-		await issue_spill_cli.run([...ARGV, DISTINCT, '6677'])
+		const body = await filed_body([...ARGV, DISTINCT, '6677'])
 
 		expect(body).toContain('- 規模見積もり: 約 2 ファイル / 40 行（テスト除く）')
+	})
+
+	it('writes the given --reason as the reason line after the estimate', async () => {
+		const body = await filed_body([...ARGV, '--reason', '1 コミットで入れないと壊れる'])
+
+		expect(body).toContain('行（テスト除く）\n- 分割しない理由: 1 コミットで入れないと壊れる\n')
+	})
+
+	it('refuses a blank --reason and reads nothing', async () => {
+		expect(await issue_spill_cli.run([...ARGV, '--reason', ' '])).toBe(FAILURE)
+		expect(console.error).toHaveBeenCalledWith(issue_spill_cli.USAGE)
+		expect(issue_spill_cli.USAGE).toContain('[--reason "<理由>"]')
+		expect(classified_mock).not.toHaveBeenCalled()
 	})
 })
 

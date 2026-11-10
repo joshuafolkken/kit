@@ -17,7 +17,7 @@ import { issue_number_shape } from './issue-number-shape'
 import { issue_spill, type SpillSubject } from './issue-spill'
 import { session_cite } from './session-cite'
 
-// `josh issue:spill <N> --estimate "<files> / <lines>"` — move #N's unchecked acceptance criteria into
+// `josh issue:spill <N> --estimate "<files> / <lines>" [--reason "<reason>"]` — move #N's unchecked acceptance criteria into
 // a follow-up Issue, place it after #N, and leave one link line in #N where they stood.
 //
 // **Every write is an existing command's function**: the filing is `issue:file --route split`'s
@@ -33,9 +33,10 @@ import { session_cite } from './session-cite'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh issue:spill <issue-number> --estimate "<files> ファイル / <lines> 行" [--distinct <N,…>]…'
+	'Usage: josh issue:spill <issue-number> --estimate "<files> ファイル / <lines> 行" [--reason "<理由>"] [--distinct <N,…>]…'
 const OPTIONS = {
 	estimate: { type: 'string' },
+	reason: { type: 'string' },
 	distinct: { type: 'string', multiple: true },
 } as const
 const SUBJECT_FIELDS = 'title,body,labels'
@@ -53,9 +54,15 @@ const subject_schema = z.looseObject({
 
 interface SpillRequest {
 	issue_number: number
-	estimate: string
+	// The follow-up's size lines: the estimate, then the `--reason` line when one was given.
+	sizing: ReadonlyArray<string>
 	// The `--distinct` values as given, passed on to `issue:file`, which parses and checks them.
 	distinct: ReadonlyArray<string>
+}
+
+interface SizingFlags {
+	estimate?: string | undefined
+	reason?: string | undefined
 }
 
 interface SpillIssue extends SpillSubject {
@@ -78,15 +85,26 @@ function distinct_of(values: ReadonlyArray<string> | undefined): ReadonlyArray<s
 	return values ?? []
 }
 
+// A malformed `--estimate` or a blank `--reason` is `undefined`, the usage refusal.
+function sizing_of(flags: SizingFlags): ReadonlyArray<string> | undefined {
+	const estimate = issue_spill.estimate_line(flags.estimate ?? '')
+
+	if (estimate === undefined) return undefined
+	if (flags.reason === undefined) return [estimate]
+	const reason = issue_spill.reason_line(flags.reason)
+
+	return reason === undefined ? undefined : [estimate, reason]
+}
+
 function parse_request(argv: ReadonlyArray<string>): SpillRequest | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 	if (parsed === undefined) return undefined
 	const issue_number = issue_number_of(parsed.positionals)
-	const estimate = issue_spill.estimate_line(parsed.values.estimate ?? '')
+	const sizing = sizing_of(parsed.values)
 
-	if (issue_number === undefined || estimate === undefined) return undefined
+	if (issue_number === undefined || sizing === undefined) return undefined
 
-	return { issue_number, estimate, distinct: distinct_of(parsed.values.distinct) }
+	return { issue_number, sizing, distinct: distinct_of(parsed.values.distinct) }
 }
 
 function parse_subject(json: string): z.infer<typeof subject_schema> | undefined {
@@ -145,7 +163,7 @@ async function file_follow_up(
 	const body_file = path.join(directory, 'body.md')
 
 	try {
-		await writeFile(body_file, issue_spill.follow_up_body(issue, request.estimate))
+		await writeFile(body_file, issue_spill.follow_up_body(issue, request.sizing))
 
 		const filed = github_issue_url.parse(
 			await issue_file_cli.file_issue(filing_argv(issue, request, body_file)),
