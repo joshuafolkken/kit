@@ -20,5 +20,5 @@ A workflow run stopped — on purpose, as `halfrun` does, or because a session e
 
 ## Common failures
 
-- `josh stash:pop` answers `no-match` or `ambiguous`: the message did not pick out exactly one stash; list them and use the full message.
+- `josh stash:pop` answers `no-match` or `ambiguous`: the message did not pick out exactly one stash. On `no-match`, list them and use the full message; on `ambiguous`, pop the entry you want by one of the hashes it names (`josh stash:pop <hash>`).
 - A hold still answers `busy` after 8 hours: the tree is dirty, so it does not expire. Commit, stash or release the work first.

@@ -19,6 +19,8 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(git_stash, 'list').mockResolvedValue([])
 	vi.spyOn(git_stash, 'pop').mockResolvedValue()
+	vi.spyOn(git_stash, 'list_by_hash').mockResolvedValue([])
+	vi.spyOn(git_stash, 'position_of').mockResolvedValue(undefined)
 })
 
 describe('josh stash:pop targeting', () => {
@@ -78,6 +80,48 @@ describe('josh stash:pop refusals', () => {
 		const code = await stash_pop_cli.run([MESSAGE, '--nope'])
 
 		expect(vi.mocked(git_stash.pop)).not.toHaveBeenCalled()
+		expect(code).toBe(FAILURE_EXIT_CODE)
+	})
+})
+
+// joshuafolkken/kit#6979: two withdraws pushed one lane's work under one message, and the ambiguous
+// refusal left no way to the entry that held the work.
+describe('josh stash:pop — one message, several entries', () => {
+	const WORK = { selector: 'aaaa1111bbbb2222', subject: `On 6683-lane: ${MESSAGE}` }
+	const DELETIONS = { selector: 'cccc3333dddd4444', subject: `On 6683-lane: ${MESSAGE}` }
+
+	it('names each matching entry by its hash when refusing', async () => {
+		vi.mocked(git_stash.list).mockResolvedValue([PARKED, { ...PARKED, selector: 'stash@{2}' }])
+		vi.mocked(git_stash.list_by_hash).mockResolvedValue([DELETIONS, WORK])
+
+		const code = await stash_pop_cli.run([MESSAGE])
+
+		expect(verdict()).toBe(stash_pop_cli.AMBIGUOUS_VERDICT)
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(
+			expect.stringContaining(`${DELETIONS.selector}, ${WORK.selector}`),
+		)
+		expect(code).toBe(FAILURE_EXIT_CODE)
+	})
+
+	it('pops the entry a hash prefix names, at the position read before the pop', async () => {
+		vi.mocked(git_stash.list_by_hash).mockResolvedValue([DELETIONS, WORK])
+		vi.mocked(git_stash.position_of).mockResolvedValue('stash@{1}')
+
+		const code = await stash_pop_cli.run(['aaaa1111', '--dir', LANE_DIR])
+
+		expect(vi.mocked(git_stash.position_of)).toHaveBeenCalledWith(WORK.selector, LANE_DIR)
+		expect(vi.mocked(git_stash.pop)).toHaveBeenCalledWith('stash@{1}', LANE_DIR)
+		expect(verdict()).toBe(stash_pop_cli.POPPED_VERDICT)
+		expect(code).toBe(SUCCESS_EXIT_CODE)
+	})
+
+	it('refuses a hash no entry carries', async () => {
+		vi.mocked(git_stash.list_by_hash).mockResolvedValue([DELETIONS, WORK])
+
+		const code = await stash_pop_cli.run(['eeee5555'])
+
+		expect(vi.mocked(git_stash.pop)).not.toHaveBeenCalled()
+		expect(verdict()).toBe(stash_pop_cli.NO_MATCH_VERDICT)
 		expect(code).toBe(FAILURE_EXIT_CODE)
 	})
 })

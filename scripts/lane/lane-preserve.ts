@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { repository_lock } from '#scripts/git/repository-lock'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { session_cite } from '#scripts/issue/session-cite'
 import { error_text } from '#scripts/lib/error-message'
@@ -42,20 +43,48 @@ type KeptWork =
 	| { kind: 'saved'; stash: string | undefined }
 	| { kind: 'unsaved'; directory: string; reason: string }
 
+// One keep per issue at a time: two withdraws of one lane each reading the tree and pushing pushed one
+// entry twice under one message, which `stash:pop` then refused as ambiguous (joshuafolkken/kit#6979).
+// Held for a status read and one push, so the wait only bounds a holder that hung.
+const KEEP_LOCK_PREFIX = 'josh-lane-keep-lock-'
+const KEEP_LOCK_WAIT_MS = 60_000
+const KEEP_LOCK_TIMEOUT = 'another keep of this lane held the lock for the whole wait'
+
+function keep_lock_path(issue: string, directory: string): string {
+	return repository_lock.lock_path(`${KEEP_LOCK_PREFIX}${issue}-`, directory)
+}
+
+// A tree holding only deleted tracked files is one caught mid-removal, not work (`holds_work`).
 async function stash_of(
 	issue: string,
 	directory: string,
 	occasion: string,
 ): Promise<string | undefined> {
-	if (!(await git_stash.has_changes(directory))) return undefined
+	if (!(await git_stash.has_work(directory))) return undefined
 
 	return await push_work(issue, directory, occasion)
+}
+
+async function locked_stash_of(
+	issue: string,
+	directory: string,
+	occasion: string,
+): Promise<KeptWork> {
+	const kept = await repository_lock.with_lock(
+		async () => ({ stash: await stash_of(issue, directory, occasion) }),
+		keep_lock_path(issue, directory),
+		KEEP_LOCK_WAIT_MS,
+	)
+
+	if (kept === undefined) return { kind: 'unsaved', directory, reason: KEEP_LOCK_TIMEOUT }
+
+	return { kind: 'saved', stash: kept.stash }
 }
 
 /** Stash the tree's uncommitted work, if any, answering `unsaved` rather than throwing. */
 async function keep_work(issue: string, directory: string, occasion: string): Promise<KeptWork> {
 	try {
-		return { kind: 'saved', stash: await stash_of(issue, directory, occasion) }
+		return await locked_stash_of(issue, directory, occasion)
 	} catch (error) {
 		return { kind: 'unsaved', directory, reason: error_text.message_of(error) }
 	}
