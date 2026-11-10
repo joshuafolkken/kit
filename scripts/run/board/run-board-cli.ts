@@ -14,6 +14,7 @@ import { run_board_fold } from './run-board-fold'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
+import { run_board_issue_count } from './run-board-issue-count'
 import { run_board_keys, type KeyReading } from './run-board-keys'
 import { run_board_labels } from './run-board-labels'
 import { run_board_plan_shared } from './run-board-plan-shared'
@@ -68,6 +69,7 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 	snapshot: run_board_snapshot.file_store(),
 	read_thanks: async () => await run_board_thanks_read.read_thanks(),
 	read_rate_limit: read_rate_limit_with_transport,
+	read_issue_count: async (repo) => await run_board_issue_count.read_issue_count(repo),
 	now: () => Date.now(),
 	write: (frame) => process.stdout.write(frame),
 	// No fallback: a terminal that opens no link, or a pipe, gets the bare number rather than a URL.

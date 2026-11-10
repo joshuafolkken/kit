@@ -250,6 +250,44 @@ function fold_rate_limit(state: BoardState): BoardState {
 	return { ...state, rate_limit: answer.value, rate_limit_fetch: undefined }
 }
 
+// The repository's issue count is asked as often as the plan, once the plan has named the repository;
+// a read in flight is not launched again, and an ended run holds the count it has, as it holds its plan.
+function is_issue_count_due(state: BoardState, gather: Gather): boolean {
+	if (state.issue_count_fetch !== undefined) return false
+	if (gather.local.ended_ms !== undefined && state.issue_count !== undefined) return false
+
+	return is_due(state.issue_count_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+}
+
+function repo_of(state: BoardState): string | undefined {
+	return state.plan?.context.repo
+}
+
+function launch_issue_count(state: BoardState, gather: Gather): BoardState {
+	const { read_issue_count } = gather.ports
+	const repo = repo_of(state)
+
+	if (repo === undefined || read_issue_count === undefined || !is_issue_count_due(state, gather)) {
+		return state
+	}
+
+	const issue_count_fetch = run_board_fetch.launch(
+		read_issue_count.bind(undefined, repo),
+		undefined,
+	)
+
+	return { ...state, issue_count_fetch, issue_count_attempted_ms: gather.now_ms }
+}
+
+// A failed read answers `undefined`, which clears the last count rather than drawing a stale one.
+function fold_issue_count(state: BoardState): BoardState {
+	const answer = state.issue_count_fetch?.answer()
+
+	if (answer === undefined) return state
+
+	return { ...state, issue_count: answer.value, issue_count_fetch: undefined }
+}
+
 // At the `settled` pace, waits for a read in flight to land.
 async function settle(pending: Fetch<unknown> | undefined, pace: Pace): Promise<void> {
 	if (pending !== undefined && pace === 'settled') await pending.landed
@@ -264,15 +302,30 @@ function known_of(state: BoardState): Known {
 
 // Each read that landed rewrites the snapshot whole, for the board opened next on this run.
 function keep_snapshot(before: BoardState, after: BoardState, gather: Gather): void {
-	if (after.plan === before.plan && after.closed === before.closed) return
+	const is_same = after.plan === before.plan && after.closed === before.closed
 
+	if (is_same && after.issue_count === before.issue_count) return
+
+	const { closed, issue_count } = after
 	const run_started_ms = gather.local.started_ms
 
-	gather.ports.snapshot?.save({ run_started_ms, ...known_of(after), closed: after.closed })
+	gather.ports.snapshot?.save({ run_started_ms, ...known_of(after), closed, issue_count })
 }
 
-// Folds what landed and launches what is due — the plan first, since the closed children are read off
-// the plan's listing; the rate limit beside the plan, since nothing waits on it.
+// The reads the plan has to land first: the closed children are read off its listing, and the issue
+// count asks for the repository it names.
+async function gather_after_plan(planned: BoardState, gather: Gather): Promise<BoardState> {
+	const opened = fold_issue_count(fold_closed(fold_plan(planned)))
+	const closing = launch_issue_count(launch_closed(opened, gather), gather)
+
+	await settle(closing.closed_fetch, gather.pace)
+	await settle(closing.issue_count_fetch, gather.pace)
+
+	return fold_issue_count(fold_rate_limit(fold_closed(closing)))
+}
+
+// Folds what landed and launches what is due — the plan first, since the reads after it need it; the
+// rate limit beside the plan, since nothing waits on it.
 async function gather_github(state: BoardState, gather: Gather): Promise<BoardState> {
 	const folded = fold_plan(fold_rate_limit(state))
 	const planned = launch_rate_limit(launch_plan(folded, gather), gather)
@@ -280,11 +333,7 @@ async function gather_github(state: BoardState, gather: Gather): Promise<BoardSt
 	await settle(planned.plan_fetch, gather.pace)
 	await settle(planned.rate_limit_fetch, gather.pace)
 
-	const closing = launch_closed(fold_closed(fold_plan(planned)), gather)
-
-	await settle(closing.closed_fetch, gather.pace)
-
-	const gathered = fold_rate_limit(fold_closed(closing))
+	const gathered = await gather_after_plan(planned, gather)
 
 	keep_snapshot(state, gathered, gather)
 

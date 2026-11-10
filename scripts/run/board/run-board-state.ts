@@ -5,6 +5,7 @@ import type { SectionKey, TerminalSize } from './run-board-fit'
 import type { Gatherer, GatherRead } from './run-board-gather'
 import type { BoardForm } from './run-board-header'
 import { run_board_idle } from './run-board-idle'
+import type { IssueCount } from './run-board-issue-count'
 import type { KeyInput } from './run-board-keys'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
@@ -49,6 +50,8 @@ interface BoardPorts {
 	// GitHub's REST core and GraphQL allowances with the transport (`gh-core-rate-limit.ts`); none where
 	// the frame shows none.
 	read_rate_limit?: (() => Promise<GithubRateLimit | undefined>) | undefined
+	// The repository's open and closed issues (`run-board-issue-count.ts`); none where none is read.
+	read_issue_count?: ((repo: string) => Promise<IssueCount | undefined>) | undefined
 	// Sends one chat frame off-screen, for `--every` alone.
 	push: (frame: string) => Promise<void>
 	// Runs `leave` however the process ends: a normal exit, Ctrl+C or SIGTERM.
@@ -92,6 +95,11 @@ interface BoardState extends GatherRead {
 	rate_limit: GithubRateLimit | undefined
 	rate_limit_fetch: Fetch<GithubRateLimit | undefined> | undefined
 	rate_limit_attempted_ms: number | undefined
+	// The repository's issue count — none once a read fails — the read in flight, and when it was last
+	// launched.
+	issue_count: IssueCount | undefined
+	issue_count_fetch: Fetch<IssueCount | undefined> | undefined
+	issue_count_attempted_ms: number | undefined
 }
 
 const FRESH_STATE: BoardState = {
@@ -121,6 +129,9 @@ const FRESH_STATE: BoardState = {
 	rate_limit: undefined,
 	rate_limit_fetch: undefined,
 	rate_limit_attempted_ms: undefined,
+	issue_count: undefined,
+	issue_count_fetch: undefined,
+	issue_count_attempted_ms: undefined,
 }
 
 function is_due(last_ms: number | undefined, interval_ms: number, now_ms: number): boolean {
