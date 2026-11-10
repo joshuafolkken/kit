@@ -48,7 +48,7 @@ function warning_of(
 		size_estimate.split_over_guide(body, route, rate, growth)
 
 	if (guide !== undefined) return { estimate: guide, remedy: remedy_of(route) }
-	const budget = size_estimate.over_budget(body, route, rate, growth)
+	const budget = size_estimate.over_budget(body, rate, growth)
 
 	return budget === undefined ? undefined : { estimate: budget, remedy: BUDGET_REMEDY }
 }
