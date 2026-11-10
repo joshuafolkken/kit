@@ -227,8 +227,8 @@ function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> 
 }
 
 // A file every test imports, or one past the reach cap, narrows to its direct importers (`capped`)
-// unless the run keeps the whole suite: the gate's unit leg, and the gate's reuse of it, pass
-// `test_related_cap.NO_CAP` (`gate_labels.KEEP_WHOLE_SUITE_FLAG`).
+// unless the run keeps the whole suite: the gate's unit leg outside a lane, and the gate's reuse of
+// it, pass `test_related_cap.NO_CAP` (`test_related_whole.is_whole_suite_kept`).
 async function scope_of(
 	root: string,
 	change: ChangeReading,

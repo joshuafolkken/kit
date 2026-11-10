@@ -5,8 +5,8 @@ type LaneEnvironment = Record<string, string | undefined>
 
 // **A lane leaves the whole suite to CI** (joshuafolkken/kit#7014): a changed file every test imports
 // sent a lane's gate through every test file on a machine other lanes share. Its direct importers still run here, and the required `Checks` context in `ci.yml` is green
-// only when every unit shard is, so the whole suite still runs before the merge. A main checkout's
-// gate keeps it.
+// only when every unit shard is, so the whole suite still runs before the merge. A main checkout's gate
+// keeps it.
 function is_whole_suite_kept(
 	given: ReadonlyArray<string>,
 	root: string,

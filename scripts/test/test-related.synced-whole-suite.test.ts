@@ -4,6 +4,7 @@ import { gate_labels } from '#scripts/gate/gate-labels'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { direct_importers } from './direct-importers'
 import { pure_files_entries } from './pure-files-entries'
@@ -168,7 +169,7 @@ describe('test_related.run_related_tests — an entries-only edit of the pure-fi
 // and the flag never reaches vitest. Outside a lane, wherever this suite runs (joshuafolkken/kit#7014).
 describe('test_related.run_related_tests — the gate’s whole-suite flag', () => {
 	beforeEach(() => {
-		vi.stubEnv('JOSH_LANE_ROOT', path.join(path.sep, 'no-lane-root'))
+		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
 		mocked_changed.mockResolvedValue([pure_files_entries.PURE_FILES_PATH, FIXED_SOURCE])
 		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
 	})
@@ -198,6 +199,25 @@ describe('test_related.run_related_tests — the gate’s whole-suite flag', () 
 
 	it('narrows by that green without the flag', async () => {
 		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual([
+			'related',
+			path.join(REPOSITORY_ROOT, FIXED_SOURCE),
+			'--run',
+		])
+	})
+})
+
+// joshuafolkken/kit#7014: a lane's gate leaves the whole suite to CI.
+describe('test_related.run_related_tests — the gate’s whole-suite flag in a lane', () => {
+	beforeEach(() => {
+		mocked_changed.mockResolvedValue([pure_files_entries.PURE_FILES_PATH, FIXED_SOURCE])
+		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
+		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue('7014')
+	})
+
+	it('narrows by that green with the flag', async () => {
+		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
 
 		expect(vitest_arguments()).toEqual([
 			'related',
