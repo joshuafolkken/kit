@@ -102,6 +102,21 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'checks:failed': {
+		script: 'scripts/gh/git-gh-checks-failed-main.ts',
+		description:
+			'List the failing CI checks of a pull request or commit, required or not (check runs and commit statuses)',
+		category: 'Workflow',
+		reference: ['[<PR|sha>]', 'developer', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '', note: "the current branch's pull request" },
+				{ arguments: '7147', note: 'a pull request by number' },
+				{ arguments: 'c0ffee1', note: 'a commit by sha' },
+			],
+		},
+		is_read_only: true,
+	},
 	notify: {
 		script: 'scripts/notify/telegram-test-main.ts',
 		description: 'Send Telegram notification',
