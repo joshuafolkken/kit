@@ -156,3 +156,41 @@ describe('prose_stale_read.references — a deleted file', () => {
 		TIMEOUT_MS,
 	)
 })
+
+// joshuafolkken/kit#7048: a deleted namespace's members, `record` of which a live module outside the
+// change still declares.
+async function delete_namespace(): Promise<Array<Reference>> {
+	await write(
+		GONE_CODE,
+		'function record(): void {}\nfunction gone_only(): void {}\nexport const gone = { record, gone_only }\n',
+	)
+	await write('scripts/ledger.ts', 'function record(): void {}\n')
+	await write('docs/d.md', 'Call `record`.\n')
+	await write('docs/e.md', 'gone_only\n')
+	await commit('namespace')
+	await rm(path.join(fixture.root, GONE_CODE))
+
+	return await found_references()
+}
+
+describe('prose_stale_read.references — a deleted name a live module still declares', () => {
+	it(
+		'does not count prose naming `record`, which the live ledger still declares',
+		async () => {
+			const found = await delete_namespace()
+
+			expect(prose_stale_scan.report(found).text).not.toContain('record')
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'still counts prose naming `gone_only`, which only the deleted file declared',
+		async () => {
+			const found = await delete_namespace()
+
+			expect(prose_stale_scan.report(found).text).toBe('docs/e.md:1 name gone_only')
+		},
+		TIMEOUT_MS,
+	)
+})
