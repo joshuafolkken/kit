@@ -1,0 +1,7 @@
+{
+	"reason": "#7148 adds the overrides verdict line and the josh latest exit on a moved overrides block (+21 code lines)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 23
+	}
+}

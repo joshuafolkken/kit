@@ -3,12 +3,12 @@ import { describe, it, vi } from 'vitest'
 
 const { run } = vi.hoisted(() => ({ run: vi.fn() }))
 
-vi.mock('./security-audit', () => ({ security_audit: { run } }))
+vi.mock('./security-audit-cache', () => ({ security_audit_cache: { run } }))
 
 const CASES = main_entry_fixture.entry_cases({
 	command: 'audit',
 	entry: 'scripts/security/security-audit-main.ts',
-	library: 'scripts/security/security-audit.ts',
+	library: 'scripts/security/security-audit-cache.ts',
 	run,
 	called_with: [],
 })
