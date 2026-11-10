@@ -46,7 +46,7 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 
 **Trigger: `pnpm josh main:merge` prints a `split notice`** — the branch's diff, untracked files
 included, passes the Issue's declared size × the growth factor, capped at the guide (no declaration:
-the guide), on either axis; the first `pnpm josh lint:related` or `pnpm josh test:related` past that bar prints it earlier,
+the guide), on either axis; the first `lint:related` or `test:related` past that bar prints it earlier,
 once per Issue. The notice is a warning, not a stop: go on implementing;
 `run:cut`, `run:chain`, review and ship print it and proceed.
 
@@ -82,7 +82,7 @@ is the non-closing home for the split rationale.
 
 **Each split child is filed with the `route:split` label** —
 `pnpm josh issue:file "<sub-title>" --body-file .josh/tmp/body.md --route split` — and judged for
-`auto-ok` like any filing (`kickoff.md` → "Words typed after `new`").
+`auto-ok` and the implement budget like any filing (`kickoff.md` → "Words typed after `new`").
 
 ## Promote, or create a new epic
 
