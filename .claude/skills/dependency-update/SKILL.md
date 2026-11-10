@@ -17,18 +17,17 @@ versions. Overrides exist on purpose (e.g. `"esbuild@<=0.24.2": ">=0.25.0"` for 
 **`package.json` is ignored** (verified with pnpm 12.6.0). Inspect both to preserve existing
 declarations, but an absent package field says nothing about workspace overrides.
 
-## 2. The check is a command you run, not a conclusion you reach
+## 2. Quote the printed overrides verdict
 
-```bash
-pnpm josh overrides --diff HEAD                # an update not yet committed
-pnpm josh overrides --diff <default>...<branch> # after `josh adopt`, which committed and returned
-```
+`josh latest`, `josh adopt` and `josh latest:if-required` print it last, after §3's line and a
+`✖ <file> overrides changed` heading per moved block. `overrides: keep` — keep. `overrides: restore (…)`
+(non-zero exit) — restore the moved entries, investigate, report. `overrides: not judged (…)` — run
+the check below.
 
-**Quote its verdict lines** — the `devEngines` line (§3), then `✔ overrides unchanged since
-<range> (…)` or a `✖ <file> overrides changed since <range>` heading per moved block with its
-entries. They cover the overrides blocks, not the `devDependencies` of overridden packages: confirm
-those still respect the effective overrides. A removed, modified or over-bumped entry: restore it
-immediately, investigate, and report — never keep it without approval.
+**No verdict printed** (`pnpm update`, a Dependabot merge) — run `pnpm josh overrides --diff HEAD`
+(`<default>...<branch>` once committed) and quote its `✔` / `✖` lines the same way.
+
+It covers the overrides blocks only: confirm overridden packages' `devDependencies` still respect them.
 
 ## 3. `devEngines` — the one expected change
 
