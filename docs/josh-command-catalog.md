@@ -169,7 +169,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
 | `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
 | `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |
-| `josh issue:priority` | `<issue> [--critical --reason <text>]` | automation | network | Raise an issue to the priority its body declares or reaches after filing |
+| `josh issue:priority` | `<issue> [--critical\|--high\|--normal --reason <text>]` | automation | network | Raise an issue to the priority its body declares or reaches, or set the one a person instructs |
 | `josh issue:read` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
 | `josh issue:release-class` | `<issue> <enhancement\|other-change>` | automation | network | Write the issue body's one release classification line, replacing any earlier one |

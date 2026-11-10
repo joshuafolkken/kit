@@ -52,19 +52,22 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:a
 
 <!-- usage: issue:priority -->
 
-Raise an issue to the priority its body declares or reaches after filing.
+Raise an issue to the priority its body declares or reaches, or set the one a person instructs.
 
 ```bash
 pnpm josh issue:priority 4960
 pnpm josh issue:priority 6707 --critical --reason "asked in this turn"   # on a person's instruction only
+pnpm josh issue:priority 6683 --normal --reason "asked in this turn"     # lowers it the same way
 ```
 
 <!-- /usage -->
 
-`--critical --reason "<text>"` applies `priority:critical` whatever the body declares and comments the reason on the issue.
+Either way the issue keeps one priority label: the new one goes on, then the others come off.
+
+`--critical|--high|--normal --reason "<text>"` sets that level whatever the body declares, raising or lowering, and comments the reason on the issue. `--normal` takes every priority label off.
 
 - Use it **only on a person's current-turn instruction** ("make #N critical"), `--reason` giving its gist. Never on an agent's own judgment: the agent's route is the body's `- 優先度:` declaration.
-- No non-blank `--reason` → usage error, nothing written. Already `priority:critical` → `labelled`, no comment. A failed label or comment → `failed`, exit 1.
+- More than one level flag, or no non-blank `--reason` → usage error, nothing written. Already at that level with no other priority label → `labelled`, no comment. A failed label change or comment → `failed`, exit 1.
 
 ### `josh issue:state`
 
