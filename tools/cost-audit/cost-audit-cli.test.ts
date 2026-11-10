@@ -157,6 +157,12 @@ describe('cost_audit_cli.run — the printed report', () => {
 	})
 })
 
+describe('cost_audit_cli.USAGE', () => {
+	it('names the absolute period flags', () => {
+		expect(cost_audit_cli.USAGE).toContain('--since <YYYY-MM-DD> --until <YYYY-MM-DD>')
+	})
+})
+
 describe('cost_audit_cli.summary — the lines josh retrospective carries', () => {
 	beforeEach(stub_sources)
 
