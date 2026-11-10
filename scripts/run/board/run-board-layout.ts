@@ -86,7 +86,7 @@ interface BoardRow {
 	// Why the row waits beyond its blockers (`run-board-reason.ts`), or why a parked or withdrawn row
 	// ended; any other row the run has touched has none.
 	reason?: RowReason | undefined
-	// An earlier run's lane (`run-board-earlier.ts`): drawn as its status says, marked 🧳.
+	// An earlier run's lane (`run-board-earlier.ts`): drawn as its status says, marked 🧳 after its title.
 	is_earlier?: boolean | undefined
 	// A touched child carrying `run:solo`, which nothing else starts beside while it runs.
 	is_solo?: boolean | undefined

@@ -128,16 +128,21 @@ describe('cost_audit_format.report_lines — the full cache rewrites', () => {
 
 const IMPLEMENT_READ = 'implement: read'
 const OPUS = 'claude-opus-4-6'
+const PHASE_TITLE = 'Lane children by phase'
 
 // joshuafolkken/kit#5936: the lane requests by phase, the four token kinds beside the cost.
 describe('cost_audit_format.report_lines — the phase table', () => {
 	it('prints each phase with its cost and four token kinds', () => {
 		const tokens = { input: 1200, cache_read: 3_400_000, cache_write: 56_000, output: 7800 }
 		const lines = cost_audit_format.report_lines(
-			audit_with({ phases: [{ key: IMPLEMENT_READ, tokens, usd: 2.5, models: [] }] }),
+			audit_with({
+				phases: [{ key: IMPLEMENT_READ, tokens, usd: 2.5, models: [], long_calls: 0 }],
+			}),
 		)
 
-		expect(lines).toContain('  implement: read: $2.5000 — 1,200 / 3,400,000 / 56,000 / 7,800')
+		expect(lines).toContain(
+			'  implement: read: $2.5000 — 1,200 / 3,400,000 / 56,000 / 7,800 · 0 calls over 2000',
+		)
 	})
 
 	// joshuafolkken/kit#6899: under the row, each model's dollars by the same four token types.
@@ -145,9 +150,9 @@ describe('cost_audit_format.report_lines — the phase table', () => {
 		const tokens = { input: 0, cache_read: 0, cache_write: 0, output: 0 }
 		const models = [{ model: OPUS, input: 0.5, cache_read: 1, cache_write: 0.25, output: 0.75 }]
 		const lines = cost_audit_format.report_lines(
-			audit_with({ phases: [{ key: IMPLEMENT_READ, tokens, usd: 2.5, models }] }),
+			audit_with({ phases: [{ key: IMPLEMENT_READ, tokens, usd: 2.5, models, long_calls: 0 }] }),
 		)
-		const phase = lines.indexOf('  implement: read: $2.5000 — 0 / 0 / 0 / 0')
+		const phase = lines.indexOf('  implement: read: $2.5000 — 0 / 0 / 0 / 0 · 0 calls over 2000')
 
 		expect(lines.filter((line) => line.endsWith('; per model in dollars)'))).toHaveLength(2)
 		expect(lines[phase + 1]).toBe(
@@ -157,9 +162,23 @@ describe('cost_audit_format.report_lines — the phase table', () => {
 
 	it('says none for a period with no lane request', () => {
 		const lines = cost_audit_format.report_lines(audit_with())
-		const title = lines.findIndex((line) => line.startsWith('Lane children by phase'))
+		const title = lines.findIndex((line) => line.startsWith(PHASE_TITLE))
 
 		expect(lines[title + 1]).toBe('  none')
+	})
+})
+
+// joshuafolkken/kit#7045: the long-output calls placed by phase, named in the title.
+describe('cost_audit_format.report_lines — the long-output calls by phase', () => {
+	it('prints each phase with its calls whose output passed 2000 tokens', () => {
+		const tokens = { input: 0, cache_read: 0, cache_write: 0, output: 9000 }
+		const lines = cost_audit_format.report_lines(
+			audit_with({ phases: [{ key: 'plan', tokens, usd: 1, models: [], long_calls: 3 }] }),
+		)
+		const title = lines.findIndex((line) => line.startsWith(PHASE_TITLE))
+
+		expect(lines[title]).toContain('· calls with output over 2000 tokens;')
+		expect(lines[title + 1]).toBe('  plan: $1.0000 — 0 / 0 / 0 / 9,000 · 3 calls over 2000')
 	})
 })
 
@@ -170,11 +189,15 @@ describe('cost_audit_format.report_lines — the agent type table', () => {
 	it('prints each agent type with its cost and four token kinds', () => {
 		const tokens = { input: 10, cache_read: 2000, cache_write: 300, output: 40 }
 		const lines = cost_audit_format.report_lines(
-			audit_with({ agents: [{ key: 'subagent: reviewer', tokens, usd: 1.25, models: [] }] }),
+			audit_with({
+				agents: [{ key: 'subagent: reviewer', tokens, usd: 1.25, models: [], long_calls: 2 }],
+			}),
 		)
 		const title = lines.findIndex((line) => line.startsWith(AGENT_TITLE))
 
-		expect(lines[title + 1]).toBe('  subagent: reviewer: $1.2500 — 10 / 2,000 / 300 / 40')
+		expect(lines[title + 1]).toBe(
+			'  subagent: reviewer: $1.2500 — 10 / 2,000 / 300 / 40 · 2 calls over 2000',
+		)
 	})
 
 	it('says none for a period with no lane subagent, before the closing regressions', () => {

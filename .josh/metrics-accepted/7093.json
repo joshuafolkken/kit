@@ -1,0 +1,8 @@
+{
+	"reason": "#7093 adds the merged-PR check before issue:already-done closes (new already-done-citation.ts) and documents the label-then-close order in issue-comments.md",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 43,
+		"ai_cost.on_demand_bytes": 108
+	}
+}

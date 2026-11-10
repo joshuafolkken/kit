@@ -24,3 +24,5 @@ to find out **how the subject currently works**, not what to change.
   helper usage), each with `file:line` citations. If either does not apply or was not found, say so;
   do not invent an API or fixture, or paste whole implementations.
 - Report what the code does, never a root cause or a fix: deciding that stays in the main line.
+- Keep the reply within 60 lines: one bullet per claim with its citations, grouped under the brief's
+  questions, with no preamble, recap or list of the files you opened.

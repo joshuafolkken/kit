@@ -2,6 +2,8 @@ import { stripVTControlCharacters } from 'node:util'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { run_board_earlier } from './run-board-earlier'
+import { run_board_every } from './run-board-every'
+import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_labels } from './run-board-labels'
 import { run_board_lane_state } from './run-board-lane-state'
@@ -18,19 +20,31 @@ import type { UsageMark } from './run-board-usage'
 const { LOCAL, harness, plan_titled } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
 const { NO_LANES } = run_board_lane_state
+const { width_of } = run_board_fit
+const { chat_frame } = run_board_every
 const { PHASE_ICONS, STATE_ICONS } = run_board_labels
 const { EARLIER_ICON } = run_board_earlier
 const EARLIER = 4173
 const OWN = 4195
 const MINUTE_MS = 60_000
 const LAUNCHED_MINUTES = 12
-// An earlier row leads with the spinner and 🧳, its issue after the time columns (joshuafolkken/kit#4292).
-const EARLIER_ROW = new RegExp(String.raw`^\s*\S +${EARLIER_ICON} .* ${String(EARLIER)}\b`, 'u')
+// An earlier row leads with the spinner and its phase's icon, its issue after the time columns
+// (joshuafolkken/kit#4292), and 🧳 after its title (#7098).
+const EARLIER_ROW = new RegExp(
+	String.raw`^\s*\S +(?!${EARLIER_ICON})\S .* ${String(EARLIER)}\b.*\s${EARLIER_ICON}(\s|$)`,
+	'u',
+)
 const LAUNCHED_MS = LOCAL.started_ms - LAUNCHED_MINUTES * MINUTE_MS
 const LATER = '2026-10-08T09:05:00.000Z'
 
 function event_of(pos: number, kind: string, text: string): RunEvent {
 	return { pos, at: LATER, kind, text }
+}
+
+// This run's own child, launched when the run began.
+const OWN_LAUNCH: RunEvent = {
+	...event_of(1, 'child-launch', `#${String(OWN)} a`),
+	at: new Date(LOCAL.started_ms).toISOString(),
 }
 
 // What the whole stream says the earlier lane is doing: launched before this run began.
@@ -81,24 +95,50 @@ function row_of(lines: ReadonlyArray<string>, issue: number): string {
 	)
 }
 
+// The terminal column a row's issue starts in.
+function issue_column(lines: ReadonlyArray<string>, issue: number): number {
+	const row = row_of(lines, issue)
+	const lead = row.slice(0, row.indexOf(String(issue)))
+
+	return width_of(lead)
+}
+
 function header(lines: ReadonlyArray<string>): Array<string> {
 	return lines.slice(0, lines.indexOf(''))
 }
 
 describe('run_board_tick.tick — what an earlier run’s lane is doing', () => {
-	it('draws it marked 🧳, with its phase and its time from its launch', async () => {
+	it('draws it marked 🧳 after its title, with its phase and its time from its launch', async () => {
 		const status: ItemStatus = { ...EARLIER_STATUS, track: ['implement'], phase_ms: LAUNCHED_MS }
 		const row = row_of(await frame_of(held(status)), EARLIER)
 
 		expect(row).toMatch(EARLIER_ROW)
+		expect(row.trim().split(/\s+/u, 2)[1]).toBe(PHASE_ICONS.implement)
 		expect(row).toContain(`${String(LAUNCHED_MINUTES)}′00″`)
 	})
 
-	it('draws its newest activity as this run’s own row does', async () => {
+	it('draws its newest activity after 🧳 as this run’s own row does', async () => {
 		const stage = event_of(1, 'ship-stage', `#${String(EARLIER)} gate start`)
 		const row = row_of(await frame_of({ ...HELD, events: [stage] }), EARLIER)
 
-		expect(row).toMatch(new RegExp(`${PHASE_ICONS.gate} 0″$`, 'u'))
+		expect(row).toMatch(new RegExp(`${EARLIER_ICON} ${PHASE_ICONS.gate} 0″$`, 'u'))
+	})
+
+	it('starts its issue in the column this run’s own row does', async () => {
+		const both = { ...HELD, lanes: [String(OWN), String(EARLIER)], events: [OWN_LAUNCH] }
+		const lines = await frame_of(both)
+
+		expect(issue_column(lines, EARLIER)).toBe(issue_column(lines, OWN))
+	})
+
+	it('draws it in the chat’s form as on the terminal', async () => {
+		const status: ItemStatus = { ...EARLIER_STATUS, track: ['implement'], phase_ms: LAUNCHED_MS }
+		const { text } = await chat_frame(harness(held(status), []).ports)
+		const row = row_of(text.split('\n'), EARLIER)
+
+		// The chat draws no spinner: the row leads with its phase.
+		expect(row.trim().startsWith(PHASE_ICONS.implement)).toBe(true)
+		expect(row).toMatch(new RegExp(String.raw`\s${String(EARLIER)}\b.*\s${EARLIER_ICON}\s`, 'u'))
 	})
 
 	// joshuafolkken/kit#4269: paused is the record's, whatever processes the lane still has running.
@@ -128,11 +168,10 @@ describe('run_board_tick.tick — an earlier run’s lane its child cut and resu
 	})
 
 	it('keeps this run’s own child running across its cut and resume', async () => {
-		const launch = {
-			...event_of(1, 'child-launch', `#${String(OWN)} a`),
-			at: new Date(LOCAL.started_ms).toISOString(),
-		}
-		const own = [launch, ...CUT_RESUME.map((event) => ({ ...event, text: `#${String(OWN)} x` }))]
+		const own = [
+			OWN_LAUNCH,
+			...CUT_RESUME.map((event) => ({ ...event, text: `#${String(OWN)} x` })),
+		]
 		const lines = await frame_of({ ...HELD, lanes: [String(OWN), String(EARLIER)], events: own })
 
 		expect(row_of(lines, OWN)).not.toContain(EARLIER_ICON)

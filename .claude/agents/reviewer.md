@@ -23,4 +23,7 @@ its `review:attest` step.
   there is none). It lints the review and checks the lines together; fix everything it reports and
   run it again. The dispatcher records that slot with `pnpm josh review:record --from-slot` and
   never copies findings from your reply.
-- Return that review as your reply.
+- Keep the review to the rubric's items: a finding's problem and minimal fix in at most three lines
+  (its other sites one list of citations), a category with no finding in one proof line, and no
+  walkthrough of the diff.
+- Reply with the review file's path and the finding lines you submitted, not the review again.
