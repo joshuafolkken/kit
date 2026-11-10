@@ -214,14 +214,14 @@ The followup row is `followup (driver, outside lane net)`; `--why` groups a foll
 lanes over that many net minutes, the total, the lane count and the median per lane, the longest total first
 (`lane-sinks.ts`).
 
-The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive), from one
-listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`). The `scoped pair`
-row also lists each one whose title contains the file name of an `over_cap_hub` the `test-related` runs of those
-lanes recorded.
+The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive): `none` when
+none does, `unread` when the listing failed (`lane-sinks-issues.ts`). The `scoped pair` row also matches the file
+name of each `over_cap_hub` those lanes' `test-related` runs recorded.
 
-`--over <minutes>` prints one row per merged lane of the period over that many net minutes, the longest first: its
-net and waited minutes, the ledger chain behind them, its longest stage and the open Issues that stage matches as
-`--sinks` matches a row (`lane-over.ts`).
+`--over <minutes>` prints a row per merged lane over that many net minutes, longest first: net and wait minutes,
+ledger chain, top stage and its open Issues as `--sinks` matches them (`lane-over.ts`). A cause table follows
+(`lane-over-causes.ts`): per over-cap `hub` and `ci job`, lanes, minutes over, open Issues; `filing candidates:`
+lists unnamed.
 
 Groups overlap; each sums net lane time. Implement attribution is unverified; Issues match names.
 
