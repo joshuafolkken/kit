@@ -126,13 +126,15 @@ async function has_changes(
 // A porcelain line for an unstaged deletion (` D`): a tracked file gone from the work tree, which the
 // index and the commit still hold. A staged deletion (`D `) is a deliberate `git rm` and an unmerged
 // `DD` a conflict, so both stay work.
-const DELETION_STATUS = /^ D /u
+const DELETION_STATUS = ' D '
 
 // Whether a porcelain status carries work worth keeping. A tree whose only changes are tracked files
 // deleted is a work tree caught mid-removal, not work: the files are still in the commit, and pushing
 // it would leave an entry whose apply deletes them (joshuafolkken/kit#6979).
 function holds_work(status: string): boolean {
-	return status.split(ENTRY_SEPARATOR).some((line) => line !== '' && !DELETION_STATUS.test(line))
+	return status
+		.split(ENTRY_SEPARATOR)
+		.some((line) => line !== '' && !line.startsWith(DELETION_STATUS))
 }
 
 async function has_work(directory: string): Promise<boolean> {
