@@ -1,4 +1,5 @@
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { run_ship_detach } from './run-ship-detach'
 
 // A supervisor's successor on new code (`run-ship-handover.ts`) is the same launch: it keeps the launch
@@ -12,6 +13,8 @@ import { run_ship_detach } from './run-ship-detach'
 // **The successor is this very process's command line, re-invoked under the same runner**, as the wake
 // supervisor re-invokes itself (`run-wake-session.ts`). Launched through `pnpm josh ship`, the spawned
 // pid would be pnpm's while the claim names the node process under it, so no claim would ever match.
+// The command line names the `.ts` source, and a pre-built ship leaves no loader flag behind, so the
+// loader is added (`ts-entry-loader.ts`).
 
 interface RelaunchRequest {
 	repository: string
@@ -26,7 +29,10 @@ function holder_pid(repository: string, number: string): number | undefined {
 
 // The supervisor's own argv ends with its `"<title> #<N>"` title, which a lane's liveness pattern needs.
 function successor_argv(): LaunchArgv {
-	return { command: process.execPath, args: [...process.execArgv, ...process.argv.slice(1)] }
+	return {
+		command: process.execPath,
+		args: [...ts_entry_loader.loader_argv(process.execArgv), ...process.argv.slice(1)],
+	}
 }
 
 // The successor's pid, `undefined` where this process is no supervisor or none started.

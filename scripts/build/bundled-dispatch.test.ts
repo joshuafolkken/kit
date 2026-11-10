@@ -11,8 +11,8 @@ import { build_commands } from './build-commands'
 import { DISPATCH_TEST_PREFIX } from './distribution-scratch-fixture'
 import { SCRIPTS_DIR } from './import-closure-fixture'
 
-// Each `is_bundled` command answers the same through a built `dist/josh.js` as through the source
-// dispatcher, so pre-building it changes only the start-up cost (joshuafolkken/kit#4186).
+// A pre-built command answers the same through a built `dist/josh.js` as through the source
+// dispatcher, so pre-building changes only the start-up cost (joshuafolkken/kit#4186, #7013).
 //
 // The built package is a private root under `dist/`: its top-level entries are links to this
 // checkout's, so the bundles resolve the same documents, and node still finds `node_modules` above
@@ -23,8 +23,9 @@ const RUN_TIMEOUT = 30_000
 const PACKAGE_DIR = path.join(SCRIPTS_DIR, '..')
 const UNLINKED: ReadonlySet<string> = new Set(['.git', 'dist', 'node_modules'])
 
-// One network-free invocation per bundled command; a usage refusal where any other answer would
-// reach GitHub.
+// Network-free invocations, a usage refusal where any other answer would reach GitHub.
+// `run:board` sits three directories deep and shares chunks with other commands, so its answer
+// shows that a chunked module still finds the package from its source location.
 const NOT_AN_ISSUE = 'not-a-number'
 const INVOCATIONS: ReadonlyArray<ReadonlyArray<string>> = [
 	['completion', '--names'],
@@ -33,6 +34,10 @@ const INVOCATIONS: ReadonlyArray<ReadonlyArray<string>> = [
 	['read:set', 'backlogrun'],
 	['run:prep', NOT_AN_ISSUE],
 	['run:step', NOT_AN_ISSUE],
+	['run:board', '--help'],
+	['run:chain', NOT_AN_ISSUE],
+	['ship:wait', NOT_AN_ISSUE],
+	['lane:stats', NOT_AN_ISSUE],
 ]
 
 interface Answer {
@@ -77,15 +82,11 @@ async function source_answer(arguments_: ReadonlyArray<string>): Promise<Answer>
 	return await answer(executable, [...leading_arguments, ...arguments_])
 }
 
-const BUNDLED_COMMANDS = Object.keys(COMMAND_MAP).filter(
-	(name) => COMMAND_MAP[name]?.is_bundled === true,
-)
-
 describe('bundled commands through dist/josh.js', () => {
-	it('names an invocation for every bundled command', () => {
-		const named = new Set(INVOCATIONS.map(([command]) => command))
+	it('names only script commands', () => {
+		const named = INVOCATIONS.map(([command = '']) => COMMAND_MAP[command]?.script)
 
-		expect(named).toStrictEqual(new Set(BUNDLED_COMMANDS))
+		expect(named).not.toContain(undefined)
 	})
 
 	// The two sides share no state, so they start together: one start-up each test, not two.

@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hook_lap } from '#scripts/hooks/hook-lap'
 import { describe, expect, it, vi } from 'vitest'
+import { josh_in_process } from './josh-in-process'
 import {
 	ALIASES,
 	COMMAND_MAP,
@@ -280,27 +281,20 @@ describe('COMMAND_MAP pr command', () => {
 	})
 })
 
-describe('josh_logic.spawn_script — default_script_arguments injection', () => {
-	it('injects default_script_arguments between script path and user args', () => {
-		const spy = vi.spyOn(josh_logic, 'spawn_script').mockReturnValue(0)
-		const tsx_executable = 'tsx'
-		const script_path = path.join(PACKAGE_DIR, 'scripts/git/git-workflow.ts')
+describe('josh_logic.run_command — default_script_arguments injection', () => {
+	it('puts default_script_arguments before the user arguments', async () => {
+		const run = vi.spyOn(josh_in_process, 'run_in_process').mockResolvedValue(0)
 		const user_arguments = ['feat: my feature #42']
-		const expected_arguments = [
-			script_path,
+
+		await josh_logic.run_command('pr', user_arguments)
+
+		expect(run.mock.calls[0]?.[1]).toEqual([
 			YES_FLAG,
 			SKIP_COMMIT_FLAG,
 			SKIP_PUSH_FLAG,
 			...user_arguments,
-		]
-
-		josh_logic.spawn_script(tsx_executable, expected_arguments)
-
-		expect(spy).toHaveBeenCalledWith(
-			tsx_executable,
-			expect.arrayContaining([YES_FLAG, SKIP_COMMIT_FLAG, SKIP_PUSH_FLAG]),
-		)
-		spy.mockRestore()
+		])
+		run.mockRestore()
 	})
 })
 

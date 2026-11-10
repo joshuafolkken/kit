@@ -250,6 +250,48 @@ describe('run_ship_synced_scope.settle — what cannot be read settles nothing',
 	})
 })
 
+// joshuafolkken/kit#7052: a branch of 9 files named test:related over 1,536 of main's after a sync.
+describe('run_ship_synced_scope.read_sync — what test:related is named over', () => {
+	const BRANCH = [
+		'scripts/run/ship/run-ship-scoped.ts',
+		'scripts/run/ship/run-ship-synced-scope.ts',
+	]
+	const MAIN_SIZE = 1500
+	const MAIN = Array.from({ length: MAIN_SIZE }, (_, index) => `scripts/main/m${String(index)}.ts`)
+	const MAIN_TESTS = MAIN.map((file) => file.replace('.ts', '.test.ts'))
+	const MEETS = { left: MAIN, shared: MAIN_TESTS, meeting: [...MAIN, ...MAIN_TESTS] }
+
+	beforeEach(() => {
+		vi.spyOn(changed_file_scope, 'repository_root_or_cwd').mockResolvedValue(process.cwd())
+		read_parts.mockResolvedValue(synced_parts(MAIN))
+		read_branch.mockResolvedValue([...BRANCH, 'scripts/deleted-by-branch.ts'])
+		split.mockResolvedValue(MEETS)
+	})
+
+	it('names the branch change alone for a merge main brought in only (ac-ea05869a)', async () => {
+		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(reading?.test_overlap).toStrictEqual(BRANCH)
+		expect(run_ship_synced_scope.files_for(reading, TEST, MAIN)).toStrictEqual(BRANCH)
+		expect(run_ship_synced_scope.files_for(reading, LINT, BRANCH)).toBe(reading?.overlap)
+	})
+
+	it('names the same set from the same tree and base (ac-5c617617)', async () => {
+		const first = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(await run_ship_synced_scope.read_sync(TREE, PAIR)).toStrictEqual(first)
+	})
+
+	it('keeps the branch change only where a test meets it (ac-62eacc9c)', async () => {
+		split.mockResolvedValue({ ...MEETS, shared: [] })
+
+		const reading = await run_ship_synced_scope.read_sync(TREE, PAIR)
+
+		expect(reading?.test_overlap).toStrictEqual([])
+		expect(reading?.overlap).toHaveLength(MAIN_SIZE * 2)
+	})
+})
+
 // joshuafolkken/kit#6279: review can meet a merge and unchecked own edits together.
 describe('run_ship_synced_scope.read_sync — own edits after a merge', () => {
 	it('names own edits and excludes unrelated main files from the review pair', async () => {

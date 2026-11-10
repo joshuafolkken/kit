@@ -18,7 +18,6 @@ import {
 } from './josh-command-map'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 import { josh_environment_file } from './josh-environment-file'
-import { josh_gh_usage } from './josh-gh-usage'
 import { josh_in_process } from './josh-in-process'
 import { kit_only } from './kit-only'
 import { find_package_directory } from './package-directory'
@@ -162,22 +161,6 @@ function format_unknown_command(cmd: string): string {
 	return `Unknown command: ${cmd}.${hint} Run 'josh --help' for common commands or 'josh --all' for the full list.`
 }
 
-// No `shell` option on purpose: execa runs a Windows `.cmd` shim itself and escapes the arguments
-// for cmd.exe, which the shell would receive unescaped.
-function spawn_script(
-	tsx_executable: string,
-	script_arguments: Array<string>,
-	environment: Record<string, string> = {},
-): number {
-	const result = execaSync(tsx_executable, script_arguments, {
-		env: environment,
-		stdio: 'inherit',
-		reject: false,
-	})
-
-	return resolve_spawn_exit(tsx_executable, result)
-}
-
 function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): number {
 	const [executable = '', ...rest_arguments] = shell
 	const result = execaSync(executable, [...rest_arguments, ...extra], {
@@ -188,37 +171,21 @@ function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): 
 	return resolve_spawn_exit(executable, result)
 }
 
-function spawn_script_entry(
-	entry: CommandEntry,
-	script_path: string,
-	script_arguments: ReadonlyArray<string>,
-): number {
-	const runner = resolve_tsx_runner()
-	const tsx_arguments = [
-		...runner.leading_arguments,
-		...josh_environment_file.apply_node_flags(entry.tsx_arguments ?? []),
-		script_path,
-		...script_arguments,
-	]
-
-	return josh_gh_usage.from_child((environment) =>
-		spawn_script(runner.executable, tsx_arguments, environment),
-	)
-}
-
-// Only the in-process branch is genuinely asynchronous; the spawning one answers the moment the
-// child exits. Both are reported as a promise so every caller has one shape to handle, and
-// `josh.ts` awaits it either way.
+// Every script command runs in this process (`josh-in-process.ts`). Its `tsx_arguments` — only ever
+// the optional `.env` flag, which a spawned node would have read before the script's own code —
+// are loaded into this process's environment before the import, through the same filter that
+// keeps launch-only switches out of the file's reach.
 async function run_script_entry(
 	entry: CommandEntry,
+	script: string,
 	subcommand_arguments: Array<string>,
 ): Promise<number> {
 	const script_arguments = [...(entry.default_script_arguments ?? []), ...subcommand_arguments]
-	const target = josh_in_process.in_process_target(entry, PACKAGE_DIR, import.meta.url)
+	const target = josh_in_process.in_process_target(script, PACKAGE_DIR, import.meta.url)
 
-	if (target !== undefined) return await josh_in_process.run_in_process(target, script_arguments)
+	josh_environment_file.apply_node_flags(entry.tsx_arguments ?? [])
 
-	return spawn_script_entry(entry, path.join(PACKAGE_DIR, entry.script ?? ''), script_arguments)
+	return await josh_in_process.run_in_process(target, script_arguments)
 }
 
 function github_prerequisite_exit(resolved: string, is_consumer: boolean): number | undefined {
@@ -264,7 +231,7 @@ async function run_entry(
 ): Promise<number> {
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
-	return await run_script_entry(entry, subcommand_arguments)
+	return await run_script_entry(entry, entry.script ?? '', subcommand_arguments)
 }
 
 function declared(value: number | (() => number) | undefined): number | undefined {
@@ -315,7 +282,6 @@ const josh_logic = {
 	format_help,
 	format_unknown_command,
 	run_command,
-	spawn_script,
 	run_shell_command,
 }
 

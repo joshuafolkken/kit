@@ -128,3 +128,34 @@ describe('run_ship_scoped.scoped_pair — the lap of a merge-scoped pair', () =>
 		expect(lap()).not.toHaveProperty('named')
 	})
 })
+
+// joshuafolkken/kit#7052: lint's meeting handed to test:related ran every importer of main's modules.
+describe('run_ship_scoped.scoped_pair — each check over its own part of a merge', () => {
+	it('names test:related over its own part and lint:related over the overlap alone', async () => {
+		const meeting = 'scripts/run/ship/run-ship-narrowed.ts'
+
+		read_sync_mock.mockResolvedValue({
+			checks: [],
+			synced: [meeting],
+			overlap: [meeting],
+			test_overlap: [NAMED_FILE],
+		})
+
+		await run_ship_scoped.scoped_pair()
+
+		expect(commands()).toStrictEqual([`${LINT} ${meeting}`, `${TEST} ${NAMED_FILE}`])
+	})
+
+	it('runs the pair bare when test:related’s own part cannot be named', async () => {
+		read_sync_mock.mockResolvedValue({
+			checks: [],
+			synced: [NAMED_FILE],
+			overlap: [NAMED_FILE],
+			test_overlap: ['scripts/run/ship/no-such-file.ts'],
+		})
+
+		await run_ship_scoped.scoped_pair()
+
+		expect(commands()).toStrictEqual([LINT, TEST])
+	})
+})

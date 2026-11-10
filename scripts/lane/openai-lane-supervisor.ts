@@ -7,6 +7,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { poll } from '#scripts/lib/poll'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
@@ -207,7 +208,10 @@ async function supervise(lane: LaneInfo, profile: AgentProfile, nonce: string): 
 }
 
 function supervisor_argv(issue: string, nonce: string): LaunchArgv {
-	return { command: process.execPath, args: [...process.execArgv, SUPERVISOR_SCRIPT, issue, nonce] }
+	return {
+		command: process.execPath,
+		args: [...ts_entry_loader.loader_argv(process.execArgv), SUPERVISOR_SCRIPT, issue, nonce],
+	}
 }
 
 const openai_lane_supervisor = {

@@ -111,6 +111,8 @@ single source of the distinction, the filing, the pause and the ceiling. Then:
 
 ## Splitting a child mid-run
 
+Never after implementation starts (`split-assessment.md` → "Over the guide before the gate").
+
 Not a reason to stop. File the new children (Tier A, first-party; `split-assessment.md` → "Two or
 more always means an epic"), then
 `pnpm josh epic --add <E> <N...> [--before <M> | --after <M>]` — never a hand edit. Same criteria as

@@ -90,9 +90,6 @@ interface CommandEntry {
 	// listing carries only what a consumer can run. The audience in
 	// `reference` separately decides whether the command appears in the default listing.
 	is_kit_only?: boolean
-	// Pre-built to `dist/commands/` so a consumer's `dist/josh.js` imports it in its own process
-	// instead of spawning tsx for it (`docs/maintainers/runtime-bundling.md`).
-	is_bundled?: boolean
 	// The cores the command reserves from the machine-wide budget before it starts its heavy tools.
 	// `josh-logic.ts` claims them at the one dispatch point every command
 	// passes through, so the command only declares the number. A function means the weight is read

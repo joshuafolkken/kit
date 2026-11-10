@@ -25,7 +25,6 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 		description: 'Print command names and aliases, or a shell completion script',
 		category: 'Development',
 		reference: ['--names | <zsh|bash|fish>', 'automation', ['none']],
-		is_bundled: true,
 		is_read_only: true,
 		usage: {
 			examples: [
