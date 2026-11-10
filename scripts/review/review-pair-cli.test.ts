@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { review_pair_cli, type PairSources } from './review-pair-cli'
@@ -40,6 +41,31 @@ describe('review_pair_cli.findings_of', () => {
 	it('reads none as no finding and a missing file as unreadable', () => {
 		expect(review_pair_cli.findings_of('none\n')).toStrictEqual([])
 		expect(review_pair_cli.findings_of(undefined)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7020: a reviewer the ship or a lane's broker started headless is a session of its own.
+describe('review_pair_cli.is_agent_session', () => {
+	it("matches a delegated unit's transcript and a headless session's own", () => {
+		expect(review_pair_cli.is_agent_session('root/subagents/agent-abc', 'abc')).toBe(true)
+		expect(review_pair_cli.is_agent_session('abc', 'abc')).toBe(true)
+		expect(review_pair_cli.is_agent_session('other-abc', 'abc')).toBe(false)
+	})
+
+	it("reads a headless reviewer's cost from its own session transcript", () => {
+		const headless = {
+			session_id: 'abc',
+			path: '/missing/abc.jsonl',
+			modified_ms: 0,
+			is_delegated: false,
+			depth: 0,
+		}
+
+		vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue([headless])
+		const read = vi.spyOn(cost_transcript, 'read_session')
+
+		expect(review_pair_cli.agent_cost('abc')).not.toStrictEqual({})
+		expect(read).toHaveBeenCalledWith(headless)
 	})
 })
 

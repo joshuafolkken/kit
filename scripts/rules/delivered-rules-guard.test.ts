@@ -1,6 +1,7 @@
 import type { HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DeliveredRule } from './delivered-rules'
 import { delivered_rules_guard } from './delivered-rules-guard'
@@ -8,8 +9,8 @@ import { delivered_rules_guard } from './delivered-rules-guard'
 // joshuafolkken/kit#6973: a row reads the context of the call it judges, never the process's.
 
 const RULE_ID = 'example-rule'
-const LANE: HookContext = { cwd: '/lanes/6973', env: { MARK: 'lane' } }
-const PERSON: HookContext = { cwd: '/person', env: {} }
+const LANE: HookContext = hook_context_fixture.of('/lanes/6973', { MARK: 'lane' })
+const PERSON: HookContext = hook_context_fixture.of('/person', {})
 const CALL: GuardedCall = { name: 'Bash', input: { command: 'ls' } }
 const RUN = { transcript: '/session.jsonl', now_ms: 0, context: LANE }
 

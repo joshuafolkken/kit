@@ -478,7 +478,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/review/review-lint-findings.test.ts',
 	'scripts/review/review-lint-sections.test.ts',
 	'scripts/review/review-lint.test.ts',
-	'scripts/review/review-pair-cli.test.ts',
 	'scripts/review/review-pair.test.ts',
 	'scripts/review/review-prior-findings.test.ts',
 	'scripts/review/review-record-cli-disposition.test.ts',

@@ -2,6 +2,7 @@ import path from 'node:path'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut } from '#scripts/run/cut/run-cut'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pre_gate_cut } from './pre-gate-cut'
@@ -26,7 +27,7 @@ describe('pre_gate_cut.is_uncut_gate_in — the call context', () => {
 		const carried = vi.spyOn(run_cut, 'carried_cut_sync').mockReturnValue(undefined)
 
 		vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('over')
-		const context = { cwd: LANE_DIRECTORY, env: { [lane_child_marker.KEY]: ISSUE } }
+		const context = hook_context_fixture.of(LANE_DIRECTORY, { [lane_child_marker.KEY]: ISSUE })
 
 		expect(pre_gate_cut.is_uncut_gate_in(GATE, context)).toBe(true)
 		expect(directory).toHaveBeenCalledWith(LANE_DIRECTORY)

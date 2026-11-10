@@ -14,11 +14,13 @@ const PAIRED_ENV = 'JOSH_REVIEWER_PAIRED'
 const ENABLED_VALUE = '1'
 const BRIEF_PREFIX = 'josh-review-paired-brief-'
 const FINDINGS_PREFIX = 'josh-review-paired-findings-'
+const LOG_PREFIX = 'josh-review-paired-log-'
 const PAIRED_PROFILE = agent_role_profile.VERIFICATION_PROFILES.anthropic
 
 interface PairedPaths {
 	brief: string
 	findings: string
+	log: string
 }
 
 function is_enabled(environment: NodeJS.ProcessEnv = process.env): boolean {
@@ -29,6 +31,7 @@ function paths(directory: string = PROJECT_ROOT): PairedPaths {
 	return {
 		brief: stamp_file.stamp_path(BRIEF_PREFIX, directory, '.md'),
 		findings: stamp_file.stamp_path(FINDINGS_PREFIX, directory, '.txt'),
+		log: stamp_file.stamp_path(LOG_PREFIX, directory, '.log'),
 	}
 }
 
@@ -69,24 +72,39 @@ function launch_note(brief: string): string {
 }
 
 // Round 1's code brief, copied for the paired reviewer when the comparison is on; round 2 is never paired.
+// **A paired brief exists only while this round is paired** (joshuafolkken/kit#7020): an unpaired brief
+// removes the last one, since the ship's reviewer launch reads its presence as the pair being on.
 function offer(
 	text: string,
 	environment: NodeJS.ProcessEnv = process.env,
 	directory: string = PROJECT_ROOT,
 ): string | undefined {
-	if (!is_enabled(environment) || review_round.from_brief(text) === '2') return undefined
 	const { brief, findings } = paths(directory)
 
-	stamp_file.write_text_stamp(brief, `${paired_brief(text, findings)}\n`)
 	stamp_file.remove_stamp(findings)
+
+	if (!is_enabled(environment) || review_round.from_brief(text) === '2') {
+		stamp_file.remove_stamp(brief)
+
+		return undefined
+	}
+
+	stamp_file.write_text_stamp(brief, `${paired_brief(text, findings)}\n`)
 
 	return launch_note(brief)
 }
 
+function is_offered(directory: string = PROJECT_ROOT): boolean {
+	return stamp_file.read_stamp_text(paths(directory).brief) !== undefined
+}
+
 const review_pair = {
 	PAIRED_ENV,
+	PAIRED_PROFILE,
 	is_enabled,
+	is_offered,
 	offer,
+	opening: paired_opening,
 	paths,
 }
 
