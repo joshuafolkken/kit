@@ -58,6 +58,15 @@ describe('reviewer agent definition', () => {
 		expect(body).toContain('not the review again')
 		expect(body).not.toContain('Return that review as your reply')
 	})
+
+	// joshuafolkken/kit#7113: the reply carries a numeric cap and a fixed line order.
+	it('caps the reply length and fixes its format', () => {
+		const { body } = definition(AGENT_PATH)
+
+		expect(body).toContain('Reply within 2,000 characters')
+		expect(body).toContain("the review file's path on the first line")
+		expect(body).toContain('one per line (`none` when there is none)')
+	})
 })
 
 describe('reviewer-verification agent definition', () => {
