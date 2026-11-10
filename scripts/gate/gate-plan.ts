@@ -150,7 +150,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 // (joshuafolkken/kit#4065): `josh test:related` narrows through the module graph and the test-read
 // map, and runs the whole suite — refreshing that map — whenever it cannot tell. The label stays
 // `test:unit`, the name every ledger, reservation and record knows the check by. CI runs the whole
-// sharded suite regardless.
+// sharded suite regardless, so a lane's gate drops `--keep-whole-suite` (`test-related-whole.ts`).
 const GATE_CHECKS: ReadonlyArray<GateCheck> = [
 	...STATIC_CHECKS,
 	{ label: UNIT_LABEL, target: UNIT_TARGET, args: [KEEP_WHOLE_SUITE_FLAG], reserved_cores: 0 },

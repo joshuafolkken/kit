@@ -13,6 +13,7 @@ const UNIT_LABEL = 'test:unit'
 const UNIT_TARGET = 'test:related'
 // **The gate's unit leg runs the whole suite for a changed file every test imports**
 // (joshuafolkken/kit#5122), which every other `josh test:related` narrows to its direct importers.
+// Outside a lane only: a lane leaves the whole suite to CI (`test-related-whole.ts`, joshuafolkken/kit#7014).
 const KEEP_WHOLE_SUITE_FLAG = '--keep-whole-suite'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'

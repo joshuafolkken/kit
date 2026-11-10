@@ -19,15 +19,35 @@ import { cost_audit_read, type AuditSession } from './cost-audit-read'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: pnpm josh cost:audit [--period <days>] [--density]'
+const USAGE =
+	'Usage: pnpm josh cost:audit [--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]'
 const DENSITY_FLAG = '--density'
-const OPTIONS = { period: { type: 'string' }, density: { type: 'boolean' } } as const
+const OPTIONS = {
+	period: { type: 'string' },
+	since: { type: 'string' },
+	until: { type: 'string' },
+	density: { type: 'boolean' },
+} as const
 // A positive whole number of days (`cli_flags.to_positive`), at most ten years.
 const MAX_PERIOD_DAYS = 3650
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u
+const ISO_DATE_LENGTH = 10
 // GitHub's search qualifier takes an ISO instant without the milliseconds `toISOString` writes.
 const MILLISECONDS_PATTERN = /\.\d{3}Z$/u
 
 const search_count_schema = z.object({ total_count: z.number() })
+
+// The period's length in days and the instant it ends.
+interface AuditSpan {
+	days: number
+	now_ms: number
+}
+
+interface SpanValues {
+	period?: string | undefined
+	since?: string | undefined
+	until?: string | undefined
+}
 
 // An unknown flag or a `--period` with no value is refused, not read as the default period.
 function read_period(argv: ReadonlyArray<string>): number | undefined {
@@ -39,6 +59,56 @@ function read_period(argv: ReadonlyArray<string>): number | undefined {
 	const days = cli_flags.to_positive(raw)
 
 	return days !== undefined && days <= MAX_PERIOD_DAYS ? days : undefined
+}
+
+// A UTC calendar date's midnight, or `undefined` for anything but a real `YYYY-MM-DD` date.
+function date_ms(raw: string): number | undefined {
+	if (!DATE_PATTERN.test(raw)) return undefined
+
+	const ms = Date.parse(`${raw}T00:00:00Z`)
+
+	if (Number.isNaN(ms)) return undefined
+
+	return new Date(ms).toISOString().slice(0, ISO_DATE_LENGTH) === raw ? ms : undefined
+}
+
+// `--since` through `--until`, both UTC dates and both included, as the period's length and its end;
+// the period before is as long, ending where this one opens.
+function dated_span(since: string, until: string): AuditSpan | undefined {
+	const start = date_ms(since)
+	const end = date_ms(until)
+
+	if (start === undefined || end === undefined || end < start) return undefined
+
+	const days = (end - start) / cost_audit.MS_PER_DAY + 1
+
+	return days <= MAX_PERIOD_DAYS ? { days, now_ms: end + cost_audit.MS_PER_DAY } : undefined
+}
+
+function relative_span(argv: ReadonlyArray<string>, now_ms: number): AuditSpan | undefined {
+	const days = read_period(argv)
+
+	return days === undefined ? undefined : { days, now_ms }
+}
+
+// `--since` and `--until` together, never one alone or beside `--period`.
+function absolute_span(values: SpanValues): AuditSpan | undefined {
+	const { period, since, until } = values
+
+	if (since === undefined || until === undefined || period !== undefined) return undefined
+
+	return dated_span(since, until)
+}
+
+// The period the audit reads: the dated pair, or the trailing `--period` ending now.
+function read_span(argv: ReadonlyArray<string>, now_ms: number): AuditSpan | undefined {
+	const values = cli_flags.values_of(argv, OPTIONS)
+
+	if (values === undefined) return undefined
+
+	const is_dated = values.since !== undefined || values.until !== undefined
+
+	return is_dated ? absolute_span(values) : relative_span(argv, now_ms)
 }
 
 function instant(ms: number): string {
@@ -132,17 +202,17 @@ async function run(
 	cwd: string = process.cwd(),
 	now_ms: number = Date.now(),
 ): Promise<number> {
-	const days = read_period(argv)
+	const span = read_span(argv, now_ms)
 
-	if (days === undefined) {
+	if (span === undefined) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	return printed(printed_lines(argv, await measure(cwd, days, now_ms)))
+	return printed(printed_lines(argv, await measure(cwd, span.days, span.now_ms)))
 }
 
-const cost_audit_cli = { USAGE, read_period, merged_query, run, summary }
+const cost_audit_cli = { USAGE, read_period, read_span, merged_query, run, summary }
 
 export { cost_audit_cli }

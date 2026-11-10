@@ -79,9 +79,10 @@ const SYNC_STEP: Step = {
 		await run_ship_sync.sync_stage(args.number, args.title, state.is_dirty === true),
 }
 
-// A default branch that moved since the sync stage is merged and gated again before the push
-// (`run_ship_sync.catch_up`, joshuafolkken/kit#4825). A resumed ship with nothing left to push leaves
-// that to the followup, which pushes what it merges; a pushed branch with new work still catches up.
+// A default branch that moved since the sync stage with a conflict is merged and gated again before
+// the push; a clean move is left to the merge ref's CI (`run_ship_sync.catch_up`,
+// joshuafolkken/kit#7058). A resumed ship with nothing left to push leaves that to the followup,
+// which pushes what it merges; a pushed branch with new work still catches up.
 // The commit's hooks claim cores with priority (`core-priority.ts`): a short closing stage need not
 // queue behind other lanes' heavy checks (joshuafolkken/kit#5767). `josh git` and its hooks time their
 // own steps under the commit's lap (joshuafolkken/kit#5831).

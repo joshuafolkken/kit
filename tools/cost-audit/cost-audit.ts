@@ -8,6 +8,7 @@ import type { AuditSession } from './cost-audit-read'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import { cost_audit_tool } from './cost-audit-tool'
+import { cost_audit_usage, type UsageBreakdown } from './cost-audit-usage'
 
 // The aggregation half of `josh cost:audit`: one period's cost broken down by session kind, tool
 // category and guard, set beside the period before it, with every row that grew past the regression
@@ -64,6 +65,8 @@ interface Audit {
 	phases: ReadonlyArray<PhaseRow>
 	// The current period's lane delegated units by agent type (joshuafolkken/kit#5971).
 	agents: ReadonlyArray<PhaseRow>
+	// The current period's usage breakdown (joshuafolkken/kit#7042).
+	usage: UsageBreakdown
 }
 
 interface AuditInput {
@@ -206,6 +209,17 @@ function phases_inside(input: AuditInput, window: AuditWindow): Array<PhaseRow> 
 	})
 }
 
+function lane_density(
+	sessions: ReadonlyArray<AuditSession>,
+	current: AuditWindow,
+	previous: AuditWindow,
+): LaneDensity {
+	return {
+		current: cost_audit_density.density_of(inside(sessions, current)),
+		previous: cost_audit_density.density_of(inside(sessions, previous)),
+	}
+}
+
 function audit(input: AuditInput): Audit {
 	const [current_window, previous_window] = windows_of(input.days, input.now_ms)
 	const current = period_cost(input.sessions, current_window)
@@ -213,10 +227,7 @@ function audit(input: AuditInput): Audit {
 
 	return {
 		days: input.days,
-		lane_density: {
-			current: cost_audit_density.density_of(inside(input.sessions, current_window)),
-			previous: cost_audit_density.density_of(inside(input.sessions, previous_window)),
-		},
+		lane_density: lane_density(input.sessions, current_window, previous_window),
 		total: row('total', current.total, previous.total),
 		merges: input.merges,
 		per_merge: per_merge(current, previous, input.merges),
@@ -229,6 +240,9 @@ function audit(input: AuditInput): Audit {
 		},
 		phases: phases_inside(input, current_window),
 		agents: cost_audit_phase.agent_rows_of(inside(input.sessions, current_window)),
+		usage: cost_audit_usage.breakdown_of(input.sessions, (at_ms) =>
+			is_inside(at_ms, current_window),
+		),
 	}
 }
 
@@ -237,7 +251,7 @@ function since_ms(days: number, now_ms: number): number {
 	return windows_of(days, now_ms)[1].start_ms
 }
 
-const cost_audit = { DEFAULT_PERIOD_DAYS, audit, since_ms, windows_of }
+const cost_audit = { DEFAULT_PERIOD_DAYS, MS_PER_DAY, audit, since_ms, windows_of }
 
 export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts }
 export { cost_audit }
