@@ -1,10 +1,11 @@
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_argv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
@@ -14,7 +15,6 @@ import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { split_resolution } from '#scripts/split/split-resolution'
-import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
 import { run_cut_budget } from './run-cut-budget'
@@ -24,8 +24,9 @@ import { run_cut_digest } from './run-cut-digest'
 // the per-test reset — so the setup-boundary suite runs on the same harness as the main suite rather
 // than on a second copy of it.
 
-const make_directory = temporary_directory('suite')
-const scratch = make_directory('run-cut-cli-test-')
+// The path is reserved once per module, but the directory belongs to each suite: under `isolate: false`
+// the cached module outlives the first suite's cleanup, so `install` recreates it and removes it again.
+const scratch = mkdtempSync(path.resolve(PLATFORM_TEMP_ROOT, 'run-cut-cli-test-'))
 const REPOSITORY = path.join(scratch, 'repository.git')
 
 const ISSUE = '1839'
@@ -58,40 +59,65 @@ function lane(): LaneInfo {
 	}
 }
 
-const state = vi.spyOn(run_cut, 'current_state')
-const default_branch = vi.spyOn(git_command, 'get_default_branch')
-const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
-const log_path = vi.spyOn(lane_dispatch_log, 'default_log_path')
-const launch = vi.spyOn(detached_launch, 'launch')
+// The mocks the cases read are created once with the module, and `install` attaches them to the real
+// methods for each suite: under `isolate: false` the cached module outlives the first suite, whose
+// `restoreAllMocks` detaches that suite's spies but leaves these mocks and their implementations intact.
+const state = vi.fn<typeof run_cut.current_state>()
+const default_branch = vi.fn<typeof git_command.get_default_branch>()
+const find_open_lane = vi.fn<typeof lane_registry.find_open_lane>()
+const log_path = vi.fn<typeof lane_dispatch_log.default_log_path>()
+const launch = vi.fn<typeof detached_launch.launch>()
 
 // The pre-gate cut is conditional on the current context, so the suite pins the verdict rather than
 // reading the live session. `over` is the beforeEach default, so a case cuts unless it says otherwise.
-const session_verdict = vi.spyOn(cost_cli, 'session_verdict')
+const session_verdict = vi.fn<typeof cost_cli.session_verdict>()
 // Pinned rather than read from the environment: a suite run by a ship reviewer carries that role, and
 // would take no cut at all. A case that is the reviewer says so once, for its own call.
-const is_reviewer = vi.spyOn(agent_session_role, 'is_reviewer').mockReturnValue(false)
+const is_reviewer = vi.fn<typeof agent_session_role.is_reviewer>().mockReturnValue(false)
 // The stream append a cut makes is spied so the suite writes no event to the real repository; what it
 // pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
-const emit = vi.spyOn(run_event_stream_emit, 'emit')
+const emit = vi.fn<typeof run_event_stream_emit.emit>()
 // The split notice's warning is read off the repository's own lane ledger; a case that got the notice
 // says so (joshuafolkken/kit#4695, joshuafolkken/kit#6602).
-const split_warning = vi.spyOn(split_resolution, 'ledger_warning')
+const split_warning = vi.fn<typeof split_resolution.ledger_warning>()
 // The implementation's budget is read off the repository's own ledger, events and Issue body; no case
 // is over it unless it says so (joshuafolkken/kit#6026).
-const budget_over = vi.spyOn(run_cut_budget, 'over_minutes')
+const budget_over = vi.fn<typeof run_cut_budget.over_minutes>()
 // The review round a cut must not drop is read off the repository's own attestation and ledger; no
 // round is attested unless a case says so (joshuafolkken/kit#4868).
-const is_attested_on = vi.spyOn(review_attest, 'is_attested_on')
-const record_check = vi.spyOn(review_record, 'check')
+const is_attested_on = vi.fn<typeof review_attest.is_attested_on>()
+const record_check = vi.fn<typeof review_record.check>()
 // The digest is read off the session's real transcript; no case carries one unless it says so
 // once (joshuafolkken/kit#5040).
-const own_digest = vi.spyOn(run_cut_digest, 'own_digest').mockReturnValue(undefined)
+const own_digest = vi.fn<typeof run_cut_digest.own_digest>().mockReturnValue(undefined)
 // The section a verdict is followed by is `run_step_section`'s own print; spied so `verdict()` still
 // reads the token, and so a case can pin which section followed it (joshuafolkken/kit#5953).
-const print_section = vi.spyOn(run_step_section, 'print_once').mockReturnValue(0)
-const info = vi.spyOn(console, 'info').mockReturnValue()
+const print_section = vi.fn<typeof run_step_section.print_once>().mockReturnValue(0)
+const info = vi.fn<typeof console.info>()
 
-const errors = vi.spyOn(console, 'error').mockReturnValue()
+const errors = vi.fn<typeof console.error>()
+
+function attach_run_spies(): void {
+	vi.spyOn(run_cut, 'current_state').mockImplementation(state)
+	vi.spyOn(git_command, 'get_default_branch').mockImplementation(default_branch)
+	vi.spyOn(lane_registry, 'find_open_lane').mockImplementation(find_open_lane)
+	vi.spyOn(lane_dispatch_log, 'default_log_path').mockImplementation(log_path)
+	vi.spyOn(detached_launch, 'launch').mockImplementation(launch)
+	vi.spyOn(cost_cli, 'session_verdict').mockImplementation(session_verdict)
+	vi.spyOn(agent_session_role, 'is_reviewer').mockImplementation(is_reviewer)
+	vi.spyOn(run_event_stream_emit, 'emit').mockImplementation(emit)
+}
+
+function attach_review_spies(): void {
+	vi.spyOn(split_resolution, 'ledger_warning').mockImplementation(split_warning)
+	vi.spyOn(run_cut_budget, 'over_minutes').mockImplementation(budget_over)
+	vi.spyOn(review_attest, 'is_attested_on').mockImplementation(is_attested_on)
+	vi.spyOn(review_record, 'check').mockImplementation(record_check)
+	vi.spyOn(run_cut_digest, 'own_digest').mockImplementation(own_digest)
+	vi.spyOn(run_step_section, 'print_once').mockImplementation(print_section)
+	vi.spyOn(console, 'info').mockImplementation(info)
+	vi.spyOn(console, 'error').mockImplementation(errors)
+}
 
 function verdict(): string {
 	return String(info.mock.calls.at(-1)?.[0])
@@ -130,6 +156,7 @@ function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
 }
 
 function write_handoffs(): void {
+	mkdirSync(scratch, { recursive: true })
 	writeFileSync(HANDOFF_PATH, JSON.stringify(HANDOFF))
 	writeFileSync(
 		FINDINGS_HANDOFF_PATH,
@@ -144,11 +171,13 @@ function reset_review(): void {
 	record_check.mockResolvedValue({ status: 'not-required' })
 }
 
-// Registers the suite's hooks and the spies no case reads, from each suite's top level. The scratch
-// directory and the spies the cases read are created when this module is imported.
+// Registers the suite's hooks and spies, and (re)creates the scratch directory, from each suite's top
+// level. The scratch path and the mocks the cases read are created when this module is imported.
 function install(): void {
 	// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
+	attach_run_spies()
+	attach_review_spies()
 	write_handoffs()
 
 	beforeEach(() => {
@@ -171,6 +200,7 @@ function install(): void {
 
 	afterAll(() => {
 		vi.restoreAllMocks()
+		rmSync(scratch, { recursive: true, force: true })
 	})
 }
 

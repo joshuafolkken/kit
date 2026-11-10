@@ -1,3 +1,4 @@
+import { stub_unanswered_batch } from '#scripts/gh/git-gh-issue-batch-graphql-fixture'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { close_completed_epics } from './epic-close'
@@ -37,6 +38,7 @@ function unreadable_notes(): Array<string> {
 }
 
 beforeEach(() => {
+	stub_unanswered_batch()
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	mocked_list.mockResolvedValue(listing_outcome(JSON.stringify([{ number: 200, body: EPIC_BODY }])))
 })

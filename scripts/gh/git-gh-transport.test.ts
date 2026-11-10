@@ -30,6 +30,11 @@ function failure(status: number): Error {
 	return gh_failure.attach(new Error(`status ${String(status)}`), { status })
 }
 
+// `gh` exits non-zero on a GraphQL document with `errors`; the execa error keeps it on `stdout`.
+function exited_with(stdout: string): Error {
+	return new Error('gh exited 1', { cause: Object.assign(new Error('exit 1'), { stdout }) })
+}
+
 function probes(): number {
 	return mocked_api.mock.calls.filter(([request]) => request.body?.includes(PROBE_QUERY)).length
 }
@@ -106,6 +111,34 @@ describe('git_gh_transport.query under auto', () => {
 
 		await expect(git_gh_transport.query(BODY, NOW_MS + 1)).resolves.toBeUndefined()
 		await expect(git_gh_transport.query(BODY, NOW_MS + 2)).resolves.toBe(ANSWER)
+	})
+})
+
+describe('git_gh_transport.query_partial', () => {
+	const PARTIAL =
+		'{"data":{"repository":{"issue1":{},"issue2":null}},"errors":[{"type":"NOT_FOUND"}]}'
+	const FAILED = '{"data":null,"errors":[{"type":"NOT_FOUND"}]}'
+
+	beforeEach(() => {
+		vi.stubEnv(TRANSPORT_ENV_VAR, 'graphql')
+	})
+
+	it('answers the document whose errors sit beside answered data', async () => {
+		mocked_api.mockRejectedValueOnce(exited_with(PARTIAL))
+
+		await expect(git_gh_transport.query_partial(BODY, NOW_MS)).resolves.toBe(PARTIAL)
+	})
+
+	it('leaves a document with no data to REST', async () => {
+		mocked_api.mockRejectedValueOnce(exited_with(FAILED))
+
+		await expect(git_gh_transport.query_partial(BODY, NOW_MS)).resolves.toBeUndefined()
+	})
+
+	it('keeps query answering nothing for the same partial document', async () => {
+		mocked_api.mockRejectedValueOnce(exited_with(PARTIAL))
+
+		await expect(git_gh_transport.query(BODY, NOW_MS)).resolves.toBeUndefined()
 	})
 })
 

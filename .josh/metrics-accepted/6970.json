@@ -1,0 +1,7 @@
+{
+	"reason": "45 classifier-pure test paths listed in the generated tools/test/pure-files.ts (#6970); data entries, no logic",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 45
+	}
+}

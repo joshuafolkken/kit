@@ -1,0 +1,7 @@
+{
+	"reason": "query_partial keeps a batched read's answered aliases when one number does not exist (#6964), plus its tests",
+	"date": "2026-11-09",
+	"growth": {
+		"scripts.code_lines": 41
+	}
+}

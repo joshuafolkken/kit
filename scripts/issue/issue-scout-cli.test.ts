@@ -1,6 +1,7 @@
 import { epic_bundle_fixture } from '#scripts/epic/epic-bundle-fixture'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { stub_unanswered_batch } from '#scripts/gh/git-gh-issue-batch-graphql-fixture'
 import {
 	capped_listing_outcome,
 	listing_of,
@@ -59,6 +60,7 @@ interface ScoutReads {
 }
 
 function stub_reads(backlog: ReadonlyArray<ListingRow>, reads: ScoutReads = {}): void {
+	stub_unanswered_batch()
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(
 		listing_of(reads.epics ?? [EPIC_ROW], reads.is_epic_listing_capped ?? false),
