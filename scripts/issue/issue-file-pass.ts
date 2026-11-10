@@ -126,7 +126,7 @@ function is_candidate_clear(filing: Filing, outcome: ScoutOutcome): boolean {
 }
 
 // The scout's report is printed whatever it finds — by `issue:file --batch` for a filing it scouted —
-// and the filing is held until every candidate it names is declared separate and no open issue
+// and the filing is held until every title match it names is declared separate and no open issue
 // declares its measurement.
 async function is_scout_clear(filing: Filing): Promise<boolean> {
 	const outcome = filing.scouted ?? (await scout_filing(filing))
