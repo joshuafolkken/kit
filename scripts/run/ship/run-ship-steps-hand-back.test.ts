@@ -69,10 +69,10 @@ describe('run_ship_steps — the hand-back hold at a lane’s merge wait', () =>
 		await followup_step().run(ARGS, FRESH)
 
 		const [opened] = vi.mocked(run_ship_stage.mark_merge_waiting).mock.invocationCallOrder
-		const [held] = vi.mocked(lane_hand_back_held.record).mock.invocationCallOrder
+		const [held = 0] = vi.mocked(lane_hand_back_held.record).mock.invocationCallOrder
 
 		expect(lane_hand_back_held.record).toHaveBeenCalledOnce()
-		expect(opened).toBeLessThan(held ?? 0)
+		expect(opened).toBeLessThan(held)
 	})
 
 	it('leaves the mark alone on a ship outside a lane, which frees no seat', async () => {
