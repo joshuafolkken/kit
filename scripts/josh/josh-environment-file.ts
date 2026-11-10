@@ -47,9 +47,9 @@ function load_environment_file(): void {
 	}
 }
 
-// The node flags a spawned command is started with. The `.env` flag is loaded here, into the
-// environment the child inherits, rather than handed to node, whose own loader cannot leave the
-// launch-only keys out.
+// A command's `tsx_arguments`, applied before its in-process import. The `.env` flag is loaded here,
+// into this process's environment, rather than handed to node, whose own loader cannot leave the
+// launch-only keys out; the flags left over are answered.
 function apply_node_flags(flags: ReadonlyArray<string>): ReadonlyArray<string> {
 	const [environment_flag] = OPTIONAL_ENV_FILE_FLAGS
 

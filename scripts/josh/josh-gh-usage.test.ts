@@ -1,6 +1,4 @@
-import { appendFileSync, existsSync } from 'node:fs'
 import { gh_request_tally } from '#scripts/gh/gh-request-tally'
-import { gh_tally_handoff } from '#scripts/gh/gh-tally-handoff'
 import { gh_usage_event, type GhUsageContext, type GhUsageLine } from '#scripts/gh/gh-usage-event'
 import { GH_REQUEST_TIMEOUT_MS, type GhApiRequest } from '#scripts/gh/git-gh-exec'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,8 +10,6 @@ import { josh_gh_usage } from './josh-gh-usage'
 const STARTED_MS = 1_792_999_000_000
 const EXIT_CODE = 3
 const ISSUE = 6707
-const SPAWNED_COMMAND = 'epic:audit'
-const HANDED = { calls: 2, not_modified: 0, endpoints: { graphql: { calls: 2, not_modified: 0 } } }
 
 function recording_write(): {
 	lines: Array<GhUsageLine>
@@ -110,46 +106,6 @@ describe('josh_gh_usage.recorded — a throwing command and the watch', () => {
 		)
 
 		expect(order).toStrictEqual(['watch', 'run'])
-	})
-})
-
-// joshuafolkken/kit#6965: a command the built dispatcher spawns counts its calls in the child.
-describe('josh_gh_usage.from_child — a spawned command', () => {
-	it("records the child's handed calls in the dispatcher's line and removes the handoff file", async () => {
-		const { lines, write } = recording_write()
-		const targets: Array<string> = []
-
-		const exit_code = await josh_gh_usage.recorded(
-			SPAWNED_COMMAND,
-			['6870'],
-			async () =>
-				josh_gh_usage.from_child((environment) => {
-					const target = environment[gh_tally_handoff.HANDOFF_ENV] ?? ''
-
-					targets.push(target)
-					appendFileSync(target, `${JSON.stringify(HANDED)}\n`)
-
-					return EXIT_CODE
-				}),
-			write,
-		)
-
-		expect(exit_code).toBe(EXIT_CODE)
-		expect(lines).toHaveLength(1)
-		expect(lines[0]).toMatchObject({
-			command: SPAWNED_COMMAND,
-			calls: 2,
-			endpoints: HANDED.endpoints,
-		})
-		expect(existsSync(targets[0] ?? '')).toBe(false)
-	})
-
-	it('writes nothing when the child sent no gh call', async () => {
-		const { lines, write } = recording_write()
-
-		await josh_gh_usage.recorded('lint', [], async () => josh_gh_usage.from_child(() => 0), write)
-
-		expect(lines).toHaveLength(0)
 	})
 })
 

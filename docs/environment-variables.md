@@ -209,7 +209,6 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_SHIP_RETRY_PENDING`   | `josh ship`                    | `josh ship` will run this stage again on an infrastructure stop, so the AI review gate sends no confirmation for an unreadable listing.  |
 | `JOSH_SHIP_LAP_SCOPE`       | `josh ship`                    | The lap scope a child process times its steps under, so `lane:breakdown` names the `josh git` step or hook that spent a stage's minutes. |
 | `JOSH_INIT_HANDED_OFF`      | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                      |
-| `JOSH_GH_TALLY_FILE`        | the built `josh` dispatcher    | The file a spawned command appends its GitHub request tally to as it exits, so the dispatcher's `josh gh:usage` line counts its calls.   |
 | `JOSH_ESLINT_MEMORY_CHILD`  | the ESLint memory preload      | `1` marks the ESLint child whose peak RSS is measured, so the preload does not launch another observer.                                  |
 | `JOSH_ESLINT_UNTYPED`       | the edit-time `eslint_d`       | `1`: `create_base_config` drops the TypeScript program, so the daemon holds none; the gate's cold lint never sets it.                    |
 | `JOSH_WORKFLOW`             | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                    |
