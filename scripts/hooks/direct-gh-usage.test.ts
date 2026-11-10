@@ -3,6 +3,7 @@ import path from 'node:path'
 import { gh_usage_log } from '#scripts/gh/gh-usage-log'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { direct_gh_usage } from './direct-gh-usage'
@@ -138,7 +139,9 @@ describe('direct_gh_usage.record — the calls a command line launches', () => {
 
 // joshuafolkken/kit#6973: the log, the test-run check and the lane issue come from the call's context.
 describe('direct_gh_usage.record — the call context', () => {
-	const context = { cwd: '/call/checkout', env: { [lane_child_marker.KEY]: String(LANE_ISSUE) } }
+	const context = hook_context_fixture.of('/call/checkout', {
+		[lane_child_marker.KEY]: String(LANE_ISSUE),
+	})
 
 	it("logs under the context cwd's repository with the context's lane issue", async () => {
 		vi.mocked(lane_child_marker.marked_issue).mockRestore()
@@ -153,7 +156,10 @@ describe('direct_gh_usage.record — the call context', () => {
 	it('writes nothing when the context marks a test run', async () => {
 		const append = vi.spyOn(gh_usage_log, 'append').mockReturnValue(undefined)
 
-		await direct_gh_usage.record(bash_payload(PR_CHECKS), { cwd: '/x', env: { VITEST: 'true' } })
+		await direct_gh_usage.record(
+			bash_payload(PR_CHECKS),
+			hook_context_fixture.of('/x', { VITEST: 'true' }),
+		)
 
 		expect(append).not.toHaveBeenCalled()
 	})

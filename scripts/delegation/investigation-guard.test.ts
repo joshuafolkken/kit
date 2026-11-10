@@ -5,6 +5,7 @@ import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -39,6 +40,7 @@ const { BRANCH, call_line, edit_call_line, error_result_line, result_line, ms, t
 
 const BELOW_THRESHOLD = delegation_policy.INVESTIGATION_FILE_THRESHOLD - 1
 const NOW_MS = ms(59)
+const context_of = hook_context_fixture.of
 const EARLIER_REFUSAL_MS = ms(9)
 const DELEGATION_MINUTE = 20
 const DELEGATION_END_MINUTE = 23
@@ -343,10 +345,9 @@ function at_threshold_payload(name: string): string {
 
 describe('investigation_outcome — the per-call context, not the process (kit#6967)', () => {
 	it('stands down for a reviewer role the context names under a worker process', () => {
-		const reviewer = {
-			cwd: process.cwd(),
-			env: { [agent_session_role.KEY]: agent_role_profile.REVIEWER },
-		}
+		const reviewer = context_of(process.cwd(), {
+			[agent_session_role.KEY]: agent_role_profile.REVIEWER,
+		})
 
 		expect(
 			investigation_outcome(at_threshold_payload('ctx-reviewer'), NOW_MS, reviewer).reason,
@@ -354,7 +355,7 @@ describe('investigation_outcome — the per-call context, not the process (kit#6
 	})
 
 	it('reads its switch from the context environment', () => {
-		const off = { cwd: process.cwd(), env: { [SWITCH_ENV_KEY]: 'off' } }
+		const off = context_of(process.cwd(), { [SWITCH_ENV_KEY]: 'off' })
 
 		expect(
 			investigation_outcome(at_threshold_payload('ctx-off'), NOW_MS, off).reason,
@@ -363,7 +364,7 @@ describe('investigation_outcome — the per-call context, not the process (kit#6
 
 	it('refuses when only the process environment switches it off', () => {
 		process.env[SWITCH_ENV_KEY] = 'off'
-		const on = { cwd: process.cwd(), env: {} }
+		const on = context_of(process.cwd(), {})
 
 		expect(investigation_outcome(at_threshold_payload('ctx-on'), NOW_MS, on).reason).toBe(
 			investigation_reads.REASON,
@@ -376,7 +377,7 @@ function lane_instruction_reason(name: string, cwd: string): string | undefined 
 	const tool_input = { file_path: path.join(LANE_DIRECTORY, 'prompts', 'review.md') }
 	const payload = payload_of(write_transcript(name, at_threshold_lines()), { tool_input })
 
-	return investigation_outcome(payload, NOW_MS, { cwd, env: {} }).reason
+	return investigation_outcome(payload, NOW_MS, context_of(cwd, {})).reason
 }
 
 // The instruction exemption is anchored at the call's checkout, not the process's (kit#6967).

@@ -7,6 +7,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_cut_decline } from '#scripts/run/cut/run-cut-decline'
 import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { implementation_cut } from './implementation-cut'
 import { implementation_cut_verdict } from './implementation-cut-verdict'
@@ -132,7 +133,7 @@ describe('implementation cut candidate', () => {
 		const run = {
 			transcript: NEW_TRANSCRIPT,
 			now_ms: implementation_cut.REISSUE_WINDOW_MS,
-			context: { cwd: CALL_CWD, env: SOURCE },
+			context: hook_context_fixture.of(CALL_CWD, SOURCE),
 		}
 
 		expect(implementation_cut.ROW.decide(call, run, true, 0)).toBe(true)

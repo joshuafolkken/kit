@@ -1,6 +1,7 @@
 import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_spilled_read } from './lane-spilled-read'
@@ -14,8 +15,8 @@ const SPILLED =
 	'/Users/someone/.claude/projects/-Users-someone-kit-lanes-5040/session/tool-results/b3mcr32i7.txt'
 const SOURCE = '/Users/someone/kit/scripts/rules/delivered-rules.ts'
 const PAGE = 40
-const is_lane_child: HookContext = { cwd: '/lanes/5040', env: {} }
-const is_not_lane_child: HookContext = { cwd: '/person', env: {} }
+const is_lane_child: HookContext = hook_context_fixture.of('/lanes/5040', {})
+const is_not_lane_child: HookContext = hook_context_fixture.of('/person', {})
 
 beforeEach(() => {
 	vi.spyOn(lane_child_marker, 'is_child_of').mockImplementation(

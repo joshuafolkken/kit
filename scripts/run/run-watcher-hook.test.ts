@@ -1,6 +1,7 @@
 import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_watcher_guard } from './run-watcher-guard'
@@ -76,6 +77,18 @@ describe('watcher_hook_reason — lanes in-flight, watcher stale', () => {
 		const second = await run_watcher_hook.watcher_hook_reason(payload)
 
 		expect(second).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#6683: a daemon answers calls from many launchers, so the watcher is judged under
+	// the call's own process ancestry, never the answering process's.
+	it("judges the watcher under the call's ancestry", async () => {
+		const check = vi.spyOn(run_watcher_guard, 'check')
+		const context = hook_context_fixture.of(TEMPORARY, {})
+
+		await run_watcher_hook.watcher_hook_reason(fresh_payload(), context)
+
+		expect(check).toHaveBeenCalledWith(LIFE_TARGET, context.ancestry)
+		check.mockRestore()
 	})
 })
 
