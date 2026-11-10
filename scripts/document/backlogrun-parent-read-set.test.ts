@@ -81,7 +81,7 @@ describe('backlogrun_parent_read_set.costed — the reduction', () => {
 	it('reports under the backlogrun label, and drops only the child stages documents', () => {
 		const report = backlogrun_parent_read_set.costed(ROOT)
 		const reached = backlogrun_parent_read_set.REACHED_POINT_OF_USE
-		const skipped = backlogrun_parent_read_set.SKIPPED_POINT_OF_USE
+		const skipped = new Set(['background-commands.md', 'chain-rule.md', 'fullrun.md'])
 		const base = entry_read_set.costed(ROOT, BACKLOGRUN, reached)
 
 		expect(report.entry).toBe(BACKLOGRUN)

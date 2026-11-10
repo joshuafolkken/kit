@@ -80,7 +80,6 @@ function costed(root: string): ReadSetCost {
 const backlogrun_parent_read_set = {
 	BACKLOGRUN,
 	REACHED_POINT_OF_USE,
-	SKIPPED_POINT_OF_USE,
 	UNUSED_SKILL_SECTIONS,
 	costed,
 	printed_sections,
