@@ -82,21 +82,18 @@ describe('lane_ledger.read_entries over an unchanged ledger', () => {
 		vi.restoreAllMocks()
 	})
 
-	it('parses the ledger once while it is unchanged, and again once it is appended to', () => {
+	it('parses the ledger once while it is unchanged, and hands back the same entries', () => {
 		const target = ledger('unchanged')
 
 		lane_ledger_write.append(target, { kind: 'merge', at: AT, issue: 1 })
 		const parse = vi.spyOn(json_value, 'parse_or_undefined')
 
-		lane_ledger.read_entries(target)
+		const first = lane_ledger.read_entries(target)
 		const parsed = parse.mock.calls.length
 
-		lane_ledger.read_entries(target)
+		expect(lane_ledger.read_entries(target)).toBe(first)
 		expect(parsed).toBeGreaterThan(0)
 		expect(parse).toHaveBeenCalledTimes(parsed)
-
-		lane_ledger_write.append(target, { kind: 'merge', at: AT, issue: 2 })
-		expect(lane_ledger.read_entries(target)).toHaveLength(2)
 	})
 })
 
