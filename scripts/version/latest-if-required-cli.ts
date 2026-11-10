@@ -88,7 +88,8 @@ async function update(): Promise<number> {
 	const is_stashed = verdict === stash_push_cli.STASHED_VERDICT
 	const code = run_latest()
 
-	if (code !== SUCCESS_EXIT_CODE) {
+	// A moved overrides block is a full update the check below stops on, after the pop.
+	if (code !== SUCCESS_EXIT_CODE && code !== latest_scope_cli.OVERRIDES_MOVED_EXIT_CODE) {
 		return stop(is_stashed ? `josh latest failed — ${KEPT_STASH_HINT}` : 'josh latest failed')
 	}
 
