@@ -1,3 +1,4 @@
+import { lane_hand_back_hold } from '#scripts/lane/lane-hand-back-hold'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import type { DriveEnd, DrivePorts, DriveState, OfferRead, PassResult } from './backlog-drive'
 import { backlog_ready } from './backlog-ready'
@@ -14,7 +15,8 @@ import { backlog_ready } from './backlog-ready'
 // finished run — a `stop`, the drain's `watch` or `retrospective` — owes no lane a child. Either writes
 // a `released` entry instead, which ends the hold before it: a lane opened outside this driver can
 // fill the pool, and no dispatch of this driver's would end that hold. A full pool's release is written
-// once per hold, so it does not add a line on every pass; the finished run's is written every time.
+// once per hold, so it does not add a line on every pass, and so is a full pool's hand-back, which
+// leaves `lane-hand-back-hold.ts`'s mark beside it; the finished run's is written every time.
 
 const NO_FREE_LANES = 0
 const OFFER_PREFIX = 'offer'
@@ -102,9 +104,11 @@ async function free_count(
 	}
 }
 
+// Every ledger line clears a hand-back mark: a driver writing again is the one recording the lanes.
 async function release(ledger: HoldLedger): Promise<void> {
 	ledger.is_open = false
 	await lane_ledger_write.record_released()
+	await lane_hand_back_hold.clear()
 }
 
 async function release_open(ledger: HoldLedger): Promise<void> {
@@ -135,6 +139,25 @@ async function record(
 
 	ledger.is_open = true
 	await lane_ledger_write.record_held({ reason: draft.reason, waiting: draft.waiting })
+	await lane_hand_back_hold.clear()
+}
+
+// A hand-back on a full pool releases an open hold, then marks the lanes as waiting on a session: a
+// lane freed after this driver ends has no driver to record it (joshuafolkken/kit#7159). A closed hold
+// is not released again — a `released` line reads as an offer's answer in `lane-gap-stats.ts`.
+async function hand_back(
+	ledger: HoldLedger,
+	reason: string | undefined,
+	count: number | undefined,
+): Promise<void> {
+	if (reason === undefined || count !== NO_FREE_LANES) {
+		await record(ledger, { reason }, count)
+
+		return
+	}
+
+	await release_open(ledger)
+	await lane_hand_back_hold.mark(reason)
 }
 
 // The production `hold` port and the driver's end, sharing whether a hold is open. Best-effort like
@@ -151,7 +174,9 @@ function recorder(
 	return {
 		hold: write,
 		end: async (end) => {
-			await write(hand_back_reason(end))
+			const reason = hand_back_reason(end)
+
+			await hand_back(ledger, reason, await free_count(free_lanes, reason))
 		},
 	}
 }
