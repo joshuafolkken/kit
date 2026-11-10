@@ -189,6 +189,28 @@ describe('git_gh_transport.label', () => {
 	})
 })
 
+// joshuafolkken/kit#7150: the login the cache record is keyed under costs one `gh config get` per host.
+function config_reads(host: string): number {
+	return mocked_command.mock.calls.filter(([arguments_]) => arguments_.includes(host)).length
+}
+
+describe('git_gh_transport login', () => {
+	const OTHER_HOST = 'ghe.example.com'
+
+	it('runs gh config get at most once per host within the process', async () => {
+		await git_gh_transport.current(NOW_MS)
+		await git_gh_transport.known(NOW_MS + 1)
+		await git_gh_transport.label(NOW_MS + 2)
+		expect(config_reads('github.com')).toBe(1)
+
+		vi.stubEnv('GH_HOST', OTHER_HOST)
+		await git_gh_transport.known(NOW_MS + 3)
+		await git_gh_transport.known(NOW_MS + 4)
+		expect(config_reads(OTHER_HOST)).toBe(1)
+		expect(mocked_command).toHaveBeenCalledTimes(2)
+	})
+})
+
 describe('git_gh_transport.known', () => {
 	it('answers the kept transport under auto, and none before the probe, without probing', async () => {
 		await expect(git_gh_transport.known(NOW_MS)).resolves.toBeUndefined()

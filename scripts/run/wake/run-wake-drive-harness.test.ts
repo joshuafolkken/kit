@@ -115,6 +115,11 @@ function wake_ports(world: World): LoopPorts {
 
 			return { kind: 'launched', pid: 1 }
 		},
+		wake_beside: () => {
+			world.agents += 1
+
+			return { kind: 'launched', pid: 1 }
+		},
 		sleep: async () => undefined,
 		now: () => NOW,
 		retry_closes: async () => undefined,

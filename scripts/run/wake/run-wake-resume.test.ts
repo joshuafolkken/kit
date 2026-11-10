@@ -1,10 +1,12 @@
 import path from 'node:path'
 import { josh_command } from '#scripts/josh/josh-run'
+import { process_identity } from '#scripts/josh/process-identity'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_wake_driver } from './run-wake-driver'
+import { run_wake_resume } from './run-wake-resume'
 
 const make_directory = temporary_directory()
 
@@ -13,6 +15,8 @@ const STARTED = new Date('2026-11-07T00:00:00.000Z')
 const LATER = new Date('2026-11-07T01:00:00.000Z')
 const PARKED = 'merge over #2509\nresume: --owner 1 --exclude 2508'
 const SETTLED = 'merge over #2509\nresume: --owner 1'
+const TRIAGE_PID = 4242
+const TRIAGE_START = 'Tue Nov 10 09:00:00 2026'
 const scratch = { target: '' }
 
 beforeEach(() => {
@@ -69,6 +73,26 @@ test('re-drives a busy verdict with the parked-child triage still owed', async (
 	await run_wake_driver.drive(scratch.target, no_pause)
 
 	expect(args_of(subprocess, 1)).toContain('--triage-owed')
+})
+
+test('drives the pass after a triage with the triage session named on the kept line', async () => {
+	const subprocess = driver_returns('triage\nresume: --owner 1 --exclude 2508', SETTLED)
+
+	vi.spyOn(process_identity, 'read_start').mockReturnValue(TRIAGE_START)
+
+	expect(await run_wake_driver.drive(scratch.target)).toMatchObject({ kind: 'triage' })
+	const read = run_carry.read_carry(scratch.target)
+	if (read.kind === 'carried') run_wake_resume.name_beside(scratch.target, read.carry, TRIAGE_PID)
+	await run_wake_driver.drive(scratch.target)
+
+	expect(args_of(subprocess, 1).slice(-6)).toStrictEqual([
+		'--exclude',
+		'2508',
+		'--triage-pid',
+		String(TRIAGE_PID),
+		'--triage-start',
+		'Tue_Nov_10_09:00:00_2026',
+	])
 })
 
 test('restarts the idle watch rather than carrying the last activity into the next pass', async () => {

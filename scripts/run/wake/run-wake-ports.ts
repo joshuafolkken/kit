@@ -11,6 +11,7 @@ import type { WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
 import type { LoopPorts } from './run-wake-loop'
+import { run_wake_resume } from './run-wake-resume'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 // The production ports of the supervisor's loop (`run-wake-loop.ts` → `LoopPorts`), and the session
@@ -46,22 +47,57 @@ function session_owner(
 	})
 }
 
-function wake_session(
+interface Session {
+	id: string
+	material: string
+	// The headless mark is what lets the stop hook hold this session's turn open while its lanes run —
+	// under `claude -p` a turn-end is the process's end (`run-headless.ts`).
+	environment: Record<string, string>
+}
+
+function launch_session(
 	context: WakeContext,
 	invocation: string,
 	profile: AgentProfile,
-	session: { id: string; material: string },
+	session: Session,
 ): LaunchResult {
 	const built = run_wake_session.wake_argv(invocation, profile, context.worktree, session)
 
 	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
 
-	// The headless mark is what lets the stop hook hold this session's turn open while its lanes run —
-	// under `claude -p` a turn-end is the process's end (`run-headless.ts`).
-	const environment = run_headless.environment()
-	const target = { cwd: context.worktree, env: environment, log_path: context.log_target }
-	const result = run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
+	const target = { cwd: context.worktree, env: session.environment, log_path: context.log_target }
+
+	return run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
+}
+
+// **A triage session takes no record** (joshuafolkken/kit#7120): its process is named on the driver's
+// kept resume line instead, so the driver this supervisor runs next holds back what that triage could
+// change until the process has ended. It starts marked as beside the driver, so its turn-end never
+// cuts the record the supervisor still owns (`run-headless.ts`).
+function wake_beside(
+	context: WakeContext,
+	invocation: string,
+	profile: AgentProfile,
+	session: Session,
+): LaunchResult {
+	const result = launch_session(context, invocation, profile, session)
+	const read = run_carry.read_carry(context.carry_target)
+
+	if (result.kind === 'launched' && read.kind === 'carried') {
+		run_wake_resume.name_beside(context.carry_target, read.carry, result.pid)
+	}
+
+	return result
+}
+
+function wake_session(
+	context: WakeContext,
+	invocation: string,
+	profile: AgentProfile,
+	session: Session,
+): LaunchResult {
+	const result = launch_session(context, invocation, profile, session)
 
 	if (result.kind === 'launched') {
 		run_wake_handoff.hand_on(
@@ -88,6 +124,29 @@ function is_session_at_work(carry: RunCarry): boolean {
 	return run_carry.is_held_by_another(carry) && run_wake_handoff.has_session_begun(carry)
 }
 
+type SessionPorts = Pick<LoopPorts, 'new_session_id' | 'hand_off' | 'wake' | 'wake_beside'>
+
+function session_ports(context: WakeContext, profile: AgentProfile): SessionPorts {
+	return {
+		new_session_id: () => randomUUID(),
+		hand_off: (session_id) => {
+			run_wake_handoff.hand_to(context.carry_target, session_owner(context, profile, session_id))
+		},
+		wake: (invocation, session_id, material) =>
+			wake_session(context, invocation, profile, {
+				id: session_id,
+				material,
+				environment: run_headless.environment(),
+			}),
+		wake_beside: (invocation, session_id, material) =>
+			wake_beside(context, invocation, profile, {
+				id: session_id,
+				material,
+				environment: run_headless.beside_environment(),
+			}),
+	}
+}
+
 // **A record this supervisor owns itself is not a session at work.** A failed driver leaves the record
 // adopted for this process, so reading that owner as live would have every restarted pass wait on
 // itself and never drive again.
@@ -108,13 +167,8 @@ function ports_for(
 		read_carry: () => run_carry.read_carry(context.carry_target),
 		is_owner_live: (read) => read.kind === 'carried' && is_session_at_work(read.carry),
 		has_work: async () => true,
-		new_session_id: () => randomUUID(),
-		hand_off: (session_id) => {
-			run_wake_handoff.hand_to(context.carry_target, session_owner(context, profile, session_id))
-		},
+		...session_ports(context, profile),
 		drive: async () => await run_wake_driver.drive(context.carry_target, poll.sleep, is_planning),
-		wake: (invocation, session_id, material) =>
-			wake_session(context, invocation, profile, { id: session_id, material }),
 		sleep: poll.sleep,
 		now: () => new Date(),
 		retry_closes,

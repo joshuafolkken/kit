@@ -20,6 +20,10 @@ const HEADLESS_VALUE = '1'
 // owner is its ancestor too; the mark keeps it from reading as the `backlogrun` parent the way a lane
 // child's own mark does (`driving_carry`).
 const HANDOFF_CHILD_KEY = 'JOSH_HANDOFF_CHILD'
+// A triage session `run:wake` started beside its driver (joshuafolkken/kit#7120). It runs under the
+// supervisor that owns the record, so without the mark its turn-end would cut the record the
+// still-running driver holds.
+const BESIDE_CHILD_KEY = 'JOSH_BESIDE_CHILD'
 const SESSION_CUT = { cuts: 1 }
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
@@ -35,11 +39,18 @@ function handoff_child_environment(): Record<string, string | undefined> {
 	return { [HEADLESS_ENV_KEY]: undefined, [HANDOFF_CHILD_KEY]: HEADLESS_VALUE }
 }
 
-// A lane child or a hand-off child: a session started under the parent that is never the parent.
+// The fragment a triage session beside the driver starts with: headless, and marked as beside it.
+function beside_environment(): Record<string, string> {
+	return { ...environment(), [BESIDE_CHILD_KEY]: HEADLESS_VALUE }
+}
+
+// A lane child, a hand-off child or a triage session beside the driver: a session started under the
+// parent that is never the parent.
 function is_started_child(source: EnvironmentSource): boolean {
 	return (
 		lane_child_marker.marked_issue(source) !== undefined ||
-		source[HANDOFF_CHILD_KEY] === HEADLESS_VALUE
+		source[HANDOFF_CHILD_KEY] === HEADLESS_VALUE ||
+		source[BESIDE_CHILD_KEY] === HEADLESS_VALUE
 	)
 }
 
@@ -179,6 +190,7 @@ async function hand_back_at_turn_end(
 
 const run_headless = {
 	HEADLESS_ENV_KEY,
+	beside_environment,
 	current_carry,
 	hand_back_at_turn_end,
 	driven_here,

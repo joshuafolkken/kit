@@ -2,16 +2,19 @@ import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
+import { process_identity } from '#scripts/josh/process-identity'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
+import { run_headless } from '#scripts/run/run-headless'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_ports } from './run-wake-ports'
+import { run_wake_resume } from './run-wake-resume'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 const make_directory = temporary_directory()
@@ -115,6 +118,50 @@ describe('the supervisor handing the record to a judgment session', () => {
 		ports.wake(INVOCATION, SID, MATERIAL)
 
 		expect(ports.is_owner_live(ports.read_carry())).toBe(false)
+	})
+})
+
+// Wake a triage session beside the driver through the real port, after a `triage` hand-back kept its
+// resume line.
+function wake_beside(): ReturnType<typeof vi.spyOn> {
+	const target = context().carry_target
+	const carry = run_carry.begin_carry(target, INVOCATION, run_carry.NO_OWNER, new Date())
+	if (carry === undefined) throw new Error('Missing carry record')
+
+	run_wake_resume.remember(target, carry, { code: 0, out: 'triage\nresume: --owner 1' })
+	vi.spyOn(process_identity, 'read_start').mockReturnValue(undefined)
+	const launch = vi
+		.spyOn(run_wake_session, 'launch')
+		.mockReturnValue({ kind: 'launched', pid: SESSION_PID })
+
+	run_wake_ports.ports_for(context(), PROFILE).wake_beside(INVOCATION, SID, MATERIAL)
+
+	return launch
+}
+
+// joshuafolkken/kit#7120: a triage session wakes beside the driver — named on the kept resume line,
+// marked as beside it, and never handed the record.
+describe('the supervisor waking a triage session beside the driver', () => {
+	it('names the launched session on the kept resume line', () => {
+		wake_beside()
+		const read = run_carry.read_carry(context().carry_target)
+		const line =
+			read.kind === 'carried' ? run_wake_resume.stored(context().carry_target, read.carry) : ''
+
+		expect(line).toBe(`resume: --owner 1 --triage-pid ${String(SESSION_PID)}`)
+	})
+
+	it('hands the record to no one', () => {
+		wake_beside()
+		const read = run_carry.read_carry(context().carry_target)
+
+		expect(read.kind === 'carried' ? read.carry.owner_pid : SESSION_PID).toBeUndefined()
+	})
+
+	it('launches the session marked as beside the driver', () => {
+		const launch = wake_beside()
+
+		expect(launch.mock.calls[0]?.[0]).toMatchObject({ env: run_headless.beside_environment() })
 	})
 })
 
