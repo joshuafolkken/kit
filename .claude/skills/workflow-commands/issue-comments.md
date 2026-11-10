@@ -56,7 +56,8 @@ reopen undoes the close. **Anything else leaves it OPEN with the label**, the re
 
 **Commit nothing, push nothing, open no pull request** — run one command; it posts the evidence,
 applies `already-done` and closes the Issue when the citation checks, and releases the hold, in that
-order, stopping at the first failure:
+order, stopping at a failed comment or label; a failed close leaves the labelled Issue OPEN and
+still releases the hold:
 
 ```bash
 pnpm josh issue:already-done <N> --evidence-file .josh/tmp/evidence.md

@@ -3,6 +3,6 @@
 	"date": "2026-11-10",
 	"growth": {
 		"scripts.code_lines": 43,
-		"ai_cost.on_demand_bytes": 25
+		"ai_cost.on_demand_bytes": 108
 	}
 }
