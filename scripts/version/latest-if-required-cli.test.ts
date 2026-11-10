@@ -15,6 +15,7 @@ const { STASH_MESSAGE } = latest_if_required_cli
 const SPAWNED_LATEST = ['pnpm', ['josh', 'latest'], { stdio: 'inherit', reject: false }]
 const PINS_INTACT = { is_overrides_moved: false, is_engines_moved: false }
 const PIN_MOVED = 'a protected pin moved'
+const LATEST_FAILED = 'josh latest failed'
 
 function answer_scope(scope: 'required' | 'skip'): void {
 	vi.spyOn(latest_scope_cli, 'scope_decision').mockReturnValue({ scope, reason: 'test reason' })
@@ -161,6 +162,26 @@ describe('josh latest:if-required answers the dependency-update check', () => {
 	})
 })
 
+// joshuafolkken/kit#7148: `josh latest` exits on its own code when the overrides moved — a full
+// update, so the stash is popped and the check stops, rather than a failed update.
+describe('josh latest:if-required on josh latest exiting on moved overrides', () => {
+	it('pops the stash and stops on the moved-pin answer', async () => {
+		answer_scope('required')
+		latest_exits(latest_scope_cli.OVERRIDES_MOVED_EXIT_CODE)
+		vi.mocked(overrides_diff_report.report).mockReturnValue({
+			is_overrides_moved: true,
+			is_engines_moved: false,
+		})
+
+		const code = await latest_if_required_cli.run([])
+
+		expect(code).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(stash_pop_cli.run)).toHaveBeenCalledWith([STASH_MESSAGE])
+		expect(stderr_text()).toContain(PIN_MOVED)
+		expect(stderr_text()).not.toContain(LATEST_FAILED)
+	})
+})
+
 describe('josh latest:if-required stops with the stash kept', () => {
 	it('stops and names the stash when the pop conflicts', async () => {
 		answer_scope('required')
@@ -192,7 +213,7 @@ describe('josh latest:if-required stops with the stash kept', () => {
 
 		expect(code).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(stash_pop_cli.run)).not.toHaveBeenCalled()
-		expect(stderr_text()).toContain('josh latest failed')
+		expect(stderr_text()).toContain(LATEST_FAILED)
 	})
 })
 

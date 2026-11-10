@@ -1,8 +1,9 @@
 import { epic_child_schema, type EpicChildData } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 import {
 	git_gh_issue_read as git_gh_issue,
 	NOT_FOUND_STATUS,
@@ -34,6 +35,10 @@ vi.mock('./git-gh-etag-read', () => ({
 
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const mocked_status = vi.mocked(git_gh_exec.exec_gh_api_status)
+
+beforeEach(() => {
+	git_gh_issue_memo.forget()
+})
 
 const OTHER_REPO = 'joshuafolkken/app-kit'
 const ISSUE_PATH = `${CURRENT_REPO_ISSUES}/${String(ISSUE_NUMBER)}`

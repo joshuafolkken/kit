@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
 import { git_gh_exec } from './git-gh-exec'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 import { git_gh_issue_read, read_blocked_by } from './git-gh-issue-read'
 import { git_gh_issue_rest } from './git-gh-issue-rest'
 import {
@@ -35,7 +36,10 @@ function sent_etags(): Array<string | undefined> {
 	return vi.mocked(git_gh_conditional.read_conditional).mock.calls.map(([, etag]) => etag)
 }
 
+// Each read stands for the next process, which starts with no issue read remembered
+// (`git-gh-issue-memo.ts`).
 async function blocker_states(): Promise<Array<string>> {
+	git_gh_issue_memo.forget()
 	const blocked_by = await read_blocked_by(READ_NUMBER, BLOCKED_REST)
 
 	return blocked_by.nodes.map((node) => `${String(node.number)}:${node.state}`)
@@ -44,6 +48,7 @@ async function blocker_states(): Promise<Array<string>> {
 beforeEach(() => {
 	vi.restoreAllMocks()
 	shared_cache_fixture.keep_in_memory()
+	git_gh_issue_memo.forget()
 })
 
 describe('read_blocked_by — the previous ETag', () => {
@@ -94,6 +99,7 @@ describe('git_gh_issue_read — the issue GET through the ETag layer', () => {
 		serve({ kind: 'changed', etag: FIRST_ETAG, body: rest_issue() }, { kind: 'unchanged' })
 
 		expect(await git_gh_issue_read.issue_get_title(READ_NUMBER)).toBe(ISSUE_TITLE)
+		git_gh_issue_memo.forget()
 		expect(await git_gh_issue_read.issue_get_title(READ_NUMBER)).toBe(ISSUE_TITLE)
 		expect(sent_etags()).toStrictEqual([undefined, FIRST_ETAG])
 	})
