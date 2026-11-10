@@ -55,7 +55,8 @@ An interrupt filed for a parked child turns the park into a wait — `issue:file
 
 **`needs-decision` means "a person has to choose", and nothing else.** It carries only:
 
-- a Tier B toss-up with no recommendation, or a Tier C action (decision-autonomy below);
+- a Tier B toss-up with no recommendation, or a Tier C action (decision-autonomy below) — the
+  driver decides the first only once (`A park the driver decides`);
 - an upstream defect in another package, whose wait-or-defer is the person's (`upstream-interrupt.md`);
 - information only the web holds — no lane launches a web tool (`scripts/agent/claude-agent-argv.ts`),
   so a person fetches it.
@@ -90,10 +91,17 @@ file. An option whose `必要な権限` starts with `親` → carry it out first
 `--done <what was done>`. A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
 decision, `run:park <N> --clear`, `run:add <N> --retry`.
 
+### A park the driver decides
+
+A `parked` child whose park recommends a tier A option needing no permission, or says `推奨なし` over a
+reversible option needing none and no size approval → `backlog:drive` decides it once per issue, records `Auto-decided: …`
+and notifies afterwards (`backlog-drive-after-merge.ts`, `run_park_body.default_pick`). A person
+overrides it with a later decision comment (`issue-comments.md`).
+
 ### A park left for a person
 
-`推奨なし`, a trust or security setting, an upstream defect, a third-party write, a destructive
-operation, or web-only information.
+`推奨なし` with no option the driver may take, a second park after its decision, a trust or security
+setting, an upstream defect, a third-party write, a destructive operation, or web-only information.
 
 ## `in-progress` is removed by whoever finds it stale
 
