@@ -86,7 +86,7 @@ Two figures under one definition, which is what makes a before and an after comp
 - `total read` sums the scoped entry read and the point-of-use documents that entry actually reaches — the figure a before/after compares.
 - **Every row and the total carry a per-run dollar figure** — the cache-read rate times the run size the report states.
 - **`lane-child` is a synthetic entry**: it prints the trimmed set a dispatched lane child reads.
-- **`backlogrun` prints a trimmed parent set**: the parent never implements, so it skips `SKILL.md` §3. It is a _different_ trim from the lane child's — the parent keeps §0 and drops no point-of-use document.
+- **`backlogrun` prints a trimmed parent set**: the parent never implements, so it skips `SKILL.md` §3. It is a _different_ trim from the lane child's — the parent keeps §0, drops only the documents of its children's stages (`chain-rule.md`, `background-commands.md`, `fullrun.md`), and also charges the sections `run:step` prints at its own stages.
 
 **Output / exit codes:** an unrecognized keyword is refused with the known ones listed, rather than reporting a saving of zero.
 
