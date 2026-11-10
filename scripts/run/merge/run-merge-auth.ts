@@ -9,7 +9,8 @@ import { run_merge_usage_limit } from './run-merge-usage-limit'
 // are held as a usage limit holds them (`run-merge-usage-limit.ts`), re-tried every `RECHECK_MS` —
 // the run does not stop, so it resumes by itself once a person has run `/login` (joshuafolkken/kit#7078).
 // `/login` is a person's to run, so the first such hold since the last merge is pushed as a
-// `confirmation`; later ones are not, so a long wait sends it once and a failure after recovery again. **It is no `OUTAGE`**: the per-child cap counts those
+// `confirmation` and later ones are not: a long wait sends it once, and an authentication failure
+// after a merge sends it again. **It is no `OUTAGE`**: the per-child cap counts those
 // (`run-merge-cap.ts`). Script-emitted, so English.
 
 const LIMIT = 'authentication failure'
