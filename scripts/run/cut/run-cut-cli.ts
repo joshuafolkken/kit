@@ -15,7 +15,6 @@ import { run_step_section } from '#scripts/run/run-step-section'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { run_cut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
-import { run_cut_budget } from './run-cut-budget'
 import { run_cut_decline } from './run-cut-decline'
 import { run_cut_digest } from './run-cut-digest'
 import { run_cut_handoff } from './run-cut-handoff'
@@ -40,7 +39,6 @@ import { run_cut_review } from './run-cut-review'
 const ARGV_OFFSET = 2
 const COMMAND = 'run:cut'
 
-const { BUDGET_OVER_VERDICT } = run_cut_budget
 const {
 	BAD_HANDOFF_VERDICT,
 	BUSY_VERDICT,
@@ -96,17 +94,14 @@ function verdict_answer(verdict: CostVerdict): number | undefined {
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
 //
 // **An unanswered split notice is printed as a warning and the cut goes on** (joshuafolkken/kit#6602):
-// size alone never stops a started Issue. **An implementation past its budget with a green part ships it**
-// (joshuafolkken/kit#6026) rather than resuming into the rest — elapsed time, not size. Returns the
-// answer given without cutting, or `undefined`.
+// size alone never stops a started Issue. **Nor does an implementation past its budget**
+// (joshuafolkken/kit#7010): the overrun stays in `lane:stats` / `lane:breakdown` only, and a started
+// Issue is implemented to the end. Returns the answer given without cutting, or `undefined`.
 async function pre_gate_answer(issue: string, phase: string): Promise<number | undefined> {
 	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
 	const split_note = await split_resolution.ledger_warning(Number(issue))
 
 	if (split_note !== undefined) console.error(split_note)
-	const over = await run_cut_budget.over_minutes(Number(issue))
-
-	if (over !== undefined) return run_cut_budget.report_over(issue, over)
 
 	return verdict_answer(cost_cli.session_verdict())
 }
@@ -407,7 +402,6 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const run_cut_cli = {
 	BAD_HANDOFF_VERDICT,
-	BUDGET_OVER_VERDICT,
 	BUSY_VERDICT,
 	CUT_VERDICT,
 	ENDED_VERDICT,

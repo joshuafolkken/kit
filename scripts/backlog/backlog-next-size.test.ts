@@ -38,6 +38,7 @@ const REPO = 'joshuafolkken/kit'
 const SLOW: ImplementRate = { median: 3.75, lanes: 4 }
 const FAST: ImplementRate = { median: 0.75, lanes: 3 }
 const BUDGET_NOTE = 'projected over the implement budget'
+const HELD_REMEDY = 'split it and file the parts again, or declare `- 分割しない理由: <理由>`'
 const MEASURED_GUIDE_NOTE = 'more than 9.6 files or 240 lines'
 const EXCEEDS_CAP = 'exceeds the cap'
 const EXCEEDS_GUIDE = 'exceeds the guide'
@@ -131,10 +132,10 @@ describe('backlog:next over the guide', () => {
 	})
 })
 
-// joshuafolkken/kit#6066: an unreasoned issue projected over the implement budget is noted; the reason
-// excuses the budget as it does the guide (joshuafolkken/kit#6602).
+// joshuafolkken/kit#7006: an unreasoned issue projected over the implement budget is withheld, as one
+// over the cap is; the reason excuses the budget as it does the guide (joshuafolkken/kit#6602).
 describe('backlog:next with a measured implement rate', () => {
-	it('warns on budget alone for an estimate within the guide floor', async () => {
+	it('withholds an issue over the budget alone and says what to do', async () => {
 		const body = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）'
 
 		backlog_fixture.stub_backlog({
@@ -143,9 +144,10 @@ describe('backlog:next with a measured implement rate', () => {
 		})
 		await backlog_next.run([])
 
-		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.stop)
+		expect(stderr()).toContain('not offered: size estimate 1 file(s) / 70 line(s)')
 		expect(stderr()).toContain(BUDGET_NOTE)
-		expect(stderr()).not.toContain(EXCEEDS_GUIDE)
+		expect(stderr()).toContain(HELD_REMEDY)
 	})
 
 	it('notes nothing on a reasoned issue projected over the implement budget', async () => {
@@ -164,13 +166,13 @@ describe('backlog:next with a measured implement rate', () => {
 		expect(stderr()).not.toContain(OVER_NOTE)
 	})
 
-	it('keeps the guide note on an unreasoned issue', async () => {
+	it('withholds an unreasoned issue over the guide and the budget', async () => {
 		backlog_fixture.stub_backlog({ opted_in: [sized()], implement_rate: SLOW })
 		await backlog_next.run([])
 
-		expect(stderr()).toContain('with no `- 分割しない理由:`')
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.stop)
 		expect(stderr()).toContain(MEASURED_GUIDE_NOTE)
-		expect(stderr()).not.toContain(BUDGET_NOTE)
+		expect(stderr()).toContain(BUDGET_NOTE)
 	})
 })
 
@@ -202,11 +204,11 @@ describe('backlog:next with measured size limits', () => {
 	it('warns a split child with the measured guide while exempting it from the cap', async () => {
 		const child = { ...sized_at(25), labels: [{ name: SPLIT_ROUTE_LABEL }] }
 
-		backlog_fixture.stub_backlog({ opted_in: [child], implement_rate: SLOW })
+		backlog_fixture.stub_backlog({ opted_in: [child], implement_rate: { median: 2.5, lanes: 4 } })
 		await backlog_next.run([])
 
 		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
-		expect(stderr()).toContain(MEASURED_GUIDE_NOTE)
+		expect(stderr()).toContain('more than 14.4 files or 360 lines')
 		expect(stderr()).toContain('split it further')
 		expect(stderr()).not.toContain(EXCEEDS_CAP)
 	})
@@ -338,6 +340,13 @@ describe('backlog_next_size.held_children', () => {
 			new Set([epic_graph.key_of(over)]),
 		)
 		expect(stderr()).toContain('exceeds the cap (more than 14.399999999999999 files or 360 lines)')
+	})
+
+	it('holds an epic child within the cap projected over the budget (joshuafolkken/kit#7006)', () => {
+		const over = epic_child(6, [])
+
+		expect(backlog_next_size.held_children([over], SLOW).size).toBe(1)
+		expect(stderr()).toContain(BUDGET_NOTE)
 	})
 
 	it('holds no reasoned epic child over the cap (joshuafolkken/kit#6602)', () => {

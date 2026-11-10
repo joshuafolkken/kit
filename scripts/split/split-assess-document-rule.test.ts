@@ -1,3 +1,5 @@
+import { readdirSync } from 'node:fs'
+import { package_file } from '#scripts/claude/skill-fixture'
 import { read_repo_file } from '#scripts/document/ai-document-fixture'
 import { decision_oracle } from '#scripts/rules/decision-oracle'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +8,8 @@ import { split_assess } from './split-assess'
 // joshuafolkken/kit#2218: the acceptance criterion "split-assessment.md carries a route to this
 // command" is pinned so the pointer cannot be dropped, and the oracle entry stays registered.
 
-const SPLIT_ASSESSMENT = '.claude/skills/workflow-commands/split-assessment.md'
+const WORKFLOW_COMMANDS = '.claude/skills/workflow-commands'
+const SPLIT_ASSESSMENT = `${WORKFLOW_COMMANDS}/split-assessment.md`
 const ISSUE_TEMPLATE = 'prompts/collaboration-workflow/issue-template.md'
 const COMMAND = 'split:assess'
 
@@ -36,6 +39,22 @@ describe('split-assessment.md carries the pre-gate notice steps', () => {
 		)
 		expect(document).not.toContain('split-unresolved')
 		expect(document).not.toContain('Stop implementation before')
+	})
+
+	// joshuafolkken/kit#7011: size is judged before implementation only, stated in this one place.
+	it('states once that a started implementation never splits or stops for size', () => {
+		const document = read_repo_file(SPLIT_ASSESSMENT)
+
+		expect(document).toContain('at filing (`issue:file`) and at `lane:plan`')
+		expect(document).toContain('never splits, spills or stops for size')
+	})
+
+	it('leaves no mid-implementation split or spill guidance in the other workflow documents', () => {
+		const guided = readdirSync(package_file(WORKFLOW_COMMANDS)).filter((name) =>
+			/split notice|issue:spill/u.test(read_repo_file(`${WORKFLOW_COMMANDS}/${name}`)),
+		)
+
+		expect(guided).toEqual([])
 	})
 
 	it('lets one verified deliverable answer the notice without a child (ac-75da8719)', () => {

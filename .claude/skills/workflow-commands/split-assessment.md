@@ -44,14 +44,17 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 
 ## Over the guide before the gate
 
-**Trigger: `run:cut` or `run:chain` repeats the `split notice` `lane:plan` recorded** while the
+**Size is judged at filing (`issue:file`) and at `lane:plan` only.
+Once implementation has started, the run never splits, spills or stops for size.**
+
+**Trigger: `run:cut` or `run:chain` repeats the size notice `lane:plan` recorded** while the
 branch's diff, untracked files included, still passes the Issue's declared size × the growth factor,
 capped at the guide (no declaration: the guide), on either axis. Scoped checks and `main:merge` print
 none. The notice is a warning, not a stop: go on implementing;
 review and ship print it and proceed.
 
 - Split again only for an independent added requirement, or scope growth this Issue cannot verify:
-  file it with `pnpm josh issue:file --route split --found-during <N>`.
+  file it with `pnpm josh issue:file --route split --found-during <N>`, and finish this Issue.
   On its direction refusal → `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.
   On its duplicate refusal → `issue-fold-existing.md`, applying with `--apply <M> --found-during <N>`.
 - Size alone is never that reason; a re-plan needs no `--size-approval`.
