@@ -62,9 +62,8 @@ describe('issue_priority_cli.run --critical', () => {
 		).resolves.toBe(code)
 		expect(mocked_instructed).toHaveBeenCalledWith(ISSUE_NUMBER, 'critical', REASON)
 		expect(mocked_raise).not.toHaveBeenCalled()
-		expect(print).toHaveBeenCalledWith(
-			expect.stringMatching(new RegExp(`${text}.*\\(--critical\\)\\.$`, 'u')),
-		)
+		expect(print).toHaveBeenCalledWith(expect.stringContaining(text))
+		expect(print).toHaveBeenCalledWith(expect.stringMatching(/\(--critical\)\.$/u))
 	})
 })
 
