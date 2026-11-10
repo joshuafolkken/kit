@@ -289,7 +289,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			"Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line",
 		category: 'AI tools',
 		reference: [
-			`<issue> --estimate "<F> ファイル / <L> 行" [${DISTINCT}]`,
+			`<issue> --estimate "<F> ファイル / <L> 行" [--reason "<理由>"] [${DISTINCT}]`,
 			'automation',
 			['network'],
 		],
@@ -300,6 +300,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--estimate "<F> ファイル / <L> 行"'],
 					description:
 						"the follow-up's size estimate, never apportioned from the issue's. Required.",
+				},
+				{
+					names: ['--reason "<理由>"'],
+					description:
+						"the follow-up's `- 分割しない理由:` line, the only excuse from the implement budget; the issue's own is not carried over.",
 				},
 				{
 					names: [DISTINCT],

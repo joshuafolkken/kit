@@ -174,7 +174,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
 | `josh issue:release-class` | `<issue> <enhancement\|other-change>` | automation | network | Write the issue body's one release classification line, replacing any earlier one |
 | `josh issue:scout` | `<title> [--body <summary> \| --body-file <path>]` | automation | network | Before filing: say whether an issue like this exists and which epic it belongs to |
-| `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行" [--distinct <N,…>]` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
+| `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行" [--reason "<理由>"] [--distinct <N,…>]` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |
 | `josh issue:tick` | `<issue> <ac-id>...` | automation | network | Tick selected acceptance checkboxes by their plan identifiers |
 | `josh lane:adopt` · `josh lad` | `<issue> \| --all` | developer | files, git, processes, network | Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched |

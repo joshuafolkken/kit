@@ -27,10 +27,13 @@ describe('size_estimate measured thresholds', () => {
 		expect(size_estimate.is_issue_over_cap({ body: body_of(1, 200) }, RATE)).toBe(false)
 	})
 
+	// joshuafolkken/kit#7005: the split exemption covers the guide and cap, not the implement budget.
 	it('preserves the split exemption while exposing its measured warning', () => {
 		const body = body_of(1, 230)
+		const problem = size_estimate.guide_problem(body, SPLIT, RATE)
 
-		expect(size_estimate.guide_problem(body, SPLIT, RATE)).toBeUndefined()
+		expect(problem).toContain('over the 9-minute implement budget')
+		expect(problem).not.toContain('exceeds the cap')
 		expect(size_estimate.over_cap(body, SPLIT, RATE)).toBeUndefined()
 		expect(size_estimate.split_over_guide(body, SPLIT, RATE)?.verdict).toBe('split')
 	})

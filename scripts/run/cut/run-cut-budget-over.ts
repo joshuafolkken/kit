@@ -67,9 +67,10 @@ async function implement_over(issue: number): Promise<number | undefined> {
 }
 
 // `issue:spill` files the rest as a split child (`issue:file --route split`, recording `split-filed`)
-// and the run ships the tree it has.
+// and the run ships the tree it has. The split route does not excuse the implement budget, so a rest
+// projected past it needs `--reason` (joshuafolkken/kit#7005).
 function spill_steps(issue: string): string {
-	return `Check off the acceptance criteria this tree meets, move the rest out with \`pnpm josh issue:spill ${issue} --estimate "<files> ファイル / <lines> 行"\`, and go on to \`run:review\` and the ship on this tree without resuming.`
+	return `Check off the acceptance criteria this tree meets, move the rest out with \`pnpm josh issue:spill ${issue} --estimate "<files> ファイル / <lines> 行"\` (add \`--reason "<理由>"\` when it refuses the rest over the implement budget), and go on to \`run:review\` and the ship on this tree without resuming.`
 }
 
 const run_cut_budget_over = { implement_over, over_of, spill_steps }

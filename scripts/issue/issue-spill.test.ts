@@ -1,6 +1,8 @@
+import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { describe, expect, it } from 'vitest'
 import { expected_effect_lint } from './expected-effect-lint'
 import { issue_spill } from './issue-spill'
+import { size_estimate } from './size-estimate'
 
 const ESTIMATE = '- 規模見積もり: 約 2 ファイル / 40 行（テスト除く）'
 const ACCEPTANCE = '## 受け入れ条件'
@@ -10,6 +12,11 @@ const LEFT_TWO = '- [ ] left two'
 const FENCED = '- [ ] fenced example'
 const MOVED = [LEFT_ONE, LEFT_ONE_TAIL, LEFT_TWO]
 const PROSE = 'prose that is not a declaration'
+const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
+const SPLIT_ROUTE = 'route:split'
+// The same slow rate `size-estimate-budget.test.ts` projects 2 files / 110 lines over the budget at.
+const SLOW: ImplementRate = { median: 10, lanes: 4 }
+const OVER_BUDGET = 'over the 9-minute implement budget'
 
 const BODY = [
 	'## 背景',
@@ -97,7 +104,7 @@ describe('issue_spill.kept_body', () => {
 })
 
 describe('issue_spill.follow_up_body', () => {
-	const body = issue_spill.follow_up_body(SUBJECT, ESTIMATE)
+	const body = issue_spill.follow_up_body(SUBJECT, [ESTIMATE])
 
 	it('carries the background declarations with the given estimate, not the original', () => {
 		expect(body).toContain(
@@ -142,14 +149,14 @@ describe('issue_spill.follow_up_body expected effect', () => {
 	].join('\n')
 
 	it('carries the expected-effect section a run-time-shortening aim requires', () => {
-		const body = issue_spill.follow_up_body({ ...SUBJECT, body: timed }, ESTIMATE)
+		const body = issue_spill.follow_up_body({ ...SUBJECT, body: timed }, [ESTIMATE])
 
 		expect(body).toContain(effect.join('\n'))
 		expect(expected_effect_lint.problems(body)).toStrictEqual([])
 	})
 
 	it('writes no expected-effect section when the original has none', () => {
-		expect(issue_spill.follow_up_body(SUBJECT, ESTIMATE)).not.toContain(
+		expect(issue_spill.follow_up_body(SUBJECT, [ESTIMATE])).not.toContain(
 			expected_effect_lint.HEADING,
 		)
 	})
@@ -166,5 +173,31 @@ describe('issue_spill.estimate_line', () => {
 
 	it.each(['', '2 files / 40 lines', '2 ファイル'])('refuses %j', (given) => {
 		expect(issue_spill.estimate_line(given)).toBeUndefined()
+	})
+})
+
+describe('issue_spill.reason_line', () => {
+	it('reads the given reason as the reason line, and a blank one as none', () => {
+		expect(issue_spill.reason_line(' 1 コミットで入れないと壊れる ')).toBe(REASON)
+		expect(issue_spill.reason_line('  ')).toBeUndefined()
+	})
+})
+
+describe('issue_spill.follow_up_body and the implement budget', () => {
+	const over_budget = issue_spill.estimate_line('2 ファイル / 110 行') ?? ''
+	const reasoned = { ...SUBJECT, body: BODY.replace(PROSE, () => REASON) }
+
+	it("leaves #N's own reason out, so an over-budget spill at a slow rate is refused", () => {
+		const body = issue_spill.follow_up_body(reasoned, [over_budget])
+
+		expect(body).not.toContain(REASON)
+		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, SLOW)).toContain(OVER_BUDGET)
+	})
+
+	it('files an over-budget spill with the caller reason line', () => {
+		const body = issue_spill.follow_up_body(SUBJECT, [over_budget, REASON])
+
+		expect(body).toContain(`${over_budget}\n${REASON}\n`)
+		expect(size_estimate.guide_problem(body, SPLIT_ROUTE, SLOW)).toBeUndefined()
 	})
 })
