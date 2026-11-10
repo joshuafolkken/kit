@@ -185,14 +185,34 @@ describe('issue_scout.find_duplicates — explicit references', () => {
 		expect(found.candidates[0]?.is_referenced).toBe(true)
 	})
 
-	it('puts referenced issues before title-only matches', () => {
+	it('puts a cited title match first and an issue only cited last', () => {
 		const issues = [
-			{ number: NEAR_DUPLICATE_NUMBER, title: NEAR_DUPLICATE_TITLE },
 			{ number: UNRELATED_NUMBER, title: UNRELATED_TITLE },
+			{ number: RESTATED_NUMBER, title: RESTATED_TITLE },
+			{ number: NEAR_DUPLICATE_NUMBER, title: NEAR_DUPLICATE_TITLE },
 		]
-		const found = issue_scout.find_duplicates(DRAFT_TITLE, issues, [UNRELATED_NUMBER])
+		const found = issue_scout.find_duplicates(DRAFT_TITLE, issues, [
+			UNRELATED_NUMBER,
+			RESTATED_NUMBER,
+		])
 
-		expect(found.candidates[0]?.number).toBe(UNRELATED_NUMBER)
+		expect(found.candidates.map((candidate) => candidate.number)).toStrictEqual([
+			RESTATED_NUMBER,
+			NEAR_DUPLICATE_NUMBER,
+			UNRELATED_NUMBER,
+		])
+	})
+
+	it('keeps a title match in the list when the body cites more issues than it shows', () => {
+		const cited = filler_issues(issue_scout.MAX_CANDIDATES)
+		const issues = [...cited, { number: NEAR_DUPLICATE_NUMBER, title: NEAR_DUPLICATE_TITLE }]
+		const found = issue_scout.find_duplicates(
+			DRAFT_TITLE,
+			issues,
+			cited.map((issue) => issue.number),
+		)
+
+		expect(found.candidates[0]?.number).toBe(NEAR_DUPLICATE_NUMBER)
 	})
 })
 

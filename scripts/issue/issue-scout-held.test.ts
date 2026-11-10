@@ -48,4 +48,10 @@ describe('issue_scout_cli.scout — the candidates that hold a filing', () => {
 
 		expect(outcome?.candidates).toStrictEqual([NEAR_DUPLICATE_NUMBER])
 	})
+
+	it('prints the score beside `ref` for a cited title match only', async () => {
+		const outcome = await issue_scout_cli.scout(cited_draft(NEAR_DUPLICATE_NUMBER), REPO)
+
+		expect(outcome?.report).toMatch(/#1249\]\([^)]*\) {2}ref 0\.\d\d/u)
+	})
 })

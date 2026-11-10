@@ -200,10 +200,13 @@ function to_candidate(
 	}
 }
 
+// Title matches lead, so the list cut at `MAX_CANDIDATES` never drops one behind an issue the body only
+// cites — the title matches are the ones that hold a filing.
 function compare_candidates(left: DuplicateCandidate, right: DuplicateCandidate): number {
+	const match_order = Number(right.score > 0) - Number(left.score > 0)
 	const reference_order = Number(right.is_referenced === true) - Number(left.is_referenced === true)
 
-	return reference_order || right.score - left.score
+	return match_order || reference_order || right.score - left.score
 }
 
 // One row per number. The open listing, a directly read reference and the closed listing can each

@@ -102,8 +102,18 @@ function draft_of(args: ScoutArguments, repo: string): BacklogIssue {
 
 // The epic beside a candidate is the placement answer for a draft that cites nothing: the epic half
 // below decides from signal references, and a title-only draft has none to give it.
+// A cited title match keeps its score beside `ref`, so the rows that hold a filing read apart from
+// the ones the body only cites.
+function score_label(candidate: DuplicateCandidate): string {
+	const score = candidate.score.toFixed(SCORE_DIGITS)
+
+	if (candidate.is_referenced !== true) return score
+
+	return candidate.score > 0 ? `ref ${score}` : 'ref'
+}
+
 function format_duplicate(candidate: DuplicateCandidate): string {
-	const score = candidate.is_referenced === true ? 'ref' : candidate.score.toFixed(SCORE_DIGITS)
+	const score = score_label(candidate)
 	const epic = candidate.epic === undefined ? '' : ` (epic ${session_cite.issue(candidate.epic)})`
 	// The reader does two different things with the two states, so the row has to say which it is: an
 	// open candidate means somebody is already tracking this, a closed one means it may already be
