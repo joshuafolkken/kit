@@ -66,10 +66,10 @@ function refusal_line(minute: number, id: string, reason: string): string {
 	)
 }
 
-function bash_call_line(minute: number, id: string): string {
+function bash_call_line(minute: number, id: string, command = 'ls'): string {
 	return time_transcript_fixture.tool_call_line(minute, BRANCH, {
 		name: 'Bash',
-		input: { command: 'ls' },
+		input: { command },
 		id,
 	})
 }

@@ -45,6 +45,7 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		agents: [],
 		usage: NO_USAGE,
 		results: NO_RESULTS,
+		sequences: { runs: [], retries: [] },
 		...overrides,
 	}
 }
