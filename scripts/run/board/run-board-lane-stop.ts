@@ -1,5 +1,6 @@
-import { has_label_name, NEEDS_DECISION_LABEL, parked_label_of } from '#scripts/issue/issue-labels'
+import { parked_label_of } from '#scripts/issue/issue-labels'
 import { issue_run_hold } from '#scripts/issue/issue-run-hold'
+import { run_board_human } from './run-board-human'
 import type { IdleSince } from './run-board-idle'
 import type { BoardLanes } from './run-board-lane-state'
 import { run_board_settle } from './run-board-settle'
@@ -67,11 +68,11 @@ function stop_lanes(statuses: Map<number, ItemStatus>, lanes: BoardLanes, idle: 
 }
 
 // What a running child's labels say it is doing, `undefined` where they agree it is running: the child
-// applies `needs-decision` and drops `in-progress` itself when it stops, while the stream's park is
-// written by a parent that may no longer be there.
+// applies a human-stop label (`run-board-human.ts`) and drops `in-progress` itself when it stops, while
+// the stream's park is written by a parent that may no longer be there.
 function label_stop(labels: ReadonlyArray<string> | undefined): LabelStop | undefined {
 	if (labels === undefined) return undefined
-	if (has_label_name(labels, NEEDS_DECISION_LABEL)) return { state: 'human' }
+	if (run_board_human.is_human(labels)) return { state: 'human' }
 
 	const parked = parked_label_of(labels)
 	if (parked !== undefined) return { state: 'stopped', reason: parked }

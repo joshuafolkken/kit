@@ -17,6 +17,7 @@ import { run_step, type ParentInput, type StepInput } from './run-step'
 import { run_step_lane_plan } from './run-step-lane-plan'
 import { run_step_progress } from './run-step-progress'
 import { run_step_section } from './run-step-section'
+import { run_step_section_once } from './run-step-section-once'
 
 // `josh run:step [<N>]` — print the run's next single action, followed by the section that governs it
 // (`run-step-section.ts`), computed from the event stream, the carry
@@ -28,6 +29,8 @@ import { run_step_section } from './run-step-section'
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
+const SHIP_REPEAT =
+	'ship preconditions: unchanged — printed earlier this session; after a compaction: pnpm josh run:prep '
 const USAGE =
 	'Usage: josh run:step [<issue-number>] — without a number it answers for the `backlogrun` carry record this session drives'
 
@@ -187,6 +190,17 @@ async function action_lines(input: StepInput, line: string): Promise<ReadonlyArr
 	return [line, ...(await run_step_lane_plan.lines_for(input.issue_number, input.is_lane_child))]
 }
 
+// The ship preconditions, once per session while they read the same (`run-step-section-once.ts`):
+// `run:entry` printed them in its bundle, so an unchanged list is one line naming where to re-read it.
+function ship_text(issue_number: string, problems: ReadonlyArray<string>): string {
+	const body = run_prep.ship_body(problems)
+
+	if (run_step_section_once.is_text_recorded(body)) return `${SHIP_REPEAT}${issue_number}`
+	run_step_section_once.record_text(body)
+
+	return body
+}
+
 async function report({ input, ship_problems }: Gathered): Promise<number> {
 	const action = run_step.next_action(input)
 
@@ -196,8 +210,8 @@ async function report({ input, ship_problems }: Gathered): Promise<number> {
 
 	for (const line of lines) console.info(line)
 	// On stderr, so stdout stays the action lines and their rule: what `josh ship` would
-	// refuse on is said at every step, while it is still cheap to meet.
-	if (ship_problems.length > 0) console.error(run_prep.ship_body(ship_problems))
+	// refuse on is said at every step — in full once per session, then as one line — while it is still cheap to meet.
+	if (ship_problems.length > 0) console.error(ship_text(input.issue_number, ship_problems))
 
 	// A state that could not be read exits non-zero, exactly as `run:prep` and `run:next` exit on the
 	// same failure, so a position missing its issue state is never read as a confident next step.
@@ -227,7 +241,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const run_step_cli = { run }
+const run_step_cli = { run, ship_text }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
