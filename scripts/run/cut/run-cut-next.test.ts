@@ -20,18 +20,15 @@ describe('the pre-gate cut next action', () => {
 		['busy', 'Do not relaunch; a cut is already in flight.'],
 		['failed', GATE],
 		['unknown', GATE],
-		[
-			'budget-over',
-			'pnpm josh issue:spill 6235 --estimate "<files> ファイル / <lines> 行", then pnpm josh run:chain 6235',
-		],
 	])('prints one next line for %s', (verdict, action) => {
 		run_cut_next.print_next(verdict, '6235')
 
 		expect(error).toHaveBeenCalledExactlyOnceWith(`next: ${action}`)
 	})
 
-	it('leaves other verdicts to their own protocol', () => {
-		run_cut_next.print_next('resume', '6235')
+	// joshuafolkken/kit#7010: `budget-over` is no verdict of the pre-gate cut any more, so it prints no spill.
+	it.each(['resume', 'budget-over'])('leaves %s to its own protocol', (verdict) => {
+		run_cut_next.print_next(verdict, '6235')
 
 		expect(error).not.toHaveBeenCalled()
 	})

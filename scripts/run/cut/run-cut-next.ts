@@ -9,10 +9,6 @@ function print_next(verdict: string, issue: string): void {
 		['busy', 'Do not relaunch; a cut is already in flight.'],
 		['failed', gate],
 		['unknown', gate],
-		[
-			'budget-over',
-			`pnpm josh issue:spill ${issue} --estimate "<files> ファイル / <lines> 行", then ${gate}`,
-		],
 	])
 	const action = actions.get(verdict)
 

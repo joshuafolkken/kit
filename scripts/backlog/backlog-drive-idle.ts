@@ -27,7 +27,7 @@ const DECISION_HEADING = `Waiting on a decision (${NEEDS_DECISION_LABEL}):`
 const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
 const UNTRUSTED_HEADING = 'Waiting on a person to vouch for the body (author without write access):'
 const OVER_CAP_HEADING =
-	'Waiting on a person to split it or declare it one deliverable (over the size cap, no reason declared):'
+	'Waiting on a person to split it or declare it one deliverable (over the size cap or the implement budget, no reason declared):'
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
 const IDLE_RECOVERY =
 	'Decide the parked issues, fix and release the stalled ones, or start the next run with `backlogrun`.'
@@ -85,8 +85,9 @@ function untrusted_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 		.map((issue) => cited(issue))
 }
 
-// `backlog:next` holds one declared over the size cap until a person splits it or declares it one
-// deliverable (joshuafolkken/kit#5502, joshuafolkken/kit#6602).
+// `backlog:next` holds one declared over the size cap, or projected over the implement budget, until a
+// person splits it or declares it one deliverable (joshuafolkken/kit#5502, joshuafolkken/kit#6602,
+// joshuafolkken/kit#7006).
 function over_cap_lines(issues: ReadonlyArray<OpenIssueData>, reading: IdleReading): Array<string> {
 	return issues
 		.filter((issue) =>

@@ -6,6 +6,7 @@ import {
 	mkdirSync,
 	openSync,
 	readFileSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	writeFileSync,
@@ -28,7 +29,7 @@ import { hook_daemon_call, type CallAnswer, type DaemonOrigin } from '#tools/hoo
 // and root this process started with (`hook-daemon-call.ts`). Bundles that are no longer fresh, or
 // were rebuilt since this process loaded them, are never answered from: the call is replied `stale`
 // for the launcher to run itself, and the daemon goes, so the next call starts one on the new build.
-// So does an idle daemon.
+// So does an idle daemon. An installed package's launcher hands its calls to the daemon the same way.
 //
 // Built into `dist/hooks/` and run from source in tests: both sit two levels under the package.
 
@@ -78,16 +79,21 @@ function stamp_text(out_directory: string): string {
 	return existsSync(stamp_path) ? readFileSync(stamp_path, 'utf8') : ''
 }
 
+function is_installed(package_directory: string): boolean {
+	return package_directory.split(path.sep).includes('node_modules')
+}
+
 // What the launch gate (`hook-bundle-fast.ts`) checks before running a bundle, and that the build
-// this process loaded is still the one in place.
+// this process loaded is still the one in place. An installed package ships no sources to check
+// (joshuafolkken/kit#6962), so there only the build in place counts: a reinstall rewrites its stamp.
 function bundle_currency(out_directory: string, package_directory: string): () => boolean {
 	const loaded = stamp_text(out_directory)
+	const is_built_fresh = is_installed(package_directory)
+		? (): boolean => true
+		: (): boolean => hook_bundle_stamp.is_fresh(out_directory, package_directory)
 
 	return function is_current(): boolean {
-		return (
-			hook_bundle_stamp.is_fresh(out_directory, package_directory) &&
-			stamp_text(out_directory) === loaded
-		)
+		return is_built_fresh() && stamp_text(out_directory) === loaded
 	}
 }
 
@@ -239,7 +245,13 @@ async function main(launch_arguments: ReadonlyArray<string>): Promise<void> {
 	if (daemon !== undefined) await serve(daemon)
 }
 
-if (process.argv[1] === DAEMON_SCRIPT) await main(process.argv.slice(ARGUMENTS_START))
+// Resolved, as `import.meta.url` is: an installed package is launched through its `node_modules`
+// symlink (joshuafolkken/kit#6962).
+function is_launched(launched: string | undefined): boolean {
+	return launched !== undefined && existsSync(launched) && realpathSync(launched) === DAEMON_SCRIPT
+}
+
+if (is_launched(process.argv[1])) await main(process.argv.slice(ARGUMENTS_START))
 
 const hook_daemon = { bundle_currency, close, serve, start, STALE_REPLY }
 
