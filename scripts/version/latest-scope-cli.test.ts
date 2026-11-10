@@ -1,3 +1,4 @@
+import { overrides_diff_report } from '#scripts/overrides/overrides-diff-report'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { latest_scope_cli } from './latest-scope-cli'
 import { latest_stamp, type LatestStamp } from './latest-stamp'
@@ -139,11 +140,33 @@ describe('latest_scope_cli.run --record', () => {
 	// invocation that was only meant to note a run down.
 	it('writes the record and prints nothing on stdout', () => {
 		const write = vi.spyOn(latest_stamp, 'write_stamp').mockReturnValue(STAMP_PATH)
+
+		vi.spyOn(overrides_diff_report, 'judge_overrides').mockReturnValue(true)
 		const captured = capture()
 
 		expect(latest_scope_cli.run([latest_scope_cli.RECORD_FLAG])).toBe(0)
 		expect(write).toHaveBeenCalledOnce()
 		expect(captured.stdout).toStrictEqual([])
 		expect(captured.stderr[0]).toContain(STAMP_PATH)
+	})
+
+	// joshuafolkken/kit#7148: the overrides verdict against HEAD ends the `josh latest` chain.
+	it('judges the overrides against HEAD after the record', () => {
+		vi.spyOn(latest_stamp, 'write_stamp').mockReturnValue(STAMP_PATH)
+		const judge = vi.spyOn(overrides_diff_report, 'judge_overrides').mockReturnValue(true)
+
+		capture()
+
+		latest_scope_cli.run([latest_scope_cli.RECORD_FLAG])
+
+		expect(judge).toHaveBeenCalledWith('HEAD')
+	})
+
+	it('exits non-zero when the overrides are not kept', () => {
+		vi.spyOn(latest_stamp, 'write_stamp').mockReturnValue(STAMP_PATH)
+		vi.spyOn(overrides_diff_report, 'judge_overrides').mockReturnValue(false)
+		capture()
+
+		expect(latest_scope_cli.run([latest_scope_cli.RECORD_FLAG])).toBe(1)
 	})
 })

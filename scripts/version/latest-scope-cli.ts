@@ -1,3 +1,4 @@
+import { overrides_diff_report } from '#scripts/overrides/overrides-diff-report'
 import { latest_lane_guard } from './latest-lane-guard'
 import { latest_stamp, type LatestStamp } from './latest-stamp'
 
@@ -25,6 +26,7 @@ const FAILURE_EXIT_CODE = 1
 const NO_STAMP_REASON =
 	'no record of a `josh latest` run in this checkout — update rather than assume the dependencies are current'
 const HOURS_PRECISION = 1
+const PIN_CHECK_RANGE = 'HEAD'
 
 type LatestScope = typeof REQUIRED_SCOPE | typeof SKIPPED_SCOPE
 
@@ -97,6 +99,9 @@ function print_decision(decision: Decision, is_json: boolean): void {
 // with a stack trace — over a note nobody reads directly. A failed write leaves no record, and no
 // record answers `required`, so the only consequence is that the next run updates again: the safe
 // direction, and the one the write's own guards were built to fall in.
+//
+// The overrides verdict against HEAD ends the chain (`josh adopt` inherits it through its own `josh
+// latest` step): an overrides block the update moved must be restored, so it exits non-zero.
 function record(): number {
 	try {
 		console.error(`recorded this josh latest run at ${latest_stamp.write_stamp()}`)
@@ -104,7 +109,7 @@ function record(): number {
 		console.error(`could not record this josh latest run: ${String(error)}`)
 	}
 
-	return 0
+	return overrides_diff_report.judge_overrides(PIN_CHECK_RANGE) ? 0 : FAILURE_EXIT_CODE
 }
 
 function run(argv: ReadonlyArray<string>): number {
