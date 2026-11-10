@@ -1,0 +1,7 @@
+{
+	"reason": "#7134 adds a persistent per-run store for rule:value (stamped-store + rule-value-runs) so --refresh re-reads only changed transcripts",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 176
+	}
+}
