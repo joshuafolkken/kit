@@ -1,0 +1,8 @@
+{
+	"reason": "plan:scaffold is a new command (#7145): its module, CLI, catalog row and round-1 fixes (unreadable-body note, regular-file check) add code lines and on-demand doc bytes",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 177,
+		"ai_cost.on_demand_bytes": 176
+	}
+}

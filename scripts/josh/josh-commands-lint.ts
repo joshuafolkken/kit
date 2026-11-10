@@ -76,6 +76,19 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'plan:scaffold': {
+		script: 'scripts/plan/plan-scaffold-cli.ts',
+		description:
+			"Print a work summary's inputs in one call: the run:prep skeleton, planned files near the line limit, the test:declared verdict, the owed cases and the plan:consumers draft",
+		category: 'AI tools',
+		reference: ['<issue> [<path>...]', 'automation', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '123', note: 'planned files from the issue body' },
+				{ arguments: '123 scripts/a.ts scripts/b.ts', note: 'the files this plan touches' },
+			],
+		},
+	},
 }
 
 export { LINT_COMMANDS }

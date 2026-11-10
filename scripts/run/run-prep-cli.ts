@@ -48,6 +48,11 @@ interface PrepReads {
 	investigation: InvestigationRecord | undefined
 }
 
+interface SummaryRead {
+	body: string
+	text: string
+}
+
 // Exactly one issue number, or the call is refused: `run:prep` prepares one run, and a second number
 // would print a second issue's body a caller reads as this run's own.
 function parse_number(argv: ReadonlyArray<string>): string | undefined {
@@ -145,22 +150,30 @@ function exit_code(reads: PrepReads): number {
 
 // `--summary` prints the work summary's skeleton alone: it is read at the plan step, after the
 // bundle, so it reads the body and the author trust `issue:read` would mark it with. A trust read
-// that failed leaves the body unmarked as trusted, never trusted.
-async function print_summary(issue_number: string): Promise<number> {
+// that failed leaves the body unmarked as trusted, never trusted. `plan:scaffold` reads the same pair.
+async function read_summary(issue_number: string): Promise<SummaryRead | undefined> {
 	const [body, block] = await Promise.all([
 		git_gh_issue_read.issue_get_body(issue_number),
 		issue_read_cli.read_block(issue_number),
 	])
 
-	if (body === undefined) {
+	if (body === undefined) return undefined
+
+	const is_trusted = block.kind === 'ok' ? block.trust.is_body_trusted : undefined
+
+	return { body, text: session_cite.text(run_prep_summary.format_summary(body, is_trusted)) }
+}
+
+async function print_summary(issue_number: string): Promise<number> {
+	const summary = await read_summary(issue_number)
+
+	if (summary === undefined) {
 		console.error(failure_note(issue_number, 'unreadable'))
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const is_trusted = block.kind === 'ok' ? block.trust.is_body_trusted : undefined
-
-	console.info(session_cite.text(run_prep_summary.format_summary(body, is_trusted)))
+	console.info(summary.text)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -185,7 +198,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 // `gather` and `to_parts` are exported so `run:next` reads the same state from the same three reads
-// rather than growing a second copy of the gather.
-const run_prep_cli = { gather, parse_number, run, to_parts }
+// rather than growing a second copy of the gather; `read_summary` and `failure_note` so `plan:scaffold`
+// reads the skeleton and reports an unreadable body the same way.
+const run_prep_cli = { failure_note, gather, parse_number, read_summary, run, to_parts }
 
+export type { SummaryRead }
 export { run_prep_cli }
