@@ -28,15 +28,20 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'issue:priority': {
 		script: 'scripts/issue/issue-priority-cli.ts',
-		description: 'Raise an issue to the priority its body declares or reaches after filing',
+		description:
+			'Raise an issue to the priority its body declares or reaches, or set the one a person instructs',
 		category: 'AI tools',
-		reference: ['<issue> [--critical --reason <text>]', 'automation', ['network']],
+		reference: ['<issue> [--critical|--high|--normal --reason <text>]', 'automation', ['network']],
 		usage: {
 			examples: [
 				{ arguments: '4960' },
 				{
 					arguments: '6707 --critical --reason "asked in this turn"',
 					note: "on a person's instruction only",
+				},
+				{
+					arguments: '6683 --normal --reason "asked in this turn"',
+					note: 'lowers it the same way',
 				},
 			],
 		},

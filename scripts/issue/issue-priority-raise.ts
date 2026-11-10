@@ -35,6 +35,42 @@ function decision(labels: ReadonlyArray<string>): RaiseResult {
 	return issue_priority.is_typed(labels) ? 'labelled' : 'below'
 }
 
+const PRIORITY_LABELS: ReadonlySet<string> = new Set(
+	Object.values(issue_priority.LABELS).filter((label) => label !== undefined),
+)
+
+function priority_labels_of(labels: ReadonlyArray<string>): ReadonlyArray<string> {
+	return labels.filter((label) => PRIORITY_LABELS.has(label))
+}
+
+// Whether the issue's priority labels are exactly `label` — none at all for `undefined`, normal.
+function is_only(labels: ReadonlyArray<string>, label: string | undefined): boolean {
+	const present = priority_labels_of(labels)
+
+	return present.length === (label === undefined ? 0 : 1) && present.every((name) => name === label)
+}
+
+// joshuafolkken/kit#7000: a priority change leaves one priority label. The new label goes on before the
+// others come off, so a failed write never leaves the issue below either rank.
+async function replace(
+	issue_number: string,
+	labels: ReadonlyArray<string>,
+	label: string | undefined,
+): Promise<boolean> {
+	const is_added =
+		label === undefined ||
+		labels.includes(label) ||
+		(await git_gh_command.issue_add_label(issue_number, label))
+
+	if (!is_added) return false
+	const stale = priority_labels_of(labels).filter((name) => name !== label)
+	const cleared = await Promise.all(
+		stale.map(async (name) => await git_gh_command.issue_clear_label(issue_number, name)),
+	)
+
+	return cleared.every(Boolean)
+}
+
 async function raise(issue_number: string): Promise<RaiseResult> {
 	const read = await read_issue(issue_number)
 
@@ -42,7 +78,7 @@ async function raise(issue_number: string): Promise<RaiseResult> {
 	const label = issue_priority.raise_label(read.labels, read.body)
 
 	if (label === undefined) return decision(read.labels)
-	const is_applied = await git_gh_command.issue_add_label(issue_number, label)
+	const is_applied = await replace(issue_number, read.labels, label)
 
 	return is_applied ? 'raised' : 'failed'
 }
@@ -54,7 +90,7 @@ function is_failure(result: RaiseResult): boolean {
 	return FAILURES.has(result)
 }
 
-const issue_priority_raise = { read_issue, raise, is_failure }
+const issue_priority_raise = { read_issue, is_only, replace, raise, is_failure }
 
 export type { RaiseResult }
 export { issue_priority_raise }
