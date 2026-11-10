@@ -62,9 +62,14 @@ function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<s
 		.map((problem) => with_template(problem))
 }
 
-// Warnings print whichever way the verdict goes and never change the exit code.
-function report(found: ReadonlyArray<string>, body: string): number {
+// The body's warnings, printed by every command that lints a body whichever way its verdict goes; they
+// never change an exit code.
+function warn(body: string): void {
 	for (const warning of figure_source_lint.warnings(body)) console.warn(`⚠ ${warning}`)
+}
+
+function report(found: ReadonlyArray<string>, body: string): number {
+	warn(body)
 
 	if (found.length === 0) {
 		console.info(OK_MESSAGE)
@@ -90,6 +95,6 @@ async function run(body_path: string | undefined): Promise<number> {
 	return report(problems(body), body)
 }
 
-const issue_lint_cli = { problems, run }
+const issue_lint_cli = { problems, run, warn }
 
 export { issue_lint_cli }

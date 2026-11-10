@@ -41,6 +41,8 @@ async function apply(request: BodyRequest): Promise<number> {
 	const body = cli_body.read_file_or_stdin(request.body_path)
 	const problems = size_estimate.is_epic(body) ? [] : issue_lint_cli.problems(body)
 
+	issue_lint_cli.warn(body)
+
 	if (problems.length > 0) {
 		console.error(problems.map((problem) => `✖ ${problem}`).join('\n'))
 

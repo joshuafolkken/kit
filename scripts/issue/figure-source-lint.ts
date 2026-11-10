@@ -14,8 +14,15 @@ const WARNING = `number with no source (add the command that measured it in back
 // Numbers that are not figures: issue and pull request references, dates and an ordered-list marker.
 const NOT_A_FIGURE = /#\d+|\d{4}-\d{2}-\d{2}|^\d+\.\s/gu
 const DIGIT = /\d/u
-// A background declaration line such as the size estimate: the template fixes its shape and source.
-const DECLARATION = /^- [^\s:]+:/u
+// The background declarations whose figure the template already sources or marks an estimate
+// (`issue-template.md`'s declaration table); any other keyed bullet is read as prose.
+const DECLARATIONS = [
+	'- 規模見積もり:',
+	'- 原因のレーン:',
+	'- 原因の損失:',
+	'- 優先度:',
+	'- 実施可能条件:',
+]
 
 function text_lines(body: string, heading: string): ReadonlyArray<string> {
 	const section = markdown_section.section_lines(body, heading).join('\n')
@@ -31,7 +38,9 @@ function has_no_source(line: string): boolean {
 
 // One warning per figure line with no source, background lines first.
 function warnings(body: string): ReadonlyArray<string> {
-	const background = text_lines(body, BACKGROUND_HEADING).filter((line) => !DECLARATION.test(line))
+	const background = text_lines(body, BACKGROUND_HEADING).filter((line) =>
+		DECLARATIONS.every((prefix) => !line.startsWith(prefix)),
+	)
 
 	return [...background, ...text_lines(body, EFFECT_HEADING)]
 		.filter((line) => has_no_source(line))

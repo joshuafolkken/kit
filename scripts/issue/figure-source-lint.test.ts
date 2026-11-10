@@ -13,6 +13,14 @@ describe('figure_source_lint.warnings', () => {
 		expect(found).toStrictEqual([expect.stringContaining('約 35 分 / 100 行')])
 	})
 
+	it('warns about a keyed background bullet the template does not declare', () => {
+		const found = figure_source_lint.warnings(
+			`${BACKGROUND}- 見積もり: implement 約 35 分 / 100 行\n`,
+		)
+
+		expect(found).toStrictEqual([expect.stringContaining('約 35 分')])
+	})
+
 	it('reads a backticked name with no argument as no source', () => {
 		const found = figure_source_lint.warnings(`${BACKGROUND}\`issue:file\` は約 35 分を通した\n`)
 
@@ -24,7 +32,9 @@ describe('figure_source_lint.warnings', () => {
 
 		expect(found).toStrictEqual([expect.stringContaining('約 6 分')])
 	})
+})
 
+describe('figure_source_lint.warnings — sourced or not a figure', () => {
 	it.each([
 		[
 			'a backticked command',

@@ -111,6 +111,20 @@ describe('issue_file_pass.labels_in_one_pass — every refusal in one call', () 
 	})
 })
 
+// joshuafolkken/kit#7021: the figure-source warning prints from issue:file too, never refusing.
+describe('issue_file_pass.labels_in_one_pass — a figure with no source', () => {
+	it('warns about a background figure with no source and still answers the labels', async () => {
+		const body = CLEAR_BODY.replace('## 現象', '中央値 約 35 分\n\n## 現象')
+
+		vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(body))).toBeDefined()
+		expect(console.warn).toHaveBeenCalledWith(
+			expect.stringMatching(/^⚠ number with no source .*約 35 分/u),
+		)
+	})
+})
+
 // joshuafolkken/kit#6008: an open issue declaring the same measurement holds the filing, and no
 // `--distinct` releases it.
 describe('issue_file_pass.labels_in_one_pass — a measurement already declared', () => {
