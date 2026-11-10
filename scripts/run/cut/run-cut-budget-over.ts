@@ -7,9 +7,8 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
 // How far the implementation has run past its stage budget (`lane-stage-budget.ts`, the single source),
-// and the one way out of it. `run:cut`'s `budget-over` (`run-cut-budget.ts`) and the split notice a
-// scoped check prints (`split-early-notice.ts`, joshuafolkken/kit#6544) both read it. It reads no Issue
-// body, so the scoped checks reach no Issue-body module through it.
+// and the one way out of it. `run:cut`'s `budget-over` (`run-cut-budget.ts`) reads it. It reads no
+// Issue body.
 
 function dispatched_ms(entries: ReadonlyArray<LedgerEntry>, issue: number): number {
 	const dispatch = entries

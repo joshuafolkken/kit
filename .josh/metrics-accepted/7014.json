@@ -1,0 +1,7 @@
+{
+	"reason": "test-related-whole.ts: a lane drops the gate's whole-suite fallback (#7014)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}

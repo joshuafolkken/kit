@@ -38,7 +38,7 @@ vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { stage: preflight_
 // The pre-detach checks' own branches are pinned in `run-ship-pre-detach.test.ts`; here they pass.
 vi.mock('./run-ship-pre-detach', () => ({ run_ship_pre_detach: { checks: pre_detach_mock } }))
 // The conflict probe (`run-ship-cli-conflict.test.ts`) finds none, so no test fetches the default branch.
-vi.mock('./run-ship-conflict-probe', () => ({ run_ship_conflict_probe: { probe: vi.fn() } }))
+vi.mock('./run-ship-conflict-probe')
 vi.mock('./run-ship-scoped', async (import_original) => {
 	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
 	const scoped_pair = vi

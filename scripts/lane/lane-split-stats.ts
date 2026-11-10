@@ -8,9 +8,9 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // whenever it was filed, since a lane may carve the rest out before the notice reaches it.
 //
 // **One row per reason under the `all` row** (joshuafolkken/kit#5568): the axis `josh lane:plan`
-// answered `split` on, `diff` for the measured-diff notice, which carries none, or `budget` for the
-// implement-budget notice (joshuafolkken/kit#6544). A lane noticed on two axes counts once in `all` and
-// once under each.
+// answered `split` on, or `diff` / `budget` for the measured-diff and implement-budget notices, which
+// only entries from before joshuafolkken/kit#7009 carry (joshuafolkken/kit#6544). A lane noticed on two
+// axes counts once in `all` and once under each.
 
 const COLUMNS = ['reason', 'noticed lanes', 'split'] as const
 const REASONS = ['files', 'hunks', 'lines', 'hub', 'diff', 'budget'] as const
