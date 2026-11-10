@@ -29,7 +29,10 @@ describe('lane_hand_back_held.record', () => {
 		await lane_hand_back_hold.mark(REASON, target)
 		await lane_hand_back_held.record(target)
 
-		expect(lane_ledger.read_entries(target).at(-1)).toMatchObject({ kind: 'held', reason: REASON })
+		expect(lane_ledger.read_entries(target).at(-1)).toMatchObject({
+			kind: 'held',
+			reason: `${lane_hand_back_held.DRIVERLESS_PREFIX}${REASON}`,
+		})
 		expect(lane_hand_back_hold.read(target)).toBeUndefined()
 	})
 
