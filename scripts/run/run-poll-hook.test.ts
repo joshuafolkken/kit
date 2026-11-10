@@ -1,8 +1,10 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_headless } from './run-headless'
 import { run_poll_hook } from './run-poll-hook'
 
 const make_directory = temporary_directory('suite')
@@ -55,6 +57,7 @@ async function not_parent(): Promise<boolean> {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('run_poll_hook.poll_reason — a repeated state read', () => {
@@ -155,6 +158,17 @@ describe('run_poll_hook.safe_poll_reason', () => {
 		})
 
 		expect(await run_poll_hook.safe_poll_reason(raw)).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#6683: a daemon answers calls from many launchers, so the parent is judged under
+	// the call's own environment and process ancestry, never the answering process's.
+	it("judges the parent under the call's environment and ancestry", async () => {
+		const is_backlog_parent = vi.spyOn(run_headless, 'is_backlog_parent').mockResolvedValue(true)
+		const context = hook_context_fixture.of(TEMPORARY, { CALL_ONLY: '1' })
+		const raw = payload(after(BOARD), { command: BOARD })
+
+		expect(await run_poll_hook.safe_poll_reason(raw, context)).toBe(run_poll_hook.POLL_REASON)
+		expect(is_backlog_parent).toHaveBeenCalledWith(context.env, context.ancestry)
 	})
 })
 

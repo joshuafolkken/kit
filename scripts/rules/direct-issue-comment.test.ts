@@ -1,4 +1,5 @@
 import { hook_context } from '#scripts/hooks/hook-context'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -103,7 +104,7 @@ describe('direct-issue-comment delivery', () => {
 	// repository has no own repository, so the owner spelled out is not the checkout's.
 	it("reads the checkout's repository under the call context's cwd", () => {
 		const command = OWN_SPELLED_OUT_WRITE
-		const context = { cwd: OUTSIDE_REPOSITORY, env: process.env }
+		const context = hook_context_fixture.of(OUTSIDE_REPOSITORY, process.env)
 
 		expect(direct_issue_comment.ROW.is_trigger({ name: 'Bash', input: { command } }, context)).toBe(
 			false,

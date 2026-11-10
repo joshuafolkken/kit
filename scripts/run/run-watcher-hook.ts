@@ -52,8 +52,12 @@ function is_active(context: HookContext): boolean {
 // The guard's note when the watcher is stale and this call is the once-per-run one that refuses, or
 // `undefined` when the watcher is fresh (or the refusal was already spent this run). No session is asked
 // to relay the run's stream — the watch pane does.
-async function stale_reason(transcript: string, now_ms: number): Promise<string | undefined> {
-	const result = await run_watcher_guard.check(await run_progress_read.live_target())
+async function stale_reason(
+	transcript: string,
+	now_ms: number,
+	ancestry: () => ReadonlySet<number>,
+): Promise<string | undefined> {
+	const result = await run_watcher_guard.check(await run_progress_read.live_target(), ancestry)
 
 	if (result.kind === 'ok') return undefined
 
@@ -74,7 +78,7 @@ async function watcher_hook_reason(
 
 	if (transcript === undefined) return undefined
 
-	return await stale_reason(transcript, now_ms)
+	return await stale_reason(transcript, now_ms, context.ancestry)
 }
 
 const run_watcher_hook = { transcript_of, watcher_hook_reason }

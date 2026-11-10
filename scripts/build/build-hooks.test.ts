@@ -261,6 +261,7 @@ describe('build_hooks output directory', () => {
 			await build_hooks(out_directory)
 
 			expect(existsSync(path.join(out_directory, hook_bundle_stamp.STAMP_NAME))).toBe(true)
+			expect(existsSync(path.join(out_directory, 'daemon.js'))).toBe(true)
 			expect(hook_bundle_stamp.is_fresh(out_directory, process.cwd())).toBe(true)
 			expect(readdirSync(path.dirname(out_directory))).not.toContainEqual(
 				expect.stringMatching(/^\.hooks-staging-/u),

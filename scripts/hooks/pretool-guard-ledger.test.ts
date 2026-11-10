@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { direct_gh_usage } from './direct-gh-usage'
@@ -69,7 +70,7 @@ describe('pretool_guard.respond — the hook ledger', () => {
 describe('pretool_guard.record_refusal — the call context', () => {
 	it('reads the demoted rules from the call context and hands both recorders that context', async () => {
 		const environment = { VITEST: 'true', MARK: 'x' }
-		const context = { cwd: WORK_DIRECTORY, env: environment }
+		const context = hook_context_fixture.of(WORK_DIRECTORY, environment)
 		const payload = bash_payload(ALLOWED_COMMAND)
 		const rules = vi.spyOn(hook_demoted, 'rules')
 		const ledger = vi.spyOn(hook_ledger, 'record_reason').mockResolvedValue(undefined)

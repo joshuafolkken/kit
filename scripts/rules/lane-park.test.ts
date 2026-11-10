@@ -4,6 +4,7 @@ import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { run_park } from '#scripts/run/park/run-park'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -215,7 +216,9 @@ describe('lane_park.ROW — the call context', () => {
 		const parked = vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(false)
 		const call = { name: BASH, input: { command: CONFIRMATION_NOTIFY } }
 
-		expect(lane_park.ROW.is_trigger(call, { cwd: LANE_DIRECTORY, env: environment })).toBe(true)
+		expect(
+			lane_park.ROW.is_trigger(call, hook_context_fixture.of(LANE_DIRECTORY, environment)),
+		).toBe(true)
 		expect(is_child).toHaveBeenCalledWith(LANE_DIRECTORY, environment)
 		expect(parked).toHaveBeenCalledWith(ISSUE, LANE_DIRECTORY)
 	})
