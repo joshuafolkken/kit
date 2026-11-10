@@ -102,6 +102,9 @@ const PARK_OPTIONS = [
 	'   - 必要な権限: 人',
 ].join('\n')
 
+const PICK_ONE = '1 cheaper'
+const PICK_ONE_SUMMARY = '推奨: 1（層 A）'
+
 function park_body(heading: string, pick: string): string {
 	return `${heading}${PARK_OPTIONS}\n\n### 推奨\n${pick}\n`
 }
@@ -110,9 +113,29 @@ describe('run_board_decision park summary (ac-0be6b188)', () => {
 	it.each([
 		[park_body(`## ${QUESTION}\n\n`, '2 the key leaked'), `${QUESTION} — 推奨: 2（層 C）`],
 		[park_body(`## ${QUESTION}\n\n`, '推奨なし both need the owner'), `${QUESTION} — 推奨なし`],
-		[park_body('', '1 cheaper'), '推奨: 1（層 A）'],
+		[park_body('', PICK_ONE), PICK_ONE_SUMMARY],
 	])('shows the recommendation and tier on the park row: %s', (body, expected) => {
 		expect(run_board_decision.comment_question([body])).toBe(expected)
+	})
+})
+
+// joshuafolkken/kit#7001: a child parked again after an adoption shows its round on the park row.
+describe('run_board_decision park round (ac-80f5c282)', () => {
+	const park = park_body('', PICK_ONE)
+	const adopted = '#7001: adopted park option 1 (backlog:triage --adopt) — cheaper'
+
+	it('marks the second park after an adoption', () => {
+		expect(run_board_decision.comment_question([park, adopted, park])).toBe(
+			`${PICK_ONE_SUMMARY} — park 2 回目`,
+		)
+	})
+
+	it('adds no round to the first park', () => {
+		expect(run_board_decision.comment_question([adopted, park])).toBe(PICK_ONE_SUMMARY)
+	})
+
+	it('adds no round when the latest comment is no park, so the title fallback stays', () => {
+		expect(run_board_decision.comment_question([park, adopted, park, adopted])).toBeUndefined()
 	})
 })
 

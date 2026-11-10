@@ -62,8 +62,12 @@ const NO_PICK = /^推奨なし[\s:：—-]+\S/u
 const AUTO_TIER = 'A'
 // The tier no parent takes, even on a person's behalf: trust settings, third parties, destructive acts.
 const PERSON_TIER = 'C'
-// The permissions a parent holds without a person: none at all, or the parent's own.
-const AUTO_PERMISSIONS: ReadonlySet<string> = new Set(['なし', '親'])
+// The permission a parent adopts with no person and no action of its own.
+const AUTO_PERMISSION = 'なし'
+// An option needing the parent's own action (filing, closing, editing an Issue): adopting it is not
+// taking it, so the lane must not resume before the parent has (joshuafolkken/kit#7001).
+const PARENT_PERMISSION = '親'
+const PARENT_ACTION_NOTE = ' · 親の操作'
 
 const FORMAT = [
 	'Park body schema:',
@@ -226,22 +230,33 @@ function picked_option(body: string): ParkOption | undefined {
 	return park.options.find((candidate) => candidate.number === number)
 }
 
+function is_parent_action(option: ParkOption | undefined): boolean {
+	return option?.permission?.startsWith(PARENT_PERMISSION) === true
+}
+
 // The recommended option and its tier, or no recommendation; `undefined` for a body off the schema.
 function summary_of(body: string): string | undefined {
 	if (problem_of(body) !== undefined) return undefined
 	const option = picked_option(body)
 
 	if (option === undefined) return NO_PICK_WORD
+	const note = is_parent_action(option) ? PARENT_ACTION_NOTE : ''
 
-	return `推奨: ${String(option.number)}（層 ${option.tier ?? ''}）`
+	return `推奨: ${String(option.number)}（層 ${option.tier ?? ''}${note}）`
+}
+
+// Whether option `number` needs the parent's own action before the lane may resume.
+function parent_action(body: string, number: number): boolean {
+	return is_parent_action(parse(body).options.find((candidate) => candidate.number === number))
 }
 
 function is_parents(option: ParkOption): boolean {
-	return option.tier === AUTO_TIER && AUTO_PERMISSIONS.has(option.permission ?? '')
+	return option.tier === AUTO_TIER && option.permission === AUTO_PERMISSION
 }
 
 // The recommended option a parent with no person takes itself (joshuafolkken/kit#6738): tier A, needing
-// no permission beyond the parent's. `undefined` for any other park, which stays a person's.
+// no permission at all. An option needing the parent's own action is not taken by adopting it, so it
+// waits for `backlog:triage --adopt --done` (joshuafolkken/kit#7001). `undefined` for any other park.
 function auto_pick(body: string): number | undefined {
 	if (problem_of(body) !== undefined) return undefined
 	const option = picked_option(body)
@@ -291,6 +306,7 @@ const run_park_body = {
 	adoptable_pick,
 	approval_range,
 	auto_pick,
+	parent_action,
 	problem_of,
 	summary_of,
 }
