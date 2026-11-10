@@ -1,13 +1,15 @@
+import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_park_body } from '#scripts/run/park/run-park-body'
-import { run_park_write } from '#scripts/run/park/run-park-write'
+import { run_park_release } from '#scripts/run/park/run-park-release'
+import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_yield_cap } from './backlog-yield-cap'
 
-const { PORTS, WINDOW_MS, YIELD_CAP, body_of, capped, is_tripped, times_of } = backlog_yield_cap
+const { PORTS, TRIP_CAUSE, WINDOW_MS, YIELD_CAP, body_of, capped, is_tripped, times_of } =
+	backlog_yield_cap
 const ISSUE = '6799'
 const NOW = new Date('2026-11-08T16:30:00.000Z')
 
@@ -86,22 +88,33 @@ describe('backlog_yield_cap.PORTS', () => {
 		await expect(PORTS.yields(ISSUE)).resolves.toStrictEqual([at])
 	})
 
-	it('parks as a system stop and notes the trip with its exit code', async () => {
-		const run = vi.spyOn(run_park_write, 'system_stop').mockResolvedValue(0)
-		const emit = vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
+	// joshuafolkken/kit#7076: a mechanical stop the drive's auto-retry re-offers, not a person's park.
+	it('parks run:stalled with the trip cause, then releases the lane', async () => {
+		const apply = vi.spyOn(run_stalled_park, 'apply').mockResolvedValue(true)
+		const release = vi.spyOn(run_park_release, 'release').mockResolvedValue(0)
 
 		await PORTS.park(ISSUE, 'body')
 
-		expect(run).toHaveBeenCalledWith({ issue_number: ISSUE, body: 'body' }, process.cwd())
-		expect(emit).toHaveBeenCalledWith(
-			run_event_stream.EVENT_KIND.NOTE,
-			expect.stringContaining(`#${ISSUE} parked by backlog:drive`),
-		)
+		expect(apply).toHaveBeenCalledWith(ISSUE, 'body', TRIP_CAUSE)
+		expect(release).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('releases nothing when the run:stalled label did not land', async () => {
+		vi.spyOn(run_stalled_park, 'apply').mockResolvedValue(false)
+		const release = vi.spyOn(run_park_release, 'release').mockResolvedValue(0)
+
+		await PORTS.park(ISSUE, 'body')
+
+		expect(release).not.toHaveBeenCalled()
 	})
 })
 
 describe('backlog_yield_cap.body_of', () => {
-	it('writes a park body run:park accepts', () => {
-		expect(run_park_body.problem_of(body_of(ISSUE))).toBeUndefined()
+	it('names the label, the trip and the automatic re-offer, asking no person', () => {
+		const body = body_of(ISSUE)
+
+		expect(body).toContain(`Parked with \`${RUN_STALLED_LABEL}\``)
+		expect(body).toContain('re-offers it itself')
+		expect(body).not.toContain('必要な権限')
 	})
 })

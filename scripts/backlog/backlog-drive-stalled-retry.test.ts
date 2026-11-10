@@ -9,10 +9,14 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_stalled } from '#scripts/run/park/run-stalled'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_budget } from './backlog-budget'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_drive_stalled_retry } from './backlog-drive-stalled-retry'
+import { backlog_yield_cap } from './backlog-yield-cap'
+
+const { CAP_NOTE } = backlog_drive_stalled_retry
 
 const PARKED = 6675
 const AT = '2026-11-09T10:01:00Z'
@@ -115,7 +119,9 @@ describe('backlog_drive_stalled_retry.sweep — the cause cleared', () => {
 		vi.spyOn(console, 'error').mockReturnValue()
 
 		await expect(next_sweep()).resolves.toBeUndefined()
-		expect(console.error).toHaveBeenCalledOnce()
+		expect(console.error).toHaveBeenCalledExactlyOnceWith(
+			`Error: Could not retry #${String(PARKED)} automatically. Left for a person.`,
+		)
 	})
 
 	it('sweeps at most once per offer interval', async () => {
@@ -164,7 +170,7 @@ describe('backlog_drive_stalled_retry.sweep — parks left for a person (ac-22d3
 					.mocked(run_add_issue.read)
 					.mockResolvedValue(issue([RUN_STALLED_LABEL, NEEDS_DECISION_LABEL])),
 		],
-		['no classification', () => mock_stream([park({})])],
+		['no stop and a cause with no check', () => mock_stream([park({})])],
 		[
 			'a stage with no check',
 			() => mock_stream([park({ stop: { stage: 'review', cause: 'finding' } })]),
@@ -182,37 +188,94 @@ describe('backlog_drive_stalled_retry.sweep — parks left for a person (ac-22d3
 	})
 })
 
-describe('backlog_drive_stalled_retry.sweep — the cap (ac-bc44aff6)', () => {
+describe('backlog_drive_stalled_retry.sweep — the cap (ac-bc44aff6, ac-328f94e0)', () => {
 	const capped = [retry_event(0), retry_event(0), park()]
 
-	it('restates the park with the cap note instead of retrying', async () => {
+	it("counts a restarted drive's earlier retries off the whole stream, restating the park with the cap note and its cause", async () => {
 		mock_stream([park()], capped)
 		await next_sweep()
 
 		expect(josh_command.josh_run).not.toHaveBeenCalled()
 		expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(
 			PARK,
-			`#${String(PARKED)} parked (${RUN_STALLED_LABEL}: ${backlog_drive_stalled_retry.CAP_NOTE})`,
+			`#${String(PARKED)} parked (${RUN_STALLED_LABEL}: ${CAP_NOTE} — ship-stop cap)`,
 			expect.any(Date),
 			{ stop: FOLLOWUP_STOP },
 		)
 	})
 
-	it('shows the cap on the board row of the restated park', () => {
-		const restated = park(undefined, backlog_drive_stalled_retry.CAP_NOTE)
+	it('shows the cap and the cause on the board row of the restated park (ac-9b3cdd83)', () => {
+		const restated = park(undefined, `${CAP_NOTE} — ${run_stalled.SESSION_UNFINISHED.short}`)
 		const reason = run_board_ending_reason.reason_of(restated) ?? ''
 
 		expect(run_board_ending_reason.park_row_reason(PARKED, reason, true)).toBe(
-			`→ resume: pnpm josh run:add ${String(PARKED)} --retry (${backlog_drive_stalled_retry.CAP_NOTE})`,
+			`→ resume: pnpm josh run:add ${String(PARKED)} --retry (${CAP_NOTE} — session unfinished)`,
 		)
 	})
 
 	it('restates the cap only once', async () => {
-		mock_stream([park(undefined, backlog_drive_stalled_retry.CAP_NOTE)], capped)
+		mock_stream([park(undefined, CAP_NOTE)], capped)
 		await next_sweep()
 
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 		expect(run_add_issue.read).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7076: `run:merge`'s causes name nothing a read could show cleared.
+describe('backlog_drive_stalled_retry.sweep — a park with no stop (ac-a7d6e211)', () => {
+	it.each([
+		run_stalled.SESSION_UNFINISHED.short,
+		run_stalled.CUT_NOT_RELAUNCHED.short,
+		run_stalled.STALE_HANDOFF.short,
+		run_stalled.session_unfinished('Implementation done; gate red on lint.').short,
+	])('retries a %s park on the next sweep, reading no pull request', async (cause) => {
+		mock_stream([park({}, cause)])
+		await next_sweep()
+
+		expect(git_gh_pr_snapshot.pr_get_checks_snapshot).not.toHaveBeenCalled()
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+	})
+})
+
+// A yield-cap park parked `at` milliseconds into the test clock.
+function yield_park(at: number): RunEvent {
+	return { ...park({}, backlog_yield_cap.TRIP_CAUSE), at: new Date(at).toISOString() }
+}
+
+// The park instant whose window has passed exactly at the next sweep's clock.
+function due_at(): number {
+	return clock.now + backlog_budget.OFFER_INTERVAL_MS - backlog_yield_cap.WINDOW_MS
+}
+
+describe('backlog_drive_stalled_retry.sweep — a yield-cap park (ac-1737b91a)', () => {
+	it('does not retry before its window has passed', async () => {
+		mock_stream([yield_park(due_at() + 1)])
+		await next_sweep()
+
+		expect(josh_command.josh_run).not.toHaveBeenCalled()
+	})
+
+	it('retries once its window has passed', async () => {
+		mock_stream([yield_park(due_at())])
+		await next_sweep()
+
+		expect(josh_command.josh_run).toHaveBeenCalledExactlyOnceWith(RETRY_ARGV, true)
+	})
+
+	it('reaches the cap on the third trip, naming the cause', async () => {
+		const trip = yield_park(due_at())
+
+		mock_stream([trip], [retry_event(0), retry_event(0), trip])
+		await next_sweep()
+
+		expect(josh_command.josh_run).not.toHaveBeenCalled()
+		expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(
+			PARK,
+			`#${String(PARKED)} parked (${RUN_STALLED_LABEL}: ${CAP_NOTE} — ${backlog_yield_cap.TRIP_CAUSE})`,
+			expect.any(Date),
+			{},
+		)
 	})
 })
 

@@ -27,7 +27,7 @@ Issue labels and entry states. Procedures: [`workflow-commands`](../.claude/skil
 | `measured:unmet` | Set with `measured` by `josh issue:measured --unmet`: the measurement fell short of the expected effect it checked. `josh effect:audit` reads it.                                                                             |
 | `epic`           | The Issue tracks child Issues and the order they land in.                                                                                                                                                                     |
 
-A live backlogrun retries a `run:stalled` `followup` park itself once its PR is mergeable with all required checks green, 2 times at most; then its row shows `auto-retry cap 2 reached`.
+A live backlogrun retries a `run:stalled` park itself — a `followup` stop once its PR is mergeable and green, `yield cap` after its 15-minute window, `session unfinished`, `cut not relaunched` and `stale hand-off` on the next sweep — 2 times per Issue across driver restarts; then its row shows `auto-retry cap 2 reached — <cause>`. Any other park, or one at the cap, waits for `run:add N --retry`.
 
 ### `needs-human-review` — the opposite label
 
