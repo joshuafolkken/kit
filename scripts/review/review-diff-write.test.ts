@@ -12,6 +12,8 @@ import { review_diff_write } from './review-diff-write'
 
 const TIMEOUT_MS = 30_000
 const CAP = 300
+// Wide enough for both paths' whole diffs, so packing writes a single file.
+const WIDE_CAP = 8000
 const EDITED = 'edited.ts'
 const ADDED = 'added.ts'
 const LINE_COUNT = 60
@@ -42,20 +44,35 @@ async function build_change(root: string): Promise<string> {
 	return await git(root, ['rev-parse', 'HEAD'])
 }
 
-async function write_change_parts(): Promise<DiffParts> {
+async function write_change_parts(cap = CAP): Promise<DiffParts> {
 	const directory = path.join(fixture.workspace, 'parts')
 
 	mkdirSync(directory)
 	const paths = await changed_paths.read_changed_paths(false)
 
 	return await review_diff_write.write_parts(
-		{ root: fixture.root, base: fixture.base, paths, cap: CAP },
+		{ root: fixture.root, base: fixture.base, paths, cap },
 		directory,
 	)
 }
 
-function body(files: ReadonlyArray<string> | undefined): string {
-	return (files ?? []).map((file) => review_diff_parts.body_of(readFileSync(file, 'utf8'))).join('')
+// A packed file can carry the tail of one path and the head of the next (joshuafolkken/kit#7044), so a
+// path's diff is the parts under its own headers. No fixture line starts with `# `, so the headers are
+// the only lines that do.
+const PART_HEADER = /^# (?<relative>\S+) — part \d+ of \d+\n/mu
+
+function own_parts(text: string, relative: string): Array<string> {
+	return text
+		.split(/(?=^# \S+ — part \d+ of \d+\n)/mu)
+		.filter((part) => PART_HEADER.exec(part)?.groups?.['relative'] === relative)
+}
+
+function body(parts: DiffParts, relative: string): string {
+	const text = [...new Set(parts[relative])].map((file) => readFileSync(file, 'utf8')).join('')
+
+	return own_parts(text, relative)
+		.map((part) => review_diff_parts.body_of(part))
+		.join('')
 }
 
 beforeEach(async () => {
@@ -93,12 +110,12 @@ describe('review_diff_write.write_parts — the whole change, under the cap', ()
 		const parts = await write_change_parts()
 		const diff = await review_diff_write.path_diff(fixture.root, fixture.base, EDITED)
 
-		expect(body(parts[EDITED])).toBe(diff)
+		expect(body(parts, EDITED)).toBe(diff)
 	})
 
 	it('reads a tracked path against the base, staged edits included', async () => {
 		const parts = await write_change_parts()
-		const edited = body(parts[EDITED])
+		const edited = body(parts, EDITED)
 
 		expect(edited).toContain('-old 0')
 		expect(edited).toContain('+new 0')
@@ -107,6 +124,12 @@ describe('review_diff_write.write_parts — the whole change, under the cap', ()
 	it("carries an untracked file's whole content", async () => {
 		const parts = await write_change_parts()
 
-		expect(body(parts[ADDED])).toContain(lines('added'))
+		expect(body(parts, ADDED)).toContain(lines('added'))
+	})
+
+	it('packs a change that fits the cap into one file for both paths', async () => {
+		const parts = await write_change_parts(WIDE_CAP)
+
+		expect(new Set(Object.values(parts).flat()).size).toBe(1)
 	})
 })
