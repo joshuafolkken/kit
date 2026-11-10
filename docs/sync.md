@@ -50,6 +50,7 @@ The Codex project files are managed by kit. Sync overwrites both files, and rewr
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hooks`                                 | Replaces kit's hooks with the distributed ones and removes a hook kit has retired. Every other hook stays, after kit's.                             |
 | `permissions.allow`, `permissions.deny` | Keeps every kit entry present — a kit `deny` you removed comes back — and keeps your own entries after them. An entry kit has withdrawn is removed. |
+| `statusLine`                            | Your own status line is kept. Only a file without one gets kit's, which runs `pnpm josh usage:tee` to record Claude rate limits for `run:board`.    |
 | Other keys kit ships                    | Set to kit's value. Inside an object such as `env` or `enabledPlugins`, kit's entries win and your own entries stay.                                |
 | Keys kit does not ship                  | Left as they are (`permissions.defaultMode`, for example).                                                                                          |
 

@@ -705,13 +705,13 @@ pnpm josh ship --log <N>                                          # a detached s
 
 <!-- /usage -->
 
-It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate stops the ship before the followup merges; a sync that merged the default branch pushes onto an open pull request ahead of the gate, and the commit stage pushes the gated tree. The the report closes with the name of the stopped step.
+It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate stops the ship before the followup merges; a sync that merged the default branch pushes onto an open pull request ahead of the gate, and the commit stage pushes the gated tree. The report names the stopped step.
 
-The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run (branch-2 filing runs before `ship`), forwarded to `run:tail` after the closed issue.
+The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run, forwarded to `run:tail` after the closed issue.
 
-A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate.
+A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate. A pass is reused on an unchanged tree, base, title and body.
 
-A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped (re-ship after review or followup failure)` (`run-ship-reship.ts`). A `--review` ship still runs its `test:pinned` there; the supervised preflight and gate still run.
+A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped …` (`run-ship-reship.ts`). A `--review` ship still runs its `test:pinned` there; the supervised preflight and gate still run.
 
 A followup red after a main move is merged, gated and pushed inside the followup stage, printing `followup: the default branch moved under the failed checks — …`; only a red there stops.
 
@@ -721,9 +721,11 @@ In scope, run the `lane:plan` command the stop prints (every path, as a re-run r
 
 The notice is the same answer, printed ahead of the ship by `check:related`, `run:review --join` and a lane child's `review:record` after round 1's fixes — a file a fix added is planned before the ship.
 
-A re-run resumes: a per-issue stage record, honored only where the actual state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
+A re-run resumes: a per-issue stage record, honored only where git state corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
 
 A lane child always ships with `--review`, after its in-implement round 1. The `review` stage reuses a round 1 attested on this branch whose tree held, or moved only where round 2 reads, and ends `skipped` (`done` when an owed interaction review then runs); any other round 1 is reviewed again. A gate stage that reuses a green record ends `skipped` too.
+
+Round 2 re-runs only on a moved tree or base, or a stale review.
 
 The review stage's `ship-stage` line carries the reason after `|` (`reused: …` or `ran: … — <cause>`), and `lane:breakdown` prints it beside the stage.
 
