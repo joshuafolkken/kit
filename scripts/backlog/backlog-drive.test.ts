@@ -309,6 +309,21 @@ describe('backlog_drive.run_loop', () => {
 	})
 })
 
+// joshuafolkken/kit#7016: the tick's shared snapshot is taken once, before the tick asks anything.
+it('begins each tick once with the lanes then in flight', async () => {
+	const { ports, states } = harness({ finished: [FIRST_CHILD], offers: [offer('stop')] })
+	const ticks: Array<ReadonlyArray<string>> = []
+
+	async function begin_tick(in_flight: ReadonlyArray<string>): Promise<void> {
+		ticks.push(in_flight)
+	}
+
+	await backlog_drive.run_loop(state([FIRST_CHILD]), CONFIG, { ...ports, begin_tick })
+
+	expect(ticks[0]).toStrictEqual([FIRST_CHILD])
+	expect(ticks).toHaveLength(states.length)
+})
+
 it('returns window once the bounded wait is spent', async () => {
 	const { ports } = harness({})
 	const end = await backlog_drive.run_loop(

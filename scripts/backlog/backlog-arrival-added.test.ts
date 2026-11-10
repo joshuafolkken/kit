@@ -1,5 +1,5 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { backlog_arrival_added } from './backlog-arrival-added'
 
 // joshuafolkken/kit#3433: the `add` event `run:add` writes is what ends the parent's `--wait` early.
@@ -64,5 +64,29 @@ async function raised(): Promise<ReadonlyArray<RunEvent>> {
 describe('backlog_arrival_added.is_raised_since', () => {
 	it('sees a lane-limit event written at or after the instant', async () => {
 		await expect(backlog_arrival_added.is_raised_since(SINCE_MS, raised)).resolves.toBe(true)
+	})
+})
+
+// joshuafolkken/kit#7016: the addition and the raise question share one parse of the stream per tick.
+describe('backlog_arrival_added.tick_reader', () => {
+	it('reads the stream once for both questions of a tick', async () => {
+		const read = vi.fn(raised)
+		const tick = backlog_arrival_added.tick_reader(read)
+		const added = await backlog_arrival_added.is_added_since(SINCE_MS, tick.read)
+		const is_raised = await backlog_arrival_added.is_raised_since(SINCE_MS, tick.read)
+
+		expect([added, is_raised]).toStrictEqual([false, true])
+		expect(read).toHaveBeenCalledTimes(1)
+	})
+
+	it('reads the stream again once the next tick begins', async () => {
+		const read = vi.fn(raised)
+		const tick = backlog_arrival_added.tick_reader(read)
+
+		await tick.read()
+		tick.begin_tick()
+		await tick.read()
+
+		expect(read).toHaveBeenCalledTimes(2)
 	})
 })

@@ -253,7 +253,7 @@ function origin_problem(body: string, target: string, current: string): string |
 
 // The duplicate candidates the caller has not declared separate. The scan cannot tell a duplicate from
 // a neighbor — that is a reading of each candidate (`issue-fold-existing.md`) — so the command holds
-// the filing until every candidate it printed is named back with `--distinct`.
+// the filing until every title match it printed is named back with `--distinct`.
 function unacknowledged(
 	candidates: ReadonlyArray<number>,
 	distinct: ReadonlyArray<number>,

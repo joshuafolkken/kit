@@ -250,12 +250,17 @@ function record_ports(script: Script, now: () => Date): RecordPorts {
 	}
 }
 
+// The scripted ports read no process table or stream, so a tick has no snapshot to take.
+async function no_snapshot(): Promise<void> {
+	await Promise.resolve()
+}
+
 // The loop-facing ports: a clock the sleeps advance, and the finish and state records.
 function loop_ports(
 	script: Script,
 	calls: Array<string>,
 	states: Array<DriveState>,
-): Pick<LoopPorts, 'now' | 'sleep' | 'finish' | 'on_state'> & RecordPorts {
+): Pick<LoopPorts, 'now' | 'begin_tick' | 'sleep' | 'finish' | 'on_state'> & RecordPorts {
 	let now_ms = START_MS
 
 	function now(): Date {
@@ -264,6 +269,7 @@ function loop_ports(
 
 	return {
 		now,
+		begin_tick: no_snapshot,
 		...record_ports(script, now),
 		sleep: async (milliseconds) => {
 			now_ms += milliseconds
