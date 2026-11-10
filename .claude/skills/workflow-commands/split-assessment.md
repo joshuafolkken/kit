@@ -53,7 +53,6 @@ capped at the guide (no declaration: the guide), on either axis. Scoped checks a
 none. The notice is a warning, not a stop: go on implementing;
 review and ship print it and proceed.
 
-- `run:cut`'s `budget-over` is the same warning; never run the spill command it prints.
 - Split again only for an independent added requirement, or scope growth this Issue cannot verify:
   file it with `pnpm josh issue:file --route split --found-during <N>`, and finish this Issue.
   On its direction refusal → `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.

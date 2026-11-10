@@ -5,7 +5,7 @@
 # clear the git location variables (`GIT_LOCATION_VARIABLES`) when the checkout resolves without them,
 # then run `dist/hooks/<name>.js`, or josh with `<name>`'s first `-` as `:`. kit's checkout gates the
 # bundles with the built `dist/hooks/ready.js`, or `tools/hooks/hook-bundle-ready.ts` before a first
-# build; a built checkout first hands `pretool-guard` to its resident daemon (`daemon_answer`). No
+# build; a built checkout or package first hands `pretool-guard` to its resident daemon (`daemon_answer`). No
 # process the shell can do itself, and `if`/`else`
 # rather than `&&`/`||`: a guard's refusal is a non-zero exit that must not run the hook twice.
 
@@ -22,6 +22,8 @@ josh_command="${hook_name%%-*}:${hook_name#*-}"
 
 launch_directory=$PWD
 cd "${package_dir%/node_modules/*/*}" || exit
+# The project's own cache: an installed package's directory may be a read-only store link.
+cache_dir=$PWD/node_modules/.cache
 # A command from before joshuafolkken/kit#6033 exports the launch directory itself, then moves to the root.
 if [ "$launch_directory" != "$PWD" ] || [ -z "$JOSH_HOOK_CWD" ]; then export JOSH_HOOK_CWD="$launch_directory"; fi
 worktrees_dir=$PWD/.claude/worktrees/
@@ -39,7 +41,7 @@ if [ -n "$GIT_ALTERNATE_OBJECT_DIRECTORIES$GIT_COMMON_DIR$GIT_DIR$GIT_INDEX_FILE
 	unset $location_variables
 fi
 
-compile_cache="$package_dir/node_modules/.cache/kit-hook-compile"
+compile_cache="$cache_dir/kit-hook-compile"
 
 # Hand the call to the resident pretool-guard of this checkout and launch environment
 # (`tools/hooks/hook-daemon.ts`) and exit with its answer. Returns, with the payload back on stdin, when
@@ -52,7 +54,7 @@ daemon_answer() {
 		unset PWD OLDPWD JOSH_HOOK_CWD _ SHLVL
 		export -p
 	) | cksum)
-	daemons_dir="$package_dir/node_modules/.cache/kit-hook-daemon"
+	daemons_dir="$cache_dir/kit-hook-daemon"
 	daemon_dir="$daemons_dir/${daemon_key%% *}"
 	daemon_pid=
 	if [ -f "$daemon_dir/pid" ]; then read -r daemon_pid <"$daemon_dir/pid"; fi
@@ -99,13 +101,14 @@ daemon_answer() {
 	rm -rf "$request"
 }
 
+daemon="$package_dir/dist/hooks/daemon.js"
+if [ "$hook_name" = pretool-guard ] && [ -f "$daemon" ]; then daemon_answer "$daemon"; fi
+
 case $0 in
 *node_modules/*)
 	if [ -d "$package_dir/dist/hooks" ]; then exec node "$bundle" "$@"; else exec node "$package_dir/dist/josh.js" "$josh_command" "$@"; fi
 	;;
 *)
-	daemon="$package_dir/dist/hooks/daemon.js"
-	if [ "$hook_name" = pretool-guard ] && [ -f "$daemon" ]; then daemon_answer "$daemon"; fi
 	gate="$package_dir/dist/hooks/ready.js"
 	if [ ! -f "$gate" ]; then gate="$package_dir/tools/hooks/hook-bundle-ready.ts"; fi
 	NODE_COMPILE_CACHE="$compile_cache" exec node --disable-warning=ExperimentalWarning "$gate" "$hook_name" "$josh_command" "$@"

@@ -231,18 +231,6 @@ function route_of(labels: ReadonlyArray<string>): string | undefined {
 	return labels.includes(SPLIT_ROUTE_LABEL) ? SPLIT_ROUTE_LABEL : undefined
 }
 
-// Whether an open Issue is declared over the cap — `backlog:next`, `auto-ok:next` and the idle
-// notice all hold it for a person through this one check.
-function is_issue_over_cap(
-	issue: Pick<OpenIssueData, 'body' | 'labels'>,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
-): boolean {
-	const labels = issue.labels?.map((label) => label.name) ?? []
-
-	return over_cap(issue.body ?? '', route_of(labels), rate, growth) !== undefined
-}
-
 // The counts against the cap, shared by the filing refusal and `backlog:next`'s withheld note.
 function capped(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
 	const { cap } = guide_for(rate)
@@ -275,7 +263,7 @@ function budget_refusal(
 }
 
 // joshuafolkken/kit#6025: an estimate whose projected implement time exceeds the stage
-// budget — the filing refuses it and `backlog:next` notes it (joshuafolkken/kit#6066);
+// budget — the filing refuses it and `backlog:next` holds it (joshuafolkken/kit#7006);
 // `undefined` for one declaring why it stays one deliverable (joshuafolkken/kit#6602), with no
 // measured rate, or within the budget. A split filing is judged too — its exemption is the guide's
 // alone (joshuafolkken/kit#7005).
@@ -289,6 +277,23 @@ function over_budget(
 	if (estimate === undefined || rate === undefined) return undefined
 
 	return projected_minutes(estimate, rate, growth) > IMPLEMENT_BUDGET ? estimate : undefined
+}
+
+// Whether an open Issue is declared over the cap, or projected over the implement budget at `rate`
+// (joshuafolkken/kit#7006) — `backlog:next`, `auto-ok:next` and the idle notice all hold it for a
+// person through this one check, so the size is settled before a lane starts it.
+function is_issue_over_cap(
+	issue: Pick<OpenIssueData, 'body' | 'labels'>,
+	rate?: ImplementRate,
+	growth?: SizeRatios,
+): boolean {
+	const body = issue.body ?? ''
+	const labels = issue.labels?.map((label) => label.name) ?? []
+
+	return (
+		over_cap(body, route_of(labels), rate, growth) !== undefined ||
+		over_budget(body, rate, growth) !== undefined
+	)
 }
 
 function budget_problem(

@@ -36,6 +36,12 @@ const DAEMON_STUB =
 	'if (process.env.DAEMON_HOLD) setInterval(() => {}, 1000)\n'
 const DAEMON_SCRIPT = 'dist/hooks/daemon.js'
 const FALLBACK_OUTPUT = `gate pretool-guard pretool:guard ${PAYLOAD}`
+// joshuafolkken/kit#6962: the installed package's launcher, which runs its bundle where kit's runs the gate.
+const INSTALLED_PACKAGE = 'node_modules/@joshuafolkken/kit'
+const INSTALLED_LAUNCHER = `${INSTALLED_PACKAGE}/${LAUNCHER}`
+const BUNDLE_STUB =
+	"process.stdout.write(`bundle ${process.getBuiltinModule('node:fs').readFileSync(0, 'utf8')}`)\n"
+const BUNDLE_OUTPUT = `bundle ${PAYLOAD}`
 
 interface LaunchResult {
 	status: number | null
@@ -76,8 +82,8 @@ function read_log(name: string): string {
 	return existsSync(path_in(name)) ? readFileSync(path_in(name), 'utf8') : ''
 }
 
-async function launch(): Promise<LaunchResult> {
-	const child = spawn('sh', [LAUNCHER, 'pretool-guard'], {
+async function launch(launcher = LAUNCHER): Promise<LaunchResult> {
+	const child = spawn('sh', [launcher, 'pretool-guard'], {
 		cwd: workspace.root,
 		env: workspace.environment,
 	})
@@ -96,8 +102,8 @@ async function launch(): Promise<LaunchResult> {
 }
 
 // A launch with no daemon starts one; the stub records the directory it was asked to serve.
-async function daemon_directory(): Promise<string> {
-	await launch()
+async function daemon_directory(launcher = LAUNCHER): Promise<string> {
+	await launch(launcher)
 
 	return await vi.waitFor(() => {
 		const directory = DETACH_PATTERN.exec(read_log(DAEMON_LOG))?.groups?.['directory']
@@ -127,8 +133,8 @@ function daemon_identity(directory: string): ChildProcess {
 }
 
 // The daemon served in this process, under a pid that passes the launcher's identity check.
-function serve_from(directory: string, answer: Daemon['answer']): void {
-	const daemon = hook_daemon.start(directory, { answer, is_current: () => true })
+function serve_from(directory: string, answer: Daemon['answer'], is_current = true): void {
+	const daemon = hook_daemon.start(directory, { answer, is_current: () => is_current })
 
 	if (daemon === undefined) throw new Error('the daemon directory was already claimed')
 	started.push(daemon)
@@ -207,6 +213,65 @@ describe(
 			expect(stdout).toBe(FALLBACK_OUTPUT)
 			expect(unrelated.signalCode).toBeNull()
 			expect(existsSync(path.join(directory, 'requests'))).toBe(false)
+		})
+
+		// joshuafolkken/kit#6962: a daemon whose build was replaced replies `stale` and goes
+		// (`tools/hooks/hook-daemon.test.ts`), so the call runs on the build in place.
+		it('runs a call itself on the build in place when the daemon replies stale', async () => {
+			const answer = vi.fn<Daemon['answer']>()
+
+			serve_from(await daemon_directory(), answer, false)
+			const { stdout } = await launch()
+
+			expect(stdout).toBe(FALLBACK_OUTPUT)
+			expect(answer).not.toHaveBeenCalled()
+		})
+	},
+)
+
+describe(
+	'run-hook.sh pretool-guard in an installed package',
+	{ timeout: LAUNCH_TIMEOUT_MS },
+	() => {
+		beforeEach(() => {
+			mkdirSync(path_in(`${INSTALLED_PACKAGE}/scripts/hooks`), { recursive: true })
+			copyFileSync(RUN_HOOK_SOURCE, path_in(INSTALLED_LAUNCHER))
+			write_file(workspace.root, `${INSTALLED_PACKAGE}/${DAEMON_SCRIPT}`, DAEMON_STUB)
+			write_file(workspace.root, `${INSTALLED_PACKAGE}/dist/hooks/pretool-guard.js`, BUNDLE_STUB)
+		})
+
+		it('answers a passed call from a live daemon without launching node', async () => {
+			const answer = vi
+				.fn<Daemon['answer']>()
+				.mockResolvedValue({ status: 0, stdout: '', stderr: '' })
+
+			serve_from(await daemon_directory(INSTALLED_LAUNCHER), answer)
+			rmSync(path_in(NODE_LOG), { force: true })
+			const result = await launch(INSTALLED_LAUNCHER)
+
+			expect(result).toStrictEqual({ status: 0, stdout: '', node_launches: 0 })
+			expect(answer).toHaveBeenCalledWith(PAYLOAD, workspace.root, expect.any(Number))
+		})
+
+		it('runs the bundle itself and starts a daemon under the project cache when there is none', async () => {
+			const result = await launch(INSTALLED_LAUNCHER)
+
+			expect(result.stdout).toBe(BUNDLE_OUTPUT)
+			await expect(daemon_directory(INSTALLED_LAUNCHER)).resolves.toContain(
+				path_in('node_modules/.cache/kit-hook-daemon/'),
+			)
+		})
+
+		it('runs the bundle itself and stops a daemon that does not answer', async () => {
+			const directory = await daemon_directory(INSTALLED_LAUNCHER)
+			const stopped = exited(daemon_identity(directory))
+
+			execFileSync('mkfifo', [path.join(directory, 'requests')])
+
+			const { stdout } = await launch(INSTALLED_LAUNCHER)
+
+			expect(stdout).toBe(BUNDLE_OUTPUT)
+			await expect(stopped).resolves.toBe('SIGTERM')
 		})
 	},
 )
