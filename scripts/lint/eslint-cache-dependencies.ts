@@ -38,6 +38,24 @@ interface CacheEntry {
 
 type Hashes = ReadonlyMap<string, string>
 
+// How many of the cache file's entries the drop removed, of how many it read: a slow cached run is
+// read against it, since a change to a module many files import drops all of them (joshuafolkken/kit#6984).
+interface CacheDrop {
+	dropped: number
+	total: number
+}
+
+interface StaleDrop {
+	hashes: Hashes
+	drop: CacheDrop
+}
+
+// The run's answer, and the drop before it — undefined where no import graph guarded the run.
+interface CountedRun<T> {
+	result: T
+	drop?: CacheDrop | undefined
+}
+
 function is_record(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -94,14 +112,14 @@ function recorded_hash(entry: CacheEntry): string | undefined {
 }
 
 // Drops every entry whose imports no longer hash as recorded, and answers the hashes it took.
-function drop_stale(cache_file: string, graph: ImportGraph): Hashes {
+function drop_stale(cache_file: string, graph: ImportGraph): StaleDrop {
 	const entries = read_or_discard(cache_file)
 	const hashes = new Map(entries.map((entry) => [entry.key, graph.closure_hash(entry.key)]))
 	const kept = entries.filter((entry) => recorded_hash(entry) === hashes.get(entry.key))
 
 	if (kept.length !== entries.length) write_entries(cache_file, kept)
 
-	return hashes
+	return { hashes, drop: { dropped: entries.length - kept.length, total: entries.length } }
 }
 
 // eslint writes `data` only for a file it linted, so an entry with `data` and no hash is one this run
@@ -123,23 +141,35 @@ function record(cache_file: string, hashes: Hashes, graph: ImportGraph): void {
 	if (recorded.length > 0) write_entries(cache_file, entries)
 }
 
-// Runs one cached eslint run between the drop and the record. A project without `typescript` or a `tsconfig.json` runs it as it was.
+// Runs one cached eslint run between the drop and the record, answering what the drop removed. A
+// project without `typescript` or a `tsconfig.json` runs it as it was.
+async function guard_counted<T>(
+	cache_file: string,
+	run: () => Promise<T>,
+	root: string = process.cwd(),
+): Promise<CountedRun<T>> {
+	const graph = await import_graph.create(root)
+	if (graph === undefined) return { result: await run() }
+	const location = path.resolve(root, cache_file)
+	const { hashes, drop } = drop_stale(location, graph)
+	const result = await run()
+
+	record(location, hashes, graph)
+
+	return { result, drop }
+}
+
 async function guard<T>(
 	cache_file: string,
 	run: () => Promise<T>,
 	root: string = process.cwd(),
 ): Promise<T> {
-	const graph = await import_graph.create(root)
-	if (graph === undefined) return await run()
-	const location = path.resolve(root, cache_file)
-	const hashes = drop_stale(location, graph)
-	const result = await run()
-
-	record(location, hashes, graph)
+	const { result } = await guard_counted(cache_file, run, root)
 
 	return result
 }
 
-const eslint_cache_dependencies = { guard }
+const eslint_cache_dependencies = { guard, guard_counted }
 
+export type { CacheDrop }
 export { eslint_cache_dependencies }

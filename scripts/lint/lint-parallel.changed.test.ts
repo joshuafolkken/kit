@@ -20,7 +20,9 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 }))
 vi.mock('./eslint-cache-dependencies', () => ({
 	eslint_cache_dependencies: {
-		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+		guard_counted: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => ({
+			result: await work(),
+		})),
 	},
 }))
 
@@ -34,7 +36,8 @@ const WHOLE_TREE = '.'
 const FAILED = 1
 const CHANGED_ARGUMENTS = ['--changed']
 const PRETTIER_PASS = 'All matched files use Prettier code style!'
-const TIMING_LINE = /^lint timing — prettier \d+\.\d s · eslint \d+\.\d s\n$/u
+const TIMING_LINE =
+	/^lint timing — prettier \d+\.\d s · eslint \d+\.\d s · cache (?:present|absent)/u
 const ESLINT_HEAP = `--max-old-space-size=${String(ESLINT_HEAP_MIB)}`
 const COLD_OPTIONS = `${ESLINT_HEAP} --import=${new URL('eslint-memory.js', import.meta.url).href}`
 

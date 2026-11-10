@@ -23,12 +23,14 @@ vi.mock('./eslint-daemon', () => ({
 }))
 vi.mock('./eslint-cache-dependencies', () => ({
 	eslint_cache_dependencies: {
-		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+		guard_counted: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => ({
+			result: await work(),
+		})),
 	},
 }))
 
 const { eslint_cache_dependencies } = await import('./eslint-cache-dependencies')
-const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
+const mocked_guard = vi.mocked(eslint_cache_dependencies.guard_counted)
 const { eslint_daemon } = await import('./eslint-daemon')
 const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
 const { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
@@ -246,6 +248,23 @@ describe('run_lint_checks — the timing line', () => {
 		await run_lint_parallel_checks({ warm_daemon: false, timing: timing_of('whole tree') })
 
 		expect(write).toHaveBeenCalledWith(expect.stringContaining('· whole tree · cold process · '))
+	})
+})
+
+// joshuafolkken/kit#6984: a slow lint is read against how many entries the dependency guard dropped.
+describe('run_lint_checks — the cache entries the dependency guard dropped', () => {
+	it('names the dropped entries beside a present cache', async () => {
+		const write = mock_warm_run(0, DAEMON_REUSED)
+
+		mocked_guard.mockImplementationOnce(async (_cache_file, work) => ({
+			result: await work(),
+			drop: { dropped: 3, total: 40 },
+		}))
+		await run_lint_checks(PRETTIER, ESLINT, PRESENT_CACHE_FILE, { ...WARM, timing: timing_of('1') })
+
+		expect(write).toHaveBeenCalledWith(
+			expect.stringContaining('· cache present · 3 of 40 cache entries dropped\n'),
+		)
 	})
 })
 
