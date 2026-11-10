@@ -1,6 +1,5 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { size_estimate } from '#scripts/issue/size-estimate'
-import { split_assess } from '#scripts/split/split-assess'
 import { describe, expect, it } from 'vitest'
 import type { LanePlan } from './lane-plan'
 import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-size'
@@ -10,7 +9,6 @@ import { lane_plan_size, type Oversize, type PlanSignals } from './lane-plan-siz
 // joshuafolkken/kit#5568: the probed hunks and the projected lines answer `split` too, with their reason.
 
 const ISSUE = 5533
-const FORMER_IMPLEMENT_BUDGET = 12
 const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト除く）\n'
 const PLANNED_AT = '2026-10-31T00:00:00.000Z'
 const TEST_FILE = 'scripts/lane/lane-plan-size.test.ts'
@@ -112,38 +110,35 @@ describe('lane_plan_size.oversize', () => {
 	})
 })
 
-// joshuafolkken/kit#6540: the lane budget rebalance shrank the implement budget the guide derives from.
-describe('lane_plan_size rebalanced implement budget', () => {
-	it('splits a measurement the former implement budget passed (ac-4e84878a)', () => {
-		const implement_rate = { median: 4, lanes: 1 }
-		const former = split_assess.guide_for(FORMER_IMPLEMENT_BUDGET, implement_rate)
+// joshuafolkken/kit#7074: the lines axis is the filing's size bar, twice the implement budget.
+describe('lane_plan_size size bar', () => {
+	it.each([
+		[50, undefined],
+		[60, 54],
+	])('judges %s declared lines at 20.6 min / 100 lines and growth 1.59375', (lines, limit) => {
+		const signals = { implement_rate: { median: 20.6, lanes: 372 }, lines_ratio: 1.59375 }
 
-		expect(signalled(declared(1, former.lines / 2), { implement_rate })).toMatchObject({
-			reason: 'lines',
-			measured: former.lines,
-		})
+		expect(signalled(declared(1, lines), signals)?.limit).toBe(limit)
 	})
 })
 
 describe('lane_plan_size measured guide', () => {
 	it.each([
-		[12, 100, false],
-		[12, 101, true],
-		[3, 150, false],
-		[3, 151, true],
-		[undefined, 100, false],
-		[undefined, 101, true],
+		[12, 75, false],
+		[12, 76, true],
+		[3, 300, false],
+		[3, 301, true],
 	])(
-		'matches the backlog line boundary at rate %s and %s lines (ac-881063cd)',
+		'matches the backlog size bar at rate %s and %s lines (ac-881063cd)',
 		(median, lines, split) => {
-			const implement_rate = median === undefined ? undefined : { median, lanes: 1 }
+			const implement_rate = { median, lanes: 1 }
 			const issues = declared(1, lines)
 			const body = issues[0]?.body ?? ''
 
 			const over = signalled(issues, { implement_rate })
 
 			expect(over).toEqual(split ? expect.objectContaining({ reason: 'lines' }) : undefined)
-			expect(size_estimate.over_guide(body, undefined, implement_rate) !== undefined).toBe(split)
+			expect(size_estimate.over_budget(body, implement_rate) !== undefined).toBe(split)
 		},
 	)
 
@@ -151,7 +146,7 @@ describe('lane_plan_size measured guide', () => {
 		const signals = { implement_rate: { median: 12, lanes: 1 }, lines_ratio: 1.5 }
 		const issues = declared(1, 140)
 
-		expect(signalled(issues, signals)).toMatchObject({ reason: 'lines', measured: 210, limit: 200 })
+		expect(signalled(issues, signals)).toMatchObject({ reason: 'lines', measured: 210, limit: 100 })
 		expect(signalled(issues, { ...signals, split_filed: true })).toBeUndefined()
 		expect(replanned(issues, signals)).toBeUndefined()
 		expect(replanned(issues, signals, false)).toMatchObject({ reason: 'lines' })

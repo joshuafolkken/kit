@@ -1,4 +1,3 @@
-import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
@@ -35,6 +34,10 @@ const EXAMPLE = `${PREFIX} 約 3 ファイル / 60 行（テスト除く）`
 const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 const estimate_schema = z.object({ files: z.coerce.number(), lines: z.coerce.number() })
 const IMPLEMENT_BUDGET = lane_stage_budget.BUDGET_MINUTES.implement
+// joshuafolkken/kit#7074: the size bar is twice the implement budget — below it, a split adds a lane's
+// fixed stages, which cost more than the implement minutes it saves.
+const BAR_BUDGETS = 2
+const BAR_MINUTES = BAR_BUDGETS * IMPLEMENT_BUDGET
 
 function declared(body: string, prefix: string): string | undefined {
 	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
@@ -145,7 +148,7 @@ function problems(body: string): ReadonlyArray<string> {
 	return parse(body) === undefined ? [MALFORMED] : []
 }
 
-// Whether the body declares why it stays one Issue — the only excuse from the implement budget
+// Whether the body declares why it stays one Issue — the only excuse from the size bar
 // (joshuafolkken/kit#7005).
 function is_reasoned(body: string): boolean {
 	return (declared(body, REASON_PREFIX) ?? '') !== ''
@@ -231,7 +234,7 @@ function route_of(labels: ReadonlyArray<string>): string | undefined {
 	return labels.includes(SPLIT_ROUTE_LABEL) ? SPLIT_ROUTE_LABEL : undefined
 }
 
-// The counts against the cap, shared by the filing refusal and `backlog:next`'s withheld note.
+// The counts against the cap, shared by the filing refusal and `backlog:next`'s size note.
 function capped(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
 	const { cap } = guide_for(rate)
 
@@ -251,49 +254,76 @@ function projected_minutes(
 	return lane_implement_rate.minutes_for(grown(estimate.lines, 'lines', growth), rate)
 }
 
-function budget_refusal(
-	estimate: SizeMeasurement,
-	rate: ImplementRate,
-	growth?: SizeRatios,
-): string {
-	const minutes = Math.round(projected_minutes(estimate, rate, growth))
-	const measured = `${rate.median.toFixed(1)} implement min / 100 lines over ${String(rate.lanes)} lane(s)`
+// The most declared lines whose grown count projects within the size bar at `rate` — the one number
+// the filing refusal, `lane:plan`'s lines axis and `backlog:next`'s note judge by
+// (joshuafolkken/kit#7074); `undefined` with no usable rate.
+function declared_lines_bar(rate?: ImplementRate, growth?: SizeRatios): number | undefined {
+	const lines = lane_implement_rate.lines_for(BAR_MINUTES, rate)
 
-	return `${exceeded(estimate, rate, growth)} and projects ${String(minutes)} implement minute(s) at ${measured}, over the ${String(IMPLEMENT_BUDGET)}-minute implement budget — split it into children each within the budget or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return lines === undefined
+		? undefined
+		: Math.floor(lines / declared_growth.factor(growth, 'lines'))
 }
 
-// joshuafolkken/kit#6025: an estimate whose projected implement time exceeds the stage
-// budget — the filing refuses it and `backlog:next` holds it (joshuafolkken/kit#7006);
-// `undefined` for one declaring why it stays one deliverable (joshuafolkken/kit#6602), with no
-// measured rate, or within the budget. A split filing is judged too — its exemption is the guide's
-// alone (joshuafolkken/kit#7005).
+// The declared estimate of a body with no declared reason it stays one deliverable.
+function unreasoned(
+	body: string,
+	rate?: ImplementRate,
+	growth?: SizeRatios,
+): SizeMeasurement | undefined {
+	return is_reasoned(body) ? undefined : parse(body, rate, growth)
+}
+
+interface BarOverrun {
+	estimate: SizeMeasurement
+	rate: ImplementRate
+	bar: number
+}
+
+// An estimate declaring more lines than the size bar allows (joshuafolkken/kit#6025); `undefined` for
+// one declaring why it stays one deliverable (joshuafolkken/kit#6602), with no measured rate, or within
+// the bar. A split filing is judged too — its exemption is the guide's alone (joshuafolkken/kit#7005).
+function bar_overrun(
+	body: string,
+	rate: ImplementRate | undefined,
+	growth?: SizeRatios,
+): BarOverrun | undefined {
+	const estimate = unreasoned(body, rate, growth)
+	if (estimate === undefined || rate === undefined) return undefined
+	const bar = declared_lines_bar(rate, growth)
+
+	return bar !== undefined && estimate.lines > bar ? { estimate, rate, bar } : undefined
+}
+
+// The counts against the size bar, shared by the filing refusal and `backlog:next`'s offer note.
+function overrun_text(overrun: BarOverrun, growth?: SizeRatios): string {
+	const { estimate, rate, bar } = overrun
+	const minutes = Math.round(projected_minutes(estimate, rate, growth))
+	const measured = `${rate.median.toFixed(1)} implement min / 100 lines over ${String(rate.lanes)} lane(s)`
+	const limit = `the ${String(BAR_MINUTES)}-minute size bar (${String(BAR_BUDGETS)} × the ${String(IMPLEMENT_BUDGET)}-minute implement budget: at most ${String(bar)} declared line(s))`
+
+	return `${exceeded(estimate, rate, growth)} and projects ${String(minutes)} implement minute(s) at ${measured}, over ${limit}`
+}
+
+// The estimate over the size bar — the filing refuses it; `backlog:next` offers it with a note and the
+// lane's `lane:plan` answers `split` on it (joshuafolkken/kit#7074).
 function over_budget(
 	body: string,
 	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	const estimate = is_reasoned(body) ? undefined : parse(body, rate, growth)
-
-	if (estimate === undefined || rate === undefined) return undefined
-
-	return projected_minutes(estimate, rate, growth) > IMPLEMENT_BUDGET ? estimate : undefined
+	return bar_overrun(body, rate, growth)?.estimate
 }
 
-// Whether an open Issue is declared over the cap, or projected over the implement budget at `rate`
-// (joshuafolkken/kit#7006) — `backlog:next`, `auto-ok:next` and the idle notice all hold it for a
-// person through this one check, so the size is settled before a lane starts it.
-function is_issue_over_cap(
-	issue: Pick<OpenIssueData, 'body' | 'labels'>,
-	rate?: ImplementRate,
+// The note on an estimate over the size bar, or `undefined` within it.
+function budget_note(
+	body: string,
+	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
-): boolean {
-	const body = issue.body ?? ''
-	const labels = issue.labels?.map((label) => label.name) ?? []
+): string | undefined {
+	const overrun = bar_overrun(body, rate, growth)
 
-	return (
-		over_cap(body, route_of(labels), rate, growth) !== undefined ||
-		over_budget(body, rate, growth) !== undefined
-	)
+	return overrun === undefined ? undefined : overrun_text(overrun, growth)
 }
 
 function budget_problem(
@@ -301,14 +331,14 @@ function budget_problem(
 	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
 ): string | undefined {
-	const estimate = over_budget(body, rate, growth)
+	const note = budget_note(body, rate, growth)
 
-	return estimate === undefined || rate === undefined
+	return note === undefined
 		? undefined
-		: budget_refusal(estimate, rate, growth)
+		: `${note} — split it into children each within the bar or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
-// The filing refusal for an estimate over the cap, else over the implement budget at `rate`, else over
+// The filing refusal for an estimate over the cap, else over the size bar at `rate`, else over
 // the guide. A missing or malformed estimate is `problems`' refusal, not this one.
 function guide_problem(
 	body: string,
@@ -331,13 +361,14 @@ function declared_files(body: string): number | undefined {
 }
 
 const size_estimate = {
+	budget_note,
 	capped,
 	declared_files,
+	declared_lines_bar,
 	declared_size: parse,
 	exceeded,
 	guide_problem,
 	is_epic,
-	is_issue_over_cap,
 	over_budget,
 	over_cap,
 	over_guide,
