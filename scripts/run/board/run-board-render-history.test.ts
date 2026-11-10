@@ -126,6 +126,8 @@ describe('run_board_render.render settled rows', () => {
 	it.each<[ItemState, string]>([
 		['merged', '✅'],
 		['done', '🏁'],
+		// joshuafolkken/kit#7095 (ac-38bbacca, ac-da3ab33e): timed from its spans like any finished row.
+		['already_done', '⏩'],
 	])('leads a %s row with its finish time and ends it on its duration', (state, icon) => {
 		const finish = day_minute_of(NOW)
 

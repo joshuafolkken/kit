@@ -26,6 +26,8 @@ const FIRST_SHARD_DIRECTORIES: ReadonlyArray<string> = [
 
 type LintShard = typeof FIRST_SHARD | typeof SECOND_SHARD
 
+const SHARDS: ReadonlyArray<LintShard> = [FIRST_SHARD, SECOND_SHARD]
+
 function parse_shard(value: string): LintShard {
 	const shard = Number(value)
 
@@ -41,6 +43,11 @@ function shard_of(arguments_: ReadonlyArray<string>): LintShard | undefined {
 	const flag = arguments_.find((argument) => argument.startsWith(SHARD_FLAG_PREFIX))
 
 	return flag === undefined ? undefined : parse_shard(flag.slice(SHARD_FLAG_PREFIX.length))
+}
+
+// The flag that names a shard — what `shard_of` reads back.
+function shard_flag(shard: LintShard): string {
+	return `${SHARD_FLAG_PREFIX}${String(shard)}`
 }
 
 function second_shard_targets(): Array<string> {
@@ -71,10 +78,12 @@ function describe(shard: LintShard | undefined): string {
 const lint_shard = {
 	FIRST_SHARD_DIRECTORIES,
 	FORMATTING_SHARD_REASON,
+	SHARDS,
 	WHOLE_TREE,
 	checks_formatting,
 	describe,
 	eslint_targets,
+	shard_flag,
 	shard_of,
 }
 
