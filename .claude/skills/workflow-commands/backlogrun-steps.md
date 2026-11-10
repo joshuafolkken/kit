@@ -65,12 +65,13 @@ record is the parent loop's; a lane never touches it**. Count with `--merged <N>
 | `began` | Report the plan and run the decision pass, then run what the bare `pnpm josh run:step` prints — an empty plan or a `none` from `backlog:next` included, which the driver's idle watch ends, never the session |
 | `driving` | The supervisor already holds the record — "The plan, beside the first child" |
 | `resumed` | Take the budget from `--json`, report the plan again, read `backlogrun-progress.md` → "Resuming after a cut" |
-| `busy` / `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
+| `busy` | Wait; do not open a lane — ask `--begin` again at the next wake |
+| `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
 | `over` | **End the conversation**; retype the invocation in a fresh session |
-| `standing` | **Stop; do not open a lane**: report `pnpm josh backlogrun --restart` (continue the run) and `pnpm josh run:carry --end` (discard it) for the person to choose — a crash from a run-tooling defect this run has since fixed you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
+| `standing` | **Run `pnpm josh backlogrun --restart`**, then report it and `pnpm josh run:carry --end` (`scripts/backlog/backlogrun-restart.ts`; a run-tooling crash: `upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
 **End the record when the run ends** — `pnpm josh run:report --end`: the report, `run:carry --end`,
 then `run:wake --stop`, stopping at the first failed stage, which it names. **A run that ends by
-_stopping_** (a `stop` verdict or the consecutive-failure guard) **ends with `pnpm josh run:report
+_stopping_** (a `stop` verdict) **ends with `pnpm josh run:report
 --end --stopped "<one-line reason>"`** instead, which sends the one ⏸️ confirmation.
 
 **A driver hand-off of `epic #N` is a named epic**, declared or added by `run:add`: settle it by `backlogrun-progress.md` → "Running a
@@ -130,7 +131,7 @@ run `run:carry --begin`; act on the row, then end the turn:
 | `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` |
 | `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** |
 | `launch #N` | The driver parked `#N` `run:stalled`: "Resolve what the plan can resolve" → "A recovered mechanical failure" |
-| `merge [<token>] #N` | `environment` ends the run; the others re-read the child |
+| `merge [<token>] #N` | Re-read the child |
 | `epic #N` | A named epic's turn |
 | `watch` | The retrospective is owed (`run:step`): run `pnpm josh run:handoff retrospective` (`retrospective.md`) |
 | `window` | Hand the loop back as is |

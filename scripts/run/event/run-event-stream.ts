@@ -466,14 +466,19 @@ function read_last(target: string): RunEvent | undefined {
 	return read_events(target).findLast((event) => !TRACE_KINDS.has(event.kind))
 }
 
+// The events after the newest `reset_kind` — all of them, before the first one.
+function since(events: ReadonlyArray<RunEvent>, reset_kind: string): ReadonlyArray<RunEvent> {
+	const reset_at = events.findLastIndex((event) => event.kind === reset_kind)
+
+	return events.slice(reset_at + POSITION_INCREMENT)
+}
+
 // Whether `kind` is already on the stream after the newest `reset_kind` — or anywhere, before the first
 // one. The episode test for a marker whose episode ends only when something specific happens rather than
 // when any other event lands: a stall ends at a dispatch, and the merges, parks
 // and heartbeats every parallel lane appends in between must not read as a fresh stall.
 function has_since(events: ReadonlyArray<RunEvent>, kind: string, reset_kind: string): boolean {
-	const reset_at = events.findLastIndex((event) => event.kind === reset_kind)
-
-	return events.slice(reset_at + POSITION_INCREMENT).some((event) => event.kind === kind)
+	return since(events, reset_kind).some((event) => event.kind === kind)
 }
 
 // One event as the line a reader relays. The follow reader and the degenerate
@@ -499,6 +504,7 @@ const run_event_stream = {
 	read_events,
 	read_from,
 	read_last,
+	since,
 	target_of,
 }
 

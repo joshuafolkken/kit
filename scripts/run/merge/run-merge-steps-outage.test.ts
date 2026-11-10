@@ -82,3 +82,15 @@ describe('run_merge_steps.do_outage — an unanswered ship stop', () => {
 		expect(apply).toHaveBeenCalledWith(TARGET, expect.anything(), { outages: 1 })
 	})
 })
+
+// joshuafolkken/kit#7078: the outage cap reads the run-wide streak through this record.
+describe('run_merge_steps.read_record', () => {
+	it('reads the carried outage streak', async () => {
+		carried(OWNED_CARRY)
+
+		expect(await run_merge_steps.read_record()).toStrictEqual({
+			target: TARGET,
+			carry: OWNED_CARRY,
+		})
+	})
+})
