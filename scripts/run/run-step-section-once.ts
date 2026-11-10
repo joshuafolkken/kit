@@ -15,37 +15,61 @@ import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 // it once between them. It is a per-session cache, so it stays in the temp root (`durable-state.ts`).
 // Without a session id (a Codex session, a detached supervisor) nothing is remembered and the section
 // always prints: a missing rule costs more than a repeated one.
+//
+// **A printed text that is no doc section is keyed on the text itself** (joshuafolkken/kit#7111) — the
+// ship preconditions `run:entry` and `run:step` both print — so a changed text prints again.
 
 const MARKER_PREFIX = 'josh-section-'
 const DIGEST_LENGTH = 16
+const TEXT_KEY_PREFIX = 'text\n'
 
 interface PrintedSection {
 	document: string
 	heading: string
 }
 
-function marker_of(found: PrintedSection): string | undefined {
+function marker_of(key: string): string | undefined {
 	const session = process.env[agent_session_environment.SESSION_ID_KEY]
 
 	if (session === undefined) return undefined
 	const digest = createHash('sha256')
-		.update(`${session}\n${found.document}\n${found.heading}`)
+		.update(`${session}\n${key}`)
 		.digest('hex')
 		.slice(0, DIGEST_LENGTH)
 
 	return path.join(PLATFORM_TEMP_ROOT, `${MARKER_PREFIX}${digest}`)
 }
 
-function is_recorded(found: PrintedSection): boolean {
-	const marker = marker_of(found)
+function section_key(found: PrintedSection): string {
+	return `${found.document}\n${found.heading}`
+}
+
+function is_key_recorded(key: string): boolean {
+	const marker = marker_of(key)
 
 	return marker !== undefined && existsSync(marker)
 }
 
-function record(found: PrintedSection): void {
-	const marker = marker_of(found)
+function record_key(key: string): void {
+	const marker = marker_of(key)
 
 	if (marker !== undefined) writeFileSync(marker, '')
+}
+
+function is_recorded(found: PrintedSection): boolean {
+	return is_key_recorded(section_key(found))
+}
+
+function record(found: PrintedSection): void {
+	record_key(section_key(found))
+}
+
+function is_text_recorded(text: string): boolean {
+	return is_key_recorded(`${TEXT_KEY_PREFIX}${text}`)
+}
+
+function record_text(text: string): void {
+	record_key(`${TEXT_KEY_PREFIX}${text}`)
 }
 
 function repeat_line(found: PrintedSection): string {
@@ -54,6 +78,6 @@ function repeat_line(found: PrintedSection): string {
 	return `section: ${found.document} → "${found.heading}" — printed earlier this session; after a compaction: ${fetch}`
 }
 
-const run_step_section_once = { is_recorded, record, repeat_line }
+const run_step_section_once = { is_recorded, is_text_recorded, record, record_text, repeat_line }
 
 export { run_step_section_once }

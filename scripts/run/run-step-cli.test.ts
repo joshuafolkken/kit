@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -232,6 +233,10 @@ describe('run_step_cli.run — the ship preconditions', () => {
 	const evidence_problem =
 		'This change touches runtime code, but the PR body has no ## 実機証跡 section'
 
+	beforeEach(() => {
+		vi.stubEnv('CLAUDE_CODE_SESSION_ID', randomUUID())
+	})
+
 	it('reports an unmet precondition on stderr and keeps stdout the action line', async () => {
 		to_parts_mock.mockReturnValue(parts({ ship_problems: [evidence_problem] }))
 
@@ -242,6 +247,16 @@ describe('run_step_cli.run — the ship preconditions', () => {
 		expect(printed()).toBe(run_step.IMPLEMENT)
 		expect(reported).toContain(run_prep.SHIP_UNMET)
 		expect(reported).toContain(evidence_problem)
+	})
+
+	it('reports an unchanged list as one line on the second step of a session', async () => {
+		to_parts_mock.mockReturnValue(parts({ ship_problems: [evidence_problem] }))
+		await run_step_cli.run([ISSUE])
+		error_mock.mockClear()
+
+		await run_step_cli.run([ISSUE])
+
+		expect(error_mock.mock.calls.map(String).join('\n')).not.toContain(evidence_problem)
 	})
 
 	it('reports nothing when every precondition is met', async () => {
