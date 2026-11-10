@@ -66,6 +66,7 @@ Run `pnpm josh command:derive` to regenerate.
 
 | Command | Arguments | Audience | Side effects | Description |
 | --- | --- | --- | --- | --- |
+| `josh checks:failed` · `josh ckf` | `[<PR\|sha>]` | developer | network | List the failing CI checks of a pull request or commit, required or not (check runs and commit statuses) |
 | `josh followup` | `<title> [--notify-message <text>]` | automation | git, network, notifications | Follow-up git workflow |
 | `josh git` · `josh g` | `[-y] <message>` | developer | git, network | Git workflow helper |
 | `josh main:merge` · `josh mm` | — | developer | git, network | Merge origin default branch into the current branch |

@@ -187,6 +187,15 @@ describe('lefthook/base.yml pre-commit type-check command (kit#1381)', () => {
 	})
 })
 
+// kit#7146: `reserved-run … -- pnpm josh audit` started pnpm twice; the audit reserves its own place.
+describe('lefthook/base.yml pre-push audit command (kit#7146)', () => {
+	const run = PRE_PUSH_HOOK?.commands?.['audit']?.run
+
+	it('calls josh audit with a single pnpm launch', () => {
+		expect(run).toBe('pnpm josh audit')
+	})
+})
+
 describe('lefthook/base.yml pre-push parallel (kit#676)', () => {
 	// Enabled in kit#676 after auditing every active consumer: each has at most one
 	// preview-owning pre-push command (app-kit's unified `verify`, or a single `test-e2e`),

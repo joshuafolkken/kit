@@ -272,7 +272,15 @@ Against the hand tally of 2026-10-27 to 11-10 (110,714 calls; first context p50 
 
 - the cost by the `effort` each request ran at, `unknown` where its line names none;
 - the characters of tool results by tool and by josh subcommand, the ten largest each, every result charged to the call it answers;
+- the same for any other Bash command, keyed by its command and up to two subcommand words (`git status`, `gh issue view`) cut at the first flag, path, number or quoted word (a lowercase argument stays: `git log origin`), any josh call counted in the josh rows only (`tools/cost-audit/cost-audit-command.ts`);
+- the same by Read target file, by its absolute path, a default-rooted lane's file read as the main checkout's (`.kit-lanes/7137/x` → `kit/x`);
 - the Reads of a path the same session had already read, whatever range either covered, and their characters.
+
+`Bash command runs` and `Retries after a refusal` (`tools/cost-audit/cost-audit-sequence.ts`) close the report, for the current period:
+
+- a Bash call's token is its josh subcommand (`josh gate`), else its per-command key (`git status`);
+- the ten most frequent runs of two and three consecutive tokens, each transcript walked on its own, a subagent's apart from its parent's, so a run never spans two sessions — a repeated run is a candidate for one command;
+- by guard, the Bash refusals whose token a call issued within the next two calls after the refusal came back repeated, under the guard name the By guard table uses.
 
 It exits `0` on a report, and `1` with the usage on a bad `--period`, a lone `--since` or `--until`, or a pair beside `--period`.
 

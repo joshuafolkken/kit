@@ -7,6 +7,7 @@ import { cost_audit_phase, type PhaseRow } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_result, type ResultBreakdown } from './cost-audit-result'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
+import { cost_audit_sequence, type Sequences } from './cost-audit-sequence'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import { cost_audit_tool } from './cost-audit-tool'
 import { cost_audit_usage, type UsageBreakdown } from './cost-audit-usage'
@@ -70,6 +71,8 @@ interface Audit {
 	usage: UsageBreakdown
 	// The current period's cost by effort and tool-result characters (joshuafolkken/kit#7055).
 	results: ResultBreakdown
+	// The current period's Bash command runs and refusal retries (joshuafolkken/kit#7138).
+	sequences: Sequences
 }
 
 interface AuditInput {
@@ -223,12 +226,29 @@ function lane_density(
 	}
 }
 
+// The breakdowns read off the current period alone, never set beside the period before.
+function current_only(
+	input: AuditInput,
+	window: AuditWindow,
+): Pick<Audit, 'phases' | 'agents' | 'usage' | 'results' | 'sequences'> {
+	const cut = inside(input.sessions, window)
+
+	return {
+		phases: phases_inside(input, window),
+		agents: cost_audit_phase.agent_rows_of(cut),
+		usage: cost_audit_usage.breakdown_of(input.sessions, (at_ms) => is_inside(at_ms, window)),
+		results: cost_audit_result.breakdown_of(cut),
+		sequences: cost_audit_sequence.sequences_of(cut),
+	}
+}
+
 function audit(input: AuditInput): Audit {
 	const [current_window, previous_window] = windows_of(input.days, input.now_ms)
 	const current = period_cost(input.sessions, current_window)
 	const previous = period_cost(input.sessions, previous_window)
 
 	return {
+		...current_only(input, current_window),
 		days: input.days,
 		lane_density: lane_density(input.sessions, current_window, previous_window),
 		total: row('total', current.total, previous.total),
@@ -241,12 +261,6 @@ function audit(input: AuditInput): Audit {
 			current: rewrites_inside(input.sessions, current_window),
 			previous: rewrites_inside(input.sessions, previous_window),
 		},
-		phases: phases_inside(input, current_window),
-		agents: cost_audit_phase.agent_rows_of(inside(input.sessions, current_window)),
-		usage: cost_audit_usage.breakdown_of(input.sessions, (at_ms) =>
-			is_inside(at_ms, current_window),
-		),
-		results: cost_audit_result.breakdown_of(inside(input.sessions, current_window)),
 	}
 }
 

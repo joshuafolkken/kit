@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_issue_list } from './git-gh-issue-list'
 import { is_listing_query } from './git-gh-issue-list-graphql-fixture'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 import {
 	BLOCKED_BY_SEGMENT,
 	BLOCKER_NUMBER,
@@ -24,6 +25,10 @@ vi.mock('./git-gh-etag-read', () => ({
 }))
 
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
+
+beforeEach(() => {
+	git_gh_issue_memo.forget()
+})
 
 const PICKUP_FIELDS = 'number,title,labels,createdAt,blockedBy'
 const SECOND_NUMBER = 900

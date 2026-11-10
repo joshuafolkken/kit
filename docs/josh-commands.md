@@ -748,6 +748,24 @@ pnpm josh main:merge
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh main:merge` in detail".
 
+### `josh checks:failed`
+
+<!-- usage: checks:failed -->
+
+List the failing CI checks of a pull request or commit, required or not (check runs and commit statuses).
+
+```bash
+pnpm josh checks:failed           # the current branch's pull request
+pnpm josh checks:failed 7147      # a pull request by number
+pnpm josh checks:failed c0ffee1   # a commit by sha
+```
+
+<!-- /usage -->
+
+`#N` or a number of up to 6 digits names a pull request; 7 to 40 hex characters name a commit.
+
+**Output / exit codes:** one `- <name> — <conclusion> — <URL>` line per failing check run (`failure`, `timed_out`, `cancelled`, `action_required`, `startup_failure`; the newest run per name) or commit status (`failure`, `error`); `No failing checks on <sha>.` when none. Exits 0 either way, 1 when the checks cannot be read.
+
 ## Versioning
 
 ### `josh version`
@@ -864,6 +882,10 @@ pnpm josh audit
 <!-- /usage -->
 
 The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`) — in a linked work tree, the primary checkout's cache, so every work tree shares one binary and one failed-download record. With neither the audit exits non-zero and prints how to get one — never skipped.
+
+- A clean scan is recorded against the lockfile's digest in the common git directory, so every work tree shares it.
+- While that record is under 24 hours old, the audit prints one `✔ audit skipped` line and exits 0 without scanning. A changed lockfile or an expired record is scanned as before.
+- The scan claims one core in the machine-wide budget itself, so the pre-push hook calls `pnpm josh audit` directly.
 
 ### `josh overrides`
 

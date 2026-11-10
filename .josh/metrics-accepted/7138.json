@@ -1,0 +1,7 @@
+{
+	"reason": "cost:audit gains the Bash command-run and refusal-retry sections (#7138)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 124
+	}
+}

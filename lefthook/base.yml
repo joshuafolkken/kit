@@ -106,12 +106,11 @@ pre-push:
   # this back. Removing the barrier while leaving this `true` reopens #813.
   parallel: true
   commands:
-    # Wrapped in `josh reserved-run` so the scan claims a place in the machine-wide core budget
-    # (kit#2351) — eight lanes auditing around the same time as they push spiked a machine the gate
-    # thought it had to itself. The weight is a conservative reservation for the single-process scan,
-    # not a measurement.
+    # Called directly so pnpm starts once (kit#7146): `josh audit` claims its own place in the
+    # machine-wide core budget (kit#2351), and skips the scan while the lockfile's last clean scan is
+    # under a day old (`scripts/security/security-audit-cache.ts`).
     audit:
-      run: pnpm josh reserved-run 1 -- pnpm josh audit
+      run: pnpm josh audit
 
     # Routed through `josh pre-push-unit` rather than a bare `pnpm exec vitest run` so the hook can
     # read the record `pnpm josh gate` leaves behind (kit#1334). A green gate writes down the digest

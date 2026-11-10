@@ -1,0 +1,8 @@
+{
+	"reason": "#7147 adds the checks:failed command (module, CLI entry, command entry and the operating-rules pointer to it)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 116,
+		"ai_cost.on_demand_bytes": 60
+	}
+}

@@ -9,6 +9,7 @@ import {
 	type IssueListOutcome,
 	type IssueListRequest,
 } from './git-gh-issue-list'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 import {
 	BLOCKER_NUMBER,
 	ISSUE_BODY,
@@ -40,6 +41,7 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 // session, since one on GraphQL reads a listing one page holds in one query (joshuafolkken/kit#6785).
 beforeEach(() => {
 	vi.stubEnv(TRANSPORT_ENV_VAR, 'rest')
+	git_gh_issue_memo.forget()
 })
 
 const SUMMARY_FIELDS = 'number,title,labels,createdAt'

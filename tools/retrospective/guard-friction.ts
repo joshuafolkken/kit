@@ -67,8 +67,13 @@ const RENAMED_GUARDS = new Map(
 	).filter(([former, current]) => former !== current),
 )
 
+// The name a refusal's raw guard label is tallied under — every reader of a guard name shares it.
+function guard_name(raw_guard: string): string {
+	return RENAMED_GUARDS.get(raw_guard) ?? raw_guard
+}
+
 function hit(guard: string, kind: HitKind, at_ms: number): GuardHit {
-	return { guard: RENAMED_GUARDS.get(guard) ?? guard, kind, at_ms }
+	return { guard: guard_name(guard), kind, at_ms }
 }
 
 function line_hits(line: TranscriptLine): Array<GuardHit> {
@@ -135,7 +140,7 @@ function add_hit(rows: Map<string, GuardRow>, one: GuardHit, usd: number): void 
 }
 
 function add_rephrase(rows: Map<string, GuardRow>, raw_guard: string): void {
-	const guard = RENAMED_GUARDS.get(raw_guard) ?? raw_guard
+	const guard = guard_name(raw_guard)
 	const row = row_of(rows, guard)
 
 	rows.set(guard, { ...row, rephrased: row.rephrased + 1 })
@@ -178,7 +183,7 @@ function report_lines(rows: ReadonlyArray<GuardRow>): Array<string> {
 	return [head, ...rows.map((row) => row_line(row))]
 }
 
-const guard_friction = { guard_rows, report_lines }
+const guard_friction = { guard_name, guard_rows, report_lines }
 
 export type { GuardRow, GuardSource, SessionTranscript }
 export { guard_friction }

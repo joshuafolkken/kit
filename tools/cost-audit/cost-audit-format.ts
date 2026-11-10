@@ -4,6 +4,7 @@ import { cost_audit_density, type Density } from './cost-audit-density'
 import type { PhaseRow } from './cost-audit-phase'
 import { cost_audit_result } from './cost-audit-result'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
+import { cost_audit_sequence } from './cost-audit-sequence'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import {
 	cost_audit_usage,
@@ -246,6 +247,7 @@ function report_lines(audit: Audit): Array<string> {
 		...phase_lines(audit),
 		...usage_lines(audit.usage),
 		...cost_audit_result.result_lines(audit.results),
+		...cost_audit_sequence.sequence_lines(audit.sequences),
 		'',
 		`Regressions: ${regression_text(audit)}`,
 	]

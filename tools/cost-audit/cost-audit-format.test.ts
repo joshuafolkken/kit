@@ -25,6 +25,8 @@ const NO_RESULTS: ResultBreakdown = {
 	efforts: [],
 	tools: [],
 	josh: [],
+	commands: [],
+	reads: [],
 	duplicate_reads: { files: 0, reads: 0, chars: 0 },
 }
 
@@ -43,6 +45,7 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		agents: [],
 		usage: NO_USAGE,
 		results: NO_RESULTS,
+		sequences: { runs: [], retries: [] },
 		...overrides,
 	}
 }

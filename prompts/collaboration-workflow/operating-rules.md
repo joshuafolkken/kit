@@ -8,7 +8,7 @@
 `pnpm josh followup` は Required チェックだけを待つが、Workers Builds（Cloudflare デプロイ）など**非 Required チェックの失敗もユーザーに報告する**。
 
 - 緑の `pnpm josh followup` → 一覧は `followup` が完了通知に書く（`docs/josh-commands-automation.md` → "`josh followup`"）。修正内容・原因は `--notify-message`
-- 赤の run・マージ済み PR の再実行 → 印字された失敗を全件、修正内容か「名前・原因・未解決」で `--notify-message` に書く。読み直しは `gh api repos/{owner}/{repo}/commits/<sha>/check-runs`（`gh pr checks` はクラウドで 403）。**完了コメントに失敗を隠してはならない**
+- 赤の run・マージ済み PR の再実行 → 印字された失敗を全件、修正内容か「名前・原因・未解決」で `--notify-message` に書く。読み直しは `pnpm josh checks:failed [<PR|sha>]`（非 Required を含む失敗を check runs と commit statuses から一覧。`gh pr checks` はクラウドで 403）。**完了コメントに失敗を隠してはならない**
 - ユーザーへの報告でも失敗を「成功」として扱わない
 
 ### git-rules — コミット・共有状態・index・PR
