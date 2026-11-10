@@ -2,10 +2,15 @@ import type { GateTree } from '#scripts/gate/gate-tree'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SyncReading } from './run-ship-synced-scope'
 
-const { LINT, TEST } = vi.hoisted(() => ({ LINT: 'lint:related', TEST: 'test:related' }))
+const { LINT, TEST, WHOLE_TREE_FLAG } = vi.hoisted(() => ({
+	LINT: 'lint:related',
+	TEST: 'test:related',
+	WHOLE_TREE_FLAG: '--whole-tree',
+}))
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const missing_mock = vi.hoisted(() => vi.fn<() => Array<string>>())
 const reusable_mock = vi.hoisted(() => vi.fn<() => object | undefined>())
+const whole_tree_mock = vi.hoisted(() => vi.fn(async () => true))
 const rerecord_mock = vi.hoisted(() => vi.fn(async () => false))
 const settle_mock = vi.hoisted(() => vi.fn((): string | undefined => undefined))
 const read_sync_mock = vi.hoisted(() =>
@@ -46,6 +51,9 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 	},
 }))
 vi.mock('#scripts/gate/gate-skip', () => ({ gate_skip: { reusable_green_gate: reusable_mock } }))
+vi.mock('#scripts/gate/whole-tree-reuse', () => ({
+	whole_tree_reuse: { WHOLE_TREE_FLAG, is_reused: whole_tree_mock },
+}))
 vi.mock('#scripts/lane/lane-ledger-write', () => ({
 	lane_ledger_write: { record_ship_lap: lap_mock, target: async () => LEDGER },
 }))
@@ -73,6 +81,8 @@ const { run_ship_gate_runs } = await import('./run-ship-gate-runs')
 
 const OK = 0
 const FAILED = 1
+// The ship's gate on the final tree runs the whole-tree checks a lane's own gate leaves out.
+const GATE = `gate ${WHOLE_TREE_FLAG}`
 // A file on disk, so the narrowed run can name it.
 const MOVED = 'scripts/run/ship/run-ship-scoped.ts'
 
@@ -87,6 +97,7 @@ function forget_ship_memory(): void {
 	lap_mock.mockClear()
 	reused_ledger_mock.mockClear()
 	reusable_mock.mockReset().mockReturnValue(undefined)
+	whole_tree_mock.mockReset().mockResolvedValue(true)
 }
 
 function gate_laps(): ReadonlyArray<object> {
@@ -329,8 +340,8 @@ describe('run_ship_scoped.scoped_gate', () => {
 		missing_mock.mockReturnValue([LINT])
 
 		expect(await run_ship_scoped.scoped_gate()).toStrictEqual({ code: OK, out: '' })
-		expect(commands()).toStrictEqual([LINT, 'gate'])
-		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate'], true)
+		expect(commands()).toStrictEqual([LINT, GATE])
+		expect(josh_run_mock).toHaveBeenLastCalledWith(['gate', WHOLE_TREE_FLAG], true)
 	})
 
 	it('stops before josh gate when the scoped pair fails', async () => {
@@ -351,7 +362,7 @@ describe('run_ship_scoped.scoped_gate — reuse and reruns', () => {
 
 		const hash = run_ship_gate_runs.tree_hash({ files: {}, base: 'base' })
 
-		expect(commands()).toStrictEqual(['gate'])
+		expect(commands()).toStrictEqual([GATE])
 		expect(gate_laps()).toMatchObject([
 			{ stage: 'gate', rerun: 'no-record' },
 			{ stage: 'commit', reused_tree: hash },
@@ -364,23 +375,7 @@ describe('run_ship_scoped.scoped_gate — reuse and reruns', () => {
 		read_tree_mock.mockResolvedValue({ files: {}, base: 'merged' })
 		await run_ship_lap.within('5567', 'commit', run_ship_scoped.scoped_gate)
 
-		expect(commands()).toStrictEqual(['gate', 'gate'])
+		expect(commands()).toStrictEqual([GATE, GATE])
 		expect(gate_laps()).toMatchObject([{ stage: 'gate' }, { stage: 'commit', rerun: 'merge' }])
-	})
-})
-
-// joshuafolkken/kit#3643: the gate's own reuse test decides whether a gate stage only reused a record.
-describe('run_ship_scoped.is_gate_green', () => {
-	it('is green when the gate holds a reusable record for this tree', async () => {
-		reusable_mock.mockReturnValue({})
-
-		expect(await run_ship_scoped.is_gate_green()).toBe(true)
-		expect(reusable_mock).toHaveBeenCalledWith({}, 'base')
-	})
-
-	it('is not green when no record matches the tree', async () => {
-		reusable_mock.mockReturnValue(undefined)
-
-		expect(await run_ship_scoped.is_gate_green()).toBe(false)
 	})
 })
