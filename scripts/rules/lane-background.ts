@@ -1,4 +1,5 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -102,10 +103,7 @@ function is_candidate(call: GuardedCall): boolean {
 
 // True when this session is a dispatched lane child backgrounding a long-running josh command. The call's
 // own fields are tested first, so the dispatch mark is read only on the handful of calls that match.
-function is_background_long_run(
-	call: GuardedCall,
-	is_lane_child: () => boolean = () => lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+function is_background_long_run(call: GuardedCall, is_lane_child: () => boolean): boolean {
 	return is_candidate(call) && is_lane_child()
 }
 
@@ -132,7 +130,7 @@ function is_capped_foreground(input: Record<string, unknown>): boolean {
 // `undefined` for every call this does not apply to.
 function foreground_input(
 	call: GuardedCall,
-	is_lane_child: () => boolean = () => lane_child_marker.is_child_of(process.cwd()),
+	is_lane_child: () => boolean,
 ): Record<string, unknown> | undefined {
 	const input = ship_alone_input(call)
 
@@ -221,7 +219,8 @@ const LANE_AGENT_STOP_REASON =
 // a reissue. It declares no `keeps`: the detached ship is a different command, not this call made right.
 const ROW = {
 	id: 'lane-background',
-	is_trigger: (call: GuardedCall): boolean => is_background_long_run(call),
+	is_trigger: (call: GuardedCall, context: HookContext): boolean =>
+		is_background_long_run(call, () => lane_child_marker.is_child_of(context.cwd, context.env)),
 	reason: LANE_BACKGROUND_REASON,
 	decide: (): boolean => true,
 	// `pretool-guard.ts` rewrites a lone `josh ship` to the foreground rather than refusing it; this is

@@ -1,4 +1,5 @@
 import { interactive_ask } from '#scripts/agent/interactive-ask'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { stop_rules } from './stop-rules'
@@ -28,13 +29,10 @@ import { stop_rules } from './stop-rules'
 // dispatch mark against this checkout's own issue; the tool-name test runs first, so a run that never
 // asks pays nothing for it, and a person working in a lane carries no mark and sees no refusal.
 
-function is_interactive_ask(
-	call: GuardedCall,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+function is_interactive_ask(call: GuardedCall, context: HookContext): boolean {
 	if (!interactive_ask.is_interactive_tool(call.name)) return false
 
-	return is_lane_child
+	return lane_child_marker.is_child_of(context.cwd, context.env)
 }
 
 // The instruction in the shape a refusal can carry: what the child cannot do, what to do instead, and

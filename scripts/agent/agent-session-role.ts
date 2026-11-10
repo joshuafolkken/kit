@@ -31,12 +31,24 @@ function can_implement(source: EnvironmentSource = process.env): boolean {
 	return source[KEY] === agent_profile_schema.WORKER
 }
 
+// A session a kit launcher started, in any role; the one a person opens is the consultation main line.
+function is_launched(source: EnvironmentSource = process.env): boolean {
+	return (source[KEY] ?? '') !== ''
+}
+
 function scope_line(source: EnvironmentSource = process.env): string {
 	return can_implement(source)
 		? 'Session scope: implementation lane; implementation is permitted by the launcher role.'
 		: 'Session scope: consultation, filing and operations only; hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
 }
 
-const agent_session_role = { KEY, can_implement, env_for: environment_for, is_reviewer, scope_line }
+const agent_session_role = {
+	KEY,
+	can_implement,
+	env_for: environment_for,
+	is_launched,
+	is_reviewer,
+	scope_line,
+}
 
 export { agent_session_role }

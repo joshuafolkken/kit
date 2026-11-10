@@ -1,6 +1,7 @@
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/cut/run-cut'
 import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
@@ -344,7 +345,7 @@ describe('delivered_rules.delivery — the pre-gate cut at the call that runs th
 	// remedy would leave a run with nothing it is allowed to do.
 	it('leaves the cut command unclaimed by every rule in the enumeration', () => {
 		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) =>
-			rule.is_trigger(call_of(TAKE_THE_CUT)),
+			rule.is_trigger(call_of(TAKE_THE_CUT), hook_context.from_process()),
 		)
 
 		expect(claiming).toStrictEqual([])

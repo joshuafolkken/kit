@@ -26,7 +26,7 @@ const {
 	trimmed,
 	warn_of_default,
 } = agent_provider
-const { CONSULTATION_MODELS, consultation_provider } = agent_consultation_model
+const { consultation_provider } = agent_consultation_model
 
 const {
 	DEFAULT_PROFILES,
@@ -351,7 +351,6 @@ function investigation_model(
 
 const agent_role_profile = {
 	CODEX_SESSION_KEY,
-	CONSULTATION_MODELS,
 	DEFAULT_PROFILES,
 	HANDED_PROVIDER_KEY,
 	IMPLEMENTATION_PHASE,
@@ -364,7 +363,6 @@ const agent_role_profile = {
 	SCHEDULER,
 	VERIFICATION_PROFILES,
 	WORKER,
-	consultation_provider,
 	default_notice,
 	describe,
 	describe_review,

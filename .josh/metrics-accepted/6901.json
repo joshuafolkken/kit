@@ -1,0 +1,8 @@
+{
+	"reason": "#6901: role-based consultation-main detection (is_launched, model_provider, CONSULTATION_MAIN_MODEL) and the design-consultant pointer in delegation.md",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 25,
+		"ai_cost.on_demand_bytes": 2
+	}
+}

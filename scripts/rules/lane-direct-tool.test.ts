@@ -1,8 +1,10 @@
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { core_weights } from '#scripts/gate/core-weights'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -37,8 +39,12 @@ const WRITTEN_TRANSCRIPTS = new Set<string>()
 
 function rules_claiming(command: string): number {
 	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: BASH, input: { command } }),
+		rule.is_trigger({ name: BASH, input: { command } }, hook_context.from_process()),
 	).length
+}
+
+function reserved_input_here(call: GuardedCall): Record<string, unknown> | undefined {
+	return lane_direct_tool.reserved_input(call, () => '', hook_context.from_process())
 }
 
 function payload_of(name: string, command: string): string {
@@ -260,7 +266,7 @@ describe('reserved_input', () => {
 	it('rewrites a lane child direct run, keeping the other input fields', () => {
 		const input = { command: PNPM_EXEC_ESLINT, description: 'Lint' }
 
-		expect(lane_direct_tool.reserved_input({ name: BASH, input })).toStrictEqual({
+		expect(reserved_input_here({ name: BASH, input })).toStrictEqual({
 			command: `pnpm josh reserved-run ${String(core_weights.CORE_WEIGHTS.lint)} -- ${PNPM_EXEC_ESLINT}`,
 			description: 'Lint',
 		})
@@ -268,12 +274,12 @@ describe('reserved_input', () => {
 
 	it('leaves a non-Bash call alone', () => {
 		expect(
-			lane_direct_tool.reserved_input({ name: 'Read', input: { command: PNPM_EXEC_ESLINT } }),
+			reserved_input_here({ name: 'Read', input: { command: PNPM_EXEC_ESLINT } }),
 		).toBeUndefined()
 	})
 
 	it('passes the rewritten line through the refusal', () => {
-		const rewritten = lane_direct_tool.reserved_input({
+		const rewritten = reserved_input_here({
 			name: BASH,
 			input: { command: PNPM_EXEC_ESLINT },
 		})
@@ -288,7 +294,7 @@ describe('reserved_input — outside a lane checkout', () => {
 		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 
 		expect(
-			lane_direct_tool.reserved_input({ name: BASH, input: { command: PNPM_EXEC_ESLINT } }),
+			reserved_input_here({ name: BASH, input: { command: PNPM_EXEC_ESLINT } }),
 		).toBeUndefined()
 	})
 })

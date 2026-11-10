@@ -1,5 +1,7 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_spilled_read } from './lane-spilled-read'
 
@@ -12,8 +14,18 @@ const SPILLED =
 	'/Users/someone/.claude/projects/-Users-someone-kit-lanes-5040/session/tool-results/b3mcr32i7.txt'
 const SOURCE = '/Users/someone/kit/scripts/rules/delivered-rules.ts'
 const PAGE = 40
-const is_lane_child = true
-const is_not_lane_child = false
+const is_lane_child: HookContext = { cwd: '/lanes/5040', env: {} }
+const is_not_lane_child: HookContext = { cwd: '/person', env: {} }
+
+beforeEach(() => {
+	vi.spyOn(lane_child_marker, 'is_child_of').mockImplementation(
+		(directory) => directory === is_lane_child.cwd,
+	)
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
 
 function read_of(file_path: string, page: Record<string, number> = {}): GuardedCall {
 	return { name: 'Read', input: { file_path, ...page } }
