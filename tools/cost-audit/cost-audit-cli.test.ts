@@ -157,6 +157,22 @@ describe('cost_audit_cli.run — the printed report', () => {
 	})
 })
 
+describe('cost_audit_cli.run — a dated period', () => {
+	beforeEach(stub_sources)
+
+	it('counts merges over the dated window, not the trailing period ending now', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await cost_audit_cli.run(dated('2026-01-03', '2026-01-09'), '/repo', NOW_MS)
+
+		const paths = exec_gh_api.mock.calls.map(([options]) => decodeURIComponent(options.path))
+
+		expect(paths).toContainEqual(
+			expect.stringContaining('merged:2026-01-03T00:00:00Z..2026-01-10T00:00:00Z'),
+		)
+	})
+})
+
 describe('cost_audit_cli.USAGE', () => {
 	it('names the absolute period flags', () => {
 		expect(cost_audit_cli.USAGE).toContain('--since <YYYY-MM-DD> --until <YYYY-MM-DD>')

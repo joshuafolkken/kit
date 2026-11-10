@@ -17,6 +17,7 @@ import {
 
 const PERCENT = 100
 const PERCENT_DECIMALS = 1
+const CALLS_PER_RUN_DECIMALS = 1
 const REGRESSION_MARK = '  regression'
 const NO_PREVIOUS = 'new'
 // The filing line's frame, shared with the retrospective's picks, which parse the row names back out.
@@ -174,7 +175,7 @@ function long_output_line(long: LongOutput): string {
 }
 
 function agent_runs_line(agent: AgentRuns): string {
-	const per_run = (agent.calls / agent.runs).toFixed(PERCENT_DECIMALS)
+	const per_run = (agent.calls / agent.runs).toFixed(CALLS_PER_RUN_DECIMALS)
 
 	return `    ${agent.agent_type}: ${String(agent.runs)} runs, ${per_run} calls/run, ${figure_format.format_usd(agent.usd)}`
 }
