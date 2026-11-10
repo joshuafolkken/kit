@@ -7,6 +7,7 @@ import { git_stash } from './git-stash'
 // while that one stays pure.
 describe('git_stash — keeping uncommitted work', () => {
 	const DIRECTORY = '/lanes/2476'
+	const STATUS_ARGS = ['-C', DIRECTORY, 'status', '--porcelain']
 
 	afterEach(() => {
 		vi.restoreAllMocks()
@@ -16,13 +17,28 @@ describe('git_stash — keeping uncommitted work', () => {
 		const read = vi.spyOn(git_spawn, 'read').mockResolvedValue('?? new-file.ts')
 
 		expect(await git_stash.has_changes(DIRECTORY)).toBe(true)
-		expect(read).toHaveBeenCalledWith(['-C', DIRECTORY, 'status', '--porcelain'])
+		expect(read).toHaveBeenCalledWith(STATUS_ARGS)
 	})
 
 	it('reports no changes for an empty status', async () => {
 		vi.spyOn(git_spawn, 'read').mockResolvedValue('')
 
 		expect(await git_stash.has_changes(DIRECTORY)).toBe(false)
+	})
+
+	it('holds no work in a tree whose only changes are deleted tracked files (#6979)', async () => {
+		const read = vi.spyOn(git_spawn, 'read').mockResolvedValue(' D src/a.ts\n D src/b.ts')
+
+		expect(await git_stash.has_work(DIRECTORY)).toBe(false)
+		expect(read).toHaveBeenCalledWith(STATUS_ARGS)
+	})
+
+	it('holds work once any change is more than an unstaged deletion', () => {
+		expect(git_stash.holds_work(' D src/a.ts\n?? src/new.ts')).toBe(true)
+		expect(git_stash.holds_work(' M src/a.ts')).toBe(true)
+		expect(git_stash.holds_work('D  src/a.ts')).toBe(true)
+		expect(git_stash.holds_work('DD src/a.ts')).toBe(true)
+		expect(git_stash.holds_work('')).toBe(false)
 	})
 
 	it('pushes untracked files with the message the pop targets', async () => {

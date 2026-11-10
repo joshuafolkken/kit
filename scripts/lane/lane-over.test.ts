@@ -166,6 +166,16 @@ describe('lane_measure_cli.run — stats --over', () => {
 		).resolves.toBe(0)
 		expect(String(info.mock.calls[0]?.[0])).toContain(SPLIT_FILED)
 	})
+
+	// joshuafolkken/kit#6985: the lane rows are followed by the causes they share.
+	it('prints the shared causes and their filing candidates after the lane rows', async () => {
+		vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
+		const info = vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+		await lane_measure_cli.run(['stats', '--period', '1', '--over', '40'], seeded_context())
+		expect(String(info.mock.calls[0]?.[0])).toContain(`| hub | ${HUB} | 1 |`)
+		expect(String(info.mock.calls[0]?.[0])).toContain(`filing candidates: hub ${HUB}`)
+	})
 })
 
 describe('lane_measure_cli.run — issue linking and causes', () => {
