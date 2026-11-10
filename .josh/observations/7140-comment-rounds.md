@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/code/code-symbol.ts:35 | 2026-11-10 | #7140 | fixed
+- rf:bug-risks | low | scripts/code/code-symbol-cli.ts:73 | 2026-11-10 | #7140 | fixed
+- rf:none | none | - | 2026-11-10 | #7140

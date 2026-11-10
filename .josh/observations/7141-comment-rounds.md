@@ -1,0 +1,2 @@
+- rf:none | none | - | 2026-11-10 | #7141
+- k:followup-unrelated-test-rerun | d1 | 2026-11-10 | scripts/gh/git-gh-issue-list-relations.test.ts, scripts/gh/git-gh-issue-list.test.ts | followup reran Unit Tests (1/6); failed outside the change: isolated scripts/gh/git-gh-issue-list-relations.test.ts > issue_list — concurrent blocker relations > starts the second read before the first one has finished; isolated scripts/gh/git-gh-issue-list.test.ts > issue_list — the blocker relations > answers undefined when the blocker relations cannot be read

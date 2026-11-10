@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | scripts/lane/lane-plan-premise.ts:67 | 2026-11-10 | #7022
