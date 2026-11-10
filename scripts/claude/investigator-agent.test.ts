@@ -77,4 +77,12 @@ describe('investigation handoff', () => {
 		expect(document).toContain('does not apply or was not found')
 		expect(document).toContain('invent')
 	})
+
+	// joshuafolkken/kit#7045: the unit's reply is a top source of long outputs, so its shape is capped.
+	it('caps the reply length and shape', () => {
+		const document = read(AGENT_PATH)
+
+		expect(document).toContain('Keep the reply within 60 lines')
+		expect(document).toContain('one bullet per claim with its citations')
+	})
 })
