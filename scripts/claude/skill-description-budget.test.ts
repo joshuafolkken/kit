@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#3394: every session loads each skill's description, so the four run-facing ones
 // are held under one byte budget. Trimming must keep what an agent matches the situation against,
-// so each skill's trigger keywords are asserted beside the budget.
-const DESCRIPTION_BUDGET_BYTES = 1024
+// so each skill's trigger keywords are asserted beside the budget. Lowered to the trimmed total plus
+// headroom when joshuafolkken/kit#7046 cut the descriptions to their trigger words.
+const DESCRIPTION_BUDGET_BYTES = 768
 
 const TRIGGERS: Record<string, Array<string>> = {
 	'workflow-commands': ['`kickoff`', '`fullrun`', '`halfrun`', '`prrun`', '`backlogrun`', '`new`'],
