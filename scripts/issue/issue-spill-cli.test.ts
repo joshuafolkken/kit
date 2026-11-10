@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const classified_mock = vi.hoisted(() => vi.fn())
@@ -32,6 +33,7 @@ const FOLLOW_UP = 6100
 const EPIC = 6000
 const ESTIMATE = ['--estimate', '2 ファイル / 40 行']
 const ARGV = [String(ISSUE), ...ESTIMATE]
+const DISTINCT = '--distinct'
 const FOLLOW_UP_URL = `https://github.com/joshuafolkken/kit/issues/${String(FOLLOW_UP)}`
 const LINK_LINE = `- → #${String(FOLLOW_UP)} に移した`
 const UNCHECKED_BODY = '## 受け入れ条件\n\n- [x] done\n- [ ] left\n'
@@ -92,14 +94,7 @@ describe('issue_spill_cli.run', () => {
 		await issue_spill_cli.run(ARGV)
 
 		expect(file_issue_mock).toHaveBeenCalledWith(
-			expect.arrayContaining([
-				'--route',
-				'split',
-				'--distinct',
-				String(ISSUE),
-				'--label',
-				'run:lane',
-			]),
+			expect.arrayContaining(['--route', 'split', DISTINCT, String(ISSUE), '--label', 'run:lane']),
 		)
 	})
 
@@ -109,6 +104,33 @@ describe('issue_spill_cli.run', () => {
 		expect(await issue_spill_cli.run(ARGV)).toBe(FAILURE)
 		expect(edit_body_mock).not.toHaveBeenCalled()
 		expect(fetch_epics_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('issue_spill_cli.run --distinct', () => {
+	it('declares the given duplicate candidates separate beside #N', async () => {
+		const distinct = [DISTINCT, '6677,6678', DISTINCT, '6679']
+
+		listing('none', new Map([[ISSUE, EPIC]]))
+		await issue_spill_cli.run([...ARGV, ...distinct])
+
+		const argv: ReadonlyArray<string> = file_issue_mock.mock.calls[0]?.[0] ?? []
+
+		expect(argv.join(' ')).toContain(`${DISTINCT} ${String(ISSUE)} ${distinct.join(' ')}`)
+	})
+
+	it('writes the given estimate into the filed body', async () => {
+		let body = ''
+
+		file_issue_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
+			body = await readFile(argv[argv.indexOf('--body-file') + 1] ?? '', 'utf8')
+
+			return FOLLOW_UP_URL
+		})
+		listing('none', new Map([[ISSUE, EPIC]]))
+		await issue_spill_cli.run([...ARGV, DISTINCT, '6677'])
+
+		expect(body).toContain('- 規模見積もり: 約 2 ファイル / 40 行（テスト除く）')
 	})
 })
 

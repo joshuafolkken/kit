@@ -1,0 +1,7 @@
+{
+	"reason": "Preflight reuse (#6986): shared tree stamp, preflight pass record keyed by tree/base/title/body, cleared before each ask",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 49
+	}
+}

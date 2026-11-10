@@ -1,0 +1,7 @@
+{
+	"reason": "statusLine consumer-wins branch in merge_top_level (#6319): one constant and one branch",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}

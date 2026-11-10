@@ -1,10 +1,12 @@
 import type { TimingAnswer } from '#scripts/ci/ci-timing'
 import { size_estimate } from '#scripts/issue/size-estimate'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_related } from './lane-breakdown-related'
 import { lane_breakdown_text } from './lane-breakdown-text'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
 import type { ImplementRate } from './lane-implement-rate'
+import { lane_implement_signals } from './lane-implement-signals'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_sinks } from './lane-sinks'
 import type { OpenIssue } from './lane-sinks-issues'
@@ -40,6 +42,8 @@ const SHIP_BUDGETS: ReadonlySet<BudgetStage> = new Set(['ship', 'followup'])
 interface WhyRecords {
 	issue: number
 	entries: ReadonlyArray<LedgerEntry>
+	// The run events, read for the implement signals.
+	events: ReadonlyArray<RunEvent>
 	breakdown: Breakdown
 	// The filing's projected implement minutes, `undefined` with no estimate or measured rate.
 	projected: number | undefined
@@ -116,18 +120,37 @@ function projected_cell(records: WhyRecords): string {
 	return records.projected === undefined ? BLANK : `${records.projected.toFixed(1)} min`
 }
 
-// A ship row's cause keys, its open Issues and the keys none names; any other row's open Issues
+// An implement row's keys from its recorded signals (joshuafolkken/kit#6983); `undefined` when it
+// recorded none or none passed its bar, so the row falls back to the Issues naming its stage.
+function implement_keys(records: WhyRecords): Array<string> | undefined {
+	const signals = lane_implement_signals.signals_of(records.events, records.issue)
+	const keys = signals === undefined ? [] : lane_implement_signals.keys_of(signals)
+
+	return keys.length === 0 ? undefined : keys
+}
+
+// A ship row's keys from its log and ledger, an implement row's from its signals; `undefined` for
+// any other row.
+function keys_of(budget: BudgetStage, records: WhyRecords): Array<string> | undefined {
+	if (SHIP_BUDGETS.has(budget)) {
+		return lane_why_causes.keys_of(records.entries, records.issue, records.log)
+	}
+
+	return budget === 'implement' ? implement_keys(records) : undefined
+}
+
+// A keyed row's cause keys, its open Issues and the keys none names; any other row's open Issues
 // name its stage (joshuafolkken/kit#6679).
 function cause_cells({ stage, budget }: OverStage, records: WhyRecords): Array<string> {
-	if (!SHIP_BUDGETS.has(budget)) {
+	const keys = keys_of(budget, records)
+
+	if (keys === undefined) {
 		return [
 			BLANK,
 			lane_why_causes.open_cell([lane_sinks.base_name(stage.name)], records.issues),
 			BLANK,
 		]
 	}
-
-	const keys = lane_why_causes.keys_of(records.entries, records.issue, records.log)
 
 	return [
 		keys.join(KEY_SEPARATOR),

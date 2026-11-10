@@ -24,6 +24,27 @@ describe('run_step_progress.step_of', () => {
 		expect(step_of('pnpm josh followup', KIND.PR_OPENED)).toBe(STEP.FOLLOWUP)
 	})
 
+	// joshuafolkken/kit#6983: reaching the gate writes the implement signals.
+	it('records the implement signals at the gate step only', async () => {
+		const recorded: Array<string> = []
+		const io = {
+			step: async (issue: string) => {
+				recorded.push(`step ${issue}`)
+				await Promise.resolve()
+			},
+			signals: async (issue: string) => {
+				recorded.push(`signals ${issue}`)
+				await Promise.resolve()
+			},
+		}
+
+		await run_step_progress.record('1', run_step.STOP, KIND.MERGE, io)
+		await run_step_progress.record('2', run_step.IMPLEMENT, KIND.PLAN, io)
+		await run_step_progress.record('3', run_entry.GATE_VERDICT, undefined, io)
+
+		expect(recorded).toEqual(['step 2', 'step 3', 'signals 3'])
+	})
+
 	it('names no step for a position outside the fullrun steps', () => {
 		expect(step_of(run_step.STOP, KIND.MERGE)).toBeUndefined()
 		// The ship's own stage lines are the newer words on the board; a step written over them hides a failure.
