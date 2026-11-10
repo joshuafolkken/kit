@@ -144,7 +144,8 @@ describe('Claude launched-tool argv construction', () => {
 	const WORKER = agent_role_profile.DEFAULT_PROFILES.worker
 
 	it('names the launched tool list from the one constant', () => {
-		const argv = claude_agent_argv.build(INVOCATION, WORKER, undefined, project_directory(false))
+		const { scheduler } = agent_role_profile.DEFAULT_PROFILES
+		const argv = claude_agent_argv.build(INVOCATION, scheduler, undefined, project_directory(false))
 		const at = argv.args.indexOf(TOOLS_FLAG)
 
 		expect(argv.args[at + 1]).toBe(claude_agent_argv.LAUNCHED_TOOLS.join(','))
@@ -234,10 +235,14 @@ describe('Claude per-role launched tools', () => {
 	// forks a second reader of the same diff and brief.
 	const PINNED_REVIEWER_TOOLS =
 		'Bash,Read,Edit,Write,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite'
+	// #7104: a worker has no Skill call path, so the skill listing leaves its preamble; it keeps Agent
+	// to start its reviewer.
+	const PINNED_WORKER_TOOLS =
+		'Bash,Read,Edit,Write,Agent,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite'
 
 	it.each([
 		['scheduler', PINNED_TOOLS],
-		['worker', PINNED_TOOLS],
+		['worker', PINNED_WORKER_TOOLS],
 		['reviewer', PINNED_REVIEWER_TOOLS],
 	] as const)('launches the %s with the pinned tool list and no web tool', (role, pinned) => {
 		const tools = launched_tools(role)
@@ -246,8 +251,11 @@ describe('Claude per-role launched tools', () => {
 		expect(tools).not.toMatch(/WebFetch|WebSearch/u)
 	})
 
-	it('resumes a reviewer without the Agent and Skill tools as well', () => {
-		const profile = agent_role_profile.DEFAULT_PROFILES.reviewer
+	it.each([
+		['reviewer', PINNED_REVIEWER_TOOLS],
+		['worker', PINNED_WORKER_TOOLS],
+	] as const)('resumes a %s with the same narrowed tool list', (role, pinned) => {
+		const profile = agent_role_profile.DEFAULT_PROFILES[role]
 		const argv = claude_agent_argv.build_resume(
 			INVOCATION,
 			profile,
@@ -255,6 +263,6 @@ describe('Claude per-role launched tools', () => {
 			project_directory(false),
 		)
 
-		expect(tools_of(argv)).toBe(PINNED_REVIEWER_TOOLS)
+		expect(tools_of(argv)).toBe(pinned)
 	})
 })
