@@ -32,6 +32,7 @@ const FIRST_HEADER_CELLS = [
 	'test:related scope',
 	'test:related whole-suite trigger',
 	'transcript metric',
+	'concurrent lanes',
 ]
 
 function first_header_cell(table: string): string {

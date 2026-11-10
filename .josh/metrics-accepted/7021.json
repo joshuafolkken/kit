@@ -1,0 +1,9 @@
+{
+	"reason": "figure-source lint plus review fixes: issue:body and issue:file print the warning, every template declaration exempt, with tests",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 59,
+		"rules.lines": 6,
+		"ai_cost.on_demand_bytes": 839
+	}
+}

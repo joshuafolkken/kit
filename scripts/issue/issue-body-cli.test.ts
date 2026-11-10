@@ -67,6 +67,18 @@ describe('issue_body_cli.run', () => {
 		expect(await issue_body_cli.run([ISSUE, BODY_FILE, body_path])).toBe(0)
 		expect(issue_edit_body).toHaveBeenCalledExactlyOnceWith(ISSUE, EPIC_BODY)
 	})
+
+	it('warns about a background figure with no source and still writes the body', async () => {
+		const body = VALID_BODY.replace('## 現象', '中央値 約 35 分\n\n## 現象')
+		const body_path = await body_file(body)
+
+		vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		expect(await issue_body_cli.run([ISSUE, BODY_FILE, body_path])).toBe(0)
+		expect(console.warn).toHaveBeenCalledWith(
+			expect.stringMatching(/^⚠ number with no source .*約 35 分/u),
+		)
+	})
 })
 
 describe('issue_body_cli.run refusals', () => {

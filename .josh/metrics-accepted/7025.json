@@ -1,0 +1,7 @@
+{
+	"reason": "New lane:stats table splitting lint:related / test:related durations by concurrent lane count #7025",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 84
+	}
+}
