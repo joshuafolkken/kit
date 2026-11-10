@@ -72,6 +72,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		repo: 'joshuafolkken/app-kit',
 		link: (reference) => reference,
 		pull_link: String,
+		repo_link: String,
 		...extra,
 	}
 }
