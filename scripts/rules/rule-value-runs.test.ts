@@ -5,6 +5,7 @@ import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { piped_verification } from './piped-verification'
+import { rule_value } from './rule-value'
 import { rule_value_cache } from './rule-value-cache'
 import { rule_value_cli } from './rule-value-cli'
 import { rule_value_fixture } from './rule-value-fixture'
@@ -89,7 +90,7 @@ function stored_reading(
 	code = 'code',
 ): { parts: ReturnType<typeof rule_value_cli.render_parts>; read: number } {
 	const reader = vi.spyOn(cost_transcript, 'read_optional')
-	const store = rule_value_runs.open(corpus.directory, module_file(corpus.directory, code))
+	const store = rule_value_runs.open(corpus.directory, [module_file(corpus.directory, code)])
 
 	if (store === undefined) throw new Error('no store outside a lane')
 
@@ -140,6 +141,34 @@ describe('rule_value_runs.summaries_of — the table equals a full read', () => 
 	})
 })
 
+describe('rule_value_runs.summaries_of — the peak is one run, not the corpus', () => {
+	it('reads one run at a time, counting each before the next is read', () => {
+		const { runs } = written_corpus()
+		const steps: Array<string> = []
+
+		vi.spyOn(cost_transcript, 'read_optional').mockImplementation((file) => {
+			steps.push(`read ${file.session_id}`)
+
+			return ''
+		})
+		vi.spyOn(rule_value, 'read_run').mockImplementation(() => {
+			steps.push('count')
+
+			return new Map()
+		})
+
+		rule_value_runs.summaries_of(runs, stamped_memo.create())
+
+		expect(steps).toStrictEqual([
+			`read ${RUN_ONE}`,
+			`read ${RUN_ONE}`,
+			'count',
+			`read ${RUN_TWO}`,
+			'count',
+		])
+	})
+})
+
 describe('rule_value_runs.open — what invalidates the saved counts', () => {
 	it('reads every run again once the measuring code changed', () => {
 		const corpus = written_corpus()
@@ -149,16 +178,30 @@ describe('rule_value_runs.open — what invalidates the saved counts', () => {
 		expect(stored_reading(corpus, 'after').read).toBe(3)
 	})
 
-	it('versions by the measuring code', () => {
+	it('versions by the content of the measuring code', () => {
 		const directory = make_directory('rule-value-runs-version-')
-		const before = rule_value_runs.version_of(module_file(directory, 'before'))
+		const before = rule_value_runs.version_of([module_file(directory, 'before')])
 
-		expect(rule_value_runs.version_of(module_file(directory, 'after'))).not.toBe(before)
+		expect(rule_value_runs.version_of([module_file(directory, 'after')])).not.toBe(before)
+	})
+
+	it('counts as measuring code every module the counting reaches', () => {
+		const sources = rule_value_runs.counting_sources().map((file) => path.basename(file))
+
+		expect(sources).toStrictEqual(
+			expect.arrayContaining([
+				'rule-value.ts',
+				'piped-verification-shapes.ts',
+				'rule-rephrase.ts',
+				'delivered-rules.ts',
+				'git-force.ts',
+			]),
+		)
 	})
 
 	it('opens no store in a lane, whose transcripts are not the whole repository', () => {
 		vi.spyOn(rule_value_cache, 'is_linked_work_tree').mockReturnValue(true)
 
-		expect(rule_value_runs.open(make_directory('rule-value-runs-lane-'), MODULE)).toBeUndefined()
+		expect(rule_value_runs.open(make_directory('rule-value-runs-lane-'), [MODULE])).toBeUndefined()
 	})
 })

@@ -241,6 +241,17 @@ describe('rule_value_cli.run_rule_value — --refresh fills the loop-head cache'
 		}
 	})
 
+	it('keeps the per-run counts for the next refresh, versioned by the counting code', () => {
+		const cwd = make_directory(TEMPORARY_PREFIX)
+
+		rule_value_cli.run_rule_value(['--refresh'], cwd)
+
+		const stored = readFileSync(rule_value_cache.cache_path(cwd, 'rule-value-runs.json'), 'utf8')
+		const version = rule_value_runs.version_of(rule_value_runs.counting_sources())
+
+		expect(JSON.parse(stored)).toStrictEqual(expect.objectContaining({ version }))
+	})
+
 	it('prints the reading to stdout and leaves the cache alone without --refresh', () => {
 		const cwd = make_directory(TEMPORARY_PREFIX)
 		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)

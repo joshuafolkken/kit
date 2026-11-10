@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { import_closure } from '#scripts/lib/import-closure'
 import { file_reader } from '#scripts/lib/read-file'
 import { stamped_memo, type StampedMemo } from '#scripts/lib/stamped-memo'
 import { stamped_store, type StampedStore } from '#scripts/lib/stamped-store'
@@ -128,27 +130,42 @@ function tally(summaries: Iterable<RunSummary>): Tally {
 	return { runs: read.length, readings, shapes, rephrased }
 }
 
-// How the kept counts were computed: the measured rule ids and the code doing the measuring. Run from
-// `dist/`, `module_file` is the command's entry, whose chunk imports are named by content hash, so a
-// change to any predicate it reaches changes the version and every run is read again.
-function version_of(module_file: string): string {
-	const ids = delivered_rules.MEASURED_RULES.map((rule) => rule.id).join(LINE)
-	const code = file_reader.read_if_readable(module_file) ?? ''
+// The code doing the counting: this module's static import closure, which reaches `read_run`, every
+// rule predicate, the refusal shapes and the rephrase count. Run from `dist/`, `import.meta.url` still
+// names this source file (`scripts/build/source-location.ts`), and `scripts/` ships beside it.
+function counting_sources(): Array<string> {
+	return [...import_closure.closure([fileURLToPath(import.meta.url)])].toSorted((left, right) =>
+		left.localeCompare(right),
+	)
+}
 
-	return createHash(HASH).update(ids).update(LINE).update(code).digest('hex')
+// How the kept counts were computed: the measured rule ids and the content of every counting source,
+// so a change to any of them reads every run again.
+function version_of(sources: ReadonlyArray<string>): string {
+	const ids = delivered_rules.MEASURED_RULES.map((rule) => rule.id).join(LINE)
+	const hash = createHash(HASH).update(ids)
+
+	for (const source of sources) {
+		hash.update(LINE).update(file_reader.read_if_readable(source) ?? '')
+	}
+
+	return hash.digest('hex')
 }
 
 // The main checkout's store. A lane reads only its own transcripts, so it opens no store: keeping its
 // runs alone would forget every other one (`rule_value_cache.is_linked_work_tree`).
-function open(cwd: string, module_file: string): StampedStore<RunSummary> | undefined {
+function open(
+	cwd: string,
+	sources: ReadonlyArray<string> = counting_sources(),
+): StampedStore<RunSummary> | undefined {
 	if (rule_value_cache.is_linked_work_tree(cwd)) return undefined
 
 	const file = rule_value_cache.cache_path(cwd, STORE_FILE)
 
-	return stamped_store.open(file, version_of(module_file), summary_schema)
+	return stamped_store.open(file, version_of(sources), summary_schema)
 }
 
-const rule_value_runs = { open, summaries_of, summarize, tally, version_of }
+const rule_value_runs = { counting_sources, open, summaries_of, summarize, tally, version_of }
 
 export { rule_value_runs }
 export type { RunSummary, Tally }

@@ -34,8 +34,6 @@ const NO_TARGETS = 'no measurement targets'
 const UNMEASURED = 'unmeasured'
 // A measurable rule no run reached: the denominator is zero, so no rate is taken over it.
 const UNREACHED = 'unreached'
-// The code doing the measuring, whose content versions the stored run counts (`rule-value-runs.ts`).
-const MODULE_FILE = fileURLToPath(import.meta.url)
 
 // Every transcript grouped by the run it belongs to: a session's own file and the units it delegated
 // share one `owning_session_id`, so a lane child is counted with its parent rather than as a run of
@@ -61,7 +59,7 @@ function group_by_run(files: ReadonlyArray<SessionFile>): Map<string, Array<Sess
 function gather_summaries(cwd: string): Array<RunSummary> {
 	const directories = cost_transcript.transcript_directories(cwd)
 	const runs = group_by_run(cost_transcript.list_sessions_across(directories))
-	const store = rule_value_runs.open(cwd, MODULE_FILE)
+	const store = rule_value_runs.open(cwd)
 	const summaries = rule_value_runs.summaries_of(runs, store ?? stamped_memo.create())
 
 	store?.save()
