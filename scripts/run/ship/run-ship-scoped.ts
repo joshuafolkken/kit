@@ -24,6 +24,7 @@ const should_forward_stderr = true
 const MOVED_SINCE_GREEN = 'moved since this ship last met the pair green on this base'
 const MERGE_MEETS_BRANCH = "where the merge with the default branch meets this branch's change"
 const REUSED_PAIR = 'scoped pair: reused — both checks are green on this tree'
+const RED_PAIR = 'scoped pair: red on this tree in this ship — not run again'
 
 type Phase = () => Promise<JoshResult>
 // A pair's result with the files it was named over, or why a merge could not split, for its lap.
@@ -154,7 +155,19 @@ async function narrowed_or_bare(
 	return { ...result, note: { named: named.files.length } }
 }
 
+// The red a pair ahead in the queue met, its output kept as it was, after the line saying so.
+function replayed(red: JoshResult): JoshResult {
+	printed(RED_PAIR)
+
+	return red
+}
+
+// A pair this ship already met red on the unmoved tree answers that red again without running.
 async function stale_pair(tree: GateTree, scripts: ReadonlyArray<string>): Promise<PairResult> {
+	const red = run_ship_pair_runs.red_on(tree)
+
+	if (red !== undefined) return replayed(red)
+
 	const sync = await run_ship_synced_scope.read_sync(tree, scripts)
 	const settled = sync === undefined ? undefined : run_ship_synced_scope.settle(sync, tree)
 
@@ -189,7 +202,7 @@ async function settled_pair(): Promise<PairResult> {
 
 	const result = await stale_pair(tree, scripts)
 
-	run_ship_pair_runs.met(tree, result.code)
+	run_ship_pair_runs.met(tree, result.code, result.out)
 	if (result.code === SUCCESS_EXIT_CODE && (await is_still(tree))) run_ship_narrowed.remember(tree)
 
 	return result
@@ -277,7 +290,14 @@ async function is_gate_green(): Promise<boolean> {
 	return await is_reusable(await gate_tree.read_gate_tree())
 }
 
-const run_ship_scoped = { REUSED_PAIR, is_gate_green, run_phases, scoped_gate, scoped_pair }
+const run_ship_scoped = {
+	RED_PAIR,
+	REUSED_PAIR,
+	is_gate_green,
+	run_phases,
+	scoped_gate,
+	scoped_pair,
+}
 
 export type { Phase }
 export { run_ship_scoped }

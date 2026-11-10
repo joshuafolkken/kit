@@ -2,6 +2,7 @@ import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
+import { ALREADY_DONE_LABEL, has_label_name } from '#scripts/issue/issue-labels'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { z } from 'zod'
@@ -32,8 +33,9 @@ const STILL_OPEN = 'open' as const
 // What one issue answered: closed, still open, or `undefined` when it could not be read.
 type ClosedRead = ClosedIssue | typeof STILL_OPEN | undefined
 
-// How a closed child ended — merged, withdrawn as not planned, or done.
-type ClosedState = 'merged' | 'withdrawn' | 'done'
+// How a closed child ended — merged, withdrawn as not planned, closed as already done
+// (`josh issue:already-done`, joshuafolkken/kit#7095), or done.
+type ClosedState = 'merged' | 'withdrawn' | 'already_done' | 'done'
 
 // The open listing a closed read is weighed against, and when it was read.
 interface ListingRead {
@@ -137,7 +139,9 @@ async function read_all(
 function state_of(closed: ClosedIssue): ClosedState {
 	if (closed.is_merged) return 'merged'
 
-	return closed.is_not_planned ? 'withdrawn' : 'done'
+	if (closed.is_not_planned) return 'withdrawn'
+
+	return has_label_name(closed.labels, ALREADY_DONE_LABEL) ? 'already_done' : 'done'
 }
 
 // A person reopened the child when a listing read after its close holds it again. A listing read

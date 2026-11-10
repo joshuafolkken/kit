@@ -92,6 +92,16 @@ describe('measure_declaration.problems on premise lines', () => {
 		expect(found.every((problem) => problem.split('\n').at(-1)?.startsWith('- 前提: `'))).toBe(true)
 	})
 
+	// joshuafolkken/kit#7022: `lane:plan` re-runs every premise that parses.
+	it('reads every premise line that parses, in body order', () => {
+		const body = `${BACKGROUND}- 前提: \`echo 1\` <= 5\n- 前提: about 35\n- 前提: \`echo 2\` > 1\n`
+
+		expect(measure_declaration.premises(body)).toStrictEqual([
+			{ command: 'echo 1', operator: '<=', threshold: 5 },
+			{ command: 'echo 2', operator: '>', threshold: 1 },
+		])
+	})
+
 	it('reads no premise line as the measurement declaration', () => {
 		expect(measure_declaration.parse(`${BACKGROUND}- 前提: \`echo 1\` <= 5\n`)).toBeUndefined()
 	})

@@ -4,7 +4,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import type { BoardRow, RowRead, RowReason } from './run-board-layout'
 import { run_board_render_title } from './run-board-render-title'
-import type { ItemStatus } from './run-board-status'
+import type { ItemState, ItemStatus } from './run-board-status'
 
 // Why a child's park or withdraw ended it, in the ending event's own words — the reason its board row
 // draws and its park note carries.
@@ -99,17 +99,21 @@ function is_stalled(status: ItemStatus, labels: ReadonlyArray<string> = []): boo
 	return STALLED_STATES.has(status.state) && has_label_name(labels, RUN_STALLED_LABEL)
 }
 
+// Each finished state that did not merge: how its tail names it, and the reason it draws when none
+// was recorded.
+const FINISHED_ENDINGS: Partial<Record<ItemState, { word: string; fallback: string }>> = {
+	done: { word: 'done', fallback: 'closed without a PR to merge' },
+	withdrawn: { word: 'withdrawn', fallback: 'run withdrawn' },
+	already_done: { word: 'already done', fallback: 'closed with verified evidence' },
+}
+
 // Finished rows name why no action remains; merge rows keep their existing tail.
 function tail_of(status: ItemStatus): string | undefined {
-	if (status.state === 'done') {
-		return `nothing to do · done: ${status.reason ?? 'closed without a PR to merge'}`
-	}
+	const ending = FINISHED_ENDINGS[status.state]
 
-	if (status.state === 'withdrawn') {
-		return `nothing to do · withdrawn: ${status.reason ?? 'run withdrawn'}`
-	}
+	if (ending === undefined) return status.reason
 
-	return status.reason
+	return `nothing to do · ${ending.word}: ${status.reason ?? ending.fallback}`
 }
 
 // joshuafolkken/kit#6577: what stopped a lane, or the ship of a child still working, by the command its

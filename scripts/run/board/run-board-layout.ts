@@ -128,7 +128,15 @@ interface Drawn extends Overlay {
 	reason_of: ReasonOf | undefined
 }
 
-const SETTLED_STATES: ReadonlySet<ItemState> = new Set(['merged', 'parked', 'done', 'withdrawn'])
+// A child that has ended for good — drawn in the done section rather than the leading one.
+const FINISHED_STATES: ReadonlySet<ItemState> = new Set([
+	'merged',
+	'done',
+	'already_done',
+	'withdrawn',
+])
+// The finished ones and a parked one: what has stopped moving.
+const SETTLED_STATES: ReadonlySet<ItemState> = new Set([...FINISHED_STATES, 'parked'])
 
 function is_settled(state: ItemState): boolean {
 	return SETTLED_STATES.has(state)
@@ -171,9 +179,6 @@ function plan_row(child: EpicChild, state: ItemState, overlay: Drawn): BoardRow 
 		waits,
 	}
 }
-
-// A child that has ended for good — drawn in the done section rather than the leading one.
-const FINISHED_STATES: ReadonlySet<ItemState> = new Set(['merged', 'done', 'withdrawn'])
 
 function is_finished(state: ItemState): boolean {
 	return FINISHED_STATES.has(state)

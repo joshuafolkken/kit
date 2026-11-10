@@ -55,6 +55,7 @@ function bash_block(command: string): Block {
 		token_lines: [],
 		background_id: '',
 		agent_id: '',
+		result_chars: 0,
 	}
 }
 
