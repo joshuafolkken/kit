@@ -35,6 +35,8 @@ const {
 } = retrigger_fixture
 const { CAP_NOTE, AGAIN_NOTE, RETRIGGER_BODY, RETRIGGER_CAP } = followup_coderabbit_retrigger
 const LATER = '2026-10-28T01:05:00Z'
+// A retrigger written before the notice: one CodeRabbit answered with another rate limit.
+const EARLIER = '2026-10-28T00:55:00Z'
 
 function spent_retriggers(): Array<ReturnType<typeof retrigger_at>> {
 	return Array.from({ length: RETRIGGER_CAP }, () => retrigger_at(NOTICE_AT))
@@ -106,7 +108,7 @@ describe('followup_coderabbit_retrigger.run — retriggers up to the cap', () =>
 
 		const result = await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
 
-		expect(result).toStrictEqual({ is_retriggered: true, notes: [AGAIN_NOTE] })
+		expect(result).toStrictEqual({ is_retriggered: true, notes: [CAP_NOTE] })
 		expect(vi.mocked(git_gh_command.pr_comment).mock.calls).toStrictEqual(
 			Array.from({ length: RETRIGGER_CAP }, () => [BRANCH, RETRIGGER_BODY]),
 		)
@@ -120,5 +122,28 @@ describe('followup_coderabbit_retrigger.run — retriggers up to the cap', () =>
 		expect(result).toStrictEqual({ is_retriggered: false, notes: [CAP_NOTE] })
 		expect(git_gh_command.pr_comment).not.toHaveBeenCalled()
 		expect(lane_ledger_write.record_stage).not.toHaveBeenCalled()
+	})
+})
+
+describe('followup_coderabbit_retrigger.run — the cap reached partway through the run', () => {
+	use_run_spies()
+
+	it('still reports its own retriggers, and ends on the cap', async () => {
+		const comments = [coderabbit(notice(TWO_MINUTES)), retrigger_at(EARLIER)]
+
+		vi.mocked(git_gh_command.pr_get_comments).mockImplementation(async () =>
+			JSON.stringify(comments),
+		)
+		vi.mocked(git_gh_command.pr_comment).mockImplementation(async () => {
+			comments.push(retrigger_at(EARLIER))
+
+			return ''
+		})
+		checks_read(RUNNING, RATE_LIMITED, RUNNING, RATE_LIMITED)
+
+		const result = await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
+
+		expect(result).toStrictEqual({ is_retriggered: true, notes: [CAP_NOTE] })
+		expect(git_gh_command.pr_comment).toHaveBeenCalledTimes(RETRIGGER_CAP - 1)
 	})
 })

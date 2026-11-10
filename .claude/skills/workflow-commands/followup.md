@@ -27,7 +27,7 @@ PR URL and exits successfully without a completion report. Read the diff on GitH
 `--merge` cannot bypass this stop. Re-run `followup` after the manual merge to finish the tail.
 
 **A rate-limited CodeRabbit check is cleared by a retrigger, never a bypass** (Tier C). `followup`
-waits out each window (≤30 min) and posts `@coderabbitai review`, ≤3 times per PR, then parks
+waits out each window (≤30 min) and posts `@coderabbitai review`, ≤3 times per PR, then asks for
 `run:stalled`. On its no-retrigger note, do so and rerun it.
 
 A pre-merge failure stops the run; an unverifiable AI finding or CI failure needing input sends a

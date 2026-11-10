@@ -232,30 +232,34 @@ async function retrigger(
 }
 
 // A retriggered review rate-limited again is decided afresh from the pull request's comments, which
-// now count the retrigger; `rounds_left` bounds the loop should a posted retrigger not read back.
+// now count the retrigger; `rounds_left` bounds the loop should a posted retrigger not read back, and
+// running out of it is the cap. A stop after this run's own retrigger still reports it, so the checks
+// are read again and the completion report names it.
 async function attempt(
 	branch_name: string,
 	wait: CodeRabbitWait,
 	rounds_left: number,
+	is_retriggered: boolean,
 ): Promise<Retrigger> {
 	const decision = decide(await read_comments(branch_name), Date.now())
-	if (decision.kind === 'stop') return { is_retriggered: false, notes: [decision.note] }
+	if (decision.kind === 'stop') return { is_retriggered, notes: [decision.note] }
 
 	if (decision.kind === 'await') {
 		return { is_retriggered: true, notes: await wait_for_review(branch_name, wait) }
 	}
 
 	const outcome = await retrigger(branch_name, wait, decision.wait_ms)
-	if (rounds_left <= 1 || !outcome.notes.includes(AGAIN_NOTE)) return outcome
+	if (!outcome.notes.includes(AGAIN_NOTE)) return outcome
+	if (rounds_left <= 1) return { is_retriggered: true, notes: [CAP_NOTE] }
 
-	return await attempt(branch_name, wait, rounds_left - 1)
+	return await attempt(branch_name, wait, rounds_left - 1, true)
 }
 
 // Runs only when the check wait last saw CodeRabbit rate-limited; anything else is untouched.
 async function run(branch_name: string, wait: CodeRabbitWait): Promise<Retrigger> {
 	if (wait.last?.state !== RATE_LIMITED) return { is_retriggered: false, notes: [] }
 
-	return await attempt(branch_name, wait, RETRIGGER_CAP)
+	return await attempt(branch_name, wait, RETRIGGER_CAP, false)
 }
 
 // The checks after a retriggered review are read again, so the merge and the skip notes read the
