@@ -13,8 +13,8 @@ import { review_readers_scan } from './review-readers-scan'
 // (joshuafolkken/kit#5540) imports it as well as `prose-stale-cli.ts`.
 
 const SEARCH_PATHS = ['*.md', 'prompts', 'docs', '.claude', 'scripts', ':(exclude)CHANGELOG.md']
-// The code files a live declaration is looked for in, at any depth.
-const CODE_PATHSPECS = ['*.ts', '*.js']
+// The code files a live declaration is looked for in, at any depth; a test file names nothing.
+const CODE_PATHSPECS = ['*.ts', '*.js', ':(exclude)*.test.ts', ':(exclude)*.test.js']
 
 async function read_hunks(root: string, base: string): Promise<Array<Hunk>> {
 	const diff = await git_spawn.read([
@@ -84,13 +84,11 @@ async function tree_of(root: string, hunks: ReadonlyArray<Hunk>): Promise<Tree> 
 		prose_stale_scan.CODE_FILE.test(file),
 	)
 	const present = files.filter((file) => existsSync(path.join(root, file)))
+	const names = await declared_in(root, present)
 	const deleted = files.filter((file) => !present.includes(file))
-	const surviving = [
-		...(await declared_in(root, present)),
-		...(await declared_elsewhere(root, hunks, deleted)),
-	]
+	const elsewhere = await declared_elsewhere(root, hunks, deleted)
 
-	return { surviving: new Set(surviving), deleted: new Set(deleted) }
+	return { surviving: new Set([...names, ...elsewhere]), deleted: new Set(deleted) }
 }
 
 // `hunks` is the whole change: a declaration moved into another file of it is kept, not removed.
