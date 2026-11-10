@@ -1,3 +1,5 @@
+import { lane_ledger } from './lane-ledger'
+import type { LoadEntry } from './lane-ledger-schema'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_load } from './lane-load'
 import type { LaneSpan } from './lane-net-time'
@@ -24,10 +26,45 @@ interface MeasureContext {
 	now_ms?: number
 }
 
-async function take(context: MeasureContext = {}): Promise<void> {
+async function take(context: MeasureContext = {}): Promise<LoadEntry> {
 	const at = new Date(context.now_ms ?? Date.now()).toISOString()
+	const entry = await lane_load.sample(at)
 
-	await lane_ledger_write.record(await lane_load.sample(at), context.ledger_path)
+	await lane_ledger_write.record(entry, context.ledger_path)
+
+	return entry
+}
+
+async function newest_load(ledger_path?: string): Promise<LoadEntry | undefined> {
+	const path = ledger_path ?? (await lane_ledger.target())
+
+	if (path === undefined) return undefined
+
+	return lane_ledger
+		.read_entries(path)
+		.findLast((entry): entry is LoadEntry => entry.kind === lane_ledger.KIND.LOAD)
+}
+
+// How far the host's sleep counter (`lane-load.ts`) grew from `previous` to `current`; an absent
+// counter, or a reboot between the two (the boot instant moved), reads as no growth.
+function counter_growth(previous: LoadEntry, current: LoadEntry): number {
+	if (previous.booted_ms !== current.booted_ms) return 0
+
+	return (current.slept_ms ?? 0) - (previous.slept_ms ?? Infinity)
+}
+
+// The sleep between `previous` and `current`, ending at the host's last wake (the sampler may start long
+// after it) and starting no earlier than `previous`; a counter grown by less than a tick reads as none.
+function sleep_since(previous: LoadEntry | undefined, current: LoadEntry): LaneSpan | undefined {
+	if (previous === undefined) return undefined
+
+	const slept_ms = counter_growth(previous, current)
+
+	if (slept_ms < SAMPLE_INTERVAL_MS) return undefined
+
+	const to_ms = Math.min(Date.parse(current.at), current.woke_ms ?? Infinity)
+
+	return { from_ms: Math.max(Date.parse(previous.at), to_ms - slept_ms), to_ms }
 }
 
 // A timer tick has no caller to raise into, and a sample that could not be read must never end the run
@@ -49,11 +86,24 @@ async function record_quietly(span: LaneSpan, context: MeasureContext): Promise<
 	}
 }
 
+// A sleep between two samplers (joshuafolkken/kit#7026): each drive starts its own, so a late tick never
+// shows a lid closed while no drive ran — the gap to the ledger's newest sample is read by the counter.
+async function take_first(context: MeasureContext): Promise<void> {
+	try {
+		const previous = await newest_load(context.ledger_path)
+		const slept = sleep_since(previous, await take(context))
+
+		if (slept !== undefined) await record_quietly(slept, context)
+	} catch {
+		// Best-effort, as `take_quietly`.
+	}
+}
+
 /** Sample now and then every minute, recording a tick the host slept through; the returned function stops it. */
 function start(context: MeasureContext = {}): () => void {
 	let last_ms = Date.now()
 
-	void take_quietly(context)
+	void take_first(context)
 	const timer = setInterval(() => {
 		const now_ms = Date.now()
 		const slept = lane_sleep.gap_of(last_ms, now_ms, SAMPLE_INTERVAL_MS)
