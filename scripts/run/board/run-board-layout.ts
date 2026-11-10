@@ -4,7 +4,6 @@ import type { WavePlan } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import {
 	has_label_name,
-	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_MERGE_LABEL,
 	RUN_SOLO_LABEL,
 	RUN_STALLED_LABEL,
@@ -13,6 +12,7 @@ import type { FiledKind } from '#scripts/run/event/run-event-filed'
 import { run_board_decision } from './run-board-decision'
 import { run_board_earlier, type EarlierLanes } from './run-board-earlier'
 import { run_board_ending_reason } from './run-board-ending-reason'
+import { run_board_human } from './run-board-human'
 import { run_board_human_merge } from './run-board-human-merge'
 import { run_board_kind, type BoardPriority } from './run-board-kind'
 import { run_board_standing_waits } from './run-board-standing-waits'
@@ -209,12 +209,6 @@ function active_order(left: BoardRow, right: BoardRow): number {
 	return compared(rank_of(left), rank_of(right)) || compared(key_of(left), key_of(right))
 }
 
-// A park waiting on a person's decision (joshuafolkken/kit#4099) — the one answer the 🙋 decision
-// section and the findings section read a park reason by.
-function is_decision(reason: string | undefined): boolean {
-	return reason?.includes(NEEDS_DECISION_LABEL) === true
-}
-
 function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'> {
 	return has_label_name(labels, RUN_SOLO_LABEL) ? { is_solo: true } : {}
 }
@@ -222,7 +216,7 @@ function solo_flag(labels: ReadonlyArray<string> = []): Pick<BoardRow, 'is_solo'
 // A child parked on a decision is a 🙋 row: it waits on a person, as an untouched `needs-decision`
 // child does; its tail names the decision that resumes it.
 function touched_row(number: number, status: ItemStatus, read: RowRead): BoardRow {
-	const is_asked = status.state === 'parked' && is_decision(status.reason)
+	const is_asked = status.state === 'parked' && run_board_human.is_decision(status.reason)
 	const labels = read.labels.get(number)
 
 	return {
@@ -271,7 +265,7 @@ function is_untouched(child: EpicChild, overlay: Overlay): boolean {
 // stalled on it mechanically (`run:stalled`), which is drawn as the stop it is, never as a decision.
 function plan_state(child: EpicChild): ItemState {
 	if (has_label_name(child.labels, NEEDS_HUMAN_MERGE_LABEL)) return 'waiting'
-	if (has_label_name(child.labels, NEEDS_DECISION_LABEL)) return 'human'
+	if (run_board_human.is_human(child.labels)) return 'human'
 
 	return has_label_name(child.labels, RUN_STALLED_LABEL) ? 'stopped' : 'waiting'
 }
@@ -423,7 +417,7 @@ const run_board_layout = {
 	EMPTY_LAYOUT,
 	drawn_rows,
 	is_blocked,
-	is_decision,
+	is_decision: run_board_human.is_decision,
 	is_finished,
 	is_settled,
 	lane_rows,
