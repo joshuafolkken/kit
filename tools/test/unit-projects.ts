@@ -61,6 +61,10 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // (joshuafolkken/kit#5029): the supervisor sets `JOSH_SHIP_RETRY_PENDING` around a retried attempt,
 // and a hand-kept list let it reach the gate's run alone. Any `JOSH_SHIP_*` key the config process
 // inherits is blanked by its prefix, and the lane marks are read from where the launcher composes them.
+//
+// **The paired review switch is blanked as well** (joshuafolkken/kit#6902): a lane run with
+// `JOSH_REVIEWER_PAIRED=1` would make every `run:review` fixture write a paired brief its stubs never
+// planned. A suite about the paired review passes the environment itself.
 const SHIP_MARK = /^JOSH_SHIP_[A-Z0-9_]+$/u
 const PROFILE_KEY = /^JOSH_[A-Z0-9_]+_(?:MODEL|EFFORT)$/u
 
@@ -90,6 +94,7 @@ function unit_environment(source: EnvironmentSource): Record<string, string> {
 		// `auto` would probe GitHub and keep its answer in the repository's shared cache, which the
 		// developer's own sessions read; a test that exercises `auto` sets it and isolates that cache.
 		JOSH_GH_TRANSPORT: 'graphql',
+		JOSH_REVIEWER_PAIRED: '',
 		JOSH_SHIP_SUPERVISED: '',
 	}
 }

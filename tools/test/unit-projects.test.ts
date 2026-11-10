@@ -3,6 +3,7 @@ import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { RETRY_PENDING_KEY, RETRY_PENDING_VALUE } from '#scripts/gh/git-gh-comments-unreadable'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
+import { review_pair } from '#scripts/review/review-pair'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { PURE_FILES } from '#tools/test/pure-files'
 import { unit_projects, type UnitProject } from '#tools/test/unit-projects'
@@ -134,6 +135,12 @@ describe('each project carries the per-run environment and timeout', () => {
 	// cut-guard delivery fixture, which then stands down where the refusal is expected.
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session role for %s', (name) => {
 		expect(project(name).env[agent_session_role.KEY]).toBe('')
+	})
+
+	// joshuafolkken/kit#6902: a lane run with the paired review on would otherwise make every run:review
+	// fixture write a paired brief its stubs never planned.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the paired review switch for %s', (name) => {
+		expect(project(name).env[review_pair.PAIRED_ENV]).toBe('')
 	})
 })
 
