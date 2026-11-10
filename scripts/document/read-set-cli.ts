@@ -50,11 +50,12 @@ const LANE_CHILD_NOTE: ReadonlyArray<string> = [
 // **The `backlogrun` parent reads a trimmed set of its own** — a scheduler that never implements, so
 // the implementer-only `SKILL.md` sections are read section by section rather than whole.
 // A *different* trim from the lane child's: the parent keeps §0, which is the
-// scheduler's own, and drops no point-of-use document.
+// scheduler's own, and drops only the documents of its children's stages.
 const BACKLOGRUN_PARENT_NOTE: ReadonlyArray<string> = [
 	'  the backlogrun parent (scheduler) reads this trimmed set:',
 	'  - omits SKILL.md §3 — the parent edits no rule mid-run',
-	'  - keeps every point-of-use document — the parent is the one dispatching children and running lanes',
+	'  - skips the documents of a child’s stages — the gate, the ship and fullrun.md',
+	'  - reads the sections run:step prints at its own stages beside the ones its manifest names',
 ]
 const FETCH_RULE =
 	'fetch: one `Read` call per file — never `cat`, and never two files in one command.'

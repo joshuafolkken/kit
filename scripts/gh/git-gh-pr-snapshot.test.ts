@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { forget_branch_rules } from './git-gh-branch-rules'
 import { git_gh_conditional } from './git-gh-conditional'
@@ -15,11 +15,13 @@ import {
 	pr_detail_path,
 	PR_HEAD_SHA,
 	pr_lookup_path,
+	PR_NUMBER,
 	pr_reviews_path,
 	pr_routes,
 	status_pages,
 	type GhApiAnswer,
 } from './git-gh-pr-fixture'
+import { git_gh_pr_graphql_snapshot, type GraphqlSnapshot } from './git-gh-pr-graphql-snapshot'
 import {
 	forget_pr_numbers,
 	NO_PULL_REQUEST_MESSAGE,
@@ -30,6 +32,7 @@ import {
 	pr_get_checks_snapshot,
 	pr_get_review_decision,
 	pr_get_state_snapshot,
+	pr_read_review_decision,
 } from './git-gh-pr-snapshot'
 import { evaluate_pr_state } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot } from './git-pr-checks-parse'
@@ -70,6 +73,8 @@ function routes(input: {
 		[pr_reviews_path()]: input.reviews ?? NO_REVIEWS,
 	})
 }
+
+const APPROVED_ROUTES = routes({ reviews: JSON.stringify([APPROVED_REVIEW]) })
 
 async function read_snapshot(
 	input: Parameters<typeof routes>[0] = {},
@@ -279,6 +284,59 @@ describe('the snapshot split into its checks half and its review half', () => {
 		const checks = await pr_get_checks_snapshot(PR_BRANCH)
 
 		await expect(pr_get_review_decision(checks.pr_number)).resolves.toBe('APPROVED')
+	})
+
+	it('reads the review half over REST where the checks half was read over REST', async () => {
+		mocked_api.mockImplementation(gh_api_routes(APPROVED_ROUTES))
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		expect(checks.graphql).toBeUndefined()
+		await expect(pr_read_review_decision(checks)).resolves.toBe('APPROVED')
+	})
+})
+
+function answer_graphql(review_decision: string | undefined): GraphqlSnapshot {
+	const snapshot = {
+		pr_number: PR_NUMBER,
+		fields: { mergeStateStatus: 'CLEAN', statusCheckRollup: [] },
+		review_decision,
+		rate_limit: { cost: 1, remaining: 1 },
+	}
+
+	vi.spyOn(git_gh_pr_graphql_snapshot, 'read_snapshot').mockResolvedValue(snapshot)
+
+	return snapshot
+}
+
+// #7143: a poll round whose snapshot GraphQL answered asks no second query for the review decision.
+describe('pr_read_review_decision — the decision the snapshot query already read', () => {
+	beforeEach(() => {
+		mocked_api.mockClear()
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('answers from the one snapshot query, with no second GraphQL or REST read', async () => {
+		answer_graphql('APPROVED')
+		const second_query = vi.spyOn(git_gh_pr_graphql_snapshot, 'read_review_decision')
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		await expect(pr_read_review_decision(checks)).resolves.toBe('APPROVED')
+		expect(git_gh_pr_graphql_snapshot.read_snapshot).toHaveBeenCalledTimes(1)
+		expect(second_query).not.toHaveBeenCalled()
+		expect(mocked_api).not.toHaveBeenCalled()
+	})
+
+	it('folds the REST reviews where the query answered no decision, without asking GraphQL again', async () => {
+		answer_graphql(undefined)
+		mocked_api.mockImplementation(gh_api_routes(APPROVED_ROUTES))
+		const second_query = vi.spyOn(git_gh_pr_graphql_snapshot, 'read_review_decision')
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		await expect(pr_read_review_decision(checks)).resolves.toBe('APPROVED')
+		expect(second_query).not.toHaveBeenCalled()
 	})
 })
 

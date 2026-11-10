@@ -35,7 +35,7 @@ import {
 vi.mock('./git-gh-pr-snapshot', () => ({
 	git_gh_pr_snapshot: {
 		pr_get_checks_snapshot: vi.fn(),
-		pr_get_review_decision: vi.fn(),
+		pr_read_review_decision: vi.fn(),
 	},
 }))
 
@@ -49,7 +49,7 @@ vi.mock('./git-pr-checks', async (import_original) => {
 
 const wait = vi.mocked(wait_for_pr_success)
 const fetch_checks = vi.mocked(git_gh_pr_snapshot.pr_get_checks_snapshot)
-const fetch_review = vi.mocked(git_gh_pr_snapshot.pr_get_review_decision)
+const fetch_review = vi.mocked(git_gh_pr_snapshot.pr_read_review_decision)
 
 const PR_NUMBER = 972
 
