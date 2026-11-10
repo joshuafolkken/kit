@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
+import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hook_daemon, type Daemon, type DaemonOptions } from './hook-daemon'
@@ -29,6 +30,16 @@ const SOURCE_CONTENT = 'export {}\n'
 const FIRST_OUTPUT = 'first.js'
 // Any pid not this process's: the launcher's, or a successor daemon's.
 const LAUNCHER_PID = 1
+// The launcher's environment as `run-hook.sh` writes it, and the call the daemon reads from it: under
+// this process's temporary root, as only a call under the daemon's own is answered.
+const TEMP_ROOT = process.env[platform_temporary.TEMP_ROOT_KEY] ?? ''
+const CALL_ENVIRONMENT_FILE = `CALLER=one%0A two\n${platform_temporary.TEMP_ROOT_KEY}=${TEMP_ROOT}\n`
+const EXPECTED_CALL = {
+	raw_payload: PAYLOAD,
+	launch_directory: LAUNCH_DIRECTORY,
+	launcher_pid: LAUNCHER_PID,
+	environment: { CALLER: 'one\n two', [platform_temporary.TEMP_ROOT_KEY]: TEMP_ROOT },
+}
 
 // Each output written and stamped as built from the one source as it reads now.
 function write_build(out_directory: string, outputs: ReadonlyArray<string>): void {
@@ -61,6 +72,7 @@ function request_directory(root: string): string {
 	writeFileSync(path.join(request, 'payload'), PAYLOAD)
 	writeFileSync(path.join(request, 'cwd'), LAUNCH_DIRECTORY)
 	writeFileSync(path.join(request, 'launcher'), String(LAUNCHER_PID))
+	writeFileSync(path.join(request, 'env'), CALL_ENVIRONMENT_FILE)
 	execFileSync('mkfifo', [path.join(request, 'reply')])
 
 	return request
@@ -112,7 +124,7 @@ describe('hook_daemon', () => {
 		expect(await call(request, daemon.directory)).toBe(String(REFUSED))
 		expect(readFileSync(path.join(request, 'out'), 'utf8')).toBe('denied')
 		expect(readFileSync(path.join(request, 'err'), 'utf8')).toBe('why')
-		expect(daemon.answer).toHaveBeenCalledWith(PAYLOAD, LAUNCH_DIRECTORY, LAUNCHER_PID)
+		expect(daemon.answer).toHaveBeenCalledWith(EXPECTED_CALL)
 	})
 
 	it('replies stale and goes once its bundles are no longer current', async () => {
@@ -142,19 +154,40 @@ describe('hook_daemon', () => {
 	})
 })
 
+describe('hook_daemon with a call that carries no environment', () => {
+	it('replies stale for the launcher to run itself, and stays to answer the next call', async () => {
+		const root = make_directory(ROOT_PREFIX)
+		const daemon = serving(path.join(root, 'daemon'), () => true)
+		const request = request_directory(root)
+
+		rmSync(path.join(request, 'env'))
+
+		expect(await call(request, daemon.directory)).toBe(hook_daemon.STALE_REPLY)
+		expect(existsSync(daemon.directory)).toBe(true)
+		expect(daemon.answer).not.toHaveBeenCalled()
+	})
+
+	it('replies stale to a call under another temporary root, and removes its environment', async () => {
+		const root = make_directory(ROOT_PREFIX)
+		const daemon = serving(path.join(root, 'daemon'), () => true)
+		const request = request_directory(root)
+
+		writeFileSync(path.join(request, 'env'), `${platform_temporary.TEMP_ROOT_KEY}=${root}\n`)
+
+		expect(await call(request, daemon.directory)).toBe(hook_daemon.STALE_REPLY)
+		expect(existsSync(path.join(request, 'env'))).toBe(false)
+		expect(daemon.answer).not.toHaveBeenCalled()
+	})
+})
+
 describe('hook_daemon without an injected answer', () => {
-	it('answers through the guard call under the root and environment it started with', async () => {
+	it('answers through the guard call under the root it started in and the call environment', async () => {
 		const answer = vi.spyOn(hook_daemon_call, 'answer').mockResolvedValue(REFUSED_ANSWER)
 		const root = make_directory(ROOT_PREFIX)
 		const daemon = serving_with(path.join(root, 'daemon'), { is_current: () => true })
 
 		expect(await call(request_directory(root), daemon.directory)).toBe(String(REFUSED))
-		expect(answer).toHaveBeenCalledWith(
-			{ root: process.cwd(), environment: { ...process.env } },
-			PAYLOAD,
-			LAUNCH_DIRECTORY,
-			LAUNCHER_PID,
-		)
+		expect(answer).toHaveBeenCalledWith(process.cwd(), EXPECTED_CALL)
 	})
 })
 

@@ -311,6 +311,8 @@ function seeded_state(seeded: Seeded, context: DriveContext): DriveState {
 		context.stopped === undefined ? fresh : backlog_drive.merge_stopped(context.stopped, fresh)
 
 	initial.is_triage_owed = context.is_triage_owed
+	initial.triage_pid = context.triage_pid
+	initial.triage_start = context.triage_start
 
 	return { ...initial, ...seeded.left_out }
 }

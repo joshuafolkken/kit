@@ -94,6 +94,9 @@ interface DriveState extends OfferTiming {
 	is_memory_held?: boolean | undefined
 	// A collected park still owes the parent triage after an interrupted collection resumes.
 	is_triage_owed?: boolean | undefined
+	// The triage session the supervisor launched beside the driver (`backlog-drive-park-triage.ts`).
+	triage_pid?: number | undefined
+	triage_start?: string | undefined
 }
 
 interface DriveEnd {
@@ -343,7 +346,7 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 function is_offering(before: DriveState, after: DriveState, should_offer: boolean): boolean {
 	const is_collected = after.in_flight.length !== before.in_flight.length
 
-	return !after.is_stopping && (should_offer || is_collected || after.is_triage_owed === true)
+	return !after.is_stopping && (should_offer || is_collected || park_triage.is_owed(after))
 }
 
 // No free lane hands any owed triage back unasked.
@@ -369,7 +372,7 @@ async function run_pass(
 	should_offer: boolean,
 	ports: DrivePorts,
 ): Promise<PassResult> {
-	const held = await backlog_drive_adopt.held(state, should_offer, ports)
+	const held = await backlog_drive_adopt.held(park_triage.settled(state), should_offer, ports)
 	const collected = await collect_finished(held, ports)
 
 	if (collected.kind === 'end') return collected

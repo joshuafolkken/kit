@@ -18,15 +18,18 @@ import { createInterface, type Interface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { error_text } from '#scripts/lib/error-message'
-import { hook_daemon_call, type CallAnswer, type DaemonOrigin } from '#tools/hooks/hook-daemon-call'
+import { hook_daemon_call, type CallAnswer, type DaemonCall } from '#tools/hooks/hook-daemon-call'
 
-// The resident `pretool-guard` of one checkout and launch environment (joshuafolkken/kit#6683):
+// The resident `pretool-guard` of one checkout (joshuafolkken/kit#6683, #7125):
 // `scripts/hooks/run-hook.sh` hands it each call through files and FIFOs in its directory instead of
 // starting node, and falls back to that node launch whenever it gets no answer. The directory holds
 // `pid` and the `requests` FIFO; each request line names a call directory holding `payload`, `cwd`
-// (the call's launch directory), `launcher` (the launcher's pid) and the `reply` FIFO, beside which `out` and `err` are written before
-// the call's exit status is replied. Calls are answered one at a time, each under the environment
-// and root this process started with (`hook-daemon-call.ts`). Bundles that are no longer fresh, or
+// (the call's launch directory), `env` (the launcher's environment), `launcher` (the launcher's pid)
+// and the `reply` FIFO, beside which `out` and `err` are written before the call's exit status is
+// replied. Calls are answered one at a time, each under its own environment and the root this process
+// started in (`hook-daemon-call.ts`); a call without its environment, or under a temporary root other
+// than the one this process imported, is replied `stale` for the launcher to run itself. The `env` file
+// is removed once read. Bundles that are no longer fresh, or
 // were rebuilt since this process loaded them, are never answered from: the call is replied `stale`
 // for the launcher to run itself, and the daemon goes, so the next call starts one on the new build.
 // So does an idle daemon. An installed package's launcher hands its calls to the daemon the same way.
@@ -40,6 +43,7 @@ const DETACH_FLAG = '--detach'
 const REQUESTS_NAME = 'requests'
 const PID_NAME = 'pid'
 const LAUNCHER_NAME = 'launcher'
+const ENVIRONMENT_NAME = 'env'
 const STALE_REPLY = 'stale'
 const MINUTE_MS = 60_000
 const IDLE_MINUTES = 15
@@ -50,11 +54,7 @@ const REQUESTS_FLAGS = constants.O_RDWR + constants.O_NONBLOCK
 // `process.argv` is node, this script, then the optional detach flag and the daemon directory.
 const ARGUMENTS_START = 2
 
-type Answer = (
-	raw_payload: string,
-	launch_directory: string,
-	launcher_pid: number,
-) => Promise<CallAnswer>
+type Answer = (call: DaemonCall) => Promise<CallAnswer>
 
 interface DaemonOptions {
 	readonly answer?: Answer
@@ -98,10 +98,9 @@ function bundle_currency(out_directory: string, package_directory: string): () =
 }
 
 function own_answer(): Answer {
-	const origin: DaemonOrigin = { root: process.cwd(), environment: { ...process.env } }
+	const root = process.cwd()
 
-	return async (raw_payload, launch_directory, launcher_pid) =>
-		await hook_daemon_call.answer(origin, raw_payload, launch_directory, launcher_pid)
+	return async (call) => await hook_daemon_call.answer(root, call)
 }
 
 // Non-blocking, so a caller that already gave up costs nothing: with no reader the open fails.
@@ -157,14 +156,31 @@ function write_answer(request: string, answer: CallAnswer): void {
 	reply(request, String(answer.status))
 }
 
+function call_of(request: string): DaemonCall | undefined {
+	const environment_path = path.join(request, ENVIRONMENT_NAME)
+
+	if (!existsSync(environment_path)) return undefined
+
+	const environment = hook_daemon_call.parse_environment(readFileSync(environment_path, 'utf8'))
+
+	// Gone once read, so the caller's secrets outlive no answer, even a launcher killed while it waits.
+	rmSync(environment_path, { force: true })
+
+	return {
+		raw_payload: readFileSync(path.join(request, 'payload'), 'utf8'),
+		launch_directory: readFileSync(path.join(request, 'cwd'), 'utf8'),
+		launcher_pid: Number(readFileSync(path.join(request, LAUNCHER_NAME), 'utf8')),
+		environment,
+	}
+}
+
 async function serve_call(daemon: Daemon, request: string): Promise<void> {
 	if (is_refused_stale(daemon, request)) return
 
-	const raw_payload = readFileSync(path.join(request, 'payload'), 'utf8')
-	const launch_directory = readFileSync(path.join(request, 'cwd'), 'utf8')
-	const launcher_pid = Number(readFileSync(path.join(request, LAUNCHER_NAME), 'utf8'))
+	const call = call_of(request)
 
-	write_answer(request, await daemon.answer(raw_payload, launch_directory, launcher_pid))
+	if (call === undefined || !hook_daemon_call.is_answerable(call)) reply(request, STALE_REPLY)
+	else write_answer(request, await daemon.answer(call))
 	arm_idle(daemon)
 }
 
