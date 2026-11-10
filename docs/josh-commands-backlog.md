@@ -429,6 +429,7 @@ pnpm josh issue:spill 5999 --estimate "3 ファイル / 80 行"
 **Options:**
 
 - `--estimate "<F> ファイル / <L> 行"` — the follow-up's size estimate, never apportioned from the issue's. Required.
+- `--distinct <N,…>` — duplicate candidates `issue:file` held the follow-up on, declared separate; the issue itself always is. Repeatable.
 
 <!-- /usage -->
 

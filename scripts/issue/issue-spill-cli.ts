@@ -23,7 +23,8 @@ import { session_cite } from './session-cite'
 // **Every write is an existing command's function**: the filing is `issue:file --route split`'s
 // `file_issue` (its scout, lint and labels included), the placement `epic --add`'s `add_children` or
 // `epic`'s `create_epic_number`. #N is passed as `--distinct`: the follow-up quotes #N's criteria, so
-// the scout would otherwise hold #N as its duplicate.
+// the scout would otherwise hold #N as its duplicate. Any other candidate the scout holds is declared
+// separate by re-running with `--distinct <N,…>`.
 //
 // **#N is rewritten only once the follow-up exists**, and before the placement: a refused filing
 // leaves #N untouched, and a failed placement leaves the two bodies consistent and prints the
@@ -31,8 +32,12 @@ import { session_cite } from './session-cite'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh issue:spill <issue-number> --estimate "<files> ファイル / <lines> 行"'
-const OPTIONS = { estimate: { type: 'string' } } as const
+const USAGE =
+	'Usage: josh issue:spill <issue-number> --estimate "<files> ファイル / <lines> 行" [--distinct <N,…>]…'
+const OPTIONS = {
+	estimate: { type: 'string' },
+	distinct: { type: 'string', multiple: true },
+} as const
 const SUBJECT_FIELDS = 'title,body,labels'
 // The same bound `epic:bundle` lists the open epics with.
 const EPIC_LIMIT = 200
@@ -49,6 +54,8 @@ const subject_schema = z.looseObject({
 interface SpillRequest {
 	issue_number: number
 	estimate: string
+	// The `--distinct` values as given, passed on to `issue:file`, which parses and checks them.
+	distinct: ReadonlyArray<string>
 }
 
 interface SpillIssue extends SpillSubject {
@@ -67,6 +74,10 @@ function issue_number_of(positionals: ReadonlyArray<string>): number | undefined
 	return is_one_number ? Number(issue_number) : undefined
 }
 
+function distinct_of(values: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
+	return values ?? []
+}
+
 function parse_request(argv: ReadonlyArray<string>): SpillRequest | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 	if (parsed === undefined) return undefined
@@ -75,7 +86,7 @@ function parse_request(argv: ReadonlyArray<string>): SpillRequest | undefined {
 
 	if (issue_number === undefined || estimate === undefined) return undefined
 
-	return { issue_number, estimate }
+	return { issue_number, estimate, distinct: distinct_of(parsed.values.distinct) }
 }
 
 function parse_subject(json: string): z.infer<typeof subject_schema> | undefined {
@@ -100,24 +111,44 @@ async function read_issue(issue_number: number): Promise<SpillIssue | undefined>
 	}
 }
 
-// #N's own triage label rides along: `issue:file` refuses an `auto-ok` filing without one.
-function filing_argv(issue: SpillIssue, body_file: string): ReadonlyArray<string> {
+// #N's own triage label rides along: `issue:file` refuses an `auto-ok` filing without one. The
+// caller's `--distinct` values follow #N's, so a filing held on another duplicate candidate is
+// reissued with that candidate declared separate.
+function filing_argv(
+	issue: SpillIssue,
+	request: SpillRequest,
+	body_file: string,
+): ReadonlyArray<string> {
 	const triage = issue.labels.filter((label) => TRIAGE_LABELS.has(label))
 	const labels = triage.flatMap((label) => ['--label', label])
-	const route = ['--route', 'split', '--distinct', String(issue.issue_number)]
+	const distinct = [String(issue.issue_number), ...request.distinct].flatMap((value) => [
+		'--distinct',
+		value,
+	])
 
-	return [issue_spill.follow_up_title(issue), '--body-file', body_file, ...route, ...labels]
+	return [
+		issue_spill.follow_up_title(issue),
+		'--body-file',
+		body_file,
+		'--route',
+		'split',
+		...distinct,
+		...labels,
+	]
 }
 
-async function file_follow_up(issue: SpillIssue, estimate: string): Promise<number | undefined> {
+async function file_follow_up(
+	issue: SpillIssue,
+	request: SpillRequest,
+): Promise<number | undefined> {
 	const directory = await mkdtemp(path.join(tmpdir(), 'josh-issue-spill-'))
 	const body_file = path.join(directory, 'body.md')
 
 	try {
-		await writeFile(body_file, issue_spill.follow_up_body(issue, estimate))
+		await writeFile(body_file, issue_spill.follow_up_body(issue, request.estimate))
 
 		const filed = github_issue_url.parse(
-			await issue_file_cli.file_issue(filing_argv(issue, body_file)),
+			await issue_file_cli.file_issue(filing_argv(issue, request, body_file)),
 		)
 
 		return filed === undefined ? undefined : Number(filed.issue_number)
@@ -197,8 +228,8 @@ async function rewrite(issue: SpillIssue, follow_up: number): Promise<boolean> {
 	}
 }
 
-async function spill(issue: SpillIssue, estimate: string): Promise<number> {
-	const follow_up = await file_follow_up(issue, estimate)
+async function spill(issue: SpillIssue, request: SpillRequest): Promise<number> {
+	const follow_up = await file_follow_up(issue, request)
 
 	if (follow_up === undefined || !(await rewrite(issue, follow_up))) return FAILURE_EXIT_CODE
 	console.info(
@@ -219,9 +250,7 @@ async function spill_request(request: SpillRequest): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	if (issue_spill.unchecked_lines(issue.body).length > 0) {
-		return await spill(issue, request.estimate)
-	}
+	if (issue_spill.unchecked_lines(issue.body).length > 0) return await spill(issue, request)
 
 	console.info(`${number} has no unchecked acceptance criteria — nothing spilled.`)
 
