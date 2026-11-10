@@ -293,6 +293,24 @@ The body travels through [`cli-body.ts`](../scripts/josh/cli-body.ts), shared wi
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:comment` in detail".
 
+### `josh issue:body`
+
+<!-- usage: issue:body -->
+
+Replace an issue's body with a file that passes issue:lint.
+
+```bash
+pnpm josh issue:body 6982 --body-file .josh/tmp/issue-6982-body.md
+```
+
+**Options:**
+
+- `--body-file <path>` — the new body, from a file or stdin (`-`). A body `issue:lint` refuses is not written.
+
+<!-- /usage -->
+
+It prints the issue URL. `issue:plan` writes only a blank body; this replaces a non-blank one. An epic body (`## Split rationale`) skips `issue:lint`; check it with `epic:check`. A consultation session refuses every non-GET `gh api`, so a body rewrite goes through this command.
+
 ### `josh issue:plan`
 
 <!-- usage: issue:plan -->

@@ -56,6 +56,6 @@ the main line decides what that means and what to change.
 
 ## A consultation main line hands its investigation to a unit
 
-**On Fable or Codex Astra, broad investigation goes to a unit on the investigation model** — Claude
-`JOSH_INVESTIGATION_MODEL`, Codex `gpt-6.1-sol`; the main line keeps a narrow check of a cited line
-(the `consultation-investigation` rows of `pnpm josh rule:list`).
+**With no launcher role, broad reading → an investigation-model unit** — Claude
+`JOSH_INVESTIGATION_MODEL`, Codex `gpt-6.1-sol` (`consultation-investigation` rows).
+Design on `claude-opus-5-5` → `kit:design-consultant` (`.claude/agents/design-consultant.md`).
