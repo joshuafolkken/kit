@@ -14,7 +14,7 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
-const { WORDS } = run_board_labels
+const { STATE_ICONS, WORDS } = run_board_labels
 const { EARLIER_ICON } = run_board_earlier
 const REPO = 'joshuafolkken/kit'
 const RUNNING = 4195
@@ -87,10 +87,12 @@ describe('run_board_tick.tick — an earlier run’s lanes holding a place', () 
 		const rows = lane_rows(lines)
 
 		expect(rows[0]).toContain(String(RUNNING))
-		// A running row leads with its spinner, then its mark.
+		// A running row leads with its spinner, then its state's icon in its phase's place, and ends on
+		// its mark (joshuafolkken/kit#7098).
 		expect(rows.slice(1).map((row) => row.trim().split(/\s+/u).slice(1, 3))).toStrictEqual(
-			EARLIER.map((issue) => [EARLIER_ICON, issue]),
+			EARLIER.map((issue) => [STATE_ICONS.running, issue]),
 		)
+		expect(rows.slice(1).every((row) => row.endsWith(` ${EARLIER_ICON}`))).toBe(true)
 		expect(lines.some((line) => line.includes(`${EARLIER_ICON} ${WORDS.earlier}`))).toBe(true)
 	})
 
@@ -103,7 +105,7 @@ describe('run_board_tick.tick — an earlier run’s lanes holding a place', () 
 
 	it('draws the earlier run’s lanes before the plan is read', async () => {
 		const lines = await frame_of(FULL, [])
-		const row = new RegExp(String.raw`^\s*(?:\S +)?${EARLIER_ICON} .* \d+\b`, 'u')
+		const row = new RegExp(String.raw`^\s*(?:\S +)?\S .* \d+\b.* ${EARLIER_ICON}$`, 'u')
 
 		expect(lines.filter((line) => row.test(line))).toHaveLength(EARLIER.length)
 	})
