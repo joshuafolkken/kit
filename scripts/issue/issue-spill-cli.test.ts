@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const classified_mock = vi.hoisted(() => vi.fn())
@@ -116,6 +117,20 @@ describe('issue_spill_cli.run --distinct', () => {
 		const argv: ReadonlyArray<string> = file_issue_mock.mock.calls[0]?.[0] ?? []
 
 		expect(argv.join(' ')).toContain(`${DISTINCT} ${String(ISSUE)} ${distinct.join(' ')}`)
+	})
+
+	it('writes the given estimate into the filed body', async () => {
+		let body = ''
+
+		file_issue_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
+			body = await readFile(argv[argv.indexOf('--body-file') + 1] ?? '', 'utf8')
+
+			return FOLLOW_UP_URL
+		})
+		listing('none', new Map([[ISSUE, EPIC]]))
+		await issue_spill_cli.run([...ARGV, DISTINCT, '6677'])
+
+		expect(body).toContain('- 規模見積もり: 約 2 ファイル / 40 行（テスト除く）')
 	})
 })
 
