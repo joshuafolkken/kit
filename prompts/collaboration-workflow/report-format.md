@@ -18,7 +18,7 @@
 ### 作業前サマリはいつ・どう出すか
 
 - **いつ**: 実装コードを書く前に、Issue ごとに 1 回出す。`fullrun` / `halfrun` / `prrun` / `backlogrun` で必須、`kickoff` は対象外。確認のための停止ではない — 出したらそのまま実装に進む
-- **骨組み**: `pnpm josh run:prep <N> --summary` が本文から印字する。埋めるのはテスト名（`docs/josh-commands-run.md` → "`josh run:prep`"）
+- **材料**: `pnpm josh plan:scaffold <N> [<path>...]` 1 回で集める（骨組み・`lines`・`test:declared`・`cases`・`plan:consumers`）。骨組みで埋めるのはテスト名（`docs/josh-commands-run.md` → "`josh run:prep`"）
 - **概要**: `Now` / `Change` / `Check` を各 1 文、セッション言語で、プログラマでない人にも追える文で書く。各行に具体的な主語を書き、主語のない文は不可（下記「具体的な主語を必ず書く」）。ファイルパス・関数名や型名・CLI のオプションフラグは書かない — 禁じるのは内部識別子だけである
 - **技術詳細**: すべての変更をそのテストとともに `<変更内容> — Test: <Unit|E2E> — <file path> — <検証する挙動>` の形で並べる
 - **完了報告**は `Cause` / `Fix` / `Result` を先頭に置く
@@ -36,11 +36,11 @@
 - 第 1 段（ケース）は固定語彙を並べ、**該当しないものは `該当なし` に続けて理由を書いて消す**（例:「重複: 該当なし — 入力は集合なので重複しない」）
 - 第 2 段（壊れるとしたら）は、この変更に固有の壊れうる条件を**最低 3 件**書く。書けないときは `どう呼ばれても壊れない` と明示する
 - 複数ケースは `it.each` 1 本に畳んでよい
-- 差分が HTTP・プロセス起動・ファイル IO・時間の境界を跨ぐとき、または共有状態（`.josh/` 配下・lock）や環境（`process.env`・常駐プロセス）に依存するときは、`pnpm josh cases <path...>` が印字する異常系を第 2 段に載せる。共有状態には同じ状態を読み書きする他のソースが `file:line` で付く
+- 差分が HTTP・プロセス起動・ファイル IO・時間の境界を跨ぐとき、または共有状態（`.josh/` 配下・lock）や環境（`process.env`・常駐プロセス）に依存するときは、`plan:scaffold` の `cases` 節（単独では `pnpm josh cases <path...>`）が印字する異常系を第 2 段に載せる。共有状態には同じ状態を読み書きする他のソースが `file:line` で付く
 
 ### 行数予算は編集前に読む
 
-**「対象」に書くファイルは、書き始める前に `pnpm josh lines <path> [<path>...]` に渡し、上限に近いと言われたファイルには分割方針を「対象」に書く**（joshuafolkken/kit#1425）。行数は `wc -l` で数えない。関数単位の上限は `pnpm josh lint` が報告する。
+**「対象」に書くファイルは、書き始める前に `plan:scaffold` の `lines` 節（単独では `pnpm josh lines <path> [<path>...]`）で読み、上限に近いと言われたファイルには分割方針を「対象」に書く**（joshuafolkken/kit#1425）。行数は `wc -l` で数えない。関数単位の上限は `pnpm josh lint` が報告する。
 
 ### 変更対象はまとめて読んでから編集する（joshuafolkken/kit#2202）
 
