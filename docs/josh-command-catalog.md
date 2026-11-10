@@ -158,7 +158,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh eval` · `josh ev` · **kit only** | `[scenario...]` | maintainer | processes, network | Run the agent rule-compliance scenarios (real Claude sessions) |
 | `josh fanout` | `<unit-files> <unit-files> [<unit-files> …]` | automation | none | Say whether proposed implementation units are file-disjoint, so they may run in parallel |
 | `josh issue:ack` | `<issue>` | automation | network | Record that the run read a person's update to its issue, printing the update it acknowledges |
-| `josh issue:already-done` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose work is already merged: post the evidence, close it (cited merge) or apply already-done, release the hold |
+| `josh issue:already-done` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose work is already merged: post the evidence, apply already-done, close it when a cited PR is merged, release the hold |
 | `josh issue:body` | `<issue> --body-file <path>` | automation | network | Replace an issue's body with a file that passes issue:lint |
 | `josh issue:cite` | `<issue...> [--repo <owner/repo>]` | automation | network | Print the paste-ready number-link citation line for each issue, in one call |
 | `josh issue:comment` | `<issue> --body <text> \| --body-file <path>` | automation | network | Post one comment to an issue from a file, so no shell expands the body |
