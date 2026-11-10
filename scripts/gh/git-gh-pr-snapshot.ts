@@ -135,22 +135,43 @@ async function resolve_pull(branch_name: string): Promise<ResolvedPull> {
 
 // Everything the snapshot carries except the review decision: three requests rather than four.
 // `pr_number` travels with it so a caller that then *does* want the review decision needs no second
-// resolution.
+// resolution. **`graphql` is the decision the one GraphQL query already read**, so a poll round that
+// wants it asks no second query (joshuafolkken/kit#7143); absent on the REST path.
 interface PrChecksSnapshot {
 	pr_number: number
 	snapshot_json: string
+	graphql?: { review_decision: string | undefined }
 }
 
 async function pr_get_checks_snapshot(branch_name: string): Promise<PrChecksSnapshot> {
 	const graphql = await git_gh_pr_graphql_snapshot.read_snapshot(branch_name)
 
 	if (graphql !== undefined) {
-		return { pr_number: graphql.pr_number, snapshot_json: JSON.stringify(graphql.fields) }
+		return {
+			pr_number: graphql.pr_number,
+			snapshot_json: JSON.stringify(graphql.fields),
+			graphql: { review_decision: graphql.review_decision },
+		}
 	}
 
 	const { pr_number, pull } = await resolve_pull(branch_name)
 
 	return { pr_number, snapshot_json: JSON.stringify(await build_checks_fields(pull)) }
+}
+
+// GraphQL's `null` decision is no answer (`to_review_decision`), so it is folded from the REST reviews.
+async function graphql_or_rest_decision(
+	decision: string | undefined,
+	pr_number: number,
+): Promise<string> {
+	return decision ?? (await read_rest_review_decision(pr_number))
+}
+
+// The review decision of a snapshot already read: the GraphQL query's own where it answered one.
+async function pr_read_review_decision(checks: PrChecksSnapshot): Promise<string> {
+	if (checks.graphql === undefined) return await pr_get_review_decision(checks.pr_number)
+
+	return await graphql_or_rest_decision(checks.graphql.review_decision, checks.pr_number)
 }
 
 // Throws where the branch has no pull request or a read fails, which is the contract `gh pr view`
@@ -165,8 +186,10 @@ async function pr_get_state_snapshot(branch_name: string): Promise<string> {
 	const graphql = await git_gh_pr_graphql_snapshot.read_snapshot(branch_name)
 
 	if (graphql !== undefined) {
-		const review_decision =
-			graphql.review_decision ?? (await read_rest_review_decision(graphql.pr_number))
+		const review_decision = await graphql_or_rest_decision(
+			graphql.review_decision,
+			graphql.pr_number,
+		)
 
 		return JSON.stringify({ ...graphql.fields, reviewDecision: review_decision })
 	}
@@ -184,6 +207,7 @@ const git_gh_pr_snapshot = {
 	pr_get_state_snapshot,
 	pr_get_checks_snapshot,
 	pr_get_review_decision,
+	pr_read_review_decision,
 }
 
 export {
@@ -191,5 +215,6 @@ export {
 	pr_get_state_snapshot,
 	pr_get_checks_snapshot,
 	pr_get_review_decision,
+	pr_read_review_decision,
 	NO_HEAD_SHA_MESSAGE,
 }
