@@ -165,6 +165,7 @@ async function is_admitted(filing: Filing): Promise<boolean> {
 	const { implement_rate, growth } = await lane_net_read.measurements()
 	const refusals = refusals_of(filing, implement_rate, growth)
 
+	issue_lint_cli.warn(filing.body)
 	if (refusals.length === 0) return true
 	const hint = await issue_file_lane_hint.lines_of(filing.args.found_during, filing.body)
 

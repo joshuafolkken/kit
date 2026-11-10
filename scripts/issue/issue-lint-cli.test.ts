@@ -181,6 +181,25 @@ describe('issue:lint measurement declaration (joshuafolkken/kit#4621)', () => {
 	})
 })
 
+describe('issue:lint figure sources (joshuafolkken/kit#7021)', () => {
+	it('warns about a figure with no source and still passes', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		expect(await lint_body(declaring('概算は約 35 分 / 100 行'))).toBe(0)
+		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^⚠ number with no source .*約 35 分/u))
+	})
+
+	it('does not warn about a figure with its command', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		await lint_body(declaring('中央値 16.9 分（`pnpm josh lane:stats --period 3`）'))
+
+		expect(warn).not.toHaveBeenCalled()
+	})
+})
+
 describe('issue:lint decision rule (joshuafolkken/kit#6501)', () => {
 	const RULE = '- 判定規則: 検出範囲を保てるなら A、そうでなければ B（#6403）'
 
