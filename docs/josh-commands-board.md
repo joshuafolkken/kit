@@ -137,6 +137,8 @@ A child whose open lane has had no child process for `lane:await`'s 15-second re
 
 A stopped row's times freeze at its stop — the record's end, else its first idle read or transcript's last write, if earlier — and its tail reads `stopped by <command>` if recorded. A child labelled stopped whose transcript reads running stays running: `ship stopped by <command>`.
 
+A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue:already-done` or `🚫` withdrawn.
+
 A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 
 - `🚪` / `📥` / `📤` `<time>` — how long its lane has been opening, installing or dispatching.

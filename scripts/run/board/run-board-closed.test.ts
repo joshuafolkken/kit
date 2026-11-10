@@ -1,6 +1,7 @@
 import { git_gh_etag_read } from '#scripts/gh/git-gh-etag-read'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { TRANSPORT_ENV_VAR } from '#scripts/gh/git-gh-transport'
+import { ALREADY_DONE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_closed } from './run-board-closed'
@@ -87,6 +88,31 @@ describe('run_board_closed.read_closed — an issue not read closed', () => {
 		vi.mocked(git_gh_issue_read.issue_view_json).mockResolvedValue(undefined)
 
 		await expect(run_board_closed.read_closed(3439)).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7095: a close `josh issue:already-done` made keeps its label, and draws as ⏩.
+describe('run_board_closed.state_of', () => {
+	const closed = {
+		title: TITLE,
+		labels: [],
+		closed_ms: undefined,
+		is_merged: false,
+		is_not_planned: false,
+	}
+	const labelled = { ...closed, labels: [ALREADY_DONE_LABEL] }
+
+	it('answers already_done for a close labelled already-done (ac-38bbacca)', () => {
+		expect(run_board_closed.state_of(labelled)).toBe('already_done')
+	})
+
+	it('answers done for a close with no such label (ac-b055a6a2)', () => {
+		expect(run_board_closed.state_of(closed)).toBe('done')
+	})
+
+	it('lets a merge or a not-planned close outrank the label', () => {
+		expect(run_board_closed.state_of({ ...labelled, is_merged: true })).toBe('merged')
+		expect(run_board_closed.state_of({ ...labelled, is_not_planned: true })).toBe('withdrawn')
 	})
 })
 
