@@ -56,7 +56,7 @@ const read_issue = vi.spyOn(issue_state_cli, 'read_issue')
 const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const reap_child = vi.spyOn(lane_reap, 'reap_child')
-const changes_probe = vi.spyOn(git_stash, 'has_changes')
+const changes_probe = vi.spyOn(git_stash, 'has_work')
 const push = vi.spyOn(git_stash, 'push')
 const try_comment = vi.spyOn(git_gh_issue_write, 'issue_try_comment')
 // The REST transport every issue write goes through, so a close of any reason is caught.
