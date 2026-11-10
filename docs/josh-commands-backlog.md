@@ -354,6 +354,19 @@ pnpm josh plan:consumers lane:pause run:paused   # one block per identifier, one
 
 <!-- /usage -->
 
+### `josh plan:scaffold`
+
+<!-- usage: plan:scaffold -->
+
+Print a work summary's inputs in one call: the run:prep skeleton, planned files near the line limit, the test:declared verdict, the owed cases and the plan:consumers draft.
+
+```bash
+pnpm josh plan:scaffold 123                             # planned files from the issue body
+pnpm josh plan:scaffold 123 scripts/a.ts scripts/b.ts   # the files this plan touches
+```
+
+<!-- /usage -->
+
 ### `josh issue:already-done`
 
 <!-- usage: issue:already-done -->
