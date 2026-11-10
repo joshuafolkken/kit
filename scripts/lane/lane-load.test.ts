@@ -24,6 +24,14 @@ const SYSCTL_OUTPUT = [
 	'hw.pagesize: 4096',
 ].join('\n')
 const SWAPPED_MB = 3
+// joshuafolkken/kit#7026: the host's sleep since boot, the continuous wake clock past the absolute one.
+const TIMEBASE_NAME = 'hw.tbfrequency'
+const SLEEP_OUTPUT = [
+	`${TIMEBASE_NAME}: 24000000`,
+	'machdep.wake_abstime: 24000000',
+	'machdep.wake_conttime: 72000000',
+].join('\n')
+const SLEPT_MS = 2000
 
 function stub_platform(platform: NodeJS.Platform): void {
 	vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
@@ -66,7 +74,9 @@ describe('lane_load.sample', () => {
 		const sample = await lane_load.sample(AT)
 		const available_mb = await read_admission()
 		// The admission reads the memory at both ends of its window, to see swapping across it.
-		const [sampled, ...admitted] = hanging_execa.calls()
+		const [sampled, ...admitted] = hanging_execa
+			.calls()
+			.filter((call) => !call.arguments_list.includes(TIMEBASE_NAME))
 
 		expect(available_mb).toBeGreaterThan(0)
 		expect(sample.available_mb).toBe(Math.round(available_mb ?? 0))
@@ -125,6 +135,31 @@ function lane(issue: string, is_stranded: boolean): LaneInfo {
 		is_stranded,
 	}
 }
+
+describe('lane_load.parse_slept_ms', () => {
+	it('reads the wake clocks apart in milliseconds', () => {
+		expect(lane_load.parse_slept_ms(SLEEP_OUTPUT)).toBe(SLEPT_MS)
+	})
+
+	it('reads none when a clock is missing', () => {
+		expect(lane_load.parse_slept_ms(`${TIMEBASE_NAME}: 24000000`)).toBeUndefined()
+	})
+})
+
+describe('lane_load.sample host sleep', () => {
+	it('carries the host sleep counter on macOS', async () => {
+		stub_platform('darwin')
+		hanging_execa.answer_with('sysctl', `${SYSCTL_OUTPUT}\n${SLEEP_OUTPUT}`)
+
+		await expect(lane_load.sample(AT)).resolves.toMatchObject({ slept_ms: SLEPT_MS })
+	})
+
+	it('records no sleep counter on another platform', async () => {
+		stub_platform('win32')
+
+		await expect(lane_load.sample(AT)).resolves.toMatchObject({ slept_ms: undefined })
+	})
+})
 
 describe('lane_load.count_working', () => {
 	it('counts only open lanes whose child process is running', () => {

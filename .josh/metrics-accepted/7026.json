@@ -1,0 +1,7 @@
+{
+	"reason": "Host-sleep counter on load samples and sleep detection across sampler restarts (#7026)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 56
+	}
+}

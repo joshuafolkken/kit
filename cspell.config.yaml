@@ -72,6 +72,11 @@ words:
   - numer
   # The macOS `sysctl` memory-pressure key the core budget reads available memory from (#3371).
   - memorystatus
+  # The macOS `sysctl` timebase and wake-clock keys a load sample reads the host's sleep from (#7026).
+  - tbfrequency
+  - machdep
+  - abstime
+  - conttime
   # British spellings review findings record verbatim (#6577).
   - memoising
   - behaviour
