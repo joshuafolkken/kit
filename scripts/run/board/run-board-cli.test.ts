@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_cli } from './run-board-cli'
 import { run_board_fixture, type Harness } from './run-board-fixture'
+import type { IssueCount } from './run-board-issue-count'
 import type { BoardPlan } from './run-board-layout'
 import type { BoardPorts } from './run-board-state'
 
@@ -19,6 +20,18 @@ const LAUNCH = { pos: 1, at: '2026-10-08T08:00:00.000Z', kind: 'child-launch', t
 // A link as a terminal that opens one draws it, so a chat frame is seen to strip it.
 function hyperlink(text: string): string {
 	return `${ESCAPE}]8;;https://x${ESCAPE}\\${text}${ESCAPE}]8;;${ESCAPE}\\`
+}
+
+const ISSUES = 'https://github.com/joshuafolkken/kit/issues?q=is%3Aissue+is%3A'
+
+// A link drawn as text, naming the address it opens.
+function bracketed(text: string, url: string): string {
+	return `[${text}](${url})`
+}
+
+// The repository's issues as GitHub would count them.
+async function read_issue_count(): Promise<IssueCount> {
+	return { open: 87, closed: 6912 }
 }
 
 describe('run_board_cli.run', () => {
@@ -54,6 +67,16 @@ describe('run_board_cli.run', () => {
 		expect(stripVTControlCharacters(frames[0] ?? '')).toMatch(/^▶ backlogrun/u)
 		expect(frames[0]).toContain(LANE_ROW)
 	})
+
+	// joshuafolkken/kit#7089: the header's issue counts open their lists, its name the repository.
+	it('links the issue counts and the repository’s name into the plan’s repository', async () => {
+		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+
+		await run_board_cli.run(['--once'], { ...ports, link: bracketed, read_issue_count })
+
+		expect(frames[0]).toContain(`[87](${ISSUES}open)/[6,912](${ISSUES}closed)`)
+		expect(frames[0]).toContain('[kit](https://github.com/joshuafolkken/kit)')
+	})
 })
 
 // joshuafolkken/kit#3456: the answer to a progress question in a `backlogrun` — one frame a chat shows
@@ -70,6 +93,18 @@ describe('run_board_cli.run --chat', () => {
 		expect(frames[0]).not.toContain(ESCAPE)
 		expect(frames[0]).toContain(LANE_ROW)
 		expect(marks).toStrictEqual([clock.now_ms])
+	})
+
+	// joshuafolkken/kit#7089: the header's repository links come out as their plain text.
+	it('writes the issue counts and the repository’s name with no link', async () => {
+		const { ports, frames } = harness(LOCAL, [plan_titled('a')])
+
+		await run_board_cli.run(['--chat'], { ...ports, link: hyperlink, read_issue_count })
+
+		const [first, second] = (frames[0] ?? '').split('\n', 2)
+
+		expect(first).toMatch(/📮 87\/6,912$/u)
+		expect(second).toMatch(/^ {2}kit /u)
 	})
 
 	it('records no report for a frame a person drew', async () => {

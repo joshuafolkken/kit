@@ -9,6 +9,7 @@ import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan, type LanePlan } from './lane-plan'
+import { lane_plan_premise } from './lane-plan-premise'
 import { lane_plan_probe } from './lane-plan-probe'
 import { lane_plan_size, type Oversize } from './lane-plan-size'
 import { lane_plan_wait } from './lane-plan-wait'
@@ -48,6 +49,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const YIELD_EXIT_CODE = 2
 const SPLIT_EXIT_CODE = 3
+const PREMISE_EXIT_CODE = 4
 const RELEASE_FLAG = '--release'
 const NEAR_CAP_HEADROOM = 20
 
@@ -199,10 +201,29 @@ async function settle(plan: LanePlan, clash: Clash, directory: string): Promise<
 		: held(waiting, clash, until)
 }
 
+// A first plan whose issue's premise does not hold stops before the first edit, unrecorded
+// (joshuafolkken/kit#7022); a re-plan after the lane started never re-runs them.
+async function premise_stop(
+	plan: LanePlan,
+	issues: ReadonlyArray<OpenIssueData> | undefined,
+	directory: string,
+): Promise<number | undefined> {
+	if (lane_plan.read(plan.issue, directory) !== undefined) return undefined
+	const stop = await lane_plan_premise.stop_text(plan.issue, issues)
+
+	if (stop === undefined) return undefined
+	console.error(stop)
+	console.info('premise')
+
+	return PREMISE_EXIT_CODE
+}
+
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
 	const issues = await lane_plan_probe.opted_in()
-	const refused = await refusal(plan, await lane_plan_probe.oversize_of(plan, issues, directory))
+	const refused =
+		(await refusal(plan, await lane_plan_probe.oversize_of(plan, issues, directory))) ??
+		(await premise_stop(plan, issues, directory))
 
 	if (refused !== undefined) return refused
 	const sized = sized_of(plan, issues)
@@ -292,6 +313,7 @@ async function yield_at_entry(issue: number, directory: string = process.cwd()):
 }
 
 const lane_plan_check = {
+	PREMISE_EXIT_CODE,
 	SPLIT_EXIT_CODE,
 	YIELD_EXIT_CODE,
 	check_plan,

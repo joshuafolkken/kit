@@ -18,7 +18,7 @@
 
 ### Decision autonomy
 
-Classify each decision point and act; stop **only** where the user's judgment is genuinely needed. `prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy".
+Classify each decision point and act; stop **only** where the user's judgment is genuinely needed. `prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy". The stops left to a person, each with why: `scripts/issue/issue-human-stops.ts`.
 
 - **Tier A — reversible implementation / design choices** (library, naming, layout, tests, refactor shape; placing a filed Issue into an epic; self-correction). Pick the clearly-better option, proceed, log it. Unasked filing: unattended only (`observation-filing.md`).
 - **Tier B — genuine toss-up.** The only tier that stops — ask with the candidates and trade-offs.
