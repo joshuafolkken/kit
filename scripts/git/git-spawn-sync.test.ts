@@ -79,6 +79,19 @@ describe('git_spawn_sync.read', () => {
 	})
 })
 
+describe('git_spawn_sync.located', () => {
+	it('is no options without a directory', () => {
+		expect(git_spawn_sync.located(undefined)).toStrictEqual({})
+	})
+
+	it('names the directory and clears the git location variables', () => {
+		expect(git_spawn_sync.located(ROOT)).toStrictEqual({
+			cwd: ROOT,
+			env: git_location_environment.location_free_environment(),
+		})
+	})
+})
+
 describe('git_spawn_sync.origin_url', () => {
 	it('asks the origin URL in the given directory', () => {
 		answer(0, `${ORIGIN}\n`)

@@ -1,3 +1,4 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { platform_temporary } from '#scripts/josh/platform-temporary'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { bash_triggers } from './bash-triggers'
@@ -87,13 +88,10 @@ function invokes_budget_command(command: string): boolean {
 // dispatch mark against this checkout's own issue — runs only on the handful of calls that invoke a
 // budget command, not on every `Bash` call in the run. A person working in a lane carries no mark and
 // sees no refusal, exactly as `lane-park.ts` and `lane-interactive-ask.ts` gate their own reads.
-function is_carry_conflict(
-	command: string,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+function is_carry_conflict(command: string, context: HookContext): boolean {
 	if (!invokes_budget_command(command)) return false
 
-	return is_lane_child
+	return lane_child_marker.is_child_of(context.cwd, context.env)
 }
 
 // The instruction in the shape a refusal can carry: what the child cannot do, why the record is not a

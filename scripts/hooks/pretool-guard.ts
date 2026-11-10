@@ -2,6 +2,7 @@ import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard
 import { investigation_outcome } from '#scripts/delegation/investigation-guard'
 import { issue_watch_hook } from '#scripts/issue/issue-watch-hook'
 import { hook_decision, type GuardOutcome, type TranscriptGuard } from '#scripts/josh/hook-decision'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_phase } from '#scripts/lane/lane-phase'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { lane_background } from '#scripts/rules/lane-background'
@@ -145,7 +146,11 @@ function guard_outcome(raw_payload: string, context: HookContext): GuardOutcome 
 		guard.outcome(raw_payload, context),
 	)
 
-	return combine_outcomes(outcomes, delivered_rules.delivery(raw_payload))
+	return combine_outcomes(
+		outcomes,
+		delivered_rules.delivery(raw_payload, Date.now(), context),
+		hook_demoted.rules(context.env),
+	)
 }
 
 // The synchronous verdict the Codex adapter asks for, with the session reminders as its last layer.
@@ -182,12 +187,17 @@ async function mark_phase(
 // beside the watcher rather than among the synchronous rows; a stale watcher is the cheaper fix and is
 // surfaced first. **The poll guard is third**: it reads the same carry record, and only for a call that
 // repeats a state read, so the hand-off still wins over it.
-async function async_reason(raw_payload: string): Promise<string | undefined> {
-	const watcher = await run_watcher_hook.watcher_hook_reason(raw_payload)
-	const cut = watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload))
-	const poll = cut ?? (await run_poll_hook.safe_poll_reason(raw_payload))
+async function async_reason(
+	raw_payload: string,
+	context: HookContext,
+): Promise<string | undefined> {
+	const watcher = await run_watcher_hook.watcher_hook_reason(raw_payload, context)
+	const state = run_parent_cut_hook.current_state(context)
+	const cut =
+		watcher ?? (await run_parent_cut_hook.parent_cut_reason(raw_payload, Date.now(), state))
+	const poll = cut ?? (await run_poll_hook.safe_poll_reason(raw_payload, context))
 
-	return poll ?? (await issue_watch_hook.watch_reason())
+	return poll ?? (await issue_watch_hook.watch_reason(context))
 }
 
 async function pretool_outcome_async(
@@ -198,7 +208,7 @@ async function pretool_outcome_async(
 
 	if (base.reason !== undefined) return base
 
-	const reason = await async_reason(raw_payload)
+	const reason = await async_reason(raw_payload, context)
 
 	if (reason !== undefined) return { reason, notice: undefined, fault: undefined }
 
@@ -216,7 +226,7 @@ function rewrite_context(note: string, outcome: GuardOutcome): string {
 
 function foreground_input_of(
 	raw_payload: string,
-	is_lane_child?: () => boolean,
+	is_lane_child: () => boolean,
 ): Record<string, unknown> | undefined {
 	const call = guarded_call(raw_payload)
 
@@ -231,7 +241,7 @@ function foreground_input_of(
 function foreground_rewrite(
 	outcome: GuardOutcome,
 	raw_payload: string,
-	is_lane_child?: () => boolean,
+	is_lane_child: () => boolean,
 	rewrite?: RuleRewrite,
 ): string | undefined {
 	const input =
@@ -257,9 +267,16 @@ function rule_envelope(
 }
 
 // The hook's one write: a rewrite where one applies, the outcome's own envelope otherwise.
-function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite): void {
+function emit(
+	raw_payload: string,
+	outcome: GuardOutcome,
+	rewrite?: RuleRewrite,
+	context: HookContext = hook_context.from_process(),
+): void {
+	const is_lane_child = lane_child_marker.is_child_of.bind(undefined, context.cwd, context.env)
 	const envelope =
-		foreground_rewrite(outcome, raw_payload, undefined, rewrite) ?? rule_envelope(outcome, rewrite)
+		foreground_rewrite(outcome, raw_payload, is_lane_child, rewrite) ??
+		rule_envelope(outcome, rewrite)
 
 	if (envelope === undefined) hook_decision.emit_outcome(outcome)
 	else process.stdout.write(`${envelope}\n`)
@@ -271,13 +288,14 @@ function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite)
 async function record_refusal(
 	judged_payload: string,
 	outcome: GuardOutcome,
-	demoted: ReadonlySet<string> = hook_demoted.rules(),
+	context: HookContext = hook_context.from_process(),
+	demoted: ReadonlySet<string> = hook_demoted.rules(context.env),
 ): Promise<void> {
 	const refusal = outcome.reason ?? hook_demoted.refusal_of(outcome.notice, demoted)
 
-	await hook_ledger.record_reason(HOOK_NAME, refusal, judged_payload)
+	await hook_ledger.record_reason(HOOK_NAME, refusal, judged_payload, context)
 
-	if (outcome.reason === undefined) await direct_gh_usage.record(judged_payload)
+	if (outcome.reason === undefined) await direct_gh_usage.record(judged_payload, context)
 }
 
 // **The guards judge the call that will run.** A rewritten call reaches every guard already made
@@ -288,14 +306,14 @@ async function respond(
 	raw_payload: string,
 	context: HookContext = hook_context.from_process(),
 ): Promise<void> {
-	const rewrite = rule_rewrite.rewrite(raw_payload)
+	const rewrite = rule_rewrite.rewrite(raw_payload, context)
 	const judged = rewrite?.payload ?? raw_payload
 
 	bash_revert.stamp(judged, context.cwd)
 	const outcome = await pretool_outcome_async(judged, context)
 
-	emit(judged, outcome, rewrite)
-	await record_refusal(judged, outcome)
+	emit(judged, outcome, rewrite, context)
+	await record_refusal(judged, outcome, context)
 }
 
 const pretool_guard = {

@@ -1,3 +1,4 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { time_markers } from '#scripts/time-runtime/time-markers'
@@ -104,18 +105,22 @@ function fixes_an_open_round(tail: string): boolean {
 
 // **The command test comes first and the world is consulted second**: a person working in a lane
 // carries no mark and sees no refusal.
-function runs_in_lane_child(command: string, is_counted: SegmentTest): boolean {
+function runs_in_lane_child(
+	command: string,
+	is_counted: SegmentTest,
+	context: HookContext,
+): boolean {
 	if (shell_segments.segments_of(command).every((segment) => !is_counted(segment))) return false
 
-	return lane_child_marker.is_child_of(process.cwd())
+	return lane_child_marker.is_child_of(context.cwd, context.env)
 }
 
-function is_candidate(command: string): boolean {
-	return runs_in_lane_child(command, is_check_related)
+function is_candidate(command: string, context: HookContext): boolean {
+	return runs_in_lane_child(command, is_check_related, context)
 }
 
-function is_full_reach_candidate(command: string): boolean {
-	return runs_in_lane_child(command, is_full_reach_check)
+function is_full_reach_candidate(command: string, context: HookContext): boolean {
+	return runs_in_lane_child(command, is_full_reach_check, context)
 }
 
 // Refused on every occurrence while the round stays open: the way on is the join, never a reissue.

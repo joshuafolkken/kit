@@ -8,6 +8,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { z } from 'zod'
+import { hook_context, type HookContext } from './hook-context'
 
 // Every refusal a hook makes, one JSON line each, so a rule can be judged by how often it spoke.
 //
@@ -76,7 +77,12 @@ function command_of(input: unknown): string {
 	return typeof value === 'string' ? value.slice(0, COMMAND_HEAD) : ''
 }
 
-function entry_of(refusal: Refusal, branch: string, now: Date): HookLedgerEntry {
+function entry_of(
+	refusal: Refusal,
+	branch: string,
+	now: Date,
+	environment: HookContext['env'],
+): HookLedgerEntry {
 	const payload = json_value.parse_with(refusal.raw_payload, payload_schema) ?? EMPTY_PAYLOAD
 
 	return {
@@ -84,7 +90,7 @@ function entry_of(refusal: Refusal, branch: string, now: Date): HookLedgerEntry 
 		hook: refusal.hook,
 		rule: rule_of(refusal.reason),
 		tool: payload.tool_name,
-		role: process.env[agent_session_role.KEY] ?? '',
+		role: environment[agent_session_role.KEY] ?? '',
 		issue: git_branch.issue_from_branch(branch),
 		session: payload.transcript_path,
 		command: command_of(payload.tool_input),
@@ -92,10 +98,10 @@ function entry_of(refusal: Refusal, branch: string, now: Date): HookLedgerEntry 
 }
 
 // `undefined` outside a repository and under a test run, so a hook suite never writes the real ledger.
-function ledger_directory(cwd?: string): string | undefined {
-	if (process.env['VITEST'] !== undefined) return undefined
+function ledger_directory(context: HookContext = hook_context.from_process()): string | undefined {
+	if (context.env['VITEST'] !== undefined) return undefined
 
-	const common = git_common_directory.repository(cwd)
+	const common = git_common_directory.repository(context.cwd)
 
 	return common === undefined
 		? undefined
@@ -114,13 +120,14 @@ async function append(entry: HookLedgerEntry, directory: string): Promise<void> 
 async function record(
 	refusal: Refusal,
 	directory: string | undefined = ledger_directory(),
+	context: HookContext = hook_context.from_process(),
 ): Promise<void> {
 	if (directory === undefined) return
 
 	try {
-		const branch = await git_spawn.read(['rev-parse', '--abbrev-ref', 'HEAD'])
+		const branch = await git_spawn.read(['-C', context.cwd, 'rev-parse', '--abbrev-ref', 'HEAD'])
 
-		await append(entry_of(refusal, branch, new Date()), directory)
+		await append(entry_of(refusal, branch, new Date(), context.env), directory)
 	} catch {
 		// Nothing to report to: the hook has already answered the call.
 	}
@@ -131,8 +138,11 @@ async function record_reason(
 	hook: string,
 	reason: string | undefined,
 	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
 ): Promise<void> {
-	if (reason !== undefined) await record({ hook, reason, raw_payload })
+	if (reason !== undefined) {
+		await record({ hook, reason, raw_payload }, ledger_directory(context), context)
+	}
 }
 
 // The reason a written `Stop` envelope sends the turn back with, or `undefined` for one that holds nothing.

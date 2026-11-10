@@ -1,6 +1,7 @@
 import { mkdirSync, realpathSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { read_unwrapped } from '#scripts/document/ai-document-fixture'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -92,7 +93,9 @@ function comment_read_tail(issue: number): string {
 // on every reissue after a one-time formatting rule has already delivered.
 function rules_claiming(command: string): number {
 	return delivered_rules.DELIVERED_RULES.filter(
-		(rule) => rule.id !== 'egress' && rule.is_trigger({ name: 'Bash', input: { command } }),
+		(rule) =>
+			rule.id !== 'egress' &&
+			rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 	).length
 }
 
