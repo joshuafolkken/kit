@@ -183,7 +183,8 @@ function agent_runs_line(agent: AgentRuns): string {
 // sets its before and after on, read beside the dollar rows rather than filed on.
 function usage_lines(usage: UsageBreakdown): Array<string> {
 	const { cache_write: write } = usage
-	const agents = usage.agents.length === 0 ? ['    none'] : usage.agents.map(agent_runs_line)
+	const agents =
+		usage.agents.length === 0 ? ['    none'] : usage.agents.map((agent) => agent_runs_line(agent))
 
 	return [
 		'',
