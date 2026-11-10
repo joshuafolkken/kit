@@ -14,14 +14,18 @@ const WARNING = `number with no source (add the command that measured it in back
 // Numbers that are not figures: issue and pull request references, dates and an ordered-list marker.
 const NOT_A_FIGURE = /#\d+|\d{4}-\d{2}-\d{2}|^\d+\.\s/gu
 const DIGIT = /\d/u
-// The background declarations whose figure the template already sources or marks an estimate
-// (`issue-template.md`'s declaration table); any other keyed bullet is read as prose.
+// The background declarations whose numbers the template already sources, marks an estimate or reads
+// as a date or rule (`issue-template.md`'s declaration table); any other keyed bullet is read as prose.
 const DECLARATIONS = [
 	'- 規模見積もり:',
 	'- 原因のレーン:',
 	'- 原因の損失:',
 	'- 優先度:',
 	'- 実施可能条件:',
+	'- 実施可能日:',
+	'- 計測宣言なし:',
+	'- 計測:',
+	'- 判定規則:',
 ]
 
 function text_lines(body: string, heading: string): ReadonlyArray<string> {

@@ -46,6 +46,11 @@ describe('figure_source_lint.warnings — sourced or not a figure', () => {
 			'a background declaration line',
 			`${BACKGROUND}- 規模見積もり: 約 4 ファイル / 50 行（テスト除く）\n`,
 		],
+		['a start date declaration', `${BACKGROUND}- 実施可能日: 2026-11-10T12:00Z\n`],
+		[
+			'a no-measurement declaration',
+			`${BACKGROUND}- 計測宣言なし: マージ後に 1 コマンドで集計する値が無い\n`,
+		],
 		['a figure in a fenced output', `${BACKGROUND}\`\`\`\n| 177 | 16.9 |\n\`\`\`\n`],
 		['a figure under another heading', `## 現象\n\n約 35 分\n`],
 		['an ordered-list marker', `${BACKGROUND}1. 予算を守る\n`],
