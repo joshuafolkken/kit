@@ -201,6 +201,17 @@ describe('the unit environment blanks the agent profile keys', () => {
 	})
 })
 
+// joshuafolkken/kit#7035: a session exporting `JOSH_REVIEWER_PAIRED=1` turned the run:review suites red,
+// because the paired review reached a stamp-file mock without `stamp_path`.
+describe('the unit environment blanks the paired review switch', () => {
+	it('turns an inherited paired review off', () => {
+		const environment = unit_environment({ [review_pair.PAIRED_ENV]: '1' })
+
+		expect(environment[review_pair.PAIRED_ENV]).toBe('')
+		expect(review_pair.is_enabled(environment)).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#4301: execa and zod were the suite's two largest import costs, paid again by every
 // isolated file; an optimizer without them would silently pay them again.
 describe('the dependency optimizer pre-bundles the packages most test files load', () => {
