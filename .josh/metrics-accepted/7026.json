@@ -1,7 +1,7 @@
 {
-	"reason": "Host-sleep counter on load samples and sleep detection across sampler restarts (#7026)",
+	"reason": "Review round 1 of #7026 found two medium sleep-placement bugs; anchoring the span at the host last wake and ignoring a reboot adds the boot/wake parse, two ledger fields and their tests",
 	"date": "2026-11-10",
 	"growth": {
-		"scripts.code_lines": 56
+		"scripts.code_lines": 76
 	}
 }

@@ -46,14 +46,15 @@ async function newest_load(ledger_path?: string): Promise<LoadEntry | undefined>
 }
 
 // How far the host's sleep counter (`lane-load.ts`) grew from `previous` to `current`; an absent
-// counter reads as no growth.
+// counter, or a reboot between the two (the boot instant moved), reads as no growth.
 function counter_growth(previous: LoadEntry, current: LoadEntry): number {
+	if (previous.booted_ms !== current.booted_ms) return 0
+
 	return (current.slept_ms ?? 0) - (previous.slept_ms ?? Infinity)
 }
 
-// The sleep between `previous` and `current`, ending at `current` and starting no earlier than
-// `previous`, as the wake is not recorded; a counter reset by a reboot or grown by less than a tick
-// reads as none.
+// The sleep between `previous` and `current`, ending at the host's last wake (the sampler may start long
+// after it) and starting no earlier than `previous`; a counter grown by less than a tick reads as none.
 function sleep_since(previous: LoadEntry | undefined, current: LoadEntry): LaneSpan | undefined {
 	if (previous === undefined) return undefined
 
@@ -61,7 +62,7 @@ function sleep_since(previous: LoadEntry | undefined, current: LoadEntry): LaneS
 
 	if (slept_ms < SAMPLE_INTERVAL_MS) return undefined
 
-	const to_ms = Date.parse(current.at)
+	const to_ms = Math.min(Date.parse(current.at), current.woke_ms ?? Infinity)
 
 	return { from_ms: Math.max(Date.parse(previous.at), to_ms - slept_ms), to_ms }
 }

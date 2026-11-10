@@ -76,6 +76,9 @@ words:
   - tbfrequency
   - machdep
   - abstime
+  - boottime
+  - waketime
+  - usec
   - conttime
   # British spellings review findings record verbatim (#6577).
   - memoising

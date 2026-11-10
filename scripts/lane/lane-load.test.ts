@@ -141,6 +141,13 @@ describe('lane_load.parse_slept_ms', () => {
 		expect(lane_load.parse_slept_ms(SLEEP_OUTPUT)).toBe(SLEPT_MS)
 	})
 
+	it('reads the boot and last-wake instants in epoch milliseconds', () => {
+		const output =
+			'kern.boottime: { sec = 100, usec = 5 } x\nkern.waketime: { sec = 200, usec = 9 } y'
+
+		expect(lane_load.parse_times(output)).toStrictEqual({ booted_ms: 100_000, woke_ms: 200_000 })
+	})
+
 	it('reads none when a clock is missing', () => {
 		expect(lane_load.parse_slept_ms(`${TIMEBASE_NAME}: 24000000`)).toBeUndefined()
 	})
@@ -157,7 +164,9 @@ describe('lane_load.sample host sleep', () => {
 	it('records no sleep counter on another platform', async () => {
 		stub_platform('win32')
 
-		await expect(lane_load.sample(AT)).resolves.toMatchObject({ slept_ms: undefined })
+		const entry = await lane_load.sample(AT)
+
+		expect(entry.slept_ms).toBeUndefined()
 	})
 })
 

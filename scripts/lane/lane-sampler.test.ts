@@ -105,9 +105,15 @@ describe('lane_sampler.start — host sleep', () => {
 const COUNTER_MS = 5 * 60_000
 const IDLE_MS = 2 * 60_000
 
+interface HostClocks {
+	booted_ms?: number
+	woke_ms?: number
+}
+
 async function start_after(
 	previous_slept_ms: number | undefined,
 	slept_ms: number,
+	clocks: { previous?: HostClocks; current?: HostClocks } = {},
 ): Promise<string> {
 	const ledger_path = fresh_ledger()
 	const events_path = fresh_ledger()
@@ -115,12 +121,18 @@ async function start_after(
 
 	if (previous_slept_ms !== undefined) {
 		await lane_ledger_write.record(
-			{ kind: 'load', at: previous_at, load: 1, slept_ms: previous_slept_ms },
+			{ kind: 'load', at: previous_at, load: 1, slept_ms: previous_slept_ms, ...clocks.previous },
 			ledger_path,
 		)
 	}
 
-	sample_mock.mockImplementation((at: string) => ({ kind: 'load', at, load: 3, slept_ms }))
+	sample_mock.mockImplementation((at: string) => ({
+		kind: 'load',
+		at,
+		load: 3,
+		slept_ms,
+		...clocks.current,
+	}))
 	const stop = lane_sampler.start({ ledger_path, events_path })
 
 	await vi.advanceTimersByTimeAsync(0)
@@ -138,6 +150,26 @@ describe('lane_sampler.start — host sleep between samplers', () => {
 		expect(sleep?.kind).toBe('sleep')
 		expect(sleep?.at).toBe(woke_at)
 		expect(sleep?.elapsed_ms).toBe(SLEEP_MS)
+	})
+
+	it('ends the sleep at the host last wake when the sampler started long after it', async () => {
+		const woke_ms = Date.now() - IDLE_MS
+		const events_path = await start_after(COUNTER_MS, COUNTER_MS + SLEEP_MS, {
+			current: { woke_ms },
+		})
+		const [sleep] = run_event_stream.read_events(events_path)
+
+		expect(sleep?.at).toBe(new Date(woke_ms).toISOString())
+		expect(sleep?.elapsed_ms).toBe(SLEEP_MS)
+	})
+
+	it('records no sleep across a reboot, whatever the counter reads', async () => {
+		const events_path = await start_after(COUNTER_MS, COUNTER_MS + SLEEP_MS, {
+			previous: { booted_ms: 1 },
+			current: { booted_ms: 2 },
+		})
+
+		expect(run_event_stream.read_events(events_path)).toStrictEqual([])
 	})
 
 	it('records no sleep when the counter did not grow', async () => {
