@@ -1,6 +1,6 @@
 ---
 name: epic-commands
-description: Procedures for `josh epic:audit`, `epic:next` and `epic:bundle`. Read it before running one, before an epic tracks a child in another repository, when `epic:bundle` places a filed issue, and when recording a decision on a `needs-decision` child.
+description: Procedures for `josh epic:audit`, `epic:next`, `epic:bundle`, an epic child in another repository and a `needs-decision` decision. Read it before any of them and when `epic:bundle` places a filed issue.
 ---
 
 # The `josh epic:*` commands
