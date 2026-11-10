@@ -1,3 +1,4 @@
+import { hook_context } from '#scripts/hooks/hook-context'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_background } from './lane-background'
@@ -259,7 +260,9 @@ describe('lane_background.ROW — delivery', () => {
 		const row = delivered_rules.DELIVERED_RULES.find((rule) => rule.id === ROW_ID)
 
 		expect(row?.reason).toBe(lane_background.LANE_BACKGROUND_REASON)
-		expect(row?.decide?.(background_call('ls'), { transcript: '', now_ms: 0 }, false, 0)).toBe(true)
+		const run = { transcript: '', now_ms: 0, context: hook_context.from_process() }
+
+		expect(row?.decide?.(background_call('ls'), run, false, 0)).toBe(true)
 	})
 
 	it('is listed before run-tail, whose foreground push it claims in a lane child', () => {

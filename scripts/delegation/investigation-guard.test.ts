@@ -337,6 +337,61 @@ describe('investigation — a dispatched lane child is refused like the main lin
 	})
 })
 
+function at_threshold_payload(name: string): string {
+	return payload_of(write_transcript(name, at_threshold_lines()))
+}
+
+describe('investigation_outcome — the per-call context, not the process (kit#6967)', () => {
+	it('stands down for a reviewer role the context names under a worker process', () => {
+		const reviewer = {
+			cwd: process.cwd(),
+			env: { [agent_session_role.KEY]: agent_role_profile.REVIEWER },
+		}
+
+		expect(
+			investigation_outcome(at_threshold_payload('ctx-reviewer'), NOW_MS, reviewer).reason,
+		).toBeUndefined()
+	})
+
+	it('reads its switch from the context environment', () => {
+		const off = { cwd: process.cwd(), env: { [SWITCH_ENV_KEY]: 'off' } }
+
+		expect(
+			investigation_outcome(at_threshold_payload('ctx-off'), NOW_MS, off).reason,
+		).toBeUndefined()
+	})
+
+	it('refuses when only the process environment switches it off', () => {
+		process.env[SWITCH_ENV_KEY] = 'off'
+		const on = { cwd: process.cwd(), env: {} }
+
+		expect(investigation_outcome(at_threshold_payload('ctx-on'), NOW_MS, on).reason).toBe(
+			investigation_reads.REASON,
+		)
+	})
+})
+
+// A read of the lane checkout's `prompts/review.md` at the threshold, judged in `cwd`.
+function lane_instruction_reason(name: string, cwd: string): string | undefined {
+	const tool_input = { file_path: path.join(LANE_DIRECTORY, 'prompts', 'review.md') }
+	const payload = payload_of(write_transcript(name, at_threshold_lines()), { tool_input })
+
+	return investigation_outcome(payload, NOW_MS, { cwd, env: {} }).reason
+}
+
+// The instruction exemption is anchored at the call's checkout, not the process's (kit#6967).
+describe('investigation_outcome — the context directory', () => {
+	it('exempts an instruction file of the checkout the context names', () => {
+		expect(lane_instruction_reason('ctx-root', LANE_DIRECTORY)).toBeUndefined()
+	})
+
+	it('counts the same file as subject code read from another checkout', () => {
+		expect(lane_instruction_reason('ctx-other-root', process.cwd())).toBe(
+			investigation_reads.REASON,
+		)
+	})
+})
+
 describe('the guard is adopted without configuring anything', () => {
 	it('is on when the variable is unset', () => {
 		process.env[SWITCH_ENV_KEY] = UNSET

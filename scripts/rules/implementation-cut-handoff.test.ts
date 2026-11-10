@@ -1,5 +1,6 @@
 import path from 'node:path'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
 import { describe, expect, it } from 'vitest'
@@ -34,7 +35,7 @@ function over_threshold_lane(): LaneCostState {
 // The guard refuses an edit when the trigger matches and `decide` fires; the window has passed.
 function is_refused(name: string, file_path: string): boolean {
 	const call = { name, input: { file_path, content: '{}' } }
-	const run = { transcript: '', now_ms: PAST_THE_WINDOW_MS }
+	const run = { transcript: '', now_ms: PAST_THE_WINDOW_MS, context: hook_context.from_process() }
 
 	return (
 		implementation_cut.is_over_threshold_edit(call, over_threshold_lane()) &&

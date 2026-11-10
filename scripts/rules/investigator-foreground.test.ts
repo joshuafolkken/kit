@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
+import { hook_context } from '#scripts/hooks/hook-context'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -81,7 +82,9 @@ const TIMESTAMP_MS = Date.parse(TIMESTAMP)
 // A transcript of its own per call, so one test's remembered build never reaches another's. Past the
 // reissue window of the tail's results unless a test says otherwise.
 function fresh_run(now_ms = TIMESTAMP_MS + REISSUE_WINDOW_MS): GuardRun {
-	return { transcript: path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`), now_ms }
+	const transcript = path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`)
+
+	return { transcript, now_ms, context: hook_context.from_process() }
 }
 
 function lacks(tail: string, call: GuardedCall, run: GuardRun = fresh_run()): boolean {

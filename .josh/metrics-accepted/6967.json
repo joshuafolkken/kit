@@ -1,0 +1,7 @@
+{
+	"reason": "#6967: pretool guards read cwd/env from HookContext; hook-envelope module, per-guard context plumbing and the investigation-reads root threaded per call",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 68
+	}
+}

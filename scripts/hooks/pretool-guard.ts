@@ -1,7 +1,7 @@
 import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
 import { investigation_outcome } from '#scripts/delegation/investigation-guard'
 import { issue_watch_hook } from '#scripts/issue/issue-watch-hook'
-import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
+import { hook_decision, type GuardOutcome, type TranscriptGuard } from '#scripts/josh/hook-decision'
 import { lane_phase } from '#scripts/lane/lane-phase'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { lane_background } from '#scripts/rules/lane-background'
@@ -109,6 +109,15 @@ function lane_plan_outcome(raw_payload: string, context: HookContext): GuardOutc
 	return { reason, notice: undefined, fault: undefined }
 }
 
+// The transcript guards take a clock before the context, so the call is judged at the wall clock.
+function clocked(
+	outcome: TranscriptGuard['outcome'],
+): (raw_payload: string, context: HookContext) => GuardOutcome {
+	return function clocked_outcome(raw_payload: string, context: HookContext): GuardOutcome {
+		return outcome(raw_payload, Date.now(), context)
+	}
+}
+
 // The most frequent calls of a session, which only the guards marked `reads` act on.
 const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['Read', 'Glob', 'Grep'])
 
@@ -122,10 +131,9 @@ const SYNC_GUARDS: ReadonlyArray<{
 	reads: boolean
 }> = [
 	{ outcome: authority_outcome, reads: false },
-	// These three take a clock as their second argument, so the context is not passed to them.
-	{ outcome: (raw_payload) => batch_outcome(raw_payload), reads: true },
-	{ outcome: (raw_payload) => investigation_outcome(raw_payload), reads: true },
-	{ outcome: (raw_payload) => duplicate_read_outcome(raw_payload), reads: true },
+	{ outcome: clocked(batch_outcome), reads: true },
+	{ outcome: clocked(investigation_outcome), reads: true },
+	{ outcome: clocked(duplicate_read_outcome), reads: true },
 	{ outcome: lane_plan_outcome, reads: false },
 ]
 

@@ -2,6 +2,7 @@ import path from 'node:path'
 import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_cli_fixture } from '#scripts/cost-runtime/cost-cli-fixture'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_cut_decline } from '#scripts/run/cut/run-cut-decline'
@@ -89,7 +90,11 @@ describe('implementation cut session identity', () => {
 		stub_cuttable_lane()
 		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('over')
 		const call = EDIT_CALL
-		const run = { transcript: NEW_TRANSCRIPT, now_ms: implementation_cut.REISSUE_WINDOW_MS }
+		const run = {
+			transcript: NEW_TRANSCRIPT,
+			now_ms: implementation_cut.REISSUE_WINDOW_MS,
+			context: hook_context.from_process(),
+		}
 
 		expect(implementation_cut.ROW.decide(call, run, true, 0)).toBe(true)
 		expect(read).toHaveBeenCalledWith(
