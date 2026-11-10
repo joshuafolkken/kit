@@ -24,7 +24,8 @@ import { lane_stage_budget } from './lane-stage-budget'
 // **Two more axes answer `split`** (joshuafolkken/kit#5568), since declarations run short — merged lanes
 // changed 1.5 times the files and 1.8 times the lines they declared, so twice the files alone rarely
 // fired: the probed hunks past the grown declared files, and the declared lines times the period's
-// `lines actual / declared median` past the line guide. Each unmeasured axis uses 2. Both
+// `lines actual / declared median` past the size bar the filing refuses on (`size_estimate`,
+// joshuafolkken/kit#7074). Each unmeasured axis uses 2. Both
 // stand down once the lane has filed a split child: the lines axis reads the declaration alone, and the
 // hunks the tree already holds would otherwise refuse every re-plan the ship's `unplanned` stop asks for.
 // The lines axis also stands down on a re-plan of a cleared plan (joshuafolkken/kit#5600): the
@@ -234,11 +235,22 @@ function hunks_over(
 	return hunks > limit ? { reason: 'hunks', declared, limit, measured: hunks } : undefined
 }
 
-function lines_over(declared: number, signals: PlanSignals): MeasureOver | undefined {
-	const measured = Math.round(declared * declared_growth.factor(ratios_of(signals), 'lines'))
-	const limit = guide_of(signals).lines
+// The declared lines past the size bar `issue:file` refuses on and `backlog:next` notes
+// (joshuafolkken/kit#7074); `limit` is the most declared lines the bar allows, `measured` the grown
+// count. With no measured rate the bar is the guide's fallback lines, which the filing refuses past too.
+function lines_limit(signals: PlanSignals): number {
+	const growth = ratios_of(signals)
+	const bar = size_estimate.declared_lines_bar(signals.implement_rate, growth)
 
-	return measured > limit ? { reason: 'lines', declared, limit, measured } : undefined
+	return bar ?? Math.floor(guide_of(signals).lines / declared_growth.factor(growth, 'lines'))
+}
+
+function lines_over(declared: number, signals: PlanSignals): MeasureOver | undefined {
+	const limit = lines_limit(signals)
+	if (declared <= limit) return undefined
+	const measured = Math.round(declared * declared_growth.factor(ratios_of(signals), 'lines'))
+
+	return { reason: 'lines', declared, limit, measured }
 }
 
 function unapproved(
@@ -344,7 +356,7 @@ function measure_bar(over: MeasureOver): string {
 		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
 	}
 
-	return `\`- 規模見積もり:\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)}-line guide`
+	return `\`- 規模見積もり:\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)} declared lines the size bar allows`
 }
 
 function measure_text(issue: number, over: MeasureOver): string {

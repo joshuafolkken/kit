@@ -37,7 +37,6 @@ const POOL: ReadonlyArray<OpenIssueData> = [
 function idle_ports(overrides: Partial<IdlePorts>): IdlePorts {
 	return {
 		read_issues: async () => POOL,
-		read_measurements: async () => ({ implement_rate: undefined, growth: {} }),
 		emit: async (compose) => await compose(),
 		send: async () => true,
 		now_ms: () => NOW_MS,
@@ -127,33 +126,16 @@ describe('backlog_drive_idle.describe — an author without write access', () =>
 	})
 })
 
-// joshuafolkken/kit#5502: `backlog:next` holds an issue declared over the size cap until a person
-// splits it, so the notice names it.
+// joshuafolkken/kit#7074: `backlog:next` offers an issue over the size cap with a note rather than
+// holding it, so the notice no longer names it as waiting on a person.
 describe('backlog_drive_idle.describe — an estimate over the size cap', () => {
-	it('lists an issue declared over the cap as waiting on a person to split it', () => {
+	it('names no issue over the cap as waiting on a person', () => {
 		const body = `## 背景\n\n- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）\n`
 		const over = issue(OVER_CAP, { body })
 		const text = backlog_drive_idle.describe({ merged: 0, issues: [...POOL, over], now_ms: NOW_MS })
 
-		expect(text).toContain(
-			`(over the size cap or the implement budget, no reason declared):\n- #${String(OVER_CAP)} Issue ${String(OVER_CAP)}`,
-		)
-		expect(text).not.toContain(`- #${String(READY)}`)
-	})
-
-	// joshuafolkken/kit#7006: one within the cap but projected over the implement budget is held too.
-	it('lists an issue projected over the implement budget alone', () => {
-		const body = `## 背景\n\n- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）\n`
-		const over = issue(OVER_CAP, { body })
-		const implement_rate = { median: 10, lanes: 4 }
-		const text = backlog_drive_idle.describe({
-			merged: 0,
-			issues: [over],
-			now_ms: NOW_MS,
-			implement_rate,
-		})
-
-		expect(text).toContain(`implement budget, no reason declared):\n- #${String(OVER_CAP)}`)
+		expect(text).not.toContain('size cap')
+		expect(text).not.toContain(`- #${String(OVER_CAP)}`)
 	})
 })
 
@@ -170,15 +152,13 @@ describe('backlog_drive_idle.notify', () => {
 	it('neither reads the pool nor sends while the episode is already marked', async () => {
 		const send = vi.fn(async () => true)
 		const read_issues = vi.fn(async () => POOL)
-		const read_measurements = vi.fn(async () => ({ implement_rate: undefined, growth: {} }))
 
 		await backlog_drive_idle.notify(
 			state(),
-			idle_ports({ emit: async () => undefined, send, read_issues, read_measurements }),
+			idle_ports({ emit: async () => undefined, send, read_issues }),
 		)
 
 		expect(read_issues).not.toHaveBeenCalled()
-		expect(read_measurements).not.toHaveBeenCalled()
 		expect(send).not.toHaveBeenCalled()
 	})
 
@@ -190,47 +170,5 @@ describe('backlog_drive_idle.notify', () => {
 		})
 
 		await expect(backlog_drive_idle.notify(state(), failing)).resolves.toBeUndefined()
-	})
-})
-
-describe('backlog idle measured size classification', () => {
-	const over_cap_text = 'over the size cap'
-	const body = '## 背景\n\n- 規模見積もり: 約 7 ファイル / 70 行（テスト除く）\n'
-	const issues = [issue(OVER_CAP, { body })]
-	const reading = { merged: 0, issues, now_ms: NOW_MS }
-
-	it('uses measured growth even without measured speed (ac-54136377)', () => {
-		const measured = backlog_drive_idle.describe({ ...reading, growth: { files: 1, lines: 1 } })
-		const fallback = backlog_drive_idle.describe(reading)
-
-		expect(measured).not.toContain(over_cap_text)
-		expect(fallback).toContain(over_cap_text)
-	})
-
-	it('uses the measured guide for the same cap as the offer (ac-54136377)', () => {
-		const measured = backlog_drive_idle.describe({
-			...reading,
-			implement_rate: { median: 3, lanes: 1 },
-			growth: { files: 2, lines: 2 },
-		})
-
-		expect(measured).not.toContain(over_cap_text)
-	})
-
-	it('passes measurements from the fresh notification read into classification', async () => {
-		const send = vi.fn(async (_body: string) => true)
-		const ports = idle_ports({
-			send,
-			read_issues: async () => issues,
-			read_measurements: async () => ({
-				implement_rate: undefined,
-				growth: { files: 1, lines: 1 },
-			}),
-		})
-
-		await backlog_drive_idle.notify(state(), ports)
-
-		expect(send).toHaveBeenCalledOnce()
-		expect(send.mock.calls[0]?.[0]).not.toContain(over_cap_text)
 	})
 })

@@ -80,7 +80,7 @@ describe('split-assessment.md states the lane:plan growth bar', () => {
 		expect(split_assess.DECLARED_GROWTH_FACTOR).toBe(2)
 		expect(document).toContain('median actual / declared ratios per axis, apart from speed')
 		expect(document).toContain('unmeasured: 2')
-		expect(document).toContain('`lane:plan` answers `split` past the declared files × files ratio')
+		expect(document).toContain('`lane:plan` answers `split` past declared files × files ratio')
 	})
 
 	// joshuafolkken/kit#6647, joshuafolkken/kit#6602: `--single` waives every axis; a re-plan only warns.
@@ -103,7 +103,9 @@ describe('the issue template uses the shared split guide', () => {
 	it('references the measured derivation, fallback and cap (ac-f05d82e6)', () => {
 		const template = read_repo_file(ISSUE_TEMPLATE)
 
-		expect(template).toContain('実測からの導出・未測定時の fallback・cap は')
+		expect(template).toContain(
+			'実測からの導出・未測定時の fallback・cap・基準（実装予算の 2 倍を宣言行数で）は',
+		)
 		expect(template).toContain(`split-assessment.md\` → "${split_assess.QUESTION_SECTION}"`)
 	})
 
@@ -111,7 +113,7 @@ describe('the issue template uses the shared split guide', () => {
 		const template = read_repo_file(ISSUE_TEMPLATE)
 
 		expect(template).toContain('文書・スナップショット・コマンド一覧の追従も数える')
-		expect(template).toContain('ファイル数または行数が分割の目安')
+		expect(template).toContain('目安・cap・基準を超えても 1 件にするなら')
 		expect(template).toContain(`split-assessment.md\` → "${split_assess.QUESTION_SECTION}"`)
 	})
 })
@@ -126,6 +128,11 @@ describe('the split question explains the measured guide', () => {
 		expect(document).toContain('line guide × (fallback file guide / fallback line guide)')
 		expect(document).toContain('Floor (also the unmeasured fallback)')
 		expect(document).toContain('more than 8 changed files or more than 200 changed lines')
-		expect(document).toContain('the cap, 1.5 times the guide')
+		expect(document).toContain('the cap (1.5 × guide)')
+	})
+
+	// joshuafolkken/kit#7074: the size bar is twice the implement budget.
+	it('states the size bar as twice the budget', () => {
+		expect(read_repo_file(SPLIT_ASSESSMENT)).toContain('the bar (2 × budget): split or say why')
 	})
 })

@@ -3,28 +3,30 @@ import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
 import { describe, expect, it } from 'vitest'
 import { size_estimate } from './size-estimate'
 
-// joshuafolkken/kit#6025: an estimate over the guide whose projected implement time — the declared
-// lines grown by `DECLARED_GROWTH_FACTOR` at the ledger's implement minutes per 100 lines — exceeds the
-// implement stage budget is refused; only a declared reason passes it (joshuafolkken/kit#6602) — a split
-// filing is excused the guide, not the budget (joshuafolkken/kit#7005).
+// joshuafolkken/kit#6025: an estimate whose projected implement time — the declared lines grown by
+// `DECLARED_GROWTH_FACTOR` at the ledger's implement minutes per 100 lines — exceeds the size bar,
+// twice the implement stage budget (joshuafolkken/kit#7074), is refused; only a declared reason passes
+// it (joshuafolkken/kit#6602) — a split filing is excused the guide, not the bar (joshuafolkken/kit#7005).
 
 const SPLIT_ROUTE = 'route:split'
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
 const EXCEEDS_GUIDE = 'exceeds the guide'
-// The over-guide estimate below projects past the stage budget at the slow rate, within it at the fast.
-const SLOW: ImplementRate = { median: 10, lanes: 4 }
+// The over-guide estimate below projects past the size bar at the slow rate, within it at the fast.
+const SLOW: ImplementRate = { median: 20, lanes: 4 }
 const FAST: ImplementRate = { median: 4, lanes: 3 }
-// The over-guide estimate below projects within the budget joshuafolkken/kit#6540 replaced and past
-// the current one at this rate.
+// The over-guide estimate below projects past the implement budget and within the size bar at this rate.
 const BETWEEN: ImplementRate = { median: 5, lanes: 3 }
-const FORMER_IMPLEMENT_BUDGET = 12
+// The ledger's measured rate and lines growth when joshuafolkken/kit#7074 set the size bar.
+const MEASURED: ImplementRate = { median: 20.6, lanes: 372 }
+const MEASURED_GROWTH = { lines: 1.59375 }
 // The over-guide estimate's declared lines grown by the fallback factor.
 const GROWN_OVER_GUIDE_LINES = 220
-const OVER_BUDGET = 'over the 9-minute implement budget'
+const OVER_BUDGET = 'over the 18-minute size bar'
 const BUDGET_REFUSAL_PARTS = [
-	'22 implement minute(s)',
-	'9-minute',
-	'10.0 implement min',
+	'44 implement minute(s)',
+	'2 × the 9-minute implement budget',
+	'at most 45 declared line(s)',
+	'20.0 implement min',
 	'4 lane(s)',
 	'or declare `- 分割しない理由: <理由>`',
 ]
@@ -45,7 +47,7 @@ describe('size_estimate.guide_problem — the projected implement time', () => {
 	it('refuses an over-budget estimate within the floor without claiming a guide overrun', () => {
 		const problem = size_estimate.guide_problem(body_with(estimate(1, 70)), undefined, SLOW)
 
-		expect(problem).toContain('14 implement minute(s)')
+		expect(problem).toContain('28 implement minute(s)')
 		expect(problem).toContain(OVER_BUDGET)
 		expect(problem).not.toContain(EXCEEDS_GUIDE)
 	})
@@ -133,15 +135,30 @@ describe('size_estimate.over_budget', () => {
 	})
 })
 
-// joshuafolkken/kit#6540: the lane budget rebalance shrank the implement budget.
-describe('size_estimate.guide_problem — the rebalanced implement budget', () => {
-	it('refuses an estimate the former implement budget passed (ac-a815e182)', () => {
+// joshuafolkken/kit#7074: the size bar is twice the implement budget.
+describe('size_estimate.guide_problem — the size bar', () => {
+	it('passes the budget on an estimate projecting past it within twice it', () => {
 		const projected = lane_implement_rate.minutes_for(GROWN_OVER_GUIDE_LINES, BETWEEN)
 		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined, BETWEEN)
 
-		expect(projected).toBeLessThanOrEqual(FORMER_IMPLEMENT_BUDGET)
 		expect(projected).toBeGreaterThan(lane_stage_budget.BUDGET_MINUTES.implement)
-		expect(problem).toContain('11 implement minute(s)')
-		expect(problem).toContain(OVER_BUDGET)
+		expect(problem).toContain(EXCEEDS_GUIDE)
+		expect(problem).not.toContain(OVER_BUDGET)
+	})
+
+	it.each([40, 50])('neither refuses nor bars %s declared lines at the measured rate', (lines) => {
+		const body = body_with(estimate(1, lines))
+
+		expect(size_estimate.guide_problem(body, undefined, MEASURED, MEASURED_GROWTH)).toBeUndefined()
+		expect(size_estimate.over_budget(body, MEASURED, MEASURED_GROWTH)).toBeUndefined()
+	})
+
+	it('bars 60 declared lines at the measured rate and prints the 54-line bar', () => {
+		const body = body_with(estimate(1, 60))
+		const problem = size_estimate.guide_problem(body, undefined, MEASURED, MEASURED_GROWTH)
+
+		expect(size_estimate.over_budget(body, MEASURED, MEASURED_GROWTH)).toBeDefined()
+		expect(size_estimate.declared_lines_bar(MEASURED, MEASURED_GROWTH)).toBe(54)
+		expect(problem).toContain('at most 54 declared line(s)')
 	})
 })

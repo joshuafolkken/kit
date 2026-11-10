@@ -157,16 +157,17 @@ describe('issue_file_pass.labels_in_one_pass — measured speed', () => {
 		})
 		const body = CLEAR_BODY.replace(
 			CLEAR_ESTIMATE,
-			'- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）',
+			'- 規模見積もり: 約 1 ファイル / 100 行（テスト除く）',
 		)
 
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(body))).toBeUndefined()
-		expect(printed()).toContain('implement budget')
+		expect(printed()).toContain('size bar')
 	})
 
+	// joshuafolkken/kit#7074: the bar is twice the implement budget — 50 declared lines at this rate.
 	it.each([
-		{ lines: 25, passes: true },
-		{ lines: 50, passes: false },
+		{ lines: 50, passes: true },
+		{ lines: 51, passes: false },
 	])('judges $lines declared lines at the measured rate', async ({ lines, passes }) => {
 		vi.mocked(lane_net_read.measurements).mockResolvedValue({
 			implement_rate: { median: 17.7, lanes: 316 },

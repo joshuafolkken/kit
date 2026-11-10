@@ -304,7 +304,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--reason "<理由>"'],
 					description:
-						"the follow-up's `- 分割しない理由:` line, the only excuse from the implement budget; the issue's own is not carried over.",
+						"the follow-up's `- 分割しない理由:` line, the only excuse from the size bar; the issue's own is not carried over.",
 				},
 				{
 					names: [DISTINCT],
