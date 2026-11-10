@@ -1,5 +1,6 @@
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_progress } from '#scripts/run/progress/run-progress'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
@@ -56,7 +57,7 @@ function with_last_report(elapsed_ms: number | undefined): void {
 function arm(name: string, command: string, now_ms = NOW_MS, can_record = true): boolean {
 	return early_heartbeat.decide(
 		{ name: 'Bash', input: { command } },
-		{ transcript: transcript_named(name), now_ms },
+		{ transcript: transcript_named(name), now_ms, context: hook_context.from_process() },
 		can_record,
 	)
 }

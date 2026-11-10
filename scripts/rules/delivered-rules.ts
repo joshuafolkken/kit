@@ -272,12 +272,18 @@ const BATCHING_RULE: MeasuredRule = {
 	},
 }
 
+// A row reads the call alone, so its paths resolve against this process's checkout until the rows take
+// the per-call context (joshuafolkken/kit#6973).
+function is_investigation_read(call: GuardedCall): boolean {
+	return investigation_reads.is_refusable_call(call)
+}
+
 // No `is_trigger`, as for batching. No `keeps`: any dispatch would read as compliance, so it is left
 // unmeasured — `pnpm josh time`'s `Investigation reads:` block is the compliance reading.
 const INVESTIGATION_RULE: MeasuredRule = {
 	id: 'investigation',
 	reason: investigation_reads.REASON,
-	reaches: investigation_reads.is_refusable_call,
+	reaches: is_investigation_read,
 	about: {
 		title: 'Investigation delegation threshold',
 		topic: '`delegation.md`',
@@ -343,11 +349,16 @@ function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_blo
 	}
 }
 
+// A trigger is handed the call alone: the guard's second argument, the call's context, would otherwise
+// land on a trigger's own defaulted parameter (`is_interactive_ask`'s `is_lane_child`). The rows take
+// the context in joshuafolkken/kit#6973.
 function guard_of(rule: DeliveredRule): ReturnType<typeof hook_decision.create_transcript_guard> {
 	return hook_decision.create_transcript_guard({
 		prefix: `${STAMP_PREFIX}${rule.id}-`,
 		switch_key: SWITCH_ENV_KEY,
-		is_candidate: rule.is_trigger,
+		is_candidate: function is_candidate(call: GuardedCall): boolean {
+			return rule.is_trigger(call)
+		},
 		should_block: delivery_decision(rule),
 		reason: rule.reason,
 	})

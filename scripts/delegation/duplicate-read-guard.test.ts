@@ -226,6 +226,58 @@ describe('duplicate_read_outcome — a dispatched lane child is nudged, not kill
 	})
 })
 
+function unchanged_reread(name: string): string {
+	const target = subject_file(BEFORE_READ_MS)
+
+	return payload_of(read_once(name, target), target)
+}
+
+describe('duplicate_read_outcome — the per-call context, not the process', () => {
+	// joshuafolkken/kit#6967: the process stays on the main line; only the context names the lane.
+	const LANE_CONTEXT = { cwd: LANE_DIRECTORY, env: { [lane_child_marker.KEY]: LANE_ISSUE } }
+
+	it('nudges a lane child the context names under a main-line process', () => {
+		const result = duplicate_read_outcome(unchanged_reread('context-lane'), NOW_MS, LANE_CONTEXT)
+
+		expect(result.reason).toBeUndefined()
+		expect(result.notice).toBe(duplicate_reads.NOTICE)
+	})
+
+	it('reads its switch from the context environment', () => {
+		const off = { cwd: process.cwd(), env: { [SWITCH_ENV_KEY]: 'off' } }
+
+		expect(
+			duplicate_read_outcome(unchanged_reread('context-off'), NOW_MS, off).reason,
+		).toBeUndefined()
+	})
+
+	it('refuses when only the process environment switches it off', () => {
+		process.env[SWITCH_ENV_KEY] = 'off'
+		const on = { cwd: process.cwd(), env: {} }
+
+		expect(duplicate_read_outcome(unchanged_reread('context-on'), NOW_MS, on).reason).toBe(
+			duplicate_reads.REASON,
+		)
+	})
+
+	// A relative path names a file of the call's checkout; the process's checkout holds no such file.
+	it('resolves a relative read against the context directory', () => {
+		const target = subject_file(BEFORE_READ_MS)
+		const payload = payload_of(read_once('context-root', target), path.basename(target))
+		const work = { cwd: WORK_DIRECTORY, env: {} }
+
+		expect(duplicate_read_outcome(payload, NOW_MS, work).reason).toBe(duplicate_reads.REASON)
+	})
+
+	it('does not resolve a relative read against the process directory', () => {
+		const target = subject_file(BEFORE_READ_MS)
+		const payload = payload_of(read_once('process-root', target), path.basename(target))
+		const here = { cwd: process.cwd(), env: {} }
+
+		expect(duplicate_read_outcome(payload, NOW_MS, here).reason).toBeUndefined()
+	})
+})
+
 describe('the guard is adopted without configuring anything', () => {
 	it('is on when the variable is unset', () => {
 		process.env[SWITCH_ENV_KEY] = UNSET

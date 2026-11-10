@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -152,7 +153,9 @@ describe('consultation-investigation — a session that cannot dispatch', () => 
 	const tail = `\n${JSON.stringify({ type: 'assistant', message: { model: FABLE } })}\n`
 
 	function is_satisfied(is_unit: boolean): boolean | undefined {
-		return ROW.already_satisfied?.(tail, glob, { transcript: '', now_ms: 0, is_unit })
+		const context = hook_context.from_process()
+
+		return ROW.already_satisfied?.(tail, glob, { transcript: '', now_ms: 0, is_unit, context })
 	}
 
 	it('refuses the Fable main line', () => {

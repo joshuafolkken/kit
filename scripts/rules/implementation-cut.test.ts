@@ -2,6 +2,8 @@ import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { hook_context } from '#scripts/hooks/hook-context'
+import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import type { RunCut } from '#scripts/run/cut/run-cut'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
@@ -87,8 +89,10 @@ function edit_call(name = EDIT): { name: string; input: unknown } {
 	return { name, input: { file_path: 'scripts/x.ts', old_string: 'a', new_string: 'b' } }
 }
 
-function run_at(now_ms: number): { transcript: string; now_ms: number } {
-	return { transcript: path.join(WORK_DIRECTORY, 'transcript.jsonl'), now_ms }
+function run_at(now_ms: number): GuardRun {
+	const transcript = path.join(WORK_DIRECTORY, 'transcript.jsonl')
+
+	return { transcript, now_ms, context: hook_context.from_process() }
 }
 
 // A verdict thunk fails the test if read, proving the cost measurement is gated

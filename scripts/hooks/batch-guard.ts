@@ -1,4 +1,5 @@
 import { will_refuse as will_investigation_refuse } from '#scripts/delegation/investigation-guard'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { lane_guard_policy, type LaneGuardMode } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -45,20 +46,21 @@ function is_batch_candidate(call: GuardedCall): boolean {
 // searches issued one per turn, the largest share of the child's single-call pairs (kit#5342). The
 // enumeration reads `is_child_of` — the dispatch mark against this checkout's own issue — only for a
 // guard whose mode it would actually change, so a person working in a lane sees the guard unchanged.
-function batching_mode(): LaneGuardMode {
-	return lane_guard_policy.mode_here('batching')
+// The checkout and marker are the call's own (`HookContext`), never the process's.
+function batching_mode(context: HookContext): LaneGuardMode {
+	return lane_guard_policy.mode_here('batching', context.cwd, context.env)
 }
 
-function is_search_refused_here(): boolean {
-	return lane_guard_policy.mode_here('search-batching') === 'refuse'
+function is_search_refused_here(context: HookContext): boolean {
+	return lane_guard_policy.mode_here('search-batching', context.cwd, context.env) === 'refuse'
 }
 
 // Where the general rule is `off`, only a search the narrower refusal judges is read for. The
 // lane-child modes and their reasons live in `lane-guard-policy.ts`; on the main line both are `refuse`.
-function is_candidate(call: GuardedCall): boolean {
-	if (batching_mode() !== 'off') return is_batch_candidate(call)
+function is_candidate(call: GuardedCall, context: HookContext): boolean {
+	if (batching_mode(context) !== 'off') return is_batch_candidate(call)
 
-	return is_search_refused_here() && time_batch_guard.is_search_chain_call(call)
+	return is_search_refused_here(context) && time_batch_guard.is_search_chain_call(call)
 }
 
 // A refusable call is refused only where the mode is `refuse`; elsewhere a search chain alone is, under
@@ -70,8 +72,13 @@ function should_block_here(
 	refused_at_ms: number,
 	run: GuardRun,
 ): boolean {
-	if (batching_mode() === 'refuse') return time_batch_guard.should_block(tail, call, refused_at_ms)
-	if (!is_search_refused_here() || will_investigation_refuse(tail, call, run)) return false
+	if (batching_mode(run.context) === 'refuse') {
+		return time_batch_guard.should_block(tail, call, refused_at_ms)
+	}
+
+	if (!is_search_refused_here(run.context) || will_investigation_refuse(tail, call, run)) {
+		return false
+	}
 
 	return time_batch_guard.should_block_search_chain(tail, call, refused_at_ms)
 }
@@ -79,9 +86,14 @@ function should_block_here(
 // The whole-file write earns a notice on every run. The second branch turns a
 // refusable call into a notice under a `notice`-mode guard. Both read the notice's own record, so a notice never spends the refusal's
 // stamp and re-fires on the notice's own `NOTICE_REFIRE_EVERY` cadence.
-function should_notify_here(tail: string, call: GuardedCall, notified_at_ms: number): boolean {
+function should_notify_here(
+	tail: string,
+	call: GuardedCall,
+	notified_at_ms: number,
+	run: GuardRun,
+): boolean {
 	if (time_batch_guard.should_notify(tail, call, notified_at_ms)) return true
-	if (batching_mode() !== 'notice') return false
+	if (batching_mode(run.context) !== 'notice') return false
 
 	return time_batch_guard.should_block(
 		tail,
@@ -131,7 +143,7 @@ const STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PREFIX)
 // Whether this guard refuses the call in hand, asked with its real record — the rule guard stands
 // aside for it, so the two never decide apart.
 function will_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
-	if (!is_enabled() || !is_candidate(call)) return false
+	if (!is_enabled(run.context.env) || !is_candidate(call, run.context)) return false
 
 	return should_block_here(tail, call, STAMP.last_ms(STAMP.path(run.transcript)), run)
 }

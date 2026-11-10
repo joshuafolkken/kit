@@ -1,10 +1,12 @@
 import { text } from 'node:stream/consumers'
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { json_value } from '#scripts/lib/json-value'
 import { file_reader } from '#scripts/lib/read-file'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
 import { z } from 'zod'
+import { hook_envelope } from './hook-envelope'
 import { hook_payload_capture } from './hook-payload-capture'
 import { hook_tool_payload } from './hook-tool-payload'
 import { josh_environment_file } from './josh-environment-file'
@@ -42,9 +44,6 @@ const refusal_schema = z.object({ refused_at_ms: z.number() })
 
 type HookPayload = z.infer<typeof payload_schema>
 
-const HOOK_EVENT_NAME = 'PreToolUse'
-const DENY_DECISION = 'deny'
-const ALLOW_DECISION = 'allow'
 // No record means nothing has been refused yet, and every span began after instant zero — which is
 // the answer wanted: the first qualifying accumulation of a run is refused.
 const NEVER_MS = 0
@@ -55,9 +54,10 @@ const NEVER_MS = 0
 const DISABLED_VALUES: ReadonlyArray<string> = ['off', '0', 'false', 'no']
 
 // **Read at call time, never cached at module load.** A suite that switches the variable between
-// cases — and both hooks' suites do — sees a cached answer as the guard ignoring the switch.
-function is_switch_enabled(key: string): boolean {
-	return !DISABLED_VALUES.includes((process.env[key] ?? '').trim().toLowerCase())
+// cases — and both hooks' suites do — sees a cached answer as the guard ignoring the switch. A
+// guard reads the call's own environment (`HookContext.env`); a caller with none reads the process's.
+function is_switch_enabled(key: string, environment: HookContext['env'] = process.env): boolean {
+	return !DISABLED_VALUES.includes((environment[key] ?? '').trim().toLowerCase())
 }
 
 // The opt-in counterpart of `DISABLED_VALUES`: an unset variable stays off, and only one of these
@@ -76,57 +76,7 @@ function parse_hook_payload(raw_payload: string): HookPayload | undefined {
 	return json_value.parse_with(raw_payload, payload_schema)
 }
 
-// The documented shape a `PreToolUse` hook answers with. Plain stdout is not it — only this envelope
-// stops the call, and only `permissionDecisionReason` reaches the model.
-function deny_envelope(reason: string): string {
-	return JSON.stringify({
-		hookSpecificOutput: {
-			hookEventName: HOOK_EVENT_NAME,
-			permissionDecision: DENY_DECISION,
-			permissionDecisionReason: reason,
-		},
-	})
-}
-
-// **A rewrite, not a refusal**: the call proceeds with `updated_input` merged
-// over its own and is allowed past the permission prompt; a settings `deny` rule still wins over it.
-// Where the line may carry commands the hook did not write, `flow_rewrite_envelope` is the one to use.
-function rewrite_envelope(updated_input: Record<string, unknown>, context: string): string {
-	return JSON.stringify({
-		systemMessage: context,
-		hookSpecificOutput: {
-			hookEventName: HOOK_EVENT_NAME,
-			permissionDecision: ALLOW_DECISION,
-			updatedInput: updated_input,
-			additionalContext: context,
-		},
-	})
-}
-
-// **A rewrite that leaves the permission to the harness.** No `permissionDecision`, so the rewritten
-// call meets the same permission flow the typed one would have — whatever else rides the line beside
-// the rewritten part is prompted for, or not, exactly as before (joshuafolkken/kit#3875).
-function flow_rewrite_envelope(updated_input: Record<string, unknown>, context: string): string {
-	return JSON.stringify({
-		systemMessage: context,
-		hookSpecificOutput: {
-			hookEventName: HOOK_EVENT_NAME,
-			updatedInput: updated_input,
-			additionalContext: context,
-		},
-	})
-}
-
-// **A notice, not a decision.** It carries no `permissionDecision`, so the call proceeds exactly as it
-// would have; `additionalContext` is what reaches the model, and `systemMessage` is what the person
-// watching sees. Both are filled because either channel alone leaves one of the two blind — and the
-// whole point of this envelope is that a guard which cannot look stops being invisible.
-function notice_envelope(notice: string): string {
-	return JSON.stringify({
-		systemMessage: notice,
-		hookSpecificOutput: { hookEventName: HOOK_EVENT_NAME, additionalContext: notice },
-	})
-}
+const { deny_envelope, flow_rewrite_envelope, notice_envelope, rewrite_envelope } = hook_envelope
 
 // Named after the guard that raised it rather than after any one of them: `create_transcript_guard` is
 // the shell three hooks are built from, and a fault that announced the wrong origin would send whoever
@@ -225,6 +175,8 @@ interface GuardRun {
 	model?: string | undefined
 	// The call comes from a delegated unit (the payload names its `agent_id`), not the main line.
 	is_unit?: boolean
+	// The call's own cwd and environment, which a rule reads in place of the process's.
+	context: HookContext
 }
 
 // The notice half of a guard's rule, kept optional so a guard that only refuses supplies nothing and is
@@ -254,7 +206,7 @@ interface TranscriptGuardSpec {
 	// Whether this call is one the hook may refuse at all, judged **before** the transcript is read:
 	// most of a run's calls are ones the hook could never refuse, and a quarter-megabyte tail read for
 	// each of them would be paid inside a hook that is holding the call.
-	is_candidate: (call: GuardedCall) => boolean
+	is_candidate: (call: GuardedCall, context: HookContext) => boolean
 	// This hook's own rule, over the tail. `run` carries what a rule may need about the *run* rather
 	// than about the call — the transcript the stamps are keyed on, and the instant this decision is
 	// being made — because a rule may have to ask what **another** hook has already recorded, and
@@ -285,10 +237,10 @@ interface GuardOutcome {
 const NO_OUTCOME: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
 
 interface TranscriptGuard {
-	is_enabled: () => boolean
+	is_enabled: (environment?: HookContext['env']) => boolean
 	refusal_path: (transcript_path: string) => string
-	refusal: (raw_payload: string, now_ms?: number) => string | undefined
-	outcome: (raw_payload: string, now_ms?: number) => GuardOutcome
+	refusal: (raw_payload: string, now_ms?: number, context?: HookContext) => string | undefined
+	outcome: (raw_payload: string, now_ms?: number, context?: HookContext) => GuardOutcome
 }
 
 interface FireResult {
@@ -372,17 +324,18 @@ function guard_reason_for_payload(
 	parts: GuardParts,
 	payload: HookPayload,
 	now_ms: number,
+	hook: HookContext,
 ): GuardOutcome {
 	const call = { name: payload.tool_name, input: payload.tool_input }
 
-	if (!parts.spec.is_candidate(call)) return NO_OUTCOME
+	if (!parts.spec.is_candidate(call, hook)) return NO_OUTCOME
 
 	// A hook firing inside a delegated unit is handed the *parent's* path, so the fork's own file is
 	// derived here rather than judged from the parent's frozen timeline.
 	const transcript = time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id)
 	const tail = transcript_tail.read_tail(transcript)
 	const is_unit = typeof payload.agent_id === 'string' && payload.agent_id.length > 0
-	const run = { transcript, now_ms, model: payload.model ?? undefined, is_unit }
+	const run = { transcript, now_ms, model: payload.model ?? undefined, is_unit, context: hook }
 	const context = { ...parts, tail, call, run }
 
 	// The block path decides first, and the notice is asked only where it stayed clear. The two never
@@ -395,12 +348,19 @@ function guard_reason_for_payload(
 	return notify_outcome(context)
 }
 
-function guard_outcome(parts: GuardParts, raw_payload: string, now_ms: number): GuardOutcome {
+function guard_outcome(
+	parts: GuardParts,
+	raw_payload: string,
+	now_ms: number,
+	hook: HookContext,
+): GuardOutcome {
 	const payload = parse_hook_payload(raw_payload)
 
-	if (payload === undefined || !is_switch_enabled(parts.spec.switch_key)) return NO_OUTCOME
+	if (payload === undefined || !is_switch_enabled(parts.spec.switch_key, hook.env)) {
+		return NO_OUTCOME
+	}
 
-	return guard_reason_for_payload(parts, payload, now_ms)
+	return guard_reason_for_payload(parts, payload, now_ms, hook)
 }
 
 function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
@@ -410,12 +370,8 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	const notify_stamp = spec.notify ? create_refusal_stamp(spec.notify.prefix) : undefined
 	const parts = { spec, stamp, notify_stamp }
 
-	function is_enabled(): boolean {
-		return is_switch_enabled(spec.switch_key)
-	}
-
-	function refusal_path(transcript_path: string): string {
-		return stamp.path(transcript_path)
+	function is_enabled(environment: HookContext['env'] = process.env): boolean {
+		return is_switch_enabled(spec.switch_key, environment)
 	}
 
 	// **Every failure allows the call.** An unreadable transcript, a half-written tail, a temp directory
@@ -427,19 +383,23 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	// goes through — failing open is the right call and is not being revisited — but the fault comes
 	// back as text the run can see, so "the guard said nothing" and "the guard could not look" stop
 	// being the same observation.
-	function outcome(raw_payload: string, now_ms: number = Date.now()): GuardOutcome {
+	function outcome(
+		raw_payload: string,
+		now_ms: number = Date.now(),
+		hook: HookContext = hook_context.from_process(),
+	): GuardOutcome {
 		try {
-			return guard_outcome(parts, raw_payload, now_ms)
+			return guard_outcome(parts, raw_payload, now_ms, hook)
 		} catch (error) {
 			return { reason: undefined, notice: undefined, fault: fault_notice(spec.switch_key, error) }
 		}
 	}
 
-	function refusal(raw_payload: string, now_ms: number = Date.now()): string | undefined {
-		return outcome(raw_payload, now_ms).reason
+	function refusal(...call: Parameters<typeof outcome>): string | undefined {
+		return outcome(...call).reason
 	}
 
-	return { is_enabled, outcome, refusal, refusal_path }
+	return { is_enabled, outcome, refusal, refusal_path: stamp.path }
 }
 
 // Write one already-resolved outcome, so a caller that has to await its rule (the watcher guard reads

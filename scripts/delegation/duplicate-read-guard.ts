@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs'
-import { hook_decision } from '#scripts/josh/hook-decision'
+import type { HookContext } from '#scripts/hooks/hook-context'
+import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { lane_guard_policy, type LaneGuardMode } from '#scripts/lane/lane-guard-policy'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -61,18 +62,14 @@ function names_one_file(file_path: unknown): file_path is string {
 // alone: a non-`Read` tool, a paginated read, or a target that names no single file. Resolved through
 // `investigation-reads.ts` so the two ways a path reaches here — a tool field and a transcript span —
 // compare as one string.
-function read_target(call: GuardedCall): string | undefined {
+function read_target(call: GuardedCall, root: string): string | undefined {
 	if (call.name !== READ_TOOL || !json_value.is_record(call.input)) return undefined
 
 	const { input } = call
 
 	if (is_paginated(input) || !names_one_file(input['file_path'])) return undefined
 
-	return investigation_reads.resolved(input['file_path'])
-}
-
-function is_refusable_call(call: GuardedCall): boolean {
-	return read_target(call) !== undefined
+	return investigation_reads.resolved(input['file_path'], root)
 }
 
 // A read the run made and that returned — a denied or errored read carried no text into the prompt, so
@@ -84,17 +81,17 @@ function is_successful_read(span: Span): boolean {
 	return is_read && span.outcome !== time_spans.FAILED_OUTCOME
 }
 
-function reads_target(span: Span, target: string): boolean {
-	return span.targets.some((one) => investigation_reads.resolved(one) === target)
+function reads_target(span: Span, target: string, root: string): boolean {
+	return span.targets.some((one) => investigation_reads.resolved(one, root) === target)
 }
 
 // **The instant the run last read this exact path, or `NEVER_MS` where the tail holds no such read.**
 // The most recent successful read wins: an earlier read that has since been superseded says nothing
 // about whether the content is current. The tail is the same bounded window the other guards read, so
 // a first read that has scrolled out reads as "never read" — a miss, never a false refusal.
-function last_read_ms(spans: ReadonlyArray<Span>, target: string): number {
+function last_read_ms(spans: ReadonlyArray<Span>, target: string, root: string): number {
 	const times = spans
-		.filter((span) => is_successful_read(span) && reads_target(span, target))
+		.filter((span) => is_successful_read(span) && reads_target(span, target, root))
 		.map((span) => span.ended_ms)
 
 	return times.length === 0 ? hook_decision.NEVER_MS : Math.max(...times)
@@ -117,10 +114,10 @@ interface ReadWindow {
 	window_start_ms: number
 }
 
-function read_window(tail: string, target: string): ReadWindow {
+function read_window(tail: string, target: string, root: string): ReadWindow {
 	const { spans, started_ms } = time_spans.parse_timeline(tail)
 
-	return { last_ms: last_read_ms(spans, target), window_start_ms: started_ms }
+	return { last_ms: last_read_ms(spans, target, root), window_start_ms: started_ms }
 }
 
 // **The re-read returns nothing new.** The path was read before (`last_ms` is set) and the file has
@@ -146,12 +143,17 @@ function is_rearmed(window: ReadWindow, fired_at_ms: number): boolean {
 
 // The pure rule, shared by the refusal and the notice: is this call an unchanged re-read that the
 // enumeration's mode should act on, given whatever this disposition last fired at.
-function is_redundant_reread(tail: string, call: GuardedCall, fired_at_ms: number): boolean {
-	const target = read_target(call)
+function is_redundant_reread(
+	tail: string,
+	call: GuardedCall,
+	fired_at_ms: number,
+	root: string,
+): boolean {
+	const target = read_target(call, root)
 
 	if (target === undefined) return false
 
-	const window = read_window(tail, target)
+	const window = read_window(tail, target, root)
 
 	if (!is_unchanged_reread(window.last_ms, file_mtime_ms(target))) return false
 
@@ -162,32 +164,43 @@ function is_redundant_reread(tail: string, call: GuardedCall, fired_at_ms: numbe
 // main line, `notice` in a dispatched lane child. The enumeration reads the
 // dispatch mark against this checkout's own issue only for a mode it would change, so a person working
 // in a lane sees the guard refuse exactly as the main line does.
-function duplicate_mode(): LaneGuardMode {
-	return lane_guard_policy.mode_here(LANE_GUARD_ID)
+// The checkout and marker are the call's own (`HookContext`), never the process's.
+function duplicate_mode(context: HookContext): LaneGuardMode {
+	return lane_guard_policy.mode_here(LANE_GUARD_ID, context.cwd, context.env)
 }
 
 // A candidate call is reached unless the enumeration turns the guard fully `off`; today no mode does,
 // but the three-valued wrapper keeps that a change to the enumeration rather than to this file.
-function is_candidate(call: GuardedCall): boolean {
-	return is_refusable_call(call) && duplicate_mode() !== 'off'
+function is_candidate(call: GuardedCall, context: HookContext): boolean {
+	return read_target(call, context.cwd) !== undefined && duplicate_mode(context) !== 'off'
 }
 
 // A refusable call is refused only where the mode is `refuse`. A lane child is `notice`, so it reaches
 // here and is withheld the refusal — the notice branch carries the guidance instead, for the reason its
 // `because` in `lane-guard-policy.ts` records.
-function should_block_here(tail: string, call: GuardedCall, refused_at_ms: number): boolean {
-	if (duplicate_mode() !== 'refuse') return false
+function should_block_here(
+	tail: string,
+	call: GuardedCall,
+	refused_at_ms: number,
+	run: GuardRun,
+): boolean {
+	if (duplicate_mode(run.context) !== 'refuse') return false
 
-	return is_redundant_reread(tail, call, refused_at_ms)
+	return is_redundant_reread(tail, call, refused_at_ms, run.context.cwd)
 }
 
 // The `notice`-mode branch, reached in a dispatched lane child. It reads the notice's own last-fired
 // instant, so a notice never spends the refusal's stamp and re-arms on the same "a newer read landed"
 // rule the refusal does.
-function should_notify_here(tail: string, call: GuardedCall, notified_at_ms: number): boolean {
-	if (duplicate_mode() !== 'notice') return false
+function should_notify_here(
+	tail: string,
+	call: GuardedCall,
+	notified_at_ms: number,
+	run: GuardRun,
+): boolean {
+	if (duplicate_mode(run.context) !== 'notice') return false
 
-	return is_redundant_reread(tail, call, notified_at_ms)
+	return is_redundant_reread(tail, call, notified_at_ms, run.context.cwd)
 }
 
 const GUARD = hook_decision.create_transcript_guard({

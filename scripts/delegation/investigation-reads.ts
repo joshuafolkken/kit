@@ -55,26 +55,29 @@ interface ReadTally {
 	// Files successfully edited in the window or changed on the branch; a read of one stays in the main
 	// line, so it never counts.
 	edited: ReadonlySet<string>
+	// The checkout every path above resolved against.
+	root: string
 }
 
 // The run's own instructions are not the Issue's subject and cannot be delegated, so they never count.
 // Matched relative to the repository root, so `tools/eval/prompts/x.ts` stays subject code.
 const INSTRUCTION_PATHS: ReadonlyArray<string> = ['prompts', '.claude/skills']
 const INSTRUCTION_FILES: ReadonlySet<string> = new Set(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'])
-const REPOSITORY_ROOT = process.cwd()
 
 // A tool call carries an absolute `file_path`, a shell line a relative word; resolve so both compare.
-function resolved(target: string): string {
-	return path.resolve(REPOSITORY_ROOT, target)
+// `root` is the call's own checkout (`HookContext.cwd`); the process's is the default only for a caller
+// with no call context.
+function resolved(target: string, root: string = process.cwd()): string {
+	return path.resolve(root, target)
 }
 
 // Anchored at the repository root: a checkout under a `prompts` directory must not exempt everything.
-function repository_relative(absolute: string): string {
-	return path.relative(REPOSITORY_ROOT, absolute)
+function repository_relative(absolute: string, root: string): string {
+	return path.relative(root, absolute)
 }
 
-function is_instruction_document(target: string): boolean {
-	const relative = repository_relative(resolved(target))
+function is_instruction_document(target: string, root: string = process.cwd()): boolean {
+	const relative = repository_relative(resolved(target, root), root)
 	const segments = relative.split(path.sep)
 
 	return (
@@ -107,15 +110,15 @@ function is_harness_output(segments: ReadonlyArray<string>): boolean {
 }
 
 // Leaving the checkout is a precondition, so no repository file is ever exempted as a session artifact.
-function is_outside_repository(absolute: string): boolean {
-	return repository_relative(absolute).startsWith('..')
+function is_outside_repository(absolute: string, root: string): boolean {
+	return repository_relative(absolute, root).startsWith('..')
 }
 
-function is_session_artifact(target: string): boolean {
-	const absolute = resolved(target)
+function is_session_artifact(target: string, root: string = process.cwd()): boolean {
+	const absolute = resolved(target, root)
 	const segments = absolute.split(path.sep)
 
-	if (!is_outside_repository(absolute)) return false
+	if (!is_outside_repository(absolute, root)) return false
 
 	return (
 		segments.some((_segment, index) => has_state_root(segments, index)) ||
@@ -124,8 +127,8 @@ function is_session_artifact(target: string): boolean {
 	)
 }
 
-function is_subject_file(target: string): boolean {
-	return !is_instruction_document(target) && !is_session_artifact(target)
+function is_subject_file(target: string, root: string = process.cwd()): boolean {
+	return !is_instruction_document(target, root) && !is_session_artifact(target, root)
 }
 
 // A glob is a path no edit can name, so it would stay pending forever.
@@ -137,14 +140,14 @@ function is_content_read(label: string): boolean {
 	return READ_TOOLS.has(label) || CONTENT_READ_LABELS.has(label)
 }
 
-function subject_targets(targets: ReadonlyArray<string>): ReadonlyArray<string> {
+function subject_targets(targets: ReadonlyArray<string>, root: string): ReadonlyArray<string> {
 	return targets
-		.filter((target) => is_nameable_file(target) && is_subject_file(target))
-		.map((target) => resolved(target))
+		.filter((target) => is_nameable_file(target) && is_subject_file(target, root))
+		.map((target) => resolved(target, root))
 }
 
-function call_targets(call: GuardedCall): ReadonlyArray<string> {
-	return subject_targets(time_bundle_call.call_facts(call.name, call.input).targets)
+function call_targets(call: GuardedCall, root: string): ReadonlyArray<string> {
+	return subject_targets(time_bundle_call.call_facts(call.name, call.input).targets, root)
 }
 
 // The closing instant: the refusal it re-arms predates the briefing, and it needs no duration arithmetic.
@@ -159,10 +162,10 @@ function is_failed_outcome(span: Span): boolean {
 }
 
 // The one source of "this run edited that file", bounded by the window the hook read.
-function edited_files(spans: ReadonlyArray<Span>): Set<string> {
+function edited_files(spans: ReadonlyArray<Span>, root: string): Set<string> {
 	const written = spans
 		.filter((span) => !is_failed_outcome(span))
-		.flatMap((span) => subject_targets(span.writes))
+		.flatMap((span) => subject_targets(span.writes, root))
 
 	return new Set(written)
 }
@@ -183,6 +186,7 @@ interface Accumulation {
 	pending: Map<string, number>
 	// Search turns, keyed by message id so a turn's parallel searches count once, valued the same way.
 	searches: Map<string, number>
+	root: string
 }
 
 // A span with no message id is a turn of its own, as in every other turn counter.
@@ -228,7 +232,9 @@ function apply_span(accumulation: Accumulation, span: Span, edited: ReadonlySet<
 
 	if (!is_content_read(span.label)) return
 
-	const fresh = subject_targets(span.targets).filter((target) => !edited.has(target))
+	const fresh = subject_targets(span.targets, accumulation.root).filter(
+		(target) => !edited.has(target),
+	)
 
 	add_all(accumulation.pending, fresh, span.ended_ms)
 }
@@ -248,10 +254,11 @@ function tally_of(
 	text: string,
 	since_ms: number = hook_decision.NEVER_MS,
 	branch_files: ReadonlyArray<string> = [],
+	root: string = process.cwd(),
 ): ReadTally {
 	const { spans, started_ms } = time_spans.parse_timeline(text)
-	const edited = new Set([...edited_files(spans), ...subject_targets(branch_files)])
-	const accumulation: Accumulation = { pending: new Map(), searches: new Map() }
+	const edited = new Set([...edited_files(spans, root), ...subject_targets(branch_files, root)])
+	const accumulation: Accumulation = { pending: new Map(), searches: new Map(), root }
 
 	for (const span of spans) apply_span(accumulation, span, edited)
 
@@ -263,6 +270,7 @@ function tally_of(
 		searches: accumulation.searches.size,
 		searches_since: pending_after(accumulation.searches, since_ms),
 		edited,
+		root,
 	}
 }
 
@@ -271,8 +279,11 @@ function projected_count(
 	pending: ReadonlyArray<string>,
 	call: GuardedCall,
 	edited: ReadonlySet<string> = new Set<string>(),
+	root: string = process.cwd(),
 ): number {
-	return new Set([...pending, ...call_targets(call).filter((target) => !edited.has(target))]).size
+	const added = call_targets(call, root).filter((target) => !edited.has(target))
+
+	return new Set([...pending, ...added]).size
 }
 
 // The accumulated count, never the projected one, must reach the boundary — otherwise one bundled
@@ -328,9 +339,9 @@ function is_search_call(call: GuardedCall): boolean {
 
 // This guard counts reading, so a `Bash` line that also writes is never refused, and neither is a call
 // naming no subject file (e.g. only `CLAUDE.md`).
-function is_refusable_call(call: GuardedCall): boolean {
+function is_refusable_call(call: GuardedCall, root: string = process.cwd()): boolean {
 	if (is_search_call(call)) return true
-	if (call_targets(call).length === 0) return false
+	if (call_targets(call, root).length === 0) return false
 	if (READ_TOOLS.has(call.name)) return true
 
 	return is_read_only_command(call, CONTENT_READ_LABELS)
@@ -342,7 +353,7 @@ function is_growing_past_threshold(tally: ReadTally, call: GuardedCall): boolean
 	if (is_search_call(call)) return is_at_search_threshold(tally.searches)
 	if (!is_at_threshold(tally.pending.length)) return false
 
-	return projected_count(tally.pending, call, tally.edited) > tally.pending.length
+	return projected_count(tally.pending, call, tally.edited, tally.root) > tally.pending.length
 }
 
 function is_blocking(tally: ReadTally, call: GuardedCall, refused_at_ms: number): boolean {
@@ -351,12 +362,17 @@ function is_blocking(tally: ReadTally, call: GuardedCall, refused_at_ms: number)
 
 // The branch diff is a git read, so it is asked only of a call the transcript alone would refuse; more
 // edited files can only lower the counts, so a call that passes without it passes with it.
-function is_blocking_past_branch(text: string, call: GuardedCall, refused_at_ms: number): boolean {
-	if (!is_blocking(tally_of(text, refused_at_ms), call, refused_at_ms)) return false
+function is_blocking_past_branch(
+	text: string,
+	call: GuardedCall,
+	refused_at_ms: number,
+	root: string,
+): boolean {
+	if (!is_blocking(tally_of(text, refused_at_ms, [], root), call, refused_at_ms)) return false
 
-	const branch_files = changed_paths_sync.read_changed_paths()
+	const branch_files = changed_paths_sync.read_changed_paths(root)
 
-	return is_blocking(tally_of(text, refused_at_ms, branch_files), call, refused_at_ms)
+	return is_blocking(tally_of(text, refused_at_ms, branch_files, root), call, refused_at_ms)
 }
 
 function should_block(
@@ -365,10 +381,12 @@ function should_block(
 	refused_at_ms: number,
 	run?: GuardRun,
 ): boolean {
-	// A delegated unit is never refused: the remedy — send the reading to a unit — does not exist inside one.
-	if (!is_refusable_call(call) || is_unit_run(run)) return false
+	const root = run?.context.cwd ?? process.cwd()
 
-	return is_blocking_past_branch(text, call, refused_at_ms)
+	// A delegated unit is never refused: the remedy — send the reading to a unit — does not exist inside one.
+	if (!is_refusable_call(call, root) || is_unit_run(run)) return false
+
+	return is_blocking_past_branch(text, call, refused_at_ms, root)
 }
 
 const investigation_reads = {

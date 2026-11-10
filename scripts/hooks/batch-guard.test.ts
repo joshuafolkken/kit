@@ -332,6 +332,30 @@ describe('batch_outcome — a dispatched lane child is silent, neither refused n
 	})
 })
 
+describe('batch_outcome — the per-call context, not the process (kit#6967)', () => {
+	const LANE_CONTEXT = { cwd: LANE_DIRECTORY, env: { [lane_child_marker.KEY]: LANE_ISSUE } }
+
+	it('stays silent for a lane child the context names under a main-line process', () => {
+		const { reason, notice } = batch_outcome(payload_of('context-lane'), NOW_MS, LANE_CONTEXT)
+
+		expect(reason).toBeUndefined()
+		expect(notice).toBeUndefined()
+	})
+
+	it('reads its switch from the context environment', () => {
+		const off = { cwd: process.cwd(), env: { [SWITCH_ENV_KEY]: 'off' } }
+
+		expect(batch_outcome(payload_of('context-off'), NOW_MS, off).reason).toBeUndefined()
+	})
+
+	it('refuses when only the process environment switches it off', () => {
+		process.env[SWITCH_ENV_KEY] = 'off'
+		const on = { cwd: process.cwd(), env: {} }
+
+		expect(batch_outcome(payload_of('context-on'), NOW_MS, on).reason).toContain('batching')
+	})
+})
+
 describe('is_enabled', () => {
 	it('is on when the variable is unset, so the guard costs nothing to adopt', () => {
 		expect(is_enabled()).toBe(true)
