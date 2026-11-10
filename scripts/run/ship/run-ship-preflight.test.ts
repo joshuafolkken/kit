@@ -27,6 +27,7 @@ const removed_mock = vi.hoisted(() =>
 )
 const draft_mock = vi.hoisted(() => vi.fn<(issue: string) => Promise<string | undefined>>())
 const prepare_mock = vi.hoisted(() => vi.fn<(issue: string, rows: string) => Promise<string>>())
+const reuse_mock = vi.hoisted(() => vi.fn(async (_k: unknown, ask: () => unknown) => await ask()))
 
 vi.mock('#scripts/git/git-preflight', () => ({
 	git_preflight: { problems_of: problems_mock },
@@ -50,6 +51,7 @@ vi.mock('#scripts/review/removed-tests-check', () => ({
 	removed_tests_check: { body_refusal: removed_mock },
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
+vi.mock('./run-ship-preflight-reuse', () => ({ run_ship_preflight_reuse: { run: reuse_mock } }))
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
 vi.mock('./run-ship-planned', () => ({
 	run_ship_planned: { PRECONDITION: 'unplanned', problems: planned_mock },
