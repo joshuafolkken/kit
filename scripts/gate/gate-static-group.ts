@@ -1,3 +1,4 @@
+import { lint_shard, type LintShard } from '#scripts/lint/lint-shard'
 import { gate_labels } from './gate-labels'
 import type { GateCheck } from './gate-plan'
 
@@ -24,6 +25,18 @@ const STATIC_GROUPS: Readonly<Record<string, ReadonlyArray<string>>> = {
 	],
 }
 
+// **The lint check alone, on one shard of the tree** (joshuafolkken/kit#7018): `lint-<n>` runs the
+// lint check with `josh lint --shard=<n>`, so two legs share the whole-tree lint that one leg ran in
+// about 220 s. Kept apart from `STATIC_GROUPS`, which the workflow matrix names exactly, until CI
+// runs these legs in place of `lint` (joshuafolkken/kit#7108).
+const LINT_SHARD_GROUPS: Readonly<Record<string, LintShard>> = Object.fromEntries(
+	lint_shard.SHARDS.map((shard) => [`lint-${String(shard)}`, shard]),
+)
+
+function is_group(name: string): boolean {
+	return Object.hasOwn(STATIC_GROUPS, name) || Object.hasOwn(LINT_SHARD_GROUPS, name)
+}
+
 // The group an argument names, or `undefined` when it is not the flag or names no group — so an
 // unknown group is refused with every other unknown argument.
 function group_of(argument: string): string | undefined {
@@ -31,11 +44,20 @@ function group_of(argument: string): string | undefined {
 
 	const name = argument.slice(STATIC_GROUP_FLAG_PREFIX.length)
 
-	return Object.hasOwn(STATIC_GROUPS, name) ? name : undefined
+	return is_group(name) ? name : undefined
 }
 
 function find_group(arguments_: ReadonlyArray<string>): string | undefined {
 	return arguments_.map((argument) => group_of(argument)).find((name) => name !== undefined)
+}
+
+function shard_lint_checks(
+	checks: ReadonlyArray<GateCheck>,
+	shard: LintShard,
+): ReadonlyArray<GateCheck> {
+	return checks
+		.filter((check) => check.label === gate_labels.LINT_LABEL)
+		.map((check) => ({ ...check, args: [...(check.args ?? []), lint_shard.shard_flag(shard)] }))
 }
 
 function narrow_checks(
@@ -44,12 +66,17 @@ function narrow_checks(
 ): ReadonlyArray<GateCheck> {
 	if (group === undefined) return checks
 
+	const shard = LINT_SHARD_GROUPS[group]
+
+	if (shard !== undefined) return shard_lint_checks(checks, shard)
+
 	const labels = STATIC_GROUPS[group] ?? []
 
 	return checks.filter((check) => labels.includes(check.label))
 }
 
 const gate_static_group = {
+	LINT_SHARD_GROUPS,
 	STATIC_GROUPS,
 	STATIC_GROUP_FLAG_PREFIX,
 	find_group,

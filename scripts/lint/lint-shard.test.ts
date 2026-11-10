@@ -19,6 +19,11 @@ describe('lint_shard.shard_of', () => {
 	it.each(['--shard=0', '--shard=3', '--shard=', '--shard=one'])('refuses %s', (flag) => {
 		expect(() => lint_shard.shard_of([flag])).toThrow(/unknown shard/u)
 	})
+
+	// joshuafolkken/kit#7018: the gate's `lint-<n>` groups hand the lint check this flag.
+	it.each(lint_shard.SHARDS)('reads back the flag shard_flag writes for shard %i', (shard) => {
+		expect(lint_shard.shard_of([lint_shard.shard_flag(shard)])).toBe(shard)
+	})
 })
 
 // joshuafolkken/kit#6997: the two shards together are `eslint .` — shard 2 is the whole tree with
