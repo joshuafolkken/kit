@@ -19,7 +19,7 @@ declarations, but an absent package field says nothing about workspace overrides
 
 ## 2. Quote the printed overrides verdict
 
-`josh latest`, `josh adopt` and `josh latest:if-required` print it last, after §3's line and a
+`josh latest`, `josh adopt` and `josh latest:if-required` print it after §3's line and a
 `✖ <file> overrides changed` heading per moved block. `overrides: keep` — keep. `overrides: restore (…)`
 (non-zero exit) — restore the moved entries, investigate, report. `overrides: not judged (…)` — run
 the check below.
