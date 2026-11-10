@@ -1,0 +1,7 @@
+{
+	"reason": "New single registry of the human-only stops with reasons and its coverage test (#7080)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 93
+	}
+}

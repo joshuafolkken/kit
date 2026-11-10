@@ -1,4 +1,5 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { issue_human_stops } from '#scripts/issue/issue-human-stops'
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_fixture } from './backlog-drive-fixture'
@@ -123,6 +124,30 @@ describe('backlog_drive_idle.describe — an author without write access', () =>
 			`(author without write access):\n- #${String(UNTRUSTED)} Issue ${String(UNTRUSTED)}`,
 		)
 		expect(body).not.toContain(`- #${String(READY)}`)
+	})
+})
+
+// joshuafolkken/kit#7080: every stop the registry lists for the notice gets its heading here.
+describe('backlog_drive_idle.describe — the registry of a person stops', () => {
+	it.each(issue_human_stops.idle_stops().filter((stop) => stop.label !== undefined))(
+		'lists an issue carrying $key under its heading',
+		(stop) => {
+			const waiting = issue(PARKED, { labels: [{ name: stop.label ?? '' }] })
+			const body = backlog_drive_idle.describe({ merged: 0, issues: [waiting], now_ms: NOW_MS })
+
+			expect(body).toContain(
+				`${stop.idle_heading ?? ''}\n- #${String(PARKED)} Issue ${String(PARKED)}`,
+			)
+		},
+	)
+
+	it('lists already-done and needs-human-merge as waiting on a person', () => {
+		const done = issue(PARKED, { labels: [{ name: 'already-done' }] })
+		const merge = issue(STALLED, { labels: [{ name: 'needs-human-merge' }] })
+		const body = backlog_drive_idle.describe({ merged: 0, issues: [done, merge], now_ms: NOW_MS })
+
+		expect(body).toContain(`(already-done):\n- #${String(PARKED)}`)
+		expect(body).toContain(`(needs-human-merge):\n- #${String(STALLED)}`)
 	})
 })
 
