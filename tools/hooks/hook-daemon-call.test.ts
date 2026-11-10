@@ -4,7 +4,7 @@ import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_payload_capture } from '#scripts/josh/hook-payload-capture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { hook_daemon_call, type CallAnswer, type DaemonOrigin } from './hook-daemon-call'
+import { hook_daemon_call, type CallAnswer, type DaemonCall } from './hook-daemon-call'
 
 // The guards that read GitHub or run state are mocked as in `pretool-guard.test.ts`; the rule guard
 // that refuses a shell-evaluated body runs for real, so a refusal is the one a fresh process gives.
@@ -48,7 +48,7 @@ const make_directory = temporary_directory()
 const capture = vi.mocked(hook_payload_capture.capture)
 const SHELL_BODY_COMMAND = 'pnpm josh notify --body="hi `date`"'
 const SHELL_BODY_REASON = 'shell-evaluated body'
-const ORIGIN_VARIABLE = 'HOOK_DAEMON_ORIGIN'
+const CALLER_VARIABLE = 'HOOK_DAEMON_CALLER'
 const STRAY_VARIABLE = 'HOOK_DAEMON_STRAY'
 const LAUNCH_DIRECTORY = '/launched/here'
 const ROOT_PREFIX = 'hook-daemon-root-'
@@ -74,24 +74,23 @@ function bash_payload(command: string): string {
 	return JSON.stringify({ tool_name: 'Bash', tool_input: { command }, transcript_path })
 }
 
-function origin_under(root: string): DaemonOrigin {
+function call_of(command: string, launcher_pid = ROOT_LAUNCHER, caller = 'caller'): DaemonCall {
+	const environment: Record<string, string> = {}
+
+	for (const [key, value] of Object.entries(original.environment)) {
+		if (value !== undefined) environment[key] = value
+	}
+
 	return {
-		root,
-		environment: {
-			...original.environment,
-			[agent_session_role.KEY]: 'worker',
-			[ORIGIN_VARIABLE]: 'origin',
-		},
+		raw_payload: bash_payload(command),
+		launch_directory: LAUNCH_DIRECTORY,
+		launcher_pid,
+		environment: { ...environment, [agent_session_role.KEY]: 'worker', [CALLER_VARIABLE]: caller },
 	}
 }
 
 async function answer_from(launcher_pid: number): Promise<CallAnswer> {
-	return await hook_daemon_call.answer(
-		origin_under(make_directory(ROOT_PREFIX)),
-		bash_payload('ls'),
-		LAUNCH_DIRECTORY,
-		launcher_pid,
-	)
+	return await hook_daemon_call.answer(make_directory(ROOT_PREFIX), call_of('ls', launcher_pid))
 }
 
 beforeEach(() => {
@@ -103,23 +102,36 @@ afterEach(() => {
 })
 
 describe('hook_daemon_call.answer', () => {
-	it('puts back the start environment and root with only the launch directory changed', async () => {
+	it('puts the call environment and launch directory in place, under the start root', async () => {
 		const root = realpathSync(make_directory(ROOT_PREFIX))
 
 		process.env[STRAY_VARIABLE] = 'stray'
-		await hook_daemon_call.answer(
-			origin_under(root),
-			bash_payload('ls'),
-			LAUNCH_DIRECTORY,
-			ROOT_LAUNCHER,
-		)
+		await hook_daemon_call.answer(root, call_of('ls'))
 
 		expect(process.env[STRAY_VARIABLE]).toBeUndefined()
-		expect(process.env[ORIGIN_VARIABLE]).toBe('origin')
+		expect(process.env[CALLER_VARIABLE]).toBe('caller')
 		expect(process.env[hook_daemon_call.LAUNCH_DIRECTORY_VARIABLE]).toBe(LAUNCH_DIRECTORY)
 		expect(process.cwd()).toBe(root)
 	})
+})
 
+describe('hook_daemon_call.answer — the environment', () => {
+	it('answers each call under its own environment, keeping nothing of the call before', async () => {
+		const root = make_directory(ROOT_PREFIX)
+		const first = call_of('ls', ROOT_LAUNCHER, 'first')
+
+		await hook_daemon_call.answer(root, {
+			...first,
+			environment: { ...first.environment, [STRAY_VARIABLE]: 'first only' },
+		})
+		await hook_daemon_call.answer(root, call_of('ls', ROOT_LAUNCHER, 'second'))
+
+		expect(process.env[CALLER_VARIABLE]).toBe('second')
+		expect(process.env[STRAY_VARIABLE]).toBeUndefined()
+	})
+})
+
+describe('hook_daemon_call.answer — the guard', () => {
 	it('captures the payload under the pretool guard command', async () => {
 		await answer_from(ROOT_LAUNCHER)
 
@@ -127,12 +139,9 @@ describe('hook_daemon_call.answer', () => {
 	})
 
 	it('answers a refusal with the deny envelope a fresh guard process writes', async () => {
-		const root = make_directory(ROOT_PREFIX)
 		const answer = await hook_daemon_call.answer(
-			origin_under(root),
-			bash_payload(SHELL_BODY_COMMAND),
-			LAUNCH_DIRECTORY,
-			ROOT_LAUNCHER,
+			make_directory(ROOT_PREFIX),
+			call_of(SHELL_BODY_COMMAND),
 		)
 
 		expect(answer.status).toBe(0)
@@ -152,5 +161,14 @@ describe('hook_daemon_call.answer — the ancestry', () => {
 		const { stdout } = await answer_from(ROOT_LAUNCHER)
 
 		expect(stdout).not.toContain(OWNER_REASON)
+	})
+})
+
+describe('hook_daemon_call.parse_environment', () => {
+	it('reads one variable per line, with escaped percent signs and line breaks put back', () => {
+		expect(hook_daemon_call.parse_environment('A=1%252\nB=x=y%0Az\n\n')).toStrictEqual({
+			A: '1%2',
+			B: 'x=y\nz',
+		})
 	})
 })
