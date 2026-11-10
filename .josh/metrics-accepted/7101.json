@@ -1,0 +1,8 @@
+{
+	"reason": "#7101 adds the commit-SHA ancestry check to already-done-citation.ts and documents it where the merged-PR check is described",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 20,
+		"ai_cost.on_demand_bytes": 45
+	}
+}
