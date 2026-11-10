@@ -2,6 +2,7 @@ import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -146,8 +147,8 @@ describe('invokes_budget_command — a redirected state root', () => {
 
 describe('is_carry_conflict', () => {
 	// The marker read is stubbed to answer by directory, so each context reads as what it names.
-	const child: HookContext = { cwd: '/lanes/child', env: {} }
-	const person: HookContext = { cwd: '/lanes/person', env: {} }
+	const child: HookContext = hook_context_fixture.of('/lanes/child', {})
+	const person: HookContext = hook_context_fixture.of('/lanes/person', {})
 
 	beforeEach(() => {
 		vi.spyOn(lane_child_marker, 'is_child_of').mockImplementation(

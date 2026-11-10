@@ -75,6 +75,8 @@ const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 // Kit's own launch of those hooks (`scripts/hooks/run-hook.sh`): built beside them so a fresh build
 // runs without TypeScript, and kept out of `HOOK_BUNDLES` because no hook config launches it.
 const LAUNCH_GATE: HookBundle = { source: 'tools/hooks/hook-bundle-fast.ts', out: 'ready' }
+// The resident pretool-guard daemon the launcher hands a call to (#6683), built the same way.
+const HOOK_DAEMON: HookBundle = { source: 'tools/hooks/hook-daemon.ts', out: 'daemon' }
 
 function entry_point(bundle: HookBundle): { in: string; out: string } {
 	return { in: path.join(PACKAGE_DIR, bundle.source), out: bundle.out }
@@ -240,13 +242,13 @@ async function bundle_pass(
 	return files
 }
 
-// The launch gate is built unsplit: a launch that read the previous `ready.js` would otherwise link
+// The launch gates are built unsplit: a launch that read the previous `ready.js` would otherwise link
 // chunks a background rebuild had just pruned, and fail open. Both passes share one stamp.
 async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 	const sources = build_inputs()
 	const passes = await Promise.all([
 		bundle_pass(HOOK_BUNDLES, true, sources, out_directory),
-		bundle_pass([LAUNCH_GATE], false, sources, out_directory),
+		bundle_pass([LAUNCH_GATE, HOOK_DAEMON], false, sources, out_directory),
 	])
 	const files = passes.flat()
 	const stamp = hook_bundle_stamp.stamp_text(

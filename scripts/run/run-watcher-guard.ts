@@ -1,3 +1,4 @@
+import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
@@ -39,18 +40,27 @@ const OK_RESULT: GuardResult = { kind: 'ok' }
 // `backlogrun` carry record is the one that dispatched them; every other session passes. A session
 // `run:wake` woke owes none either: the supervisor's driver watches the lanes, and the woken session
 // only acts on the branch it was handed and cuts.
-async function owes_watcher(): Promise<boolean> {
-	if (run_headless.is_headless() || !(await run_headless.is_backlog_parent())) return false
+async function owes_watcher(ancestry: () => ReadonlySet<number>): Promise<boolean> {
+	if (
+		run_headless.is_headless() ||
+		!(await run_headless.is_backlog_parent(process.env, ancestry))
+	) {
+		return false
+	}
 
 	return await lane_registry.has_lanes_in_flight()
 }
 
 // `life_target` is the path returned by `run_progress_read.stamp_target()` or
 // `run_progress_clock.life_target_of(git_directory)`. Passed in rather than resolved here so the
-// caller can use whichever resolution fits its sync/async context.
-async function check(life_target: string): Promise<GuardResult> {
+// caller can use whichever resolution fits its sync/async context. `ancestry` is the calling session's
+// (`HookContext`).
+async function check(
+	life_target: string,
+	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
+): Promise<GuardResult> {
 	if (
-		!(await owes_watcher()) ||
+		!(await owes_watcher(ancestry)) ||
 		run_progress_clock.is_life_fresh(life_target, STALE_THRESHOLD_MS)
 	) {
 		return OK_RESULT

@@ -1782,7 +1782,6 @@
 	"scripts/sonar/sonar-new-code.test.ts": 38,
 	"scripts/split/split-assess-document-rule.test.ts": 17,
 	"scripts/split/split-assess.test.ts": 31,
-	"scripts/split/split-early-notice.test.ts": 118,
 	"scripts/split/split-measure.git.test.ts": 471,
 	"scripts/split/split-measure.test.ts": 41,
 	"scripts/split/split-resolution.test.ts": 97,

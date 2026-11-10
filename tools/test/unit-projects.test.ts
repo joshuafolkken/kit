@@ -136,6 +136,12 @@ describe('each project carries the per-run environment and timeout', () => {
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session role for %s', (name) => {
 		expect(project(name).env[agent_session_role.KEY]).toBe('')
 	})
+
+	// joshuafolkken/kit#6902: a lane run with the paired review on would otherwise make every run:review
+	// fixture write a paired brief its stubs never planned.
+	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the paired review switch for %s', (name) => {
+		expect(project(name).env[review_pair.PAIRED_ENV]).toBe('')
+	})
 })
 
 // joshuafolkken/kit#5029: the supervisor's retry-pending mark reached the gate's run alone, so a test
