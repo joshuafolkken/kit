@@ -161,6 +161,7 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 | `JOSH_BATCH_GUARD`          | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — calls that could have gone out together.     |
 | `JOSH_INVESTIGATION_GUARD`  | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — reading too much before delegating.          |
 | `JOSH_DUPLICATE_READ_GUARD` | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — reading the same file twice.                 |
+| `JOSH_LARGE_READ_GUARD`     | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — reading a whole large file.                  |
 | `JOSH_RULE_GUARD`           | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — a rule delivered at the call that breaks it. |
 | `JOSH_STOP_GUARD`           | No       | on      | [`josh stop:guard`](./josh-commands-automation.md#josh-stopguard) — what a turn must do before it ends.                |
 | `JOSH_WATCHER_GUARD`        | No       | on      | [`josh run:watcher:guard`](./josh-commands-board.md#josh-runwatcherguard) — a run whose progress watcher stopped.      |
