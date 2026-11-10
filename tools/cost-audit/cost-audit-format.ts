@@ -27,10 +27,12 @@ const FILING_SUFFIX = ' — reproduce with `pnpm josh cost:audit`'
 // Each row's model lines follow it, indented: the same four token types in dollars.
 const KIND_TITLE =
 	'By session kind (this period per model: cost — input / cache read / cache write / output in dollars)'
-const PHASE_TITLE =
-	'Lane children by phase (this period: cost — billed input / cache read / cache write / output tokens; per model in dollars)'
-const AGENT_TITLE =
-	'Lane subagents by agent type (this period: cost — billed input / cache read / cache write / output tokens; per model in dollars)'
+const LONG_OUTPUT = String(cost_audit_usage.LONG_OUTPUT_TOKENS)
+// Each phase and agent type row also counts its calls whose output passed `LONG_OUTPUT_TOKENS`
+// (joshuafolkken/kit#7045), so the period's long outputs are placed, not only totalled.
+const TABLE_FIGURES = `cost — billed input / cache read / cache write / output tokens · calls with output over ${LONG_OUTPUT} tokens; per model in dollars`
+const PHASE_TITLE = `Lane children by phase (this period: ${TABLE_FIGURES})`
+const AGENT_TITLE = `Lane subagents by agent type (this period: ${TABLE_FIGURES})`
 
 interface AuditSection {
 	name: string
@@ -123,7 +125,9 @@ function phase_line(row: PhaseRow): string {
 		figure_format.format_tokens(count),
 	)
 
-	return `  ${row.key}: ${figure_format.format_usd(row.usd)} — ${tokens.join(' / ')}`
+	const long = `${String(row.long_calls)} calls over ${LONG_OUTPUT}`
+
+	return `  ${row.key}: ${figure_format.format_usd(row.usd)} — ${tokens.join(' / ')} · ${long}`
 }
 
 // One model's share of a row, its dollars by token type in the order the row's tokens are printed.

@@ -5,6 +5,7 @@ import { cost_audit_kind } from './cost-audit-kind'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import type { ToolCategory } from './cost-audit-tool'
+import { cost_audit_usage } from './cost-audit-usage'
 
 // The lane children's tokens and cost by the phase each request fell in, for `josh cost:audit`
 // (joshuafolkken/kit#5936), so a change aimed at one phase is read against that phase's figure rather
@@ -51,6 +52,8 @@ interface PhaseRow {
 	usd: number
 	// The row's dollars by model and token type (joshuafolkken/kit#6899), summing to `usd`.
 	models: ReadonlyArray<ModelSpend>
+	// The row's requests whose output passed `LONG_OUTPUT_TOKENS` (joshuafolkken/kit#7045).
+	long_calls: number
 }
 
 interface Placed {
@@ -151,6 +154,7 @@ function row_of(key: string, records: ReadonlyArray<UsageRecord>): PhaseRow {
 		tokens: tokens_sum(records),
 		usd: cost_pricing.cost_of(records),
 		models: cost_audit_spend.spend_of(records),
+		long_calls: cost_audit_usage.long_calls_of(records),
 	}
 }
 

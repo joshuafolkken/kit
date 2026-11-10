@@ -47,16 +47,17 @@ separately-mergeable deliverables is the split assessment's business (`split-ass
 satisfied in merged code — one procedure either way. **Parking it is not the place**: `needs-decision`
 means "waiting for an answer", and here the answer exists.
 
-**The exit closes the Issue as `completed` when the evidence cites the merge** — a pull request
-(`PR #N`, `pull request #N`, `merged in #N`, a `/pull/N` link) or a commit SHA; a reopen undoes it.
-**Evidence citing neither gets the `already-done` label instead**: `epic:next`, `backlog:next` and
-`auto-ok:next` stop offering the Issue (`scripts/issue/issue-labels.ts` →
-`NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` → `human`), `epic:busy` stops counting it, and only
-a person removes it, by closing the Issue.
+**The exit applies the `already-done` label, then closes the Issue as `completed` when a cited pull
+request reads back as merged** (`scripts/issue/already-done-citation.ts`); the label stays, and a
+reopen undoes the close. **Anything else leaves it OPEN with the label**, the reason printed:
+`epic:next`, `backlog:next` and `auto-ok:next` stop offering the Issue
+(`scripts/issue/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` → `human`),
+`epic:busy` stops counting it, and a person closes it.
 
 **Commit nothing, push nothing, open no pull request** — run one command; it posts the evidence,
-closes the Issue or applies `already-done`, and releases the hold, in that order, stopping at the
-first failure:
+applies `already-done` and closes the Issue when the citation checks, and releases the hold, in that
+order, stopping at a failed comment or label; a failed close leaves the labelled Issue OPEN and
+still releases the hold:
 
 ```bash
 pnpm josh issue:already-done <N> --evidence-file .josh/tmp/evidence.md

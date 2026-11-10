@@ -129,8 +129,18 @@ function first_context_of(
 	return { sessions: tokens.length, p50_tokens: lane_stats.median(tokens) }
 }
 
+function long_records(records: ReadonlyArray<UsageRecord>): Array<UsageRecord> {
+	return records.filter((record) => record.totals.output_tokens > LONG_OUTPUT_TOKENS)
+}
+
+// The requests whose output passed `LONG_OUTPUT_TOKENS`, counted per phase and agent type row too
+// (joshuafolkken/kit#7045).
+function long_calls_of(records: ReadonlyArray<UsageRecord>): number {
+	return long_records(records).length
+}
+
 function long_output_of(records: ReadonlyArray<UsageRecord>): LongOutput {
-	const long = records.filter((record) => record.totals.output_tokens > LONG_OUTPUT_TOKENS)
+	const long = long_records(records)
 
 	return { calls: long.length, all_calls: records.length, usd: cost_pricing.cost_of(long) }
 }
@@ -163,7 +173,7 @@ function breakdown_of(sessions: ReadonlyArray<AuditSession>, is_inside: IsInside
 	}
 }
 
-const cost_audit_usage = { LONG_OUTPUT_TOKENS, breakdown_of }
+const cost_audit_usage = { LONG_OUTPUT_TOKENS, breakdown_of, long_calls_of }
 
 export type { AgentRuns, CacheWrite, FirstContext, LongOutput, UsageBreakdown }
 export { cost_audit_usage }

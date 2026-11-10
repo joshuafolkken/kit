@@ -65,7 +65,7 @@ The issue-driven flow: `prompts/collaboration-workflow/`.
 
 ### Shorthand Commands
 
-`kickoff`, `fullrun`, `prrun`, `halfrun`, `backlogrun` (with `#N` / `new`) are procedures in the `workflow-commands` skill — read it before any part of a command, including the first `gh` call. Read the `epic-commands` skill before any `josh epic:*` command, before writing an epic that tracks a child in another repository, when `epic:bundle` places a filed issue, and when recording a decision on a `needs-decision` child.
+`kickoff`, `fullrun`, `prrun`, `halfrun`, `backlogrun` (with `#N` / `new`) are procedures in the `workflow-commands` skill — read it before any part of a command, including the first `gh` call. The `epic-commands` skill: before `josh epic:*`, a cross-repository epic child or a `needs-decision` decision, and when `epic:bundle` places a filed issue.
 
 #### Explicit invocation required (MANDATORY)
 

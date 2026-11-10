@@ -1,0 +1,7 @@
+{
+	"reason": "cost:audit counts long-output calls per phase and agent type row (#7045)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 10
+	}
+}

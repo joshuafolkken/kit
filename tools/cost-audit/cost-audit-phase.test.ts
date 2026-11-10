@@ -18,6 +18,7 @@ const SHIP_GATE = 'ship gate'
 const FULLRUN = 'fullrun'
 const REVIEW_FIX = 'implement: review-fix'
 const IMPLEMENT_EDIT = 'implement: edit'
+const REVIEWER_ROW = 'subagent: reviewer'
 
 function span(from: number, to: number): { from_ms: number; to_ms: number } {
 	return { from_ms: ms(from), to_ms: ms(to) }
@@ -202,7 +203,7 @@ describe('cost_audit_phase.agent_rows_of — a lane subagent by its agent type',
 		const rows = cost_audit_phase.agent_rows_of(sessions).map((row) => [row.key, row.usd])
 
 		expect(rows).toStrictEqual([
-			['subagent: reviewer', 6],
+			[REVIEWER_ROW, 6],
 			['subagent: investigator', 3],
 			['subagent', 1],
 		])
@@ -213,5 +214,38 @@ describe('cost_audit_phase.agent_rows_of — a lane subagent by its agent type',
 		const sessions = [CHILD, outside]
 
 		expect(cost_audit_phase.agent_rows_of(sessions)).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#7045: each row counts its requests whose output passed `LONG_OUTPUT_TOKENS`.
+function with_output(base: UsageRecord, output_tokens: number): UsageRecord {
+	return { ...base, totals: { ...base.totals, output_tokens } }
+}
+
+describe('cost_audit_phase — the long-output calls of a row', () => {
+	it('counts only the requests whose output passed 2000 tokens, by phase', () => {
+		const records = [
+			with_output(record('long', 5, 1), 2001),
+			with_output(record('edge', 6, 1), 2000),
+			with_output(record('short', 7, 1), 10),
+		]
+		const sessions = [lane_session(FULLRUN, records)]
+		const [row] = cost_audit_phase.rows_of({
+			sessions,
+			reviews: sessions,
+			breakdowns: new Map([[ISSUE, BREAKDOWN]]),
+		})
+
+		expect([row?.key, row?.long_calls]).toStrictEqual([cost_audit_phase.PLAN, 1])
+	})
+
+	it('counts them by agent type', () => {
+		const sessions = [
+			unit('review', [with_output(record('r1', 5, 2), 4000)], 'reviewer'),
+			unit('review', [with_output(record('r2', 7, 4), 3000)], 'reviewer'),
+		]
+		const rows = cost_audit_phase.agent_rows_of(sessions).map((row) => [row.key, row.long_calls])
+
+		expect(rows).toStrictEqual([[REVIEWER_ROW, 2]])
 	})
 })

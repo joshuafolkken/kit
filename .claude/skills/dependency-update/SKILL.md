@@ -1,6 +1,6 @@
 ---
 name: dependency-update
-description: Checks after `pnpm update`, `josh latest`, `josh adopt`, `pnpm josh overrides` or any dependency update — the `overrides` survived, the one expected `devEngines` change. Read it before reporting the pins intact or pinning a bump back.
+description: Checks after `pnpm update`, `josh latest`, `josh adopt`, `pnpm josh overrides` or any dependency update — `overrides` kept, one expected `devEngines` change. Read it before reporting the pins or pinning a bump back.
 ---
 
 # After a dependency-update command

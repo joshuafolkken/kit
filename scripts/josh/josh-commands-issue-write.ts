@@ -149,7 +149,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:already-done': {
 		script: 'scripts/issue/issue-already-done-cli.ts',
 		description:
-			'Exit an issue whose work is already merged: post the evidence, close it (cited merge) or apply already-done, release the hold',
+			'Exit an issue whose work is already merged: post the evidence, apply already-done, close it when a cited PR is merged, release the hold',
 		category: 'AI tools',
 		// Releasing the hold runs `run:hold`, which reaches the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
@@ -158,7 +158,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '4130 --evidence-file .josh/tmp/already-done.md',
-					note: 'comment, close or label, release — in that order',
+					note: 'comment, label, close on a merged PR, release — in that order',
 				},
 			],
 			flags: [
