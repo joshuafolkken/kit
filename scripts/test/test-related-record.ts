@@ -157,16 +157,22 @@ function over_cap_record(
 }
 
 // joshuafolkken/kit#6982: a run whose `changed` swelled to ~1,500 left nothing that told an untracked
-// flood from a base that fell back to the default branch.
+// flood from a base that fell back to the default branch — nor (joshuafolkken/kit#7066) the branch
+// change from named files or moves since the last green.
 function branch_parts_record(
 	parts: ChangedParts | undefined,
-): Pick<TestRelatedRecord, 'branch_tracked' | 'branch_untracked' | 'branch_base'> {
+	own: ReadonlyArray<string>,
+): Partial<TestRelatedRecord> {
 	if (parts === undefined) return {}
+	const branch = new Set([...parts.tracked, ...parts.untracked])
+	const in_branch = own.filter((file) => branch.has(file)).length
 
 	return {
 		branch_tracked: parts.tracked.length,
 		branch_untracked: parts.untracked.length,
 		branch_base: parts.base,
+		changed_in_branch: in_branch,
+		changed_off_branch: own.length - in_branch,
 	}
 }
 
@@ -174,7 +180,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const { own, synced, since_map } = parts_of(input)
 	const record = {
 		...reuse_record(input.reuse),
-		...branch_parts_record(input.branch_parts),
+		...branch_parts_record(input.branch_parts, own),
 		scope: input.kind ?? related_scope.scope_kind(input.scope),
 		changed: own.length,
 		synced: synced.length,

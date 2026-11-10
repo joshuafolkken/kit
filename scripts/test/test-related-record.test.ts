@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import type { ChangedParts } from '#scripts/git/changed-paths'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -193,6 +194,28 @@ describe('test_related_record.record_of — the branch change by half and base',
 
 		expect(record).not.toHaveProperty('branch_base')
 		expect(record).not.toHaveProperty('branch_tracked')
+		expect(record).not.toHaveProperty('changed_in_branch')
+	})
+})
+
+// joshuafolkken/kit#7066: a swollen `changed` is told apart by how much of it the branch change holds.
+describe('test_related_record.record_of — the change inside and outside the branch', () => {
+	const branch_parts: ChangedParts = { tracked: [OWN_CHANGE], untracked: [], base: 'merge_base' }
+	const named = 'scripts/named.ts'
+
+	it('counts a named file the branch change does not hold apart from the branch change', () => {
+		const base = related_input()
+		const input: RunInput = { ...base, changed: [...(base.changed ?? []), named], branch_parts }
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record).toMatchObject({ changed: 2, changed_in_branch: 1, changed_off_branch: 1 })
+	})
+
+	it('counts a bare run whose own change is the branch change wholly inside it', () => {
+		const input: RunInput = { ...related_input(), branch: [OWN_CHANGE], branch_parts }
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record).toMatchObject({ changed: 1, changed_in_branch: 1, changed_off_branch: 0 })
 	})
 })
 
