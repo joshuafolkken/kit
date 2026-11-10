@@ -113,6 +113,33 @@ describe('lint_parallel.run_lint_command --changed', () => {
 	})
 })
 
+// joshuafolkken/kit#6997: CI's sharded gate lint reaches eslint with the shard's targets, and its
+// scope line names the shard.
+describe('lint_parallel.run_lint_command --changed --shard in CI', () => {
+	it('lints shard 1 directories and the whole tree’s formatting', async () => {
+		vi.stubEnv('CI', 'true')
+		mock_exit_codes(0, 0)
+
+		await lint_parallel.run_lint_command([...CHANGED_ARGUMENTS, '--shard=1'])
+
+		expect(linter_arguments()[1]).toContain('scripts/run')
+		expect(linter_arguments()[1]).not.toContain(WHOLE_TREE)
+		expect(process.stdout.write).toHaveBeenCalledWith(expect.stringContaining(' · shard 1 of 2\n'))
+	})
+
+	it('lints shard 2 with eslint alone, ignoring shard 1 directories', async () => {
+		vi.stubEnv('CI', 'true')
+		mocked_execa.mockResolvedValueOnce(fake_result(0))
+
+		await expect(lint_parallel.run_lint_command([...CHANGED_ARGUMENTS, '--shard=2'])).resolves.toBe(
+			0,
+		)
+
+		expect(mocked_execa).toHaveBeenCalledOnce()
+		expect(linter_arguments()[0]).toEqual(expect.arrayContaining([WHOLE_TREE, 'scripts/run/']))
+	})
+})
+
 describe('CI whole-tree resource settings', () => {
 	it('preserves CI whole-tree violations and gives eslint its heap (ac-2027cb4a)', async () => {
 		vi.stubEnv('CI', 'true')

@@ -59,3 +59,23 @@ describe('run_board_usual.usual_of over the recent period', () => {
 		expect(usual.get('gate')).toBe(5 * MINUTE)
 	})
 })
+
+// joshuafolkken/kit#7012: a board round over an unchanged ledger aggregates nothing again.
+describe('run_board_usual.usual_of over an unchanged ledger', () => {
+	// Long after, the recent period holds nothing and a fresh aggregation falls back to the old median.
+	const LATER = NOW + 30 * 24 * 60 * MINUTE
+	const ledger = [stage('gate', 1, LONG_AGO), stage('gate', 1, LONG_AGO), stage('gate', 9)]
+
+	it('hands back the times it computed for the same entries, aggregating nothing again', () => {
+		const first = run_board_usual.usual_of(ledger, NOW)
+
+		expect(run_board_usual.usual_of(ledger, LATER)).toBe(first)
+		expect(first.get('gate')).toBe(9 * MINUTE)
+	})
+
+	it('aggregates again once the ledger hands back new entries', () => {
+		run_board_usual.usual_of(ledger, NOW)
+
+		expect(run_board_usual.usual_of([...ledger], LATER).get('gate')).toBe(MINUTE)
+	})
+})

@@ -10,6 +10,7 @@ import { gate_plan, type GatePlan } from './gate-plan'
 import type { CheckClaim, GateStep, GateStepResult } from './gate-report'
 import { build_gate_step, with_granted_workers } from './gate-steps'
 import { project_checks } from './project-checks'
+import { type_program_serial, type SerialRun } from './type-program-serial'
 
 // Running the gate's checks: each one under its place in the machine-wide budget, a reused one
 // (`check-reuse.ts`) without starting it. `verification-gate.ts` decides what runs and records the
@@ -137,12 +138,11 @@ async function admitted_step(
 // own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
 // claimed would wait for cores the outer gate cannot free until the suite — this test included —
 // finishes.
-async function run_reserved_step(
+async function run_claimed_step(
 	reserved: ReservedStep,
 	budget: BudgetContext,
 	cpu: CheckCpu,
 ): Promise<GateStepResult> {
-	if (reserved.reused_at !== undefined) return reused_result(reserved.step, reserved.reused_at)
 	if (!budget.is_reserved) return await run_gate_step(reserved.step, cpu)
 
 	return await core_budget.with_core_reservation(
@@ -161,6 +161,21 @@ async function run_reserved_step(
 			command: `gate ${reserved.step.label}`,
 			is_unit: reserved.step.label === gate_labels.UNIT_LABEL,
 		},
+	)
+}
+
+// A reused check starts nothing, so it does not wait for a type-program check's turn.
+async function run_reserved_step(
+	reserved: ReservedStep,
+	budget: BudgetContext,
+	cpu: CheckCpu,
+	serial: SerialRun,
+): Promise<GateStepResult> {
+	if (reserved.reused_at !== undefined) return reused_result(reserved.step, reserved.reused_at)
+
+	return await serial(
+		reserved.step.label,
+		async () => await run_claimed_step(reserved, budget, cpu),
 	)
 }
 
@@ -197,6 +212,7 @@ async function run_gate_steps(
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const reserved = await build_reserved_steps(plan, budget.available_cores, reused)
 	const cpu = check_cpu.check_cpu_reader()
+	const serial = type_program_serial.serial_runner()
 
 	// **The checks run under the held mark, so a check's own dispatch claims nothing**.
 	// Each check is a `pnpm josh <target>` child, and a target that declares
@@ -207,7 +223,7 @@ async function run_gate_steps(
 			await run_lightest_first(
 				reserved,
 				plan.concurrency,
-				async (entry) => await run_reserved_step(entry, budget, cpu),
+				async (entry) => await run_reserved_step(entry, budget, cpu, serial),
 			),
 	)
 }

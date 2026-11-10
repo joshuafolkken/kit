@@ -75,6 +75,33 @@ describe('changed_paths.read_changed_paths', () => {
 	})
 })
 
+// joshuafolkken/kit#6982: the halves and the base `josh test:related` records.
+describe('changed_paths.read_changed_parts', () => {
+	it('splits the reading into its halves measured from the resolved base', async () => {
+		resolved_through_merge.mockResolvedValueOnce(LATER_BASE)
+		diff_names_since.mockResolvedValue(TRACKED)
+		untracked_names.mockResolvedValue(UNTRACKED)
+
+		await expect(changed_paths.read_changed_parts()).resolves.toStrictEqual({
+			tracked: [TRACKED],
+			untracked: [UNTRACKED],
+			base: 'merge_base',
+		})
+	})
+
+	it('names the base a fallback when none resolved', async () => {
+		resolved_through_merge.mockResolvedValueOnce(undefined)
+		diff_main_names.mockResolvedValue(TRACKED)
+		untracked_names.mockResolvedValue('')
+
+		await expect(changed_paths.read_changed_parts()).resolves.toStrictEqual({
+			tracked: [TRACKED],
+			untracked: [],
+			base: 'fallback',
+		})
+	})
+})
+
 describe('changed_paths.read_held_at', () => {
 	it('reads which of the paths the commit’s tree held', async () => {
 		tree_names_at.mockResolvedValue(`${TRACKED}\n`)
