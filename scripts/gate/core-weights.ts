@@ -70,10 +70,12 @@ const ESLINT_PEAK_MB = Math.ceil((ESLINT_HEAP_MIB * BYTES_PER_MIB) / BYTES_PER_M
 // later growth (joshuafolkken/kit#4528). Metrics uses the cache-miss peak because its parent retains
 // its heap beside the merge-base child (joshuafolkken/kit#4595). E2E reserves the full Playwright
 // process tree, including the dev server, once per run rather than per worker (joshuafolkken/kit#5413).
+// Type check uses the cold incremental peak — no `.tsbuildinfo` — because the warm peak is less than
+// half of it and a fresh lane starts cold (joshuafolkken/kit#7131).
 const MEMORY_MB = {
 	lint: ESLINT_PEAK_MB,
 	metrics: 1900,
-	type_check: 1300,
+	type_check: 2900,
 	spell_check: 350,
 	eslint_scan: ESLINT_PEAK_MB,
 	unit_worker: 400,
