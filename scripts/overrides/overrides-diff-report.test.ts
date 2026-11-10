@@ -18,6 +18,9 @@ const REMOVED_BLOCK: ChangedBlock = {
 }
 
 const UNCHANGED = 'devEngines: unchanged'
+const MOVED_HEADING = '✖ pnpm-workspace.yaml overrides changed since HEAD:'
+const KEEP_LINE = 'overrides: keep'
+const RESTORE_LINE = 'overrides: restore (pnpm-workspace.yaml changed since HEAD)'
 
 function printed(stream: typeof console.info): string {
 	return vi
@@ -61,7 +64,7 @@ describe('overrides-diff-report — a pin moved', () => {
 		const verdict = overrides_diff_report.report('HEAD')
 
 		expect(verdict?.is_overrides_moved).toBe(true)
-		expect(printed(console.error)).toContain('✖ pnpm-workspace.yaml overrides changed since HEAD:')
+		expect(printed(console.error)).toContain(MOVED_HEADING)
 		expect(printed(console.info)).not.toContain('✔ overrides unchanged')
 	})
 
@@ -87,5 +90,46 @@ describe('overrides-diff-report — a pin moved', () => {
 
 		expect(overrides_diff_report.report('no-such-ref')).toBeUndefined()
 		expect(vi.mocked(console.info)).not.toHaveBeenCalled()
+	})
+})
+
+describe('overrides-diff-report — the overrides verdict line', () => {
+	it('ends the report on keep when no block moved', () => {
+		overrides_diff_report.report('HEAD')
+
+		expect(vi.mocked(console.info)).toHaveBeenLastCalledWith(KEEP_LINE)
+	})
+
+	it('ends the report on restore naming the moved file', () => {
+		vi.mocked(overrides_diff.changed_blocks).mockReturnValue([REMOVED_BLOCK])
+
+		overrides_diff_report.report('HEAD')
+
+		expect(vi.mocked(console.info)).toHaveBeenLastCalledWith(RESTORE_LINE)
+	})
+})
+
+describe('overrides-diff-report — judge_overrides', () => {
+	it('answers kept on keep, printing only on stderr', () => {
+		expect(overrides_diff_report.judge_overrides('HEAD')).toBe(true)
+		expect(vi.mocked(console.error)).toHaveBeenLastCalledWith(KEEP_LINE)
+		expect(vi.mocked(console.info)).not.toHaveBeenCalled()
+	})
+
+	it('answers not kept on restore, after the moved entries', () => {
+		vi.mocked(overrides_diff.changed_blocks).mockReturnValue([REMOVED_BLOCK])
+
+		expect(overrides_diff_report.judge_overrides('HEAD')).toBe(false)
+		expect(printed(console.error)).toContain(MOVED_HEADING)
+		expect(vi.mocked(console.error)).toHaveBeenLastCalledWith(RESTORE_LINE)
+	})
+
+	it('answers not kept when the range resolves to no commit', () => {
+		vi.mocked(overrides_diff.read_sources).mockReturnValue(undefined)
+
+		expect(overrides_diff_report.judge_overrides('HEAD')).toBe(false)
+		expect(vi.mocked(console.error)).toHaveBeenLastCalledWith(
+			'overrides: not judged (no commit at HEAD)',
+		)
 	})
 })

@@ -4,6 +4,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 
 // Writing issues and labels through REST, in the return-value contracts the `gh <noun> <verb>`
 // wrappers had.
@@ -58,12 +59,22 @@ async function did_write_succeed(write: () => Promise<unknown>): Promise<boolean
 	}
 }
 
+// Every write below to an existing issue goes through here, which clears the issue reads this process remembers
+// (`git-gh-issue-memo.ts`) — in `finally`, because a write that threw may still have landed.
+async function write_api(request: GhApiRequest): Promise<string> {
+	try {
+		return await git_gh_exec.exec_gh_api(request)
+	} finally {
+		git_gh_issue_memo.forget()
+	}
+}
+
 async function issue_patch(
 	issue_number: string,
 	fields: Readonly<Record<string, string>>,
 	repo?: string,
 ): Promise<string> {
-	return await git_gh_exec.exec_gh_api({
+	return await write_api({
 		path: git_gh_api_path.issue_api_path(issue_number, repo),
 		method: PATCH_METHOD,
 		body: JSON.stringify(fields),
@@ -89,7 +100,7 @@ async function issue_edit_title(
 // posts under the person's own `gh` login, so the marker is the only thing that tells the issue watch
 // (`issue-watch-diff.ts`) a run's comment from a person's update.
 async function issue_comment(issue_number: string, body: string, repo?: string): Promise<string> {
-	return await git_gh_exec.exec_gh_api({
+	return await write_api({
 		path: `${git_gh_api_path.issue_api_path(issue_number, repo)}${COMMENTS_SEGMENT}`,
 		body: JSON.stringify({ body: `${body}\n\n${issue_watch_diff.RUN_MARKER}` }),
 		jq_filter: HTML_URL_FILTER,
@@ -130,7 +141,7 @@ async function close_with(
 ): Promise<boolean> {
 	return await did_write_succeed(async () => {
 		if (comment !== undefined) await issue_comment(issue_number, comment)
-		await git_gh_exec.exec_gh_api({
+		await write_api({
 			path: git_gh_api_path.issue_api_path(issue_number),
 			method: PATCH_METHOD,
 			body: JSON.stringify(state),
@@ -280,7 +291,7 @@ async function issue_apply_label(
 	const labels_path = git_gh_api_path.issue_labels_api_path(issue_number, repo)
 
 	try {
-		await git_gh_exec.exec_gh_api({ path: labels_path, body: JSON.stringify({ labels: [label] }) })
+		await write_api({ path: labels_path, body: JSON.stringify({ labels: [label] }) })
 
 		return { is_applied: true }
 	} catch (error) {
@@ -322,7 +333,7 @@ async function issue_add_label(
 async function issue_remove_label(issue_number: string, label: string): Promise<void> {
 	const labels_path = git_gh_api_path.issue_labels_api_path(issue_number)
 
-	await git_gh_exec.exec_gh_api({
+	await write_api({
 		path: `${labels_path}/${encodeURIComponent(label)}`,
 		method: DELETE_METHOD,
 	})
@@ -381,7 +392,7 @@ async function issue_add_blocked_by(issue_number: string, blocker: string): Prom
 	return await did_write_succeed(async () => {
 		const issue_id = await read_issue_id(blocker)
 
-		await git_gh_exec.exec_gh_api({
+		await write_api({
 			path: git_gh_api_path.blocked_by_api_path(issue_number),
 			body: JSON.stringify({ issue_id }),
 		})
@@ -397,7 +408,7 @@ async function issue_remove_blocked_by(issue_number: string, blocker: string): P
 		const issue_id = await read_issue_id(blocker)
 		const relations_path = git_gh_api_path.blocked_by_api_path(issue_number)
 
-		await git_gh_exec.exec_gh_api({
+		await write_api({
 			path: `${relations_path}/${String(issue_id)}`,
 			method: DELETE_METHOD,
 		})

@@ -6,6 +6,7 @@ import { git_gh_exec } from './git-gh-exec'
 import { gh_failure, type GhFailure } from './git-gh-failure'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_issue_graphql } from './git-gh-issue-graphql'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 import {
 	BLOCKED_BY_FIELD,
 	git_gh_issue_rest,
@@ -40,7 +41,7 @@ async function read_blocked_by_listing(
 	repo?: string,
 	exact_total?: number,
 ): Promise<BlockedBy> {
-	const json = await git_gh_etag_read.read(
+	const json = await git_gh_issue_memo.read(
 		`${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
 	)
 
@@ -111,6 +112,8 @@ async function read_relations(
 // The request itself, sent with the previous process's ETag (joshuafolkken/kit#6754): every one of
 // the five commands `josh gh:usage` counts most calls for reads issues one GET at a time, and an
 // unchanged issue answers `304`, which costs no core. A caller passes its own read where it has one.
+// The default is remembered for the process (`git-gh-issue-memo.ts`), so a second read of the same
+// issue makes no request at all; a caller's own read is never remembered.
 type PathRead = (path: string) => Promise<string>
 
 // One issue through REST, answered in the field names `gh issue view --json` used. Every read below
@@ -125,7 +128,7 @@ async function read_issue_fields(
 	issue_number: string,
 	fields: string,
 	repo?: string,
-	read_path: PathRead = git_gh_etag_read.read,
+	read_path: PathRead = git_gh_issue_memo.read,
 ): Promise<Record<string, unknown>> {
 	const rest = git_gh_issue_rest.parse_rest_issue(
 		await read_path(git_gh_api_path.issue_api_path(issue_number, repo)),

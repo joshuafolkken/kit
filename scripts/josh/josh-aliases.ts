@@ -36,6 +36,7 @@ const ALIASES: Record<string, string> = {
 	gp: 'pr',
 	ms: 'main:sync',
 	mm: 'main:merge',
+	ckf: 'checks:failed',
 	bp: 'bump',
 	re: 'release',
 	v: 'version',

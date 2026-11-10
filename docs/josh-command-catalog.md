@@ -66,6 +66,7 @@ Run `pnpm josh command:derive` to regenerate.
 
 | Command | Arguments | Audience | Side effects | Description |
 | --- | --- | --- | --- | --- |
+| `josh checks:failed` · `josh ckf` | `[<PR\|sha>]` | developer | network | List the failing CI checks of a pull request or commit, required or not (check runs and commit statuses) |
 | `josh followup` | `<title> [--notify-message <text>]` | automation | git, network, notifications | Follow-up git workflow |
 | `josh git` · `josh g` | `[-y] <message>` | developer | git, network | Git workflow helper |
 | `josh main:merge` · `josh mm` | — | developer | git, network | Merge origin default branch into the current branch |
@@ -204,6 +205,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh pin:verify` | `<owner/repo> <tag> <sha>` | automation | none | Check that a tag resolves to the commit a SHA pin names, printing a line a bypass reason cites |
 | `josh pkg:scout` | `<keywords> [--size <n>] [--issue <n>]` | automation | network | Rank package candidates by measured metrics so the Package-First tier decision is read, not judged |
 | `josh plan:consumers` | `<identifier...>` | automation | none | List every existing reference to each identifier a plan adds or changes, by kind, and draft the plan's existing-consumers section |
+| `josh plan:scaffold` | `<issue> [<path>...]` | automation | network | Print a work summary's inputs in one call: the run:prep skeleton, planned files near the line limit, the test:declared verdict, the owed cases and the plan:consumers draft |
 | `josh prose:stale` | — | automation | none | List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name |
 | `josh read:files` | `<path> [<path> ...]` | automation | none | Read several files in one call so edit targets fold into one turn |
 | `josh read:set` | `[<entry>] [--json \| --bytes]` | automation | none | Print what an entry point reads before it starts, and what that read costs |
