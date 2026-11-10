@@ -2,7 +2,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
-import { backlog_arrival_added } from './backlog-arrival-added'
+import { backlog_arrival_added, type EventReader } from './backlog-arrival-added'
 import type { LoopPorts } from './backlog-drive'
 import type { DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_yield_cap } from './backlog-yield-cap'
@@ -39,13 +39,14 @@ async function stall(issue: string, outcome: DriveLaunch): Promise<void> {
 	await run_stalled_park.apply(issue, comment, `launch ${outcome}`)
 }
 
-function record_ports(): Pick<
-	LoopPorts,
-	'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park' | 'stall'
-> {
+// `read` is the tick's shared stream read (`backlog_arrival_added.tick_reader`), so the two questions
+// parse the stream once between them (joshuafolkken/kit#7016).
+function record_ports(
+	read?: EventReader,
+): Pick<LoopPorts, 'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park' | 'stall'> {
 	return {
-		added_since: async (since_ms) => await backlog_arrival_added.is_added_since(since_ms),
-		raised_since: async (since_ms) => await backlog_arrival_added.is_raised_since(since_ms),
+		added_since: async (since_ms) => await backlog_arrival_added.is_added_since(since_ms, read),
+		raised_since: async (since_ms) => await backlog_arrival_added.is_raised_since(since_ms, read),
 		named_left: is_named_left,
 		...backlog_yield_cap.PORTS,
 		stall,
