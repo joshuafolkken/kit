@@ -76,9 +76,9 @@ async function distributed_settings_text(): Promise<string> {
 	return read_settings_text()
 }
 
-function write_own_settings(): void {
+function write_own_settings(settings: object = OWN_SETTINGS): void {
 	mkdirSync(path.dirname(settings_path()), { recursive: true })
-	writeFileSync(settings_path(), JSON.stringify(OWN_SETTINGS))
+	writeFileSync(settings_path(), JSON.stringify(settings))
 }
 
 beforeEach(() => {
@@ -133,6 +133,18 @@ describe('josh sync on a .claude/settings.json the project has added to', () => 
 		await run_sync(true)
 
 		expect(read_settings_text()).toBe(distributed)
+	})
+})
+
+describe('josh sync on the statusLine of .claude/settings.json', () => {
+	it("writes kit's usage:tee statusLine where the project has none", async () => {
+		write_own_settings({ ...OWN_SETTINGS, statusLine: undefined })
+		await run_sync()
+
+		expect(read_settings().statusLine).toMatchObject({
+			type: 'command',
+			command: expect.stringMatching(/ usage:tee$/u) as unknown,
+		})
 	})
 })
 

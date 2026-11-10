@@ -429,6 +429,7 @@ pnpm josh issue:spill 5999 --estimate "3 ファイル / 80 行"
 **Options:**
 
 - `--estimate "<F> ファイル / <L> 行"` — the follow-up's size estimate, never apportioned from the issue's. Required.
+- `--distinct <N,…>` — duplicate candidates `issue:file` held the follow-up on, declared separate; the issue itself always is. Repeatable.
 
 <!-- /usage -->
 
@@ -578,6 +579,8 @@ pnpm josh stash:pop "backlogrun: josh latest before lanes" --dir "$dir"   # into
 <!-- /usage -->
 
 **Verdicts:** `popped` and `conflicted` (exit 0), `no-match` and `ambiguous` (exit 1). `conflicted` means the stash is on the tree: resolve the conflicts and continue. A message matching no stash, or more than one, is refused — pass one identifying exactly one entry.
+
+`ambiguous` names each matching entry's commit hash; `pnpm josh stash:pop <hash>` pops that entry alone.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh stash:pop` in detail".
 

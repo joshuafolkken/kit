@@ -1,5 +1,5 @@
 import { package_name_schema } from '#scripts/git/git-schemas'
-import { poll, POLL_BACKOFF, type BackoffSchedule, type PollOptions } from '#scripts/lib/poll'
+import { poll, PR_POLL_SCHEDULES, type BackoffSchedule, type PollOptions } from '#scripts/lib/poll'
 import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
@@ -272,8 +272,8 @@ async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptR
 	}
 }
 
-// A poll that read a different pull request state from the one before waits the shortest interval
-// again; an unreadable poll reads as a change, so the retry after it comes soon.
+// Under a schedule whose waits lengthen, a poll that read a different pull request state from the
+// one before waits the schedule's first interval again, and an unreadable poll reads as a change.
 function pr_poll_options(
 	options: WaitForPrSuccessOptions,
 	progress: { carried: PollAttemptResult },
@@ -374,7 +374,7 @@ async function wait_for_pr_success_default(
 		fetcher: observed_fetcher(observe),
 		interval_ms: CHECK_WAIT_INTERVAL_MS,
 		max_attempts: CHECK_MAX_ATTEMPTS,
-		backoff: POLL_BACKOFF,
+		backoff: PR_POLL_SCHEDULES.checks,
 		required_stable_reads,
 		before_poll,
 	})
@@ -414,8 +414,11 @@ async function wait_for_pr_merged(branch_name: string): Promise<MergeProgress> {
 
 			return progress !== 'waiting'
 		},
-		// Nothing it reads moves before the wait ends, so every tick lengthens the interval.
-		{ attempts: CHECK_MAX_ATTEMPTS, interval_ms: CHECK_WAIT_INTERVAL_MS, backoff: {} },
+		{
+			attempts: CHECK_MAX_ATTEMPTS,
+			interval_ms: CHECK_WAIT_INTERVAL_MS,
+			backoff: { schedule: PR_POLL_SCHEDULES.merge },
+		},
 	)
 
 	return progress

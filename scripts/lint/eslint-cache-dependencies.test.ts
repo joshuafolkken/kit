@@ -179,3 +179,29 @@ describe('eslint_cache_dependencies.guard — a project with no tsconfig.json', 
 		expect(answered).toBe('ran')
 	})
 })
+
+async function counted_drop(): Promise<unknown> {
+	const { drop } = await eslint_cache_dependencies.guard_counted(
+		ESLINT_CACHE_FILE,
+		async () => 'ran',
+		project,
+	)
+
+	return drop
+}
+
+// joshuafolkken/kit#6984: a slow CI lint is read against how many entries the drop sent back to eslint.
+describe('eslint_cache_dependencies.guard_counted — the drop it answers', () => {
+	it('answers no entry dropped while the imports hash as recorded', async () => {
+		writeFileSync(path.join(project, REFERENCED), TYPED_VALUE)
+		await run_guarded()
+
+		expect(await counted_drop()).toEqual({ dropped: 0, total: 1 })
+	})
+
+	it('answers the entry whose import changed as dropped', async () => {
+		writeFileSync(path.join(project, REFERENCED), ANY_VALUE)
+
+		expect(await counted_drop()).toEqual({ dropped: 1, total: 1 })
+	})
+})
