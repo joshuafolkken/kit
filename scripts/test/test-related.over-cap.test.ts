@@ -17,6 +17,7 @@ import { test_unit_guard } from './test-unit-guard'
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: {
+		read_changed_parts: vi.fn(),
 		read_changed_paths: vi.fn(),
 		read_changed_since: vi.fn(),
 		read_held_at: vi.fn(),
@@ -95,5 +96,19 @@ describe('test_related.run_related_tests — a file past the reach cap', () => {
 
 		expect(written_output()).toContain('1 over cap')
 		expect(written_output()).not.toContain('not a file this check reads')
+	})
+})
+
+// joshuafolkken/kit#6982: the run hands the branch change by half and base to its record.
+describe('test_related.run_related_tests — the branch change by half and base', () => {
+	it('passes the halves git read into the recorded input', async () => {
+		const branch_parts = { tracked: [CHANGED_SOURCE], untracked: [], base: 'merge_base' as const }
+
+		vi.mocked(changed_paths.read_changed_parts).mockResolvedValue(branch_parts)
+		const record = vi.spyOn(test_related_record, 'record_run')
+
+		await test_related.run_related_tests([])
+
+		expect(record.mock.calls[0]?.[0].branch_parts).toStrictEqual(branch_parts)
 	})
 })

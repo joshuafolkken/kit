@@ -171,6 +171,31 @@ describe('test_related_record.record_of — the summary line of the same run', (
 	})
 })
 
+// joshuafolkken/kit#6982: a swollen `changed` is told apart by its half and its base.
+describe('test_related_record.record_of — the branch change by half and base', () => {
+	it('counts the tracked and untracked halves and names the base', () => {
+		const parts = { tracked: [OWN_CHANGE], untracked: [SYNCED_CHANGE, READER_TEST] }
+		const input: RunInput = { ...related_input(), branch_parts: { ...parts, base: 'fallback' } }
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record).toMatchObject({
+			branch_tracked: 1,
+			branch_untracked: 2,
+			branch_base: 'fallback',
+		})
+	})
+
+	it('leaves the halves out where git could not read them', () => {
+		const record = test_related_record.record_of(related_input(), {
+			elapsed_ms: 0,
+			test_files: undefined,
+		})
+
+		expect(record).not.toHaveProperty('branch_base')
+		expect(record).not.toHaveProperty('branch_tracked')
+	})
+})
+
 // joshuafolkken/kit#5041: a shared test and a synced file the split cannot vouch for are in the change
 // without being this branch's.
 describe("test_related_record.record_of — the branch's own change", () => {
