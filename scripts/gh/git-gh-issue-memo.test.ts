@@ -91,7 +91,9 @@ describe('git_gh_issue_memo — a write makes the next read ask again', () => {
 	it('reads again after a write that threw, since it may have landed', async () => {
 		await git_gh_issue_read.issue_get_body(READ_NUMBER)
 		mocked_api.mockRejectedValueOnce(new Error('gh: timed out'))
-		await git_gh_issue_write.issue_remove_label(READ_NUMBER, 'in-progress').catch(() => undefined)
+		await expect(
+			git_gh_issue_write.issue_remove_label(READ_NUMBER, 'in-progress'),
+		).rejects.toThrow()
 		await git_gh_issue_read.issue_get_body(READ_NUMBER)
 
 		expect(issue_gets()).toBe(2)
