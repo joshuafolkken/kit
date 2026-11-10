@@ -170,7 +170,9 @@ describe('a failed gate leaves its whole output in a file', () => {
 
 		const written = readFileSync(RECORDS.log_path, 'utf8')
 
-		for (const check of gate_plan.GATE_CHECKS) expect(written).toContain(`${check.label} (pnpm `)
+		for (const check of gate_plan.LANE_GATE_CHECKS) {
+			expect(written).toContain(`${check.label} (pnpm `)
+		}
 	})
 
 	it('prints where the file is, in the failure summary', async () => {
