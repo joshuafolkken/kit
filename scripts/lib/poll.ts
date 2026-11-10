@@ -30,8 +30,9 @@ interface BackoffSchedule {
 	max_ms: number
 }
 
-// A CI run takes minutes, so most fixed-cadence reads of it only confirm that nothing moved, and each
-// one spends REST core (joshuafolkken/kit#6719). The wait therefore lengthens while nothing changes.
+// The schedule for a caller that names none, such as a rerun's wait: most fixed-cadence reads of a
+// run only confirm that nothing moved, and each one spends REST core (joshuafolkken/kit#6719), so the
+// wait lengthens while nothing changes. PR completion waits use `PR_POLL_SCHEDULES` instead.
 const POLL_BACKOFF: BackoffSchedule = { initial_ms: 30_000, factor: 1.5, max_ms: 120_000 }
 
 // **PR completion waits poll finer as the end nears** (joshuafolkken/kit#6868).

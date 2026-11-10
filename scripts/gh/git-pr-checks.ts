@@ -272,8 +272,8 @@ async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptR
 	}
 }
 
-// A poll that read a different pull request state from the one before waits the shortest interval
-// again; an unreadable poll reads as a change, so the retry after it comes soon.
+// Under a schedule whose waits lengthen, a poll that read a different pull request state from the
+// one before waits the schedule's first interval again, and an unreadable poll reads as a change.
 function pr_poll_options(
 	options: WaitForPrSuccessOptions,
 	progress: { carried: PollAttemptResult },

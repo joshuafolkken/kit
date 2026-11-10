@@ -228,7 +228,10 @@ async function first_waits_of(
 
 // #6868: the PR completion waits — checks and CodeRabbit, then the merge.
 describe('PR_POLL_SCHEDULES', () => {
-	it('holds the lead through changed ticks, then starts the schedule', async () => {
+	it.each([
+		['changed', ['a', 'b']],
+		['unchanged', []],
+	])('holds the lead through %s ticks, then starts the schedule', async (_label, seen_per_tick) => {
 		const schedule = {
 			lead: { count: 2, interval_ms: 5000 },
 			initial_ms: 1000,
@@ -236,7 +239,7 @@ describe('PR_POLL_SCHEDULES', () => {
 			max_ms: 3000,
 		}
 
-		await expect(first_waits_of(schedule, ['a', 'b'])).resolves.toEqual([
+		await expect(first_waits_of(schedule, seen_per_tick)).resolves.toEqual([
 			5000, 5000, 1000, 2000, 3000, 3000,
 		])
 	})
