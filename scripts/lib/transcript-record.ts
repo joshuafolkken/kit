@@ -39,6 +39,10 @@ const LINE_SCHEMA = z.object({
 	type: z.string().nullish(),
 	timestamp: z.string().nullish(),
 	gitBranch: z.string().nullish(),
+	// The billed request an assistant line belongs to and the reasoning effort it ran at, written on
+	// assistant lines only.
+	requestId: z.string().nullish(),
+	effort: z.string().nullish(),
 	// The two fields outside `message` the harness writes an end-of-task notice on. `unknown`, since a
 	// string here would reject every line whose `content` is a list of blocks.
 	content: z.unknown().nullish(),

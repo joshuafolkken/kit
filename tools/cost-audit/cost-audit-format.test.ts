@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Audit, AuditRow } from './cost-audit'
 import { cost_audit_format } from './cost-audit-format'
+import type { ResultBreakdown } from './cost-audit-result'
 import type { UsageBreakdown } from './cost-audit-usage'
 
 function row(key: string, current: number, previous: number, is_regression = false): AuditRow {
@@ -19,6 +20,13 @@ const NO_USAGE: UsageBreakdown = {
 	first_subagent: NO_FIRST,
 	long_output: { calls: 0, all_calls: 0, usd: 0 },
 }
+const NO_RESULTS: ResultBreakdown = {
+	total_usd: 0,
+	efforts: [],
+	tools: [],
+	josh: [],
+	duplicate_reads: { files: 0, reads: 0, chars: 0 },
+}
 
 function audit_with(overrides: Partial<Audit> = {}): Audit {
 	return {
@@ -34,6 +42,7 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		phases: [],
 		agents: [],
 		usage: NO_USAGE,
+		results: NO_RESULTS,
 		...overrides,
 	}
 }
@@ -244,6 +253,14 @@ describe('cost_audit_format.report_lines — the printed report', () => {
 
 		expect(lines).toContain('  edit: $2.0000 (prev $0.0000, new)')
 		expect(lines).toContain('  none')
+	})
+
+	it('prints the effort and tool-result section before the closing regressions line', () => {
+		const lines = cost_audit_format.report_lines(audit_with())
+		const title = lines.findIndex((line) => line.startsWith('Effort and tool results'))
+
+		expect(title).toBeGreaterThan(0)
+		expect(title).toBeLessThan(lines.length - 1)
 	})
 
 	it('says the merges were not read when GitHub could not be reached', () => {

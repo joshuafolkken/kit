@@ -87,6 +87,29 @@ describe('time_transcript_line stop guard', () => {
 	})
 })
 
+describe('time_transcript_line request fields', () => {
+	it('reads the request id and effort an assistant line carries', () => {
+		const line = JSON.stringify({
+			type: 'assistant',
+			timestamp: time_transcript_fixture.at(1),
+			requestId: 'req-1',
+			effort: 'medium',
+			message: { id: 'msg-1', content: [] },
+		})
+
+		expect(time_transcript_line.parse_line(line)).toMatchObject({
+			request_id: 'req-1',
+			effort: 'medium',
+		})
+	})
+
+	it('reads both as empty on a line without them', () => {
+		const line = time_transcript_fixture.result_line(1, BRANCH, 'a', 'ok')
+
+		expect(time_transcript_line.parse_line(line)).toMatchObject({ request_id: '', effort: '' })
+	})
+})
+
 describe('time_transcript_line.parse_text', () => {
 	it('reads every parseable line of a transcript and drops the rest', () => {
 		const text = [time_transcript_fixture.result_line(1, BRANCH, 'a', 'ok'), 'not json', ''].join(
