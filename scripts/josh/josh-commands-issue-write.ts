@@ -88,6 +88,22 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'issue:body': {
+		script: 'scripts/issue/issue-body-cli.ts',
+		description: "Replace an issue's body with a file that passes issue:lint",
+		category: 'AI tools',
+		reference: ['<issue> --body-file <path>', 'automation', ['network']],
+		usage: {
+			examples: [{ arguments: '6982 --body-file .josh/tmp/issue-6982-body.md' }],
+			flags: [
+				{
+					names: [BODY_FILE],
+					description:
+						'the new body, from a file or stdin (`-`). A body `issue:lint` refuses is not written.',
+				},
+			],
+		},
+	},
 	'issue:plan': {
 		script: 'scripts/issue/issue-plan-cli.ts',
 		description:
