@@ -108,6 +108,10 @@
   - fires: `pnpm josh pretool:guard` — a dispatched lane child switching to the default branch or running `josh main:sync`. Every occurrence
   - silent: not a lane child — `pnpm josh main:merge` brings the default in at the gate
   - not automated: the right act is another command, whose arguments the call does not carry
+- **Direct vitest run** (`direct-vitest-run`, `docs/josh-commands.md` → "`josh test:related`")
+  - fires: `pnpm josh pretool:guard` — `vitest run` or bare `vitest` (directly, through `pnpm` / `npx` / `pnpm exec`, or inside `sh -c`); it points at `pnpm josh test:related`. Every occurrence
+  - silent: `pnpm josh test:related`, `--project` / `--config` / `-c`, another subcommand (`bench`, `list`, …), `--help` / `--version`, or a run inside `pnpm josh reserved-run`
+  - not automated: the right act is another command, whose arguments the call does not carry
 - **Timed re-run** (`timed-rerun`, `measurement.md`)
   - fires: `pnpm josh pretool:guard` — a command timed with `time` / `/usr/bin/time` / `hyperfine`
   - silent: the duration is read from the Actions jobs or `pnpm josh lane:stats`
@@ -171,6 +175,10 @@
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
   - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence
   - silent: the command started with `run_in_background` — its exit ends the wait
+  - not automated: the right act is another command, whose arguments the call does not carry
+- **Direct git status** (`direct-git-status`, `docs/josh-commands-backlog.md` → "`josh tree:status`")
+  - fires: `pnpm josh pretool:guard` — a `git status` with no flag or only `-s` / `--short` / `-b` / `--branch` / `--porcelain` (bare, wrapped or inside `sh -c`); it points at `pnpm josh tree:status`. Once per run
+  - silent: `pnpm josh tree:status`, a global flag before the subcommand (`git -C <dir> status`), or a pathspec or any other flag
   - not automated: the right act is another command, whose arguments the call does not carry
 - **The implementation-phase cut** (`implementation-cut`, `.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold")
   - fires: `pnpm josh pretool:guard` — an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing
