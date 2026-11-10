@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { json_value } from '#scripts/lib/json-value'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { execa } from 'execa'
 import { z } from 'zod'
 import { lane_registry } from './lane-registry'
@@ -38,7 +39,7 @@ function last_line(text: string): string {
 async function reread(issue: string, received: unknown): Promise<BrokerAnswer | undefined> {
 	const result = await execa(
 		process.execPath,
-		[...process.execArgv, ENTRY, issue, JSON.stringify(received)],
+		[...ts_entry_loader.loader_argv(process.execArgv), ENTRY, issue, JSON.stringify(received)],
 		{ reject: false, stderr: 'inherit' },
 	)
 	if (result.exitCode !== 0) return undefined

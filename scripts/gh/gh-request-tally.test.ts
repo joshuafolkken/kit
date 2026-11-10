@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gh_request_tally, type CoreUsage } from './gh-request-tally'
-import { gh_tally_handoff } from './gh-tally-handoff'
 
 // joshuafolkken/kit#6694: the process-wide counts of gh requests and 304 answers.
 // joshuafolkken/kit#6697: the core `used` difference around the process's calls.
@@ -75,45 +74,33 @@ describe('gh_request_tally — per call kind', () => {
 	})
 })
 
-// joshuafolkken/kit#6965: a spawned child's handed tally joins this process's.
-describe('gh_request_tally.absorb', () => {
-	it('adds a handed tally to the totals and to each kind', () => {
-		gh_request_tally.count_call(KIND)
-		gh_request_tally.absorb({
-			calls: 2,
-			not_modified: 1,
-			endpoints: { [KIND]: { calls: 1, not_modified: 1 }, graphql: { calls: 1, not_modified: 0 } },
-		})
+// joshuafolkken/kit#7013: a command's bundle chunk carries its own copy of this module, and its
+// calls must reach the counts the dispatcher's copy records.
+describe('gh_request_tally — one state per process', () => {
+	it('counts a call made through another copy of the module into the same totals', async () => {
+		vi.resetModules()
+		const { gh_request_tally: copy } = await import('./gh-request-tally')
 
+		copy.count_call(KIND)
+
+		expect(copy).not.toBe(gh_request_tally)
 		expect(gh_request_tally.snapshot()).toStrictEqual({
-			calls: 3,
-			not_modified: 1,
-			endpoints: {
-				[KIND]: { calls: 2, not_modified: 1 },
-				graphql: { calls: 1, not_modified: 0 },
-			},
+			calls: 1,
+			not_modified: 0,
+			endpoints: { [KIND]: { calls: 1, not_modified: 0 } },
 		})
 	})
-})
 
-describe('gh_request_tally.count_call — the handoff', () => {
-	it('arms the handoff for a process that does not watch the allowance', () => {
-		const arm = vi.spyOn(gh_tally_handoff, 'arm').mockReturnValue(undefined)
+	it('starts the allowance reading the other copy was given', async () => {
+		const read = reader_of(START, END)
 
-		gh_request_tally.count_call(KIND)
+		gh_request_tally.watch_core(read)
+		vi.resetModules()
+		const { gh_request_tally: copy } = await import('./gh-request-tally')
 
-		expect(arm).toHaveBeenCalledTimes(1)
-		arm.mockRestore()
-	})
+		copy.count_call(KIND)
 
-	it('leaves the handoff unarmed for a process that watches the allowance', () => {
-		const arm = vi.spyOn(gh_tally_handoff, 'arm').mockReturnValue(undefined)
-
-		gh_request_tally.watch_core(reader_of(START, END))
-		gh_request_tally.count_call(KIND)
-
-		expect(arm).not.toHaveBeenCalled()
-		arm.mockRestore()
+		expect(read).toHaveBeenCalledTimes(1)
 	})
 })
 

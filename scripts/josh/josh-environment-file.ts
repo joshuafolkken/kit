@@ -3,13 +3,10 @@ import { parseEnv } from 'node:util'
 import { ENV_FILE_NAME } from '#ports'
 import { OPTIONAL_ENV_FILE_FLAGS } from './josh-command-types'
 
-// Loading `.env` from inside a command, for the commands that must stay in-process.
-//
-// **The flag form is what most commands use, and it is not free.** Declaring any `tsx_arguments`
-// disqualifies a command from in-process dispatch (`josh-in-process.ts`), which puts a second
-// ~0.16 s tsx start in front of every call. A
-// command a hook fires on every `Bash` call, or one an unattended `epicrun` polls every sixty
-// seconds, cannot pay that, so it reads the file itself instead.
+// Loading `.env` from inside a command. The dispatcher applies a command's `tsx_arguments` the same
+// way before the import (`apply_node_flags`); a command that reads the file itself — the hooks and
+// `epic:next` — calls `load_environment_file` on its real path instead, so its unit tests never see
+// a developer's `.env`.
 //
 // `parseEnv` is node's own `--env-file` parser, and the loader keeps node's precedence: a value
 // already in the environment wins over the file's. A missing or unreadable file is swallowed,
@@ -50,9 +47,9 @@ function load_environment_file(): void {
 	}
 }
 
-// The node flags a spawned command is started with. The `.env` flag is loaded here, into the
-// environment the child inherits, rather than handed to node, whose own loader cannot leave the
-// launch-only keys out.
+// A command's `tsx_arguments`, applied before its in-process import. The `.env` flag is loaded here,
+// into this process's environment, rather than handed to node, whose own loader cannot leave the
+// launch-only keys out; the flags left over are answered.
 function apply_node_flags(flags: ReadonlyArray<string>): ReadonlyArray<string> {
 	const [environment_flag] = OPTIONAL_ENV_FILE_FLAGS
 

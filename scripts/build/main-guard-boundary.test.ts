@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest'
 import { import_closure, SCRIPTS_DIR, TOOLS_DIR } from './import-closure-fixture'
 
 // A module another module imports carries no main guard: the guard lives in an entry nothing imports
-// (`*-cli.ts` / `*-main.ts`). A bundle is one file, so a guard inside an entry's import closure would
-// fire with the entry's own `import.meta.url` and run a second main (joshuafolkken/kit#4186). Pinning
-// it for every module, not only the `is_bundled` closures, keeps any command bundleable.
+// (`*-cli.ts` / `*-main.ts`). A single-file hook or library bundle gives every module the entry's own
+// `import.meta.url`, so a guard inside an entry's import closure would run a second main
+// (joshuafolkken/kit#4186). The command bundles keep each module's source location
+// (`source-location.ts`); pinning every module keeps the other bundles safe too.
 const TEST_SUFFIX = '.test.ts'
 
 function source_files(directory: string): Array<string> {

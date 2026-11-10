@@ -1,0 +1,7 @@
+{
+	"reason": "#7044 packs review diff parts into fewer files (new review-diff-pack.ts) so the reviewer makes fewer Read calls per run",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 40
+	}
+}

@@ -18,62 +18,14 @@ const { COMMAND_MAP, josh_logic, SPAWN_ERROR_EXIT_CODE, USAGE_ERROR_EXIT_CODE } 
 const { core_budget } = await import('#scripts/gate/core-budget')
 const { gate_plan } = await import('#scripts/gate/gate-plan')
 const { OPTIONAL_ENV_FILE_FLAGS } = await import('./josh-command-types')
+const { josh_environment_file } = await import('./josh-environment-file')
+const { josh_in_process } = await import('./josh-in-process')
 
 const SPAWN_ERROR_MESSAGE = 'ENOENT: no such file or directory'
-const SCRIPT_ARGS = ['scripts/josh/josh.ts']
 const SHELL_CMD = ['/bin/sh', '-c', 'echo hello']
 // execa reports a spawn failure as `exitCode: undefined` plus a `shortMessage`.
 const SPAWN_FAILURE = { exitCode: undefined, shortMessage: SPAWN_ERROR_MESSAGE }
-// A signal kill also has no exitCode, but is flagged via `isTerminated`.
-const SIGNAL_KILL = { exitCode: undefined, isTerminated: true }
 const SPAWN_SUCCESS = { exitCode: 0 }
-
-describe('josh_logic.spawn_script — spawn error', () => {
-	it('returns SPAWN_ERROR_EXIT_CODE when exitCode is undefined', () => {
-		execa_sync_mock.mockReturnValue(SPAWN_FAILURE)
-		vi.spyOn(console, 'error').mockImplementation(() => {
-			/* suppress */
-		})
-
-		const code = josh_logic.spawn_script('tsx', SCRIPT_ARGS)
-
-		expect(code).toBe(SPAWN_ERROR_EXIT_CODE)
-		vi.restoreAllMocks()
-	})
-
-	it('logs the error message when spawn fails', () => {
-		execa_sync_mock.mockReturnValue(SPAWN_FAILURE)
-		const error_spy = vi.spyOn(console, 'error').mockImplementation(() => {
-			/* suppress */
-		})
-
-		josh_logic.spawn_script('tsx', SCRIPT_ARGS)
-
-		expect(error_spy).toHaveBeenCalledWith(expect.stringContaining(SPAWN_ERROR_MESSAGE))
-		vi.restoreAllMocks()
-	})
-
-	it('returns actual status code when spawn succeeds', () => {
-		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
-
-		const code = josh_logic.spawn_script('tsx', SCRIPT_ARGS)
-
-		expect(code).toBe(0)
-	})
-
-	it('returns 1 without logging a spawn error when killed by a signal', () => {
-		execa_sync_mock.mockReturnValue(SIGNAL_KILL)
-		const error_spy = vi.spyOn(console, 'error').mockImplementation(() => {
-			/* suppress */
-		})
-
-		const code = josh_logic.spawn_script('tsx', SCRIPT_ARGS)
-
-		expect(code).toBe(1)
-		expect(error_spy).not.toHaveBeenCalled()
-		vi.restoreAllMocks()
-	})
-})
 
 const WORKERS_FLAG = '--workers=1'
 const TEST_CMD = 'test'
@@ -124,34 +76,29 @@ describe('josh_logic.run_command — composite commands reject extra arguments',
 })
 
 // joshuafolkken/kit#4660: node's own `--env-file` loader would take a guard switch from `.env`, so the
-// dispatcher loads the file itself and the flag never reaches the spawned node.
+// dispatcher loads the file itself. joshuafolkken/kit#7013: the command then runs in this process, so
+// the file is loaded here before the script is imported, and nothing is spawned.
 describe('josh_logic.run_command — the .env flag', () => {
 	beforeEach(() => {
 		execa_sync_mock.mockClear()
-		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
 	})
 
-	it('spawns a command declaring the flag without it', async () => {
-		const [environment_flag] = OPTIONAL_ENV_FILE_FLAGS
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('loads .env in this process before running a command declaring the flag', async () => {
+		const [environment_flag = ''] = OPTIONAL_ENV_FILE_FLAGS
 		const name = Object.keys(COMMAND_MAP).find((key) =>
-			COMMAND_MAP[key]?.tsx_arguments?.includes(environment_flag ?? ''),
+			COMMAND_MAP[key]?.tsx_arguments?.includes(environment_flag),
 		)
+		const apply = vi.spyOn(josh_environment_file, 'apply_node_flags').mockReturnValue([])
+		const run = vi.spyOn(josh_in_process, 'run_in_process').mockResolvedValue(0)
 
-		await josh_logic.run_command(name ?? '', [])
-
-		expect(execa_sync_mock).toHaveBeenCalledOnce()
-		expect(execa_sync_mock.mock.calls[0]?.[1]).not.toContain(environment_flag)
-	})
-
-	// joshuafolkken/kit#6965: the spawned child names the file it hands its gh tally back through.
-	it('spawns a script command with the gh tally handoff file in its environment', async () => {
-		const name = Object.keys(COMMAND_MAP).find((key) => COMMAND_MAP[key]?.tsx_arguments)
-
-		await josh_logic.run_command(name ?? '', [])
-
-		expect(execa_sync_mock.mock.calls[0]?.[2]).toMatchObject({
-			env: { JOSH_GH_TALLY_FILE: expect.any(String) },
-		})
+		await expect(josh_logic.run_command(name ?? '', [])).resolves.toBe(0)
+		expect(apply).toHaveBeenCalledWith([environment_flag])
+		expect(apply.mock.invocationCallOrder[0]).toBeLessThan(run.mock.invocationCallOrder[0] ?? 0)
+		expect(execa_sync_mock).not.toHaveBeenCalled()
 	})
 })
 

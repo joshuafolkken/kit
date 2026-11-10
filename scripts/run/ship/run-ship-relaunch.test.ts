@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import type { detached_launch, LaunchRequest } from '#scripts/run/detached-launch'
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_relaunch } from './run-ship-relaunch'
@@ -65,7 +66,7 @@ describe('run_ship_relaunch.relaunch', () => {
 
 		expect(launch?.argv.command).toBe(process.execPath)
 		expect(launch?.argv.args).toStrictEqual([
-			...process.execArgv,
+			...ts_entry_loader.loader_argv(process.execArgv),
 			'josh.ts',
 			'ship',
 			'--review',
@@ -94,6 +95,20 @@ describe('run_ship_relaunch.relaunch', () => {
 		launch_mock.mockReturnValue({ kind: 'failed', note: 'pnpm not found' })
 
 		expect(run_ship_relaunch.relaunch(request())).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7013: a pre-built ship runs under plain node, whose argv carries no loader.
+describe('run_ship_relaunch.relaunch — under plain node', () => {
+	it('adds the TypeScript loader where this process was started without one', () => {
+		vi.spyOn(process, 'execArgv', 'get').mockReturnValue([])
+
+		run_ship_relaunch.relaunch(request())
+
+		expect(launched()?.argv.args.slice(0, 2)).toStrictEqual([
+			ts_entry_loader.IMPORT_FLAG,
+			ts_entry_loader.loader_url(),
+		])
 	})
 })
 
