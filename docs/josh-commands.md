@@ -24,14 +24,18 @@ Run lint, type check, spell check and unit tests concurrently.
 
 ```bash
 pnpm josh gate
-pnpm josh gate --verbose   # every check's output, passing ones included
-pnpm josh gate --force     # re-run even on a tree already recorded green
-pnpm josh gate --no-unit   # the static checks only (CI only)
+pnpm josh gate --verbose      # every check's output, passing ones included
+pnpm josh gate --force        # re-run even on a tree already recorded green
+pnpm josh gate --no-unit      # the static checks only (CI only)
+pnpm josh gate --whole-tree   # add the whole-tree checks (the ship's gate on the final tree)
 ```
 
 <!-- /usage -->
 
-Also runs [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) and the [lockfile policy](josh-commands-automation.md#josh-lockfilepolicy) (kit only).
+Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-automation.md#josh-lockfilepolicy) (kit only).
+
+- The whole-tree checks — [unused namespace members](#josh-exportsunused) and the [metrics ratchet](#josh-metrics) (kit only) — run only with `--whole-tree` or `--no-unit`: the ship's gate and CI run them; a lane's own gate does not.
+- A `--whole-tree` gate reuses a green record only while both checks' own records are reusable (`scripts/gate/whole-tree-reuse.ts`).
 
 - Static checks: `pnpm josh lint`, `cspell:dot`, `behavior`, `exports:unused`, `metrics` (kit only); the unit leg is `pnpm josh test:related`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved; otherwise `lint`, `check`, `exports` and `metrics` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`), and `test:unit` while `josh test:related` would run no test for what moved (no test-read map, or one git can no longer diff against, runs it); the header reads `reused — inputs unchanged since it passed at <time>`.
@@ -40,7 +44,7 @@ Also runs [behavior](#josh-behavior), [unused namespace members](#josh-exportsun
 - `--static-group=<lint|types|rest>` implies `--no-unit`: one part of the static set per CI matrix leg (`scripts/gate/gate-static-group.ts`).
 - **On failure, a line per failed check with the command to re-run is printed just above the verdict**, so a `tail` keeps every failure.
 - **The last line is the verdict, counting ran apart from skipped**: `✔ verification gate passed (6 checks) in 41.2s.`, or `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` — which exits `0` but writes no green record.
-- Exit `1` if any check failed. Refuses any argument other than the three flags and `--static-group=<group>`.
+- Exit `1` if any check failed. Refuses any argument other than the four flags and `--static-group=<group>`.
 - [`josh test:related`](#josh-testrelated) narrows the unit leg; CI runs the whole sharded suite regardless.
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
