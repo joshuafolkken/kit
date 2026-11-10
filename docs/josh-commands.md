@@ -687,6 +687,7 @@ Count review findings by category from the observation ledger.
 
 ```bash
 pnpm josh review:findings
+pnpm josh review:findings --period 7   # the last 7 days, by category and severity
 ```
 
 <!-- /usage -->
@@ -694,6 +695,8 @@ pnpm josh review:findings
 The reader over what `josh review:record` wrote.
 
 **Behavior:** counts only `- rf:` lines, ignoring `- k:` observation lines. `none` sentinel lines are reported as the zero-finding round count, not tallied. A ledger with no finding lines prints `no review findings recorded yet`.
+
+`--period <days>` counts only lines dated from `<days>` days ago on, by category and severity, medium-and-up first. A value that is not a positive whole number prints the usage and exits non-zero.
 
 Related: [`josh review:record`](josh-commands-automation.md#josh-reviewrecord).
 

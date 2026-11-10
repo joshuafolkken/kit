@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gh_core_rate_limit } from './gh-core-rate-limit'
 
 // joshuafolkken/kit#6559, #6697: the core REST allowance is read once, unretried, and anything but a
@@ -81,7 +81,58 @@ describe('gh_core_rate_limit.read_resources', () => {
 	})
 })
 
+// joshuafolkken/kit#7150: a counted read is answered again for a short while, a failed one never.
+describe('gh_core_rate_limit kept reads', () => {
+	const FRESH_MS = 30_000
+	const NOW_MS = 1_800_000_000_000
+
+	beforeEach(() => {
+		vi.useFakeTimers({ toFake: ['Date'], now: NOW_MS })
+	})
+
+	afterEach(() => {
+		vi.useRealTimers()
+	})
+
+	it('reads the core once while it is fresh, and again once it is not', async () => {
+		const exec = vi.fn(async () => CORE)
+
+		await read_core(exec)
+		vi.setSystemTime(NOW_MS + FRESH_MS - 1)
+		await expect(read_core(exec)).resolves.toEqual(CORE_LIMIT)
+		expect(exec).toHaveBeenCalledOnce()
+
+		vi.setSystemTime(NOW_MS + FRESH_MS)
+		await read_core(exec)
+		expect(exec).toHaveBeenCalledTimes(2)
+	})
+
+	it('reads the resources once while they are fresh', async () => {
+		const exec = vi.fn(async () => `{"core":${CORE},"graphql":${GRAPHQL}}`)
+
+		await read_resources(exec)
+		await read_resources(exec)
+		expect(exec).toHaveBeenCalledOnce()
+	})
+
+	it('asks again after a failed read', async () => {
+		const exec = vi.fn(async () => CORE).mockRejectedValueOnce(new Error('HTTP 502'))
+
+		await expect(read_core(exec)).resolves.toBeUndefined()
+		await expect(read_core(exec)).resolves.toEqual(CORE_LIMIT)
+		expect(exec).toHaveBeenCalledTimes(2)
+	})
+})
+
 describe('gh_core_rate_limit.read_usage', () => {
+	it('never keeps the uncounted reading, which measures the calls between two reads', async () => {
+		const exec = vi.fn(async () => CORE)
+
+		await read_usage(exec)
+		await read_usage(exec)
+		expect(exec).toHaveBeenCalledTimes(2)
+	})
+
 	it('reads used and the reset in milliseconds off the same request', async () => {
 		const exec = vi.fn(async () => CORE)
 

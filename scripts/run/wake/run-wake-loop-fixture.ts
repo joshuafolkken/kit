@@ -10,6 +10,7 @@ const LAUNCHED: LaunchResult = { kind: 'launched', pid: 4242 }
 const HANDOFF_MATERIAL = 'merge over #2500'
 const HAND_OFF_CALL = 'hand_off'
 const WAKE_CALL = 'wake'
+const BESIDE_CALL = 'wake_beside'
 
 function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 	return {
@@ -61,6 +62,18 @@ function wake_port(calls: Calls, launch: LaunchResult): LoopPorts['wake'] {
 	}
 }
 
+// A triage session woken beside the driver: recorded in `order` and `materials`, never in `wakes`,
+// which lists only the sessions a hand-off woke (joshuafolkken/kit#7120).
+function beside_port(calls: Calls, launch: LaunchResult): LoopPorts['wake_beside'] {
+	return function wake_beside(_invocation: string, session_id: string, material: string) {
+		calls.order.push(BESIDE_CALL)
+		calls.materials.push(material)
+		calls.session_ids.push(session_id)
+
+		return launch
+	}
+}
+
 function ports_of(remaining: Array<CarryRead>, calls: Calls, launch: LaunchResult): LoopPorts {
 	return {
 		read_carry: () => remaining.shift() ?? ENDED,
@@ -79,6 +92,7 @@ function ports_of(remaining: Array<CarryRead>, calls: Calls, launch: LaunchResul
 		},
 		drive: async () => ({ kind: 'judgment', material: HANDOFF_MATERIAL }),
 		wake: wake_port(calls, launch),
+		wake_beside: beside_port(calls, launch),
 		sleep: settled,
 		now: () => NOW,
 		retry_closes: settled,
@@ -95,6 +109,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCH
 }
 
 const run_wake_loop_fixture = {
+	BESIDE_CALL,
 	ENDED,
 	HAND_OFF_CALL,
 	HANDED_OFF,

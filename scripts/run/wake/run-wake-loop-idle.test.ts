@@ -71,6 +71,7 @@ function recorder(reads: ReadonlyArray<CarryRead>, work: ReadonlyArray<boolean>)
 
 			return LAUNCHED
 		},
+		wake_beside: () => LAUNCHED,
 		sleep: async (milliseconds) => {
 			sleeps.push(milliseconds)
 			clock.now += milliseconds

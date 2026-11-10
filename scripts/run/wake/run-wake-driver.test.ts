@@ -279,12 +279,17 @@ test('leaves triage to the launched parent while it plans', async () => {
 	expect(run_event_setup.emit).not.toHaveBeenCalledWith(run_event_setup.STAGE.JUDGING)
 })
 
-test('wakes a session for triage once no launched parent is planning', async () => {
+// joshuafolkken/kit#7120: the triage session is woken beside the driver, so it is told the record
+// stays the supervisor's rather than that it is already its own.
+test('wakes a triage session beside the driver once no launched parent is planning', async () => {
 	vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: TRIAGE_OUTPUT })
 
 	const result = await run_wake_driver.drive(scratch.target, no_pause, () => false)
+	const material = result.kind === 'triage' ? result.material : ''
 
-	expect(result).toMatchObject({ kind: 'judgment' })
+	expect(result.kind).toBe('triage')
+	expect(material).toContain("the carry record stays the supervisor's")
+	expect(material).not.toContain(ALREADY_CLAIMED)
 })
 
 test.each(['merge busy #2509', 'merge retry #2509'])(

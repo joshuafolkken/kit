@@ -42,6 +42,10 @@ const INSTALLED_LAUNCHER = `${INSTALLED_PACKAGE}/${LAUNCHER}`
 const BUNDLE_STUB =
 	"process.stdout.write(`bundle ${process.getBuiltinModule('node:fs').readFileSync(0, 'utf8')}`)\n"
 const BUNDLE_OUTPUT = `bundle ${PAYLOAD}`
+const PASSED_ANSWER = { status: 0, stdout: '', stderr: '' }
+const CALLER_VARIABLE = 'HOOK_DAEMON_CALLER'
+// The second caller's value holds a line break, which the launcher escapes to keep one line a variable.
+const CALLERS = ['first', 'second\n line']
 
 interface LaunchResult {
 	status: number | null
@@ -82,10 +86,10 @@ function read_log(name: string): string {
 	return existsSync(path_in(name)) ? readFileSync(path_in(name), 'utf8') : ''
 }
 
-async function launch(launcher = LAUNCHER): Promise<LaunchResult> {
+async function launch(launcher = LAUNCHER, extra: NodeJS.ProcessEnv = {}): Promise<LaunchResult> {
 	const child = spawn('sh', [launcher, 'pretool-guard'], {
 		cwd: workspace.root,
-		env: workspace.environment,
+		env: { ...workspace.environment, ...extra },
 	})
 	const chunks: Array<Buffer> = []
 
@@ -99,6 +103,16 @@ async function launch(launcher = LAUNCHER): Promise<LaunchResult> {
 		.filter((line) => line === 'node').length
 
 	return { status, stdout: Buffer.concat(chunks).toString('utf8'), node_launches }
+}
+
+// The call a launch from the workspace root hands its daemon, under the workspace environment.
+function launched_call(): unknown {
+	return expect.objectContaining({
+		raw_payload: PAYLOAD,
+		launch_directory: workspace.root,
+		launcher_pid: expect.any(Number),
+		environment: expect.objectContaining({ DAEMON_LOG: path_in(DAEMON_LOG) }),
+	})
 }
 
 // A launch with no daemon starts one; the stub records the directory it was asked to serve.
@@ -178,7 +192,40 @@ describe(
 			const result = await launch()
 
 			expect(result).toStrictEqual({ status: REFUSED, stdout: 'denied', node_launches: 0 })
-			expect(answer).toHaveBeenCalledWith(PAYLOAD, workspace.root, expect.any(Number))
+			expect(answer).toHaveBeenCalledWith(launched_call())
+		})
+	},
+)
+
+// joshuafolkken/kit#7125: the daemon is the checkout's, whatever environment its callers run under.
+describe(
+	'run-hook.sh pretool-guard from callers of differing environments',
+	{ timeout: LAUNCH_TIMEOUT_MS },
+	() => {
+		it('hands each call to the one daemon with the environment it was launched under', async () => {
+			const answer = vi.fn<Daemon['answer']>().mockResolvedValue(PASSED_ANSWER)
+
+			serve_from(await daemon_directory(), answer)
+			rmSync(path_in(NODE_LOG), { force: true })
+			await launch(LAUNCHER, { [CALLER_VARIABLE]: CALLERS[0] })
+			const second = await launch(LAUNCHER, { [CALLER_VARIABLE]: CALLERS[1] })
+
+			expect(second.node_launches).toBe(0)
+			expect(answer.mock.calls.map(([call]) => call.environment[CALLER_VARIABLE])).toStrictEqual(
+				CALLERS,
+			)
+		})
+
+		it('runs the call itself when its environment cannot be written', async () => {
+			const answer = vi.fn<Daemon['answer']>()
+
+			serve_from(await daemon_directory(), answer)
+			write_file(workspace.root, 'bin/awk', '#!/bin/sh\nexit 1\n')
+			chmodSync(path_in('bin/awk'), 0o755)
+			const { stdout } = await launch()
+
+			expect(stdout).toBe(FALLBACK_OUTPUT)
+			expect(answer).not.toHaveBeenCalled()
 		})
 	},
 )
@@ -241,16 +288,14 @@ describe(
 		})
 
 		it('answers a passed call from a live daemon without launching node', async () => {
-			const answer = vi
-				.fn<Daemon['answer']>()
-				.mockResolvedValue({ status: 0, stdout: '', stderr: '' })
+			const answer = vi.fn<Daemon['answer']>().mockResolvedValue(PASSED_ANSWER)
 
 			serve_from(await daemon_directory(INSTALLED_LAUNCHER), answer)
 			rmSync(path_in(NODE_LOG), { force: true })
 			const result = await launch(INSTALLED_LAUNCHER)
 
 			expect(result).toStrictEqual({ status: 0, stdout: '', node_launches: 0 })
-			expect(answer).toHaveBeenCalledWith(PAYLOAD, workspace.root, expect.any(Number))
+			expect(answer).toHaveBeenCalledWith(launched_call())
 		})
 
 		it('runs the bundle itself and starts a daemon under the project cache when there is none', async () => {

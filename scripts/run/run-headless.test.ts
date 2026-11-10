@@ -243,6 +243,15 @@ describe('run_headless.hand_back_at_turn_end', () => {
 
 		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(true)
 	})
+
+	// joshuafolkken/kit#7120: the triage session beside the driver runs under the supervisor that owns
+	// the record, so only its mark keeps its turn-end from cutting the record the driver still holds.
+	it('writes no cut for a triage session started beside the driver', async () => {
+		const beside = run_headless.beside_environment()
+
+		expect(await run_headless.hand_back_at_turn_end(beside, own_ancestry)).toBe(false)
+		expect(apply_change).not.toHaveBeenCalled()
+	})
 })
 
 describe('run_headless.current_carry', () => {

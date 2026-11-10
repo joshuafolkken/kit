@@ -1,16 +1,20 @@
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { figure_format } from '#scripts/lib/figure-format'
 import { json_value } from '#scripts/lib/json-value'
 import { transcript_record } from '#scripts/lib/transcript-record'
 import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import type { Block, TranscriptLine } from '#scripts/time-runtime/time-transcript-line'
+import { cost_audit_command } from './cost-audit-command'
 import type { AuditSession } from './cost-audit-read'
 
 // The effort and tool-result half of `josh cost:audit`'s current-period breakdown
 // (joshuafolkken/kit#7055): the cost each reasoning effort ran up, and the characters tool results
-// put into the context — by tool, by josh subcommand, and the Reads of a file the session had already
-// read.
+// put into the context — by tool, by josh subcommand, by any other Bash command's leading words, by
+// Read target file (joshuafolkken/kit#7137), and the Reads of a file the session had already read.
+//
+// **A josh Bash call is counted in the josh table only**, never also in the other-command table.
 //
 // **A result is charged to the call it answers**, paired by `tool_use_id` within one session; a result
 // whose call lies outside the period is not counted. **A Read repeats when its session already read
@@ -44,6 +48,8 @@ interface ResultBreakdown {
 	efforts: ReadonlyArray<EffortSpend>
 	tools: ReadonlyArray<ResultChars>
 	josh: ReadonlyArray<ResultChars>
+	commands: ReadonlyArray<ResultChars>
+	reads: ReadonlyArray<ResultChars>
 	duplicate_reads: DuplicateReads
 }
 
@@ -100,6 +106,13 @@ function josh_of(call: Block): string {
 	if (call.name !== BASH_TOOL) return ''
 
 	return time_josh_names.josh_command_of(time_shell.bash_command(call.input))
+}
+
+// The leading words of a Bash call that runs no josh subcommand, `''` for any other call.
+function command_of(call: Block): string {
+	if (call.name !== BASH_TOOL) return ''
+
+	return cost_audit_command.command_key(time_shell.bash_command(call.input))
 }
 
 function read_path(call: Block): string {
@@ -175,6 +188,8 @@ function breakdown_of(sessions: ReadonlyArray<AuditSession>): ResultBreakdown {
 		efforts,
 		tools: chars_rows(results, (call) => call.name),
 		josh: chars_rows(results, (call) => josh_of(call)),
+		commands: chars_rows(results, (call) => command_of(call)),
+		reads: chars_rows(results, (call) => lane_paths.main_checkout_path(read_path(call))),
 		duplicate_reads: duplicates_of(per_session.map((one) => repeats_of(one))),
 	}
 }
@@ -214,6 +229,10 @@ function result_lines(breakdown: ResultBreakdown): Array<string> {
 		...chars_lines(breakdown.tools),
 		`  result characters by josh subcommand (top ${limit}):`,
 		...chars_lines(breakdown.josh),
+		`  result characters by other Bash command (top ${limit}):`,
+		...chars_lines(breakdown.commands),
+		`  result characters by Read file (top ${limit}):`,
+		...chars_lines(breakdown.reads),
 		duplicate_line(breakdown.duplicate_reads),
 	]
 }
