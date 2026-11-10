@@ -5,13 +5,14 @@ checkout and writing a new script — kept here so the reference states only eac
 
 ## How a command runs
 
-Most commands are a TypeScript file under `scripts/`; the rest are a shell line the dispatcher spawns. In kit's own checkout the dispatcher evaluates a script command in its own process rather than starting a second TypeScript runtime for it. Three conditions decide whether a command takes that route:
+Most commands are a TypeScript file under `scripts/`; the rest are a shell line the dispatcher spawns. Every script command runs in the dispatcher's own process; the dispatcher spawns no second runtime for it:
 
-- **The dispatcher must run from TypeScript source** — kit's own `pnpm josh`. A consumer's `josh` bin is the bundled `dist/josh.js` under plain node, so a consumer keeps the spawning path for every command except one marked `is_bundled`, which it imports pre-built from `dist/commands/` ([runtime-bundling.md](./runtime-bundling.md)).
-- **The command must not need node flags of its own.** `doctor`, `latest:scope`, `followup` and `notify` pass `--env-file`, so they keep a process of their own.
+- **Under the bundled `dist/josh.js`** — a consumer's `josh` bin, and kit's own `pnpm josh` on a fresh build — the dispatcher imports the pre-built `dist/commands/<script basename>.js` ([runtime-bundling.md](./runtime-bundling.md)).
+- **Under the TypeScript source dispatcher** — only `josh-ready`'s fallback when the build fails — it imports the `.ts` script itself.
+- A command's `tsx_arguments` (only the optional `.env` flag) are loaded into the process environment before the import (`josh_environment_file.apply_node_flags`).
 - **A shell command has no script to import** and is spawned as before.
 
-A new josh script keeps the canonical main guard `process.argv[1] === fileURLToPath(import.meta.url)`, or none at all. `scripts/josh/josh-in-process.test.ts` asserts the shape for every command that takes this route.
+A new josh script keeps the canonical main guard `process.argv[1] === fileURLToPath(import.meta.url)`, or none at all. `scripts/josh/josh-in-process.test.ts` asserts the shape for every script command.
 
 ## `josh gate`'s core budget
 

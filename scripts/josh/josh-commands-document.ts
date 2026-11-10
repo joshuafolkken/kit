@@ -10,7 +10,6 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print one section of a markdown document, for a `file.md` → "Heading" reference',
 		category: 'AI tools',
 		reference: ['<file> <heading>', 'automation', ['none']],
-		is_bundled: true,
 		usage: {
 			examples: [
 				{ arguments: '<file.md> "<heading>"' },
@@ -23,7 +22,6 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print what an entry point reads before it starts, and what that read costs',
 		category: 'AI tools',
 		reference: ['[<entry>] [--json | --bytes]', 'automation', ['none']],
-		is_bundled: true,
 		// Reads the repository's documents and prints, so a consultation session can run it.
 		is_read_only: true,
 		usage: {
@@ -41,7 +39,6 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 			'Read a whole document safely: print it, or point at the Read tool when over the Bash cap',
 		category: 'AI tools',
 		reference: ['<file>', 'automation', ['none']],
-		is_bundled: true,
 		usage: {
 			examples: [
 				{ arguments: 'CLAUDE.md', note: 'under the cap: prints the document' },

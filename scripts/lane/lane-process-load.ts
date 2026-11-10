@@ -47,7 +47,7 @@ const KIND_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 	['chrome', /Google Chrome/u],
 	['chromium', /chromium|headless_shell/iu],
 	['claude', /(?:^|\/)claude(?:\s|$)|@anthropic-ai\/claude-code\//u],
-	['josh', /josh\.ts|\btsx\b|(?<!\.)\bpnpm\b/u],
+	['josh', /josh(?:-ready)?\.[jt]s|\btsx\b|(?<!\.)\bpnpm\b/u],
 	['node', /\bnode\b/u],
 ]
 
