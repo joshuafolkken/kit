@@ -1,3 +1,4 @@
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_watch, type WatchRecord } from './issue-watch'
 import { issue_watch_hook } from './issue-watch-hook'
@@ -13,7 +14,7 @@ const NOTICE = 'The body was edited, but its author is not trusted.'
 const NOW = new Date('2026-10-14T00:00:00.000Z')
 const POLL_TIMEOUT_MS = 5000
 // joshuafolkken/kit#6973: the record is the call's, keyed on the context's cwd, not the process's.
-const CONTEXT = { cwd: '/call/checkout', env: {} }
+const CONTEXT = hook_context_fixture.of('/call/checkout', {})
 
 // An in-memory record the stubbed poll answers and the stubbed `mark_shown` updates, so the
 // once-per-update behavior is exercised across two hook calls.

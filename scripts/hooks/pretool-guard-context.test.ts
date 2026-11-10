@@ -9,9 +9,9 @@ import { rule_rewrite } from '#scripts/rules/rule-rewrite'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
 import { run_poll_hook } from '#scripts/run/run-poll-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { HookContext } from './hook-context'
 import { hook_demoted } from './hook-demoted'
 import { hook_ledger } from './hook-ledger'
 import { pretool_outcome, pretool_outcome_async } from './pretool-guard'
@@ -36,9 +36,7 @@ function runtime_edit(): { root: string; raw_payload: string } {
 	return { root, raw_payload }
 }
 
-function context_of(cwd: string, environment: HookContext['env']): HookContext {
-	return { cwd, env: environment }
-}
+const context_of = hook_context_fixture.of
 
 afterEach(() => {
 	vi.unstubAllEnvs()

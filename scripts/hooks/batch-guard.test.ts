@@ -3,6 +3,7 @@ import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -34,6 +35,7 @@ const { open_turn_lines, target_turn_lines, ms } = time_transcript_fixture
 const FRESH_PATH = 'scripts/fresh.ts'
 const LATER_MINUTE = 59
 const NOW_MS = ms(LATER_MINUTE)
+const context_of = hook_context_fixture.of
 // The shape Claude Code puts in a forked agent's payload: the id of the fork, beside the *parent*
 // session's transcript path (joshuafolkken/kit#1424).
 const AGENT_ID = 'a313eea340918b8a1'
@@ -333,7 +335,7 @@ describe('batch_outcome — a dispatched lane child is silent, neither refused n
 })
 
 describe('batch_outcome — the per-call context, not the process (kit#6967)', () => {
-	const LANE_CONTEXT = { cwd: LANE_DIRECTORY, env: { [lane_child_marker.KEY]: LANE_ISSUE } }
+	const LANE_CONTEXT = context_of(LANE_DIRECTORY, { [lane_child_marker.KEY]: LANE_ISSUE })
 
 	it('stays silent for a lane child the context names under a main-line process', () => {
 		const { reason, notice } = batch_outcome(payload_of('context-lane'), NOW_MS, LANE_CONTEXT)
@@ -343,14 +345,14 @@ describe('batch_outcome — the per-call context, not the process (kit#6967)', (
 	})
 
 	it('reads its switch from the context environment', () => {
-		const off = { cwd: process.cwd(), env: { [SWITCH_ENV_KEY]: 'off' } }
+		const off = context_of(process.cwd(), { [SWITCH_ENV_KEY]: 'off' })
 
 		expect(batch_outcome(payload_of('context-off'), NOW_MS, off).reason).toBeUndefined()
 	})
 
 	it('refuses when only the process environment switches it off', () => {
 		process.env[SWITCH_ENV_KEY] = 'off'
-		const on = { cwd: process.cwd(), env: {} }
+		const on = context_of(process.cwd(), {})
 
 		expect(batch_outcome(payload_of('context-on'), NOW_MS, on).reason).toContain('batching')
 	})

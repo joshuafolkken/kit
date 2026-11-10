@@ -52,19 +52,22 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:a
 
 <!-- usage: issue:priority -->
 
-Raise an issue to the priority its body declares or reaches after filing.
+Raise an issue to the priority its body declares or reaches, or set the one a person instructs.
 
 ```bash
 pnpm josh issue:priority 4960
 pnpm josh issue:priority 6707 --critical --reason "asked in this turn"   # on a person's instruction only
+pnpm josh issue:priority 6683 --normal --reason "asked in this turn"     # lowers it the same way
 ```
 
 <!-- /usage -->
 
-`--critical --reason "<text>"` applies `priority:critical` whatever the body declares and comments the reason on the issue.
+Either way the issue keeps one priority label: the new one goes on, then the others come off.
+
+`--critical|--high|--normal --reason "<text>"` sets that level whatever the body declares, raising or lowering, and comments the reason on the issue. `--normal` takes every priority label off.
 
 - Use it **only on a person's current-turn instruction** ("make #N critical"), `--reason` giving its gist. Never on an agent's own judgment: the agent's route is the body's `- 優先度:` declaration.
-- No non-blank `--reason` → usage error, nothing written. Already `priority:critical` → `labelled`, no comment. A failed label or comment → `failed`, exit 1.
+- More than one level flag, or no non-blank `--reason` → usage error, nothing written. Already at that level with no other priority label → `labelled`, no comment. A failed label change or comment → `failed`, exit 1.
 
 ### `josh issue:state`
 
@@ -179,7 +182,8 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets that floor, and so do `- 原因の損失:` lines summing to 30 minutes or more (`josh issue:priority <N>` re-applies it after a recurrence); `- 原因のレーン:` only ranks, and no reduction percentage is asked for or judged. A malformed one is refused; a body with no declaration is filed at the floor.
    A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
-   A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) or projected past the implement stage budget at the measured rate is refused the same way.
+   A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) is refused the same way.
+   One projected past the implement stage budget at the measured rate is refused unless it declares `- 分割しない理由: <理由>`, whatever its route.
 4. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件: #<PR> のマージ後 <K> マージ` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
    The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, is not read: it waits on the pull request that closes the issue, for a follow-up filed before that pull request exists.
 5. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
@@ -448,6 +452,7 @@ pnpm josh issue:spill 5999 --estimate "3 ファイル / 80 行"
 **Options:**
 
 - `--estimate "<F> ファイル / <L> 行"` — the follow-up's size estimate, never apportioned from the issue's. Required.
+- `--reason "<理由>"` — the follow-up's `- 分割しない理由:` line, the only excuse from the implement budget; the issue's own is not carried over.
 - `--distinct <N,…>` — duplicate candidates `issue:file` held the follow-up on, declared separate; the issue itself always is. Repeatable.
 
 <!-- /usage -->

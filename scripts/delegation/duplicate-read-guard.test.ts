@@ -2,6 +2,7 @@ import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -44,6 +45,7 @@ const SECOND_READ_MS = ms(SECOND_READ_MINUTE * 2 + 2)
 const BEFORE_READ_MS = ms(1)
 const AFTER_READ_MS = ms(3)
 const NOW_MS = ms(59)
+const context_of = hook_context_fixture.of
 const EARLIER_REFUSAL_MS = ms(5)
 const READ_TOOL = 'Read'
 const UNSET = ''
@@ -234,7 +236,7 @@ function unchanged_reread(name: string): string {
 
 describe('duplicate_read_outcome — the per-call context, not the process', () => {
 	// joshuafolkken/kit#6967: the process stays on the main line; only the context names the lane.
-	const LANE_CONTEXT = { cwd: LANE_DIRECTORY, env: { [lane_child_marker.KEY]: LANE_ISSUE } }
+	const LANE_CONTEXT = context_of(LANE_DIRECTORY, { [lane_child_marker.KEY]: LANE_ISSUE })
 
 	it('nudges a lane child the context names under a main-line process', () => {
 		const result = duplicate_read_outcome(unchanged_reread('context-lane'), NOW_MS, LANE_CONTEXT)
@@ -244,7 +246,7 @@ describe('duplicate_read_outcome — the per-call context, not the process', () 
 	})
 
 	it('reads its switch from the context environment', () => {
-		const off = { cwd: process.cwd(), env: { [SWITCH_ENV_KEY]: 'off' } }
+		const off = context_of(process.cwd(), { [SWITCH_ENV_KEY]: 'off' })
 
 		expect(
 			duplicate_read_outcome(unchanged_reread('context-off'), NOW_MS, off).reason,
@@ -253,7 +255,7 @@ describe('duplicate_read_outcome — the per-call context, not the process', () 
 
 	it('refuses when only the process environment switches it off', () => {
 		process.env[SWITCH_ENV_KEY] = 'off'
-		const on = { cwd: process.cwd(), env: {} }
+		const on = context_of(process.cwd(), {})
 
 		expect(duplicate_read_outcome(unchanged_reread('context-on'), NOW_MS, on).reason).toBe(
 			duplicate_reads.REASON,
@@ -264,7 +266,7 @@ describe('duplicate_read_outcome — the per-call context, not the process', () 
 	it('resolves a relative read against the context directory', () => {
 		const target = subject_file(BEFORE_READ_MS)
 		const payload = payload_of(read_once('context-root', target), path.basename(target))
-		const work = { cwd: WORK_DIRECTORY, env: {} }
+		const work = context_of(WORK_DIRECTORY, {})
 
 		expect(duplicate_read_outcome(payload, NOW_MS, work).reason).toBe(duplicate_reads.REASON)
 	})
@@ -272,7 +274,7 @@ describe('duplicate_read_outcome — the per-call context, not the process', () 
 	it('does not resolve a relative read against the process directory', () => {
 		const target = subject_file(BEFORE_READ_MS)
 		const payload = payload_of(read_once('process-root', target), path.basename(target))
-		const here = { cwd: process.cwd(), env: {} }
+		const here = context_of(process.cwd(), {})
 
 		expect(duplicate_read_outcome(payload, NOW_MS, here).reason).toBeUndefined()
 	})

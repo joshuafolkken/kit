@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
 import { hook_ledger } from './hook-ledger'
@@ -80,7 +81,7 @@ describe('hook_ledger.record call context', () => {
 		await hook_ledger.record(
 			{ hook: HOOK, reason: BATCHING_REASON, raw_payload: BASH_PAYLOAD },
 			directory,
-			{ cwd: scratch, env: { [agent_session_role.KEY]: CONTEXT_ROLE } },
+			hook_context_fixture.of(scratch, { [agent_session_role.KEY]: CONTEXT_ROLE }),
 		)
 
 		expect(JSON.parse(lines_in(directory)[0] ?? '')).toMatchObject({ role: CONTEXT_ROLE })

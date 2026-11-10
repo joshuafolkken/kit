@@ -30,7 +30,11 @@ vi.mock('./run-review-unplanned', () => ({
 }))
 vi.mock('#scripts/test/test-pinned', () => ({ test_pinned: { run: pinned_run } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
-	stamp_file: { remove_stamp: vi.fn(), write_text_stamp: vi.fn() },
+	stamp_file: {
+		remove_stamp: vi.fn(),
+		stamp_path: (prefix: string) => `/stamps/${prefix}`,
+		write_text_stamp: vi.fn(),
+	},
 }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
 	lane_session_broker: { review_paths: () => ({ brief: BRIEF_PATH }) },

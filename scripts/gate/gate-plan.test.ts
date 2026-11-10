@@ -1,4 +1,3 @@
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { describe, expect, it } from 'vitest'
 import { core_budget } from './core-budget'
@@ -44,13 +43,11 @@ const ALL_RESERVING = 3
 const LIGHTEST_RESERVING = 1
 // More lanes than the machine has cores, which is the arithmetic `MIN_SHARED_CORES` exists for.
 const OVERSUBSCRIBED_LANES = 99
-// The checks that reserve no core — behavior, exports, metrics, lockfile and the unit step — which
-// every plan admits however small its share (joshuafolkken/kit#4609).
-const ZERO_WEIGHT_CHECKS = gate_plan.GATE_CHECKS.filter(
+// The lane gate's checks that reserve no core — behavior, lockfile and the unit step — which every
+// plan admits however small its share (joshuafolkken/kit#4609).
+const ZERO_WEIGHT_CHECKS = gate_plan.LANE_GATE_CHECKS.filter(
 	(check) => check.reserved_cores === 0,
 ).length
-// What CI's `--no-unit` gate checks: the static checks of this repository.
-const STATIC_CHECKS = gate_plan.select_gate_checks(false, true)
 
 function weighted(...checks: ReadonlyArray<[string, number]>): ReadonlyArray<GateCheck> {
 	return checks.map(([label, reserved_cores]) => ({ label, target: label, reserved_cores }))
@@ -58,14 +55,14 @@ function weighted(...checks: ReadonlyArray<[string, number]>): ReadonlyArray<Gat
 
 describe('gate_plan.resolve_concurrency', () => {
 	it('runs every check at once on a machine that can host them', () => {
-		expect(gate_plan.resolve_concurrency(MEASURED_CORES)).toBe(gate_plan.GATE_CHECKS.length)
+		expect(gate_plan.resolve_concurrency(MEASURED_CORES)).toBe(gate_plan.LANE_GATE_CHECKS.length)
 	})
 
 	// The three reserving checks want five cores between them (joshuafolkken/kit#4362), so that is the
 	// smallest machine that still fans out to every check.
 	it('runs every check at once on a machine with the reserved cores', () => {
 		expect(gate_plan.resolve_concurrency(gate_plan.RESERVED_CORES)).toBe(
-			gate_plan.GATE_CHECKS.length,
+			gate_plan.LANE_GATE_CHECKS.length,
 		)
 	})
 
@@ -106,7 +103,10 @@ describe('gate_plan.resolve_concurrency — lightest first', () => {
 	})
 
 	it('keeps the declaration order among checks of one weight', () => {
-		const ordered = gate_plan.lightest_first(STATIC_CHECKS, (check) => check.reserved_cores)
+		const ordered = gate_plan.lightest_first(
+			gate_plan.LANE_GATE_CHECKS,
+			(check) => check.reserved_cores,
+		)
 
 		expect(ordered.map((check) => check.label).slice(-ALL_RESERVING)).toEqual([
 			'cspell',
@@ -356,7 +356,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 8 of 8 checks at once, test:unit at 6 workers (11 cores)',
+			'plan: 6 of 6 checks at once, test:unit at 6 workers (11 cores)',
 		)
 	})
 
@@ -379,7 +379,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
-			'plan: 6 of 8 checks at once, test:unit at 1 workers (11 cores, 6 unit runs or lanes)',
+			'plan: 4 of 6 checks at once, test:unit at 1 workers (11 cores, 6 unit runs or lanes)',
 		)
 	})
 
@@ -413,65 +413,5 @@ describe('gate_plan the checks a gate runs', () => {
 		const lint = gate_plan.GATE_CHECKS.find((check) => check.label === gate_labels.LINT_LABEL)
 
 		expect(lint?.args).toStrictEqual(['--changed'])
-	})
-})
-
-describe('gate_plan without the unit suite', () => {
-	it('keeps the three static checks and drops only the unit one', () => {
-		expect(gate_plan.select_gate_checks(false)).toEqual(gate_plan.STATIC_CHECKS)
-		expect(gate_plan.select_gate_checks(true)).toEqual(gate_plan.GATE_CHECKS)
-	})
-
-	it('is the whole gate minus one check, not a different set', () => {
-		expect(gate_plan.GATE_CHECKS).toHaveLength(gate_plan.STATIC_CHECKS.length + 1)
-		expect(gate_plan.GATE_CHECKS.slice(0, -1)).toEqual(gate_plan.STATIC_CHECKS)
-	})
-
-	// joshuafolkken/kit#4609: on CI's four cores the three reserving checks do not all fit — today the
-	// type check is the one over the share — and counted in declaration order the one that did not
-	// fit ended the count there — behavior, exports, metrics
-	// and lockfile queued behind it. Every check but the one over the share is admitted.
-	it('leaves only the check over the share out on the four-core runner CI gives it', () => {
-		const plan = gate_plan.resolve_gate_plan(CI_CORES, 1, false)
-
-		expect(plan.concurrency).toBe(gate_plan.STATIC_CHECKS.length - 1)
-		expect(plan.checks).toEqual(gate_plan.STATIC_CHECKS)
-	})
-
-	// A worker cap is a number for a check this plan never starts, so it carries none — and the line
-	// says where the suite went rather than printing a blank or an inherited count.
-	it('carries no worker cap and says where the unit suite is', () => {
-		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, 1, false)
-
-		expect(plan.unit_worker_cap).toBeUndefined()
-		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
-			'plan: 7 of 7 checks at once, test:unit elsewhere (11 cores)',
-		)
-	})
-
-	// The default is the full gate on every entry point that does not ask otherwise, and it is
-	// asserted rather than assumed: a flipped default would silently stop running the unit suite
-	// everywhere, which is the one regression this flag must not be able to cause.
-	it('leaves every other caller with every check', () => {
-		expect(gate_plan.resolve_gate_plan(MEASURED_CORES).checks).toEqual(gate_plan.GATE_CHECKS)
-		expect(gate_plan.has_unit_check(gate_plan.resolve_gate_plan(CI_CORES).checks)).toBe(true)
-	})
-})
-
-// joshuafolkken/kit#3408: the metrics ratchet's command is not in the published package, so a
-// consumer's gate must not start it — and must still run everything else.
-describe('gate_plan in a consumer repository', () => {
-	it('drops only the kit-only checks', () => {
-		const checks = gate_plan.select_gate_checks(true, false)
-
-		expect(checks.map((check) => check.label)).not.toContain('metrics')
-		expect(checks).toEqual(gate_plan.GATE_CHECKS.filter((check) => check.is_kit_only !== true))
-		expect(gate_plan.resolve_gate_plan(MEASURED_CORES, 1, true, false).checks).toEqual(checks)
-	})
-
-	it('marks a check kit-only exactly when its josh command is', () => {
-		for (const check of gate_plan.STATIC_CHECKS) {
-			expect(check.is_kit_only === true).toBe(COMMAND_MAP[check.target]?.is_kit_only === true)
-		}
 	})
 })

@@ -41,10 +41,12 @@ interface ParentCutState {
 	verdict: () => CostVerdict
 }
 
-// The world as the call in hand sees it: the carry record and session verdict under its own cwd and env.
+// The world as the call in hand sees it: the carry record and session verdict under its own cwd, env
+// and process ancestry.
 function current_state(context: HookContext = hook_context.from_process()): ParentCutState {
 	return {
-		carry: async (): Promise<RunCarry | undefined> => await run_headless.driving_carry(context.env),
+		carry: async (): Promise<RunCarry | undefined> =>
+			await run_headless.driving_carry(context.env, context.ancestry),
 		verdict: (): CostVerdict =>
 			implementation_cut_verdict.reused_verdict(
 				() => cost_cli.session_verdict(context.cwd, context.env),

@@ -8,4 +8,11 @@ describe('hook_context.from_process', () => {
 		expect(context.cwd).toBe(process.cwd())
 		expect(context.env).toBe(process.env)
 	})
+
+	it('walks the ancestry from the launched process', () => {
+		const ancestry = hook_context.from_process().ancestry()
+
+		expect(ancestry.has(process.pid)).toBe(true)
+		expect(ancestry.has(process.ppid)).toBe(true)
+	})
 })

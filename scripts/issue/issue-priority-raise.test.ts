@@ -10,6 +10,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
 		issue_get_labels_and_body: vi.fn(),
 		issue_add_label: vi.fn(),
+		issue_clear_label: vi.fn(),
 	},
 }))
 
@@ -17,6 +18,7 @@ const ISSUE_NUMBER = '4960'
 const ENHANCEMENT = 'enhancement'
 const mocked_read = vi.mocked(git_gh_command.issue_get_labels_and_body)
 const mocked_add = vi.mocked(git_gh_command.issue_add_label)
+const mocked_clear = vi.mocked(git_gh_command.issue_clear_label)
 
 function body(...minutes: ReadonlyArray<string>): string {
 	const lines = minutes.map((value) => `- 原因の損失: ${value} 分\n`).join('')
@@ -28,6 +30,8 @@ function declared(line: string): string {
 	return `## 背景\n\n- 種別: 非不具合\n${line}\n\n## 期待効果\n`
 }
 
+const URGENT = declared('- 優先度: 緊急（条件 1）')
+
 function serve(text: string, ...labels: ReadonlyArray<string>): void {
 	mocked_read.mockResolvedValue(
 		JSON.stringify({ labels: labels.map((name) => ({ name })), body: text }),
@@ -36,6 +40,7 @@ function serve(text: string, ...labels: ReadonlyArray<string>): void {
 
 beforeEach(() => {
 	mocked_add.mockResolvedValue(true)
+	mocked_clear.mockResolvedValue(true)
 })
 
 describe('issue_priority_raise.raise', () => {
@@ -88,13 +93,6 @@ describe('issue_priority_raise.raise on a declared priority', () => {
 		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, label)
 	})
 
-	it('raises priority:high to priority:critical once the body declares urgent', async () => {
-		serve(declared('- 優先度: 緊急（条件 1）'), PRIORITY_HIGH_LABEL)
-
-		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('raised')
-		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, PRIORITY_CRITICAL_LABEL)
-	})
-
 	it('raises a normal declaration once appended losses reach the high floor', async () => {
 		serve(declared('- 優先度: 通常\n- 原因の損失: 20 分\n- 原因の損失: 15 分'), ENHANCEMENT)
 
@@ -111,4 +109,38 @@ describe('issue_priority_raise.raise on a declared priority', () => {
 			expect(mocked_add).not.toHaveBeenCalled()
 		},
 	)
+})
+
+describe('issue_priority_raise.raise replacing a lower label', () => {
+	it('replaces priority:high with priority:critical once the body declares urgent', async () => {
+		serve(URGENT, PRIORITY_HIGH_LABEL)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('raised')
+		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, PRIORITY_CRITICAL_LABEL)
+		expect(mocked_clear).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, PRIORITY_HIGH_LABEL)
+	})
+
+	it('answers failed when the lower label stays on', async () => {
+		serve(URGENT, PRIORITY_HIGH_LABEL)
+		mocked_clear.mockResolvedValue(false)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('failed')
+	})
+
+	it('takes the lower label off on a retry after a failed clear', async () => {
+		serve(URGENT, PRIORITY_HIGH_LABEL, PRIORITY_CRITICAL_LABEL)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('labelled')
+		expect(mocked_add).not.toHaveBeenCalled()
+		expect(mocked_clear).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, PRIORITY_HIGH_LABEL)
+	})
+
+	it('matches a priority label stored in another case', async () => {
+		const stored = 'Priority:High'
+
+		serve(URGENT, stored)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('raised')
+		expect(mocked_clear).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, stored)
+	})
 })

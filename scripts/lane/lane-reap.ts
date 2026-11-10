@@ -105,7 +105,8 @@ const SYSTEM_PROBES: ReapProbes = {
 	terminate,
 }
 
-function ancestry_of(pid: number, probes: TreeProbes): Set<number> {
+// `pid` and every process above it.
+function ancestry_of(pid: number, probes: TreeProbes = SYSTEM_PROBES): Set<number> {
 	const ancestry = new Set<number>([pid])
 	let current = probes.parent_of(pid)
 
@@ -171,6 +172,7 @@ function is_child_running(issue: string, probes: TreeProbes = SYSTEM_PROBES): bo
 }
 
 const lane_reap = {
+	ancestry_of,
 	is_child_running,
 	lane_tree,
 	own_ancestry,
