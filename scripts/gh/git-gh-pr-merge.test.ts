@@ -1,7 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 import { gh_failure as git_gh_failure } from './git-gh-failure'
-import { git_gh_pr, MERGE_REQUEST_TIMEOUT_MS, MERGE_UNCONFIRMED_MESSAGE } from './git-gh-pr'
+import {
+	git_gh_pr,
+	MERGE_IN_PROGRESS_ATTEMPTS,
+	MERGE_REQUEST_TIMEOUT_MS,
+	MERGE_UNCONFIRMED_MESSAGE,
+} from './git-gh-pr'
 import {
 	find_request,
 	gh_api_routes,
@@ -35,6 +40,8 @@ vi.mock('./git-gh-exec', () => ({
 	has_stderr_field: (): boolean => false,
 	BODY_FROM_STDIN: '-',
 }))
+// `with_retry` waits through `node:timers/promises`, which fake timers do not reach.
+vi.mock('node:timers/promises', () => ({ setTimeout: vi.fn().mockResolvedValue(undefined) }))
 
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
@@ -51,9 +58,21 @@ const HEAD_SHA = 'c0ffee1'
 const HEAD_MOVED_STATUS = 409
 const UNPROCESSABLE_STATUS = 422
 const BAD_GATEWAY = 'gh: Server Error (HTTP 502)'
+const GATEWAY_TIMEOUT = "gh: We couldn't respond to your request in time. (HTTP 504)"
+const MERGE_IN_PROGRESS =
+	'gh: Merge already in progress (HTTP 405)\n{"message":"Merge already in progress","status":"405"}'
+const METHOD_NOT_ALLOWED_STATUS = 405
 
 function transient_merge_failure(): Error {
 	return git_gh_failure.attach(new Error(BAD_GATEWAY), { status: undefined })
+}
+
+function timed_out_merge_failure(): Error {
+	return git_gh_failure.attach(new Error(GATEWAY_TIMEOUT), { status: undefined })
+}
+
+function merge_in_progress_failure(): Error {
+	return git_gh_failure.attach(new Error(MERGE_IN_PROGRESS), { status: METHOD_NOT_ALLOWED_STATUS })
 }
 
 function merge_requests(): Array<GhApiRequest> {
@@ -229,6 +248,51 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 			'cause.message',
 			gh_failure().message,
 		)
+	})
+})
+
+// joshuafolkken/kit#7171: a 504 whose merge was still running server-side, so the resent request
+// answered 405 "Merge already in progress" while the read-back still saw the pull request open.
+describe('pr_merge — a merge GitHub reports as already in progress', () => {
+	beforeEach(() => {
+		forget_pr_numbers()
+		vi.useFakeTimers()
+	})
+
+	afterEach(() => {
+		vi.useRealTimers()
+	})
+
+	it('waits for the in-progress merge to land after a 504', async () => {
+		const merge = vi
+			.fn()
+			.mockRejectedValueOnce(timed_out_merge_failure())
+			.mockRejectedValue(merge_in_progress_failure())
+		const detail = vi
+			.fn()
+			.mockResolvedValueOnce(rest_pull())
+			.mockResolvedValueOnce(rest_pull())
+			.mockResolvedValue(rest_pull({ merged: true }))
+
+		arrange(merge, detail)
+		const outcome = expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).resolves.toBeUndefined()
+
+		await vi.runAllTimersAsync()
+		await outcome
+		expect(merge).toHaveBeenCalledTimes(2)
+	})
+
+	it('fails with the 405 when the merge has not landed within the bound', async () => {
+		const in_progress = merge_in_progress_failure()
+		const detail = vi.fn().mockResolvedValue(rest_pull())
+
+		arrange(fails_with(in_progress), detail)
+		const outcome = expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).rejects.toBe(in_progress)
+
+		await vi.runAllTimersAsync()
+		await outcome
+		expect(detail).toHaveBeenCalledTimes(MERGE_IN_PROGRESS_ATTEMPTS)
+		expect(merge_requests()).toHaveLength(1)
 	})
 })
 

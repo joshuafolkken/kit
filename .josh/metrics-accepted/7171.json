@@ -1,0 +1,7 @@
+{
+	"reason": "#7171 adds the bounded in-progress merge read-back and its tests",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 24
+	}
+}
