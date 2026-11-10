@@ -153,11 +153,9 @@ function create_refusal_stamp(prefix: string): RefusalStamp {
 	return { path, last_ms: last_refusal_ms, record: record_refusal }
 }
 
-// **`.env` is loaded here rather than through the dispatcher's `tsx_arguments`**, and the reason —
-// declaring any `tsx_arguments` disqualifies a command from in-process dispatch — is now shared with
-// every other command that has to stay in-process, so the loader lives in `josh-environment-file.ts` rather
-// than here. Re-exported under this namespace because that is where the
-// hooks reach for it.
+// **`.env` is loaded here rather than through the dispatcher's `tsx_arguments`**; the loader lives in
+// `josh-environment-file.ts`, shared with the other commands that read the file themselves.
+// Re-exported under this namespace because that is where the hooks reach for it.
 //
 // **Call it only on the real hook path**, never inside the pure refusal function, so a developer's
 // own `.env` cannot decide what the unit tests see.

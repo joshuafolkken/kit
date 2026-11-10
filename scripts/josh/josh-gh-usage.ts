@@ -1,6 +1,5 @@
 import { gh_core_rate_limit } from '#scripts/gh/gh-core-rate-limit'
 import { gh_request_tally, type CoreUsage } from '#scripts/gh/gh-request-tally'
-import { gh_tally_handoff } from '#scripts/gh/gh-tally-handoff'
 import { gh_usage_event, type GhUsageContext } from '#scripts/gh/gh-usage-event'
 import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
@@ -49,20 +48,6 @@ async function recorded<T>(
 	}
 }
 
-// A spawned child counts its calls in its own process (joshuafolkken/kit#6965): `run` starts it with
-// the handoff file in its environment, and the child's handed tallies join this process's, so the
-// line `recorded` writes counts them. The child takes no core reading; the difference covers its
-// calls only when this process called gh before the spawn, and is none otherwise.
-function from_child<T>(run: (environment: Record<string, string>) => T): T {
-	const target = gh_tally_handoff.target_path()
-
-	try {
-		return run({ [gh_tally_handoff.HANDOFF_ENV]: target })
-	} finally {
-		for (const handed of gh_tally_handoff.taken(target)) gh_request_tally.absorb(handed)
-	}
-}
-
-const josh_gh_usage = { from_child, read_usage_bounded, recorded }
+const josh_gh_usage = { read_usage_bounded, recorded }
 
 export { josh_gh_usage }

@@ -1,3 +1,4 @@
+import { ts_entry_loader } from '#scripts/run/ts-entry-loader'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_action } from './lane-session-action'
@@ -79,7 +80,7 @@ describe('lane_session_reread.reread — the supervisor reads the fresh process 
 		expect(execa_mock).toHaveBeenCalledWith(
 			process.execPath,
 			[
-				...process.execArgv,
+				...ts_entry_loader.loader_argv(process.execArgv),
 				expect.stringMatching(/lane-session-reread-main\.ts$/u),
 				ISSUE,
 				JSON.stringify(received),

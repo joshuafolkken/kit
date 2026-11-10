@@ -40,6 +40,8 @@ const KIND_CASES: Array<[string, string]> = [
 	['/cache/chromium_headless_shell-1200/headless_shell --type=renderer', 'chromium'],
 	['/Users/me/.local/bin/claude -p', 'claude'],
 	['node --import tsx scripts/josh/josh.ts ship', 'josh'],
+	['node --disable-warning=ExperimentalWarning tools/josh/josh-ready.ts gate', 'josh'],
+	['node /repo/node_modules/@joshuafolkken/kit/dist/josh.js gate', 'josh'],
 	['/Applications/Visual Studio Code.app/Contents/MacOS/Code Helper', 'vscode'],
 	[
 		'/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin) /extensions/node_modules/typescript/lib/tsserver.js',

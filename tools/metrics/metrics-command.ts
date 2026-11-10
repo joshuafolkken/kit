@@ -7,6 +7,7 @@ import { git_command } from '#scripts/git/git-command'
 import { file_reader } from '#scripts/lib/read-file'
 import { line_targets } from '#scripts/lines/line-targets'
 import { skill_meta } from '#tools/claude/skill-meta'
+import { tsImport } from 'tsx/esm/api'
 import { z } from 'zod'
 import { metrics_base, type Reading } from './metrics-base'
 import { metrics_code_lines } from './metrics-code-lines'
@@ -162,12 +163,13 @@ function prose(root: string): ProseTotals {
 }
 
 // A tree that holds no command map names no guard: the gate's kit fixture carries no `scripts/`.
+// The map is TypeScript, and the pre-built command runs under plain node, so tsx loads it.
 async function command_names(root: string): Promise<ReadonlyArray<string>> {
 	const file = path.join(root, COMMAND_MAP_FILE)
 
 	if (!existsSync(file)) return []
 
-	const loaded: unknown = await import(pathToFileURL(file).href)
+	const loaded: unknown = await tsImport(pathToFileURL(file).href, import.meta.url)
 
 	return Object.keys(command_map_schema.parse(loaded).COMMAND_MAP)
 }
@@ -349,6 +351,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 const metrics_command = {
+	command_names,
 	parse_arguments,
 }
 
