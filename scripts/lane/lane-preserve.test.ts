@@ -31,7 +31,7 @@ function lane_with_changes(has_changes: boolean): MockInstance<typeof git_stash.
 		existing: undefined,
 		targets: { directory: LANE_DIRECTORY, branch: `${ISSUE}-lane` },
 	})
-	vi.spyOn(git_stash, 'has_changes').mockResolvedValue(has_changes)
+	vi.spyOn(git_stash, 'has_work').mockResolvedValue(has_changes)
 
 	return vi.spyOn(git_stash, 'push').mockResolvedValue()
 }
@@ -73,6 +73,43 @@ describe('lane_preserve.preserve_lane', () => {
 		await expect(lane_preserve.preserve_lane(ISSUE, OCCASION, CAUSE)).resolves.toBe(false)
 		expect(error).toHaveBeenCalledWith(expect.stringContaining('could not be stashed'))
 		expect(comment_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6979: two withdraws of one lane pushed its work twice under one message.
+describe('lane_preserve.keep_work — one keep per lane', () => {
+	beforeEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('pushes once when two keeps of one lane run side by side', async () => {
+		let tree_holds_work = true
+
+		vi.spyOn(git_stash, 'has_work').mockImplementation(async () => await tree_holds_work)
+		const push = vi.spyOn(git_stash, 'push').mockImplementation(async () => {
+			await new Promise((resolve) => {
+				setTimeout(resolve, 10)
+			})
+			tree_holds_work = false
+		})
+
+		const [first, second] = await Promise.all([
+			lane_preserve.keep_work(ISSUE, LANE_DIRECTORY, OCCASION),
+			lane_preserve.keep_work(ISSUE, LANE_DIRECTORY, OCCASION),
+		])
+
+		expect(push).toHaveBeenCalledTimes(1)
+		expect([first, second]).toContainEqual({ kind: 'saved', stash: undefined })
+	})
+
+	it('pushes nothing for a tree holding no work — only deleted tracked files', async () => {
+		const push = lane_with_changes(false)
+
+		await expect(lane_preserve.keep_work(ISSUE, LANE_DIRECTORY, OCCASION)).resolves.toStrictEqual({
+			kind: 'saved',
+			stash: undefined,
+		})
+		expect(push).not.toHaveBeenCalled()
 	})
 })
 

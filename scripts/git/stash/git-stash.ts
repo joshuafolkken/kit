@@ -104,6 +104,13 @@ async function has_conflict(directory?: string): Promise<boolean> {
 	return unmerged.length > 0
 }
 
+async function status_of(
+	directory?: string,
+	pathspec: ReadonlyArray<string> = [],
+): Promise<string> {
+	return await git_spawn.read(git_args(directory, ['status', '--porcelain', ...pathspec]))
+}
+
 // Uncommitted work is anything `git status --porcelain` lists — untracked files included, which is what
 // `push` below carries with `-u`, so the two agree on what "work" means.
 // A `pathspec` narrows both to the same paths, so a push never finds nothing where this found work.
@@ -111,9 +118,27 @@ async function has_changes(
 	directory?: string,
 	pathspec: ReadonlyArray<string> = [],
 ): Promise<boolean> {
-	const status = await git_spawn.read(git_args(directory, ['status', '--porcelain', ...pathspec]))
+	const status = await status_of(directory, pathspec)
 
 	return status !== ''
+}
+
+// A porcelain line for an unstaged deletion (` D`): a tracked file gone from the work tree, which the
+// index and the commit still hold. A staged deletion (`D `) is a deliberate `git rm` and an unmerged
+// `DD` a conflict, so both stay work.
+const DELETION_STATUS = ' D '
+
+// Whether a porcelain status carries work worth keeping. A tree whose only changes are tracked files
+// deleted is a work tree caught mid-removal, not work: the files are still in the commit, and pushing
+// it would leave an entry whose apply deletes them (joshuafolkken/kit#6979).
+function holds_work(status: string): boolean {
+	return status
+		.split(ENTRY_SEPARATOR)
+		.some((line) => line !== '' && !line.startsWith(DELETION_STATUS))
+}
+
+async function has_work(directory: string): Promise<boolean> {
+	return holds_work(await status_of(directory))
 }
 
 // What `josh stash:push` sets aside: everything but the observation ledger, whose lines ride on the
@@ -187,13 +212,18 @@ async function added_lines(hash: string, file: string, directory?: string): Prom
 // throwing. Sweeps are serialized by `stash-sweep-lock`, but a plain `git stash push` or `pop` from
 // another command landing between the resolve and the drop still shifts the position — that window is
 // the length of two local git calls.
-async function drop_by_hash(hash: string, directory?: string): Promise<boolean> {
+async function position_of(hash: string, directory?: string): Promise<string | undefined> {
 	const raw = await git_spawn.read(git_args(directory, ['stash', 'list', HASH_POSITION_FORMAT]))
-	const entry = parse_entries(raw).find((candidate) => candidate.selector === hash)
 
-	if (entry === undefined) return false
+	return parse_entries(raw).find((candidate) => candidate.selector === hash)?.subject
+}
 
-	await git_spawn.read(git_args(directory, ['stash', 'drop', entry.subject]))
+async function drop_by_hash(hash: string, directory?: string): Promise<boolean> {
+	const position = await position_of(hash, directory)
+
+	if (position === undefined) return false
+
+	await git_spawn.read(git_args(directory, ['stash', 'drop', position]))
 
 	return true
 }
@@ -211,11 +241,14 @@ const git_stash = {
 	has_changes,
 	has_conflict,
 	has_stashable_changes,
+	has_work,
+	holds_work,
 	list,
 	list_by_hash,
 	matches,
 	parse_entries,
 	pop,
+	position_of,
 	push,
 	select,
 	STASHABLE_PATHSPEC,
