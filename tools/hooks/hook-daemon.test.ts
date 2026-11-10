@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
@@ -41,8 +41,10 @@ function write_build(out_directory: string, outputs: ReadonlyArray<string>): voi
 	)
 }
 
-function built_package(): { package_directory: string; out_directory: string } {
-	const package_directory = make_directory(ROOT_PREFIX)
+function built_package(package_directory = make_directory(ROOT_PREFIX)): {
+	package_directory: string
+	out_directory: string
+} {
 	const out_directory = path.join(package_directory, 'dist', 'hooks')
 
 	mkdirSync(out_directory, { recursive: true })
@@ -171,6 +173,24 @@ describe('the daemon process', () => {
 		expect(pid).not.toBe(launcher.pid)
 		expect(existsSync(path.join(directory, 'requests'))).toBe(true)
 	})
+
+	// joshuafolkken/kit#6962: an installed package is reached through its `node_modules` symlink.
+	it('runs a daemon launched through a symlink to it', async () => {
+		const root = make_directory(ROOT_PREFIX)
+		const linked = path.join(root, 'linked-daemon.ts')
+		const directory = path.join(root, 'daemon')
+
+		symlinkSync(DAEMON_SOURCE, linked)
+		const daemon = spawn(TSX_BIN, [linked, directory], { stdio: 'ignore' })
+		const pid = await vi.waitFor(() => Number(readFileSync(path.join(directory, 'pid'), 'utf8')), {
+			timeout: DETACH_TIMEOUT_MS,
+		})
+
+		detached.push(pid)
+
+		expect(pid).toBeGreaterThan(0)
+		daemon.unref()
+	})
 })
 
 describe('hook_daemon.bundle_currency', () => {
@@ -194,6 +214,34 @@ describe('hook_daemon.bundle_currency', () => {
 		const is_current = hook_daemon.bundle_currency(out_directory, package_directory)
 
 		writeFileSync(path.join(package_directory, SOURCE_NAME), 'export const moved = 1\n')
+
+		expect(is_current()).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#6962: an installed package ships its build, not the sources its stamp lists.
+function installed_package(): { package_directory: string; out_directory: string } {
+	const built = built_package(
+		path.join(make_directory(ROOT_PREFIX), 'node_modules', '@joshuafolkken', 'kit'),
+	)
+
+	rmSync(path.join(built.package_directory, SOURCE_NAME))
+
+	return built
+}
+
+describe('hook_daemon.bundle_currency in an installed package', () => {
+	it('reads the build it loaded as current without the sources it was built from', () => {
+		const { package_directory, out_directory } = installed_package()
+
+		expect(hook_daemon.bundle_currency(out_directory, package_directory)()).toBe(true)
+	})
+
+	it('reads a reinstalled build as stale', () => {
+		const { package_directory, out_directory } = installed_package()
+		const is_current = hook_daemon.bundle_currency(out_directory, package_directory)
+
+		write_build(out_directory, [FIRST_OUTPUT, 'second.js'])
 
 		expect(is_current()).toBe(false)
 	})

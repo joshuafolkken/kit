@@ -24,7 +24,17 @@ describe('size_estimate measured thresholds', () => {
 
 		expect(size_estimate.is_issue_over_cap(issue, RATE)).toBe(true)
 		expect(size_estimate.guide_problem(body, undefined, RATE)).toContain('18 files or 450 lines')
-		expect(size_estimate.is_issue_over_cap({ body: body_of(1, 200) }, RATE)).toBe(false)
+		expect(size_estimate.over_cap(body_of(1, 200), undefined, RATE)).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#7006: within the cap, a projection over the implement budget is held too.
+	it('holds an issue within the cap projected over the implement budget', () => {
+		const body = body_of(1, 200)
+
+		expect(size_estimate.is_issue_over_cap({ body }, RATE)).toBe(true)
+		expect(size_estimate.is_issue_over_cap({ body: `${body}\n- 分割しない理由: 一体` }, RATE)).toBe(
+			false,
+		)
 	})
 
 	// joshuafolkken/kit#7005: the split exemption covers the guide and cap, not the implement budget.
