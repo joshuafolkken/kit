@@ -92,12 +92,12 @@ function request_of(values: Values): AdoptRequest | undefined {
 // records an action no option asked for.
 function action_problem(body: string, request: AdoptRequest): string | undefined {
 	const { option, done } = request
-	const needed = run_park_body.parent_action(body, option)
-	const isGiven = done !== ''
+	const is_needed = run_park_body.parent_action(body, option)
+	const is_given = done !== ''
 
-	if (needed === isGiven) return undefined
+	if (is_needed === is_given) return undefined
 
-	return needed
+	return is_needed
 		? `option ${String(option)} needs the parent's own action; take it, then re-run with --done "<what was done>" — nothing was written and the child stays parked`
 		: `option ${String(option)} needs no parent action; re-run without --done — nothing was written`
 }
