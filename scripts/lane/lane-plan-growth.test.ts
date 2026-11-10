@@ -58,7 +58,7 @@ describe('lane plan measured declaration growth', () => {
 		expect(over(1, { files_ratio: 1.5, lines_ratio: 3 })).toMatchObject({
 			reason: 'lines',
 			measured: 210,
-			limit: 200,
+			limit: 66,
 		})
 	})
 })

@@ -12,10 +12,6 @@ import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { session_cite } from '#scripts/issue/session-cite'
-import { size_estimate } from '#scripts/issue/size-estimate'
-import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
-import { lane_net_read } from '#scripts/lane/lane-net-read'
-import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
 //
@@ -340,18 +336,15 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 // `tracked` is the narrowed set `epic_index.withheld_children` builds, not
 // every tracked child; this function only applies it.
 // What the issue itself must hold: an author with write access (`auto-ok-author.ts`), every blocker
-// closed, its declared start date reached, and its declared size under the cap (joshuafolkken/kit#5502).
+// closed and its declared start date reached. Its size is the lane's to settle (joshuafolkken/kit#7074).
 interface RunnableOptions {
 	now?: number
-	implement_rate?: ImplementRate | undefined
-	growth?: SizeRatios | undefined
 }
 
 function is_ready(issue: OpenIssueData, options: RunnableOptions): boolean {
 	return (
 		auto_ok_author.is_author_trusted(issue) &&
 		is_unblocked(issue) &&
-		!size_estimate.is_issue_over_cap(issue, options.implement_rate, options.growth) &&
 		issue_not_before.is_due(issue.body, options.now ?? Date.now())
 	)
 }
@@ -454,7 +447,6 @@ async function answer(
 	}
 
 	return report({
-		...(await lane_net_read.measurements()),
 		issues: read.issues,
 		cutoff: read.cutoff,
 		tracked: epic_index.withheld_children(tracking.index, read.issues),
