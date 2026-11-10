@@ -70,7 +70,9 @@ function open<Value>(file: string, version: string, schema: z.ZodType<Value>): S
 			memo.keep(keys)
 			for (const key of known.keys()) if (!keys.has(key)) known.delete(key)
 		},
-		save: () => write(file, version, known),
+		save() {
+			write(file, version, known)
+		},
 	}
 }
 
