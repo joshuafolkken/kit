@@ -76,7 +76,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh observation:record` | `<key> <depth> <where> <what> [--checkout <path>]` | automation | files | Record an observation sighting and answer whether it is now filed |
 | `josh observations:flush` | — | automation | git, network | Commit the observation ledger as a pull request of its own, and merge it |
 | `josh pr` · `josh gp` | `<message>` | developer | network | Create PR only (skip commit and push) |
-| `josh review:findings` · `josh rvf` | — | developer | files | Count review findings by category from the observation ledger |
+| `josh review:findings` · `josh rvf` | `[--period <days>]` | developer | files | Count review findings by category from the observation ledger |
 | `josh review:record` | `--issue <N> [--comment \| --interaction] [<category>:<severity>:<file>[ — <reason>] ...] \| --from-slot --issue <N> [--comment \| --interaction] [<n>=<disposition> ...] \| --check [--interaction] --issue <N>` | automation | files, network | Record a review round’s findings, or check a round was recorded |
 | `josh review:stops` · `josh rvs` | `[--period <days>]` | developer | none | List the review findings that stopped a josh ship over a period, by kind, file:line and first sentence |
 

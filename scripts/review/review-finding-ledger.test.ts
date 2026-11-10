@@ -166,3 +166,51 @@ describe('review_finding_ledger — the round boundary', () => {
 		expect(review_finding_ledger.has_issue_record(boundary, ISSUE)).toBe(false)
 	})
 })
+
+const SINCE = '2026-11-03'
+// Out of period, five- and six-field lines, zero rounds on both sides of the boundary, and three
+// lines no reader counts: a missing issue field, an unknown severity, the interaction prefix.
+const PERIOD_LEDGER = [
+	'- rf:tests | low | a.ts | 2026-11-02 | #1',
+	'- rf:tests | high | a.ts | 2026-11-03 | #1',
+	'- rf:comments | low | b.ts | 2026-11-04 | #2',
+	'- rf:comments | low | b.ts | 2026-11-05 | #2 | fixed',
+	'- rf:bug-risks | medium | c.ts | 2026-11-06 | #3 | filed:#9',
+	'- rf:bug-risks | medium | c.ts | 2026-11-06 | #3',
+	'- rf:none | none | - | 2026-11-07 | #4',
+	'- rf:none | none | - | 2026-11-01 | #5',
+	'- rf:tests | high | a.ts | 2026-11-08',
+	'- rf:tests | urgent | a.ts | 2026-11-08 | #6',
+	'- ri:tests | high | a.ts | 2026-11-08 | #7',
+].join('\n')
+const TIED_LEDGER = ['tests', 'comments', 'assumptions', 'assumptions']
+	.map((category, index) => `- rf:${category} | low | t.ts | 2026-11-09 | #${String(index)}`)
+	.join('\n')
+
+// joshuafolkken/kit#7130: the period reader counts by severity, from the boundary day on.
+describe('review_finding_ledger — severity_counts over a period', () => {
+	const content = PERIOD_LEDGER
+
+	it('counts each severity of the in-period lines, medium and up first', () => {
+		expect(review_finding_ledger.severity_counts(content, SINCE)).toEqual([
+			{ category: 'bug-risks', high: 0, medium: 2, low: 0 },
+			{ category: 'tests', high: 1, medium: 0, low: 0 },
+			{ category: 'comments', high: 0, medium: 0, low: 2 },
+		])
+	})
+
+	it('ranks by low and then by name when the medium-and-up totals tie', () => {
+		expect(
+			review_finding_ledger.severity_counts(TIED_LEDGER, SINCE).map((entry) => entry.category),
+		).toEqual(['assumptions', 'comments', 'tests'])
+	})
+
+	it('counts only the zero rounds dated on or after the boundary', () => {
+		expect(review_finding_ledger.zero_round_count(content, SINCE)).toBe(1)
+		expect(review_finding_ledger.zero_round_count(content)).toBe(2)
+	})
+
+	it('finds nothing when every line predates the boundary', () => {
+		expect(review_finding_ledger.severity_counts(content, '2026-12-01')).toEqual([])
+	})
+})
