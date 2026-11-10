@@ -138,6 +138,16 @@ describe('josh read:set', () => {
 })
 
 // joshuafolkken/kit#5952: a measurement Issue declares the total, so it has to be a bare number.
+// joshuafolkken/kit#7139: the parent's note names what its trim drops, never "every point-of-use".
+describe('josh read:set — the backlogrun parent note', () => {
+	it('notes that the parent skips its children stages documents', () => {
+		const { out } = captured(() => read_set_cli.run([BACKLOGRUN], ROOT))
+
+		expect(out).toContain('skips the documents of a child’s stages')
+		expect(out).not.toContain('keeps every point-of-use document')
+	})
+})
+
 describe('josh read:set — the total as one number', () => {
 	it('prints only the total read bytes under --bytes, the figure of the total-read row', () => {
 		const { code, out } = captured(() => read_set_cli.run([FULLRUN, read_set_cli.BYTES_FLAG], ROOT))

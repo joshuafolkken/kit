@@ -33,6 +33,11 @@ const CORRECTIONS: ReadonlyArray<Correction> = [
 		present: 'read effective overrides only from `pnpm-workspace.yaml`',
 		absent: 'package.json の overrides に',
 	},
+	{
+		document_path: DEPENDENCY_UPDATE,
+		present: 'overrides: not judged',
+		absent: 'The check is a command you run',
+	},
 	{ document_path: ENTRY_SEQUENCE, present: 'pnpm josh latest:if-required', absent: 'pnpm latest' },
 	{
 		document_path: PLAN_COMMENT,

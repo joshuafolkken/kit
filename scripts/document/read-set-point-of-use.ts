@@ -52,9 +52,10 @@ const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 // **A file an entry names but reads only later — point-of-use for that entry, an entry read for
 // another**. The global set above cannot express this, because a file
 // dropped there leaves *every* entry's read. The four ordinary entries read the decision documents
-// only when delegation or filing arises; the lane child omits their SKILL.md sections. `backlogrun`'s
-// parent additionally reads `fullrun.md` and `split-assessment.md` inside a dispatched child, while
-// `fullrun`, `halfrun` and `kickoff` read them at their own entries.
+// only when delegation or filing arises; the lane child omits their SKILL.md sections. `backlogrun`
+// names `fullrun.md` and `split-assessment.md` for its dispatched child, which reads them in its own
+// unit (the parent's trim drops `fullrun.md`), while `fullrun`, `halfrun` and `kickoff` read them at
+// their own entries.
 const DEFERRED_DECISIONS: ReadonlySet<string> = new Set(['delegation.md', 'issue-scout.md'])
 const SPLIT_ASSESSMENT = 'split-assessment.md'
 

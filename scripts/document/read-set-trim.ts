@@ -70,15 +70,18 @@ function reduce_skill(file: FileCost, saving: Cost): FileCost {
 const HEADING_JOINER = '" + "'
 
 // **A document a command prints the sections of is charged at those sections** (joshuafolkken/kit#5953):
-// the reader never fetches it, so no manifest pointer names a section and the base charges it whole.
+// a row no manifest pointer sections (charged whole by the base) is read only as the printed sections,
+// and a row a manifest already sections is read as both (joshuafolkken/kit#7139).
 function printed_cost(
 	root: string,
 	row: SectionCost,
 	printed: ReadonlyArray<SectionReference>,
 ): SectionCost {
-	const headings = printed.filter((one) => one.file === row.file).map((one) => one.heading)
+	const printed_headings = printed.filter((one) => one.file === row.file).map((one) => one.heading)
 
-	if (headings.length === 0) return row
+	if (printed_headings.length === 0) return row
+	const named = row.heading === '' ? [] : row.heading.split(HEADING_JOINER)
+	const headings = [...new Set([...named, ...printed_headings])]
 	const text = document_section.read_optional(entry_read_set.document_path(root, row.file)) ?? ''
 
 	return {
