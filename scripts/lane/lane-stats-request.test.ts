@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { lane_stats_request } from './lane-stats-request'
 
+const SINCE = '2026-11-10T08:00+07:00'
+
 // The `josh lane:stats` flags read into one request, `--pairs` among the tables (joshuafolkken/kit#6189).
 
 describe('lane_stats_request.stats_request', () => {
 	it('reads the period alone as the period row and tables', () => {
 		expect(lane_stats_request.stats_request(['--period', '7'])).toStrictEqual({
-			period_days: 7,
+			start: { period_days: 7 },
 			limit: undefined,
 			sinks: undefined,
 			over: undefined,
@@ -56,6 +58,19 @@ describe('lane_stats_request.stats_request — other tables', () => {
 
 	it('refuses a period that is not positive', () => {
 		expect(lane_stats_request.stats_request(['--period', '0'])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7007: `--since <instant>` opens the window in place of `--period`.
+describe('lane_stats_request.stats_request — since', () => {
+	it('reads an ISO 8601 instant with an offset as the window start', () => {
+		expect(
+			lane_stats_request.stats_request(['--since', SINCE, '--over', '60'])?.start,
+		).toStrictEqual({ since_ms: Date.parse('2026-11-10T01:00:00.000Z') })
+	})
+
+	it.each([[['--since', 'soon']], [['--since', SINCE, '--period', '1']]])('refuses %j', (flags) => {
+		expect(lane_stats_request.stats_request(flags)).toBeUndefined()
 	})
 })
 

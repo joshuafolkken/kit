@@ -199,11 +199,12 @@ pnpm josh lane:sample   # one machine-load reading
 Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
 
 ```bash
-pnpm josh lane:stats --period 7             # a 7-day period's stage medians and maxima
-pnpm josh lane:stats --period 1 --sinks     # stage totals of the lanes over 30 net min
-pnpm josh lane:stats --period 1 --over 40   # ledger chains of lanes over 40 net min
-pnpm josh lane:stats --period 1 --why 40    # cause groups of lanes over 40 net min
-pnpm josh lane:stats --period 7 --pairs     # a 7-day period's scoped pair runs
+pnpm josh lane:stats --period 7                           # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 1 --sinks                   # stage totals of the lanes over 30 net min
+pnpm josh lane:stats --period 1 --over 40                 # ledger chains of lanes over 40 net min
+pnpm josh lane:stats --period 1 --why 40                  # cause groups of lanes over 40 net min
+pnpm josh lane:stats --period 7 --pairs                   # a 7-day period's scoped pair runs
+pnpm josh lane:stats --since 2026-11-10T01:00Z --why 40   # cause groups since an instant
 ```
 
 <!-- /usage -->

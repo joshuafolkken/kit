@@ -8,7 +8,7 @@ import { lane_stats } from './lane-stats'
 
 const NOW = Date.parse('2026-10-06T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
-const LABEL = { limit: '4', period_days: 1 }
+const LABEL = { limit: '4' }
 const GATE_MINUTES = [2, 4, 9]
 const MERGE_ISSUE = 7
 const PER_HOUR = 'merges / hour'

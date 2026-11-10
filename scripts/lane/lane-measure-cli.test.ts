@@ -25,6 +25,7 @@ const NOW = Date.parse('2026-10-06T12:00:00.000Z')
 const AT = new Date(NOW).toISOString()
 const FAILURE = 1
 const SINCE = '2026-10-06T00:00Z'
+const BEFORE_SINCE = '2026-10-05T23:00:00.000Z'
 const SESSION_FILE = 'session.jsonl'
 const GATE_STOP: LedgerEntry = { kind: 'stop', at: AT, issue: 1, reason: 'gate' }
 
@@ -81,6 +82,7 @@ describe('lane_measure_cli.run — refusals', () => {
 
 	it('names the net verb in the usage it prints', () => {
 		expect(lane_measure_cli.USAGE).toContain('josh lane:net <issue>')
+		expect(lane_measure_cli.USAGE).toContain('josh lane:stats --since <instant>')
 	})
 })
 
@@ -97,22 +99,27 @@ describe('lane_measure_cli.run — sample', () => {
 	})
 })
 
-describe('lane_measure_cli.run — stats', () => {
-	it('prints the header and the row of the ledger period under the given limit', async () => {
+// joshuafolkken/kit#7007: `--since` opens the window at its instant, dropping the merges before it.
+describe('lane_measure_cli.run — stats window', () => {
+	it.each([
+		[['--period', '1.25'], '| 6 | 1.25 | 2 |'],
+		[['--since', SINCE], '| 6 | 0.5 | 1 |'],
+	])('prints the header and the row of the %j window under the given limit', async (flags, row) => {
 		const context = fresh_context()
 
 		lane_ledger_write.append(context.ledger_path, { kind: 'merge', at: AT, issue: 1 })
-
-		await expect(
-			lane_measure_cli.run(['stats', '--period', '2', '--limit', '6'], context),
-		).resolves.toBe(0)
-
+		lane_ledger_write.append(context.ledger_path, { kind: 'merge', at: BEFORE_SINCE, issue: 2 })
+		const code = await lane_measure_cli.run(['stats', ...flags, '--limit', '6'], context)
 		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
 
-		expect(printed.startsWith(lane_stats.header())).toBe(true)
-		expect(printed).toContain('| 6 | 2 | 1 |')
-	})
+		expect(code).toBe(0)
 
+		expect(printed.startsWith(lane_stats.header())).toBe(true)
+		expect(printed).toContain(row)
+	})
+})
+
+describe('lane_measure_cli.run — stats', () => {
 	// joshuafolkken/kit#3643: the same command prints where the period's lanes spent their time.
 	it('prints the per-stage table under the row, unmeasured stages named as such', async () => {
 		const context = fresh_context()
