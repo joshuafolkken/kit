@@ -41,7 +41,7 @@ Single source: [`.claude/skills/workflow-commands/needs-human-review.md`](../.cl
 
 ### `already-done` — the exit for work that is already merged
 
-The exit for a run that verifies its issue's work is already in `main`. `josh issue:already-done` applies it, then closes the issue as `completed` when a cited pull request reads back as merged; the label stays on the closed issue.
+The exit for a run that verifies its issue's work is already in `main`. `josh issue:already-done` applies it, then closes the issue as `completed` when a cited pull request reads back as merged or `origin/main` contains a cited commit SHA; the label stays on the closed issue.
 
 Any other evidence leaves it OPEN with the label and prints why. Not `needs-decision` — it has its answer; a person closes it.
 

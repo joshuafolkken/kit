@@ -12,8 +12,9 @@ import { session_cite } from '#scripts/issue/session-cite'
 // comment, the `already-done` label and the close, and the `run:release`, in that order
 // (`issue-evidence-exit.ts`).
 //
-// **Evidence citing a merged pull request closes the Issue as `completed`** (joshuafolkken/kit#7079,
-// checked since joshuafolkken/kit#7093 — `already-done-citation.ts`). A reopen undoes the close and
+// **Evidence citing a merged pull request, or a commit on `origin/main`, closes the Issue as
+// `completed`** (joshuafolkken/kit#7079, checked since joshuafolkken/kit#7093 and
+// joshuafolkken/kit#7101 — `already-done-citation.ts`). A reopen undoes the close and
 // the comment records why, so it is Tier A. The label goes on first and stays, so a closed Issue
 // still shows it exited here; evidence that does not check leaves it OPEN with the label, for a
 // person to close. The label is provisioned by `josh start`, so nothing here creates it.

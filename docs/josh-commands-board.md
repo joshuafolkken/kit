@@ -106,19 +106,19 @@ pnpm josh run:board --every 5   # the --chat frame as a 📊 Progress Telegram e
 
 <!-- /usage -->
 
-`.vscode/tasks.json`, from `josh init` and `josh sync`, ships it as the `josh: run board` task, started by hand from "Tasks: Run Task".
+`josh init`/`josh sync` ship it in `.vscode/tasks.json` as the `josh: run board` task, run from "Tasks: Run Task".
 
 The header is three lines — the first two in three columns, the third a spinner and time under the second column, then the kind's icon and words under the third:
 
 ```
-▶ backlogrun  ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0
+▶ backlogrun  ⏰ 7°18′07″  ✅  1/2 ■■■■■───── (+1)  🔄 1  ⏳ 0  💤 0  📮 87/6,912
   kit         💓      20″  💪  11% ■─────────  🧠  29% ■■■───────  💾 2.6M/s ■─────────
               ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
-The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — every length on the board; a colon is a time of day), a progress bar and per-state counts. `🛫`: start to first lane.
+The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second form (`1°15′57″`, `26″` — every length on the board; a colon is a time of day), a progress bar, per-state counts, `📮` open/closed issues. `🛫`: start to first lane.
 
-The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow after 15 quiet minutes, red after 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
+The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow past 15 quiet minutes, red past 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
 The third line is what the run is doing now: a spinner, its age, then the kind's icon and words.
 
@@ -136,6 +136,8 @@ Below the header: the `📈 throughput` section, `24h` in hourly cells and `7d` 
 A child whose open lane has had no child process for `lane:await`'s 15-second re-confirm window is drawn stopped; an unanswered probe leaves it running. A single frame that finds an idle lane waits out the window and reads again. A lane this run's record ended (`lane:close`) is stopped too.
 
 A stopped row's times freeze at its stop — the record's end, else its first idle read or transcript's last write, if earlier — and its tail reads `stopped by <command>` if recorded. A child labelled stopped whose transcript reads running stays running: `ship stopped by <command>`.
+
+A finished row leads with `✅` merged, `🏁` done, `⏩` closed by `josh issue:already-done` or `🚫` withdrawn.
 
 A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 
