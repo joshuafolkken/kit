@@ -43,6 +43,7 @@ import { backlog_drive_restore, type LeftOut } from './backlog-drive-restore'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_retrospective_unit } from './backlog-drive-retrospective-unit'
 import { backlog_drive_seats } from './backlog-drive-seats'
+import { backlog_drive_tick, type RunningCheck } from './backlog-drive-tick'
 import { backlog_offer_cli } from './backlog-offer-cli'
 import { backlog_ready } from './backlog-ready'
 
@@ -115,10 +116,14 @@ function merge_token(out: string, code: number): string {
 // a restart after it ended — is read as having appeared, so it is collected after the re-confirm window
 // rather than waited on until the never-appeared timeout. One that never appeared is collected too:
 // `run:merge` reads its state rather than this loop guessing.
-function finished_checker(seeded: ReadonlySet<string>): (issue: string) => boolean {
+// `is_running` answers from the tick's process snapshot (`backlog_drive_tick`).
+function finished_checker(
+	seeded: ReadonlySet<string>,
+	is_running: RunningCheck,
+): (issue: string) => boolean {
 	const states = new Map<string, AwaitState>()
 	const config = {
-		is_running: lane_await.is_process_running_default,
+		is_running,
 		is_shipped: lane_await.is_shipped_default,
 		reconfirm_ms: lane_await.RECONFIRM_MS,
 		never_appeared_timeout_ms: lane_await.NEVER_APPEARED_TIMEOUT_MS,
@@ -195,11 +200,12 @@ function room_ports(): Pick<
 function child_ports(
 	seeded: ReadonlyArray<string>,
 	owner: string,
+	is_running: RunningCheck,
 ): Pick<LoopPorts, 'adoptable' | 'is_finished' | 'merge'> {
 	const known = new Set(seeded)
 
 	return {
-		is_finished: finished_checker(known),
+		is_finished: finished_checker(known, is_running),
 		merge: async (issue) => await backlog_drive_collect.merge(issue, owner),
 		adoptable: async (in_flight) => {
 			const adopting = await backlog_drive_adopt.adoptable(in_flight)
@@ -225,8 +231,11 @@ function ports_of(
 	last: { state: DriveState },
 	holds: HoldRecorder,
 ): LoopPorts {
+	const tick = backlog_drive_tick.tick_share()
+
 	return {
-		...child_ports(seeded, context.owner),
+		...child_ports(seeded, context.owner, tick.is_running),
+		begin_tick: tick.begin_tick,
 		offer: async (state) => await offer_for(state, context),
 		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		...room_ports(),
@@ -234,7 +243,7 @@ function ports_of(
 		...reporters(holds),
 		now: () => new Date(),
 		sleep,
-		...backlog_drive_record.record_ports(),
+		...backlog_drive_record.record_ports(tick.read),
 		finish: backlog_drive_finish.finish,
 		retrospective: async () => await backlog_drive_retrospective_unit.run(context.owner),
 		on_state: (state) => {
@@ -356,12 +365,14 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const backlog_drive_cli = {
+	child_ports,
 	end_line,
 	loop_config,
 	merge: backlog_drive_collect.merge,
 	merge_token,
 	offer_argv: backlog_drive_offer_argv.offer_argv,
 	parse: backlog_drive_args.parse,
+	ports_of,
 	read_offer,
 	resume_line: backlog_drive_args.resume_line,
 	run,
