@@ -79,7 +79,7 @@ interface RunCarry {
 	// The consecutive-API-outage streak. It is kept apart from `failures`
 	// because a child that could not reach the API is not a child that failed: an outage is not counted
 	// against the consecutive-failure guard, and this streak is its own environment-broken guard — a run
-	// of outages stops the run rather than re-dispatching into a dead API forever. **A merge or a genuine
+	// of outages holds launches rather than re-dispatching into a dead API. **A merge or a genuine
 	// child failure resets it**, because both prove the API was reachable; only a further outage adds to
 	// it.
 	outages: number

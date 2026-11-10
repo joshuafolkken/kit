@@ -4,8 +4,8 @@ const { MERGE_TOKEN } = run_merge_token
 
 // How the loop reads each `run:merge` token — keyed by the producer's own type, so a token added there
 // is a type error here until it is classified. `hand-back` ends the loop at once: a hand-off, a person's
-// stop, the environment down, a foreign owner, an unreadable state. `stop` — the failure guard, or a
-// failed child left unparked — collects the child, starts nothing more, and collects the children still
+// stop, the environment down, a foreign owner, an unreadable state. `stop` — a failed child left
+// unparked — collects the child, starts nothing more, and collects the children still
 // in flight before the loop ends. `await` is a cut resumed in place: the same lane is awaited again.
 //
 // **The offer `run:merge` passes through is never read here** (joshuafolkken/kit#3781): its `stop` —

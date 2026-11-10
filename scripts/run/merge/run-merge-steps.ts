@@ -512,6 +512,7 @@ const run_merge_steps = {
 	do_outage,
 	has_resumable_cut,
 	is_over_budget,
+	read_record,
 	refused_carry,
 	resume_cut,
 	stash_stopped,

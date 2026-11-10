@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #7078 adds run-merge-health.ts (CI whole-tree main check, second-run confirmation, solo Issue filing), the shared run-event since() reset, and the outage cap during a launch hold; backlogrun stops become waits/holds; the busy row split adds 20 on-demand bytes",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 134
+	}
+}

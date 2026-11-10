@@ -616,8 +616,7 @@ branch, clean tree, no live process — `lane-vacant.ts`), else kept.
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
 `over` (the merge crossed the `pnpm josh cost --cut` context threshold: hand the lanes over and cut),
-`stop` (failure guard), `environment` (the consecutive-outage guard tripped,
-or a child could not authenticate; it keeps `in-progress`, uncounted, for `/login`), `resumed` (a cut child's successor was relaunched — await that lane again), `retry`
+`stop` (a failed child left unparked), `resumed` (a cut child's successor was relaunched — await that lane again), `retry`
 (unreadable), `busy` (refused count; exit 1).
 
 A human-review child keeps its lane and hold, counts nothing, and offers more children.
