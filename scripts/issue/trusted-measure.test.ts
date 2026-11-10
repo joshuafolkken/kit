@@ -62,6 +62,13 @@ describe('trusted_measure execution boundary', () => {
 
 		expect(trusted_measure.run_command(COMMAND, source).kind).toBe('ok')
 	})
+
+	// joshuafolkken/kit#7022: `lane:plan` re-runs a premise through the same boundary.
+	it('runs a declared premise', () => {
+		const source = { ...TRUSTED, body: `## 背景\n- 前提: \`${COMMAND}\` <= 5` }
+
+		expect(trusted_measure.run_command(COMMAND, source).kind).toBe('ok')
+	})
 })
 
 describe('trusted_measure execution refusal and failure', () => {

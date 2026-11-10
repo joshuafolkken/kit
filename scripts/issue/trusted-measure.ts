@@ -27,8 +27,10 @@ type CommandRun = { kind: 'ok'; output: string } | { kind: 'failed'; message: st
 function declared_commands(body: string): Array<string> {
 	const baselines = baseline_measure.parse_baselines(body).map((baseline) => baseline.command)
 	const declaration = measure_declaration.parse(body)
+	const premises = measure_declaration.premises(body).map((premise) => premise.command)
+	const declared = declaration === undefined ? [] : [declaration.command]
 
-	return declaration === undefined ? baselines : [...baselines, declaration.command]
+	return [...baselines, ...declared, ...premises]
 }
 
 // The command's stdout, trimmed, or the message a failing or timed-out command threw.
