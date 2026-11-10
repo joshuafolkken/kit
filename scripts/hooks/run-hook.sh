@@ -66,9 +66,13 @@ daemon_answer() {
 		;;
 	esac
 	request=$(mktemp -d "$daemons_dir/call.XXXXXX") || return
+	# Written before stdin is read, so a call whose environment cannot be written runs itself untouched.
+	if ! awk 'BEGIN { for (name in ENVIRON) { value = ENVIRON[name]; gsub(/%/, "%25", value); gsub(/\n/, "%0A", value); print name "=" value } }' >"$request/env"; then
+		rm -rf "$request"
+		return
+	fi
 	cat >"$request/payload"
 	printf '%s' "$JOSH_HOOK_CWD" >"$request/cwd"
-	awk 'BEGIN { for (name in ENVIRON) { value = ENVIRON[name]; gsub(/%/, "%25", value); gsub(/\n/, "%0A", value); print name "=" value } }' >"$request/env"
 	printf '%s' "$$" >"$request/launcher"
 	mkfifo "$request/reply"
 	exec 4<>"$request/reply"

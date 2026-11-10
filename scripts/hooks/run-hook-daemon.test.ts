@@ -215,6 +215,18 @@ describe(
 				CALLERS,
 			)
 		})
+
+		it('runs the call itself when its environment cannot be written', async () => {
+			const answer = vi.fn<Daemon['answer']>()
+
+			serve_from(await daemon_directory(), answer)
+			write_file(workspace.root, 'bin/awk', '#!/bin/sh\nexit 1\n')
+			chmodSync(path_in('bin/awk'), 0o755)
+			const { stdout } = await launch()
+
+			expect(stdout).toBe(FALLBACK_OUTPUT)
+			expect(answer).not.toHaveBeenCalled()
+		})
 	},
 )
 
