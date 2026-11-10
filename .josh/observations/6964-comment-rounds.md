@@ -1,0 +1,5 @@
+- rf:project-conventions | low | scripts/gh/git-gh-exec.test.ts:257 | 2026-11-10 | #6964 | fixed
+- rf:comments | low | scripts/gh/git-gh-failure.ts:51 | 2026-11-10 | #6964 | fixed
+- rf:project-conventions | low | scripts/gh/git-gh-exec.test.ts:257 | 2026-11-10 | #6964
+- rf:comments | low | scripts/gh/git-gh-failure.ts:51 | 2026-11-10 | #6964
+- rf:comments | low | scripts/gh/git-gh-failure.ts:47 | 2026-11-10 | #6964

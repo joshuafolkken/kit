@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/run/ship/run-ship-preflight.ts:199 | 2026-11-10 | #6986

@@ -1,0 +1,2 @@
+- rf:project-conventions | low | scripts/issue/size-estimate.ts:282 | 2026-11-10 | #7006
+- rf:comments | low | scripts/backlog/backlog-pool.ts:75 | 2026-11-10 | #7006

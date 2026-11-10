@@ -1,0 +1,1 @@
+- rf:bug-risks | low | tools/test/classify-isolation.ts:39 | 2026-11-09 | #6489

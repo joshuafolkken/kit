@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/gh/gh-call-kind.ts:49 | 2026-11-09 | #6867
+- rf:performance | low | scripts/gh/gh-usage-log.ts:36 | 2026-11-09 | #6867
