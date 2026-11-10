@@ -65,6 +65,33 @@ describe('read_set_trim.costed — an unused SKILL.md section', () => {
 	})
 })
 
+// joshuafolkken/kit#7139: a printed section joins the sections a manifest already names, never
+// replacing them; a row charged whole is read only as its printed sections.
+describe('read_set_trim.costed — a printed section', () => {
+	const base = read_set_trim.costed(ROOT, spec({}))
+	const sectioned = base.point_of_use.find((one) => one.heading !== '')
+	const whole = base.point_of_use.find((one) => one.heading === '')
+	const PRINTED = 'A printed heading'
+	const printed = [sectioned, whole]
+		.filter((one) => one !== undefined)
+		.map((one) => ({ file: one.file, heading: PRINTED }))
+	const report = read_set_trim.costed(ROOT, spec({ printed_sections: printed }))
+
+	function row_of(file: string | undefined): (typeof report.point_of_use)[number] | undefined {
+		return report.point_of_use.find((one) => one.file === file)
+	}
+
+	it('keeps the named sections of a sectioned row beside the printed one', () => {
+		expect(sectioned).toBeDefined()
+		expect(row_of(sectioned?.file)?.heading).toBe(`${sectioned?.heading ?? ''}" + "${PRINTED}`)
+	})
+
+	it('reads a whole row as its printed section alone', () => {
+		expect(whole).toBeDefined()
+		expect(row_of(whole?.file)?.heading).toBe(PRINTED)
+	})
+})
+
 describe('read_set_trim.costed — a point-of-use document the role does not own', () => {
 	const base = read_set_trim.costed(ROOT, spec({}))
 	const skipped = base.point_of_use[0]?.file ?? ''
