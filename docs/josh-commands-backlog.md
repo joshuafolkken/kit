@@ -306,7 +306,7 @@ pnpm josh issue:body 6982 --body-file .josh/tmp/issue-6982-body.md
 
 <!-- /usage -->
 
-It prints the issue URL. `issue:plan` writes only a blank body; this replaces a non-blank one. A consultation session refuses every non-GET `gh api`, so a body rewrite goes through this command.
+It prints the issue URL. `issue:plan` writes only a blank body; this replaces a non-blank one. An epic body (`## Split rationale`) skips `issue:lint`; check it with `epic:check`. A consultation session refuses every non-GET `gh api`, so a body rewrite goes through this command.
 
 ### `josh issue:plan`
 
