@@ -28,8 +28,11 @@ async function read(issue: string): Promise<ParkRead> {
 		: { comments, body }
 }
 
-function adopt_line(issue: string, option: number): string {
-	return `pnpm josh backlog:triage --apply ${issue} --adopt ${String(option)} --reason <text>`
+// An option needing the parent's own action is refused without `--done` (joshuafolkken/kit#7001).
+function adopt_line(issue: string, option: number, body: string): string {
+	const done = run_park_body.parent_action(body, option) ? ' --done <the parent action taken>' : ''
+
+	return `pnpm josh backlog:triage --apply ${issue} --adopt ${String(option)} --reason <text>${done}`
 }
 
 // The park's recommendation and tier, then the `--adopt` line when a parent may take it; no line for a
@@ -42,7 +45,7 @@ async function lines_of(number: number): Promise<ReadonlyArray<string>> {
 	const summary = `${session_cite.issue(issue)} ${run_park_body.summary_of(park.body) ?? ''}`
 	const pick = run_park_body.adoptable_pick(park.body)
 
-	return pick === undefined ? [summary] : [summary, adopt_line(issue, pick)]
+	return pick === undefined ? [summary] : [summary, adopt_line(issue, pick, park.body)]
 }
 
 const backlog_triage_park = { lines_of, read }

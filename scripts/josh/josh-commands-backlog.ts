@@ -72,7 +72,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 			"Run a parent triage pass, decide solo/lane from three conditions, or apply one issue's verdict",
 		category: 'AI tools',
 		reference: [
-			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear] | --apply <n> --adopt <k> --reason <text>',
+			'--pass [--exclude <n>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <n> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear] | --apply <n> --adopt <k> --reason <text> [--done <text>]',
 			'automation',
 			['files', 'network'],
 		],
@@ -129,6 +129,11 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--adopt <k>'],
 					description:
 						"takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.",
+				},
+				{
+					names: ['--done <text>'],
+					description:
+						'what the parent did for an option whose `必要な権限` starts with `親` (e.g. `親セッション`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.',
 				},
 			],
 		},

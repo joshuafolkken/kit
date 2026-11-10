@@ -95,17 +95,12 @@ describe('backlog_drive_after_merge — a parked child', () => {
 		expect(run).toHaveBeenLastCalledWith(CLEAR, true)
 		vi.restoreAllMocks()
 	})
-
-	it("decides a tier A park needing only the parent's permission", async () => {
-		const { ports, runs } = recorded([park_body('A', '親')])
-
-		await expect(backlog_drive_after_merge.resolve(ISSUE, ports)).resolves.toBe(true)
-		expect(runs.at(-1)).toStrictEqual(CLEAR)
-	})
 })
 
 describe('backlog_drive_after_merge — a park left to a person', () => {
 	it.each([
+		// joshuafolkken/kit#7001: adopting it takes no action, so the child would park again.
+		["a park needing the parent's own action", park_body('A', '親')],
 		['a tier B park', park_body('B', 'なし')],
 		['a park needing a person', park_body('A', '人')],
 		['a park needing the trust setting', park_body('A', '信頼設定')],
