@@ -29,19 +29,19 @@ function search_answer(path: string): string {
 
 describe('run_board_issue_count.part_of', () => {
 	it('draws the open and closed counts with thousands separated', () => {
-		expect(part_of(REPO, { open: 87, closed: 6912 })).toBe('📮 87/6,912')
+		expect(part_of(REPO, { open: 87, closed: 6912 }, String)).toBe('📮 87/6,912')
 	})
 
 	it('separates the open count too once it passes a thousand', () => {
-		expect(part_of(REPO, { open: 1234, closed: 1_234_567 })).toBe('📮 1,234/1,234,567')
+		expect(part_of(REPO, { open: 1234, closed: 1_234_567 }, String)).toBe('📮 1,234/1,234,567')
 	})
 
 	it('draws nothing where no count was read', () => {
-		expect(part_of(REPO, undefined)).toBeUndefined()
+		expect(part_of(REPO, undefined, String)).toBeUndefined()
 	})
 
 	it('draws nothing before a plan names the repository', () => {
-		expect(part_of(undefined, { open: 87, closed: 6912 })).toBeUndefined()
+		expect(part_of(undefined, { open: 87, closed: 6912 }, String)).toBeUndefined()
 	})
 })
 

@@ -1,0 +1,7 @@
+{
+	"reason": "#7111 adds text-keyed once-per-session markers for ship preconditions, the issue-only spill and their tests",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 41
+	}
+}

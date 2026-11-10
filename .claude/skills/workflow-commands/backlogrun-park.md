@@ -25,7 +25,8 @@ children while free lanes remain.
 ## park and continue
 
 When a child hits something only a person can decide (→ "Only a person's judgement carries
-`needs-decision`"), **park the child and keep going**:
+`needs-decision`"; every stop left to a person: `scripts/issue/issue-human-stops.ts`), **park the
+child and keep going**:
 
 ```bash
 pnpm josh run:park <N> --body-file .josh/tmp/park.md   # body schema: docs/josh-commands-run.md → "josh run:park"; applies needs-decision, then releases

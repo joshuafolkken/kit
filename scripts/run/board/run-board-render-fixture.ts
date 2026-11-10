@@ -42,6 +42,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		repo: undefined,
 		link: (reference) => reference,
 		pull_link: String,
+		repo_link: String,
 		...extra,
 	}
 }
