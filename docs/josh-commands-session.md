@@ -55,6 +55,29 @@ pnpm josh doc:section backlogrun.md "The hand-off"
 
 **Output / exit codes:** an unresolvable heading exits non-zero and lists the document's own headings.
 
+### `josh code:symbol`
+
+<!-- usage: code:symbol -->
+
+Print one TypeScript declaration by name, numbered, or list where a name is declared.
+
+```bash
+pnpm josh code:symbol <file> <name>                              # the declaration, its comment block included
+pnpm josh code:symbol <name>                                     # every file:line that declares it
+pnpm josh code:symbol scripts/code/code-symbol.ts declarations
+```
+
+<!-- /usage -->
+
+**Behavior:**
+
+- The code counterpart of `doc:section`: the extent comes from the TypeScript parse tree, not a guessed line range.
+- Function, class, method, interface, type alias, enum and variable declarations match by name; a variable prints its whole statement.
+- The comment block touching a declaration (no blank line between) prints with it.
+- Without a file, the tracked and untracked `.ts` / `.tsx` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` files are searched. A Svelte `<script>` is not read.
+
+**Output / exit codes:** an undeclared name exits non-zero — with a file, listing the names the file declares.
+
 ### `josh read:set`
 
 <!-- usage: read:set -->
@@ -86,7 +109,7 @@ Two figures under one definition, which is what makes a before and an after comp
 - `total read` sums the scoped entry read and the point-of-use documents that entry actually reaches — the figure a before/after compares.
 - **Every row and the total carry a per-run dollar figure** — the cache-read rate times the run size the report states.
 - **`lane-child` is a synthetic entry**: it prints the trimmed set a dispatched lane child reads.
-- **`backlogrun` prints a trimmed parent set**: the parent never implements, so it skips `SKILL.md` §3. It is a _different_ trim from the lane child's — the parent keeps §0 and drops no point-of-use document.
+- **`backlogrun` prints a trimmed parent set**: the parent never implements, so it skips `SKILL.md` §3. It is a _different_ trim from the lane child's — the parent keeps §0, drops only the documents of its children's stages (`chain-rule.md`, `background-commands.md`, `fullrun.md`), and also charges the sections `run:step` prints at its own stages.
 
 **Output / exit codes:** an unrecognized keyword is refused with the known ones listed, rather than reporting a saving of zero.
 

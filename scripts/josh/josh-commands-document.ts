@@ -17,6 +17,22 @@ const DOCUMENT_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'code:symbol': {
+		script: 'scripts/code/code-symbol-cli.ts',
+		description:
+			'Print one TypeScript declaration by name, numbered, or list where a name is declared',
+		category: 'AI tools',
+		reference: ['<file> <name> | <name>', 'automation', ['none']],
+		// Parses the repository's sources and prints, so a consultation session can run it.
+		is_read_only: true,
+		usage: {
+			examples: [
+				{ arguments: '<file> <name>', note: 'the declaration, its comment block included' },
+				{ arguments: '<name>', note: 'every file:line that declares it' },
+				{ arguments: 'scripts/code/code-symbol.ts declarations' },
+			],
+		},
+	},
 	'read:set': {
 		script: 'scripts/document/read-set-cli.ts',
 		description: 'Print what an entry point reads before it starts, and what that read costs',
