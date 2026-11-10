@@ -326,7 +326,7 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 // the two commit listings are read every poll because `mergeable_state` and the rollup both move
 // while CI runs; the review listing is read when the predicate says this poll's verdict turns on it.
 // Reading the review only when it can change the verdict keeps a long wait's request count down
-// (joshuafolkken/kit#1043).
+// (joshuafolkken/kit#1043). A GraphQL snapshot already carries it: one query per poll (#7143).
 async function default_fetch_pr_state(
 	branch_name: string,
 	should_read_review_decision: ReviewDecisionPredicate = should_always_read_review_decision,
@@ -336,7 +336,7 @@ async function default_fetch_pr_state(
 
 	if (!should_read_review_decision(snapshot)) return snapshot
 
-	const decision = await git_gh_pr_snapshot.pr_get_review_decision(checks.pr_number)
+	const decision = await git_gh_pr_snapshot.pr_read_review_decision(checks)
 
 	return { ...snapshot, review_decision: read_string(decision) }
 }

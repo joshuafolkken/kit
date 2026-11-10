@@ -15,7 +15,7 @@ vi.mock('./git-gh-pr-auto-merge', () => ({
 vi.mock('./git-gh-pr-snapshot', () => ({
 	git_gh_pr_snapshot: {
 		pr_get_checks_snapshot: vi.fn(),
-		pr_get_review_decision: vi.fn(),
+		pr_read_review_decision: vi.fn(),
 	},
 }))
 
@@ -50,7 +50,7 @@ function stub_state(state: Record<string, unknown>): void {
 
 beforeEach(() => {
 	read_merged.mockResolvedValue(false)
-	vi.mocked(git_gh_pr_snapshot.pr_get_review_decision).mockResolvedValue('')
+	vi.mocked(git_gh_pr_snapshot.pr_read_review_decision).mockResolvedValue('')
 })
 
 afterEach(() => {
@@ -60,7 +60,7 @@ afterEach(() => {
 // An approved pull request with every required check green — what the observer describes poll.
 function use_green_approved(): void {
 	beforeEach(() => {
-		vi.mocked(git_gh_pr_snapshot.pr_get_review_decision).mockResolvedValue('APPROVED')
+		vi.mocked(git_gh_pr_snapshot.pr_read_review_decision).mockResolvedValue('APPROVED')
 		stub_state(GREEN_STATE)
 	})
 }
@@ -80,6 +80,16 @@ describe('git_pr_checks.wait_for_pr_success — observer', () => {
 		const result = await git_pr_checks.wait_for_pr_success(BRANCH, 1, undefined, observe)
 
 		expect(observed).toStrictEqual([result])
+	})
+
+	// #7143: the review decision is taken from the snapshot the round already read.
+	it('reads the review decision from the round’s own snapshot', async () => {
+		await git_pr_checks.wait_for_pr_success(BRANCH, 1)
+
+		expect(git_gh_pr_snapshot.pr_read_review_decision).toHaveBeenCalledWith({
+			pr_number: PR_NUMBER,
+			snapshot_json: JSON.stringify(GREEN_STATE),
+		})
 	})
 
 	// #6868: the gate's wait reads on the checks schedule's lead, not the merge's first wait.
