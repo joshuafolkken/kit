@@ -1,4 +1,12 @@
-import { closeSync, constants, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
+import {
+	closeSync,
+	constants,
+	openSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeSync,
+} from 'node:fs'
 import { lane_ledger_write } from './lane-ledger-write'
 
 // The mark a backlog driver leaves beside the measurement ledger when it hands back a run with every
@@ -70,6 +78,26 @@ function read(ledger: string): string | undefined {
 	}
 }
 
-const lane_hand_back_hold = { clear, mark, read }
+// The mark's reason, removing it: renamed away first, so of two lanes freeing at once only one takes
+// it (joshuafolkken/kit#7121). `undefined` where none stands or another writer took it first.
+function take(ledger: string): string | undefined {
+	const taken = `${mark_of(ledger)}.${String(process.pid)}`
+
+	try {
+		renameSync(mark_of(ledger), taken)
+	} catch {
+		return undefined
+	}
+
+	try {
+		return readFileSync(taken, MARK_ENCODING)
+	} catch {
+		return undefined
+	} finally {
+		rmSync(taken, { force: true })
+	}
+}
+
+const lane_hand_back_hold = { clear, mark, read, take }
 
 export { lane_hand_back_hold }

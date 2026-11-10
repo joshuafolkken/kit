@@ -31,6 +31,18 @@ describe('run_board_read.read_local launch hold', () => {
 		})
 	})
 
+	// joshuafolkken/kit#7121: a lane freed after a full driver's hand-back holds by the mark's reason.
+	it('keeps a hand-back hold written after the driver’s release', async () => {
+		const reason = 'hand-back:window'
+
+		arrange_ledger([
+			{ kind: 'released', at: '2026-10-08T08:59:00.000Z' },
+			{ ...HOLD, reason },
+		])
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ launch_hold: reason })
+	})
+
 	it('drops the reason once a dispatch released the hold', async () => {
 		arrange_ledger([HOLD, { kind: 'dispatch', at: ENDED_AT, issue: 1 }])
 
