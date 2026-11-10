@@ -53,8 +53,8 @@ function rerun(issue: string, from?: string, mode: ReadonlyArray<string> = []): 
 	return `then rerun \`${[COMMAND, issue, ...mode, ...resume].join(' ')}\``
 }
 
-// `main:merge` exits 0 on its split notice and prints it: a size notice is a warning, so the chain goes
-// on to the review stages without a split child (joshuafolkken/kit#6602).
+// `main:merge` prints no split notice: size is judged before implementation (joshuafolkken/kit#7009),
+// so the chain goes on to the review stages without a split child (joshuafolkken/kit#6602).
 const MERGE_STAGE: ChainStage = {
 	name: MAIN_MERGE,
 	argv: [MAIN_MERGE],

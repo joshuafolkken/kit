@@ -44,11 +44,11 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 
 ## Over the guide before the gate
 
-**Trigger: `pnpm josh main:merge` prints a `split notice`** — the branch's diff, untracked files
-included, passes the Issue's declared size × the growth factor, capped at the guide (no declaration:
-the guide), on either axis; the first `lint:related` or `test:related` past that bar prints it earlier,
-once per Issue. The notice is a warning, not a stop: go on implementing;
-`run:cut`, `run:chain`, review and ship print it and proceed.
+**Trigger: `run:cut` or `run:chain` repeats the `split notice` `lane:plan` recorded** while the
+branch's diff, untracked files included, still passes the Issue's declared size × the growth factor,
+capped at the guide (no declaration: the guide), on either axis. Scoped checks and `main:merge` print
+none. The notice is a warning, not a stop: go on implementing;
+review and ship print it and proceed.
 
 - Split again only for an independent added requirement, or scope growth this Issue cannot verify:
   file it with `pnpm josh issue:file --route split --found-during <N>`.

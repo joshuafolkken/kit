@@ -1,11 +1,11 @@
 import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { issue_declared_size } from '#scripts/issue/issue-declared-size'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { split_assess } from './split-assess'
-import { split_early_notice } from './split-early-notice'
 import { split_measure } from './split-measure'
 import { split_resolution } from './split-resolution'
 import { split_verified_single } from './split-verified-single'
@@ -42,7 +42,7 @@ const list_comments = vi.spyOn(git_gh_issue_read, 'issue_list_comments')
 const is_trusted = vi.spyOn(gh_author_association, 'is_trusted')
 const record_split_filed = vi.spyOn(lane_ledger_write, 'record_split_filed')
 const read_branch = vi.spyOn(split_measure, 'read_branch')
-const declared = vi.spyOn(split_early_notice, 'declared')
+const declared = vi.spyOn(issue_declared_size, 'read')
 const verified = vi.spyOn(split_verified_single, 'verified')
 
 function comments_json(body: string, association = OWNER): string {
@@ -146,6 +146,16 @@ describe('split_resolution.ledger_warning', () => {
 		declared.mockResolvedValueOnce({ files: 2, lines: 50 })
 
 		expect(await split_resolution.ledger_warning(ISSUE)).toContain(NO_CHILD)
+		expect(declared).toHaveBeenCalledWith(String(ISSUE))
+	})
+
+	it('falls back to the guide when the declaration cannot be read', async () => {
+		vi.spyOn(lane_ledger, 'target').mockResolvedValueOnce(LEDGER_PATH)
+		vi.spyOn(lane_ledger, 'read_entries').mockReturnValueOnce([NOTICE])
+		read_branch.mockResolvedValueOnce({ files: 3, lines: 150, verdict: 'single' })
+		declared.mockRejectedValueOnce(new Error('issue body: unreadable'))
+
+		expect(await split_resolution.ledger_warning(ISSUE)).toBeUndefined()
 	})
 })
 
