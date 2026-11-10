@@ -24,7 +24,7 @@ const BLOCKED_ANSWER = 'blocked'
 const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
 const IDLE_RECOVERY =
-	'Decide the parked issues, fix and release the stalled ones, or start the next run with `backlogrun`.'
+	'Act on each issue under its heading, fix and release the stalled ones, or start the next run with `backlogrun`.'
 
 interface IdlePorts {
 	read_issues: () => Promise<ReadonlyArray<OpenIssueData> | undefined>
