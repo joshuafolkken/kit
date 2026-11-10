@@ -119,15 +119,20 @@ function parse(body: string): MeasureDeclaration | undefined {
 	return value === undefined ? undefined : parsed(value)
 }
 
+// Every premise line that parses, in body order; `problems` refuses the rest at filing.
+function premises(body: string): ReadonlyArray<MeasureDeclaration> {
+	return background_values(body, PREMISE_PREFIX).flatMap((value) => parsed(value) ?? [])
+}
+
 // The declaration's problems, then every premise line's, each read as the declaration is.
 function problems(body: string): ReadonlyArray<string> {
 	const value = declared_value(body)
 	const declared = value === undefined ? [] : value_problems(value, PREFIX)
-	const premises = background_values(body, PREMISE_PREFIX).flatMap((premise) =>
+	const premised = background_values(body, PREMISE_PREFIX).flatMap((premise) =>
 		value_problems(premise, PREMISE_PREFIX),
 	)
 
-	return [...declared, ...premises]
+	return [...declared, ...premised]
 }
 
 function value_of(output: string): number | undefined {
@@ -164,6 +169,7 @@ const measure_declaration = {
 	is_stated,
 	judge,
 	parse,
+	premises,
 	problems,
 }
 

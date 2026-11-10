@@ -427,6 +427,8 @@ A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-r
 
 A `--single` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply.
 
+A first plan re-runs each `- 前提:` line of its issue's trusted body (`scripts/lane/lane-plan-premise.ts`), printing `premise: <declaration> measured <value>` on stderr. One that does not hold, or an untrusted body, answers `premise`, exit 4, unrecorded: park the lane. No premise line runs nothing; a re-plan never re-runs them.
+
 `--size-approval <json-file>` (optional; a re-plan never needs one): `issue`, `paths`, `source` (trusted same-issue comment), `rationale`; `declared_lines`/`max_lines` and/or `declared_files`/`max_files`. Records author/body, checks scope; other gates remain. Steps: [Approve a lane plan past its size guide](./how-to/lane-size-approval.md).
 
 `--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
