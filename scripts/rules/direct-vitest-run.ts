@@ -8,8 +8,8 @@ import { shell_segments } from './shell-segments'
 //
 // **Only the runs `test:related` can carry**: `vitest run` or bare `vitest`, launched directly,
 // through `pnpm` / `npx` / `pnpm exec` or inside `sh -c` (`command_memory.tool_calls_of`, the reading
-// `lane-direct-tool` shares). Silent: a flag that takes its value (`--project`, `--config`, `-c`),
-// which `test:related` cannot carry; another subcommand (`bench`, `list`); `--help` / `--version`;
+// `lane-direct-tool` shares). Silent: a run pinned to one project or config (`--project`,
+// `--config`, `-c`), whose spaced value `test:related` would read as a file; another subcommand (`bench`, `list`); `--help` / `--version`;
 // and a run inside `reserved-run`, the budgeted path a lane child is rewritten to.
 //
 // **It fires on every occurrence**: a run refused once and free after would leave the record unwritten
@@ -71,7 +71,8 @@ function is_any_test_run(command: string): boolean {
 
 const DIRECT_VITEST_RUN_REASON =
 	'⛔ direct vitest run: pnpm josh test:related [<file>…]\n' +
-	'Run that in place of this `vitest run` — it hands the files and flags on to vitest and leaves ' +
+	'Run that in place of this `vitest run` — it hands the files and `--flag=value` flags on to ' +
+	'vitest and leaves ' +
 	'the record the gate reuses (`docs/josh-commands.md` → "`josh test:related`"). `--project` / ' +
 	'`--config` and `vitest bench` / `list` pass. **This rule fires on every occurrence.**'
 
