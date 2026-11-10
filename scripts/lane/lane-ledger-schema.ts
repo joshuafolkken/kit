@@ -201,6 +201,9 @@ const test_related_schema = z.object({
 	branch_tracked: z.number().optional(),
 	branch_untracked: z.number().optional(),
 	branch_base: z.enum(['merge_base', 'fallback']).optional(),
+	// `changed` split by whether that branch change holds the file (joshuafolkken/kit#7066).
+	changed_in_branch: z.number().optional(),
+	changed_off_branch: z.number().optional(),
 	elapsed_ms: z.number(),
 })
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
