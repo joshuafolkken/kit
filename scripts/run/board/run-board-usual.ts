@@ -37,7 +37,7 @@ function medians_of(
 	return new Map([...lane_stage_stats.medians(entries), ...lane_stage_stats.medians(recent)])
 }
 
-function usual_of(entries: ReadonlyArray<LedgerEntry>, now_ms: number): UsualTimes {
+function compute_usual(entries: ReadonlyArray<LedgerEntry>, now_ms: number): UsualTimes {
 	const medians = medians_of(entries, now_ms)
 
 	return new Map(
@@ -47,6 +47,23 @@ function usual_of(entries: ReadonlyArray<LedgerEntry>, now_ms: number): UsualTim
 			return phase === undefined || median === undefined ? [] : [[phase, median] as const]
 		}),
 	)
+}
+
+// The last ledger's usual times: `lane_ledger.read_entries` hands back the same array while the file
+// is unchanged, so a board round over it aggregates nothing again (joshuafolkken/kit#7012). The recent
+// window then trails `now_ms` only until the next append — the sampler's, within a minute.
+const usual_memo = new WeakMap<ReadonlyArray<LedgerEntry>, UsualTimes>()
+
+function usual_of(entries: ReadonlyArray<LedgerEntry>, now_ms: number): UsualTimes {
+	const known = usual_memo.get(entries)
+
+	if (known !== undefined) return known
+
+	const usual = compute_usual(entries, now_ms)
+
+	usual_memo.set(entries, usual)
+
+	return usual
 }
 
 const run_board_usual = { usual_of }
