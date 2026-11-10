@@ -8,6 +8,8 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
+import { review_pair } from '#scripts/review/review-pair'
+import { review_pair_session } from '#scripts/review/review-pair-session'
 import { review_round } from '#scripts/review/review-round'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_ship_brokered_review } from './run-ship-brokered-review'
@@ -199,6 +201,25 @@ async function run_brokered(
 		: ended_session(`isolated reviewer failed: ${answer.reason}`, slots)
 }
 
+// The paired comparison reviewer runs beside the code reviewer alone, and only while the code brief was
+// paired (joshuafolkken/kit#7020); a lane's broker starts it beside the reviewers it starts.
+async function launch_pair(slots: ReadonlyArray<ReviewSlot>): Promise<void> {
+	if (slots.includes(CODE)) await review_pair_session.launch(PROJECT_ROOT, PRIORITY_ENVIRONMENT)
+}
+
+async function run_slots(
+	sessions: ReadonlyArray<SlotSession>,
+	round: Round,
+	slots: ReadonlyArray<ReviewSlot>,
+): Promise<ReadonlyArray<JoshResult>> {
+	const [results] = await Promise.all([
+		Promise.all(sessions.map(async (session) => await run_slot(session, round))),
+		launch_pair(slots),
+	])
+
+	return results
+}
+
 // **The slots' reviewers run side by side** (joshuafolkken/kit#4672), and the first failure among
 // them is the result — each slot is launched through the same path a single review takes.
 async function run_sessions(
@@ -214,7 +235,7 @@ async function run_sessions(
 		return await run_brokered(issue, round, slots)
 	}
 
-	const results = await Promise.all(sessions.map(async (session) => await run_slot(session, round)))
+	const results = await run_slots(sessions, round, slots)
 
 	return (
 		results.find((result) => result.code !== SUCCESS_EXIT_CODE) ?? {
@@ -224,8 +245,22 @@ async function run_sessions(
 	)
 }
 
+function offer_pair(code: Briefed | undefined): void {
+	if (code !== undefined) review_pair.offer(code.brief)
+}
+
+// The paired round's comparison, recorded and never gating: a refused record is only noted.
+async function record_pair(issue: string): Promise<void> {
+	const argv = review_pair_session.pair_argv(issue, paths(CODE).log, PROJECT_ROOT)
+	if (argv === undefined) return
+	const result = await josh(argv)
+
+	if (result.code !== SUCCESS_EXIT_CODE) note(`paired reviewer: review:pair recorded nothing`)
+}
+
 // The brief goes to a file and the previous round's findings are removed, so a reviewer that writes
-// nothing reads as unfinished rather than as the last round's verdict.
+// nothing reads as unfinished rather than as the last round's verdict. The code brief is paired, or its
+// last pairing removed, before any reviewer starts (`review-pair.ts`).
 async function launch_reviewers(
 	briefs: ReadonlyArray<Briefed>,
 	prompt_of: PromptOf,
@@ -242,12 +277,17 @@ async function launch_reviewers(
 		stamp_file.remove_stamp(target.findings)
 	}
 
-	return await run_sessions(
+	offer_pair(code)
+	const result = await run_sessions(
 		effective_round === ROUND_TWO ? run_ship_review.verification_prompt : prompt_of,
 		issue,
 		effective_round,
 		briefs.map(({ slot }) => slot),
 	)
+
+	await record_pair(issue)
+
+	return result
 }
 
 // A refused attestation — the issue changed after the brief, an update left unread, no attestation —

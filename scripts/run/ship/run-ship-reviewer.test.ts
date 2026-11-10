@@ -30,6 +30,10 @@ vi.mock('#scripts/agent/agent-argv', () => ({
 	},
 }))
 vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch_attached: launch } }))
+vi.mock('#scripts/review/review-pair', () => ({ review_pair: { offer: vi.fn() } }))
+vi.mock('#scripts/review/review-pair-session', () => ({
+	review_pair_session: { launch: vi.fn(), pair_argv: vi.fn() },
+}))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: () => false },
 }))

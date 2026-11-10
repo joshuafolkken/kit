@@ -43,6 +43,15 @@ describe('review_pair_cli.findings_of', () => {
 	})
 })
 
+// joshuafolkken/kit#7020: a reviewer the ship or a lane's broker started headless is a session of its own.
+describe('review_pair_cli.is_agent_session', () => {
+	it("matches a delegated unit's transcript and a headless session's own", () => {
+		expect(review_pair_cli.is_agent_session('root/subagents/agent-abc', 'abc')).toBe(true)
+		expect(review_pair_cli.is_agent_session('abc', 'abc')).toBe(true)
+		expect(review_pair_cli.is_agent_session('other-abc', 'abc')).toBe(false)
+	})
+})
+
 describe('review_pair_cli.run', () => {
 	it('appends one comparison with both sides, their severities and costs', () => {
 		const log = fresh_log()

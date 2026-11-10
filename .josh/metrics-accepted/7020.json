@@ -1,0 +1,7 @@
+{
+	"reason": "#7020 adds the paired reviewer launch and record to the ship's round 1 and the lane broker (review-pair-session.ts)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 121
+	}
+}
