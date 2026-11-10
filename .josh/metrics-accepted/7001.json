@@ -1,0 +1,8 @@
+{
+	"reason": "Round-1 review fixes: --done refused on options needing no parent action, run:board round only on a latest park, and the 親-prefix carry-out-then-adopt wording in backlogrun-park.md and the backlog:triage docs (#7001)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 31,
+		"ai_cost.on_demand_bytes": 121
+	}
+}

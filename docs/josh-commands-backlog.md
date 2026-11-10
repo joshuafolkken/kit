@@ -358,10 +358,10 @@ pnpm josh plan:consumers lane:pause run:paused   # one block per identifier, one
 
 <!-- usage: issue:already-done -->
 
-Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold.
+Exit an issue whose work is already merged: post the evidence, close it (cited merge) or apply already-done, release the hold.
 
 ```bash
-pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # comment, label, release — in that order
+pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # comment, close or label, release — in that order
 ```
 
 **Options:**
@@ -937,6 +937,7 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
 - `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
 - `--adopt <k>` — takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.
+- `--done <text>` — what the parent did for an option whose `必要な権限` starts with `親` (e.g. `親セッション`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.
 
 <!-- /usage -->
 
@@ -947,7 +948,8 @@ The pass reads local `needs-decision`, `run:stalled` and remaining judgments onc
 Foreign-repository and excluded children are not read. With none left it prints `backlog:plan --waves`.
 
 `--adopt` reads the latest trusted park comment on `run:park`'s schema; any listed option but tier C
-is adoptable. Recovery guidance prints only when a read is due.
+is adoptable. An option whose `必要な権限` starts with `親` is carried out first, then adopted with
+`--done <what was done>`. Recovery guidance prints only when a read is due.
 
 Run the pass at the initial plan and after each collection batch that parked a child. The driver
 hands back `triage` once per such batch before its next offer; a batch without parks adds no step,

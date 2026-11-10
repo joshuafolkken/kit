@@ -102,6 +102,10 @@ describe('josh backlog:triage — atomic solo refusal', () => {
 	it('shows the three affirmative answers required for solo (ac-facb5348)', () => {
 		expect(backlog_triage_cli.USAGE).toContain(`--solo ${SOLO_ANSWERS.join(' ')}`)
 	})
+
+	it("shows --done beside --adopt for an option needing the parent's action (joshuafolkken/kit#7001)", () => {
+		expect(backlog_triage_cli.USAGE).toContain('--adopt <k> --reason <text> [--done <text>]')
+	})
 })
 
 describe('josh backlog:triage — the arguments', () => {

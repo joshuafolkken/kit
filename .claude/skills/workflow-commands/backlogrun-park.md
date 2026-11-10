@@ -86,7 +86,8 @@ known, and removed when the reason is not on it.
 A recommendation the child lacked the permission to take → the parent runs
 `pnpm josh backlog:triage --apply <N> --adopt <k> --reason <text>` (tiers: `operating-rules.md` →
 "decision-autonomy"): a scoped size approval, a premise the body constrains, a run-tooling defect to
-file. A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
+file. An option whose `必要な権限` starts with `親` → carry it out first, then adopt it with
+`--done <what was done>`. A dependency → `--apply <N> --blocked-by <M>` / `--unblock <M>`. No tracking epic → comment the
 decision, `run:park <N> --clear`, `run:add <N> --retry`.
 
 ### A park left for a person
