@@ -3,6 +3,7 @@ import { git_gh_issue_graphql } from '#scripts/gh/git-gh-issue-graphql'
 import { git_gh_transport } from '#scripts/gh/git-gh-transport'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
+import type { RepoLink } from './run-board-link'
 
 // The repository's open and closed issues as `run:board`'s first line ends on them — `📮 87/6,912` —
 // so the backlog's size is read off the board rather than GitHub (joshuafolkken/kit#7088). GraphQL's
@@ -79,11 +80,19 @@ async function read_issue_count(repo: string): Promise<IssueCount | undefined> {
 	return text === undefined ? await read_rest_count(repo) : count_of(text)
 }
 
-// The chip, drawn only once the plan has named the repository and its count has been read.
-function part_of(repo: string | undefined, count: IssueCount | undefined): string | undefined {
+// The chip, drawn only once the plan has named the repository and its count has been read; each count
+// opens its own issue list (joshuafolkken/kit#7089).
+function part_of(
+	repo: string | undefined,
+	count: IssueCount | undefined,
+	link: RepoLink,
+): string | undefined {
 	if (repo === undefined || count === undefined) return undefined
 
-	return `${ICON} ${count.open.toLocaleString(LOCALE)}/${count.closed.toLocaleString(LOCALE)}`
+	const open = link(count.open.toLocaleString(LOCALE), 'open')
+	const closed = link(count.closed.toLocaleString(LOCALE), 'closed')
+
+	return `${ICON} ${open}/${closed}`
 }
 
 const run_board_issue_count = { count_of, part_of, read_issue_count }

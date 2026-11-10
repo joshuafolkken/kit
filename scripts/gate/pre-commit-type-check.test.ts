@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
 import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
-import { TSC_ARGS } from './type-check-command'
+import { TSC_ARGS } from './tsc-arguments'
 
 // joshuafolkken/kit#1381: the pre-commit hook type-checked the whole project seconds after `josh gate`
 // had printed the same project-wide type check green on the same tree, with nothing edited in between.
@@ -93,8 +93,6 @@ const DEFAULT_STEP: ReadonlyArray<string> = ['josh', 'check']
 // Held in a variable so the lookup keeps its index-signature form: `COMMAND_MAP.check` is what the
 // formatter rewrites a literal key to, and `noPropertyAccessFromIndexSignature` then refuses it.
 const GATE_TYPE_CHECK_COMMAND = 'check'
-// The one token of the hook's argv that names `pnpm exec` rather than the check itself.
-const EXEC_TOKEN = 'exec'
 const TYPE_CHECK_SCRIPT = 'scripts/gate/type-check-command.ts'
 
 const TYPE_CHECK_EXIT_CODE = 2
@@ -369,13 +367,15 @@ describe('the core budget the type check claims', () => {
 // real invariant, and leaving it unchecked would let a later redefinition of `josh check` reopen the
 // hole the guard closes: the guard would still say yes while the record covered a different check.
 describe('the recorded default step is this hook’s own check', () => {
-	it.each(pre_commit_type_check.TYPE_CHECK_ARGUMENTS.filter((token) => token !== EXEC_TOKEN))(
-		'josh check runs %s, so a record it wrote covers what this hook would run',
-		(token) => {
-			expect(COMMAND_MAP[GATE_TYPE_CHECK_COMMAND]?.script).toBe(TYPE_CHECK_SCRIPT)
-			expect(TSC_ARGS).toContain(token)
-		},
-	)
+	it('runs the type check script josh check routes to', () => {
+		expect(COMMAND_MAP[GATE_TYPE_CHECK_COMMAND]?.script).toBe(TYPE_CHECK_SCRIPT)
+	})
+
+	it('runs tsc with exactly the arguments josh check runs it with', async () => {
+		await run_hook()
+
+		expect(execa).toHaveBeenCalledWith('pnpm', [...TSC_ARGS], expect.anything())
+	})
 })
 
 // The hook's line names this command, so a command that is not registered is a commit that fails on

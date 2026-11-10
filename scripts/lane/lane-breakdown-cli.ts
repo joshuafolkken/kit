@@ -9,7 +9,7 @@ import { lane_breakdown_estimate } from './lane-breakdown-estimate'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text } from './lane-breakdown-text'
 import { lane_cut_stats } from './lane-cut-stats'
-import { lane_ledger } from './lane-ledger'
+import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_net_time } from './lane-net-time'
 import { lane_sinks, type SinkRecords } from './lane-sinks'
 
@@ -30,12 +30,6 @@ function sinks_line(records: SinkRecords, issue: number): string {
 	return `- Largest time sinks (stages and laps overlap): ${parts.join('; ')}`
 }
 
-async function read_ledger(): Promise<ReturnType<typeof lane_ledger.read_entries>> {
-	const path = await lane_ledger.target()
-
-	return path === undefined ? [] : lane_ledger.read_entries(path)
-}
-
 function cut_lines(events: ReadonlyArray<RunEvent>, issue: number): ReadonlyArray<string> {
 	const cuts = lane_cut_stats.line(events, issue)
 
@@ -52,7 +46,7 @@ function missing(issue: string): number {
 
 async function print(issue: string): Promise<number> {
 	const timeline = await lane_breakdown_estimate.read(
-		await read_ledger(),
+		await lane_ledger_archive.read_history({}),
 		await run_event_stream_emit.all_events(),
 		Number(issue),
 	)

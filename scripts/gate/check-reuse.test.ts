@@ -124,6 +124,17 @@ describe('check_reuse.record_green_checks', () => {
 		await expect(reused(records, RECORDED)).resolves.toStrictEqual([TYPE_CHECK_LABEL])
 	})
 
+	// joshuafolkken/kit#7053: the fix after a red check reruns that check, not the green ones it left alone.
+	it('reuses a red gate green check over a fix that moved none of its inputs', async () => {
+		const records = records_in('fixed-')
+		const results = [passed(LINT_LABEL), { ...passed(TYPE_CHECK_LABEL), exit_code: FAIL }]
+		const fixed = { files: { ...FILES, [SKILL_DOC]: 'digest-fix' }, base: RECORDED.base }
+
+		await check_reuse.record_green_checks(results, RECORDED, records)
+
+		await expect(reused(records, fixed)).resolves.toStrictEqual([LINT_LABEL])
+	})
+
 	it('records nothing when the tree moved while the checks ran', async () => {
 		const records = records_in('moved-')
 

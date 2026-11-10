@@ -1,4 +1,5 @@
 import { duplicate_reads } from '#scripts/delegation/duplicate-read-guard'
+import { large_reads } from '#scripts/delegation/large-read-guard'
 import { session_language_cli } from '#scripts/josh/session-language-cli'
 import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
@@ -43,6 +44,8 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	['notice: lane direct tool rewrite', lane_direct_tool.RESERVED_NOTE],
 	['duplicate read refusal', duplicate_reads.REASON],
 	['notice: duplicate read', duplicate_reads.NOTICE],
+	['large read refusal', large_reads.REASON],
+	['notice: large read', large_reads.NOTICE],
 	['parent cut', run_parent_cut_hook.PARENT_CUT_REASON],
 	['poll', run_poll_hook.POLL_REASON],
 ]
