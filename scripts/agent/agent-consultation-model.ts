@@ -17,11 +17,8 @@ const CONSULTATION_MODELS: Readonly<Record<AgentProvider, string>> = {
 // The `Agent` tool's alias for the Claude consultation model.
 const CONSULTATION_ALIAS = 'fable'
 
-// The id prefix of each provider's models, which tells a main line's provider from its model.
-const MODEL_PREFIXES: Readonly<Record<AgentProvider, string>> = {
-	anthropic: 'claude-',
-	openai: 'gpt-',
-}
+// Every Opus release, the default's family, costs more than the investigation model.
+const MAIN_FAMILY_PREFIX = 'claude-opus-'
 
 // The provider whose consultation model this is, by id or by the `Agent` alias; `undefined` for any
 // other model.
@@ -31,16 +28,20 @@ function consultation_provider(model: string): AgentProvider | undefined {
 	return PROVIDER_SCHEMA.options.find((provider) => CONSULTATION_MODELS[provider] === model)
 }
 
-// The provider a model id belongs to; `undefined` for an id neither provider names.
-function model_provider(model: string): AgentProvider | undefined {
-	return PROVIDER_SCHEMA.options.find((provider) => model.startsWith(MODEL_PREFIXES[provider]))
+// The provider a main line on this model hands its reading over on: the Opus family or a
+// consultation model, each above its investigation model's rate; `undefined` for a cheaper or unknown
+// model, which has nothing cheaper to hand to.
+function rated_provider(model: string): AgentProvider | undefined {
+	if (model.startsWith(MAIN_FAMILY_PREFIX)) return ANTHROPIC_PROVIDER
+
+	return consultation_provider(model)
 }
 
 const agent_consultation_model = {
 	CONSULTATION_ALIAS,
 	CONSULTATION_MAIN_MODEL,
 	consultation_provider,
-	model_provider,
+	rated_provider,
 }
 
 export { agent_consultation_model }

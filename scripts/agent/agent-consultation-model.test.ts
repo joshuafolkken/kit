@@ -34,17 +34,20 @@ describe('agent_consultation_model.CONSULTATION_MAIN_MODEL — the consultation 
 	})
 })
 
-describe('agent_consultation_model.model_provider — which provider a main model belongs to', () => {
+describe('agent_consultation_model.rated_provider — a main model above the investigation rate', () => {
 	it.each([
 		[OPUS, ANTHROPIC],
+		['claude-opus-4-1', ANTHROPIC],
 		[FABLE, ANTHROPIC],
 		[ASTRA, OPENAI],
-		[SOL, OPENAI],
 	])('places %s under %s', (model, provider) => {
-		expect(agent_consultation_model.model_provider(model)).toBe(provider)
+		expect(agent_consultation_model.rated_provider(model)).toBe(provider)
 	})
 
-	it.each(['<synthetic>', 'haiku', ''])('places %s under no provider', (model) => {
-		expect(agent_consultation_model.model_provider(model)).toBeUndefined()
-	})
+	it.each(['claude-sonnet-5-5', 'claude-haiku-4-5', SOL, '<synthetic>', ''])(
+		'places %s under no provider',
+		(model) => {
+			expect(agent_consultation_model.rated_provider(model)).toBeUndefined()
+		},
+	)
 })

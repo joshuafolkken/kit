@@ -24,7 +24,7 @@ const DELEGATION = '.claude/skills/workflow-commands/delegation.md'
 const TOPIC = `\`${DELEGATION}\` → "A consultation main line hands its investigation to a unit"`
 const NARROW_EXAMPLE = `\`Read\` of a file or an \`offset\` / \`limit\` range <= ${String(READ_LINE_CAP)} lines, \`grep -n <pattern> <one file>\``
 
-const QUIET = `a launched session (lane, reviewer, scheduler), a delegated unit, a main line on the investigation model, another provider's or an unnamed model, or a narrow check (${NARROW_EXAMPLE})`
+const QUIET = `a launched session (lane, reviewer, scheduler), a delegated unit, a main line at or below the investigation rate (Sonnet, Haiku, Sol), on another provider's or an unnamed model, or a narrow check (${NARROW_EXAMPLE})`
 
 type Satisfied = (tail: string, call: GuardedCall, run: GuardRun) => boolean
 
@@ -32,8 +32,9 @@ function reason(provider: AgentProvider, dispatch: string): string {
 	const model = agent_role_profile.investigation_model(provider)
 
 	return (
-		`⛔ consultation investigation: the consultation main line hands broad investigation to ${dispatch} on ` +
-		`\`${model}\`, which returns \`file:line\` citations. ` +
+		// The dispatch opens the reason, so the Claude and Codex rows keep distinct signatures.
+		`⛔ consultation investigation → ${dispatch} on \`${model}\`: the consultation main line hands ` +
+		`broad investigation to it, and it returns \`file:line\` citations. ` +
 		`Keep only a narrow check here — ${NARROW_EXAMPLE}. It fires on every occurrence (\`${DELEGATION}\`).`
 	)
 }
@@ -42,13 +43,10 @@ function reason(provider: AgentProvider, dispatch: string): string {
 // apart by its launch, not its model: it runs on Opus, the same model a lane does. A launched session
 // has its reading budgeted by its own guards, and a delegated unit — the Fable `design-consultant`
 // among them — has no `Agent` tool to hand the reading to. A main line on another provider's model
-// is the other row's, and one already on the investigation model has nothing cheaper to hand to; an
+// is the other row's, and one at or below the investigation rate has nothing cheaper to hand to; an
 // unnamed model stays silent rather than guessing.
 function is_handed_on(provider: AgentProvider, model: string | undefined): boolean {
-	const delegated = agent_role_profile.investigation_model(provider)
-	if (model === undefined || model === delegated) return false
-
-	return agent_consultation_model.model_provider(model) === provider
+	return model !== undefined && agent_consultation_model.rated_provider(model) === provider
 }
 
 function not_consulted_on(provider: AgentProvider): Satisfied {
@@ -84,14 +82,15 @@ const ROW = row('consultation-investigation', ANTHROPIC_PROVIDER, 'an `investiga
 	title: 'Consultation main line delegates investigation (Claude)',
 	topic: TOPIC,
 	fires:
-		'a broad investigation call — `Glob`, `WebFetch`, a `Read` past the line cap, a tree `Grep` or shell search, an investigation dispatch inheriting the model — on the consultation main line on a Claude model. Every occurrence',
+		'a broad investigation call — `Glob`, `WebFetch`, a `Read` past the line cap, a tree `Grep` or shell search, an investigation dispatch inheriting the model — on the consultation main line on Opus or Fable. Every occurrence',
 	quiet: QUIET,
 })
 
 const CODEX_ROW = row('consultation-investigation-codex', OPENAI_PROVIDER, 'a Codex subagent', {
 	title: 'Consultation main line delegates investigation (Codex)',
 	topic: TOPIC,
-	fires: 'a broad shell investigation on the consultation main line on Codex. Every occurrence',
+	fires:
+		'a broad shell investigation on the consultation main line on Codex Astra. Every occurrence',
 	quiet: QUIET,
 })
 

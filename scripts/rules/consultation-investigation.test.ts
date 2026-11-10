@@ -215,6 +215,7 @@ describe('consultation-investigation — a launched session or another main line
 
 	it.each([
 		['the investigation model', SONNET],
+		['a model below the investigation rate', 'claude-haiku-4-5'],
 		['an unnamed model', undefined],
 	])('lets every broad call through on %s', (_case, model) => {
 		expect(delivered(model, 'Read', { file_path: ONE_FILE })).toBeUndefined()
