@@ -67,8 +67,10 @@ function period_of(argv: ReadonlyArray<string>): number | undefined {
 }
 
 // The first ledger date inside the last `days` — the boundary day counts, as the ledger dates by day.
+// A period reaching before the epoch starts there, since no ledger line predates it and a start past
+// `Date`'s range would throw rather than count.
 function since_of(days: number, now_ms: number): string {
-	return observation_ledger_home.ledger_date(new Date(now_ms - days * MS_PER_DAY))
+	return observation_ledger_home.ledger_date(new Date(Math.max(now_ms - days * MS_PER_DAY, 0)))
 }
 
 function report_of(content: string, days: number, now_ms: number): string {

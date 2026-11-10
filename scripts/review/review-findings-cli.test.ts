@@ -97,12 +97,20 @@ describe('review_findings_cli.run --period', () => {
 		)
 	})
 
+	it('starts a period reaching past the date range at the epoch rather than throwing', async () => {
+		expect(await report_of(root_with(ledger[0] ?? ''), ['--period', '200000000'])).toBe(
+			'findings by category and severity since 1970-01-01:\n  tests: high 0 · medium 0 · low 1\nzero-finding rounds recorded: 0',
+		)
+	})
+
 	it('leaves the run with no argument on the all-time category counts', async () => {
 		expect(await report_of(root_with(...ledger))).toBe(
 			'findings by category:\n  tests: 2\n  bug-risks: 1\nzero-finding rounds recorded: 2',
 		)
 	})
+})
 
+describe('review_findings_cli.run --period refusal', () => {
 	it.each([['0'], ['-3'], ['1.5'], ['week']])(
 		'prints the usage and fails for --period %s',
 		async (value) => {
