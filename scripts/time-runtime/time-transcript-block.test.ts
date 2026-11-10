@@ -18,7 +18,7 @@ describe('time_transcript_block.to_blocks', () => {
 		]
 		const [block] = time_transcript_block.to_blocks([{ type: 'tool_result', content }])
 
-		expect(block?.result_chars).toBeGreaterThanOrEqual(5)
+		expect(block?.result_chars).toBe(6)
 	})
 
 	it('reads a call with no body as zero characters', () => {

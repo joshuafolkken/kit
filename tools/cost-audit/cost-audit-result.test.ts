@@ -60,6 +60,16 @@ describe('cost_audit_result.breakdown_of tool results', () => {
 		expect(result.josh).toEqual([{ key: 'josh run:step', results: 1, chars: 10 }])
 	})
 
+	it('counts a result once when a resumed session repeats it', () => {
+		const lines = [
+			request_line(1, 'a', 1, [read('/x.ts')]),
+			result_line(2, BRANCH, 'a-Read', 'x'.repeat(30)),
+		]
+		const result = breakdown_of(lines, lines)
+
+		expect(result.tools).toEqual([{ key: 'Read', results: 1, chars: 30 }])
+	})
+
 	it('skips a result whose call the session does not hold', () => {
 		const result = breakdown_of([result_line(2, BRANCH, 'missing', 'z'.repeat(5))])
 

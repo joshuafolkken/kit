@@ -81,11 +81,16 @@ function calls_of(blocks: ReadonlyArray<Block>): Map<string, Block> {
 	return new Map(calls.filter((call) => call.id !== '').map((call) => [call.id, call]))
 }
 
-function results_of(lines: ReadonlyArray<TranscriptLine>): Array<CallResult> {
+// A resumed session's transcript repeats the earlier file's results, so one counted in an earlier
+// session (`seen`, by the call id it answers) is not counted again.
+function results_of(lines: ReadonlyArray<TranscriptLine>, seen: Set<string>): Array<CallResult> {
 	const blocks = lines.flatMap((line) => line.blocks)
 	const calls = calls_of(blocks)
+	const fresh = blocks.filter((block) => block.result_id !== '' && !seen.has(block.result_id))
 
-	return blocks
+	for (const block of fresh) seen.add(block.result_id)
+
+	return fresh
 		.map((block) => ({ call: calls.get(block.result_id), chars: block.result_chars }))
 		.filter((result): result is CallResult => result.call !== undefined)
 }
@@ -160,7 +165,8 @@ function effort_rows(sessions: ReadonlyArray<AuditSession>): Array<EffortSpend> 
 
 // The current period's breakdown, read from sessions already cut to the period.
 function breakdown_of(sessions: ReadonlyArray<AuditSession>): ResultBreakdown {
-	const per_session = sessions.map((session) => results_of(session.lines))
+	const seen = new Set<string>()
+	const per_session = sessions.map((session) => results_of(session.lines, seen))
 	const results = per_session.flat()
 	const efforts = effort_rows(sessions)
 

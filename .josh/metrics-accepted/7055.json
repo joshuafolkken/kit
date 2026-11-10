@@ -1,7 +1,7 @@
 {
-	"reason": "cost:audit effort and tool-result breakdown (#7055): new aggregation module plus the transcript block parser split out of time-transcript-line.ts",
+	"reason": "cost:audit effort and tool-result breakdown (#7055) adds the result module, the block split and their tests",
 	"date": "2026-11-10",
 	"growth": {
-		"scripts.code_lines": 189
+		"scripts.code_lines": 192
 	}
 }
