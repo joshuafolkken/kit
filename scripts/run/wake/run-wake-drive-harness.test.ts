@@ -49,7 +49,8 @@ function offered(world: World, state: DriveState): OfferRead {
 }
 
 // The run's own records: nothing added, raised or named.
-const NO_RECORD: Pick<DrivePorts, 'added_since' | 'raised_since' | 'named_left'> = {
+const NO_RECORD: Pick<DrivePorts, 'begin_tick' | 'added_since' | 'raised_since' | 'named_left'> = {
+	begin_tick: async () => undefined,
 	added_since: async () => false,
 	raised_since: async () => false,
 	named_left: async () => false,
