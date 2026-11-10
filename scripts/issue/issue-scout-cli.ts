@@ -351,9 +351,13 @@ async function scout(args: ScoutArguments, repo: string): Promise<ScoutOutcome |
 
 	// The same cut `warn_about_gaps` reports on standard error, read once more so standard output is
 	// held to it too — a ⚠ beside an executable instruction is not what stops a run acting on it.
+	// A cited issue whose title does not match (score 0) is shown as `ref` but holds nothing: a body
+	// cites its evidence and unrelated issues alike, and only a title match marks the same work.
 	return {
 		report: linkified_report(draft, widened, closed, repo),
-		candidates: duplicates.candidates.map((candidate) => candidate.number),
+		candidates: duplicates.candidates
+			.filter((candidate) => candidate.score > 0)
+			.map((candidate) => candidate.number),
 		measure_twins: measure_twin.twins_of(args.body, backlog.issues),
 	}
 }

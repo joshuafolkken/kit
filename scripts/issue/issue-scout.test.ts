@@ -196,6 +196,20 @@ describe('issue_scout.find_duplicates — explicit references', () => {
 	})
 })
 
+describe('issue_scout.find_duplicates — one issue in two listings', () => {
+	it('names a number once when the open and closed listings both carry it', () => {
+		const row = { number: UNRELATED_NUMBER, title: UNRELATED_TITLE }
+		const found = issue_scout.find_duplicates(
+			DRAFT_TITLE,
+			[row, { ...row, is_closed: true }],
+			[UNRELATED_NUMBER],
+		)
+
+		expect(found.candidates.map((candidate) => candidate.number)).toStrictEqual([UNRELATED_NUMBER])
+		expect(found.total).toBe(SINGLE_CANDIDATE)
+	})
+})
+
 describe('issue_scout.find_duplicates — the issue filed minutes ago', () => {
 	it('finds a candidate sitting last in the listing', () => {
 		const issues = [

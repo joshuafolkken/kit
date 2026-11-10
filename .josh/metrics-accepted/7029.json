@@ -1,0 +1,7 @@
+{
+	"reason": "#7029: dedupe scout candidates per number and hold a filing only on title matches (+14 code lines)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}

@@ -206,6 +206,22 @@ function compare_candidates(left: DuplicateCandidate, right: DuplicateCandidate)
 	return reference_order || right.score - left.score
 }
 
+// One row per number. The open listing, a directly read reference and the closed listing can each
+// carry the same issue, and naming it twice reads as two candidates to clear.
+function first_per_number(
+	candidates: ReadonlyArray<DuplicateCandidate>,
+): Array<DuplicateCandidate> {
+	const seen = new Set<number>()
+
+	return candidates.filter((candidate) => {
+		if (seen.has(candidate.number)) return false
+
+		seen.add(candidate.number)
+
+		return true
+	})
+}
+
 // The issues whose titles look like this one, strongest first.
 //
 // Every row is scored — no prefix, no early exit. The issue this search exists to catch is the one
@@ -219,9 +235,11 @@ function find_duplicates(
 ): DuplicateSearch {
 	const query = tokenize(title)
 	const references = new Set(referenced_numbers)
-	const matched = issues
-		.flatMap((issue) => to_candidate(query, issue, references) ?? [])
-		.toSorted(compare_candidates)
+	const matched = first_per_number(
+		issues
+			.flatMap((issue) => to_candidate(query, issue, references) ?? [])
+			.toSorted(compare_candidates),
+	)
 
 	// `total` rather than the shown list's length: a caller printing only what it was handed would
 	// report a truncation as a complete answer, which is the one gap in this feature that nothing else
