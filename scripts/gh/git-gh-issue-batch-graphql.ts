@@ -22,9 +22,11 @@ import { git_gh_transport } from './git-gh-transport'
 // the same REST mapping (`git-gh-issue-graphql.ts`), so nothing downstream changes.
 //
 // **A number missing from the answer is the caller's to read through REST**: a session on REST
-// (`git-gh-transport.ts`), a failed query — one number that resolves to nothing fails the whole
-// document, and `gh` exits non-zero — a pull request, or a repository the checkout cannot name. REST
-// keeps telling a missing number from a failed read, which a GraphQL error document does not.
+// (`git-gh-transport.ts`), a failed query, a repository the checkout cannot name, a pull request
+// (below), or a number that resolves to nothing — its alias answers `null` beside an `errors` entry,
+// and `gh` exits non-zero while the other aliases still answer (`query_partial`,
+// joshuafolkken/kit#6964).
+// REST keeps telling a missing number from a failed read, which a GraphQL error document does not.
 //
 // Each alias asks `issueOrPullRequest` for the issue fields only, so a pull request answers an empty
 // object that leaves its own number to REST — REST tells it apart by its URL — instead of failing
@@ -86,7 +88,7 @@ async function query_chunk(
 	issue_numbers: ReadonlyArray<number>,
 	variables: RepositoryVariables,
 ): Promise<ChunkData | undefined> {
-	const json = await git_gh_transport.query({ query: query_of(issue_numbers), variables })
+	const json = await git_gh_transport.query_partial({ query: query_of(issue_numbers), variables })
 	if (json === undefined) return undefined
 
 	return json_value.parse_with(json, response_schema)?.data

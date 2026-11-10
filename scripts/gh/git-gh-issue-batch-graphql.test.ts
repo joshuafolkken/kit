@@ -53,6 +53,17 @@ function with_pull_request(json: string, issue_number: number): string {
 	return JSON.stringify(parsed)
 }
 
+// `gh` exits non-zero on a document with `errors`, and the execa error keeps the body on `stdout`.
+function partial_error(issue_numbers: ReadonlyArray<number>, missing: number): Error {
+	const document = JSON.parse(answer(issue_numbers, [missing])) as object
+	const errors = [{ type: 'NOT_FOUND', path: ['repository', `issue${String(missing)}`] }]
+	const stdout = JSON.stringify({ ...document, errors })
+
+	return new Error('gh: Could not resolve to an issue', {
+		cause: Object.assign(new Error('exit 1'), { stdout }),
+	})
+}
+
 function numbers_to(count: number): Array<number> {
 	return Array.from({ length: count }, (_, index) => index + 1)
 }
@@ -139,6 +150,14 @@ describe('git_gh_issue_batch_graphql.read_many — what it leaves to REST', () =
 		const batch = await git_gh_issue_batch_graphql.read_many([1, 2, 3], REPO)
 
 		expect([...batch.reads.keys()]).toEqual([1, 3])
+	})
+
+	it('keeps the answered children of a chunk holding a number that does not exist', async () => {
+		mocked_api.mockRejectedValue(partial_error([1, 2, 3], 2))
+		const batch = await git_gh_issue_batch_graphql.read_many([1, 2, 3], REPO)
+
+		expect([...batch.reads.keys()]).toEqual([1, 3])
+		expect(batch.remaining).toBe(REMAINING)
 	})
 
 	it('leaves every child unanswered when the query fails', async () => {

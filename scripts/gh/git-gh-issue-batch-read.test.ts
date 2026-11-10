@@ -67,7 +67,7 @@ describe('git_gh_issue_batch_read.read_each — the batch first', () => {
 
 describe('git_gh_issue_batch_read.read_each — GraphQL unavailable', () => {
 	it('reads every number through REST when the query answers nothing', async () => {
-		vi.spyOn(git_gh_transport, 'query').mockResolvedValue(undefined)
+		vi.spyOn(git_gh_transport, 'query_partial').mockResolvedValue(undefined)
 		const reads = await git_gh_issue_batch_read.read_each([1, 2], reader(REPO))
 
 		expect(reads).toEqual([

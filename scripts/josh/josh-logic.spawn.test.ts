@@ -9,6 +9,8 @@ vi.mock('node:fs', () => ({
 	constants,
 	existsSync: vi.fn().mockReturnValue(false),
 	readFileSync: vi.fn().mockReturnValue('{"version":"0.0.0"}'),
+	// The gh tally handoff removes its file after a spawn (joshuafolkken/kit#6965).
+	rmSync: vi.fn(),
 }))
 
 const { COMMAND_MAP, josh_logic, SPAWN_ERROR_EXIT_CODE, USAGE_ERROR_EXIT_CODE } =
@@ -139,6 +141,17 @@ describe('josh_logic.run_command — the .env flag', () => {
 
 		expect(execa_sync_mock).toHaveBeenCalledOnce()
 		expect(execa_sync_mock.mock.calls[0]?.[1]).not.toContain(environment_flag)
+	})
+
+	// joshuafolkken/kit#6965: the spawned child names the file it hands its gh tally back through.
+	it('spawns a script command with the gh tally handoff file in its environment', async () => {
+		const name = Object.keys(COMMAND_MAP).find((key) => COMMAND_MAP[key]?.tsx_arguments)
+
+		await josh_logic.run_command(name ?? '', [])
+
+		expect(execa_sync_mock.mock.calls[0]?.[2]).toMatchObject({
+			env: { JOSH_GH_TALLY_FILE: expect.any(String) },
+		})
 	})
 })
 

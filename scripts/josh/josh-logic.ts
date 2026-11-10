@@ -18,6 +18,7 @@ import {
 } from './josh-command-map'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 import { josh_environment_file } from './josh-environment-file'
+import { josh_gh_usage } from './josh-gh-usage'
 import { josh_in_process } from './josh-in-process'
 import { kit_only } from './kit-only'
 import { find_package_directory } from './package-directory'
@@ -163,8 +164,13 @@ function format_unknown_command(cmd: string): string {
 
 // No `shell` option on purpose: execa runs a Windows `.cmd` shim itself and escapes the arguments
 // for cmd.exe, which the shell would receive unescaped.
-function spawn_script(tsx_executable: string, script_arguments: Array<string>): number {
+function spawn_script(
+	tsx_executable: string,
+	script_arguments: Array<string>,
+	environment: Record<string, string> = {},
+): number {
 	const result = execaSync(tsx_executable, script_arguments, {
+		env: environment,
 		stdio: 'inherit',
 		reject: false,
 	})
@@ -188,13 +194,16 @@ function spawn_script_entry(
 	script_arguments: ReadonlyArray<string>,
 ): number {
 	const runner = resolve_tsx_runner()
-
-	return spawn_script(runner.executable, [
+	const tsx_arguments = [
 		...runner.leading_arguments,
 		...josh_environment_file.apply_node_flags(entry.tsx_arguments ?? []),
 		script_path,
 		...script_arguments,
-	])
+	]
+
+	return josh_gh_usage.from_child((environment) =>
+		spawn_script(runner.executable, tsx_arguments, environment),
+	)
 }
 
 // Only the in-process branch is genuinely asynchronous; the spawning one answers the moment the
