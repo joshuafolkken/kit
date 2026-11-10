@@ -50,6 +50,10 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // delivery fixture that sets the lane mark and expects the refusal. A suite about the reviewer passes
 // the role itself.
 //
+// **The paired review switch is blanked** (joshuafolkken/kit#7035): a session exporting
+// `JOSH_REVIEWER_PAIRED=1` made the run:review suites write a paired brief through a stamp-file mock
+// that has no `stamp_path`. A suite about the paired review passes the environment itself.
+//
 // **Every inherited agent model and effort key is blanked by its suffix** (joshuafolkken/kit#5863): a
 // lane that sets `JOSH_WORKER_SHIP_MODEL` would otherwise move every fixture that resolves a profile off
 // its default model. The keys `agent-role-profile.ts` reads are its `PROFILE_KEYS`, which the suite pins
@@ -90,6 +94,7 @@ function unit_environment(source: EnvironmentSource): Record<string, string> {
 		// `auto` would probe GitHub and keep its answer in the repository's shared cache, which the
 		// developer's own sessions read; a test that exercises `auto` sets it and isolates that cache.
 		JOSH_GH_TRANSPORT: 'graphql',
+		JOSH_REVIEWER_PAIRED: '',
 		JOSH_SHIP_SUPERVISED: '',
 	}
 }
