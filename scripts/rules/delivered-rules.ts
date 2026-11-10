@@ -229,7 +229,9 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
 	// Before `timed-rerun` and `lane-direct-tool`, its overlaps (a timed or lane `vitest run`):
-	// `test:related` replaces the direct run, so neither the record nor the reservation comes first.
+	// `test:related` replaces the direct run, so neither the record nor the reservation comes first. A lane
+	// child's plain `vitest run` never reaches this order: `lane-direct-tool`'s rewrite runs before
+	// judgment (`rule-rewrite.ts`), and this row is silent on the `reserved-run` it produces.
 	direct_vitest_run.ROW,
 	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first
 	// act, and `lane-direct-tool` delivers on the reissue of a `time`-prefixed tool.
