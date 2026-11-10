@@ -82,8 +82,8 @@ describe('issue_priority_instructed.apply lowering', () => {
 		)
 		expect(mocked_add).not.toHaveBeenCalled()
 		expect(mocked_clear.mock.calls).toStrictEqual([
-			[ISSUE_NUMBER, PRIORITY_HIGH_LABEL],
 			[ISSUE_NUMBER, PRIORITY_CRITICAL_LABEL],
+			[ISSUE_NUMBER, PRIORITY_HIGH_LABEL],
 		])
 		expect(mocked_comment).toHaveBeenCalledWith(
 			ISSUE_NUMBER,

@@ -30,10 +30,10 @@ const LEVEL_FLAGS: ReadonlyArray<PriorityLevel> = ['critical', 'high', 'normal']
 
 const REPORTS: Readonly<Record<RaiseResult, string>> = {
 	raised: 'applied the priority label its body declares or reaches.',
-	labelled: 'already carries a priority label at its level — left as it is.',
+	labelled: 'already carries a priority label at its level — any lower one taken off.',
 	below: 'stays at normal priority — no label applied.',
 	unreadable: 'could not be read — no label applied.',
-	failed: 'ranks above its labels, but applying the priority label failed.',
+	failed: 'changing its priority label failed.',
 }
 
 const INSTRUCTED_REPORTS: Readonly<Record<InstructedResult, string>> = {

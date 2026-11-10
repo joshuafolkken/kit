@@ -93,21 +93,6 @@ describe('issue_priority_raise.raise on a declared priority', () => {
 		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, label)
 	})
 
-	it('replaces priority:high with priority:critical once the body declares urgent', async () => {
-		serve(URGENT, PRIORITY_HIGH_LABEL)
-
-		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('raised')
-		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, PRIORITY_CRITICAL_LABEL)
-		expect(mocked_clear).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, PRIORITY_HIGH_LABEL)
-	})
-
-	it('answers failed when the lower label stays on', async () => {
-		serve(URGENT, PRIORITY_HIGH_LABEL)
-		mocked_clear.mockResolvedValue(false)
-
-		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('failed')
-	})
-
 	it('raises a normal declaration once appended losses reach the high floor', async () => {
 		serve(declared('- 優先度: 通常\n- 原因の損失: 20 分\n- 原因の損失: 15 分'), ENHANCEMENT)
 
@@ -124,4 +109,38 @@ describe('issue_priority_raise.raise on a declared priority', () => {
 			expect(mocked_add).not.toHaveBeenCalled()
 		},
 	)
+})
+
+describe('issue_priority_raise.raise replacing a lower label', () => {
+	it('replaces priority:high with priority:critical once the body declares urgent', async () => {
+		serve(URGENT, PRIORITY_HIGH_LABEL)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('raised')
+		expect(mocked_add).toHaveBeenCalledWith(ISSUE_NUMBER, PRIORITY_CRITICAL_LABEL)
+		expect(mocked_clear).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, PRIORITY_HIGH_LABEL)
+	})
+
+	it('answers failed when the lower label stays on', async () => {
+		serve(URGENT, PRIORITY_HIGH_LABEL)
+		mocked_clear.mockResolvedValue(false)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('failed')
+	})
+
+	it('takes the lower label off on a retry after a failed clear', async () => {
+		serve(URGENT, PRIORITY_HIGH_LABEL, PRIORITY_CRITICAL_LABEL)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('labelled')
+		expect(mocked_add).not.toHaveBeenCalled()
+		expect(mocked_clear).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, PRIORITY_HIGH_LABEL)
+	})
+
+	it('matches a priority label stored in another case', async () => {
+		const stored = 'Priority:High'
+
+		serve(URGENT, stored)
+
+		await expect(issue_priority_raise.raise(ISSUE_NUMBER)).resolves.toBe('raised')
+		expect(mocked_clear).toHaveBeenCalledExactlyOnceWith(ISSUE_NUMBER, stored)
+	})
 })

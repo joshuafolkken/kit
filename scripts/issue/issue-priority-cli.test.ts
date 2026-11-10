@@ -96,7 +96,7 @@ describe('issue_priority_cli.run', () => {
 
 	it.each([
 		['unreadable', 'could not be read'],
-		['failed', 'applying the priority label failed'],
+		['failed', 'changing its priority label failed'],
 	] as const)('reports %s and exits 1', async (result, text) => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 

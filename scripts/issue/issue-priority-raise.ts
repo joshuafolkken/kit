@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
+import { has_label_name, label_name_of } from './issue-labels'
 import { issue_priority } from './issue-priority'
 
 // joshuafolkken/kit#4960: an open Issue's body can rise after it was filed — a recurrence appends a
@@ -35,19 +36,25 @@ function decision(labels: ReadonlyArray<string>): RaiseResult {
 	return issue_priority.is_typed(labels) ? 'labelled' : 'below'
 }
 
-const PRIORITY_LABELS: ReadonlySet<string> = new Set(
-	Object.values(issue_priority.LABELS).filter((label) => label !== undefined),
+// `issue_priority.LABELS` lists `critical` before `high`, so these run highest first.
+const PRIORITY_LABELS: ReadonlyArray<string> = Object.values(issue_priority.LABELS).filter(
+	(label) => label !== undefined,
 )
 
+// The stored spellings of the priority labels the issue carries, highest first.
 function priority_labels_of(labels: ReadonlyArray<string>): ReadonlyArray<string> {
-	return labels.filter((label) => PRIORITY_LABELS.has(label))
+	return PRIORITY_LABELS.map((label) => label_name_of(labels, label)).filter(
+		(name) => name !== undefined,
+	)
 }
 
 // Whether the issue's priority labels are exactly `label` — none at all for `undefined`, normal.
 function is_only(labels: ReadonlyArray<string>, label: string | undefined): boolean {
 	const present = priority_labels_of(labels)
 
-	return present.length === (label === undefined ? 0 : 1) && present.every((name) => name === label)
+	if (label === undefined) return present.length === 0
+
+	return present.length === 1 && has_label_name(present, label)
 }
 
 // joshuafolkken/kit#7000: a priority change leaves one priority label. The new label goes on before the
@@ -57,18 +64,28 @@ async function replace(
 	labels: ReadonlyArray<string>,
 	label: string | undefined,
 ): Promise<boolean> {
+	const kept = label === undefined ? undefined : label_name_of(labels, label)
 	const is_added =
 		label === undefined ||
-		labels.includes(label) ||
+		kept !== undefined ||
 		(await git_gh_command.issue_add_label(issue_number, label))
 
 	if (!is_added) return false
-	const stale = priority_labels_of(labels).filter((name) => name !== label)
+	const stale = priority_labels_of(labels).filter((name) => name !== kept)
 	const cleared = await Promise.all(
 		stale.map(async (name) => await git_gh_command.issue_clear_label(issue_number, name)),
 	)
 
 	return cleared.every(Boolean)
+}
+
+// An issue its labels already rank: a retry still takes off a lower label a failed replace left.
+async function settle(issue_number: string, labels: ReadonlyArray<string>): Promise<RaiseResult> {
+	const [top] = priority_labels_of(labels)
+
+	if (top === undefined || is_only(labels, top)) return decision(labels)
+
+	return (await replace(issue_number, labels, top)) ? 'labelled' : 'failed'
 }
 
 async function raise(issue_number: string): Promise<RaiseResult> {
@@ -77,7 +94,7 @@ async function raise(issue_number: string): Promise<RaiseResult> {
 	if (read === undefined) return 'unreadable'
 	const label = issue_priority.raise_label(read.labels, read.body)
 
-	if (label === undefined) return decision(read.labels)
+	if (label === undefined) return await settle(issue_number, read.labels)
 	const is_applied = await replace(issue_number, read.labels, label)
 
 	return is_applied ? 'raised' : 'failed'
