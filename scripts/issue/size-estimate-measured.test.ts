@@ -18,31 +18,33 @@ describe('size_estimate measured thresholds', () => {
 		expect(size_estimate.over_guide(body_of(1, 120), undefined, RATE)).toBeUndefined()
 	})
 
-	it('uses the derived cap in issue selection and refusal text', () => {
-		const body = body_of(1, 230)
-		const issue = { body, labels: [] }
-
-		expect(size_estimate.is_issue_over_cap(issue, RATE)).toBe(true)
-		expect(size_estimate.guide_problem(body, undefined, RATE)).toContain('18 files or 450 lines')
+	it('uses the derived cap in the refusal text', () => {
+		expect(size_estimate.guide_problem(body_of(1, 460), undefined, RATE)).toContain(
+			'18 files or 450 lines',
+		)
 		expect(size_estimate.over_cap(body_of(1, 200), undefined, RATE)).toBeUndefined()
 	})
 
-	// joshuafolkken/kit#7006: within the cap, a projection over the implement budget is held too.
-	it('holds an issue within the cap projected over the implement budget', () => {
-		const body = body_of(1, 200)
+	// joshuafolkken/kit#7074: within the cap, an unreasoned projection over the size bar is
+	// `over_budget` — offered with a note, never held; the implement budget alone bars nothing.
+	it('judges an issue within the cap by the size bar, not the implement budget', () => {
+		const body = body_of(1, 400)
 
-		expect(size_estimate.is_issue_over_cap({ body }, RATE)).toBe(true)
-		expect(size_estimate.is_issue_over_cap({ body: `${body}\n- 分割しない理由: 一体` }, RATE)).toBe(
-			false,
-		)
+		expect(size_estimate.over_budget(body, RATE)).toEqual({
+			files: 1,
+			lines: 400,
+			verdict: 'split',
+		})
+		expect(size_estimate.over_budget(`${body}\n- 分割しない理由: 一体`, RATE)).toBeUndefined()
+		expect(size_estimate.over_budget(body_of(1, 200), RATE)).toBeUndefined()
 	})
 
-	// joshuafolkken/kit#7005: the split exemption covers the guide and cap, not the implement budget.
+	// joshuafolkken/kit#7005: the split exemption covers the guide and cap, not the size bar.
 	it('preserves the split exemption while exposing its measured warning', () => {
-		const body = body_of(1, 230)
+		const body = body_of(1, 400)
 		const problem = size_estimate.guide_problem(body, SPLIT, RATE)
 
-		expect(problem).toContain('over the 9-minute implement budget')
+		expect(problem).toContain('over the 18-minute size bar')
 		expect(problem).not.toContain('exceeds the cap')
 		expect(size_estimate.over_cap(body, SPLIT, RATE)).toBeUndefined()
 		expect(size_estimate.split_over_guide(body, SPLIT, RATE)?.verdict).toBe('split')

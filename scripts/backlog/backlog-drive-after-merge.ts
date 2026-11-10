@@ -7,7 +7,7 @@ import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_retry } from './backlog-drive-retry'
 
 // What `backlog:drive` does after `run:merge` answered: a merged child retries the issues waiting on
-// it, and a park whose recommendation needs no person is decided here (joshuafolkken/kit#6738) — the
+// it, and a park whose recommendation needs no permission at all is decided here (joshuafolkken/kit#6738) — the
 // decision through `issue:comment`, then `run:park --clear`, whose label removal lets the next offer
 // hand the child back to a lane. A decided park is not booked done (`mark_done`), so a named run keeps the
 // child and the issues declared after it. Once per issue: a child that parks again is left to a person.

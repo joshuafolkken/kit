@@ -183,7 +183,7 @@ Steps 1–2 stop on refusal. Steps 3–7 report problems, including duplicates w
    A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-lane.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
    A `- 規模見積もり:` whose counts doubled are over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; without either, one over the cap (one and a half times the guide) is refused the same way.
-   One projected past the implement stage budget at the measured rate is refused unless it declares `- 分割しない理由: <理由>`, whatever its route.
+   One projected past twice the implement stage budget at the measured rate is refused unless it declares `- 分割しない理由: <理由>`, whatever its route.
 4. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件: #<PR> のマージ後 <K> マージ` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
    The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, is not read: it waits on the pull request that closes the issue, for a follow-up filed before that pull request exists.
 5. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
@@ -358,10 +358,10 @@ pnpm josh plan:consumers lane:pause run:paused   # one block per identifier, one
 
 <!-- usage: issue:already-done -->
 
-Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold.
+Exit an issue whose work is already merged: post the evidence, close it (cited merge) or apply already-done, release the hold.
 
 ```bash
-pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # comment, label, release — in that order
+pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # comment, close or label, release — in that order
 ```
 
 **Options:**
@@ -452,7 +452,7 @@ pnpm josh issue:spill 5999 --estimate "3 ファイル / 80 行"
 **Options:**
 
 - `--estimate "<F> ファイル / <L> 行"` — the follow-up's size estimate, never apportioned from the issue's. Required.
-- `--reason "<理由>"` — the follow-up's `- 分割しない理由:` line, the only excuse from the implement budget; the issue's own is not carried over.
+- `--reason "<理由>"` — the follow-up's `- 分割しない理由:` line, the only excuse from the size bar; the issue's own is not carried over.
 - `--distinct <N,…>` — duplicate candidates `issue:file` held the follow-up on, declared separate; the issue itself always is. Repeatable.
 
 <!-- /usage -->
@@ -937,6 +937,7 @@ pnpm josh backlog:triage --apply 915 --adopt 1 --reason "<why>"
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
 - `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
 - `--adopt <k>` — takes option `<k>` of the child's latest park in one call: records the decision in its one tracking epic (`epic --decide`'s path), clears the park, then `run:add <N> --retry`. A park with no recommendation, an unlisted or tier C option, no single tracking epic, or no backlogrun running here is refused before any write.
+- `--done <text>` — what the parent did for an option whose `必要な権限` starts with `親` (e.g. `親セッション`): the parent carries the option out first, then adopts it with `--done <what was done>`, recorded with the decision. Without it such an option is refused before any write, so the child stays parked; on any other option it is refused.
 
 <!-- /usage -->
 
@@ -947,7 +948,8 @@ The pass reads local `needs-decision`, `run:stalled` and remaining judgments onc
 Foreign-repository and excluded children are not read. With none left it prints `backlog:plan --waves`.
 
 `--adopt` reads the latest trusted park comment on `run:park`'s schema; any listed option but tier C
-is adoptable. Recovery guidance prints only when a read is due.
+is adoptable. An option whose `必要な権限` starts with `親` is carried out first, then adopted with
+`--done <what was done>`. Recovery guidance prints only when a read is due.
 
 Run the pass at the initial plan and after each collection batch that parked a child. The driver
 hands back `triage` once per such batch before its next offer; a batch without parks adds no step,

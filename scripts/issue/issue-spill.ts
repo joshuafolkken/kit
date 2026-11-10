@@ -105,7 +105,7 @@ function estimate_line(estimate: string): string | undefined {
 	return `${ESTIMATE_PREFIX} 約 ${String(groups['files'])} ファイル / ${String(groups['lines'])} 行（テスト除く）`
 }
 
-// `--reason "<reason>"` as the reason line `size_estimate` excuses the implement budget with, or
+// `--reason "<reason>"` as the reason line `size_estimate` excuses the size bar with, or
 // `undefined` for a blank one.
 function reason_line(reason: string): string | undefined {
 	const trimmed = reason.trim()

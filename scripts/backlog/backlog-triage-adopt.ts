@@ -25,11 +25,18 @@ import { backlog_triage_park } from './backlog-triage-park'
 // refuses without one), so a refusal leaves nothing written. `epic --decide`
 // skips an entry or a comment already there, so a re-run after a later failure records nothing twice.
 // An option carrying a size-approval range first writes the approval (`backlog-triage-approval.ts`).
+//
+// **An option needing the parent's own action is taken before it is adopted** (joshuafolkken/kit#7001):
+// adopting it records a choice but files, closes or edits nothing, so a requeued child hits the same
+// wall again. Without `--done <what was done>` it is refused and nothing is written — the child stays
+// parked and `run:board` keeps the park's row with its parent-action note; with it, the decision
+// records the action.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const OPTION_SHAPE = /^[1-9]\d*$/u
-const USAGE = 'Usage: josh backlog:triage --apply <N> --adopt <k> --reason <text>'
+const USAGE =
+	'Usage: josh backlog:triage --apply <N> --adopt <k> --reason <text> [--done <the parent action taken>]'
 const DECIDE_FAILED = 'could not record the decision; nothing after it was written'
 const REQUEUE_FAILED_HEAD = 'decision recorded and park cleared, but'
 const NO_RUN = 'no backlogrun is running here to requeue it; nothing was written'
@@ -38,12 +45,14 @@ const OPTIONS = {
 	apply: { type: 'string' },
 	adopt: { type: 'string' },
 	reason: { type: 'string' },
+	done: { type: 'string' },
 } as const
 
 interface AdoptRequest {
 	issue: string
 	option: number
 	reason: string
+	done: string
 }
 
 type EpicRead = { epic: number } | { problem: string }
@@ -74,8 +83,23 @@ function request_of(values: Values): AdoptRequest | undefined {
 	const reason = text_of(values.reason)
 
 	if (option === undefined || reason === '') return undefined
+	const done = text_of(values.done)
 
-	return issue_number_shape.is_issue_number(issue) ? { issue, option, reason } : undefined
+	return issue_number_shape.is_issue_number(issue) ? { issue, option, reason, done } : undefined
+}
+
+// `--done` goes with exactly the options needing the parent's own action, so the decision never
+// records an action no option asked for.
+function action_problem(body: string, request: AdoptRequest): string | undefined {
+	const { option, done } = request
+	const is_needed = run_park_body.parent_action(body, option)
+	const is_given = done !== ''
+
+	if (is_needed === is_given) return undefined
+
+	return is_needed
+		? `option ${String(option)} needs the parent's own action; take it, then re-run with --done "<what was done>" — nothing was written and the child stays parked`
+		: `option ${String(option)} needs no parent action; re-run without --done — nothing was written`
 }
 
 function refused(issue: string, problem: string): number {
@@ -88,7 +112,8 @@ async function park_of(request: AdoptRequest): Promise<ParkFound | { problem: st
 	const park = await backlog_triage_park.read(request.issue)
 
 	if ('problem' in park) return park
-	const problem = run_park_body.adopt_problem(park.body, request.option)
+	const problem =
+		run_park_body.adopt_problem(park.body, request.option) ?? action_problem(park.body, request)
 
 	if (problem !== undefined) return { problem }
 
@@ -144,10 +169,11 @@ async function approval_of(request: AdoptRequest, park: ParkFound): Promise<stri
 }
 
 function decision_of(request: AdoptRequest): string {
-	const { issue, option, reason } = request
+	const { issue, option, reason, done } = request
 	const adopted = `adopted park option ${String(option)} (backlog:triage --adopt)`
+	const action = done === '' ? '' : ` · parent action done: ${done}`
 
-	return `${issue_cite.plain_for('github', issue)}: ${adopted} — ${reason}`
+	return `${issue_cite.plain_for('github', issue)}: ${adopted} — ${reason}${action}`
 }
 
 async function is_requeued(issue: string): Promise<boolean> {

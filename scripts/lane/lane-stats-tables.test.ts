@@ -15,6 +15,7 @@ const FIRST_HEADER_CELLS = [
 	'implement read',
 	'stage turns',
 	'stop',
+	'stopped at',
 	'gap',
 	'cuts',
 	'round 1',

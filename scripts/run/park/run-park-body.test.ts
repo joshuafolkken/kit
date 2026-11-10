@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { run_park_body } from './run-park-body'
 
 const OWNER_PERMISSION = '   - 必要な権限: owner コメント'
+const PARENT_PERMISSION = '   - 必要な権限: 親セッション'
 const TIER_C = '   - 層: C'
 const OPTION_ONE = ['1. Keep the account', '   - 層: A', OWNER_PERMISSION]
 const OPTION_TWO = ['2. Rotate the account', TIER_C, '   - 必要な権限: 人']
@@ -70,6 +71,15 @@ describe('run_park_body.summary_of', () => {
 	it('answers undefined for a body off the schema', () => {
 		expect(run_park_body.summary_of(OFF_SCHEMA)).toBeUndefined()
 	})
+
+	it("notes a recommendation needing the parent's own action (ac-ec188a74)", () => {
+		const body = body_with(
+			PICK_ONE,
+			OPTIONS.replace(OWNER_PERMISSION, () => PARENT_PERMISSION),
+		)
+
+		expect(run_park_body.summary_of(body)).toBe('推奨: 1（層 A · 親の操作）')
+	})
 })
 
 // joshuafolkken/kit#6777: the pick `backlog:triage --pass` prints an `--adopt` line for.
@@ -93,16 +103,26 @@ function single_option(tier: string, permission: string): string {
 	)
 }
 
+// joshuafolkken/kit#7001: an option needing the parent's own action is taken before the lane resumes.
+describe('run_park_body.parent_action', () => {
+	it.each([
+		['親', true],
+		['親セッション', true],
+		['なし', false],
+		['人', false],
+	])('answers %j as %j', (permission, expected) => {
+		expect(run_park_body.parent_action(single_option('A', permission), 1)).toBe(expected)
+	})
+})
+
 // joshuafolkken/kit#6738: a park whose recommendation needs no person is the parent's to take.
 describe('run_park_body.auto_pick', () => {
-	it.each([
-		['tier A needing no permission', 'A', 'なし'],
-		["tier A needing the parent's", 'A', '親'],
-	])('picks the recommendation for %s', (_case, tier, permission) => {
-		expect(run_park_body.auto_pick(single_option(tier, permission))).toBe(1)
+	it('picks the recommendation for tier A needing no permission', () => {
+		expect(run_park_body.auto_pick(single_option('A', 'なし'))).toBe(1)
 	})
 
 	it.each([
+		["tier A needing the parent's own action", 'A', '親'],
 		['tier B needing no permission', 'B', 'なし'],
 		['tier A needing a person', 'A', '人'],
 		['tier A needing the trust setting', 'A', '信頼設定'],

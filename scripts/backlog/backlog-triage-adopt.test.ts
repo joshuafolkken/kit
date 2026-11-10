@@ -72,7 +72,7 @@ const OPTIONS = [
 	'### 選択肢',
 	'1. Keep the lane',
 	'   - 層: A',
-	'   - 必要な権限: 親',
+	'   - 必要な権限: なし',
 	'2. Rotate the token',
 	'   - 層: C',
 	'   - 必要な権限: 信頼設定',
@@ -234,6 +234,43 @@ describe('backlog:triage --apply --adopt — a size-approval option', () => {
 	})
 })
 
+// joshuafolkken/kit#7001: an option needing the parent's own action is taken before the child resumes.
+const PARENT_PARK = PARK.replace('必要な権限: なし', '必要な権限: 親セッション')
+const DONE = 'filed #7010 and closed the child'
+
+describe("backlog:triage --apply --adopt — an option needing the parent's action", () => {
+	it('refuses it without --done before any write, so the child stays parked (ac-ec188a74)', async () => {
+		vi.mocked(issue_read.trusted_bodies).mockReturnValue([PARENT_PARK])
+
+		await expect(adopt()).resolves.toBe(1)
+
+		expect(order).toStrictEqual([])
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining("the parent's own action"))
+	})
+
+	it('records the action taken with --done, then requeues the child (ac-ec188a74)', async () => {
+		vi.mocked(issue_read.trusted_bodies).mockReturnValue([PARENT_PARK])
+
+		await expect(
+			backlog_triage_cli.run([...adopt_argv('1'), '--done', DONE], DIRECTORY),
+		).resolves.toBe(0)
+
+		expect(order).toStrictEqual(['decide', 'clear', 'run:add'])
+		expect(epic_decide.decide).toHaveBeenCalledWith(
+			expect.objectContaining({ decision: expect.stringContaining(`parent action done: ${DONE}`) }),
+		)
+	})
+
+	it('refuses --done on an option needing no parent action before any write', async () => {
+		await expect(
+			backlog_triage_cli.run([...adopt_argv('1'), '--done', DONE], DIRECTORY),
+		).resolves.toBe(1)
+
+		expect(order).toStrictEqual([])
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('needs no parent action'))
+	})
+})
+
 describe('backlog:triage --apply --adopt — arguments', () => {
 	it.each([
 		['no reason', ['--apply', ISSUE, '--adopt', '1']],
@@ -243,5 +280,8 @@ describe('backlog:triage --apply --adopt — arguments', () => {
 		await expect(backlog_triage_cli.run(argv, DIRECTORY)).resolves.toBe(1)
 
 		expect(order).toStrictEqual([])
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining('[--done <the parent action taken>]'),
+		)
 	})
 })
