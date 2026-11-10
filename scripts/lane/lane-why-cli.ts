@@ -42,7 +42,7 @@ async function records_of(issue: number): Promise<WhyRecords | undefined> {
 		read_log(issue),
 	])
 
-	return { issue, entries, breakdown, projected, issues, timing, log }
+	return { issue, entries, events, breakdown, projected, issues, timing, log }
 }
 
 async function print(issue: string): Promise<number> {

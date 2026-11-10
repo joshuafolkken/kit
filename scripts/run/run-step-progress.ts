@@ -1,3 +1,4 @@
+import { lane_implement_signals_record } from '#scripts/lane/lane-implement-signals-record'
 import { run_entry } from '#scripts/run/entry/run-entry'
 import { run_event_step, type FullrunStep } from '#scripts/run/event/run-event-step'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -27,11 +28,32 @@ function step_of(line: string, last_event = ''): FullrunStep | undefined {
 	return VERDICT_STEPS[line] ?? EVENT_STEPS[last_event]
 }
 
-// A position that names no step writes nothing.
-async function record(issue: string, line: string, last_event: string | undefined): Promise<void> {
+interface ProgressIo {
+	step: (issue: string, step: FullrunStep) => Promise<void>
+	signals: (issue: string) => Promise<void>
+}
+
+const STREAM_IO: ProgressIo = {
+	step: async (issue, step) => {
+		await run_event_step.record(issue, step)
+	},
+	signals: lane_implement_signals_record.record,
+}
+
+// A position that names no step writes nothing; the gate also writes the implement signals
+// (joshuafolkken/kit#6983).
+async function record(
+	issue: string,
+	line: string,
+	last_event: string | undefined,
+	io: ProgressIo = STREAM_IO,
+): Promise<void> {
 	const step = step_of(line, last_event)
 
-	if (step !== undefined) await run_event_step.record(issue, step)
+	if (step === undefined) return
+
+	await io.step(issue, step)
+	if (step === STEP.GATE) await io.signals(issue)
 }
 
 const run_step_progress = { record, step_of }
