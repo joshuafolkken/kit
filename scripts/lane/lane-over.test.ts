@@ -4,11 +4,13 @@ import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { session_cite } from '#scripts/issue/session-cite'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
 import { lane_over } from './lane-over'
+import type { ToolCall } from './lane-transcript-calls'
+import { lane_transcript_stats } from './lane-transcript-stats'
 
 const make_directory = temporary_directory('suite')
 
@@ -79,6 +81,25 @@ const EVENTS: ReadonlyArray<RunEvent> = [
 
 const RECORDS = { entries: ENTRIES, events: EVENTS }
 
+// The over-budget column reads the lane's transcripts for its first edit; no test reads the real ones.
+beforeEach(() => {
+	vi.spyOn(lane_transcript_stats, 'read_calls').mockReturnValue([])
+})
+
+function edit_at(clock: string): ToolCall {
+	return {
+		session_id: 's',
+		lane: String(YIELDER),
+		started_ms: Date.parse(at(clock)),
+		duration_ms: undefined,
+		tool: 'Edit',
+		background: false,
+		command: undefined,
+		subagent: undefined,
+		output: '',
+	}
+}
+
 describe('lane_over.chain_of', () => {
 	it('names the whole #5953 chain in one cell', () => {
 		expect(lane_over.chain_of(RECORDS, YIELDER)).toBe(
@@ -122,12 +143,41 @@ describe('lane_over.chain_of — a yield the holder end does not split', () => {
 	})
 })
 
+describe('lane_over.over_budget_of', () => {
+	it('names each stage past its budget with its minutes and budget', () => {
+		expect(lane_over.over_budget_of(RECORDS, YIELDER)).toBe('start to plan 113.0/3')
+	})
+
+	it('prints a dash for a lane whose stages stayed within budget', () => {
+		const entries: Array<LedgerEntry> = [
+			{ kind: 'dispatch', at: at('20:00'), issue: SHORT },
+			{ kind: 'merge', at: at('20:02'), issue: SHORT },
+		]
+
+		expect(lane_over.over_budget_of({ entries, events: [] }, SHORT)).toBe('-')
+	})
+
+	// As `lane:breakdown`: a lane with no plan event opens its implementation at the first edit.
+	it('opens the implementation at the lane’s first edit', () => {
+		vi.spyOn(lane_transcript_stats, 'read_calls').mockReturnValue([edit_at('17:05')])
+
+		expect(lane_over.over_budget_of(RECORDS, YIELDER)).toBe(
+			'implement 108.0/9 · start to plan 5.0/3',
+		)
+	})
+})
+
 describe('lane_over.table', () => {
 	it('prints one row for #5953 alone, past the 40-minute threshold', () => {
 		const rows = lane_over.table(RECORDS, WINDOW, 40, []).split('\n')
 
 		expect(rows).toHaveLength(3)
-		expect(rows[2]).toMatch(/\| 37\.0 \| split-notice ×4 · .*run-step-section\.ts \|/u)
+		expect(rows[0]).toBe(
+			'| lane | net min | wait min | chain | over budget | top stage | open issues |',
+		)
+		expect(rows[2]).toMatch(
+			/\| 37\.0 \| split-notice ×4 · .*run-step-section\.ts \| start to plan 113\.0\/3 \|/u,
+		)
 		expect(rows[2]?.startsWith(`| ${session_cite.issue(YIELDER)} | `)).toBe(true)
 	})
 
