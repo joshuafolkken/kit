@@ -145,7 +145,7 @@ async function safe_poll_reason(
 	try {
 		return await poll_reason(
 			raw_payload,
-			async () => await run_headless.is_backlog_parent(context.env),
+			async () => await run_headless.is_backlog_parent(context.env, context.ancestry),
 		)
 	} catch (error) {
 		error_text.trace_swallowed('run_poll_hook.poll_reason', error)

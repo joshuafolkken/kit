@@ -70,6 +70,28 @@ describe('review_pair.offer', () => {
 	})
 })
 
+// joshuafolkken/kit#7020: the ship's reviewer launch reads a paired brief's presence as the pair being on.
+describe('review_pair.is_offered', () => {
+	it('holds from a paired round 1 until an unpaired brief removes it', () => {
+		const directory = fresh_directory()
+
+		expect(review_pair.is_offered(directory)).toBe(false)
+		review_pair.offer(BRIEF, ON, directory)
+		expect(review_pair.is_offered(directory)).toBe(true)
+		review_pair.offer(BRIEF, {}, directory)
+		expect(review_pair.is_offered(directory)).toBe(false)
+	})
+
+	it('ends with a round 2 brief', () => {
+		const directory = fresh_directory()
+
+		review_pair.offer(BRIEF, ON, directory)
+		review_pair.offer(`${BRIEF}\n${review_round.FINAL_LINE}`, ON, directory)
+
+		expect(review_pair.is_offered(directory)).toBe(false)
+	})
+})
+
 describe('review_pair.paths', () => {
 	it('shares no file with any review slot attest or the ship reads', () => {
 		const directory = fresh_directory()
