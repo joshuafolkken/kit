@@ -188,7 +188,7 @@ function remember_no_field(run: GuardRun): boolean {
 
 function is_known_no_field(run: GuardRun): boolean {
 	return (
-		process.env['CLAUDE_CODE_ENTRYPOINT'] === 'claude-vscode' ||
+		run.context.env['CLAUDE_CODE_ENTRYPOINT'] === 'claude-vscode' ||
 		NO_FIELD_STAMP.last_ms(NO_FIELD_STAMP.path(run.transcript)) !== hook_decision.NEVER_MS
 	)
 }

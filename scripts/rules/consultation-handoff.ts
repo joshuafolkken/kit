@@ -49,7 +49,7 @@ function is_consultation_main(
 
 // A delegated unit enters no run.
 function is_not_consultation_main(tail: string, _call: unknown, run: GuardRun): boolean {
-	if (lane_child_marker.is_child_of(process.cwd())) return true
+	if (lane_child_marker.is_child_of(run.context.cwd, run.context.env)) return true
 
 	return run.is_unit === true || !is_consultation_main(tail, run.model)
 }

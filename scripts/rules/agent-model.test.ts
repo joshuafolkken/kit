@@ -1,3 +1,4 @@
+import { hook_context } from '#scripts/hooks/hook-context'
 import { describe, expect, it } from 'vitest'
 import { agent_model } from './agent-model'
 import { delivered_rules } from './delivered-rules'
@@ -65,7 +66,10 @@ describe('agent_model.ROW — delivered by the rule guard', () => {
 	// after `agent-model`, so its reason is the one delivered first.
 	it('is the first delivered row whose trigger fires on an unnamed-model dispatch', () => {
 		const call = agent_call({ subagent_type: GENERAL_PURPOSE })
-		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) => rule.is_trigger(call))
+		const context = hook_context.from_process()
+		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) =>
+			rule.is_trigger(call, context),
+		)
 
 		expect(claiming.map((rule) => rule.id)).toEqual([
 			'agent-model',

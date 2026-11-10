@@ -1,6 +1,7 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
@@ -101,13 +102,14 @@ interface LaneCutState {
 	context_verdict: () => CostVerdict
 }
 
-function current_state(): LaneCutState {
+function current_state(context: HookContext): LaneCutState {
 	return {
-		directory: process.cwd(),
-		carried: run_cut.carried_cut_sync,
-		marked_issue: lane_child_marker.marked_issue(),
-		is_reviewer: agent_session_role.is_reviewer(),
-		context_verdict: cost_cli.session_verdict,
+		directory: context.cwd,
+		carried: (now?: Date): RunCut | undefined =>
+			run_cut.carried_cut_sync(now, run_cut.worktree_git_directory_sync(context.cwd)),
+		marked_issue: lane_child_marker.marked_issue(context.env),
+		is_reviewer: agent_session_role.is_reviewer(context.env),
+		context_verdict: () => cost_cli.session_verdict(context.cwd, context.env),
 	}
 }
 
@@ -152,10 +154,15 @@ function warrants_the_cut(verdict: CostVerdict): boolean {
 // **The command test comes first and the world is consulted second.** This predicate is asked of
 // every `Bash` call in the run, so the cheap string match is what keeps a git call — and, now, a
 // transcript read — off all of them but the handful that actually run the gate.
-function is_uncut_gate(command: string, state: LaneCutState = current_state()): boolean {
+function is_uncut_gate(command: string, state: LaneCutState): boolean {
 	if (!runs_the_gate(command) || uncut_lane_issue(state) === undefined) return false
 
 	return warrants_the_cut(state.context_verdict())
+}
+
+// The row's trigger: the lane state read from the hook call's own cwd and environment.
+function is_uncut_gate_in(command: string, context: HookContext): boolean {
+	return is_uncut_gate(command, current_state(context))
 }
 
 // The instruction in the shape a refusal can carry: the cut, the one verdict that ends the turn, and
@@ -187,6 +194,7 @@ const pre_gate_cut = {
 	asks_about_the_cut,
 	claims_the_hold,
 	is_uncut_gate,
+	is_uncut_gate_in,
 	reaches_the_pre_gate_boundary,
 	runs_the_gate,
 	takes_the_cut,

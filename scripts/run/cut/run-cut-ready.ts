@@ -49,13 +49,15 @@ function tree_of(status: string, default_branch: string): CutTree | undefined {
 	return { branch, default_branch, is_dirty }
 }
 
-// The tree read synchronously, for the `PreToolUse` guard — `undefined` where git cannot answer.
-function read_tree_sync(): CutTree | undefined {
-	const status = git_spawn_sync.read(STATUS_ARGUMENTS)
+// The tree read synchronously, for the `PreToolUse` guard under its call's cwd — `undefined` where git
+// cannot answer.
+function read_tree_sync(cwd?: string): CutTree | undefined {
+	const options = git_spawn_sync.located(cwd)
+	const status = git_spawn_sync.read(STATUS_ARGUMENTS, options)
 
 	if (status === undefined) return undefined
 
-	const reference = git_spawn_sync.read(git_diff_reads.DEFAULT_BRANCH_ARGUMENTS)
+	const reference = git_spawn_sync.read(git_diff_reads.DEFAULT_BRANCH_ARGUMENTS, options)
 
 	return tree_of(status, git_diff_reads.default_branch_of(reference))
 }
@@ -68,7 +70,7 @@ function is_ready_sync(read: () => CutTree | undefined = read_tree_sync): boolea
 	return tree === undefined || is_ready(tree)
 }
 
-const run_cut_ready = { is_lane_branch, is_ready, is_ready_sync, tree_of }
+const run_cut_ready = { is_lane_branch, is_ready, is_ready_sync, read_tree_sync, tree_of }
 
 export type { CutTree }
 export { run_cut_ready }

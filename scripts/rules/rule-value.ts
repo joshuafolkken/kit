@@ -1,4 +1,5 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
+import { hook_context } from '#scripts/hooks/hook-context'
 import {
 	time_transcript_line,
 	type TranscriptLine,
@@ -129,7 +130,7 @@ function keeps_the_rule(rule: MeasuredRule, call: IssuedCall, context: CallConte
 }
 
 function is_the_trigger(rule: MeasuredRule, call: IssuedCall): boolean {
-	return rule.is_trigger?.(call) === true
+	return rule.is_trigger?.(call, hook_context.from_process()) === true
 }
 
 function observe_before_trigger(

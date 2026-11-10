@@ -4,14 +4,15 @@ import path from 'node:path'
 import { hook_context } from '#scripts/hooks/hook-context'
 import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent_model } from './agent-model'
 import { consultation_investigation } from './consultation-investigation'
 import { delivered_rules } from './delivered-rules'
 
-// joshuafolkken/kit#5351: a main line on the consultation model hands broad investigation to a unit.
+// joshuafolkken/kit#5351: the consultation main line hands broad investigation to a unit;
+// joshuafolkken/kit#6901 tells that line by its launch, so it holds on Opus as on Fable.
 // **Both directions matter**: a row silent on a broad call leaves the rate where it was, and one that
-// speaks on a narrow check — or on any other model — refuses a call that already did the right thing.
+// speaks on a narrow check — or in a launched session — refuses a call that already did the right thing.
 
 const FABLE = 'claude-fable-5-1'
 const OPUS = 'claude-opus-5-5'
@@ -22,10 +23,16 @@ const NARROW_LIMIT = 200
 const BROAD_LIMIT = 201
 const ONE_FILE = 'package.json'
 const TREE_GREP = 'grep -rn guard scripts'
+const GLOB_PATTERN = '**/*.ts'
 const PROMPT = 'Find where the guard reads the transcript'
 const { ROW, CODEX_ROW } = consultation_investigation
 const make_directory = temporary_directory('suite')
 const WORK_DIRECTORY = make_directory('consultation-investigation-')
+
+// The suite may run inside a launched lane; a person's consultation session carries no role.
+beforeEach(() => {
+	vi.stubEnv('JOSH_AGENT_ROLE', '')
+})
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -86,13 +93,17 @@ function dispatch(input: Record<string, unknown>): Record<string, unknown> {
 	return { prompt: PROMPT, run_in_background: false, ...input }
 }
 
+const BROAD_CALLS: ReadonlyArray<[string, string, Record<string, unknown>]> = [
+	['a `Read` with no limit of a file past the cap', 'Read', { file_path: ONE_FILE }],
+	['a `Read` past the cap', 'Read', { file_path: ONE_FILE, limit: BROAD_LIMIT }],
+	['a recursive grep of a directory', 'Bash', { command: TREE_GREP }],
+	['a `Glob`', 'Glob', { pattern: GLOB_PATTERN }],
+	['a `Grep` with no path', 'Grep', { pattern: 'guard' }],
+]
+
 describe('consultation-investigation — a Fable main line', () => {
 	it.each([
-		['a `Read` with no limit of a file past the cap', 'Read', { file_path: ONE_FILE }],
-		['a `Read` past the cap', 'Read', { file_path: ONE_FILE, limit: BROAD_LIMIT }],
-		['a recursive grep of a directory', 'Bash', { command: TREE_GREP }],
-		['a `Glob`', 'Glob', { pattern: '**/*.ts' }],
-		['a `Grep` with no path', 'Grep', { pattern: 'guard' }],
+		...BROAD_CALLS,
 		['a general-purpose unit on Fable', 'Agent', dispatch({ model: 'fable' })],
 	])('refuses %s', (_case, tool, input) => {
 		expect(delivered(FABLE, tool, input)).toBe(ROW.reason)
@@ -149,7 +160,7 @@ describe('consultation-investigation — the reason', () => {
 
 // A unit or a reviewer has no `Agent` tool, so the remedy is not theirs to take.
 describe('consultation-investigation — a session that cannot dispatch', () => {
-	const glob = { name: 'Glob', input: { pattern: '**/*.ts' } }
+	const glob = { name: 'Glob', input: { pattern: GLOB_PATTERN } }
 	const tail = `\n${JSON.stringify({ type: 'assistant', message: { model: FABLE } })}\n`
 
 	function is_satisfied(is_unit: boolean): boolean | undefined {
@@ -177,14 +188,39 @@ describe('consultation-investigation — a session that cannot dispatch', () => 
 	})
 })
 
-describe('consultation-investigation — any other main line', () => {
+// joshuafolkken/kit#6901: the default consultation main line is Opus, the same model a lane runs on.
+describe('consultation-investigation — the Opus consultation main line', () => {
+	it.each(BROAD_CALLS)('refuses %s on Opus', (_case, tool, input) => {
+		expect(delivered(OPUS, tool, input)).toBe(ROW.reason)
+	})
+
+	it('lets an investigator dispatch through', () => {
+		expect(delivered(OPUS, 'Agent', dispatch({ subagent_type: 'investigator' }))).toBeUndefined()
+	})
+
+	it('lets a design-consultant unit on Fable through', () => {
+		const input = dispatch({ subagent_type: 'design-consultant' })
+
+		expect(delivered(OPUS, 'Agent', input)).toBeUndefined()
+	})
+})
+
+describe('consultation-investigation — a launched session or another main line', () => {
+	it.each(['worker', 'scheduler'])('lets every broad call through in a %s session', (role) => {
+		vi.stubEnv('JOSH_AGENT_ROLE', role)
+
+		expect(delivered(OPUS, 'Read', { file_path: ONE_FILE })).toBeUndefined()
+		expect(delivered(FABLE, 'Glob', { pattern: GLOB_PATTERN })).toBeUndefined()
+	})
+
 	it.each([
-		['Opus', OPUS],
+		['the investigation model', SONNET],
+		['a model below the investigation rate', 'claude-haiku-4-5'],
 		['an unnamed model', undefined],
 	])('lets every broad call through on %s', (_case, model) => {
 		expect(delivered(model, 'Read', { file_path: ONE_FILE })).toBeUndefined()
 		expect(delivered(model, 'Bash', { command: TREE_GREP })).toBeUndefined()
-		expect(delivered(model, 'Glob', { pattern: '**/*.ts' })).toBeUndefined()
+		expect(delivered(model, 'Glob', { pattern: GLOB_PATTERN })).toBeUndefined()
 	})
 })
 
