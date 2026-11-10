@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
 
 // The lane ledger lines `josh ship` writes about itself — a stop, the preflight's `unplanned` notice
-// and the inner steps of a stage — joined into the entry union by `lane-ledger-schema.ts`.
+// and the inner steps of a stage — and each `josh run:chain` ahead of it, joined into the entry union by `lane-ledger-schema.ts`.
 
 const { KIND } = lane_ledger_kind
 
@@ -35,6 +35,19 @@ const stop_schema = z.object({
 	preconditions: z.array(z.string()).optional(),
 	findings: z.array(z.string()).optional(),
 	base: z.string().optional(),
+})
+// One `josh run:chain` on `issue`, done or stopped: `at` is its end and `elapsed_ms` its length, so the
+// next run's start ends the wait after a stop. `stage` names where it stopped and `reason` why — the
+// stage exited non-zero (`exit`) or exited 0 on a notice that holds the run (`hold`) — both absent on a
+// run that finished. `join` marks the half after the review (joshuafolkken/kit#7024).
+const chain_schema = z.object({
+	kind: z.literal(KIND.CHAIN),
+	at: z.string(),
+	issue: z.number(),
+	elapsed_ms: z.number(),
+	join: z.boolean(),
+	stage: z.string().optional(),
+	reason: z.enum(['exit', 'hold']).optional(),
 })
 // The ship's `unplanned` answer `josh check:related` printed to the lane of `issue` ahead of the ship,
 // so a preflight `unplanned` stop after it is told apart in `lane:stats` (joshuafolkken/kit#5203).
@@ -84,6 +97,7 @@ const size_schema = z.object({
 })
 
 const lane_ledger_schema_ship = {
+	chain_schema,
 	early_push_schema,
 	ship_lap_schema,
 	size_schema,

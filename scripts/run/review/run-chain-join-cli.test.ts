@@ -1,3 +1,4 @@
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_record_slot } from '#scripts/review/review-record-slot'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
@@ -157,6 +158,20 @@ describe('run_chain_cli.run --join — findings held for the record', () => {
 			expect.any(Function),
 		)
 		expect(errors()).toContain('cut now')
+	})
+})
+
+// joshuafolkken/kit#7024: a stage that exited 0 on its hold notice is a `hold`, not an `exit`.
+describe('run_chain_cli.run --join — the ledger line', () => {
+	it('records the held round as a hold at the attest on the join', async () => {
+		const record = vi.spyOn(lane_ledger_write, 'record_chain').mockResolvedValue()
+
+		slot_holds(LOW_FINDING)
+		await run_chain_cli.run([ISSUE, JOIN])
+
+		expect(record).toHaveBeenCalledWith(
+			expect.objectContaining({ issue: 5735, join: true, stage: ATTEST, reason: 'hold' }),
+		)
 	})
 })
 
