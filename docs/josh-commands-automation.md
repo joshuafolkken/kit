@@ -1172,7 +1172,6 @@ Git hook: run a command while holding a place in the machine-wide core budget.
 
 ```bash
 pnpm josh reserved-run 2 -- pnpm install              # hold 2 cores while installing
-pnpm josh reserved-run 1 -- pnpm josh audit           # hold 1 core while scanning
 pnpm josh reserved-run 1 --memory 3000 -- <command>   # hold 3,000 MB beside the core
 ```
 

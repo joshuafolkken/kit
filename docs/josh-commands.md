@@ -862,6 +862,10 @@ pnpm josh audit
 
 The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`) — in a linked work tree, the primary checkout's cache, so every work tree shares one binary and one failed-download record. With neither the audit exits non-zero and prints how to get one — never skipped.
 
+- A clean scan is recorded against the lockfile's digest in the common git directory, so every work tree shares it.
+- While that record is under 24 hours old, the audit prints one `✔ audit skipped` line and exits 0 without scanning. A changed lockfile or an expired record is scanned as before.
+- The scan claims one core in the machine-wide budget itself, so the pre-push hook calls `pnpm josh audit` directly.
+
 ### `josh overrides`
 
 <!-- usage: overrides -->
