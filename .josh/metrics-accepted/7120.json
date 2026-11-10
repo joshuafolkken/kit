@@ -1,0 +1,8 @@
+{
+	"reason": "#7120 wakes the triage session beside the driver: --triage-pid/--triage-start parsing, beside hold in the driver, run:wake beside port, and the JOSH_BESIDE_CHILD mark so the beside session never cuts the supervisor's record",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 118,
+		"ai_cost.on_demand_bytes": 79
+	}
+}

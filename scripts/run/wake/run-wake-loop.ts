@@ -50,6 +50,9 @@ interface LoopPorts {
 	// Runs the deterministic backlog driver. A normal completion never calls `wake`.
 	drive: () => Promise<DriveResult>
 	wake: (invocation: string, session_id: string, material: string) => LaunchResult
+	// Wakes the triage session beside the driver: the record stays this supervisor's, and the session's
+	// process is named on the driver's kept resume line (joshuafolkken/kit#7120).
+	wake_beside: (invocation: string, session_id: string, material: string) => LaunchResult
 	sleep: (milliseconds: number) => Promise<void>
 	now: () => Date
 	// Closes again a lane a process outlived, once the process is gone (`lane_close.retry_closes`), and
@@ -65,7 +68,7 @@ interface LoopPorts {
 type DriveResult =
 	| { kind: 'finished' }
 	| { kind: 'released' }
-	| { kind: 'judgment'; material: string }
+	| { kind: 'judgment' | 'triage'; material: string }
 	| { kind: 'failed'; note: string }
 
 interface LoopStop {
@@ -92,23 +95,38 @@ function wake_failure_note(wake: RunWake): string {
 	return `woke a session for "${wake.invocation}" ${attempts} time(s) and none of them claimed the carry record; the last one was ${last}, which may still be running`
 }
 
+// **Triage is no hand-off** (joshuafolkken/kit#7120): the record stays this supervisor's, so the next
+// pass drives again at once — collecting and filling lanes while the session judges — and no wake is
+// counted, which would hold that pass in the grace window a hand-off waits through.
+function beside_step(wake: RunWake, material: string, ports: LoopPorts): StepOutcome {
+	const result = ports.wake_beside(wake.invocation, ports.new_session_id(), material)
+
+	return result.kind === 'failed' ? stopped(FAILED_REASON, result.note) : { kind: 'continue', wake }
+}
+
 // The hand-off is written before the launch, never after: a session that boots fast enough to count
 // before a post-launch write would meet a record still the supervisor's.
+function handoff_step(wake: RunWake, material: string, ports: LoopPorts): StepOutcome {
+	const session_id = ports.new_session_id()
+
+	ports.hand_off(session_id)
+
+	const result = ports.wake(wake.invocation, session_id, material)
+
+	if (result.kind === 'failed') return stopped(FAILED_REASON, result.note)
+
+	return { kind: 'continue', wake: run_wake.count_wake(wake, ports.now(), result.pid, session_id) }
+}
+
 async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> {
 	const driven = await ports.drive()
 	if (driven.kind === 'finished') return stopped('ended')
 	if (driven.kind === 'failed') return stopped(FAILED_REASON, driven.note)
 	if (driven.kind === 'released') return { kind: 'continue', wake }
 
-	const session_id = ports.new_session_id()
-
-	ports.hand_off(session_id)
-
-	const result = ports.wake(wake.invocation, session_id, driven.material)
-
-	if (result.kind === 'failed') return stopped(FAILED_REASON, result.note)
-
-	return { kind: 'continue', wake: run_wake.count_wake(wake, ports.now(), result.pid, session_id) }
+	return driven.kind === 'triage'
+		? beside_step(wake, driven.material, ports)
+		: handoff_step(wake, driven.material, ports)
 }
 
 // A `wait` means the woken session is at work on the carry record, so the wake mark is cleared and the
@@ -213,7 +231,8 @@ async function run_pass(
 // at all, the replaced loop ends here, quietly and before it does anything: the run is not
 // unattended, because the supervisor that took the record over is watching it.
 // A driver window already waited. Recheck ownership and reload code immediately before the next
-// driver, so the supervisor's interval cannot hide a not_before deadline between windows.
+// driver, so the supervisor's interval cannot hide a not_before deadline between windows. A triage
+// woken beside the driver re-drives at once too, so no lane waits out the interval while it judges.
 function without_release_gap(ports: LoopPorts): LoopPorts {
 	let is_released = false
 
@@ -222,7 +241,7 @@ function without_release_gap(ports: LoopPorts): LoopPorts {
 		drive: async () => {
 			const result = await ports.drive()
 
-			is_released = result.kind === 'released'
+			is_released = result.kind === 'released' || result.kind === 'triage'
 
 			return result
 		},

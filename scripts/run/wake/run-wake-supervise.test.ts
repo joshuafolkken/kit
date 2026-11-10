@@ -26,6 +26,7 @@ const PORTS: LoopPorts = {
 	hand_off: vi.fn(),
 	drive: vi.fn(),
 	wake: vi.fn(),
+	wake_beside: vi.fn(),
 	sleep: vi.fn(),
 	now: vi.fn(),
 	retry_closes: vi.fn(),
