@@ -145,6 +145,17 @@ describe('build_text — progress header', () => {
 	})
 })
 
+// joshuafolkken/kit#7077: a park the drive decided reads as information, not a confirmation.
+describe('build_text — decision header', () => {
+	it('uses 🤖 + the override-with-a-decision-comment label', () => {
+		const result = build_text(make_base({ task_type: 'decision' }))
+
+		expect(result).toBe(
+			`🤖 ${REPO_NAME}: Decided by the run — override with a later decision comment\n${ISSUE_TITLE}`,
+		)
+	})
+})
+
 describe('build_text — body and URL blocks', () => {
 	it('separates body from issue title with a blank line, URLs as separated blocks', () => {
 		const result = build_text(
