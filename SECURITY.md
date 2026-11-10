@@ -61,6 +61,14 @@ sh install-safe-chain.sh
 
 Stop if `shasum` does not print `install-safe-chain.sh: OK`. Then restart your terminal; if the warning still appears, run `safe-chain setup` and restart it again.
 
+The shell integration wraps every `pnpm` call, `pnpm josh …` included, which costs about 0.25 s per call and adds up across an agent's many josh runs. `pnpm josh` installs nothing, and the `pnpm` calls josh makes itself are child processes that never pass through a shell function, so exempting it loses no protection. In `~/.zshrc`, after the line safe-chain added:
+
+```sh
+pnpm() { [ "$1" = josh ] && { command pnpm "$@"; return; }; wrapSafeChainCommand pnpm "$@"; }
+```
+
+`pnpm install`, `pnpm add` and every other subcommand still go through safe-chain.
+
 ## Secrets
 
 kit never stores a secret in a file it ships or commits. The ones it uses:
