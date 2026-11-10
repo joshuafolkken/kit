@@ -1,3 +1,4 @@
+import { hook_context } from '#scripts/hooks/hook-context'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { direct_issue_comment } from './direct-issue-comment'
@@ -77,7 +78,7 @@ describe('direct-issue-comment delivery', () => {
 	it('claims the raw post before the body rows do', () => {
 		const command = 'gh api repos/{owner}/{repo}/issues/5/comments -f body="$(cat b.md)"'
 		const claiming = delivered_rules.DELIVERED_RULES.find((rule) =>
-			rule.is_trigger({ name: 'Bash', input: { command } }),
+			rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 		)
 
 		expect(claiming?.id).toBe(direct_issue_comment.ROW.id)
@@ -88,7 +89,7 @@ describe('direct-issue-comment delivery', () => {
 	it("claims a write to the checkout's own repository spelled out", () => {
 		const command = 'gh api repos/joshuafolkken/kit/issues/4709/comments -F body=@/tmp/x.md'
 		const claiming = delivered_rules.DELIVERED_RULES.find((rule) =>
-			rule.is_trigger({ name: 'Bash', input: { command } }),
+			rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 		)
 
 		expect(claiming?.id).toBe(direct_issue_comment.ROW.id)

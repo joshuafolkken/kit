@@ -533,7 +533,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/rules/lane-background.test.ts',
 	'scripts/rules/lane-interactive-ask-rule.test.ts',
 	'scripts/rules/lane-park-rule.test.ts',
-	'scripts/rules/lane-spilled-read.test.ts',
 	'scripts/rules/last-prompt.test.ts',
 	'scripts/rules/latest-gate-document-rule.test.ts',
 	'scripts/rules/launched-call.test.ts',

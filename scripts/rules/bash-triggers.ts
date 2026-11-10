@@ -15,11 +15,14 @@ import { shell_segments } from './shell-segments'
 // not. Every rule delivered by the enumeration is therefore one whose binding moment is a shell call —
 // so the tool-name guard belongs here rather than to each row, and a row states only what it looks for
 // in the command.
-function on_bash_command(is_match: (command: string) => boolean): (call: GuardedCall) => boolean {
-	return function is_trigger(call: GuardedCall): boolean {
+// The arguments after the call (the hook call's context) are handed on to the command test.
+function on_bash_command<Rest extends ReadonlyArray<unknown>>(
+	is_match: (command: string, ...rest: Rest) => boolean,
+): (call: GuardedCall, ...rest: Rest) => boolean {
+	return function is_trigger(call: GuardedCall, ...rest: Rest): boolean {
 		if (call.name !== cost_blocks.BASH_TOOL) return false
 
-		return is_match(time_shell.bash_command(call.input))
+		return is_match(time_shell.bash_command(call.input), ...rest)
 	}
 }
 

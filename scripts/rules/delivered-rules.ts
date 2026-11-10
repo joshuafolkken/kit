@@ -1,6 +1,6 @@
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
-import { will_refuse as will_batch_refuse } from '#scripts/hooks/batch-guard'
-import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
+import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
@@ -8,6 +8,7 @@ import { concise_reply } from './concise-reply'
 import { consultation_handoff } from './consultation-handoff'
 import { consultation_investigation } from './consultation-investigation'
 import { credential_body } from './credential-body'
+import { delivered_rules_guard } from './delivered-rules-guard'
 import { direct_filing } from './direct-filing'
 import { direct_issue_comment } from './direct-issue-comment'
 import { direct_issue_read } from './direct-issue-read'
@@ -48,9 +49,6 @@ import { worktree_guard } from './worktree-guard'
 // `hook_decision.create_transcript_guard` spec; each reason is a trigger plus a pointer to its topic
 // file (`prompts/collaboration-workflow/residency.md`).
 
-// The escape hatch, on by default like the other two guards.
-const SWITCH_ENV_KEY = 'JOSH_RULE_GUARD'
-
 // A compliance test sees the call, its turn and its run: batching needs the turn, the pre-gate cut
 // needs the run; every other row reads the call alone.
 type CallTest = (
@@ -60,7 +58,11 @@ type CallTest = (
 ) => boolean
 
 // The tail is read lazily: most calls no rewrite applies to never need it.
-type CallRewrite = (call: GuardedCall, tail: () => string) => Record<string, unknown> | undefined
+type CallRewrite = (
+	call: GuardedCall,
+	tail: () => string,
+	context: HookContext,
+) => Record<string, unknown> | undefined
 
 // The human-readable side `pnpm josh rule:list` renders, carried on the row so a rule is one entry.
 interface RuleAbout {
@@ -81,7 +83,7 @@ const PRETOOL_GUARD = 'pnpm josh pretool:guard'
 // `id` keys the rule's own refusal record, so one rule firing never spends another's budget.
 interface DeliveredRule {
 	id: string
-	is_trigger: (call: GuardedCall) => boolean
+	is_trigger: (call: GuardedCall, context: HookContext) => boolean
 	// The only text that reaches the model: the instruction and the pointer.
 	reason: string
 	about: RuleAbout
@@ -116,8 +118,6 @@ type MeasuredRule = Omit<DeliveredRule, 'is_trigger'> & {
 	is_trigger?: DeliveredRule['is_trigger']
 }
 
-const STAMP_PREFIX = 'josh-rule-guard-'
-
 const { is_issue_filing, on_bash_command } = bash_triggers
 
 const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_safe } =
@@ -135,7 +135,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	direct_filing.ROW,
 	// Before the body rows: a comment posted by hand is refused whatever its body, and the command it
 	// points at takes the body by path, so the body rows have nothing left to say.
-	direct_issue_comment.ROW,
+	delivered_rules_guard.call_only(direct_issue_comment.ROW),
 	// Before `issue-comments`, whose rewrite would add the unfiltered comments to the same read.
 	direct_issue_read.ROW,
 	issue_comments.ROW,
@@ -201,7 +201,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// safely: that row speaks first and this one delivers on the reissue.
 	{
 		id: 'pre-gate-cut',
-		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate),
+		is_trigger: on_bash_command(pre_gate_cut.is_uncut_gate_in),
 		reason: pre_gate_cut.PRE_GATE_CUT_REASON,
 		keeps: on_bash_command(pre_gate_cut.takes_the_cut),
 		reaches: pre_gate_cut.reaches_the_pre_gate_boundary,
@@ -215,7 +215,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	},
 	// A split child's park is refused before `lane-park` sees it.
 	lane_split_park.ROW,
-	lane_park.ROW,
+	delivered_rules_guard.call_only(lane_park.ROW),
 	lane_interactive_ask.ROW,
 	agent_model.ROW,
 	investigator_foreground.ROW,
@@ -246,7 +246,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// Before `rule-body`, its one overlap (a whole-file `Write` of a rule document): the right tool is
 	// chosen before the placement questions are asked of its text.
 	file_edit_rows.REWRITE_ROW,
-	rule_body_guard.ROW,
+	delivered_rules_guard.call_only(rule_body_guard.ROW),
 	...oracle_consulted.ROWS,
 ]
 
@@ -301,68 +301,7 @@ const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
 	concise_reply.ROW,
 ]
 
-// Once per run, so a run that obeyed is never wedged. A call the batching guard may refuse is stepped
-// aside from: only one hook's reason surfaces per call, and a stamp written for a lost reason would
-// silence the rule for the run. The rule delivers on the reissue instead.
-const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PREFIX)
-
-// The two hooks race on one event and the stamp is written before the reason, so a record this young
-// is the batching guard speaking about the call in hand.
-const BATCH_REFUSAL_WINDOW_MS = 10_000
-
-// Asked with its real record, not `NEVER_MS`: that guard never refuses one sequence twice.
-function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
-	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
-
-	if (run.now_ms - refused_at_ms < BATCH_REFUSAL_WINDOW_MS) return true
-
-	return will_batch_refuse(tail, call, run)
-}
-
-function is_first_delivery(
-	tail: string,
-	call: GuardedCall,
-	delivered_at_ms: number,
-	run: GuardRun,
-): boolean {
-	return delivered_at_ms === hook_decision.NEVER_MS && !will_batch_guard_refuse(tail, call, run)
-}
-
-// `decide` and `already_satisfied` each replace `is_first_delivery`. A recurring row is always asked;
-// the stand-aside reaches it as `can_record`, since what must not happen is recording a refused act.
-// An `already_satisfied` row refuses every call until the satisfying act is on the tail.
-function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_block'] {
-	const { decide, already_satisfied } = rule
-
-	if (decide === undefined && already_satisfied === undefined) return is_first_delivery
-
-	return function should_block(
-		tail: string,
-		call: GuardedCall,
-		delivered_at_ms: number,
-		run: GuardRun,
-	): boolean {
-		if (already_satisfied?.(tail, call, run) === true) return false
-		if (decide === undefined) return true
-
-		return decide(call, run, !will_batch_guard_refuse(tail, call, run), delivered_at_ms)
-	}
-}
-
-// A trigger is handed the call alone: the guard's second argument, the call's context, would otherwise
-// land on a trigger's own defaulted parameter (`is_interactive_ask`'s `is_lane_child`). The rows take
-// the context in joshuafolkken/kit#6973.
-function guard_of(rule: DeliveredRule): ReturnType<typeof hook_decision.create_transcript_guard> {
-	return hook_decision.create_transcript_guard({
-		prefix: `${STAMP_PREFIX}${rule.id}-`,
-		switch_key: SWITCH_ENV_KEY,
-		is_candidate: function is_candidate(call: GuardedCall): boolean {
-			return rule.is_trigger(call)
-		},
-		should_block: delivery_decision(rule),
-		reason: rule.reason,
-	})
-}
+const { SWITCH_ENV_KEY, guard_of } = delivered_rules_guard
 
 const GUARDS = new Map(DELIVERED_RULES.map((rule) => [rule.id, guard_of(rule)]))
 
@@ -373,9 +312,13 @@ function delivery_path(rule_id: string, transcript_path: string): string {
 
 // The first entry whose delivery fires wins. An overlap is admissible only when the losing rule is
 // still right one reissue later; stamps are keyed per id, so it is delivered then.
-function delivery(raw_payload: string, now_ms: number = Date.now()): string | undefined {
+function delivery(
+	raw_payload: string,
+	now_ms: number = Date.now(),
+	context: HookContext = hook_context.from_process(),
+): string | undefined {
 	for (const guard of GUARDS.values()) {
-		const reason = guard.refusal(raw_payload, now_ms)
+		const reason = guard.refusal(raw_payload, now_ms, context)
 
 		if (reason !== undefined) return reason
 	}

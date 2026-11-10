@@ -3,6 +3,7 @@ import { agent_provider, type AgentEnvironment } from '#scripts/agent/agent-prov
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
@@ -108,8 +109,8 @@ function environment_for(transcript: string, source: AgentEnvironment): AgentEnv
 // the verdict its predecessor left.
 function session_verdict(
 	transcript: string,
-	directory: string = process.cwd(),
-	source: AgentEnvironment = process.env,
+	directory: string,
+	source: AgentEnvironment,
 ): CostVerdict {
 	return implementation_cut_verdict.reused_verdict(
 		() => cost_cli.session_verdict(directory, environment_for(transcript, source)),
@@ -117,10 +118,12 @@ function session_verdict(
 	)
 }
 
-function current_state(transcript?: string): LaneCostState {
+function current_state(context: HookContext, transcript?: string): LaneCostState {
+	const { cwd, env } = context
+
 	return {
-		directory: process.cwd(),
-		source: process.env,
+		directory: cwd,
+		source: env,
 		carried: run_cut.carried_cut_sync,
 		held_issue: run_cut.held_issue_sync,
 		// **Read through the short reuse window**. The row now fires per
@@ -128,8 +131,8 @@ function current_state(transcript?: string): LaneCostState {
 		// the window collapses one turn's burst of edits to a single whole-transcript price.
 		verdict: (): CostVerdict =>
 			transcript === undefined
-				? implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict())
-				: session_verdict(transcript),
+				? implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict(cwd, env), cwd)
+				: session_verdict(transcript, cwd, env),
 		can_cut: can_cut_sync,
 	}
 }
@@ -216,10 +219,7 @@ function warrants_the_cut(state: LaneCostState): boolean {
 //
 // Whether the cut could be taken is asked only once a measured `over` warrants it, so an
 // under-threshold or unmeasurable edit spawns no git.
-function is_over_threshold_edit(
-	call: GuardedCall,
-	state: LaneCostState = current_state(),
-): boolean {
+function is_over_threshold_edit(call: GuardedCall, state: LaneCostState): boolean {
 	if (!is_edit_tool(call.name)) return false
 
 	const issue = refusable_issue(call, state)
@@ -280,14 +280,18 @@ function decide_for_session(
 ): boolean {
 	return (
 		decide(call, run, can_record, delivered_at_ms) &&
-		is_over_threshold_edit(call, current_state(run.transcript))
+		is_over_threshold_edit(call, current_state(run.context, run.transcript))
 	)
 }
 
 // The candidate half, priced on nothing: an edit an uncut run could be refused for. Outside a run no
 // edit is a candidate, so the row claims nothing another rule delivers.
-function is_refusable_edit(call: GuardedCall, state: LaneCostState = current_state()): boolean {
+function is_refusable_edit(call: GuardedCall, state: LaneCostState): boolean {
 	return is_edit_tool(call.name) && refusable_issue(call, state) !== undefined
+}
+
+function is_refusable_edit_in(call: GuardedCall, context: HookContext): boolean {
+	return is_refusable_edit(call, current_state(context))
 }
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing
@@ -297,7 +301,7 @@ function is_refusable_edit(call: GuardedCall, state: LaneCostState = current_sta
 // `keeps` predicate is reported as unmeasured").
 const ROW = {
 	id: 'implementation-cut',
-	is_trigger: is_refusable_edit,
+	is_trigger: is_refusable_edit_in,
 	reason: IMPLEMENTATION_CUT_REASON,
 	decide: decide_for_session,
 	// The opening the reason carried before it was cut to the action and the next command.

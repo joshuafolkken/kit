@@ -1,3 +1,4 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
@@ -82,19 +83,19 @@ function is_notify_of(command: string, issue: string): boolean {
 
 // **The command test comes first and the world is consulted second**, exactly as `lane-park.ts` gates
 // its own read: a person working in a lane carries no mark and sees no refusal.
-function is_candidate(command: string): boolean {
-	const issue = lane_child_marker.marked_issue()
+function is_candidate(command: string, context: HookContext): boolean {
+	const issue = lane_child_marker.marked_issue(context.env)
 
 	if (issue === undefined) return false
 	if (!is_park_of(command, issue) && !is_notify_of(command, issue)) return false
 
-	return lane_child_marker.is_child_of(process.cwd())
+	return lane_child_marker.is_child_of(context.cwd, context.env)
 }
 
 // Refused only once the run has promoted the dispatched issue, and on every occurrence: a split child
 // must never park its epic, so the route is always "return the split", never a reissue.
 function decide(_call: unknown, run: GuardRun): boolean {
-	const issue = lane_child_marker.marked_issue()
+	const issue = lane_child_marker.marked_issue(run.context.env)
 	const commands = tail_commands.prior_bash_commands(transcript_tail.read_tail(run.transcript))
 
 	return issue !== undefined && promoted_issues(commands).has(issue)

@@ -1,3 +1,4 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -46,13 +47,10 @@ function keeps_narrowed_read(call: GuardedCall): boolean {
 	return input !== undefined && reads_spilled_result(input) && is_paginated(input)
 }
 
-function is_whole_spilled_read(
-	call: GuardedCall,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+function is_whole_spilled_read(call: GuardedCall, context: HookContext): boolean {
 	if (!reaches_spilled_result(call) || keeps_narrowed_read(call)) return false
 
-	return is_lane_child
+	return lane_child_marker.is_child_of(context.cwd, context.env)
 }
 
 const LANE_SPILLED_READ_REASON =

@@ -111,7 +111,7 @@ describe('implementation cut candidate', () => {
 		stub_cuttable_lane()
 		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('under')
 
-		expect(implementation_cut.ROW.is_trigger(call)).toBe(true)
+		expect(implementation_cut.ROW.is_trigger(call, hook_context.from_process())).toBe(true)
 		expect(read).not.toHaveBeenCalled()
 	})
 
@@ -119,6 +119,6 @@ describe('implementation cut candidate', () => {
 		stub_cuttable_lane()
 		vi.spyOn(run_cut, 'held_issue_sync').mockReturnValue(undefined)
 
-		expect(implementation_cut.ROW.is_trigger(call)).toBe(false)
+		expect(implementation_cut.ROW.is_trigger(call, hook_context.from_process())).toBe(false)
 	})
 })

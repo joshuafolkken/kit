@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -57,7 +58,9 @@ function delivered_for(name: string, command: string): string | undefined {
 // The third-party-write suite separately pins both claiming IDs and the delivered reason.
 function rules_claiming(command: string): number {
 	return delivered_rules.DELIVERED_RULES.filter(
-		(rule) => rule.id !== 'egress' && rule.is_trigger({ name: 'Bash', input: { command } }),
+		(rule) =>
+			rule.id !== 'egress' &&
+			rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 	).length
 }
 
@@ -71,7 +74,7 @@ describe('egress — the backstop beside specific guidance', () => {
 		['raw-field-body', 'gh api repos/joshuafolkken/other/issues/5/comments -f body=@note.md'],
 	])('overlaps %s without losing its trigger', (specific, command) => {
 		const claimed = delivered_rules.DELIVERED_RULES.filter((rule) =>
-			rule.is_trigger({ name: 'Bash', input: { command } }),
+			rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 		).map((rule) => rule.id)
 
 		expect(claimed).toStrictEqual([specific, 'egress'])

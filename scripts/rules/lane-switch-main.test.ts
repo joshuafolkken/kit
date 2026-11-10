@@ -1,5 +1,6 @@
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -42,7 +43,7 @@ const WRITTEN_TRANSCRIPTS = new Set<string>()
 // `restore` / `stash`.
 function rules_claiming(command: string): number {
 	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: BASH, input: { command } }),
+		rule.is_trigger({ name: BASH, input: { command } }, hook_context.from_process()),
 	).length
 }
 
