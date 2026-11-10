@@ -1,6 +1,7 @@
 import type { TimingAnswer } from '#scripts/ci/ci-timing'
 import { describe, expect, it } from 'vitest'
 import { lane_breakdown, type Breakdown } from './lane-breakdown'
+import { lane_implement_signals } from './lane-implement-signals'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_why, type WhyRecords } from './lane-why'
 
@@ -63,6 +64,7 @@ function records_of(overrides: Partial<WhyRecords> = {}): WhyRecords {
 	return {
 		issue: ISSUE,
 		entries: LANE,
+		events: [],
 		breakdown: breakdown_of(),
 		projected: PROJECTED,
 		issues: [{ number: 6124, title: 'Speed up the implement stage' }],
@@ -137,6 +139,32 @@ describe('lane_why.table ship cause cells', () => {
 		const rows = lane_why.table(records_of({ breakdown: with_stages([SHIP_STAGE]) }))?.split('\n')
 
 		expect(rows?.[2]).toContain('|  | none |  |')
+	})
+})
+
+// joshuafolkken/kit#6983: an implement row's causes are the keys of its recorded signals.
+describe('lane_why.table implement cause cells', () => {
+	const signals = { edits: 2, test_related: 4, lint_related: 0, investigations: 1, unplanned: 1 }
+	const text = lane_implement_signals.text_of(String(ISSUE), signals)
+	const events = [{ pos: 2, at: at(30), kind: lane_implement_signals.KIND, text }]
+	const issues = [{ number: 7001, title: 'Cut test:related reruns in lanes' }]
+
+	it('lists the implement cause keys, the open Issues they name and the keys none names', () => {
+		const rows = lane_why.table(records_of({ events, issues }))?.split('\n')
+
+		expect(rows?.[2]).toBe(
+			'| implement | 51.0 min | 9 min | 20.3 min |  |  | plan divergence, test:related reruns | #7001 | plan divergence |',
+		)
+	})
+
+	it('falls back to the Issues naming the stage when no signal passed its bar', () => {
+		const quiet = { edits: 1, test_related: 1, lint_related: 0, investigations: 0, unplanned: 0 }
+		const quiet_text = lane_implement_signals.text_of(String(ISSUE), quiet)
+		const quiet_events = [
+			{ pos: 2, at: at(30), kind: lane_implement_signals.KIND, text: quiet_text },
+		]
+
+		expect(lane_why.table(records_of({ events: quiet_events }))).toBe(lane_why.table(records_of()))
 	})
 })
 
