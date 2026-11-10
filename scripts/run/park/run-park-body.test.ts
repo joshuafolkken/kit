@@ -228,3 +228,47 @@ describe('run_park_body size-approval values', () => {
 		expect(run_park_body.problem_of(body)).toBe(`option 1 has no "${LINES_FORMAT}" line`)
 	})
 })
+
+function option_lines(number: number, tier: string, permission: string): ReadonlyArray<string> {
+	return [
+		`${String(number)}. Option ${String(number)}`,
+		`   - 層: ${tier}`,
+		`   - 必要な権限: ${permission}`,
+	]
+}
+
+function unpicked(...options: ReadonlyArray<ReadonlyArray<string>>): string {
+	return body_with(NO_PICK, ['### 選択肢', ...options.flat()].join('\n'))
+}
+
+// joshuafolkken/kit#7077: a park with no recommendation is decided by a default rule — the first
+// listed reversible option with the smallest change — and never when only a person may take one.
+describe('run_park_body.default_pick', () => {
+	it('takes the first reversible option needing no permission, over the rest', () => {
+		const body = unpicked(
+			option_lines(1, 'A', '人'),
+			option_lines(2, 'B', 'なし'),
+			option_lines(3, 'A', 'なし'),
+		)
+
+		expect(run_park_body.default_pick(body)).toStrictEqual({ number: 2, over: [1, 3] })
+	})
+
+	it('passes over an option carrying a size approval, which widens the change', () => {
+		const body = unpicked(
+			[...option_lines(1, 'A', 'なし'), ...APPROVAL],
+			option_lines(2, 'B', 'なし'),
+		)
+
+		expect(run_park_body.default_pick(body)).toStrictEqual({ number: 2, over: [1] })
+	})
+
+	it.each([
+		['only tier C options', unpicked(option_lines(1, 'C', 'なし'), option_lines(2, 'C', '人'))],
+		["only the parent's own action", unpicked(option_lines(1, 'A', '親'))],
+		['a recommendation', single_option('A', 'なし')],
+		['an off-schema body', OFF_SCHEMA],
+	])('leaves a park with %s undecided', (_case, body) => {
+		expect(run_park_body.default_pick(body)).toBeUndefined()
+	})
+})

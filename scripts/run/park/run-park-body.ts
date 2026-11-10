@@ -288,6 +288,36 @@ function adoptable_pick(body: string): number | undefined {
 	return number !== undefined && adopt_problem(body, number) === undefined ? number : undefined
 }
 
+interface DefaultPick {
+	number: number
+	over: ReadonlyArray<number>
+}
+
+// Reversible and the narrowest change: no tier C, no permission, no size approval widening the lane.
+function is_narrowest(option: ParkOption): boolean {
+	const { tier, permission, approval } = option
+
+	return tier !== PERSON_TIER && permission === AUTO_PERMISSION && approval === undefined
+}
+
+// The options of a park with no recommendation; none for a recommended park or a body off the schema.
+function unpicked_options(body: string): ReadonlyArray<ParkOption> {
+	const park = parse(body)
+
+	return problem_of(body) === undefined && park.pick?.number === undefined ? park.options : []
+}
+
+// The option a parent takes for a park with no recommendation (joshuafolkken/kit#7077): the first
+// listed reversible option with the smallest change, and the options it was taken over. `undefined`
+// for a recommended park, a body off the schema, or one whose every option a person must take.
+function default_pick(body: string): DefaultPick | undefined {
+	const options = unpicked_options(body)
+	const number = options.find((option) => is_narrowest(option))?.number
+	const over = options.map((option) => option.number).filter((other) => other !== number)
+
+	return number === undefined ? undefined : { number, over }
+}
+
 function is_complete(approval: ParkApproval | undefined): approval is ApprovalRange {
 	return APPROVAL_PARTS.every(([key]) => approval?.[key] !== undefined)
 }
@@ -306,10 +336,11 @@ const run_park_body = {
 	adoptable_pick,
 	approval_range,
 	auto_pick,
+	default_pick,
 	parent_action,
 	problem_of,
 	summary_of,
 }
 
-export type { ApprovalRange }
+export type { ApprovalRange, DefaultPick }
 export { run_park_body }

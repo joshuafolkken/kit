@@ -47,6 +47,17 @@ describe('reviewer agent definition', () => {
 		expect(frontmatter()).toMatch(effort_line(agent_role_profile.DEFAULT_PROFILES.reviewer.effort))
 		expect(frontmatter()).toMatch(effort_line('medium'))
 	})
+
+	// joshuafolkken/kit#7045: the review stays at its effort; its output is shaped instead — the review
+	// written once to its file, the reply naming it rather than repeating it.
+	it('caps each finding and replies with the file and finding lines, not the review again', () => {
+		const { body } = definition(AGENT_PATH)
+
+		expect(body).toContain('in at most three lines')
+		expect(body).toContain('a category with no finding in one proof line')
+		expect(body).toContain('not the review again')
+		expect(body).not.toContain('Return that review as your reply')
+	})
 })
 
 describe('reviewer-verification agent definition', () => {

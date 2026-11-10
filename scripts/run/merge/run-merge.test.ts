@@ -272,7 +272,7 @@ describe('park_comment', () => {
 		expect(comment).not.toContain(NEEDS_DECISION)
 		expect(comment).toContain('- Why: the session ended unfinished.')
 		expect(comment).toContain('no merged pull request')
-		expect(comment).toContain('Consecutive failures: 2 of 3')
+		expect(comment).toContain('- Consecutive failures: 2 of 3 (every 3 in a row checks `main`).')
 		expect(comment).toContain('`lane.jsonl`')
 		expect(comment).toContain('`fullrun #2761`')
 	})
@@ -338,6 +338,32 @@ describe('is_guard_tripped', () => {
 
 	it('holds below the limit', () => {
 		expect(run_merge.is_guard_tripped(run_merge.CONSECUTIVE_FAILURE_LIMIT - 1)).toBe(false)
+	})
+
+	it('trips again only after as many more failures', () => {
+		const limit = run_merge.CONSECUTIVE_FAILURE_LIMIT
+
+		expect(run_merge.is_guard_tripped(limit + 1)).toBe(false)
+		expect(run_merge.is_guard_tripped(limit + limit)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#7078: a tripped outage guard holds launches for a wait that doubles per further
+// outage, capped.
+describe('outage_wait_ms', () => {
+	const limit = run_merge.CONSECUTIVE_OUTAGE_LIMIT
+	const base = run_merge.outage_wait_ms(limit)
+
+	it('doubles for each outage past the limit', () => {
+		expect(run_merge.outage_wait_ms(limit + 1)).toBe(base + base)
+	})
+
+	it('stops growing at the cap', () => {
+		const far_outages = limit + limit + limit + limit
+		const capped = run_merge.outage_wait_ms(far_outages)
+
+		expect(capped).toBeGreaterThan(base)
+		expect(run_merge.outage_wait_ms(far_outages + 1)).toBe(capped)
 	})
 })
 

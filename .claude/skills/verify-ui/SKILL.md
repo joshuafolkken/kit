@@ -1,6 +1,6 @@
 ---
 name: verify-ui
-description: Screenshot the affected route with the project's own command and check it matches the intent. Use it before reporting any UI, layout, styling, copy or interaction change as done.
+description: Screenshot the changed route with the project's own command. Use it before reporting a UI, layout, styling, copy or interaction change done.
 argument-hint: '[route] [route...]'
 ---
 

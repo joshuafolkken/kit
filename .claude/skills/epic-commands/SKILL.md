@@ -1,6 +1,6 @@
 ---
 name: epic-commands
-description: Procedures for `josh epic:audit`, `epic:next` and `epic:bundle`. Read it before running one, before an epic tracks a child in another repository, when `epic:bundle` places a filed issue, and when recording a decision on a `needs-decision` child.
+description: Procedures for `josh epic:audit`, `epic:next`, `epic:bundle`, an epic child in another repository and a `needs-decision` decision. Read it before any of them and when `epic:bundle` places a filed issue.
 ---
 
 # The `josh epic:*` commands
@@ -16,7 +16,7 @@ backlogrun → which calls epic:next each round
 ```
 
 Settling every `needs-decision` is `backlogrun`'s job: `backlogrun-steps.md` → "Resolve what
-the plan can resolve". A `pnpm josh backlogrun <E> --only`'s pre-check is `epic:audit`.
+the plan can resolve"; a `推奨なし` park → `backlogrun-park.md` → "A park the driver decides". A `pnpm josh backlogrun <E> --only`'s pre-check is `epic:audit`.
 
 Read `execution-waves.md` only when children need an order between groups (a wave boundary, or a child
 that must run alone), and `epic-bundle.md` only when a filing's `epic:bundle` answer places the issue.

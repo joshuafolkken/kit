@@ -252,6 +252,8 @@ Before the closing line, `Lane children by phase` gives the lane children's cost
 
 `Lane subagents by agent type` follows in the same shape, keyed by the `agentType` of each unit's `agent-<id>.meta.json`, a unit without one under its kind.
 
+Each row of both tables ends with its calls whose output passed 2,000 tokens (`· <N> calls over 2000`), so the period's long outputs are placed by phase and agent type, not only totalled under `Usage breakdown`.
+
 `Usage breakdown` (`tools/cost-audit/cost-audit-usage.ts`) gives the current period's figures a cost-reduction Issue compares before and after, in tokens and dollars, never weighted units:
 
 - the cache write by its 5-minute and 1-hour lifetime;

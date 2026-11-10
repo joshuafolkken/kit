@@ -56,7 +56,7 @@ const WORDS = {
 	in_progress: 'running',
 	stopped: 'stopped',
 	paused: 'paused',
-	earlier: 'earlier run',
+	earlier: "earlier run's lane, not counted",
 	unknown: 'lane state unknown',
 	waiting: 'waiting',
 	queued: 'queued',

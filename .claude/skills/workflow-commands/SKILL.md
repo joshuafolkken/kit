@@ -1,6 +1,6 @@
 ---
 name: workflow-commands
-description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun` and `backlogrun`. Read it the moment one is typed (with or without `#N` / `new`), before any command, and when asked what one does or a run must be resumed or repaired.
+description: Procedures for `kickoff`, `fullrun`, `halfrun`, `prrun`, `backlogrun` (with or without `#N` / `new`). Read it before running, explaining, resuming or repairing one.
 ---
 
 # Issue-driven workflow commands
