@@ -37,6 +37,8 @@ const { CAP_NOTE, AGAIN_NOTE, RETRIGGER_BODY, RETRIGGER_CAP } = followup_coderab
 const LATER = '2026-10-28T01:05:00Z'
 // A retrigger written before the notice: one CodeRabbit answered with another rate limit.
 const EARLIER = '2026-10-28T00:55:00Z'
+// CodeRabbit's answer to the retrigger at `LATER`: another rate limit.
+const ANSWERED_AT = '2026-10-28T01:10:00Z'
 
 function spent_retriggers(): Array<ReturnType<typeof retrigger_at>> {
 	return Array.from({ length: RETRIGGER_CAP }, () => retrigger_at(NOTICE_AT))
@@ -145,5 +147,24 @@ describe('followup_coderabbit_retrigger.run — the cap reached partway through 
 
 		expect(result).toStrictEqual({ is_retriggered: true, notes: [CAP_NOTE] })
 		expect(git_gh_command.pr_comment).toHaveBeenCalledTimes(RETRIGGER_CAP - 1)
+	})
+})
+
+describe('followup_coderabbit_retrigger.run — a pending retrigger rate-limited again', () => {
+	use_run_spies()
+
+	it('retriggers after the awaited review is rate-limited, below the cap', async () => {
+		const pending = [coderabbit(notice(TWO_MINUTES)), retrigger_at(LATER)]
+		const answered = [coderabbit(notice(TWO_MINUTES), ANSWERED_AT), retrigger_at(LATER)]
+
+		vi.mocked(git_gh_command.pr_get_comments)
+			.mockResolvedValueOnce(JSON.stringify(pending))
+			.mockResolvedValueOnce(JSON.stringify(answered))
+		checks_read(RUNNING, RATE_LIMITED, RUNNING, DONE)
+
+		const result = await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
+
+		expect(result).toStrictEqual({ is_retriggered: true, notes: [] })
+		expect(git_gh_command.pr_comment).toHaveBeenCalledTimes(1)
 	})
 })

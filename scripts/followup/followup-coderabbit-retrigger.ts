@@ -231,10 +231,20 @@ async function retrigger(
 	return { is_retriggered: true, notes: await wait_for_review(branch_name, wait) }
 }
 
-// A retriggered review rate-limited again is decided afresh from the pull request's comments, which
-// now count the retrigger; `rounds_left` bounds the loop should a posted retrigger not read back, and
-// running out of it is the cap. A stop after this run's own retrigger still reports it, so the checks
-// are read again and the completion report names it.
+async function follow(
+	branch_name: string,
+	wait: CodeRabbitWait,
+	decision: Exclude<Decision, { kind: 'stop' }>,
+): Promise<Retrigger> {
+	if (decision.kind === 'retrigger') return await retrigger(branch_name, wait, decision.wait_ms)
+
+	return { is_retriggered: true, notes: await wait_for_review(branch_name, wait) }
+}
+
+// A retriggered review rate-limited again — this run's retrigger or one already pending — is decided
+// afresh from the pull request's comments, which now count the retrigger; `rounds_left` bounds the
+// loop should a posted retrigger not read back, and running out of it is the cap. A stop after a
+// retrigger still reports it, so the checks are read again and the completion report names it.
 async function attempt(
 	branch_name: string,
 	wait: CodeRabbitWait,
@@ -244,11 +254,7 @@ async function attempt(
 	const decision = decide(await read_comments(branch_name), Date.now())
 	if (decision.kind === 'stop') return { is_retriggered, notes: [decision.note] }
 
-	if (decision.kind === 'await') {
-		return { is_retriggered: true, notes: await wait_for_review(branch_name, wait) }
-	}
-
-	const outcome = await retrigger(branch_name, wait, decision.wait_ms)
+	const outcome = await follow(branch_name, wait, decision)
 	if (!outcome.notes.includes(AGAIN_NOTE)) return outcome
 	if (rounds_left <= 1) return { is_retriggered: true, notes: [CAP_NOTE] }
 
