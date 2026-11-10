@@ -86,6 +86,13 @@ Detached launchers also hand this variable to processes without an agent session
 | `JOSH_LANE_MODEL`                   | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.                                                                            |
 | `JOSH_LANE_EFFORT`                  | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead.                                                                           |
 
+Which steps run at a lowered effort:
+
+- Lowered to `low` — a step that decides nothing: the lane once it reaches the gate (`josh ship`, `josh ship:wait`, the followup), and the `investigator` agent (`effort: low` in `.claude/agents/investigator.md`), which reports what the code does.
+- Kept at the role's effort — a step that decides: the plan and implementation, the review fix, round 1 (`reviewer`), the verification pass (`reviewer-verification`), and the `design-consultant`.
+- Capped by shape instead — the `reviewer` writes each finding in at most three lines and replies with the review file and finding lines; the `investigator` replies within 60 lines.
+- Measured — each row of `Lane children by phase` and `Lane subagents by agent type` in [`josh cost:audit`](./josh-commands-session.md) counts its calls with output over 2,000 tokens.
+
 ### Runs
 
 `JOSH_REVIEW_GATE` accepts `ci` or `local` and overrides `josh.review_gate` in the nearest declaring
