@@ -1,4 +1,4 @@
-import { POLL_BACKOFF } from '#scripts/lib/poll'
+import { PR_POLL_SCHEDULES } from '#scripts/lib/poll'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_pr_auto_merge } from './git-gh-pr-auto-merge'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
@@ -81,6 +81,24 @@ describe('git_pr_checks.wait_for_pr_success — observer', () => {
 
 		expect(observed).toStrictEqual([result])
 	})
+
+	// #6868: the gate's wait reads on the checks schedule's lead, not the merge's first wait.
+	it('reads again after the checks schedule’s lead interval', async () => {
+		vi.useFakeTimers()
+		fetch_checks.mockResolvedValueOnce({
+			pr_number: PR_NUMBER,
+			snapshot_json: JSON.stringify(PENDING_STATE),
+		})
+
+		const result = git_pr_checks.wait_for_pr_success(BRANCH, 1)
+
+		await vi.advanceTimersByTimeAsync(PR_POLL_SCHEDULES.merge.initial_ms)
+		expect(fetch_checks).toHaveBeenCalledTimes(1)
+		await vi.advanceTimersByTimeAsync(PR_POLL_SCHEDULES.checks.lead.interval_ms)
+
+		await expect(result).resolves.toBeDefined()
+		expect(fetch_checks).toHaveBeenCalledTimes(2)
+	})
 })
 
 // The watch polls for up to two minutes before the wait above, so a row re-entering followup after a
@@ -153,6 +171,7 @@ describe('git_pr_checks.read_merge_progress', () => {
 })
 
 describe('git_pr_checks.wait_for_pr_merged', () => {
+	// #6868: the second read comes on the merge schedule's first wait, not the checks' lead.
 	it('keeps polling while waiting and answers merged once GitHub merges', async () => {
 		vi.useFakeTimers()
 		stub_state(PENDING_STATE)
@@ -160,7 +179,7 @@ describe('git_pr_checks.wait_for_pr_merged', () => {
 		const progress = git_pr_checks.wait_for_pr_merged(BRANCH)
 
 		stub_state({ ...PENDING_STATE, merged: true })
-		await vi.advanceTimersByTimeAsync(POLL_BACKOFF.initial_ms)
+		await vi.advanceTimersByTimeAsync(PR_POLL_SCHEDULES.merge.initial_ms)
 
 		await expect(progress).resolves.toBe('merged')
 		expect(fetch_checks).toHaveBeenCalledTimes(2)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { poll, POLL_BACKOFF } from './poll'
+import { poll, POLL_BACKOFF, PR_POLL_SCHEDULES, type BackoffSchedule } from './poll'
 
 const ATTEMPTS = 5
 const INTERVAL_MS = 10
@@ -204,6 +204,56 @@ describe('poll.poll_for backoff', () => {
 
 		expect(total_ms).toBe(BUDGET_MS)
 		expect(waits.at(-1)).toBeLessThanOrEqual(POLL_BACKOFF.max_ms)
+	})
+})
+
+async function first_waits_of(
+	schedule: BackoffSchedule,
+	seen_per_tick: ReadonlyArray<string> = [],
+): Promise<Array<number>> {
+	const waits: Array<number> = []
+
+	await poll.poll_for(never_answers, {
+		attempts: 10,
+		interval_ms: 60_000,
+		sleeper: async (duration_ms) => {
+			waits.push(duration_ms)
+			await no_wait()
+		},
+		backoff: { seen: () => seen_per_tick[waits.length] ?? 'same', schedule },
+	})
+
+	return waits.slice(0, 6)
+}
+
+// #6868: the PR completion waits — checks and CodeRabbit, then the merge.
+describe('PR_POLL_SCHEDULES', () => {
+	it.each([
+		['changed', ['a', 'b']],
+		['unchanged', []],
+	])('holds the lead through %s ticks, then starts the schedule', async (_label, seen_per_tick) => {
+		const schedule = {
+			lead: { count: 2, interval_ms: 5000 },
+			initial_ms: 1000,
+			factor: 2,
+			max_ms: 3000,
+		}
+
+		await expect(first_waits_of(schedule, seen_per_tick)).resolves.toEqual([
+			5000, 5000, 1000, 2000, 3000, 3000,
+		])
+	})
+
+	it('reads the checks every 30 seconds four times, then every 20 seconds', async () => {
+		await expect(first_waits_of(PR_POLL_SCHEDULES.checks)).resolves.toEqual([
+			30_000, 30_000, 30_000, 30_000, 20_000, 20_000,
+		])
+	})
+
+	it('reads the merge from 10 seconds, 1.5 times longer each tick, up to 30 seconds', async () => {
+		await expect(first_waits_of(PR_POLL_SCHEDULES.merge)).resolves.toEqual([
+			10_000, 15_000, 22_500, 30_000, 30_000, 30_000,
+		])
 	})
 })
 

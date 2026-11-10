@@ -6,7 +6,7 @@ import { parse_pr_state_snapshot } from '#scripts/gh/git-pr-checks-parse'
 import { ai_review_pull_comment_schema } from '#scripts/git/git-schemas'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
-import { poll } from '#scripts/lib/poll'
+import { poll, PR_POLL_SCHEDULES } from '#scripts/lib/poll'
 import type { CodeRabbitState } from '#scripts/run/event/run-event-checks'
 import { followup_checks_event } from './followup-checks-event'
 import { followup_coderabbit_wait, type CodeRabbitWait } from './followup-coderabbit-wait'
@@ -39,7 +39,8 @@ const MARGIN_MS = MARGIN_SECONDS * SECOND_MS
 // The longest window `followup` waits out; a longer one is left to the person (`followup.md`).
 const WINDOW_CAP_MINUTES = 30
 const WINDOW_CAP_MS = WINDOW_CAP_MINUTES * MINUTE_MS
-// The wait for the retriggered review: twenty minutes, polled every thirty seconds.
+// The wait for the retriggered review: the budget of forty thirty-second polls, read on the PR
+// completion schedule.
 const REVIEW_WAIT_ATTEMPTS = 40
 const REVIEW_WAIT_INTERVAL_SECONDS = 30
 const REVIEW_WAIT_INTERVAL_MS = REVIEW_WAIT_INTERVAL_SECONDS * SECOND_MS
@@ -193,7 +194,12 @@ async function wait_for_review(branch_name: string, wait: CodeRabbitWait): Promi
 
 			return is_started && state !== 'running'
 		},
-		{ attempts: REVIEW_WAIT_ATTEMPTS, interval_ms: REVIEW_WAIT_INTERVAL_MS, sleeper: poll.sleep },
+		{
+			attempts: REVIEW_WAIT_ATTEMPTS,
+			interval_ms: REVIEW_WAIT_INTERVAL_MS,
+			sleeper: poll.sleep,
+			backoff: { schedule: PR_POLL_SCHEDULES.checks },
+		},
 	)
 	if (state === RATE_LIMITED) return [AGAIN_NOTE]
 
