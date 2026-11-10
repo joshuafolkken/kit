@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { TSC_ARGS } from '#scripts/gate/type-check-command'
+import { TSC_ARGS } from '#scripts/gate/tsc-arguments'
 import { plan_commands } from '#scripts/hooks/format-edited-file'
 import { PACKAGE_DIR, package_path } from '#scripts/init/init-paths'
 import { yaml_config_fixture } from '#scripts/lib/yaml-config-fixture'
