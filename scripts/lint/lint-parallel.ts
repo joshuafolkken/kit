@@ -17,18 +17,43 @@ import { eslint_cache_dependencies, type CacheDrop } from './eslint-cache-depend
 import { eslint_daemon, type DaemonState } from './eslint-daemon'
 import { eslint_heap } from './eslint-heap'
 import { lint_gate_scope } from './lint-gate-scope'
+import { lint_shard, type LintShard } from './lint-shard'
 import { lint_timing } from './lint-timing'
 
 // This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
 // cache flags come from the same constant the ignore rules are asserted against.
 // A copy here would keep writing the old location the day that constant
 // moves, with every test still green.
-const WHOLE_TREE = '.'
-const ESLINT_ARGS = ['exec', 'eslint', WHOLE_TREE, ...ESLINT_CACHE_FLAGS] as const
+function eslint_args_of(shard: LintShard | undefined): ReadonlyArray<string> {
+	return ['exec', 'eslint', ...lint_shard.eslint_targets(shard), ...ESLINT_CACHE_FLAGS]
+}
+
+const ESLINT_ARGS = eslint_args_of(undefined)
 
 // Prettier's cache stays this checkout's own, never shared through `lane_cache_run` as eslint's is:
 // its entries do not survive a move (`josh-command-types.ts` → `GATE_CACHE_SPECS`).
-const PRETTIER_ARGS = ['exec', 'prettier', '--check', WHOLE_TREE, ...PRETTIER_CACHE_FLAGS] as const
+const PRETTIER_ARGS = [
+	'exec',
+	'prettier',
+	'--check',
+	lint_shard.WHOLE_TREE,
+	...PRETTIER_CACHE_FLAGS,
+] as const
+
+// `undefined` is a shard that leaves formatting to the other one (`lint-shard.ts`).
+type PrettierArguments = ReadonlyArray<string> | undefined
+
+// Not a skip notice: prettier is used here, only by the other shard.
+const LEFT_TO_FORMATTING_SHARD: BufferedProcessResult = {
+	output: `josh prettier: ${lint_shard.FORMATTING_SHARD_REASON}.\n`,
+	exit_code: 0,
+	elapsed_ms: 0,
+}
+
+function prettier_args_of(shard: LintShard | undefined): PrettierArguments {
+	return lint_shard.checks_formatting(shard) ? PRETTIER_ARGS : undefined
+}
+
 const GATE_TIMING_LABEL = 'lint'
 
 // What one eslint run is made of: the child's arguments and the cache file they name.
@@ -106,8 +131,10 @@ function skipped(check: string, reason: string): BufferedProcessResult {
 
 async function run_prettier(
 	directory: string,
-	prettier_args: ReadonlyArray<string>,
+	prettier_args: PrettierArguments,
 ): Promise<BufferedProcessResult> {
+	if (prettier_args === undefined) return LEFT_TO_FORMATTING_SHARD
+
 	const reason = project_checks.prettier_skip_reason(directory)
 	if (reason !== undefined) return skipped('prettier', reason)
 
@@ -150,7 +177,7 @@ function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcess
 // run would have skipped. The skip reasons answer nothing for a full
 // project, so the one path serves both profiles.
 async function run_lint_pair(
-	prettier_args: ReadonlyArray<string>,
+	prettier_args: PrettierArguments,
 	eslint_args: ReadonlyArray<string>,
 	cache_file: string,
 	options: LintRunOptions,
@@ -201,7 +228,7 @@ function cache_fact(eslint: EslintResult): string {
 // A run that names a `timing` prints its line after the linters' output: the tools' seconds, then
 // what it read, the daemon it found and the cache it started from (joshuafolkken/kit#5712).
 async function run_lint_checks(
-	prettier_args: ReadonlyArray<string>,
+	prettier_args: PrettierArguments,
 	eslint_args: ReadonlyArray<string>,
 	cache_file: string,
 	options: LintRunOptions = COLD_RUN,
@@ -222,7 +249,7 @@ async function run_lint_checks(
 }
 
 async function run_timed_lint_checks(
-	prettier_args: ReadonlyArray<string>,
+	prettier_args: PrettierArguments,
 	eslint_args: ReadonlyArray<string>,
 	cache_file: string,
 ): Promise<number> {
@@ -241,30 +268,44 @@ async function run_lint_parallel_checks(options: LintRunOptions = COLD_RUN): Pro
 }
 
 // `josh lint --changed`, the gate's lint: the branch's changed files on the gate's own caches, or the
-// whole tree where `lint-gate-scope.ts` cannot narrow. The line naming the decision is printed first,
-// so a narrowed run is never read as a whole one.
-async function run_changed_lint_checks(): Promise<number> {
+// whole tree — or its `--shard` — where `lint-gate-scope.ts` cannot narrow. The line naming the
+// decision is printed first, so a narrowed run is never read as a whole one. A narrowed run reads the
+// changed files whatever the shard: both shards then lint them, which costs a repeat and loses nothing.
+async function run_whole_lint_checks(
+	scope_line: string,
+	shard: LintShard | undefined,
+): Promise<number> {
+	process.stdout.write(`${scope_line}${lint_shard.describe(shard)}\n`)
+
+	return await run_timed_lint_checks(
+		prettier_args_of(shard),
+		eslint_args_of(shard),
+		ESLINT_CACHE_FILE,
+	)
+}
+
+async function run_changed_lint_checks(shard: LintShard | undefined): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const files = await changed_file_scope.read_changed_files(root)
 	const scope = lint_gate_scope.resolve_gate_scope(files, root, process.env)
+	const scope_line = lint_gate_scope.describe_scope(scope, root)
 
-	process.stdout.write(`${lint_gate_scope.describe_scope(scope, root)}\n`)
+	if (scope.mode === 'all') return await run_whole_lint_checks(scope_line, shard)
 
-	if (scope.mode === 'all') {
-		return await run_timed_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, ESLINT_CACHE_FILE)
-	}
-
+	process.stdout.write(`${scope_line}\n`)
 	const narrowed = lint_gate_scope.narrowed_run(scope.files)
 
 	return await run_timed_lint_checks(narrowed.prettier, narrowed.eslint, narrowed.eslint_cache_file)
 }
 
 async function run_lint_command(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const shard = lint_shard.shard_of(command_arguments)
+
 	if (command_arguments.includes(lint_gate_scope.CHANGED_FLAG)) {
-		return await run_changed_lint_checks()
+		return await run_changed_lint_checks(shard)
 	}
 
-	return await run_lint_parallel_checks()
+	return await run_lint_checks(prettier_args_of(shard), eslint_args_of(shard), ESLINT_CACHE_FILE)
 }
 
 const lint_parallel = {

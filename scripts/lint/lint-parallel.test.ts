@@ -9,6 +9,7 @@ import { fake_result } from '#tools/test/execa-result'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { DaemonState } from './eslint-daemon'
 import type { LintRunTiming } from './lint-parallel'
+import { lint_shard } from './lint-shard'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
@@ -117,6 +118,31 @@ describe('whole-tree eslint in CI', () => {
 		vi.unstubAllEnvs()
 
 		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(ESLINT_ARGS)
+	})
+})
+
+// joshuafolkken/kit#6997: a `--shard` run hands eslint the shard's targets on the same cache file,
+// and only shard 1 checks formatting.
+describe('josh lint --shard', () => {
+	it('lints shard 1 with prettier over the whole tree', async () => {
+		mock_exit_codes(0, 0)
+
+		expect(await lint_parallel.run_lint_command(['--shard=1'])).toBe(0)
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(PRETTIER_ARGS)
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(
+			expect.arrayContaining([...lint_shard.FIRST_SHARD_DIRECTORIES]),
+		)
+		expect(mocked_cache_run).toHaveBeenCalledWith(ESLINT_CACHE_FILE, expect.any(Function))
+	})
+
+	it('lints shard 2 alone, saying prettier is left to shard 1', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_result(0))
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await lint_parallel.run_lint_command(['--shard=2'])).toBe(0)
+		expect(mocked_execa).toHaveBeenCalledOnce()
+		expect(mocked_execa.mock.calls[0]?.[1]).toContain('--ignore-pattern')
+		expect(stdout).toHaveBeenCalledWith(expect.stringContaining(lint_shard.FORMATTING_SHARD_REASON))
 	})
 })
 
