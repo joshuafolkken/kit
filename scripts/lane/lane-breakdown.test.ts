@@ -314,6 +314,25 @@ describe('lane_breakdown.of — waits and resumes', () => {
 	})
 })
 
+// joshuafolkken/kit#7026: #6983's round-1 review stage ran across a closed lid.
+describe('lane_breakdown.of — host sleep in a review stage', () => {
+	it('takes a host sleep inside the review stage out of that stage', () => {
+		const sleep = { ...event(70, 'sleep', 'host slept 5.0 min'), elapsed_ms: 5 * MINUTE_MS }
+		const breakdown = lane_breakdown.of(lane(), [...events_4970(), sleep], ISSUE)
+
+		expect(stage_minutes(breakdown, SHIP_REVIEW)).toBe(3)
+		expect(stage_minutes(breakdown, IMPLEMENT)).toBe(51)
+		expect(breakdown?.slept_ms).toBe(5 * MINUTE_MS)
+	})
+
+	it('leaves every stage as it was on a lane the host never slept through', () => {
+		const breakdown = lane_breakdown.of(lane(), events_4970(), ISSUE)
+
+		expect(minutes_of(breakdown)).toStrictEqual(STAGES_4970)
+		expect(breakdown?.slept_ms).toBe(0)
+	})
+})
+
 // joshuafolkken/kit#5078: the window the pre-detach's test:pinned rows are read in.
 describe('lane_breakdown.of — ship pre-detach', () => {
 	it('keeps the ship pre-detach span', () => {

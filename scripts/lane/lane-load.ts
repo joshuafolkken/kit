@@ -1,5 +1,7 @@
 import { loadavg } from 'node:os'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
+import { MS_PER_SECOND, PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { execa } from 'execa'
 import { lane_await } from './lane-await'
 import type { LoadEntry } from './lane-ledger-schema'
 import { lane_process_load } from './lane-process-load'
@@ -39,11 +41,65 @@ function rounded(megabytes: number | undefined): number | undefined {
 	return megabytes === undefined ? undefined : Math.round(megabytes)
 }
 
+// The host's sleep since boot (joshuafolkken/kit#7026): at each wake macOS stamps both its continuous
+// clock, which runs through a sleep, and its absolute one, which stops, in timebase ticks. Their
+// difference grows only by sleeping, so two samples' readings give the sleep between them even when
+// different processes took them. Another platform, or a probe that did not answer, records none.
+// The boot and last-wake instants ride along: a reboot resets the counter, and the last wake is where a
+// sleep ended, which a sampler started long after it cannot tell from its own first sample.
+const CLOCK_SYSCTL_NAMES = ['hw.tbfrequency', 'machdep.wake_abstime', 'machdep.wake_conttime']
+const SLEEP_SYSCTL_NAMES = [...CLOCK_SYSCTL_NAMES, 'kern.boottime', 'kern.waketime']
+const SYSCTL_LINE = /^(?<name>[\w.]+): (?<value>\d+)$/gmu
+const SYSCTL_TIME = /^kern\.(?<name>boottime|waketime): \{ sec = (?<seconds>\d+)/gmu
+
+interface HostSleep {
+	slept_ms?: number | undefined
+	booted_ms?: number | undefined
+	woke_ms?: number | undefined
+}
+
+function parse_times(stdout: string): Pick<HostSleep, 'booted_ms' | 'woke_ms'> {
+	const times = new Map(
+		Array.from(stdout.matchAll(SYSCTL_TIME), (match) => [
+			match.groups?.['name'],
+			Number(match.groups?.['seconds']) * MS_PER_SECOND,
+		]),
+	)
+
+	return { booted_ms: times.get('boottime'), woke_ms: times.get('waketime') }
+}
+
+function parse_slept_ms(stdout: string): number | undefined {
+	const values = new Map(
+		Array.from(stdout.matchAll(SYSCTL_LINE), (match) => [
+			match.groups?.['name'],
+			Number(match.groups?.['value']),
+		]),
+	)
+	const [frequency = 0, awake = 0, total = 0] = CLOCK_SYSCTL_NAMES.map((name) => values.get(name))
+
+	if ([frequency, awake, total].includes(0)) return undefined
+
+	return Math.round(((total - awake) / frequency) * MS_PER_SECOND)
+}
+
+async function read_host_sleep(): Promise<HostSleep> {
+	if (process.platform !== 'darwin') return {}
+
+	const { stdout } = await execa('sysctl', SLEEP_SYSCTL_NAMES, {
+		reject: false,
+		timeout: PROBE_TIMEOUT_MS,
+	})
+
+	return { slept_ms: parse_slept_ms(stdout), ...parse_times(stdout) }
+}
+
 async function sample(at: string): Promise<LoadEntry> {
-	const [memory, lanes, reading] = await Promise.all([
+	const [memory, lanes, reading, host_sleep] = await Promise.all([
 		machine_capacity.read_memory(),
 		read_lanes(),
 		lane_process_load.read(),
+		read_host_sleep(),
 	])
 	const [load = 0] = loadavg()
 
@@ -56,11 +112,14 @@ async function sample(at: string): Promise<LoadEntry> {
 		lanes,
 		processes: reading?.processes,
 		resident_mb: reading?.resident_mb,
+		...host_sleep,
 	}
 }
 
 const lane_load = {
 	count_working,
+	parse_slept_ms,
+	parse_times,
 	sample,
 }
 

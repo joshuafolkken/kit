@@ -4,6 +4,7 @@ import { git_location_environment } from '#scripts/git/git-location-environment'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
+import { stdin_text } from '#scripts/lib/stdin-text'
 
 type BodyRead = { text: string } | { problem: string }
 
@@ -22,7 +23,6 @@ type BodyRead = { text: string } | { problem: string }
 // than spelled out per flag, so the stdin form cannot come to mean one thing under one and something
 // else under another.
 const STDIN_PATH = '-'
-const STDIN_FD = 0
 // `git check-ignore -q` exits 1 for a path inside the repository that no rule ignores.
 const NOT_IGNORED_EXIT_CODE = 1
 
@@ -77,7 +77,7 @@ function read_body_file(raw_path: string): string {
 }
 
 function read_file_or_stdin(raw_path: string): string {
-	return raw_path === STDIN_PATH ? readFileSync(STDIN_FD, 'utf8') : read_body_file(raw_path)
+	return raw_path === STDIN_PATH ? stdin_text.read_all() : read_body_file(raw_path)
 }
 
 // The non-throwing read, for a caller that turns an unreadable or refused body into its own exit:
