@@ -249,8 +249,11 @@ function offer_pair(code: Briefed | undefined): void {
 	if (code !== undefined) review_pair.offer(code.brief)
 }
 
-// The paired round's comparison, recorded and never gating: a refused record is only noted.
-async function record_pair(issue: string): Promise<void> {
+// The paired round's comparison, recorded and never gating: a refused record is only noted. Only a
+// launch that briefed the code slot records, so an interaction pass alone never re-records the last
+// round 1's pair its paired brief still names.
+async function record_pair(issue: string, code: Briefed | undefined): Promise<void> {
+	if (code === undefined) return
 	const argv = review_pair_session.pair_argv(issue, paths(CODE).log, PROJECT_ROOT)
 	if (argv === undefined) return
 	const result = await josh(argv)
@@ -285,7 +288,7 @@ async function launch_reviewers(
 		briefs.map(({ slot }) => slot),
 	)
 
-	await record_pair(issue)
+	await record_pair(issue, code)
 
 	return result
 }

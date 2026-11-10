@@ -64,8 +64,8 @@ async function run(directory: string, environment: LaunchEnvironment): Promise<v
 	if (result.kind === 'failed') note(`not started — ${result.note}`)
 }
 
-// Started only while the round is paired, and settled even when it throws, so the code reviewer's
-// round never waits on or fails with it.
+// Started only while the round is paired, and settled even when it throws: the round waits on it so
+// the pair can be recorded, but never fails with it.
 async function launch(directory: string, environment: LaunchEnvironment): Promise<void> {
 	if (!review_pair.is_offered(directory)) return
 

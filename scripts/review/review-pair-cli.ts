@@ -151,7 +151,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = run(process.argv.slice(ARGV_OFFSET))
 }
 
-const review_pair_cli = { findings_of, is_agent_session, run }
+const review_pair_cli = { agent_cost, findings_of, is_agent_session, run }
 
 export type { PairSources }
 export { review_pair_cli }

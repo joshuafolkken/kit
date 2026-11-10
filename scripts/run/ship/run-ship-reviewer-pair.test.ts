@@ -44,6 +44,7 @@ const OK = 0
 const ISSUE = '7020'
 const CODE_BRIEF = 'the code brief'
 const CODE_ONLY_OPEN = ['run:review', '--code-only']
+const INTERACTION_OPEN = { open: ['review:brief', '--interaction'], slot: 'interaction' } as const
 const PAIR_ARGV = ['review:pair', '--issue', ISSUE, '--opus-agent', 'a', '--sonnet-agent', 'b']
 
 function prompt_of(brief_path: string): string {
@@ -111,9 +112,17 @@ describe('run_ship_reviewer — an unpaired round', () => {
 	})
 
 	it('pairs nothing beside an interaction review alone', async () => {
-		await run_round([{ open: ['review:brief', '--interaction'], slot: 'interaction' }])
+		await run_round([INTERACTION_OPEN])
 
 		expect(offer).not.toHaveBeenCalled()
 		expect(pair_launch).not.toHaveBeenCalled()
+	})
+
+	it("never re-records the last round 1's pair on an interaction review alone", async () => {
+		pair_argv.mockReturnValue(PAIR_ARGV)
+
+		await run_round([INTERACTION_OPEN])
+
+		expect(josh_run_mock).toHaveBeenCalledTimes(1)
 	})
 })
