@@ -5,6 +5,7 @@ const BODY_FILE = '--body-file <path>'
 const TITLE = '--title <title>'
 const EVIDENCE_FILE = '--evidence-file <path>'
 const BLOCKS_FINDER = '--blocks-finder'
+const DISTINCT = '--distinct <N,…>'
 const EVIDENCE_REFERENCE = `<issue> ${EVIDENCE_FILE}`
 
 // The commands that write to an issue — comment, plan, already-done, measured and file — split out of
@@ -233,7 +234,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					description: 'the target repository. Defaults to this repository.',
 				},
 				{
-					names: ['--distinct <N,…>'],
+					names: [DISTINCT],
 					description: 'duplicate candidates you read and judged distinct.',
 				},
 				{
@@ -271,7 +272,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line",
 		category: 'AI tools',
-		reference: ['<issue> --estimate "<F> ファイル / <L> 行"', 'automation', ['network']],
+		reference: [
+			`<issue> --estimate "<F> ファイル / <L> 行" [${DISTINCT}]`,
+			'automation',
+			['network'],
+		],
 		usage: {
 			examples: [{ arguments: '5999 --estimate "3 ファイル / 80 行"' }],
 			flags: [
@@ -279,6 +284,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--estimate "<F> ファイル / <L> 行"'],
 					description:
 						"the follow-up's size estimate, never apportioned from the issue's. Required.",
+				},
+				{
+					names: [DISTINCT],
+					description:
+						'duplicate candidates `issue:file` held the follow-up on, declared separate; the issue itself always is. Repeatable.',
 				},
 			],
 		},

@@ -1,4 +1,5 @@
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
+import { expected_effect_lint } from './expected-effect-lint'
 import { issue_cite } from './issue-cite'
 import { markdown_section } from './markdown-section'
 
@@ -108,6 +109,14 @@ function declarations(body: string): ReadonlyArray<string> {
 		.filter((line) => DECLARATION_PATTERN.test(line) && !line.startsWith(ESTIMATE_PREFIX))
 }
 
+// #N's expected-effect section, heading included, or nothing when #N has none: a run-time-shortening
+// aim carried over in the declarations makes `issue:file` require it (`expected-effect-lint.ts`).
+function effect_section(body: string): ReadonlyArray<string> {
+	const lines = markdown_section.section_lines(body, expected_effect_lint.HEADING)
+
+	return lines.length === 0 ? [] : [expected_effect_lint.HEADING, ...lines]
+}
+
 function follow_up_title(subject: SpillSubject): string {
 	return `Follow up ${issue_cite.plain_for('github', subject.issue_number)}: ${subject.title}`
 }
@@ -131,6 +140,7 @@ function follow_up_body(subject: SpillSubject, estimate: string): string {
 		'',
 		`${origin} の \`## 期待結果\` のうち、下の受け入れ条件が求める部分を満たす。`,
 		'',
+		...effect_section(subject.body),
 		'## 受け入れ条件',
 		'',
 		...unchecked_lines(subject.body),
