@@ -4,6 +4,7 @@ import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
+import { trusted_measure } from '#scripts/issue/trusted-measure'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -239,6 +240,14 @@ describe('lane:plan — what it refuses', () => {
 
 	it('waits rather than starting on a listing it could not read', async () => {
 		fetch_opted_in.mockResolvedValue({ kind: 'unreadable' })
+		// joshuafolkken/kit#7022: an unlisted issue's premises are read from its own body.
+		vi.spyOn(trusted_measure, 'read_trusted_body').mockResolvedValue({
+			kind: 'trusted',
+			body: '',
+			issue: String(LATER),
+			author: 'author',
+			editor: 'author',
+		})
 
 		expect(await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)).toBe(FAILURE)
 		expect(info).toHaveBeenCalledWith('wait')
