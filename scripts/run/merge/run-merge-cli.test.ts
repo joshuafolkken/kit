@@ -21,6 +21,9 @@ const refused_carry_mock = vi.hoisted(() => vi.fn())
 const close_split_lane_mock = vi.hoisted(() => vi.fn())
 const release_child_mock = vi.hoisted(() => vi.fn())
 const retain_lane_mock = vi.hoisted(() => vi.fn())
+const health_check_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./run-merge-health', () => ({ run_merge_health: { check: health_check_mock } }))
 
 vi.mock('#scripts/lane/lane-state', () => ({ lane_state: { record_change: retain_lane_mock } }))
 
@@ -100,6 +103,7 @@ function reset_cut_mocks(): void {
 	is_outage_mock.mockReset().mockReturnValue(false)
 	resume_cut_mock.mockReset().mockResolvedValue(true)
 	refused_carry_mock.mockReset().mockResolvedValue(undefined)
+	health_check_mock.mockReset().mockResolvedValue(true)
 }
 
 beforeEach(() => {
@@ -196,15 +200,17 @@ describe('run_merge_cli.run — a failed child', () => {
 		expect(ask_next_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
 		expect(emit_mock).toHaveBeenCalledWith('park', PARK_EVENT)
+		expect(health_check_mock).not.toHaveBeenCalled()
 	})
 
-	it('stops when the failure guard trips', async () => {
+	it('checks main and offers the next child when the failure guard trips', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
 		do_failed_mock.mockResolvedValue({ ...PARKED_FAILURE, carry: { failures: AT_GUARD } })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
-		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.STOP)
-		expect(ask_next_mock).not.toHaveBeenCalled()
+		expect(health_check_mock).toHaveBeenCalledWith(CHILD)
+		expect(info_mock).toHaveBeenCalledWith(NEXT)
+		expect(info_mock).not.toHaveBeenCalledWith(MERGE_TOKEN.STOP)
 	})
 })
 
@@ -256,7 +262,7 @@ describe('run_merge_cli.run — a child that ended on a cut', () => {
 })
 
 // joshuafolkken/kit#2240: a child that could not reach the API is re-dispatched, not parked, and a run
-// of consecutive outages stops the run as an environment failure rather than the children's.
+// of consecutive outages holds launches as an environment failure rather than the children's.
 describe('run_merge_cli.run — an API-outage child', () => {
 	beforeEach(() => {
 		is_outage_mock.mockReturnValue(true)
@@ -273,12 +279,13 @@ describe('run_merge_cli.run — an API-outage child', () => {
 		expect(emit_mock).toHaveBeenCalledWith('outage', `#${CHILD} outage (re-dispatchable)`)
 	})
 
-	it('stops with the environment token when the outage guard trips', async () => {
+	it('holds launches and offers the next child when the outage guard trips', async () => {
 		do_outage_mock.mockResolvedValue({ carry: { outages: AT_GUARD }, is_refused: false })
 
 		expect(await run_merge_cli.run(OUTPUT_ARGS)).toBe(SUCCESS)
-		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.ENVIRONMENT)
-		expect(ask_next_mock).not.toHaveBeenCalled()
+		expect(emit_mock).toHaveBeenCalledWith('usage-limit', expect.stringContaining('api outage'))
+		expect(info_mock).toHaveBeenCalledWith(NEXT)
+		expect(info_mock).not.toHaveBeenCalledWith(MERGE_TOKEN.ENVIRONMENT)
 	})
 
 	it('emits busy when the outage carry count is refused', async () => {

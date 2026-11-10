@@ -126,12 +126,12 @@ const SETTLED_ADVICE =
 // park an API-outage child that should be re-dispatched, so the recovery is
 // routed through `run:merge --output`, the same composite a returned child takes: it reads the exit
 // record without waiting for the unit to return, re-dispatches an outage child (counting the outage,
-// and stopping the run on the environment guard once a run of them trips it), and parks an abandoned
+// and holding launches once a run of them trips the environment guard), and parks an abandoned
 // child with `run:stalled` against the consecutive-failure guard.
 const STOPPED_CLEAN_ADVICE =
-	"The unit ended — classify how before booking it. Run `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo>` for a named epic): it reads the child's exit record without waiting for the unit to return, re-dispatches a child that could not reach the API (counting the outage; a run of them trips the environment guard and stops the run), and parks an abandoned child with `run:stalled` against the consecutive-failure guard. The checkout is clean, so there is nothing to stash."
+	"The unit ended — classify how before booking it. Run `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo>` for a named epic): it reads the child's exit record without waiting for the unit to return, re-dispatches a child that could not reach the API (counting the outage; a run of them trips the environment guard, which holds launches), and parks an abandoned child with `run:stalled` against the consecutive-failure guard. The checkout is clean, so there is nothing to stash."
 const STOPPED_DIRTY_ADVICE =
-	'Classify how the unit ended with `pnpm josh run:merge <N> --output <path> --stash` (add `--epic <E> --repo <owner/repo>` for a named epic): `--stash` first stashes the half-finished work and records its `stash:pop` line on the Issue, then it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard) and parks an abandoned child with `run:stalled` against the consecutive-failure guard, without waiting for the unit to return.'
+	'Classify how the unit ended with `pnpm josh run:merge <N> --output <path> --stash` (add `--epic <E> --repo <owner/repo>` for a named epic): `--stash` first stashes the half-finished work and records its `stash:pop` line on the Issue, then it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard, which holds launches) and parks an abandoned child with `run:stalled` against the consecutive-failure guard, without waiting for the unit to return.'
 const UNDETERMINED_ADVICE =
 	'Read the trace that failed and ask again. Where the process trace was given as `unknown`, leave `--process` out so the command reads it. Two of these in a row is a fault in the check itself rather than a slow unit: stop polling and report it.'
 

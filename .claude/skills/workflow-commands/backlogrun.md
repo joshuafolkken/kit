@@ -66,6 +66,6 @@ reference is read as a section").
 | --- | --- | --- |
 | Children per run | 30 | Stop and report; an epic this large should be split. |
 | Issues filed per originating work item | `prerequisite.md`'s cap (`issue:file` refuses the 11th) | Stop and report. |
-| Consecutive child failures | 3 | Stop and report; something is wrong with the environment, not the children. |
+| Consecutive child failures | 3 | Not a stop: `run:merge` checks `main`, filing a `run:solo` Issue if red, and offers the next child (`run-merge-health.ts`). |
 
 A failure that is not consecutive parks its child and the run continues.

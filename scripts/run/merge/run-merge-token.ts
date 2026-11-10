@@ -9,11 +9,10 @@ const MERGE_TOKEN = {
 	HUMAN_REVIEW: 'human-review',
 	// Matches the `busy` verdict `run:carry` emits for a refused count, so callers see one vocabulary.
 	BUSY: 'busy',
-	// The consecutive-failure guard tripped, or a failed child could not be parked.
+	// A failed child could not be parked.
 	STOP: 'stop',
-	// The consecutive-outage guard tripped: the environment is down, so the run stops rather than
-	// re-dispatching into a dead API. Distinct from `stop` so the parent's report can say the environment
-	// failed rather than the children.
+	// The environment is down. `run:merge` no longer emits it — an outage or an authentication failure
+	// holds launches instead (joshuafolkken/kit#7078) — so it is only ever read, ending the loop.
 	ENVIRONMENT: 'environment',
 	// The child's state could not be read; re-read before deciding.
 	RETRY: 'retry',

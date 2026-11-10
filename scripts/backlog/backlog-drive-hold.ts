@@ -69,7 +69,7 @@ async function held(
 	return result
 }
 
-// A collection whose `run:merge` answered `stop` — the consecutive-failure guard — finishes the run as
+// A collection whose `run:merge` answered `stop` — a failed child left unparked — finishes the run as
 // an offer's `stop` does, but no offer follows it to release the hold, so it is released here. Left
 // open, the lanes it freed read as held until the next driver's first offer (joshuafolkken/kit#4571).
 async function stopped(
