@@ -1,4 +1,5 @@
 import { ci_yml_fixture } from '#scripts/ci/ci-yml-fixture'
+import { lint_shard } from '#scripts/lint/lint-shard'
 import { describe, expect, it } from 'vitest'
 import { gate_labels } from './gate-labels'
 import { gate_plan } from './gate-plan'
@@ -12,6 +13,9 @@ const GROUP_NAMES = Object.keys(gate_static_group.STATIC_GROUPS)
 const GROUPED_LABELS = Object.values(gate_static_group.STATIC_GROUPS).flat()
 const MATRIX_JOB = 'static-checks'
 const LINT_GROUP = 'lint'
+// joshuafolkken/kit#7018: the lint shard groups stay out of the matrix until CI runs them (#7108).
+const SHARD_GROUPS = Object.entries(gate_static_group.LINT_SHARD_GROUPS)
+const SHARD_GROUP_NAMES = Object.keys(gate_static_group.LINT_SHARD_GROUPS)
 
 describe('the static groups partition the static checks', () => {
 	it.each(STATIC_LABELS)('puts %j in exactly one group', (label) => {
@@ -45,6 +49,12 @@ describe('group_of', () => {
 		},
 	)
 
+	it.each(SHARD_GROUP_NAMES)('reads the lint shard group %j from its flag', (name) => {
+		expect(gate_static_group.group_of(`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${name}`)).toBe(
+			name,
+		)
+	})
+
 	it('does not read an inherited object key as a group', () => {
 		expect(
 			gate_static_group.group_of(`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}toString`),
@@ -65,6 +75,13 @@ describe('narrow_checks', () => {
 			.map((check) => check.label)
 
 		expect(labels).toEqual([gate_labels.TYPE_CHECK_LABEL, gate_labels.EXPORTS_LABEL])
+	})
+
+	it.each(SHARD_GROUPS)('keeps only the lint check on shard %j', (name, shard) => {
+		const checks = gate_static_group.narrow_checks(gate_plan.STATIC_CHECKS, name)
+
+		expect(checks.map((check) => check.label)).toEqual([gate_labels.LINT_LABEL])
+		expect(lint_shard.shard_of(checks[0]?.args ?? [])).toBe(shard)
 	})
 
 	it('finds the group among the other arguments', () => {
