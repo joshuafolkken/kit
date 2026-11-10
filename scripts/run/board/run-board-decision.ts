@@ -40,10 +40,20 @@ function heading_of(body: string): string | undefined {
 	return HEADING.exec(heading ?? '')?.[1]?.trim()
 }
 
+// The latest park's round from its second on: a child parked more than once is a round trip
+// (joshuafolkken/kit#7001). Every schema-conforming body counts as one park; a latest comment that is
+// no park carries no round.
+function round_of(bodies: ReadonlyArray<string>): string | undefined {
+	if (run_park_body.summary_of(bodies.at(-1) ?? '') === undefined) return undefined
+	const parks = bodies.filter((body) => run_park_body.summary_of(body) !== undefined).length
+
+	return parks > 1 ? `park ${String(parks)} 回目` : undefined
+}
+
 // The park's question, then its recommendation and tier on the same line (joshuafolkken/kit#6688).
 function comment_question(bodies: ReadonlyArray<string>): string | undefined {
 	const body = bodies.at(-1) ?? ''
-	const parts = [heading_of(body), run_park_body.summary_of(body)]
+	const parts = [heading_of(body), run_park_body.summary_of(body), round_of(bodies)]
 	const present = parts.filter((part) => part !== undefined)
 
 	return present.length === 0 ? undefined : present.join(' — ')

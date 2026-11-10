@@ -90,3 +90,15 @@ describe('backlog_triage_park.read', () => {
 		expect(await backlog_triage_park.read(String(ISSUE))).toStrictEqual({ problem })
 	})
 })
+
+// joshuafolkken/kit#7001: `--adopt` refuses an option needing the parent's action without `--done`.
+describe("backlog_triage_park.lines_of — an option needing the parent's action", () => {
+	it('adds --done to its --adopt line', async () => {
+		parked_with([park(PICK_ONE).replace('必要な権限: なし', '必要な権限: 親')])
+
+		expect(await backlog_triage_park.lines_of(ISSUE)).toStrictEqual([
+			`#${String(ISSUE)} 推奨: 1（層 A · 親の操作）`,
+			`${ADOPT_LINE} --done <the parent action taken>`,
+		])
+	})
+})

@@ -37,7 +37,7 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh backlog:triage --pass [--exclude <N>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <N> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear] | --apply <N> --adopt <k> --reason <text>'
+	'Usage: josh backlog:triage --pass [--exclude <N>] | --decide --defect yes|no|unknown --verification yes|no|unknown --every-run yes|no|unknown | --apply <N> [--lane | --solo --defect yes --verification yes --every-run yes] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear] | --apply <N> --adopt <k> --reason <text> [--done <text>]'
 
 const OPTIONS = {
 	apply: { type: 'string' },
