@@ -9,6 +9,7 @@ import { distributed_paths } from '#scripts/init/distributed-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
+import { review_pair_session, type LaunchEnvironment } from '#scripts/review/review-pair-session'
 import { detached_launch, type AttachedLaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
@@ -151,6 +152,10 @@ function reviewer_answer(result: AttachedLaunchResult, log_path: string): Broker
 	return result.exit_code === 0 ? SUCCESS : exited_answer(result.exit_code, log_path)
 }
 
+function reviewer_environment(lane: LaneInfo): LaunchEnvironment {
+	return { ...lane_child_marker.env_for(lane.issue), ...core_priority.PRIORITY_ENVIRONMENT }
+}
+
 async function launch_review(
 	lane: LaneInfo,
 	action: ReviewAction,
@@ -172,7 +177,7 @@ async function launch_review(
 			cwd: lane.directory,
 			log_path: target.log,
 			profile: built.profile,
-			env: { ...lane_child_marker.env_for(lane.issue), ...core_priority.PRIORITY_ENVIRONMENT },
+			env: reviewer_environment(lane),
 		},
 		console.error,
 	)
@@ -180,12 +185,21 @@ async function launch_review(
 	return reviewer_answer(result, target.log)
 }
 
+// The paired comparison reviewer runs beside round 1's code reviewer while the ship paired its brief
+// (joshuafolkken/kit#7020); it never changes the answer.
+async function launch_pair(lane: LaneInfo, action: ReviewAction): Promise<void> {
+	if (action.round !== '1' || !action_slots(action).includes(review_attest.REVIEW_SLOT.CODE)) return
+
+	await review_pair_session.launch(lane.directory, reviewer_environment(lane))
+}
+
 // **The slots' reviewers run side by side**, and the answer is the first failure among them — each
 // slot's findings file then says which review finished (`run-ship-reviewer.ts`).
 async function launch_reviews(lane: LaneInfo, action: ReviewAction): Promise<BrokerAnswer> {
-	const answers = await Promise.all(
-		action_slots(action).map(async (slot) => await launch_review(lane, action, slot)),
-	)
+	const [answers] = await Promise.all([
+		Promise.all(action_slots(action).map(async (slot) => await launch_review(lane, action, slot))),
+		launch_pair(lane, action),
+	])
 
 	return answers.find((reply) => !reply.is_success) ?? SUCCESS
 }
