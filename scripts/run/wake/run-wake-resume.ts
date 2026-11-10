@@ -1,5 +1,6 @@
 import { backlog_drive_args } from '#scripts/backlog/backlog-drive-args'
 import type { JoshResult } from '#scripts/josh/josh-run'
+import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 
@@ -79,6 +80,19 @@ function remember(target: string, carry: RunCarry, result: JoshResult): void {
 	else stamp_file.replace_text_stamp(source, `${key_of(carry)}\n${line}`)
 }
 
-const run_wake_resume = { is_valid, remember, resume_of, resumed_args, stored }
+// The triage session launched beside the driver is named on the kept line, so every later driver run
+// holds back the answers that triage could change until its process has ended
+// (joshuafolkken/kit#7120). The `triage` hand-back that launched it left the line this extends. The
+// process's start time rides with its pid, so a reissued pid never holds the driver back.
+function name_beside(target: string, carry: RunCarry, pid: number): void {
+	const line = stored(target, carry)
+	if (line === undefined) return
+
+	const flags = backlog_drive_args.beside_flags(pid, process_identity.read_start(pid))
+
+	stamp_file.replace_text_stamp(resume_path(target), `${key_of(carry)}\n${line} ${flags.join(' ')}`)
+}
+
+const run_wake_resume = { is_valid, name_beside, remember, resume_of, resumed_args, stored }
 
 export { run_wake_resume }

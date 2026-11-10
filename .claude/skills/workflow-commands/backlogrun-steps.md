@@ -127,7 +127,7 @@ run `run:carry --begin`; act on the row, then end the turn:
 
 | Handed back | What the session does |
 | --- | --- |
-| `triage` | Run `pnpm josh backlog:triage --pass` and follow its next command; resolve as above, leaving only genuine human questions parked |
+| `triage` | The session runs beside the driver, which keeps the carry: run no `run:carry`. Run `pnpm josh backlog:triage --pass` and follow its next command; resolve as above, leaving only genuine human questions parked |
 | `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` |
 | `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** |
 | `launch #N` | The driver parked `#N` `run:stalled`: "Resolve what the plan can resolve" → "A recovered mechanical failure" |

@@ -72,8 +72,13 @@ const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 	['epic #', `follow the named-issue sections below, ${HAND_BACK}`],
 ]
 const NEXT_DEFAULT = `act on the result by the sections below, ${HAND_BACK}`
+// **A triage session is woken beside the driver, never in its place** (joshuafolkken/kit#7120): the
+// record stays the supervisor's, so the session counts nothing and its turn end hands nothing back.
+const NEXT_BESIDE =
+	"\nNext: the carry record stays the supervisor's, whose driver keeps collecting and filling lanes beside this session, so run no pnpm josh run:carry; act on the result by the sections below, then end the turn"
 
 function next_move(verdict: string): string {
+	if (verdict === TRIAGE_VERDICT) return NEXT_BESIDE
 	const found = NEXT_BY_VERDICT.find(([prefix]) => verdict.startsWith(prefix))
 
 	return `\nNext: ${ALREADY_CLAIMED} ${found?.[1] ?? NEXT_DEFAULT}`
@@ -97,7 +102,9 @@ function judged(verdict: string, resume: string, details: string): DriveResult {
 		return { kind: 'failed', note: `backlog:drive returned an invalid resume line: ${resume}` }
 	}
 
-	return { kind: 'judgment', material: handoff_material(verdict, resume, details) }
+	const kind = verdict === TRIAGE_VERDICT ? 'triage' : 'judgment'
+
+	return { kind, material: handoff_material(verdict, resume, details) }
 }
 
 function driver_result(out: string, read: CarryRead, details = ''): DriveResult {
