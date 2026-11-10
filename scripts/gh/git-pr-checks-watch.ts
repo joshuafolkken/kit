@@ -1,4 +1,4 @@
-import { POLL_BACKOFF } from '#scripts/lib/poll'
+import { PR_POLL_SCHEDULES } from '#scripts/lib/poll'
 import {
 	CHECK_WAIT_INTERVAL_MS,
 	compute_max_attempts,
@@ -153,7 +153,7 @@ async function watch_until_settled(branch_name: string, observe?: SnapshotObserv
 			PR_CHECKS_WATCH_TIMEOUT_MS / SECONDS_TO_MS,
 			CHECK_WAIT_INTERVAL_MS,
 		),
-		backoff: POLL_BACKOFF,
+		backoff: PR_POLL_SCHEDULES.checks,
 		required_stable_reads: DEFAULT_STABLE_READS,
 		evaluator: CHECKS_SETTLED_EVALUATOR,
 	})

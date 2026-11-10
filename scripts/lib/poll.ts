@@ -17,7 +17,14 @@ async function sleep(duration_ms: number): Promise<void> {
 	})
 }
 
+interface BackoffLead {
+	count: number
+	interval_ms: number
+}
+
 interface BackoffSchedule {
+	// The first `count` waits, counted from the poll's start and never restarted by a changed tick.
+	lead?: BackoffLead
 	initial_ms: number
 	factor: number
 	max_ms: number
@@ -26,6 +33,20 @@ interface BackoffSchedule {
 // A CI run takes minutes, so most fixed-cadence reads of it only confirm that nothing moved, and each
 // one spends REST core (joshuafolkken/kit#6719). The wait therefore lengthens while nothing changes.
 const POLL_BACKOFF: BackoffSchedule = { initial_ms: 30_000, factor: 1.5, max_ms: 120_000 }
+
+// **PR completion waits poll finer as the end nears** (joshuafolkken/kit#6868).
+const PR_POLL_SCHEDULES = {
+	// CI does not finish right after it starts, so the lead reads coarsely; after it a fixed interval
+	// bounds the detection delay that a lengthening wait would stretch toward its cap.
+	checks: {
+		lead: { count: 4, interval_ms: 30_000 },
+		initial_ms: 20_000,
+		factor: 1,
+		max_ms: 20_000,
+	},
+	// A merge lands soon after the checks pass, so its wait starts fine and keeps a low cap.
+	merge: { initial_ms: 10_000, factor: 1.5, max_ms: 30_000 },
+} satisfies Record<string, BackoffSchedule>
 
 interface PollBackoff {
 	// What the last read saw. A tick whose answer differs from the one before resets the interval;
@@ -70,19 +91,34 @@ function next_backoff_interval(
 	return Math.min(previous.interval_ms * schedule.factor, schedule.max_ms)
 }
 
+// A lead step leaves `seen` unset, so the schedule after the lead starts at `initial_ms`.
+function next_backoff_step(
+	schedule: BackoffSchedule,
+	previous: BackoffStep,
+	tick: number,
+	seen: string,
+): BackoffStep {
+	const { lead } = schedule
+
+	if (lead !== undefined && tick < lead.count) {
+		return { interval_ms: lead.interval_ms, seen: undefined }
+	}
+
+	return { interval_ms: next_backoff_interval(schedule, previous, seen), seen }
+}
+
 // The last wait is cut to what the budget has left, so the total wait stays the fixed cadence's.
 function backoff_cadence(options: PollOptions, backoff: PollBackoff): Cadence {
 	const schedule = backoff.schedule ?? POLL_BACKOFF
 	const budget_ms = (options.attempts - 1) * options.interval_ms
 	const state = { waited_ms: 0, step: { interval_ms: 0, seen: undefined } satisfies BackoffStep }
 
-	return function next_wait(): number | undefined {
+	return function next_wait(tick: number): number | undefined {
 		if (state.waited_ms >= budget_ms) return undefined
-		const seen = backoff.seen?.() ?? ''
-		const interval_ms = next_backoff_interval(schedule, state.step, seen)
-		const wait_ms = Math.min(interval_ms, budget_ms - state.waited_ms)
+		const step = next_backoff_step(schedule, state.step, tick, backoff.seen?.() ?? '')
+		const wait_ms = Math.min(step.interval_ms, budget_ms - state.waited_ms)
 
-		Object.assign(state, { waited_ms: state.waited_ms + wait_ms, step: { interval_ms, seen } })
+		Object.assign(state, { waited_ms: state.waited_ms + wait_ms, step })
 
 		return wait_ms
 	}
@@ -147,5 +183,5 @@ async function wait_for<T>(
 
 const poll = { poll_for, poll_until, sleep, wait_for }
 
-export { poll, POLL_BACKOFF }
-export type { BackoffSchedule, PollBackoff, PollOptions, WaitOptions }
+export { poll, POLL_BACKOFF, PR_POLL_SCHEDULES }
+export type { BackoffLead, BackoffSchedule, PollBackoff, PollOptions, WaitOptions }
