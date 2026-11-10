@@ -43,17 +43,14 @@ fi
 
 compile_cache="$cache_dir/kit-hook-compile"
 
-# Hand the call to the resident pretool-guard of this checkout and launch environment
-# (`tools/hooks/hook-daemon.ts`) and exit with its answer. Returns, with the payload back on stdin, when
-# there is none — starting one for the next call — or it answers `stale` or nothing in time. Each call
-# directory sits beside the daemon's, so a daemon that goes never takes a payload with it.
+# Hand the call to the resident pretool-guard of this checkout (`tools/hooks/hook-daemon.ts`) and exit
+# with its answer. Returns, with the payload back on stdin, when there is none — starting one for the
+# next call — or it answers `stale` or nothing in time. Each call directory sits beside the daemon's, so
+# a daemon that goes never takes a payload with it. The call carries this environment in `env`, one
+# `name=value` line per variable with `%` and line breaks escaped, for the daemon to answer under.
 daemon_answer() {
 	daemon_script=$1
-	daemon_key=$( (
-		printf '%s\n' "$PWD"
-		unset PWD OLDPWD JOSH_HOOK_CWD _ SHLVL
-		export -p
-	) | cksum)
+	daemon_key=$(printf '%s\n' "$PWD" | cksum)
 	daemons_dir="$cache_dir/kit-hook-daemon"
 	daemon_dir="$daemons_dir/${daemon_key%% *}"
 	daemon_pid=
@@ -71,6 +68,7 @@ daemon_answer() {
 	request=$(mktemp -d "$daemons_dir/call.XXXXXX") || return
 	cat >"$request/payload"
 	printf '%s' "$JOSH_HOOK_CWD" >"$request/cwd"
+	awk 'BEGIN { for (name in ENVIRON) { value = ENVIRON[name]; gsub(/%/, "%25", value); gsub(/\n/, "%0A", value); print name "=" value } }' >"$request/env"
 	printf '%s' "$$" >"$request/launcher"
 	mkfifo "$request/reply"
 	exec 4<>"$request/reply"
