@@ -1,0 +1,7 @@
+{
+	"reason": "New large-read PreToolUse guard, its file-keyed repeat rule and tests (#7047)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 103
+	}
+}

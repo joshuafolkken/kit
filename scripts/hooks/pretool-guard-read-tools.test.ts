@@ -19,21 +19,25 @@ vi.mock('#scripts/delegation/investigation-guard', () => ({ investigation_outcom
 
 vi.mock('#scripts/delegation/duplicate-read-guard', () => ({ duplicate_read_outcome: vi.fn() }))
 
+vi.mock('#scripts/delegation/large-read-guard', () => ({ large_read_outcome: vi.fn() }))
+
 const { implementation_authority } = await import('./implementation-authority')
 const { lane_plan_guard } = await import('./lane-plan-guard')
 const { batch_outcome } = await import('./batch-guard')
 const { investigation_outcome } = await import('#scripts/delegation/investigation-guard')
 const { duplicate_read_outcome } = await import('#scripts/delegation/duplicate-read-guard')
+const { large_read_outcome } = await import('#scripts/delegation/large-read-guard')
 
 const GUARDS = {
 	'implementation-authority': vi.mocked(implementation_authority.reason),
 	batch: vi.mocked(batch_outcome),
 	investigation: vi.mocked(investigation_outcome),
 	'duplicate-read': vi.mocked(duplicate_read_outcome),
+	'large-read': vi.mocked(large_read_outcome),
 	'lane-plan': vi.mocked(lane_plan_guard.reason),
 }
 
-const READ_GUARDS = ['batch', 'investigation', 'duplicate-read']
+const READ_GUARDS = ['batch', 'investigation', 'duplicate-read', 'large-read']
 const ALL_GUARDS = Object.keys(GUARDS)
 
 beforeEach(() => {
@@ -42,6 +46,7 @@ beforeEach(() => {
 	vi.mocked(batch_outcome).mockReturnValue(CLEAR)
 	vi.mocked(investigation_outcome).mockReturnValue(CLEAR)
 	vi.mocked(duplicate_read_outcome).mockReturnValue(CLEAR)
+	vi.mocked(large_read_outcome).mockReturnValue(CLEAR)
 	vi.spyOn(delivered_rules, 'delivery').mockReturnValue(undefined)
 })
 
