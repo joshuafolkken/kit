@@ -33,7 +33,13 @@ const { remove_stamp, write_text_stamp } = vi.hoisted(() => ({
 }))
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch } }))
-vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: { remove_stamp, write_text_stamp } }))
+vi.mock('#scripts/josh/stamp-file', () => ({
+	stamp_file: {
+		remove_stamp,
+		stamp_path: (prefix: string) => `/stamps/${prefix}`,
+		write_text_stamp,
+	},
+}))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
 	lane_session_broker: {
 		review_paths: (_root: string, slot: ReviewSlot) => ({
@@ -201,10 +207,9 @@ describe('run:review where the interaction review is due', () => {
 describe('run:review and the review:submit slots', () => {
 	it('clears each briefed slot’s findings so --from-slot never records a stale round', async () => {
 		expect(await run_review_cli.run([])).toBe(0)
-		expect(remove_stamp.mock.calls).toStrictEqual([
-			['/briefs/findings-code.txt'],
-			['/briefs/findings-interaction.txt'],
-		])
+		expect(
+			remove_stamp.mock.calls.filter(([file]) => String(file).startsWith('/briefs/')),
+		).toStrictEqual([['/briefs/findings-code.txt'], ['/briefs/findings-interaction.txt']])
 	})
 })
 
