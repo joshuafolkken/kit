@@ -55,6 +55,29 @@ pnpm josh doc:section backlogrun.md "The hand-off"
 
 **Output / exit codes:** an unresolvable heading exits non-zero and lists the document's own headings.
 
+### `josh code:symbol`
+
+<!-- usage: code:symbol -->
+
+Print one TypeScript declaration by name, numbered, or list where a name is declared.
+
+```bash
+pnpm josh code:symbol <file> <name>                              # the declaration, its comment block included
+pnpm josh code:symbol <name>                                     # every file:line that declares it
+pnpm josh code:symbol scripts/code/code-symbol.ts declarations
+```
+
+<!-- /usage -->
+
+**Behavior:**
+
+- The code counterpart of `doc:section`: the extent comes from the TypeScript parse tree, not a guessed line range.
+- Function, class, method, interface, type alias, enum and variable declarations match by name; a variable prints its whole statement.
+- The comment block touching a declaration (no blank line between) prints with it.
+- Without a file, the tracked and untracked `.ts` / `.tsx` / `.mts` / `.cts` / `.js` / `.mjs` / `.cjs` files are searched. A Svelte `<script>` is not read.
+
+**Output / exit codes:** an undeclared name exits non-zero — with a file, listing the names the file declares.
+
 ### `josh read:set`
 
 <!-- usage: read:set -->
