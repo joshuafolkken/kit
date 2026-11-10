@@ -15,6 +15,7 @@ import { run_merge_auth } from './run-merge-auth'
 import { run_merge_dated } from './run-merge-dated'
 import { run_merge_decision } from './run-merge-decision'
 import { run_merge_driver } from './run-merge-driver'
+import { run_merge_health } from './run-merge-health'
 import { run_merge_human_review } from './run-merge-human-review'
 import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
@@ -29,7 +30,7 @@ import { run_merge_withdrawn, type Collected } from './run-merge-withdrawn'
 // The contract is `run:carry`'s: **standard output carries one token** (or the newline-separated
 // offer `epic:next --lanes` prints), and everything else is a captured subprocess or a quiet
 // in-process call. The verdicts this command adds to the offer are `over` (hand off),
-// `stop` (the consecutive-failure guard tripped, or a failed child could not be parked) and `retry` (the
+// `stop` (a failed child could not be parked) and `retry` (the
 // child's state could not be read; re-read before deciding).
 
 const SUCCESS_EXIT_CODE = 0
@@ -264,7 +265,7 @@ async function on_parked_failure(ctx: MergeContext, result: FailedResult): Promi
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.PARK, park)
 
 	if (run_merge_decision.is_guard_tripped(cause, result.carry)) {
-		return emit(MERGE_TOKEN.STOP, SUCCESS_EXIT_CODE)
+		await run_merge_health.check(ctx.child)
 	}
 
 	return { ...(await offered(ctx)), is_parked: true }
@@ -280,9 +281,9 @@ async function on_failed(ctx: MergeContext, cause?: StallCause): Promise<MergeVe
 	return await on_parked_failure(ctx, result)
 }
 
-// An API-outage child: counted into its own streak and left re-dispatchable, not parked. Below the
-// outage guard it offers the next child — which may be this same one again; at the guard it emits
-// `environment` so the parent stops, the environment being down.
+// An API-outage child: counted into its own streak and left re-dispatchable, not parked, and the next
+// child offered — which may be this same one again. At the outage guard, launches are held the way a
+// usage limit holds them, for a wait that grows with the streak (`run_merge.outage_wait_ms`).
 async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 	const result = await run_merge_steps.do_outage(ctx)
 
@@ -293,19 +294,26 @@ async function on_outage(ctx: MergeContext): Promise<MergeVerdict> {
 		`${issue_cite.plain_for('program', ctx.child)} outage (re-dispatchable)`,
 	)
 
-	if (result.carry !== undefined && run_merge.is_outage_guard_tripped(result.carry.outages)) {
-		return emit(MERGE_TOKEN.ENVIRONMENT, SUCCESS_EXIT_CODE)
+	const outages = result.carry?.outages ?? 0
+
+	if (run_merge.is_outage_guard_tripped(outages)) {
+		await run_merge_usage_limit.record(
+			ctx.child,
+			Date.now() + run_merge.outage_wait_ms(outages),
+			'api outage',
+		)
 	}
 
 	return await offered(ctx)
 }
 
-// A child whose session could not authenticate: the run stops with nothing counted or parked
-// (`run-merge-auth.ts`).
+// A child whose session could not authenticate: released uncounted and unparked, launches held until
+// a person's `/login` lets one through (`run-merge-auth.ts`).
 async function on_unauthenticated(ctx: MergeContext): Promise<MergeVerdict> {
-	await run_merge_auth.stop(ctx.child)
+	await run_merge_steps.release_child(ctx.child)
+	await run_merge_auth.hold(ctx.child, Date.now())
 
-	return emit(MERGE_TOKEN.ENVIRONMENT, SUCCESS_EXIT_CODE)
+	return await offered(ctx)
 }
 
 // A child a usage limit stopped: released uncounted, its reset recorded (`run-merge-usage-limit.ts`).
