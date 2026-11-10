@@ -55,21 +55,28 @@ describe('backlog_drive_record.record_ports — named_left', () => {
 	})
 })
 
-describe('backlog_drive_record.record_ports — added_since', () => {
-	it('asks the event stream since the given instant', async () => {
-		const added = vi.spyOn(backlog_arrival_added, 'is_added_since').mockResolvedValue(true)
+// joshuafolkken/kit#7016: both questions ask through the tick's one shared stream read.
+async function shared_read(): Promise<[]> {
+	return []
+}
 
-		await expect(backlog_drive_record.record_ports().added_since(SINCE_MS)).resolves.toBe(true)
-		expect(added).toHaveBeenCalledWith(SINCE_MS)
+describe('backlog_drive_record.record_ports — added_since', () => {
+	it('asks the event stream since the given instant through the shared read', async () => {
+		const added = vi.spyOn(backlog_arrival_added, 'is_added_since').mockResolvedValue(true)
+		const ports = backlog_drive_record.record_ports(shared_read)
+
+		await expect(ports.added_since(SINCE_MS)).resolves.toBe(true)
+		expect(added).toHaveBeenCalledWith(SINCE_MS, shared_read)
 	})
 })
 
 describe('backlog_drive_record.record_ports — raised_since', () => {
-	it('asks the event stream for a lane:limit raise since the given instant', async () => {
+	it('asks the event stream for a lane:limit raise through the shared read', async () => {
 		const raised = vi.spyOn(backlog_arrival_added, 'is_raised_since').mockResolvedValue(true)
+		const ports = backlog_drive_record.record_ports(shared_read)
 
-		await expect(backlog_drive_record.record_ports().raised_since(SINCE_MS)).resolves.toBe(true)
-		expect(raised).toHaveBeenCalledWith(SINCE_MS)
+		await expect(ports.raised_since(SINCE_MS)).resolves.toBe(true)
+		expect(raised).toHaveBeenCalledWith(SINCE_MS, shared_read)
 	})
 })
 

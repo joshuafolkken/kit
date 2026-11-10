@@ -102,8 +102,18 @@ function draft_of(args: ScoutArguments, repo: string): BacklogIssue {
 
 // The epic beside a candidate is the placement answer for a draft that cites nothing: the epic half
 // below decides from signal references, and a title-only draft has none to give it.
+// A cited title match keeps its score beside `ref`, so the rows that hold a filing read apart from
+// the ones the body only cites.
+function score_label(candidate: DuplicateCandidate): string {
+	const score = candidate.score.toFixed(SCORE_DIGITS)
+
+	if (candidate.is_referenced !== true) return score
+
+	return candidate.score > 0 ? `ref ${score}` : 'ref'
+}
+
 function format_duplicate(candidate: DuplicateCandidate): string {
-	const score = candidate.is_referenced === true ? 'ref' : candidate.score.toFixed(SCORE_DIGITS)
+	const score = score_label(candidate)
 	const epic = candidate.epic === undefined ? '' : ` (epic ${session_cite.issue(candidate.epic)})`
 	// The reader does two different things with the two states, so the row has to say which it is: an
 	// open candidate means somebody is already tracking this, a closed one means it may already be
@@ -351,9 +361,13 @@ async function scout(args: ScoutArguments, repo: string): Promise<ScoutOutcome |
 
 	// The same cut `warn_about_gaps` reports on standard error, read once more so standard output is
 	// held to it too — a ⚠ beside an executable instruction is not what stops a run acting on it.
+	// A cited issue whose title does not match (score 0) is shown as `ref` but holds nothing: a body
+	// cites its evidence and unrelated issues alike, and only a title match marks the same work.
 	return {
 		report: linkified_report(draft, widened, closed, repo),
-		candidates: duplicates.candidates.map((candidate) => candidate.number),
+		candidates: duplicates.candidates
+			.filter((candidate) => candidate.score > 0)
+			.map((candidate) => candidate.number),
 		measure_twins: measure_twin.twins_of(args.body, backlog.issues),
 	}
 }

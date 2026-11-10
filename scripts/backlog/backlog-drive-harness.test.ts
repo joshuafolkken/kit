@@ -78,8 +78,9 @@ function merge(world_state: World, issue: string): Awaited<ReturnType<LoopPorts[
 // The run's own records and parks: nothing added, raised, named, yielded or parked.
 const NO_RECORD: Pick<
 	LoopPorts,
-	'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park' | 'stall'
+	'begin_tick' | 'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park' | 'stall'
 > = {
+	begin_tick: async () => undefined,
 	added_since: async () => false,
 	raised_since: async () => false,
 	named_left: async () => false,

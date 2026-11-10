@@ -41,6 +41,29 @@ async function is_raised_since(
 	return await is_kind_since(run_event_stream.EVENT_KIND.LANE_LIMIT, since_ms, read)
 }
 
-const backlog_arrival_added = { has_kind_since, is_added_since, is_raised_since }
+interface TickReader {
+	read: EventReader
+	begin_tick: () => void
+}
+
+// One parse of the stream per drive tick, shared by the addition and the raise question
+// (joshuafolkken/kit#7016): the first read in a tick reads the stream, the later ones reuse it.
+function tick_reader(read: EventReader = read_stream): TickReader {
+	const memo: { pending: Promise<ReadonlyArray<RunEvent>> | undefined } = { pending: undefined }
+
+	return {
+		read: async () => {
+			memo.pending ??= read()
+
+			return await memo.pending
+		},
+		begin_tick: () => {
+			memo.pending = undefined
+		},
+	}
+}
+
+const backlog_arrival_added = { has_kind_since, is_added_since, is_raised_since, tick_reader }
 
 export { backlog_arrival_added }
+export type { EventReader, TickReader }
