@@ -1,9 +1,11 @@
+import { check_reuse } from '#scripts/gate/check-reuse'
 import { gate_ledger } from '#scripts/gate/gate-ledger'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
+import { whole_tree_reuse } from '#scripts/gate/whole-tree-reuse'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_ship_gate_runs } from './run-ship-gate-runs'
@@ -197,8 +199,14 @@ async function scoped_pair(): Promise<JoshResult> {
 	)
 }
 
-function is_reusable(tree: GateTree): boolean {
-	return gate_skip.reusable_green_gate(tree.files, tree.base) !== undefined
+// The ship's gate runs the whole-tree checks a lane's own gate leaves out (joshuafolkken/kit#7030), so a
+// lane gate's green record is a reuse only with those checks' own records green on this tree too.
+const GATE_ARGUMENTS: ReadonlyArray<string> = ['gate', whole_tree_reuse.WHOLE_TREE_FLAG]
+
+async function is_reusable(tree: GateTree): Promise<boolean> {
+	if (gate_skip.reusable_green_gate(tree.files, tree.base) === undefined) return false
+
+	return await whole_tree_reuse.is_reused(tree, check_reuse.DEFAULT_RECORDS)
 }
 
 // A tree the gate would only reuse starts no gate: the ship logs the tree it reused, and the lap
@@ -223,7 +231,7 @@ async function ran_gate(tree: GateTree): Promise<JoshResult> {
 
 	const result = await run_ship_lap.timed(
 		run_ship_lap.STEP.GATE,
-		async () => await josh_command.josh_run(['gate'], should_forward_stderr),
+		async () => await josh_command.josh_run(GATE_ARGUMENTS, should_forward_stderr),
 		{ note_of: () => ({ rerun: reason }) },
 	)
 
@@ -235,7 +243,7 @@ async function ran_gate(tree: GateTree): Promise<JoshResult> {
 async function gate(): Promise<JoshResult> {
 	const tree = await gate_tree.read_gate_tree()
 
-	if (!is_reusable(tree)) return await ran_gate(tree)
+	if (!(await is_reusable(tree))) return await ran_gate(tree)
 
 	run_ship_gate_runs.met(tree, SUCCESS_EXIT_CODE)
 
@@ -251,7 +259,7 @@ async function scoped_gate(): Promise<JoshResult> {
 // Whether `josh gate` would only reuse this tree's green record: the gate's own reuse test rather than
 // a second copy of it, so the ship calls a gate stage a reuse on exactly the trees the gate skips.
 async function is_gate_green(): Promise<boolean> {
-	return is_reusable(await gate_tree.read_gate_tree())
+	return await is_reusable(await gate_tree.read_gate_tree())
 }
 
 const run_ship_scoped = { REUSED_PAIR, is_gate_green, run_phases, scoped_gate, scoped_pair }

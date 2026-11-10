@@ -47,7 +47,8 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture
 
 const PASS = 0
-const CHECK_COUNT = 8
+// The lane gate's checks: the whole-tree ones are the ship's and CI's (joshuafolkken/kit#7030).
+const CHECK_COUNT = 6
 const NOTHING_RAN = 0
 const CHANGED_FILE = 'scripts/gate/gate-skip.ts'
 const CHANGED_TREE: Record<string, string> = { [CHANGED_FILE]: 'digest-one' }

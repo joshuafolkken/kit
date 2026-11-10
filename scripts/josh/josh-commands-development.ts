@@ -29,7 +29,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
 		reference: [
-			'[--verbose|--force|--no-unit|--static-group=<group>]',
+			'[--verbose|--force|--no-unit|--whole-tree|--static-group=<group>]',
 			'developer',
 			['files', 'processes'],
 		],
@@ -39,6 +39,10 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '--verbose', note: "every check's output, passing ones included" },
 				{ arguments: '--force', note: 're-run even on a tree already recorded green' },
 				{ arguments: '--no-unit', note: 'the static checks only (CI only)' },
+				{
+					arguments: '--whole-tree',
+					note: "add the whole-tree checks (the ship's gate on the final tree)",
+				},
 			],
 		},
 	},
@@ -212,6 +216,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Report exported namespace members nothing reads (kit only; a consumer project skips it)',
 		category: 'Development',
 		reference: ['', 'developer', ['none']],
+		// One TypeScript program, as the type check builds (joshuafolkken/kit#7030).
+		core_weight: core_weights.CORE_WEIGHTS.type_check,
 		// Reads source files and prints only, so a consultation session can run it.
 		is_read_only: true,
 		usage: { examples: [{ arguments: '' }] },

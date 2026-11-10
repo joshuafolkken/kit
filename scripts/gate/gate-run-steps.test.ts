@@ -49,7 +49,7 @@ describe('run_gate_steps — the start order', () => {
 	})
 
 	it('starts the zero-weight checks first and reports in declaration order', async () => {
-		const plan = gate_plan.plan_of(1, undefined, gate_plan.select_gate_checks(false, true))
+		const plan = gate_plan.plan_of(1, undefined, gate_plan.select_gate_checks(false, true, false))
 
 		const results = await gate_run_steps.run_gate_steps(plan, UNRESERVED_BUDGET)
 		const started = mocked_execa.mock.calls.map((call) => JSON.stringify(call[1]))

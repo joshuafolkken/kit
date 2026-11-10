@@ -93,11 +93,37 @@ describe('josh gate --no-unit', () => {
 		expect(spawned_checks().join('\n')).not.toContain(gate_labels.UNIT_TARGET)
 	})
 
-	it('still runs all four when the flag is absent', async () => {
+	it('still runs the unit suite when the flag is absent', async () => {
 		await run_gate([])
 
-		expect(spawned_checks()).toHaveLength(gate_plan.GATE_CHECKS.length)
+		expect(spawned_checks()).toHaveLength(gate_plan.LANE_GATE_CHECKS.length)
 		expect(spawned_checks().join('\n')).toContain(gate_labels.UNIT_TARGET)
+	})
+})
+
+// joshuafolkken/kit#7030: a lane's own gate leaves the whole-tree checks to the ship's gate and CI.
+const EXPORTS_COMMAND = 'exports:unused'
+const METRICS_COMMAND = 'josh metrics'
+
+describe('josh gate --whole-tree', () => {
+	it('leaves exports and metrics out of a lane gate without the flag', async () => {
+		await run_gate([])
+
+		expect(spawned_checks().join('\n')).not.toContain(EXPORTS_COMMAND)
+		expect(spawned_checks().join('\n')).not.toContain(METRICS_COMMAND)
+	})
+
+	it('runs every check, the whole-tree ones included, with the flag', async () => {
+		expect(await run_gate([verification_gate.WHOLE_TREE_FLAG])).toBe(0)
+
+		expect(spawned_checks()).toHaveLength(gate_plan.GATE_CHECKS.length)
+	})
+
+	it('runs them in every static set CI gates', async () => {
+		await run_gate(NO_UNIT)
+
+		expect(spawned_checks().join('\n')).toContain(EXPORTS_COMMAND)
+		expect(spawned_checks().join('\n')).toContain(METRICS_COMMAND)
 	})
 })
 
