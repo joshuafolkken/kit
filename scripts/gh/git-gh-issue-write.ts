@@ -59,7 +59,7 @@ async function did_write_succeed(write: () => Promise<unknown>): Promise<boolean
 	}
 }
 
-// Every write below goes through here, which clears the issue reads this process remembers
+// Every write below to an existing issue goes through here, which clears the issue reads this process remembers
 // (`git-gh-issue-memo.ts`) — in `finally`, because a write that threw may still have landed.
 async function write_api(request: GhApiRequest): Promise<string> {
 	try {
