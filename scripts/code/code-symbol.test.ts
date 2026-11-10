@@ -55,6 +55,13 @@ describe('code_symbol.declarations', () => {
 	it('leaves out a comment a blank line separates', () => {
 		expect(find('add')?.text).not.toContain('header comment')
 	})
+
+	it('leaves out a comment a CRLF blank line separates', () => {
+		const text = '// header\r\n\r\nfunction a(): void {}\r\n'
+		const [found] = code_symbol.declarations(typescript, 'crlf.ts', text)
+
+		expect(found?.text).toBe('function a(): void {}\r')
+	})
 })
 
 describe('code_symbol.numbered', () => {

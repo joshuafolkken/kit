@@ -85,6 +85,11 @@ function list_declarations(api: TypeScriptApi, name: string, root: string): numb
 	return 0
 }
 
+// An empty name would match no declaration only after every source file was parsed.
+function is_usable(argv: ReadonlyArray<string>): boolean {
+	return argv.length <= MAX_ARGUMENTS && !argv.includes('')
+}
+
 function run(
 	argv: ReadonlyArray<string>,
 	api: TypeScriptApi,
@@ -92,7 +97,7 @@ function run(
 ): number {
 	const [first, second] = argv
 
-	if (first === undefined || argv.length > MAX_ARGUMENTS) {
+	if (first === undefined || !is_usable(argv)) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
@@ -109,7 +114,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = run(argv, typescript.default)
 }
 
-const code_symbol_cli = { FAILURE_EXIT_CODE, run }
+const code_symbol_cli = { FAILURE_EXIT_CODE, main, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

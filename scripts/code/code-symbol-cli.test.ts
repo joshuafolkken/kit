@@ -78,9 +78,24 @@ describe('josh code:symbol <name>', () => {
 	})
 })
 
-describe('josh code:symbol usage', () => {
-	it.each([[[]], [['a', 'b', 'c']]])('prints usage for %j', (argv) => {
-		expect(code_symbol_cli.run(argv, typescript)).toBe(code_symbol_cli.FAILURE_EXIT_CODE)
-		expect(printed(error_mock)).toContain('a Svelte <script> is not read')
+describe('josh code:symbol main', () => {
+	afterEach(() => {
+		process.exitCode = undefined
 	})
+
+	it('sets the exit code run answers, with the TypeScript API loaded', async () => {
+		await code_symbol_cli.main(['no_declaration_by_this_name'])
+
+		expect(process.exitCode).toBe(code_symbol_cli.FAILURE_EXIT_CODE)
+	})
+})
+
+describe('josh code:symbol usage', () => {
+	it.each([[[]], [['a', 'b', 'c']], [['']], [[FIXTURE_FILE, '']]])(
+		'prints usage for %j',
+		(argv) => {
+			expect(code_symbol_cli.run(argv, typescript)).toBe(code_symbol_cli.FAILURE_EXIT_CODE)
+			expect(printed(error_mock)).toContain('a Svelte <script> is not read')
+		},
+	)
 })

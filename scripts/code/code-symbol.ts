@@ -25,7 +25,7 @@ interface ParseContext {
 	lines: ReadonlyArray<string>
 }
 
-const BLANK_LINE = /\n[\t ]*\n/u
+const BLANK_LINE = /\n[\t ]*\r?\n/u
 const LINE_BASE = 1
 const NEWLINE = '\n'
 
