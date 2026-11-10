@@ -1,5 +1,6 @@
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
 import { implementation_cut_verdict } from '#scripts/rules/implementation-cut-verdict'
@@ -40,11 +41,15 @@ interface ParentCutState {
 	verdict: () => CostVerdict
 }
 
-function current_state(): ParentCutState {
+// The world as the call in hand sees it: the carry record and session verdict under its own cwd and env.
+function current_state(context: HookContext = hook_context.from_process()): ParentCutState {
 	return {
-		carry: async (): Promise<RunCarry | undefined> => await run_headless.driving_carry(),
+		carry: async (): Promise<RunCarry | undefined> => await run_headless.driving_carry(context.env),
 		verdict: (): CostVerdict =>
-			implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict()),
+			implementation_cut_verdict.reused_verdict(
+				() => cost_cli.session_verdict(context.cwd, context.env),
+				context.cwd,
+			),
 	}
 }
 
@@ -131,6 +136,7 @@ const run_parent_cut_hook = {
 	PARENT_CUT_REASON,
 	QUIET_WINDOW_MS,
 	SWITCH_ENV_KEY,
+	current_state,
 	parent_cut_reason,
 }
 

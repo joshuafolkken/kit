@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,6 +13,7 @@ const scratch = make_directory('hook-ledger-test-')
 const HOOK = 'pretool-guard'
 const TRANSCRIPT = '/sessions/a.jsonl'
 const COMMAND = 'pnpm josh gate'
+const CONTEXT_ROLE = 'context-role'
 const BATCHING_REASON = '⛔ batching: 3 single-call turns in a row. Reissue this.'
 const BASH_PAYLOAD = JSON.stringify({
 	tool_name: 'Bash',
@@ -67,6 +69,21 @@ describe('hook_ledger.record', () => {
 		await expect(
 			hook_ledger.record_reason(HOOK, BATCHING_REASON, BASH_PAYLOAD),
 		).resolves.toBeUndefined()
+	})
+})
+
+describe('hook_ledger.record call context', () => {
+	it('records the role from the call context environment', async () => {
+		vi.mocked(git_spawn.read).mockResolvedValue('6973-lane')
+		const directory = path.join(scratch, 'role')
+
+		await hook_ledger.record(
+			{ hook: HOOK, reason: BATCHING_REASON, raw_payload: BASH_PAYLOAD },
+			directory,
+			{ cwd: scratch, env: { [agent_session_role.KEY]: CONTEXT_ROLE } },
+		)
+
+		expect(JSON.parse(lines_in(directory)[0] ?? '')).toMatchObject({ role: CONTEXT_ROLE })
 	})
 })
 

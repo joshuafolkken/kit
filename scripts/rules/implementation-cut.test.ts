@@ -359,11 +359,12 @@ describe('the row in the enumeration', () => {
 	})
 
 	// **The cut this rule asks for must itself pass every row in the enumeration** — a refusal on the
-	// remedy would leave a run with nothing it is allowed to do. Read from the non-lane suite checkout,
-	// where every world-consulting row is silent.
+	// remedy would leave a run with nothing it is allowed to do. Read from the non-lane suite checkout.
 	it('leaves the implementation cut command unclaimed by every rule', () => {
 		const call = { name: 'Bash', input: { command: TAKE_THE_IMPL_CUT } }
-		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) => rule.is_trigger(call))
+		const claiming = delivered_rules.DELIVERED_RULES.filter((row) =>
+			row.is_trigger(call, hook_context.from_process()),
+		)
 
 		expect(claiming).toStrictEqual([])
 	})

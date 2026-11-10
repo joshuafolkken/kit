@@ -1,3 +1,4 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { bash_triggers } from './bash-triggers'
@@ -93,12 +94,18 @@ function own_lane_branch(directory: string): string | undefined {
 // command test is first, so the dispatch mark and the lane branch are read only on a real branch switch.
 function is_switch_away_from_lane(
 	command: string,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
-	own_branch: string | undefined = own_lane_branch(process.cwd()),
+	is_lane_child: boolean,
+	own_branch: string | undefined,
 ): boolean {
 	if (!is_lane_child || own_branch === undefined) return false
 
 	return switch_targets(command).some((target) => target !== own_branch)
+}
+
+function is_switch_away_in(command: string, context: HookContext): boolean {
+	const is_lane_child = lane_child_marker.is_child_of(context.cwd, context.env)
+
+	return is_switch_away_from_lane(command, is_lane_child, own_lane_branch(context.cwd))
 }
 
 // The instruction in the shape a refusal can carry: what the command does, why it cannot succeed, and the
@@ -117,7 +124,7 @@ const LANE_SWITCH_MAIN_REASON =
 // so the row is reported unmeasured rather than scored on an act that does not exist (`git-force.ts`).
 const ROW = {
 	id: 'lane-switch-main',
-	is_trigger: bash_triggers.on_bash_command(is_switch_away_from_lane),
+	is_trigger: bash_triggers.on_bash_command(is_switch_away_in),
 	reason: LANE_SWITCH_MAIN_REASON,
 	decide: (): boolean => true,
 	about: {

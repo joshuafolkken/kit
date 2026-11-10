@@ -21,6 +21,8 @@ const NEW_TRANSCRIPT = path.join(CWD, `${NEW_SESSION}.jsonl`)
 const OPENAI_TRANSCRIPT = path.join(CWD, 'openai.jsonl')
 const SOURCE = { JOSH_AGENT_PROVIDER: 'anthropic' }
 const EDIT_CALL = { name: 'Edit', input: { file_path: 'scripts/x.ts' } }
+const CALL_GIT = '/call/.git'
+const CALL_CWD = path.join(CWD, 'call')
 
 cost_cli_fixture.capture_console()
 
@@ -111,7 +113,7 @@ describe('implementation cut candidate', () => {
 		stub_cuttable_lane()
 		const read = vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('under')
 
-		expect(implementation_cut.ROW.is_trigger(call)).toBe(true)
+		expect(implementation_cut.ROW.is_trigger(call, hook_context.from_process())).toBe(true)
 		expect(read).not.toHaveBeenCalled()
 	})
 
@@ -119,6 +121,24 @@ describe('implementation cut candidate', () => {
 		stub_cuttable_lane()
 		vi.spyOn(run_cut, 'held_issue_sync').mockReturnValue(undefined)
 
-		expect(implementation_cut.ROW.is_trigger(call)).toBe(false)
+		expect(implementation_cut.ROW.is_trigger(call, hook_context.from_process())).toBe(false)
+	})
+
+	// joshuafolkken/kit#6973: the hold, the cut record and the decline record are the call's work tree's.
+	it("reads the run hold, cut and decline records under the call context's cwd", () => {
+		stub_cuttable_lane()
+		vi.spyOn(cost_cli, 'session_verdict').mockReturnValue('over')
+		const directory = vi.spyOn(run_cut, 'worktree_git_directory_sync').mockReturnValue(CALL_GIT)
+		const run = {
+			transcript: NEW_TRANSCRIPT,
+			now_ms: implementation_cut.REISSUE_WINDOW_MS,
+			context: { cwd: CALL_CWD, env: SOURCE },
+		}
+
+		expect(implementation_cut.ROW.decide(call, run, true, 0)).toBe(true)
+		expect(directory).toHaveBeenCalledWith(CALL_CWD)
+		expect(run_cut.held_issue_sync).toHaveBeenCalledWith(CALL_GIT)
+		expect(run_cut.carried_cut_sync).toHaveBeenCalledWith(undefined, CALL_GIT)
+		expect(run_cut_decline.is_declined_sync).toHaveBeenCalledWith('6565', CALL_GIT)
 	})
 })
