@@ -165,9 +165,10 @@ describe('test_related.run_related_tests — an entries-only edit of the pure-fi
 })
 
 // joshuafolkken/kit#5122: the gate's unit leg keeps the whole suite for a file every test imports,
-// and the flag never reaches vitest.
+// and the flag never reaches vitest. Outside a lane, wherever this suite runs (joshuafolkken/kit#7014).
 describe('test_related.run_related_tests — the gate’s whole-suite flag', () => {
 	beforeEach(() => {
+		vi.stubEnv('JOSH_LANE_ROOT', path.join(path.sep, 'no-lane-root'))
 		mocked_changed.mockResolvedValue([pure_files_entries.PURE_FILES_PATH, FIXED_SOURCE])
 		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
 	})

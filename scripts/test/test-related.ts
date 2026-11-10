@@ -20,6 +20,7 @@ import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
 import { test_related_verdict } from './test-related-verdict'
+import { test_related_whole } from './test-related-whole'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
 // The narrowing itself is `test-related-scope.ts` over the shared
@@ -378,7 +379,7 @@ async function run_fresh(
 	const command_arguments = given.filter((argument) => argument !== KEEP_WHOLE_SUITE_FLAG)
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const before = command_arguments.length === 0 ? tree : undefined
-	const is_whole = given.includes(KEEP_WHOLE_SUITE_FLAG)
+	const is_whole = test_related_whole.is_whole_suite_kept(given, root)
 	const input = await read_run_input(root, command_arguments, is_whole, before)
 	// The branch change by half and base, for the ledger alone (joshuafolkken/kit#6982).
 	const branch_parts = await read_or_undefined(changed_paths.read_changed_parts)
