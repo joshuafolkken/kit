@@ -46,6 +46,7 @@ compile_cache="$package_dir/node_modules/.cache/kit-hook-compile"
 # there is none — starting one for the next call — or it answers `stale` or nothing in time. Each call
 # directory sits beside the daemon's, so a daemon that goes never takes a payload with it.
 daemon_answer() {
+	daemon_script=$1
 	daemon_key=$( (
 		printf '%s\n' "$PWD"
 		unset PWD OLDPWD JOSH_HOOK_CWD _ SHLVL
@@ -61,7 +62,7 @@ daemon_answer() {
 	*"/daemon.js $daemon_dir") ;;
 	*)
 		rm -rf "$daemon_dir"
-		NODE_COMPILE_CACHE="$compile_cache" node --disable-warning=ExperimentalWarning "$1" --detach "$daemon_dir" </dev/null >/dev/null 2>&1 &
+		NODE_COMPILE_CACHE="$compile_cache" node --disable-warning=ExperimentalWarning "$daemon_script" --detach "$daemon_dir" </dev/null >/dev/null 2>&1 &
 		return
 		;;
 	esac
