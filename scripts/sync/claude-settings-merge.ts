@@ -9,6 +9,8 @@ import { json_value } from '#scripts/lib/json-value'
 //    and a retired one is dropped; every other handler is the project's and stays.
 //  - permissions: kit's `allow` / `deny` entries are always present, so a removed `deny` comes back;
 //    the project's own entries follow them, less the ones kit has withdrawn.
+//  - statusLine: the project's where it has one, kit's only where it has none — a project's own
+//    status line is a display choice kit's usage recorder must not take over.
 //  - any other key: kit's value where kit ships one, the project's where it does not. Objects merge
 //    entry by entry, so a project's own `env` variable or plugin survives beside kit's.
 //
@@ -20,6 +22,7 @@ type EntryMerge = (key: string, kit: unknown, own: unknown) => unknown
 
 const HOOKS_KEY = 'hooks'
 const PERMISSIONS_KEY = 'permissions'
+const STATUS_LINE_KEY = 'statusLine'
 // An entry kit stops shipping would otherwise stay in every merged file as if the project had added
 // it, so a permission kit withdraws could never be withdrawn. Withdrawing one means removing it from
 // kit's settings file and naming it here.
@@ -112,6 +115,7 @@ function merge_hooks(kit: unknown, own: unknown): unknown {
 function merge_top_level(key: string, kit: unknown, own: unknown): unknown {
 	if (key === HOOKS_KEY) return merge_hooks(kit, own)
 	if (key === PERMISSIONS_KEY) return merge_permissions(kit, own)
+	if (key === STATUS_LINE_KEY) return own ?? kit
 
 	return merge_kit_value(kit, own)
 }
