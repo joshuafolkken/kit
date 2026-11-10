@@ -207,9 +207,10 @@ describe('run:review where the interaction review is due', () => {
 describe('run:review and the review:submit slots', () => {
 	it('clears each briefed slot’s findings so --from-slot never records a stale round', async () => {
 		expect(await run_review_cli.run([])).toBe(0)
-		expect(
-			remove_stamp.mock.calls.filter(([file]) => String(file).startsWith('/briefs/')),
-		).toStrictEqual([['/briefs/findings-code.txt'], ['/briefs/findings-interaction.txt']])
+		expect(remove_stamp.mock.calls.filter(([file]) => file.startsWith('/briefs/'))).toStrictEqual([
+			['/briefs/findings-code.txt'],
+			['/briefs/findings-interaction.txt'],
+		])
 	})
 })
 
