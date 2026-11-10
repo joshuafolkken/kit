@@ -18,7 +18,7 @@ import type { ItemState } from './run-board-status'
 // while the investigation switch is off, says only what was filed during it.
 
 const { OVERRUN_MARK } = run_board_labels
-const DONE_STATES: ReadonlySet<ItemState> = new Set(['merged', 'done'])
+const DONE_STATES: ReadonlySet<ItemState> = new Set(['merged', 'done', 'already_done'])
 const SEPARATOR = ', '
 const GROUP_SEPARATOR = '  '
 const LONGEST_SEPARATOR = ' · '

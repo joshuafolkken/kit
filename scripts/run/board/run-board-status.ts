@@ -30,6 +30,8 @@ type ItemState =
 	| 'merged'
 	| 'parked'
 	| 'done'
+	// Closed by `josh issue:already-done` with verified evidence — finished, nothing to merge.
+	| 'already_done'
 	| 'waiting'
 	| 'human'
 	| 'stopped'
@@ -341,7 +343,8 @@ function is_closed_before_launch(status: ItemStatus, closed: ClosedIssue): boole
 	return closed.closed_ms < launch
 }
 
-// A child read closed ends when GitHub says it closed — merged, withdrawn as not planned, or done.
+// A child read closed ends when GitHub says it closed — merged, withdrawn as not planned, already
+// done, or done.
 function closed_as(status: ItemStatus, closed: ClosedIssue): ItemStatus {
 	return { ...settled_as(status, run_board_closed.state_of(closed)), ended_ms: closed.closed_ms }
 }

@@ -48,7 +48,8 @@ satisfied in merged code — one procedure either way. **Parking it is not the p
 means "waiting for an answer", and here the answer exists.
 
 **The exit applies the `already-done` label, then closes the Issue as `completed` when a cited pull
-request reads back as merged** (`scripts/issue/already-done-citation.ts`); the label stays, and a
+request reads back as merged or `origin/main` contains a cited commit SHA**
+(`scripts/issue/already-done-citation.ts`); the label stays, and a
 reopen undoes the close. **Anything else leaves it OPEN with the label**, the reason printed:
 `epic:next`, `backlog:next` and `auto-ok:next` stop offering the Issue
 (`scripts/issue/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` → `human`),
