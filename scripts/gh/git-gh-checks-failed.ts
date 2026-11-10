@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { read_pull, require_pr_number } from './git-gh-pr-read'
-import { git_gh_pr_rollup, STATUS_CONTEXT_TYPE_NAME } from './git-gh-pr-rollup'
+import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 
 // `josh checks:failed`: every failing check on a commit, required or not, read over REST — the check
 // runs and the commit statuses, the two halves `gh pr checks` merged before a cloud session refused it
@@ -31,8 +31,9 @@ const check_run_schema = z.looseObject({
 	html_url: z.string().nullish(),
 })
 
+// A commit status carries `context` and `state`, which no check run has, so the two shapes cannot
+// mistake one for the other.
 const status_schema = z.looseObject({
-	__typename: z.literal(STATUS_CONTEXT_TYPE_NAME),
 	context: z.string(),
 	state: z.string(),
 	target_url: z.string().nullish(),
