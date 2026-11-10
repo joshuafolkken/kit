@@ -1,5 +1,6 @@
 import { epic_bundle_fixture } from '#scripts/epic/epic-bundle-fixture'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { stub_unanswered_batch } from '#scripts/gh/git-gh-issue-batch-graphql-fixture'
 import { listing_of } from '#scripts/gh/git-gh-issue-list-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_scout_cli } from './issue-scout-cli'
@@ -32,6 +33,7 @@ function closed_read(number: number): string {
 }
 
 beforeEach(() => {
+	stub_unanswered_batch()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(listing_of([]))
 	vi.spyOn(git_gh_command, 'issue_list_recently_closed').mockResolvedValue(listing_of([]))

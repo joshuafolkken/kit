@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_batch_graphql } from '#scripts/gh/git-gh-issue-batch-graphql'
+import { git_gh_issue_batch_read } from '#scripts/gh/git-gh-issue-batch-read'
 import type { IssueRead, IssueReadFailure } from '#scripts/gh/git-gh-issue-read'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { epic_child_source, type ChildSource } from './epic-child-source'
@@ -125,18 +126,12 @@ interface ChildRead {
 
 const NOT_READ: ChildRead = { child: undefined, is_unreachable: false }
 
-// `answered` is the batch's read of this child (`read_children`); without one, the child is read
-// through REST.
-async function fetch_child_read(
-	issue_number: number,
-	repo: string,
-	scope?: string,
-	answered?: IssueRead,
-): Promise<ChildRead> {
-	const read =
-		answered ??
-		(await git_gh_command.issue_get_state_and_relations_classified(String(issue_number), scope))
+async function read_rest(issue_number: number, scope?: string): Promise<IssueRead> {
+	return await git_gh_command.issue_get_state_and_relations_classified(String(issue_number), scope)
+}
 
+// `read` is the batch's answer for this child (`read_children`), or its REST read.
+async function to_child_read(read: IssueRead, repo: string): Promise<ChildRead> {
 	if (read.kind !== 'read') {
 		return { child: undefined, is_unreachable: git_gh_command.is_unreachable_read(read) }
 	}
@@ -148,19 +143,21 @@ async function fetch_child_read(
 	return { child: parsed === undefined ? undefined : to_child(parsed, repo), is_unreachable: false }
 }
 
-// Children of one repository read together: one GraphQL query per hundred answers what it can
-// (`git-gh-issue-batch-graphql.ts`, joshuafolkken/kit#6792), and every child it left unanswered — all
-// of them in a session on REST — is read through REST one by one, as before.
+// Children of one repository read together, the batched way (`git-gh-issue-batch-read.ts`).
 async function read_children(
 	issue_numbers: ReadonlyArray<number>,
 	repo: string,
 	scope?: string,
 ): Promise<Map<number, ChildRead>> {
-	const { reads } = await git_gh_issue_batch_graphql.read_many(issue_numbers, scope)
+	const reads = await git_gh_issue_batch_read.read_each(issue_numbers, {
+		repo: scope,
+		from_json: git_gh_issue_batch_graphql.answered,
+		read_rest: async (issue_number) => await read_rest(issue_number, scope),
+	})
 	const entries = await Promise.all(
-		issue_numbers.map(async (issue_number): Promise<[number, ChildRead]> => [
+		reads.map(async ([issue_number, read]): Promise<[number, ChildRead]> => [
 			issue_number,
-			await fetch_child_read(issue_number, repo, scope, reads.get(issue_number)),
+			await to_child_read(read, repo),
 		]),
 	)
 
@@ -175,7 +172,7 @@ async function fetch_child(
 	repo: string,
 	scope?: string,
 ): Promise<EpicChild | undefined> {
-	const read = await fetch_child_read(issue_number, repo, scope)
+	const read = await to_child_read(await read_rest(issue_number, scope), repo)
 
 	return read.child
 }

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_issue_batch_graphql } from './git-gh-issue-batch-graphql'
+import { PLAN_FIELDS } from './git-gh-issue-read'
 import { TRANSPORT_ENV_VAR } from './git-gh-transport'
 
 vi.mock('./git-gh-exec', () => ({ git_gh_exec: { exec_gh_api: vi.fn() } }))
@@ -41,6 +42,15 @@ function answer(issue_numbers: ReadonlyArray<number>, missing: ReadonlyArray<num
 	)
 
 	return JSON.stringify({ data: { rateLimit: { cost: COST, remaining: REMAINING }, repository } })
+}
+
+// A pull request answers `... on Issue` with no fields at all.
+function with_pull_request(json: string, issue_number: number): string {
+	const parsed = JSON.parse(json) as { data: { repository: Record<string, object> } }
+
+	parsed.data.repository[`issue${String(issue_number)}`] = {}
+
+	return JSON.stringify(parsed)
 }
 
 // `gh` exits non-zero on a document with `errors`, and the execa error keeps the body on `stdout`.
@@ -95,6 +105,21 @@ describe('git_gh_issue_batch_graphql.read_many — the REST shape', () => {
 	})
 })
 
+describe('git_gh_issue_batch_graphql.read_many — the fields asked for', () => {
+	it('answers the plan fields, title and URL included, when asked for them', async () => {
+		mocked_api.mockResolvedValue(answer([2]))
+		const batch = await git_gh_issue_batch_graphql.read_many([2], REPO, PLAN_FIELDS)
+		const read = batch.reads.get(2)
+
+		expect(read?.kind === 'read' ? JSON.parse(read.json) : undefined).toMatchObject({
+			number: 2,
+			title: 'Child 2',
+			url: `https://github.com/${REPO}/issues/2`,
+			state: 'OPEN',
+		})
+	})
+})
+
 describe('git_gh_issue_batch_graphql.read_many — a hundred per query', () => {
 	it('reads two hundred children in two queries', async () => {
 		mocked_api.mockImplementation(async () => answer(numbers_to(CHILD_COUNT)))
@@ -118,6 +143,13 @@ describe('git_gh_issue_batch_graphql.read_many — what it leaves to REST', () =
 		const batch = await git_gh_issue_batch_graphql.read_many([1, 2], REPO)
 
 		expect([...batch.reads.keys()]).toEqual([1])
+	})
+
+	it('leaves a pull request to REST and keeps the rest of its chunk', async () => {
+		mocked_api.mockResolvedValue(with_pull_request(answer([1, 2, 3]), 2))
+		const batch = await git_gh_issue_batch_graphql.read_many([1, 2, 3], REPO)
+
+		expect([...batch.reads.keys()]).toEqual([1, 3])
 	})
 
 	it('keeps the answered children of a chunk holding a number that does not exist', async () => {

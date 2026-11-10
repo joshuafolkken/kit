@@ -1,3 +1,4 @@
+import { stub_unanswered_batch } from '#scripts/gh/git-gh-issue-batch-graphql-fixture'
 import type { IssueListOutcome } from '#scripts/gh/git-gh-issue-list'
 import { listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -47,6 +48,7 @@ const CLOSED_LINKED = child_json({ state: 'CLOSED', blocked_by: 1 })
 const NO_COMMENTS = '[]'
 
 beforeEach(() => {
+	stub_unanswered_batch()
 	mocked_close.mockResolvedValue(true)
 	// The default is an epic nobody has announced yet, which is what every case below except the
 	// re-run ones is about.

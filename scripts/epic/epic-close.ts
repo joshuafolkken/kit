@@ -1,5 +1,10 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import {
+	git_gh_issue_batch_read,
+	type BatchReader,
+	type IssueAt,
+} from '#scripts/gh/git-gh-issue-batch-read'
+import {
 	epic_child_schema,
 	epic_issue_schema,
 	type EpicChildData,
@@ -110,30 +115,39 @@ function to_sibling_state(raw_json: string | undefined): SiblingState {
 
 type ChildRead = SiblingState & { is_readable: boolean }
 
-// A same-repository child carries no `repo`; a cross-repository one names it.
-type ChildReference = Omit<ExternalChild, 'repo'> & { repo?: string | undefined }
+// A child's state and relations as raw JSON, read by number from the repository `repo` names (this
+// one when absent).
+function state_reader(repo: string | undefined): BatchReader<string | undefined> {
+	return {
+		repo,
+		from_json: (json) => json,
+		read_rest: async (issue_number) =>
+			await git_gh_command.issue_get_state_and_relations(String(issue_number), repo),
+	}
+}
 
-// A child read by number, naming its repository in the REST path when it lives in another one.
 // `is_readable` is what decides whether the epic may close at all: closing while a child's state is
 // unknown is exactly what the refusal prevents. A failed read is told apart from an open child
 // rather than read as one, which left a finished epic open with nothing in the output (#4560). A
 // read whose answer carries no state is a failed read too.
-async function inspect_child(child: ChildReference): Promise<ChildRead> {
-	const raw = await git_gh_command.issue_get_state_and_relations(String(child.number), child.repo)
-
+function to_child_read(raw: string | undefined): ChildRead {
 	return { ...to_sibling_state(raw), is_readable: parse_child(raw)?.state !== undefined }
 }
 
 // The merged Issue is excluded rather than queried: GitHub applies `closes #N` asynchronously, so
-// reading its state immediately after the merge races with that propagation.
+// reading its state immediately after the merge races with that propagation. The children are read
+// one repository at a time, the batched way (`git-gh-issue-batch-read.ts`).
 async function inspect_children(epic: EpicIssue, merged_number: number): Promise<Array<ChildRead>> {
-	const siblings: Array<ChildReference> = epic.children
+	// A same-repository child carries no `repo`; a cross-repository one names it.
+	const siblings: Array<IssueAt> = epic.children
 		.filter((child) => child !== merged_number)
 		.map((number) => ({ number }))
-
-	return await Promise.all(
-		[...siblings, ...epic.external_children].map(async (child) => await inspect_child(child)),
+	const reads = await git_gh_issue_batch_read.read_across(
+		[...siblings, ...epic.external_children],
+		state_reader,
 	)
+
+	return reads.map((raw) => to_child_read(raw))
 }
 
 // `pnpm josh epic --ordered` and `--add` record the declared chain themselves, through the REST
