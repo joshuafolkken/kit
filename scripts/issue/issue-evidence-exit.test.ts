@@ -26,7 +26,7 @@ const EVIDENCE_FILE = path.join(work, 'evidence.md')
 writeFileSync(EVIDENCE_FILE, '  evidence\n')
 
 const calls: Array<string> = []
-const finish = vi.fn<(issue_number: string) => Promise<boolean>>()
+const finish = vi.fn<(issue_number: string, evidence: string) => Promise<boolean>>()
 
 beforeEach(() => {
 	calls.length = 0
@@ -63,7 +63,7 @@ describe('issue_evidence_exit.run', () => {
 		expect(code).toBe(0)
 		expect(calls).toStrictEqual(['comment', 'finish', 'release'])
 		expect(issue_comment).toHaveBeenCalledWith(ISSUE, 'evidence')
-		expect(finish).toHaveBeenCalledWith(ISSUE)
+		expect(finish).toHaveBeenCalledWith(ISSUE, 'evidence')
 	})
 
 	it('releases nothing when the finishing write fails', async () => {

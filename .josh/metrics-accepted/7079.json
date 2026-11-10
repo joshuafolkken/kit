@@ -1,0 +1,11 @@
+{
+	"reason": "#7079: CodeRabbit retrigger cap loop, shared test fixture and cap tests, cited already-done close path with tests; on-demand prose for the close exit and retrigger cap",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 123,
+		"rules.lines": 1,
+		"ai_cost.resident_bytes": 19,
+		"ai_cost.on_demand_bytes": 469,
+		"prose.long_paragraphs": 1
+	}
+}
