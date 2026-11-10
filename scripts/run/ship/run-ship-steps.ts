@@ -1,5 +1,7 @@
 import { core_priority } from '#scripts/gate/core-priority'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_hand_back_held } from '#scripts/lane/lane-hand-back-held'
 import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
@@ -135,6 +137,19 @@ function wait_mark(target: string | undefined): WaitMark {
 	}
 }
 
+// A lane's merge wait is what frees its seat (`backlog-occupied.ts`), so it is where a full driver's
+// hand-back mark becomes the freed seat's hold (joshuafolkken/kit#7121) — not the detach, after which
+// the child still holds the seat. A ship outside a lane frees no seat and leaves the mark alone. The
+// hold is best-effort and swallows its own failure, so the followup does not wait on it.
+function freeing_mark(mark: WaitMark): WaitMark {
+	if (!lane_child_marker.is_child_of(process.cwd())) return mark
+
+	return function mark_freeing(is_merge_waiting: boolean): void {
+		mark(is_merge_waiting)
+		if (is_merge_waiting) void lane_hand_back_held.record()
+	}
+}
+
 async function remove_run_records(issue_number: string): Promise<void> {
 	await run_ship_body_draft.remove(issue_number)
 	await run_investigation_record.remove(issue_number)
@@ -143,7 +158,7 @@ async function remove_run_records(issue_number: string): Promise<void> {
 // The merge, then the ship body draft and the investigation record go with it
 // (`run-ship-body-draft.ts`, `run-investigation-record.ts`).
 async function followup_stage(args: ShipArguments): Promise<StepResult> {
-	const mark = wait_mark(await run_ship_probe.record_target(args.number))
+	const mark = freeing_mark(wait_mark(await run_ship_probe.record_target(args.number)))
 	const result = await run_ship_sync.followup_stage(args.title, args.notify, mark)
 
 	if (result.code === SUCCESS_EXIT_CODE) await remove_run_records(args.number)

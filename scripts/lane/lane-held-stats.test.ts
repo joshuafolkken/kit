@@ -50,6 +50,16 @@ describe('lane_held_stats.table — launch admission', () => {
 	})
 })
 
+// joshuafolkken/kit#7121: the hold a freed lane wrote from a full driver's hand-back mark.
+describe('lane_held_stats.table — hand-back mark', () => {
+	it('rows a hand-back hold written after the full driver’s release', () => {
+		const released: LedgerEntry = { kind: 'released', at: minutes_before_now(30) }
+		const entries = [released, held(HAND_BACK, 20), dispatch(8)]
+
+		expect(row_of(entries, HAND_BACK)).toBe(`| ${HAND_BACK} | 12.0 | 12.0 | 12.0 | 1 | 0 |`)
+	})
+})
+
 describe('lane_held_stats.table', () => {
 	it('tiles consecutive holds up to the dispatch that ended them', () => {
 		const entries = [held(BLOCKED, 30), held(BLOCKED, 29), held(BLOCKED, 28), dispatch(25)]

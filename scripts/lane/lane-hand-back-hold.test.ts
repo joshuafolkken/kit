@@ -36,6 +36,17 @@ describe('lane_hand_back_hold', () => {
 		await expect(lane_hand_back_hold.clear(ledger('absent'))).resolves.toBeUndefined()
 	})
 
+	// joshuafolkken/kit#7121: a freed lane takes the mark once.
+	it('takes the mark’s reason, removing it', async () => {
+		const target = ledger('take')
+
+		await lane_hand_back_hold.mark(REASON, target)
+
+		expect(lane_hand_back_hold.take(target)).toBe(REASON)
+		expect(lane_hand_back_hold.take(target)).toBeUndefined()
+		expect(lane_hand_back_hold.read(target)).toBeUndefined()
+	})
+
 	it('swallows a mark that cannot be written', async () => {
 		const unwritable = path.join(scratch, 'missing-directory', 'ledger.jsonl')
 

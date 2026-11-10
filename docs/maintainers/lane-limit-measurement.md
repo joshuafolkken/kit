@@ -273,8 +273,8 @@ Under the stop table, `lane:stats` prints one row per reason `backlog:drive` lef
 row shows the total, median and maximum minutes, how many holds were recorded (`holds`), and how many
 had no end (`not ended`). A period with no hold prints a `none` row.
 
-The driver records the hold only while a lane is free. A pass that collects a child asks for the
-next offer in that same pass, so a freed lane is offered at once. Two passes record a `held` entry:
+A running driver records the hold only while a lane is free. A pass that collects a child asks for
+the next offer in that same pass, so a freed lane is offered at once. Two passes record a `held` entry:
 
 - An offered pass that started nothing. The entry is `offer:<verdict>[:<answer>]`, for example
   `offer:wait:blocked`. A `stop` verdict is not a hold, because the run is finishing. A wait the
@@ -286,6 +286,13 @@ next offer in that same pass, so a freed lane is offered at once. Two passes rec
 - A driver end that hands control back to a session. The entry is `hand-back:<reason>`, for example
   `hand-back:merge` or `hand-back:window`. A finished run (`stop`, or the drain's `watch` or
   `retrospective`) is not a hold.
+
+A driver that hands back with every lane taken writes `released` and leaves a mark with its
+`hand-back:<reason>` beside the ledger; its next ledger line clears it. A lane that frees while the
+mark stands writes `held` with `driverless:hand-back:<reason>` (`scripts/lane/lane-hand-back-held.ts`).
+
+The lane frees when its ship reaches the merge wait. The next driver's first line ends the hold. No
+offer was made, so `lane:stats`'s park → offer gap does not end at it.
 
 Every lane taken is the limit, not idle capacity, and a finished run owes no lane a child. Either one
 records a `released` entry instead, once per hold. This ends a hold that a lane opened outside the

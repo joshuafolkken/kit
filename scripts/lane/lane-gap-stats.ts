@@ -2,6 +2,7 @@ import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { lane_hand_back_held } from './lane-hand-back-held'
 import { lane_ledger, type LedgerEntry, type MergeEntry } from './lane-ledger'
 import { lane_spans, type Span } from './lane-spans'
 import { lane_stage_stats } from './lane-stage-stats'
@@ -80,9 +81,16 @@ function outage_spans(events: ReadonlyArray<RunEvent>): Array<Span> {
 	})
 }
 
+// A driverless hold answers no offer: no driver ran to make one (joshuafolkken/kit#7121).
+function is_offer_answer(entry: LedgerEntry): boolean {
+	if (entry.kind === lane_ledger.KIND.HELD) return !lane_hand_back_held.is_driverless(entry.reason)
+
+	return is_dispatch(entry) || OFFER_ANSWERS.has(entry.kind)
+}
+
 function offer_times(entries: ReadonlyArray<LedgerEntry>): Array<number> {
 	return entries
-		.filter((entry) => is_dispatch(entry) || OFFER_ANSWERS.has(entry.kind))
+		.filter((entry) => is_offer_answer(entry))
 		.map((entry) => Date.parse(entry.at))
 		.toSorted((left, right) => left - right)
 }

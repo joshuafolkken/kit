@@ -1,0 +1,7 @@
+{
+	"reason": "#7121 adds the freed lane's hand-back hold: taking the mark and writing its held line after a detached ship",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 63
+	}
+}
