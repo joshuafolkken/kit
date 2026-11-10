@@ -266,7 +266,13 @@ Hand counts differ by definition:
 - a request is counted once, in the oldest transcript holding it, so a resumed session's first request is the first one no older transcript held;
 - `--until` counts the whole UTC day, today's requests up to now.
 
-Against the hand tally of 2026-10-27 to 11-10 (110,714 calls; first context p50 20.8k main / 6.2k subagent; 1,058 reviewer runs at ~20 calls), the report read 112,924 calls, 20,792 / 6,245 and 1,078 reviewer runs at 19.8 on 2026-11-10. Effort and tool-result size are not read yet.
+Against the hand tally of 2026-10-27 to 11-10 (110,714 calls; first context p50 20.8k main / 6.2k subagent; 1,058 reviewer runs at ~20 calls), the report read 112,924 calls, 20,792 / 6,245 and 1,078 reviewer runs at 19.8 on 2026-11-10.
+
+`Effort and tool results` (`tools/cost-audit/cost-audit-result.ts`) follows, for the current period:
+
+- the cost by the `effort` each request ran at, `unknown` where its line names none;
+- the characters of tool results by tool and by josh subcommand, the ten largest each, every result charged to the call it answers;
+- the Reads of a path the same session had already read, whatever range either covered, and their characters.
 
 It exits `0` on a report, and `1` with the usage on a bad `--period`, a lone `--since` or `--until`, or a pair beside `--period`.
 

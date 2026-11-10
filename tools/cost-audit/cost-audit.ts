@@ -5,6 +5,7 @@ import { guard_friction } from '#tools/retrospective/guard-friction'
 import { cost_audit_density, type Density } from './cost-audit-density'
 import { cost_audit_phase, type PhaseRow } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
+import { cost_audit_result, type ResultBreakdown } from './cost-audit-result'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
 import { cost_audit_tool } from './cost-audit-tool'
@@ -67,6 +68,8 @@ interface Audit {
 	agents: ReadonlyArray<PhaseRow>
 	// The current period's usage breakdown (joshuafolkken/kit#7042).
 	usage: UsageBreakdown
+	// The current period's cost by effort and tool-result characters (joshuafolkken/kit#7055).
+	results: ResultBreakdown
 }
 
 interface AuditInput {
@@ -243,6 +246,7 @@ function audit(input: AuditInput): Audit {
 		usage: cost_audit_usage.breakdown_of(input.sessions, (at_ms) =>
 			is_inside(at_ms, current_window),
 		),
+		results: cost_audit_result.breakdown_of(inside(input.sessions, current_window)),
 	}
 }
 
