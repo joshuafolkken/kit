@@ -6,6 +6,7 @@ import { issue_already_done_cli } from './issue-already-done-cli'
 
 // joshuafolkken/kit#4130: the already-merged exit as one command. The GitHub writes and the hold
 // release are mocked, so the order they run in — and where a failure stops it — is read back.
+// joshuafolkken/kit#7079: evidence citing the merge closes the issue; evidence citing none labels it.
 
 const { issue_comment, issue_apply_label, issue_close, issue_get_body, release } = vi.hoisted(
 	() => ({
@@ -18,7 +19,10 @@ const { issue_comment, issue_apply_label, issue_close, issue_get_body, release }
 					label: string,
 				) => Promise<{ is_applied: true } | { is_applied: false; reason: string }>
 			>(),
-		issue_close: vi.fn<() => Promise<boolean>>(),
+		issue_close:
+			vi.fn<
+				(issue_number: string, comment: string | undefined, reason?: string) => Promise<boolean>
+			>(),
 		release: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
 	}),
 )
@@ -35,6 +39,7 @@ const EVIDENCE = 'merged in #4000\n- criterion 1: scripts/a.ts:12\n'
 const make_directory = temporary_directory('suite')
 const work = make_directory('issue-already-done-cli-')
 const EVIDENCE_FILE = path.join(work, 'evidence.md')
+const UNCITED_FILE = path.join(work, 'uncited.md')
 const EMPTY_FILE = path.join(work, 'empty.md')
 
 // joshuafolkken/kit#4504: the body of #4446, the follow-up measurement a lane exited here instead
@@ -55,6 +60,7 @@ const MEASUREMENT_BODY = [
 const WORK_BODY = '## 背景\n\n- 種別: 不具合\n- 優先度: 通常\n'
 
 writeFileSync(EVIDENCE_FILE, EVIDENCE)
+writeFileSync(UNCITED_FILE, '- criterion 1: scripts/a.ts:12\n')
 writeFileSync(EMPTY_FILE, '  \n\n')
 
 const calls: Array<string> = []
@@ -76,7 +82,11 @@ beforeEach(() => {
 
 		return 0
 	})
-	issue_close.mockReset()
+	issue_close.mockReset().mockImplementation(async () => {
+		calls.push('close')
+
+		return true
+	})
 	issue_get_body.mockReset().mockResolvedValue(WORK_BODY)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -87,19 +97,23 @@ afterEach(() => {
 })
 
 describe('issue_already_done_cli.run — the exit in order', () => {
-	it('posts the evidence, then applies already-done, then releases the hold', async () => {
+	it('posts the evidence, then closes the issue as completed, then releases the hold', async () => {
 		const code = await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
 
 		expect(code).toBe(0)
-		expect(calls).toStrictEqual(['comment', 'label', 'release'])
+		expect(calls).toStrictEqual(['comment', 'close', 'release'])
 		expect(issue_comment).toHaveBeenCalledWith(ISSUE, EVIDENCE.trim())
-		expect(issue_apply_label).toHaveBeenCalledWith(ISSUE, 'already-done')
+		expect(issue_close).toHaveBeenCalledWith(ISSUE, undefined, 'completed')
+		expect(issue_apply_label).not.toHaveBeenCalled()
 		expect(release).toHaveBeenCalledWith(['--release', ISSUE])
 	})
 
-	it('never closes the issue', async () => {
-		await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
+	it('labels an issue whose evidence cites no merge already-done and leaves it open', async () => {
+		const code = await issue_already_done_cli.run([ISSUE, FLAG, UNCITED_FILE])
 
+		expect(code).toBe(0)
+		expect(calls).toStrictEqual(['comment', 'label', 'release'])
+		expect(issue_apply_label).toHaveBeenCalledWith(ISSUE, 'already-done')
 		expect(issue_close).not.toHaveBeenCalled()
 	})
 
@@ -124,12 +138,53 @@ describe('issue_already_done_cli.run — a failure stops at its step', () => {
 	it('releases nothing when the label is not applied', async () => {
 		issue_apply_label.mockResolvedValue({ is_applied: false, reason: 'HTTP 403' })
 
+		const code = await issue_already_done_cli.run([ISSUE, FLAG, UNCITED_FILE])
+
+		expect(code).toBe(1)
+		expect(calls).toStrictEqual(['comment'])
+		expect(release).not.toHaveBeenCalled()
+	})
+
+	it('releases nothing when the close fails', async () => {
+		issue_close.mockResolvedValue(false)
+
 		const code = await issue_already_done_cli.run([ISSUE, FLAG, EVIDENCE_FILE])
 
 		expect(code).toBe(1)
 		expect(calls).toStrictEqual(['comment'])
 		expect(release).not.toHaveBeenCalled()
 	})
+})
+
+async function finish_for(evidence: string): Promise<number> {
+	const file = path.join(work, 'cited.md')
+
+	writeFileSync(file, evidence)
+
+	return await issue_already_done_cli.run([ISSUE, FLAG, file])
+}
+
+describe('issue_already_done_cli.run — what evidence cites the merge', () => {
+	it.each([
+		'PR #4000 carries it',
+		'pull request #4000',
+		'merged in #4000',
+		'https://github.com/o/r/pull/4000',
+		'commit 1a2b3c4d',
+	])('closes on %s', async (evidence) => {
+		await finish_for(evidence)
+
+		expect(calls).toStrictEqual(['comment', 'close', 'release'])
+	})
+
+	it.each(['see #4000', 'scripts/a.ts:12', 'build 1234567', 'a defaced line'])(
+		'labels on %s',
+		async (evidence) => {
+			await finish_for(evidence)
+
+			expect(calls).toStrictEqual(['comment', 'label', 'release'])
+		},
+	)
 })
 
 describe('issue_already_done_cli.run — refuses before writing anything', () => {

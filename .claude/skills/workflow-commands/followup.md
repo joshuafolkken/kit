@@ -26,9 +26,9 @@ either side of a rename. `followup` leaves it open, labels its Issue `needs-huma
 PR URL and exits successfully without a completion report. Read the diff on GitHub and merge there;
 `--merge` cannot bypass this stop. Re-run `followup` after the manual merge to finish the tail.
 
-**A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** `followup` waits
-out the window (≤30 min) and posts `@coderabbitai review` once per pull request. On its
-no-retrigger note, do that and rerun `followup`. Bypassing a second rate limit is Tier C.
+**A rate-limited CodeRabbit check is cleared by a retrigger, never a bypass** (Tier C). `followup`
+waits out each window (≤30 min), posts `@coderabbitai review` ≤3 times per PR, then asks for
+`run:stalled`. On its no-retrigger note, do so and rerun it.
 
 A pre-merge failure stops the run; an unverifiable AI finding or CI failure needing input sends a
 `confirmation` Telegram. A post-merge cleanup failure is named and does not undo the merge; run the

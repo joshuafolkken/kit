@@ -22,10 +22,11 @@ interface EvidenceRequest {
 }
 
 // `admit`, when given, runs once the request parsed and before the first write: an exit that does not
-// fit the Issue refuses there, with nothing written.
+// fit the Issue refuses there, with nothing written. `finish` reads the posted evidence too, for an
+// exit whose write depends on what the evidence cites (`issue-already-done-cli.ts`).
 interface EvidenceExit {
 	command: string
-	finish: (issue_number: string) => Promise<boolean>
+	finish: (issue_number: string, evidence: string) => Promise<boolean>
 	admit?: (issue_number: string) => Promise<boolean>
 }
 
@@ -78,7 +79,9 @@ async function post_evidence(request: EvidenceRequest): Promise<boolean> {
 
 // Each write runs only once the one before it landed: `&&` stops at the first that did not.
 async function write_exit(request: EvidenceRequest, exit: EvidenceExit): Promise<boolean> {
-	return (await post_evidence(request)) && (await exit.finish(request.issue_number))
+	const { issue_number, evidence } = request
+
+	return (await post_evidence(request)) && (await exit.finish(issue_number, evidence))
 }
 
 async function is_admitted(request: EvidenceRequest, exit: EvidenceExit): Promise<boolean> {

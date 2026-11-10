@@ -63,6 +63,7 @@
 - 起票した Issue の所属先は、候補が複数の epic に散っていても Tier A（`.claude/skills/epic-commands/epic-bundle.md`）
 - 自己修正（自分が公開した成果物の事実誤りの訂正、同じセッションで自分が特定した自分の作業の抜けの穴埋め）は Tier A。承認済みの作業の完了・修復に限り、目標の表明や問いで動いてよい意味ではない（→ `principles.md` → "consult-vs-execute"）
 - **Tier C との境界**: マージ・ブランチ削除・force push・スコープ外の変更は、自分が招いた問題でも Tier C。確認を外しても監査証跡は外さない
+- 既に merge 済みの Issue の close、CodeRabbit の rate limit の retrigger → コマンドが決める（`issue-comments.md` → "When the work turns out to be already merged"、`followup.md`）
 - blocked-by 関係の削除 → `pnpm josh backlog:triage --apply <N> --unblock <M> --reason <text>`。`--blocked-by` で戻せるので取り消し可能。生の `gh api -X DELETE …/dependencies/blocked_by/…` は `destructive-command` 行が拒否する（`scripts/rules/destructive-command.ts`）
 - **major のバージョン bump は Tier C**: `pnpm josh bump major` は自分の判断で実行も提案もしない。既定は minor / patch で、major はユーザーがそのターンで明示したときだけ（0.x の major は 1.0.0 になり戻せない）。`josh bump` が版を変えたら、変わった挙動の `docs/` をコミット前に更新する
 - 自動判断を記録する Issue コメントは `pnpm josh issue:comment <N> --body-file .josh/tmp/comment.md` で投稿する
