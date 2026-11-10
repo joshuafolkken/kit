@@ -395,7 +395,7 @@ own Issue, which cites this table as its evidence.
 
 ## What the lane sessions' transcripts show
 
-The last table is read from the lane sessions' transcripts (`~/.claude/projects/<lane-slug>/*.jsonl`),
+The transcript table is read from the lane sessions' transcripts (`~/.claude/projects/<lane-slug>/*.jsonl`),
 not the ledger ([#4418](https://github.com/joshuafolkken/kit/issues/4418)).
 
 It prints tool time per session, the verification calls (`lint:related` / `test:related` /
@@ -408,3 +408,18 @@ It prints tool time per session, the verification calls (`lint:related` / `test:
 - A call is timed from its `tool_use` line to its `tool_result` line, in the foreground only.
 - One Bash call naming two verification commands is counted as chained; the medians take solo calls.
 - The period is cut at each call's timestamp. A delegated unit's transcript is not a session.
+
+## How long verification took at each lane count
+
+The last table splits the solo `lint:related` / `test:related` calls by the lanes running when each
+started: runs and median seconds per count
+([#7025](https://github.com/joshuafolkken/kit/issues/7025)).
+
+- A call's count is the `lanes` of the latest load sample at or before it, and that count includes the
+  calling lane: 1 means it ran alone.
+- A call with no sample in the 5 minutes before it is left out. A period without `backlog:drive`'s
+  sampler gives an empty table.
+- A call that runs while more lanes start is filed under the lower count.
+
+Read it as: medians that rise with the count show the verification calls competing for CPU. A
+`JOSH_LANE_LIMIT` or verification-parallelism change is filed in its own Issue, which cites this table.
