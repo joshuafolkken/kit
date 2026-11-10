@@ -84,7 +84,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'docs/josh-commands-run.md', bytes: 53_248 },
 	{ path: 'docs/josh-commands-board.md', bytes: 20_480 },
 	{ path: 'docs/josh-commands-lane.md', bytes: 28_672 },
-	{ path: 'docs/josh-commands-session.md', bytes: 16_384 },
+	// `cost:audit`'s dated period and usage breakdown (joshuafolkken/kit#7042) crossed the 16384 block.
+	{ path: 'docs/josh-commands-session.md', bytes: 20_480 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
 	// (joshuafolkken/kit#5547) crossed the 65536 block; solo evidence in `backlog:triage`

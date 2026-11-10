@@ -128,7 +128,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before',
 		category: 'AI tools',
-		reference: ['[--period <days>] [--density]', 'maintainer', ['none']],
+		reference: [
+			'[--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]',
+			'maintainer',
+			['none'],
+		],
 		// Kit-only: it reads kit's own transcript store, like `josh retrospective`, which carries its
 		// summary line.
 		is_kit_only: true,
@@ -139,6 +143,10 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '', note: 'the last 7 days against the 7 before' },
 				{ arguments: '--period 30', note: 'the last 30 days against the 30 before' },
 				{
+					arguments: '--since 2026-10-27 --until 2026-11-10',
+					note: 'those 15 UTC days against the 15 before',
+				},
+				{
 					arguments: '--density',
 					note: 'the lane-child calls per request alone, as the last line',
 				},
@@ -147,6 +155,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--period <days>'],
 					description: 'the length of each period, a positive whole number of days (default 7).',
+				},
+				{
+					names: ['--since <YYYY-MM-DD>', '--until <YYYY-MM-DD>'],
+					description:
+						'a fixed period instead, from the first UTC date through the second, both included; given together and never beside `--period`.',
 				},
 				{
 					names: ['--density'],
