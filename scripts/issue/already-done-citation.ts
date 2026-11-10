@@ -1,6 +1,7 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_pr_rest } from '#scripts/gh/git-gh-pr-rest'
+import { get_exit_code } from '#scripts/git/git-execa-error'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { error_text } from '#scripts/lib/error-message'
@@ -66,7 +67,7 @@ function cited_commits(evidence: string): Array<string> {
 }
 
 function is_not_ancestor(error: unknown): boolean {
-	return error instanceof Error && 'exitCode' in error && error.exitCode === NOT_ANCESTOR_EXIT_CODE
+	return get_exit_code(error) === NOT_ANCESTOR_EXIT_CODE
 }
 
 // Why the commit does not check, or `undefined` once `origin/main` contains it. A SHA git does not
