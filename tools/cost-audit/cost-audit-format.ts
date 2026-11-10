@@ -4,6 +4,13 @@ import { cost_audit_density, type Density } from './cost-audit-density'
 import type { PhaseRow } from './cost-audit-phase'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
 import { cost_audit_spend, type ModelSpend } from './cost-audit-spend'
+import {
+	cost_audit_usage,
+	type AgentRuns,
+	type FirstContext,
+	type LongOutput,
+	type UsageBreakdown,
+} from './cost-audit-usage'
 
 // The printed form of a `josh cost:audit` result: the full report the command prints, and the one
 // summary line `josh retrospective` carries so a run's digest shows the trend it ran in.
@@ -148,6 +155,47 @@ function phase_lines(audit: Audit): Array<string> {
 	]
 }
 
+function tokens_usd(tokens: number, usd: number): string {
+	return `${figure_format.format_tokens(tokens)} tokens (${figure_format.format_usd(usd)})`
+}
+
+function first_text(first: FirstContext, unit: string): string {
+	const p50 =
+		first.p50_tokens === undefined ? 'none' : figure_format.format_tokens(first.p50_tokens)
+
+	return `${p50} (${String(first.sessions)} ${unit})`
+}
+
+function long_output_line(long: LongOutput): string {
+	const share = long.all_calls === 0 ? 0 : (long.calls / long.all_calls) * PERCENT
+	const counts = `${String(long.calls)} of ${String(long.all_calls)} calls`
+
+	return `  output over ${String(cost_audit_usage.LONG_OUTPUT_TOKENS)} tokens: ${counts} (${share.toFixed(PERCENT_DECIMALS)}%, ${figure_format.format_usd(long.usd)})`
+}
+
+function agent_runs_line(agent: AgentRuns): string {
+	const per_run = (agent.calls / agent.runs).toFixed(PERCENT_DECIMALS)
+
+	return `    ${agent.agent_type}: ${String(agent.runs)} runs, ${per_run} calls/run, ${figure_format.format_usd(agent.usd)}`
+}
+
+// The current period's usage breakdown (joshuafolkken/kit#7042): the figures a cost-reduction Issue
+// sets its before and after on, read beside the dollar rows rather than filed on.
+function usage_lines(usage: UsageBreakdown): Array<string> {
+	const { cache_write: write } = usage
+	const agents = usage.agents.length === 0 ? ['    none'] : usage.agents.map(agent_runs_line)
+
+	return [
+		'',
+		'Usage breakdown (this period: tokens and dollars)',
+		`  cache write 5m: ${tokens_usd(write.tokens_5m, write.usd_5m)} / 1h: ${tokens_usd(write.tokens_1h, write.usd_1h)}`,
+		`  first request context p50: main ${first_text(usage.first_main, 'sessions')} / subagent ${first_text(usage.first_subagent, 'runs')}`,
+		long_output_line(usage.long_output),
+		'  subagent runs by agent type:',
+		...agents,
+	]
+}
+
 // A row and, on the kind rows, its current-period model lines.
 function row_lines(row: AuditRow): Array<string> {
 	return [row_line(row), ...(row.models ?? []).map((spend) => spend_line(spend))]
@@ -189,6 +237,7 @@ function report_lines(audit: Audit): Array<string> {
 		...sections_of(audit).flatMap((section) => section_lines(section)),
 		...rewrite_lines(audit),
 		...phase_lines(audit),
+		...usage_lines(audit.usage),
 		'',
 		`Regressions: ${regression_text(audit)}`,
 	]

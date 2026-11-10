@@ -228,14 +228,16 @@ The cost and time section ends with the `josh cost:audit` summary line for the l
 Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before.
 
 ```bash
-pnpm josh cost:audit               # the last 7 days against the 7 before
-pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
-pnpm josh cost:audit --density     # the lane-child calls per request alone, as the last line
+pnpm josh cost:audit                                         # the last 7 days against the 7 before
+pnpm josh cost:audit --period 30                             # the last 30 days against the 30 before
+pnpm josh cost:audit --since 2026-10-27 --until 2026-11-10   # those 15 UTC days against the 15 before
+pnpm josh cost:audit --density                               # the lane-child calls per request alone, as the last line
 ```
 
 **Options:**
 
 - `--period <days>` — the length of each period, a positive whole number of days (default 7).
+- `--since <YYYY-MM-DD>` / `--until <YYYY-MM-DD>` — a fixed period instead, from the first UTC date through the second, both included; given together and never beside `--period`.
 - `--density` — print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it; no lane-child request prints nothing and exits 1.
 
 <!-- /usage -->
@@ -250,7 +252,21 @@ Before the closing line, `Lane children by phase` gives the lane children's cost
 
 `Lane subagents by agent type` follows in the same shape, keyed by the `agentType` of each unit's `agent-<id>.meta.json`, a unit without one under its kind.
 
-It exits `0` on a report, and `1` with the usage on a bad `--period`.
+`Usage breakdown` (`tools/cost-audit/cost-audit-usage.ts`) gives the current period's figures a cost-reduction Issue compares before and after, in tokens and dollars, never weighted units:
+
+- the cache write by its 5-minute and 1-hour lifetime;
+- the p50 of a session's first-request context (input, cache read and cache write), main sessions apart from subagent runs, counting the sessions that opened inside the period;
+- the calls whose output passed 2,000 tokens, their share of all calls and their cost;
+- each agent type's runs (one delegated transcript with an `agentType`), calls per run and cost.
+
+Hand counts differ by definition:
+
+- a request is counted once, in the oldest transcript holding it, so a resumed session's first request is the first one no older transcript held;
+- `--until` counts the whole UTC day, today's requests up to now.
+
+Against the hand tally of 2026-10-27 to 11-10 (110,714 calls; first context p50 20.8k main / 6.2k subagent; 1,058 reviewer runs at ~20 calls), the report read 112,924 calls, 20,792 / 6,245 and 1,078 reviewer runs at 19.8 on 2026-11-10. Effort and tool-result size are not read yet.
+
+It exits `0` on a report, and `1` with the usage on a bad `--period`, a lone `--since` or `--until`, or a pair beside `--period`.
 
 ### `josh eval`
 

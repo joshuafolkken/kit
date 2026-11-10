@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Audit, AuditRow } from './cost-audit'
 import { cost_audit_format } from './cost-audit-format'
+import type { UsageBreakdown } from './cost-audit-usage'
 
 function row(key: string, current: number, previous: number, is_regression = false): AuditRow {
 	return { key, current, previous, is_regression }
@@ -9,6 +10,15 @@ function row(key: string, current: number, previous: number, is_regression = fal
 const NO_DENSITY = { requests: 0, calls: 0, single: 0 }
 const NO_REGRESSIONS = 'Regressions: none'
 const NO_REWRITES = { after_wait: { count: 0, usd: 0 }, within_ttl: { count: 0, usd: 0 } }
+const NO_FIRST = { sessions: 0, p50_tokens: undefined }
+const USAGE_TITLE = 'Usage breakdown (this period: tokens and dollars)'
+const NO_USAGE: UsageBreakdown = {
+	cache_write: { tokens_5m: 0, tokens_1h: 0, usd_5m: 0, usd_1h: 0 },
+	agents: [],
+	first_main: NO_FIRST,
+	first_subagent: NO_FIRST,
+	long_output: { calls: 0, all_calls: 0, usd: 0 },
+}
 
 function audit_with(overrides: Partial<Audit> = {}): Audit {
 	return {
@@ -23,9 +33,51 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		rewrites: { current: NO_REWRITES, previous: NO_REWRITES },
 		phases: [],
 		agents: [],
+		usage: NO_USAGE,
 		...overrides,
 	}
 }
+
+// joshuafolkken/kit#7042: the usage breakdown a cost-reduction Issue compares before and after.
+describe('cost_audit_format.report_lines — the usage breakdown', () => {
+	const usage: UsageBreakdown = {
+		cache_write: { tokens_5m: 1_000_000, tokens_1h: 500_000, usd_5m: 1.25, usd_1h: 1 },
+		agents: [{ agent_type: 'reviewer', runs: 4, calls: 80, usd: 12 }],
+		first_main: { sessions: 3, p50_tokens: 20_800 },
+		first_subagent: { sessions: 4, p50_tokens: 6200 },
+		long_output: { calls: 5, all_calls: 200, usd: 3 },
+	}
+	const lines = cost_audit_format.report_lines(audit_with({ usage }))
+
+	it('prints the cache write by lifetime in tokens and dollars', () => {
+		expect(lines).toContain(
+			'  cache write 5m: 1,000,000 tokens ($1.2500) / 1h: 500,000 tokens ($1.0000)',
+		)
+	})
+
+	it('prints the first-request context p50 of main sessions and subagent runs', () => {
+		expect(lines).toContain(
+			'  first request context p50: main 20,800 (3 sessions) / subagent 6,200 (4 runs)',
+		)
+	})
+
+	it('prints the long-output calls with their share and cost', () => {
+		expect(lines).toContain('  output over 2000 tokens: 5 of 200 calls (2.5%, $3.0000)')
+	})
+
+	it('prints each agent type runs and calls per run', () => {
+		expect(lines).toContain('    reviewer: 4 runs, 20.0 calls/run, $12.0000')
+	})
+
+	it('prints none where no subagent ran and no p50 where no session opened', () => {
+		const empty = cost_audit_format.report_lines(audit_with())
+
+		expect(empty).toContain('    none')
+		expect(empty).toContain(
+			'  first request context p50: main none (0 sessions) / subagent none (0 runs)',
+		)
+	})
+})
 
 describe('cost_audit_format.report_lines — the lane-child density line', () => {
 	it('prints the lane children calls per request and single-call share beside the previous period', () => {
@@ -129,7 +181,10 @@ describe('cost_audit_format.report_lines — the agent type table', () => {
 		const lines = cost_audit_format.report_lines(audit_with())
 		const title = lines.findIndex((line) => line.startsWith(AGENT_TITLE))
 
-		expect(lines.slice(title + 1)).toStrictEqual(['  none', '', NO_REGRESSIONS])
+		const usage = lines.indexOf(USAGE_TITLE)
+
+		expect(lines.slice(title + 1, usage)).toStrictEqual(['  none', ''])
+		expect(lines.at(-1)).toBe(NO_REGRESSIONS)
 	})
 })
 
