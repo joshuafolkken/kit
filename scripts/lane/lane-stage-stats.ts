@@ -87,39 +87,61 @@ function started_ms(stage: StageEntry): number {
 	return Date.parse(stage.at) - stage.elapsed_ms
 }
 
-// When the same issue was dispatched again, or never: a child that died before its ship must not have
-// its implementation stretched to the ship of the child that replaced it.
-function next_dispatch_ms(sorted: ReadonlyArray<DispatchEntry>, index: number): number {
-	const next = sorted.slice(index + 1).find((entry) => entry.issue === sorted[index]?.issue)
+// Each issue's stage starts, indexed once so a dispatch reads only its own issue's stages.
+function starts_by_issue(stages: ReadonlyArray<StageEntry>): ReadonlyMap<number, Array<number>> {
+	const index = new Map<number, Array<number>>()
 
-	return next === undefined ? Infinity : Date.parse(next.at)
+	for (const stage of stages) {
+		if (stage.issue === undefined) continue
+		const starts = index.get(stage.issue) ?? []
+
+		starts.push(started_ms(stage))
+		index.set(stage.issue, starts)
+	}
+
+	return index
+}
+
+// Each dispatch's next dispatch of the same issue, `Infinity` for none, in one backward pass: a child
+// that died before its ship must not have its implementation stretched to the ship of the child that
+// replaced it.
+function next_dispatches_ms(sorted: ReadonlyArray<DispatchEntry>): Array<number> {
+	const later = new Map<number, number>()
+
+	return sorted
+		.toReversed()
+		.map((dispatch) => {
+			const next_ms = later.get(dispatch.issue) ?? Infinity
+
+			later.set(dispatch.issue, Date.parse(dispatch.at))
+
+			return next_ms
+		})
+		.toReversed()
 }
 
 function implement_ms(
-	dispatch: DispatchEntry,
+	from_ms: number,
 	until_ms: number,
-	stages: ReadonlyArray<StageEntry>,
+	starts: ReadonlyArray<number>,
 ): number | undefined {
-	const from_ms = Date.parse(dispatch.at)
-	const starts = stages
-		.filter((stage) => stage.issue === dispatch.issue)
-		.map((stage) => started_ms(stage))
-		.filter((start) => start >= from_ms && start < until_ms)
+	const inside = starts.filter((start) => start >= from_ms && start < until_ms)
 
-	return starts.length === 0 ? undefined : Math.min(...starts) - from_ms
+	return inside.length === 0 ? undefined : Math.min(...inside) - from_ms
 }
 
 // Each dispatch's implementation interval in dispatch order.
 function implement_spans(entries: ReadonlyArray<LedgerEntry>): Array<ImplementSpan> {
-	const stages = entries.filter(is_stage)
+	const starts = starts_by_issue(entries.filter(is_stage))
 	const sorted = entries
 		.filter(is_dispatch)
 		.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
+	const next_ms = next_dispatches_ms(sorted)
 
 	return sorted.map((dispatch, index) => {
 		const from_ms = Date.parse(dispatch.at)
-		const until_ms = next_dispatch_ms(sorted, index)
-		const ms = implement_ms(dispatch, until_ms, stages)
+		const until_ms = next_ms[index] ?? Infinity
+		const ms = implement_ms(from_ms, until_ms, starts.get(dispatch.issue) ?? [])
 
 		return {
 			issue: dispatch.issue,
