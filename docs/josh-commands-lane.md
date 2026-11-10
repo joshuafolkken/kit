@@ -219,8 +219,8 @@ The `open issues` column lists each open Issue whose title contains the stage na
 none does, `unread` when the listing failed (`lane-sinks-issues.ts`). The `scoped pair` row also matches the file
 name of each `over_cap_hub` those lanes' `test-related` runs recorded.
 
-`--over <minutes>` prints a row per merged lane over that many net minutes, longest first: net and wait minutes,
-ledger chain, top stage and its open Issues as `--sinks` matches them (`lane-over.ts`). A cause table follows
+`--over <minutes>`: per merged lane over that many net min, longest first, net/wait minutes, ledger chain,
+stages past budget (`implement 58.8/9`), top stage, its `--sinks` open Issues (`lane-over.ts`). A cause table follows
 (`lane-over-causes.ts`): per over-cap `hub` and `ci job`, lanes, minutes over, open Issues; `filing candidates:`
 lists unnamed.
 
