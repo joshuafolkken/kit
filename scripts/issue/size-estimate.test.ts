@@ -237,16 +237,6 @@ describe('size_estimate cap', () => {
 	})
 })
 
-describe('size_estimate.is_issue_over_cap', () => {
-	it('reads the route from the labels', () => {
-		const labels = [{ name: SPLIT_ROUTE }]
-
-		expect(size_estimate.is_issue_over_cap({ body: OVER_GUIDE })).toBe(true)
-		expect(size_estimate.is_issue_over_cap({ body: OVER_GUIDE, labels })).toBe(false)
-		expect(size_estimate.is_issue_over_cap({ body: UNDER_GUIDE })).toBe(false)
-	})
-})
-
 // joshuafolkken/kit#5758: a decision that widens the scope restates the estimate `lane:plan` reads.
 describe('size_estimate.stated_line', () => {
 	it('reads the estimate line a decision record states', () => {

@@ -17,9 +17,9 @@ line guide × (fallback file guide / fallback line guide) → file guide.
 Floor (also the unmeasured fallback):
 **more than 8 changed files or more than 200 changed lines**.
 
-Past **the cap, 1.5 times the guide**, or budget: split or say why.
+Past **the cap (1.5 × guide)** or the bar (2 × budget): split or say why.
 Merged lanes' median actual / declared ratios per axis, apart from speed; unmeasured: 2.
-First `lane:plan` answers `split` past the declared files × files ratio (files, hunks), line guide;
+First `lane:plan` answers `split` past declared files × files ratio (files, hunks), bar (lines);
 `--single` or a re-plan → `size warning` (`lane-plan-size.ts`).
 
 ## The same two questions decide the filing-time fold
@@ -84,8 +84,8 @@ condition to evaluate.** **An entry point that applies a different condition is 
 is the non-closing home for the split rationale.
 
 **Each split child is filed with the `route:split` label** —
-`pnpm josh issue:file "<sub-title>" --body-file .josh/tmp/body.md --route split` — and judged for
-`auto-ok` and the implement budget like any filing (`kickoff.md` → "Words typed after `new`").
+`pnpm josh issue:file "<sub-title>" --body-file .josh/tmp/body.md --route split` — and judged like any
+filing (`kickoff.md` → "Words typed after `new`").
 
 ## Promote, or create a new epic
 
