@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { lane_breakdown, type Breakdown } from './lane-breakdown'
+import { lane_implement_signals } from './lane-implement-signals'
 import type { LedgerEntry } from './lane-ledger'
 import type { SinkRecords } from './lane-sinks'
 import { lane_why_period } from './lane-why-period'
@@ -10,6 +11,8 @@ const START = Date.parse('2026-11-05T00:00:00Z')
 const WINDOW = { since_ms: START, until_ms: START + 120 * MINUTE_MS }
 const ISSUE = 6475
 const { CAUSE } = lane_why_period
+const SHIP_STAGES = ['ship gate', 'ship review']
+const PLAN_TEXT = '#6475 plan'
 
 function at(minute: number): string {
 	return new Date(START + minute * MINUTE_MS).toISOString()
@@ -34,12 +37,12 @@ function breakdown_of(names: ReadonlyArray<string>, followup_ms = 0): Breakdown 
 }
 
 describe('lane_why_period.causes_of', () => {
-	it('uses shared budgets and keeps implement attribution uncertain', () => {
+	it('uses shared budgets and keeps implement attribution uncertain without signals', () => {
 		const breakdown = breakdown_of(['implement', 'ship gate'], 40 * MINUTE_MS)
 
 		expect([...lane_why_period.causes_of(breakdown, []).keys()]).toStrictEqual([
 			CAUSE.IMPLEMENT,
-			CAUSE.OTHER,
+			'ship',
 			CAUSE.DRIVER,
 		])
 		expect(CAUSE.IMPLEMENT).toContain('unverified')
@@ -57,12 +60,13 @@ describe('lane_why_period.causes_of', () => {
 
 	it('groups repeated stages once and names pause and hub evidence independently', () => {
 		const breakdown = {
-			...breakdown_of(['ship gate', 'ship review']),
+			...breakdown_of(SHIP_STAGES),
 			pauses: [{ at_ms: START, name: 'pause for #12' }],
 		}
 		const causes = lane_why_period.causes_of(breakdown, ['scripts/a.ts'])
 
-		expect([...causes.keys()]).toStrictEqual([CAUSE.OTHER, CAUSE.PAUSE, CAUSE.HUB])
+		expect([...causes.keys()]).toStrictEqual(['ship', CAUSE.PAUSE, CAUSE.HUB])
+		expect(causes.get('ship')).toStrictEqual(SHIP_STAGES)
 		expect(causes.get(CAUSE.HUB)).toStrictEqual(['a.ts'])
 	})
 
@@ -85,7 +89,7 @@ describe('lane_why_period.table', () => {
 		const issues = [{ number: 6474, title: 'Shorten start to plan' }]
 
 		expect(lane_why_period.table(records, WINDOW, 40, issues).split('\n').at(-1)).toBe(
-			'| other | 2 | 110.0 | #6474 |',
+			'| plan | 2 | 110.0 | #6474 |',
 		)
 	})
 
@@ -93,7 +97,7 @@ describe('lane_why_period.table', () => {
 		const records: SinkRecords = {
 			entries: [...entries_of(ISSUE, 90), { kind: 'dispatch', issue: ISSUE, at: at(50) }],
 			events: [
-				{ pos: 0, kind: 'plan', at: at(10), text: '#6475 plan' },
+				{ pos: 0, kind: 'plan', at: at(10), text: PLAN_TEXT },
 				{ pos: 1, kind: 'park', at: at(30), text: '#6475 parked (review)' },
 				{ pos: 2, kind: 'setup', at: at(50), text: 'opening lane #6475' },
 			],
@@ -110,7 +114,9 @@ describe('lane_why_period — driver cause keys', () => {
 	const SONAR_ISSUE = { number: 5085, title: 'Check whether the SonarJasmin taint engine changed' }
 
 	it('adds the driver keys to the driver followup group only', () => {
-		const causes = lane_why_period.causes_of(breakdown_of(['implement'], 40 * MINUTE_MS), [], ['k'])
+		const causes = lane_why_period.causes_of(breakdown_of(['implement'], 40 * MINUTE_MS), [], {
+			ship: ['k'],
+		})
 
 		expect(causes.get(CAUSE.DRIVER)).toStrictEqual(['driver followup', 'k'])
 		expect(causes.get(CAUSE.IMPLEMENT)).toStrictEqual(['implement'])
@@ -136,6 +142,60 @@ describe('lane_why_period — driver cause keys', () => {
 		const table = lane_why_period.table(records, WINDOW, 40, [SONAR_ISSUE])
 
 		expect(table).toContain(`| ${CAUSE.DRIVER} | 1 | 45.0 | #5085 |`)
+	})
+})
+
+// joshuafolkken/kit#6988: implement and other overruns split into a row per cause key.
+describe('lane_why_period — cause key rows', () => {
+	const EDITED = 'edited files'
+	const IMPLEMENT = [lane_breakdown.IMPLEMENT_STAGE]
+
+	it('splits an implement overrun by its signal keys, each linked by its key', () => {
+		const causes = lane_why_period.causes_of(breakdown_of(IMPLEMENT), [], {
+			ship: [],
+			implement: [EDITED, 'plan divergence'],
+		})
+
+		expect([...causes.keys()]).toStrictEqual([`implement: ${EDITED}`, 'implement: plan divergence'])
+		expect(causes.get(`implement: ${EDITED}`)).toStrictEqual([EDITED])
+	})
+
+	it('names an implement overrun whose signals passed no bar apart from an unrecorded one', () => {
+		const causes = lane_why_period.causes_of(breakdown_of(IMPLEMENT), [], {
+			ship: [],
+			implement: [],
+		})
+
+		expect([...causes.keys()]).toStrictEqual([CAUSE.IMPLEMENT_CLEAR])
+	})
+
+	it('splits a ship overrun by its ship keys and names a plan overrun by its budget', () => {
+		const breakdown = breakdown_of([lane_breakdown.PLAN_STAGE, 'ship gate'])
+		const causes = lane_why_period.causes_of(breakdown, [], { ship: ['sonarqube'] })
+
+		expect([...causes.keys()]).toStrictEqual(['plan', 'ship: sonarqube'])
+	})
+})
+
+describe('lane_why_period.table — recorded implement signals', () => {
+	it('reads the lane recorded signals into the period table', () => {
+		const signals = { edits: 12, test_related: 0, lint_related: 0, investigations: 0, unplanned: 0 }
+		const records: SinkRecords = {
+			entries: entries_of(ISSUE, 60),
+			events: [
+				{ pos: 0, kind: 'plan', at: at(10), text: PLAN_TEXT },
+				{
+					pos: 1,
+					kind: lane_implement_signals.KIND,
+					at: at(50),
+					text: lane_implement_signals.text_of(String(ISSUE), signals),
+				},
+			],
+		}
+		const table = lane_why_period.table(records, WINDOW, 40, [])
+
+		expect(table).toContain('| implement: edited files | 1 |')
+		expect(table).not.toContain(CAUSE.IMPLEMENT)
 	})
 })
 
