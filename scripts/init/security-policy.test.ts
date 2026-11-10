@@ -22,6 +22,10 @@ function read_template(): string {
 	return readFileSync(package_path(security_policy.SECURITY_TEMPLATE), 'utf8')
 }
 
+function read_kit_policy(): string {
+	return readFileSync(package_path('SECURITY.md'), 'utf8')
+}
+
 describe('security_policy.repository_at', () => {
 	beforeEach(() => {
 		origin_url_mock.mockReset()
@@ -174,6 +178,14 @@ describe('the consumer SECURITY.md template', () => {
 	})
 
 	it("is not kit's own policy, which still reports to kit", () => {
-		expect(readFileSync(package_path('SECURITY.md'), 'utf8')).toContain(KIT_ADVISORY_URL)
+		expect(read_kit_policy()).toContain(KIT_ADVISORY_URL)
+	})
+})
+
+describe("kit's SECURITY.md safe-chain setup", () => {
+	it('exempts pnpm josh from safe-chain and wraps every other pnpm call', () => {
+		expect(read_kit_policy()).toContain(
+			'pnpm() { [ "$1" = josh ] && { command pnpm "$@"; return; }; wrapSafeChainCommand pnpm "$@"; }',
+		)
 	})
 })
