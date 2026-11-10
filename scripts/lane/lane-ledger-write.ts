@@ -4,7 +4,6 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import type {
-	ChainRecord,
 	CoreWaitRecord,
 	GateRecord,
 	HeldRecord,
@@ -25,6 +24,7 @@ import type {
 	UnitFileRecord,
 	UnplannedNoticeRecord,
 } from './lane-ledger-schema'
+import type { ChainRecord } from './lane-ledger-schema-ship'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished

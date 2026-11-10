@@ -1,5 +1,5 @@
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
-import type { ChainEntry } from './lane-ledger-schema'
+import type { ChainEntry } from './lane-ledger-schema-ship'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 

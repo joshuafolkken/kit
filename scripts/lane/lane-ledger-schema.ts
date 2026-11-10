@@ -339,8 +339,6 @@ type GateRecord = Omit<GateEntry, 'kind' | 'at'>
 type GateCheckRecord = z.infer<typeof check_schema>
 type StageRecord = Omit<StageEntry, 'kind' | 'at'>
 type StopRecord = Omit<StopEntry, 'kind' | 'at'>
-type ChainEntry = z.infer<typeof lane_ledger_schema_ship.chain_schema>
-type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
 type OverlapRecord = Omit<OverlapEntry, 'kind' | 'at'>
 type HeldRecord = Omit<HeldEntry, 'kind' | 'at' | 'waiting'> & {
 	waiting?: ReadonlyArray<number> | undefined
@@ -349,8 +347,6 @@ type HeldRecord = Omit<HeldEntry, 'kind' | 'at' | 'waiting'> & {
 const lane_ledger_schema = { entry_schema }
 
 export type {
-	ChainEntry,
-	ChainRecord,
 	CoreWaitEntry,
 	CoreWaitRecord,
 	DispatchEntry,

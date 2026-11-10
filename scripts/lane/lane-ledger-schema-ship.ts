@@ -96,6 +96,9 @@ const size_schema = z.object({
 	actual: counts_schema,
 })
 
+type ChainEntry = z.infer<typeof chain_schema>
+type ChainRecord = Omit<ChainEntry, 'kind' | 'at'>
+
 const lane_ledger_schema_ship = {
 	chain_schema,
 	early_push_schema,
@@ -105,4 +108,5 @@ const lane_ledger_schema_ship = {
 	unplanned_notice_schema,
 }
 
+export type { ChainEntry, ChainRecord }
 export { lane_ledger_schema_ship }
