@@ -73,6 +73,11 @@ const load_schema = z.object({
 	processes: z.array(process_kind_schema).optional(),
 	// The resident apps' summed size (`lane_process_load.RESIDENT_APPS`, joshuafolkken/kit#5658).
 	resident_mb: z.number().optional(),
+	// The host's sleep since boot (`lane-load.ts`, joshuafolkken/kit#7026).
+	slept_ms: z.number().optional(),
+	// The boot and last-wake instants, epoch ms (`kern.boottime`, `kern.waketime`).
+	booted_ms: z.number().optional(),
+	woke_ms: z.number().optional(),
 })
 // A lane child started on `issue` — the instant its implementation is timed from.
 const dispatch_schema = z.object({

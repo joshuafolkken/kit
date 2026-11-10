@@ -72,7 +72,10 @@ It never carries:
   (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合"),
   its filing carrying the `- 原因の park:` line when it parked or stopped an Issue (`issue-template.md` → I);
 - a wait on an open blocker or a start date — `run:merge` releases it (`run-merge-steps.ts`);
-- a mechanical failure — the driver applies `run:stalled` (`RUN_STALLED_LABEL` in `issue-labels.ts`).
+- a mechanical failure — the driver applies `run:stalled` (`RUN_STALLED_LABEL` in `issue-labels.ts`)
+  and re-offers the causes it can itself up to its auto-retry cap; any other or capped row →
+  `run:add <N> --retry`
+  (`backlog-drive-stalled-retry.ts`, `docs/labels-and-run-states.md`).
 
 **When in doubt, it is Tier A**: decide, comment the decision, and continue. **A label a mechanical step
 applied** (a failed or abandoned child, a lost merge race) is read against this list once its reason is

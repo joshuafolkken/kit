@@ -272,6 +272,9 @@ describe('run_merge_decision — prior launch confirmation', () => {
 			`📱 stop:guard sent the confirmation notify (#6268).${HEADER}${transcript(NORMAL)}`,
 		)
 
-		expect(run_merge_decision.cause(OUTPUT)).toStrictEqual({ short: NORMAL, why: NORMAL })
+		expect(run_merge_decision.cause(OUTPUT)).toStrictEqual({
+			short: `session unfinished: ${NORMAL}`,
+			why: NORMAL,
+		})
 	})
 })

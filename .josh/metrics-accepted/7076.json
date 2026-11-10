@@ -1,0 +1,8 @@
+{
+	"reason": "#7076 retries every run:stalled cause and the yield-cap park (per-cause retry checks, cause_in, class_of for message-carrying session-unfinished causes) and documents it, as its acceptance criteria require",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 19,
+		"ai_cost.on_demand_bytes": 189
+	}
+}
