@@ -59,6 +59,44 @@ describe('run_ship_pair_runs.begin', () => {
 	})
 })
 
+// joshuafolkken/kit#7053: round 2 reran a pair the gate stage had just met red on the same tree.
+// The red a pair ahead met while this turn waited, read from inside the turn.
+async function red_after(code: number): Promise<ReturnType<typeof run_ship_pair_runs.red_on>> {
+	const ahead = run_ship_pair_runs.one_at_a_time(async () => {
+		await Promise.resolve()
+		run_ship_pair_runs.met(TREE, code, 'red')
+	})
+	const waited = run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.red_on(TREE))
+
+	await ahead
+
+	return await waited
+}
+
+describe('run_ship_pair_runs.red_on', () => {
+	it('answers the red result a pair ahead met on the same tree', async () => {
+		await expect(red_after(FAILED)).resolves.toStrictEqual({ code: FAILED, out: 'red' })
+	})
+
+	it('answers nothing once the tree moved since the red pair', async () => {
+		unmoved_mock.mockReturnValue(false)
+
+		await expect(red_after(FAILED)).resolves.toBeUndefined()
+	})
+
+	it('answers nothing after a green pair', async () => {
+		await expect(red_after(OK)).resolves.toBeUndefined()
+	})
+
+	it('answers nothing for a turn that joined the queue after the red pair ended', async () => {
+		run_ship_pair_runs.met(TREE, FAILED)
+
+		await expect(
+			run_ship_pair_runs.one_at_a_time(async () => run_ship_pair_runs.red_on(TREE)),
+		).resolves.toBeUndefined()
+	})
+})
+
 describe('run_ship_pair_runs.one_at_a_time', () => {
 	it('starts a later turn only once the earlier one ended, even when it threw', async () => {
 		const order: Array<string> = []

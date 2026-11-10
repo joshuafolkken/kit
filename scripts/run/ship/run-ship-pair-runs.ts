@@ -22,27 +22,40 @@ interface PairRun {
 	rerun?: Reason
 }
 
+// `seq` numbers each pair met, so a turn tells a pair that ended while it waited from an earlier one.
 interface Last {
 	tree: GateTree
 	code: number
+	out: string
+	seq: number
 }
 
-// `current` is the run the pair now in its turn started, absent while it started none.
-const state: { runs: number; last?: Last; current?: PairRun; queue: Promise<unknown> } = {
-	runs: 0,
-	queue: Promise.resolve(),
-}
+// `current` is the run the pair now in its turn started, absent while it started none; `queued_at` is
+// how many pairs had been met when the pair in its turn joined the queue.
+const state: {
+	runs: number
+	met_count: number
+	queued_at?: number
+	last?: Last
+	current?: PairRun
+	queue: Promise<unknown>
+} = { runs: 0, met_count: 0, queue: Promise.resolve() }
 
 // The earlier pair's own caller reads its failure; the queue only waits for it to end.
-async function after<T>(ahead: Promise<unknown>, run: () => Promise<T>): Promise<T> {
+async function after<T>(
+	ahead: Promise<unknown>,
+	run: () => Promise<T>,
+	queued_at: number,
+): Promise<T> {
 	await Promise.allSettled([ahead])
 	delete state.current
+	state.queued_at = queued_at
 
 	return await run()
 }
 
 async function one_at_a_time<T>(run: () => Promise<T>): Promise<T> {
-	const turn = after(state.queue, run)
+	const turn = after(state.queue, run, state.met_count)
 
 	state.queue = turn
 
@@ -74,8 +87,27 @@ function begin(tree: GateTree): string | undefined {
 }
 
 // The tree a pair met and how it ended — a pair that ran nothing met it green.
-function met(tree: GateTree, code: number): void {
-	state.last = { tree, code }
+function met(tree: GateTree, code: number, out = ''): void {
+	state.met_count += 1
+	state.last = { tree, code, out, seq: state.met_count }
+}
+
+function is_awaited_red(last: Last, queued_at: number | undefined): boolean {
+	return last.code !== SUCCESS_EXIT_CODE && queued_at !== undefined && last.seq > queued_at
+}
+
+// The red result of a pair that ended while this turn waited, on `tree` unmoved, else `undefined`
+// (joshuafolkken/kit#7053). Round 2 beside the gate stage queued behind a red pair and ran both checks
+// again over the same inputs before the ship stopped on the same red. A pair met red before this turn
+// queued — a sync's push that carries on past its red — has its caller run it afresh, so a flaky red
+// still gets a second run. The output travels with the code: the stopped stage's output is the
+// relaunch prompt's failure tail (`run-ship-group.ts`).
+function red_on(tree: GateTree): { code: number; out: string } | undefined {
+	const { last, queued_at } = state
+
+	if (last === undefined || !is_awaited_red(last, queued_at)) return undefined
+
+	return scoped_green.is_unmoved(last.tree, tree) ? { code: last.code, out: last.out } : undefined
 }
 
 function current(): PairRun | Record<string, never> {
@@ -84,10 +116,12 @@ function current(): PairRun | Record<string, never> {
 
 function forget(): void {
 	state.runs = 0
+	state.met_count = 0
+	delete state.queued_at
 	delete state.last
 	delete state.current
 }
 
-const run_ship_pair_runs = { REASON, begin, current, forget, met, one_at_a_time }
+const run_ship_pair_runs = { REASON, begin, current, forget, met, one_at_a_time, red_on }
 
 export { run_ship_pair_runs }
