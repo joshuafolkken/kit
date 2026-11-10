@@ -34,12 +34,17 @@ const { gather_thanks } = run_board_thanks
 
 // What the last board on this run kept (`run-board-snapshot.ts`); one written on another run is
 // discarded.
-function saved_for(ports: BoardPorts, started_ms: number): Pick<BoardState, 'known' | 'closed'> {
+function saved_for(
+	ports: BoardPorts,
+	started_ms: number,
+): Pick<BoardState, 'known' | 'closed' | 'issue_count'> {
 	const snapshot = ports.snapshot?.load()
 
 	if (snapshot?.run_started_ms !== started_ms) return FRESH_STATE
 
-	return { known: { titles: snapshot.titles, labels: snapshot.labels }, closed: snapshot.closed }
+	const { titles, labels, closed, issue_count } = snapshot
+
+	return { known: { titles, labels }, closed, issue_count }
 }
 
 // The state of the run on screen, over the reads just taken; a different run starts its plan state
@@ -238,7 +243,7 @@ function links_of(repo: string | undefined, link: Link): Links {
 
 type Gauges = Pick<
 	BoardHeader,
-	'machine' | 'usages' | 'budget_waits' | 'quotas' | 'quota_hold' | 'rate_limit'
+	'machine' | 'usages' | 'budget_waits' | 'quotas' | 'quota_hold' | 'rate_limit' | 'issue_count'
 >
 
 // The machine's gauges and the usage-limit windows, with the limit that holds the run's launches.
@@ -254,6 +259,7 @@ function gauges_of(state: BoardState, local: LocalRead): Gauges {
 		quotas: state.quotas,
 		quota_hold,
 		rate_limit: state.rate_limit,
+		issue_count: state.issue_count,
 	}
 }
 

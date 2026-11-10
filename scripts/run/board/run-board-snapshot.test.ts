@@ -25,6 +25,7 @@ const SNAPSHOT: Snapshot = {
 			},
 		],
 	]),
+	issue_count: { open: 87, closed: 6912 },
 }
 
 // A directory of the test's own, removed once it finishes.
@@ -54,6 +55,15 @@ describe('run_board_snapshot.file_store — what it keeps', () => {
 		store.save({ ...SNAPSHOT, closed: new Map([[1, withdrawn]]) })
 
 		expect(store.load()?.closed.get(1)).toStrictEqual(withdrawn)
+	})
+
+	// joshuafolkken/kit#7088: a snapshot written before the count was kept reads as no count.
+	it('reads a snapshot with no issue count as having none', () => {
+		const store = file_store(path.join(scratch(), FILE_NAME))
+
+		store.save({ ...SNAPSHOT, issue_count: undefined })
+
+		expect(store.load()?.issue_count).toBeUndefined()
 	})
 
 	it('rewrites the snapshot whole', () => {

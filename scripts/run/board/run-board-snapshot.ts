@@ -2,6 +2,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import type { ClosedIssue } from './run-board-closed'
+import type { IssueCount } from './run-board-issue-count'
 
 // The last GitHub reads a `run:board` drew — the titles, the labels and the children read closed — kept
 // in one file per checkout, so a board opened again draws them at once rather than nameless until its
@@ -20,6 +21,8 @@ interface Known {
 interface Snapshot extends Known {
 	run_started_ms: number
 	closed: ReadonlyMap<number, ClosedIssue>
+	// The repository's issue count (`run-board-issue-count.ts`); none before one is read.
+	issue_count?: IssueCount | undefined
 }
 
 // Where a board keeps its snapshot; a board with none keeps nothing.
@@ -52,6 +55,7 @@ const snapshot_schema = z.object({
 	titles: z.array(title_entry_schema),
 	labels: z.array(label_entry_schema),
 	closed: z.array(closed_entry_schema),
+	issue_count: z.object({ open: z.number(), closed: z.number() }).optional(),
 })
 
 function snapshot_of(text: string): Snapshot | undefined {
@@ -60,13 +64,14 @@ function snapshot_of(text: string): Snapshot | undefined {
 
 		if (!parsed.success) return undefined
 
-		const { run_started_ms, titles, labels, closed } = parsed.data
+		const { run_started_ms, titles, labels, closed, issue_count } = parsed.data
 
 		return {
 			run_started_ms,
 			titles: new Map(titles),
 			labels: new Map(labels),
 			closed: new Map(closed),
+			issue_count,
 		}
 	} catch {
 		return undefined
@@ -85,6 +90,7 @@ function save(target: string, snapshot: Snapshot): void {
 		titles: [...snapshot.titles],
 		labels: [...snapshot.labels],
 		closed: [...snapshot.closed],
+		issue_count: snapshot.issue_count,
 	}
 
 	try {
