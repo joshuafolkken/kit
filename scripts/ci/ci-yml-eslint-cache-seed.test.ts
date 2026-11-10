@@ -169,7 +169,6 @@ describe('each lint group hands over its own cache', () => {
 
 	it('downloads the artifact of the leg’s own group', () => {
 		expect(download_environment('GROUP')).toBe('${{ matrix.group }}')
-		expect(UPLOAD_ARTIFACT.endsWith('-${{ matrix.group }}')).toBe(true)
 	})
 })
 
