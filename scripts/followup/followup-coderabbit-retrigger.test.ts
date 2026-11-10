@@ -25,6 +25,7 @@ const MARGIN = 15 * SECONDS
 const NOTICE_AT = '2026-10-28T01:00:00Z'
 const NOTICE_AT_MS = Date.parse(NOTICE_AT)
 const BRANCH = '5289-lane'
+const RETRIGGERED_AT = '2026-10-28T01:01:00Z'
 const ONE_MINUTE = '**1 minute**'
 const TWO_MINUTES = '**2 minutes**'
 const NOT_A_NOTICE = 'Actionable comments posted: 0'
@@ -236,7 +237,7 @@ describe('followup_coderabbit_retrigger.run — the review it waits for', () => 
 	use_run_spies()
 
 	it('waits for a retrigger already posted without posting another', async () => {
-		comments_are(coderabbit(notice(TWO_MINUTES)), retrigger_at('2026-10-28T01:01:00Z'))
+		comments_are(coderabbit(notice(TWO_MINUTES)), retrigger_at(RETRIGGERED_AT))
 		checks_read(RUNNING, DONE)
 
 		const result = await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
@@ -256,6 +257,26 @@ describe('followup_coderabbit_retrigger.run — the review it waits for', () => 
 		await followup_coderabbit_retrigger.run(BRANCH, wait)
 
 		expect(wait.wait_ms).toBe(2 * SECONDS)
+	})
+})
+
+// #6868: the review wait reads on the PR completion schedule, not a fixed thirty seconds.
+describe('followup_coderabbit_retrigger.run — the review wait’s cadence', () => {
+	use_run_spies()
+
+	it('reads every 30 seconds four times, then every 20 seconds', async () => {
+		comments_are(coderabbit(notice(TWO_MINUTES)), retrigger_at(RETRIGGERED_AT))
+		checks_read(RUNNING, RUNNING, RUNNING, RUNNING, RUNNING, RUNNING, DONE)
+		await followup_coderabbit_retrigger.run(BRANCH, wait_seeing(RATE_LIMITED))
+
+		expect(vi.mocked(poll.sleep).mock.calls.flat()).toStrictEqual([
+			30 * SECONDS,
+			30 * SECONDS,
+			30 * SECONDS,
+			30 * SECONDS,
+			20 * SECONDS,
+			20 * SECONDS,
+		])
 	})
 })
 

@@ -13,7 +13,7 @@ import {
 	type BufferedProcessResult,
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
-import { eslint_cache_dependencies } from './eslint-cache-dependencies'
+import { eslint_cache_dependencies, type CacheDrop } from './eslint-cache-dependencies'
 import { eslint_daemon, type DaemonState } from './eslint-daemon'
 import { eslint_heap } from './eslint-heap'
 import { lint_gate_scope } from './lint-gate-scope'
@@ -55,9 +55,11 @@ interface LintRunOptions {
 const COLD_RUN: LintRunOptions = { warm_daemon: false }
 
 // Whether the eslint cache was there once the lane's cache sharing had run, before eslint read it,
-// and what a warm run did with the daemon (`eslint_daemon.run_or_cold`).
+// how many of its entries the dependency guard dropped, and what a warm run did with the daemon
+// (`eslint_daemon.run_or_cold`).
 interface EslintResult extends BufferedProcessResult {
 	is_cached?: boolean | undefined
+	drop?: CacheDrop | undefined
 	daemon?: DaemonState | undefined
 }
 
@@ -80,12 +82,12 @@ async function run_eslint(eslint: EslintRun): Promise<EslintResult> {
 
 	return await lane_cache_run.run(cache_file, async () => {
 		const is_cached = existsSync(cache_file)
-		const result = await eslint_cache_dependencies.guard(
+		const { result, drop } = await eslint_cache_dependencies.guard_counted(
 			cache_file,
 			async () => await run_eslint_process(eslint),
 		)
 
-		return { ...result, is_cached }
+		return { ...result, is_cached, drop }
 	})
 }
 
@@ -185,8 +187,15 @@ function daemon_fact(eslint: EslintResult): string {
 	return eslint.daemon ?? 'cold process'
 }
 
+function drop_fact({ dropped, total }: CacheDrop): string {
+	return `${String(dropped)} of ${String(total)} cache entries dropped`
+}
+
+// The drop is named only where the cache was there to drop from.
 function cache_fact(eslint: EslintResult): string {
-	return eslint.is_cached === true ? 'cache present' : 'cache absent'
+	if (eslint.is_cached !== true) return 'cache absent'
+
+	return eslint.drop === undefined ? 'cache present' : `cache present · ${drop_fact(eslint.drop)}`
 }
 
 // A run that names a `timing` prints its line after the linters' output: the tools' seconds, then
@@ -220,8 +229,9 @@ async function run_timed_lint_checks(
 	const pair = await run_lint_pair(prettier_args, eslint_args, cache_file, COLD_RUN)
 	const exit_code = write_lint_pair(pair)
 
-	// joshuafolkken/kit#5116: the gate times `lint` as one step, so only this line names the long pole.
-	process.stdout.write(timing_line(pair, GATE_TIMING_LABEL, []))
+	// joshuafolkken/kit#5116: the gate times `lint` as one step, so only this line names the long pole;
+	// its cache fact says how much of a slow CI lint the dependency guard sent back to eslint (#6984).
+	process.stdout.write(timing_line(pair, GATE_TIMING_LABEL, [cache_fact(pair.eslint)]))
 
 	return exit_code
 }

@@ -1,3 +1,4 @@
+import { PR_POLL_SCHEDULES } from '#scripts/lib/poll'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
@@ -255,6 +256,7 @@ describe('pr_checks_watch — what it asks the poll loop for', () => {
 				PR_CHECKS_WATCH_TIMEOUT_MS / SECONDS_TO_MS,
 				CHECK_WAIT_INTERVAL_MS,
 			),
+			backoff: PR_POLL_SCHEDULES.checks,
 			required_stable_reads: DEFAULT_STABLE_READS,
 			evaluator: CHECKS_SETTLED_EVALUATOR,
 		})
