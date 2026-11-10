@@ -7,7 +7,8 @@ import { project_checks } from './project-checks'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 
-const { TSC_ARGS, type_check_command } = await import('./type-check-command')
+const { type_check_command } = await import('./type-check-command')
+const { TSC_ARGS } = await import('./tsc-arguments')
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
