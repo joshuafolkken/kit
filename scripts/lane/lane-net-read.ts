@@ -2,6 +2,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_implement_rate_read } from './lane-implement-rate-read'
 import type { lane_ledger } from './lane-ledger'
+import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_net_time } from './lane-net-time'
 import type { MeasureContext } from './lane-sampler'
 
@@ -20,22 +21,27 @@ async function read_events(context: ReadContext): Promise<ReadonlyArray<RunEvent
 	return await run_event_stream_emit.all_events()
 }
 
-// The ledger beside the event stream — the records `lane:stats --sinks` and `--over` read.
+// The ledger with its archive (joshuafolkken/kit#7038), beside the event stream — the records one lane's
+// `lane:why` reads, whenever it was dispatched.
 async function read_records(context: ReadContext): Promise<{
 	entries: ReturnType<typeof lane_ledger.read_entries>
 	events: ReadonlyArray<RunEvent>
 }> {
-	return { entries: await read_ledger(context), events: await read_events(context) }
+	return {
+		entries: await lane_ledger_archive.read_history(context),
+		events: await read_events(context),
+	}
 }
 
-// The lane's net minutes, whole; `undefined` when the ledger holds no dispatch and merge of it.
+// The lane's net minutes, whole; `undefined` when neither the ledger nor its archive holds a dispatch
+// and merge of it.
 async function net_minutes_of(
 	issue: number,
 	context: ReadContext = {},
 ): Promise<number | undefined> {
 	const events = await read_events(context)
 
-	return lane_net_time.net_minutes(await read_ledger(context), events, issue)
+	return lane_net_time.net_minutes(await lane_ledger_archive.read_history(context), events, issue)
 }
 
 const lane_net_read = {
