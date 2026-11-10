@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/lane/lane-breakdown-text.ts:20 | 2026-11-09 | #6678
+- rf:bug-risks | low | scripts/lane/lane-breakdown-implement.ts:193 | 2026-11-09 | #6678

@@ -1,0 +1,4 @@
+- rf:comments | low | scripts/issue/issue-cite-cli.ts:25 | 2026-11-09 | #6627
+- rf:comments | low | scripts/run/board/run-board-closed.ts:51 | 2026-11-09 | #6627
+- rf:comments | low | scripts/issue/issue-cite-cli.ts:25 | 2026-11-09 | #6627
+- rf:comments | low | scripts/run/board/run-board-closed.ts:51 | 2026-11-09 | #6627

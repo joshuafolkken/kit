@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/document/command-reference-line-budget.ts:11 | 2026-11-09 | #6676
+- rf:comments | low | scripts/document/ai-document-fixture.ts:47 | 2026-11-09 | #6676
