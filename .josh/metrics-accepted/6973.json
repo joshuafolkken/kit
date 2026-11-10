@@ -1,7 +1,7 @@
 {
-	"reason": "#6973 threads HookContext through every delivered row, rule_rewrite, the async guards (including issue watch) and the refusal recorders (including direct gh usage), and splits the per-call guard builder into delivered-rules-guard.ts",
+	"reason": "The lane-park, direct-issue-comment, implementation-cut and pre-gate-cut rows read the cut, hold and repository under the per-call HookContext cwd and env, adding small context adapters",
 	"date": "2026-11-10",
 	"growth": {
-		"scripts.code_lines": 123
+		"scripts.code_lines": 124
 	}
 }

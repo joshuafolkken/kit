@@ -9,7 +9,8 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-b
 import type { DeliveredRule } from './delivered-rules'
 
 // The transcript guard each delivered row runs as (`delivered-rules.ts`). The row reads the cwd and
-// environment of the call it judges from the guard's context, never the process's.
+// environment of the call it judges from the guard's context, never the process's; a `call_only` row
+// reads neither.
 
 // The escape hatch, on by default like the other two guards.
 const SWITCH_ENV_KEY = 'JOSH_RULE_GUARD'
@@ -66,8 +67,8 @@ function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_blo
 
 type CallTrigger = (call: GuardedCall) => boolean
 
-// A row whose trigger takes its own seam as the second argument, not the call's context: the row is
-// asked with the call alone, so the seam keeps its default.
+// A row whose trigger takes its own seam as the second argument, not the call's context, and reads no
+// cwd or environment: the row is asked with the call alone, so the seam keeps its default.
 function call_only<Row extends { is_trigger: CallTrigger }>(
 	row: Row,
 ): Omit<Row, 'is_trigger'> & { is_trigger: CallTrigger } {

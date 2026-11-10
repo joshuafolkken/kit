@@ -155,7 +155,7 @@ describe('is_parking_child', () => {
 		const handed_off = vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(true)
 
 		expect(lane_park.is_parking_child(WORK_DIRECTORY)).toBe(false)
-		expect(handed_off).toHaveBeenCalledWith(WORK_DIRECTORY)
+		expect(handed_off).toHaveBeenCalledWith(WORK_DIRECTORY, process.env)
 	})
 
 	it('reads a session with no dispatch mark as not parking, without probing the ship', () => {
@@ -198,6 +198,26 @@ describe('is_unparked_child', () => {
 
 		expect(lane_park.is_unparked_child(WORK_DIRECTORY)).toBe(false)
 		expect(parked).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#6973: the row reads the lane child from the hook call's context, not the process.
+describe('lane_park.ROW — the call context', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads the dispatch mark and the park record under the context cwd and env', () => {
+		const environment = { [lane_child_marker.KEY]: ISSUE }
+		const is_child = vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+
+		vi.spyOn(lane_handoff, 'is_handed_off').mockReturnValue(false)
+		const parked = vi.spyOn(run_park, 'is_parked_sync').mockReturnValue(false)
+		const call = { name: BASH, input: { command: CONFIRMATION_NOTIFY } }
+
+		expect(lane_park.ROW.is_trigger(call, { cwd: LANE_DIRECTORY, env: environment })).toBe(true)
+		expect(is_child).toHaveBeenCalledWith(LANE_DIRECTORY, environment)
+		expect(parked).toHaveBeenCalledWith(ISSUE, LANE_DIRECTORY)
 	})
 })
 

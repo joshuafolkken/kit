@@ -276,6 +276,17 @@ describe(`pnpm josh rule:list — the enumeration names this rule`, () => {
 	})
 })
 
+// joshuafolkken/kit#6973: the row is asked with the call alone, so the hook context never lands on
+// the trigger's own `read` seam.
+describe('the delivered rule-body row', () => {
+	it('reads a new rule document through its own seam under a hook context', () => {
+		const row = delivered_rules.DELIVERED_RULES.find((rule) => rule.id === RULE_ID)
+		const call = { name: WRITE, input: { file_path: NEW_PROMPT_PATH, content: RULE_SENTENCE } }
+
+		expect(row?.is_trigger(call, hook_context.from_process())).toBe(true)
+	})
+})
+
 describe(`${RESIDENCY} — the single source of the criterion`, () => {
 	const content = read_repo_file(RESIDENCY)
 

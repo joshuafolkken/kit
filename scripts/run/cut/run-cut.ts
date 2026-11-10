@@ -217,9 +217,9 @@ function read_cut(target: string, now: Date = new Date()): CutRead {
 // can answer by reissuing, since that row is delivered once per run.
 //
 // The work tree's own git directory (index 0), the same read `git_directories` makes asynchronously —
-// the record and the pre-gate guard both key on it.
-function worktree_git_directory_sync(): string | undefined {
-	return git_common_directory.own()
+// the record and the pre-gate guard both key on it. A guard passes its call's cwd.
+function worktree_git_directory_sync(cwd?: string): string | undefined {
+	return git_common_directory.own(cwd)
 }
 
 // **The directory is injectable so a test never has to write to the live record.** Keyed to the work
@@ -417,8 +417,10 @@ function fullrun_issue(hold: RunHold | undefined): string | undefined {
 }
 
 // The same read taken synchronously, for the `PreToolUse` implementation-cut guard.
-function held_issue_sync(): string | undefined {
-	return fullrun_issue(hold_of(worktree_git_directory_sync()))
+function held_issue_sync(
+	directory: string | undefined = worktree_git_directory_sync(),
+): string | undefined {
+	return fullrun_issue(hold_of(directory))
 }
 
 async function current_state(): Promise<CutState> {

@@ -78,9 +78,14 @@ interface LaneCostState {
 // **The guard asks for a cut only where `run:cut --impl` could take one** (joshuafolkken/kit#3881).
 // A run held on the default branch, or one whose cut was already answered `not-a-lane` / `unready`
 // under this hold, can only be refused again, so each refusal was a round trip that cut nothing. The
-// decline record is a file read and comes first; the tree read spawns git and comes second.
-function can_cut_sync(issue: string): boolean {
-	return !run_cut_decline.is_declined_sync(issue) && run_cut_ready.is_ready_sync()
+// decline record is a file read and comes first; the tree read spawns git and comes second. Both are
+// read under the call's cwd.
+function can_cut_sync(issue: string, cwd: string): boolean {
+	const directory = run_cut.worktree_git_directory_sync(cwd)
+
+	if (run_cut_decline.is_declined_sync(issue, directory)) return false
+
+	return run_cut_ready.is_ready_sync(() => run_cut_ready.read_tree_sync(cwd))
 }
 
 function is_named(value: string | undefined): boolean {
@@ -124,8 +129,11 @@ function current_state(context: HookContext, transcript?: string): LaneCostState
 	return {
 		directory: cwd,
 		source: env,
-		carried: run_cut.carried_cut_sync,
-		held_issue: run_cut.held_issue_sync,
+		// The cut record and the run hold of the call's own work tree.
+		carried: (now?: Date): RunCut | undefined =>
+			run_cut.carried_cut_sync(now, run_cut.worktree_git_directory_sync(cwd)),
+		held_issue: (): string | undefined =>
+			run_cut.held_issue_sync(run_cut.worktree_git_directory_sync(cwd)),
 		// **Read through the short reuse window**. The row now fires per
 		// threshold crossing rather than once per run, so this predicate is a candidate on every edit;
 		// the window collapses one turn's burst of edits to a single whole-transcript price.
@@ -133,7 +141,7 @@ function current_state(context: HookContext, transcript?: string): LaneCostState
 			transcript === undefined
 				? implementation_cut_verdict.reused_verdict(() => cost_cli.session_verdict(cwd, env), cwd)
 				: session_verdict(transcript, cwd, env),
-		can_cut: can_cut_sync,
+		can_cut: (issue: string): boolean => can_cut_sync(issue, cwd),
 	}
 }
 

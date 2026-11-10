@@ -135,7 +135,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	direct_filing.ROW,
 	// Before the body rows: a comment posted by hand is refused whatever its body, and the command it
 	// points at takes the body by path, so the body rows have nothing left to say.
-	delivered_rules_guard.call_only(direct_issue_comment.ROW),
+	direct_issue_comment.ROW,
 	// Before `issue-comments`, whose rewrite would add the unfiltered comments to the same read.
 	direct_issue_read.ROW,
 	issue_comments.ROW,
@@ -215,7 +215,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	},
 	// A split child's park is refused before `lane-park` sees it.
 	lane_split_park.ROW,
-	delivered_rules_guard.call_only(lane_park.ROW),
+	lane_park.ROW,
 	lane_interactive_ask.ROW,
 	agent_model.ROW,
 	investigator_foreground.ROW,

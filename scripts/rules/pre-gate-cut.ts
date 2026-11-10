@@ -105,7 +105,8 @@ interface LaneCutState {
 function current_state(context: HookContext): LaneCutState {
 	return {
 		directory: context.cwd,
-		carried: run_cut.carried_cut_sync,
+		carried: (now?: Date): RunCut | undefined =>
+			run_cut.carried_cut_sync(now, run_cut.worktree_git_directory_sync(context.cwd)),
 		marked_issue: lane_child_marker.marked_issue(context.env),
 		is_reviewer: agent_session_role.is_reviewer(context.env),
 		context_verdict: () => cost_cli.session_verdict(context.cwd, context.env),

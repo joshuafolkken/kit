@@ -1,5 +1,6 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
-import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { run_park } from '#scripts/run/park/run-park'
 import { bash_triggers } from './bash-triggers'
@@ -79,17 +80,26 @@ function mentions_confirmation_notify(text: string): boolean {
 // **A child that handed its region to the detached ship is not parking**: its
 // stop waits on nobody, so the park checklist is the wrong advice. `lane_handoff.is_handed_off` is the
 // reading the `Stop` hook stands its notify demand down on, so the two hooks cannot disagree.
-function is_parking_child(directory: string = process.cwd()): boolean {
-	return lane_child_marker.is_child_of(directory) && !lane_handoff.is_handed_off(directory)
+function is_parking_child(
+	directory: string = process.cwd(),
+	source: MarkerSource = process.env,
+): boolean {
+	return (
+		lane_child_marker.is_child_of(directory, source) &&
+		!lane_handoff.is_handed_off(directory, source)
+	)
 }
 
 // A parking child that has not parked yet: `run:park` left no record for its issue in this repository.
 // Kept apart from `is_parking_child`, which `run:entry` reads to leave a lane child's stop to this row
 // whether or not it has parked.
-function is_unparked_child(directory: string = process.cwd()): boolean {
-	if (!is_parking_child(directory)) return false
+function is_unparked_child(
+	directory: string = process.cwd(),
+	source: MarkerSource = process.env,
+): boolean {
+	if (!is_parking_child(directory, source)) return false
 
-	const issue = lane_child_marker.marked_issue()
+	const issue = lane_child_marker.marked_issue(source)
 
 	return issue === undefined || !run_park.is_parked_sync(issue, directory)
 }
@@ -98,6 +108,11 @@ function is_unparked_stop(command: string, is_child: () => boolean = is_unparked
 	if (!is_confirmation_notify(command)) return false
 
 	return is_child()
+}
+
+// The row's trigger: the lane child read from the hook call's own cwd and environment.
+function is_unparked_stop_in(command: string, context: HookContext): boolean {
+	return is_unparked_stop(command, () => is_unparked_child(context.cwd, context.env))
 }
 
 // **Keeping this rule is applying `needs-decision`**, the one act the park asks for before the stop.
@@ -141,7 +156,7 @@ const LANE_PARK_REASON =
 // doc read that quotes one is not mistaken for it.
 const ROW = {
 	id: 'lane-park',
-	is_trigger: bash_triggers.on_bash_command(is_unparked_stop),
+	is_trigger: bash_triggers.on_bash_command(is_unparked_stop_in),
 	reason: LANE_PARK_REASON,
 	keeps: bash_triggers.on_bash_command(records_the_park),
 	about: {
