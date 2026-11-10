@@ -1,5 +1,3 @@
-import { gh_tally_handoff } from './gh-tally-handoff'
-
 // How many `gh` requests this process sent, and how many of them GitHub answered `304 Not Modified`
 // (joshuafolkken/kit#6694). Every spawn in `git-gh-exec.ts` counts one call, retries included,
 // because each spawn can cost REST core quota; a 304 is a call that cost none. A `--paginate` spawn
@@ -40,9 +38,36 @@ interface CoreWatch {
 	start: Promise<CoreUsage | undefined> | undefined
 }
 
-const tally: CallCount = { calls: 0, not_modified: 0 }
-const endpoints = new Map<string, CallCount>()
-const core: CoreWatch = { read: undefined, start: undefined }
+interface TallyState {
+	tally: CallCount
+	endpoints: Map<string, CallCount>
+	core: CoreWatch
+}
+
+// One state per process, not per module copy (joshuafolkken/kit#7013): `dist/josh.js` and the
+// `dist/commands` chunks each carry this module, and a command runs inside the dispatcher's process,
+// so a command's calls must land in the counts the dispatcher's `josh_gh_usage.recorded` writes.
+const STATE_KEY = Symbol.for('josh.gh-request-tally')
+
+function is_state(value: unknown): value is TallyState {
+	return typeof value === 'object' && value !== null && Reflect.has(value, 'endpoints')
+}
+
+function shared_state(): TallyState {
+	const existing: unknown = Reflect.get(globalThis, STATE_KEY)
+	if (is_state(existing)) return existing
+	const state: TallyState = {
+		tally: { calls: 0, not_modified: 0 },
+		endpoints: new Map(),
+		core: { read: undefined, start: undefined },
+	}
+
+	Reflect.set(globalThis, STATE_KEY, state)
+
+	return state
+}
+
+const { tally, endpoints, core } = shared_state()
 
 // A reading that throws reads as none: the start reading is held unawaited, so a rejection would
 // otherwise surface as an unhandled one, and the tally never fails the process it counts.
@@ -70,11 +95,9 @@ function snapshot(): GhRequestTally {
 	return { ...tally, endpoints: Object.fromEntries(entries) }
 }
 
-// `kind` is the call's `gh_call_kind` key. A process that records no line of its own (no
-// `watch_core`) hands its tally back to the dispatcher that spawned it (`gh-tally-handoff.ts`).
+// `kind` is the call's `gh_call_kind` key.
 function count_call(kind: string): void {
-	if (core.read === undefined) gh_tally_handoff.arm(snapshot)
-	else core.start ??= core.read()
+	if (core.read !== undefined) core.start ??= core.read()
 	tally.calls += 1
 	endpoint_of(kind).calls += 1
 }
@@ -82,19 +105,6 @@ function count_call(kind: string): void {
 function count_not_modified(kind: string): void {
 	tally.not_modified += 1
 	endpoint_of(kind).not_modified += 1
-}
-
-// A spawned child's tally, added to this process's counts and kinds.
-function absorb(handed: GhRequestTally): void {
-	tally.calls += handed.calls
-	tally.not_modified += handed.not_modified
-
-	for (const [kind, count] of Object.entries(handed.endpoints)) {
-		const own = endpoint_of(kind)
-
-		own.calls += count.calls
-		own.not_modified += count.not_modified
-	}
 }
 
 // A window that refilled between the readings makes the difference meaningless, so it is none.
@@ -125,7 +135,6 @@ const gh_request_tally = {
 	count_call,
 	count_not_modified,
 	snapshot,
-	absorb,
 	core_delta,
 	reset,
 }

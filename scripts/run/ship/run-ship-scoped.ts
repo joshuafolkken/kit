@@ -12,7 +12,7 @@ import { run_ship_gate_runs } from './run-ship-gate-runs'
 import { run_ship_lap, type LapNote } from './run-ship-lap'
 import { run_ship_narrowed } from './run-ship-narrowed'
 import { run_ship_pair_runs } from './run-ship-pair-runs'
-import { run_ship_synced_scope, type SyncReading } from './run-ship-synced-scope'
+import { run_ship_synced_scope, type SyncedCheck, type SyncReading } from './run-ship-synced-scope'
 
 // The scoped pair `josh ship` meets itself rather than stops on, shared by every stage that needs a
 // green record for this tree: the preflight stage at the start, the review rounds, and the gate
@@ -81,9 +81,24 @@ async function nameable_files(
 	const checks = run_ship_synced_scope.checks_of(scripts)
 
 	if (sync === undefined) return await run_ship_narrowed.moved_since_green(checks, tree)
-	if (sync.overlap === undefined) return undefined
 
-	return await run_ship_narrowed.nameable(checks, sync.overlap)
+	const named = run_ship_synced_scope.named_of(sync)
+
+	return named === undefined ? undefined : await run_ship_narrowed.nameable(checks, named)
+}
+
+// Each check over its own part of the named files (`run_ship_synced_scope.files_for`).
+function check_phases(
+	checks: ReadonlyArray<SyncedCheck>,
+	files: ReadonlyArray<string>,
+	sync: SyncReading | undefined,
+): ReadonlyArray<Phase> {
+	return checks.flatMap((check) =>
+		run_ship_narrowed.named_phases(
+			[check],
+			run_ship_synced_scope.files_for(sync, check.script, files),
+		),
+	)
 }
 
 // The files the pair can be named over, with why, or `undefined`.
@@ -130,7 +145,7 @@ async function narrowed_or_bare(
 	printed(run_ship_narrowed.describe(named.files, named.why))
 
 	const checks = run_ship_synced_scope.checks_of(scripts)
-	const result = await run_phases(run_ship_narrowed.named_phases(checks, named.files))
+	const result = await run_phases(check_phases(checks, named.files, sync))
 
 	if (result.code === SUCCESS_EXIT_CODE && (await is_still(tree))) {
 		run_ship_narrowed.record(checks, tree)

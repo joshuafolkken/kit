@@ -2,9 +2,11 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { review_diff_pack, type Bundle } from './review-diff-pack'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
 
-// Writes the change as the parts `review-diff-parts.ts` cuts it into.
+// Writes the change as the parts `review-diff-parts.ts` cuts it into, packed into as few files as
+// the cap allows (`review-diff-pack.ts`).
 //
 // **One diff per path, read the way the target line defines the change** — `git -C <root> diff
 // <base> -- <path>` for a tracked path, and the file's own content for an untracked one, which no
@@ -38,30 +40,21 @@ async function path_diff(root: string, base: string, relative: string): Promise<
 	return diff.length > 0 ? diff : untracked_text(root, relative)
 }
 
-function part_name(position: number, relative: string, index: number): string {
+// A packed file is named after the first path it carries; the position keeps the names unique and
+// in the order the files join back to the change.
+function part_name(position: number, bundle: Bundle): string {
 	const prefix = String(position).padStart(INDEX_WIDTH, '0')
+	const [first = ''] = bundle.paths
 
-	return `${prefix}-${relative.split('/').join(SLUG_SEPARATOR)}-${String(index + 1)}${PART_SUFFIX}`
+	return `${prefix}-${first.split('/').join(SLUG_SEPARATOR)}${PART_SUFFIX}`
 }
 
-interface PathText {
-	relative: string
-	text: string
-}
+function write_bundle(directory: string, bundle: Bundle, position: number): string {
+	const file = path.join(directory, part_name(position, bundle))
 
-function write_path(
-	directory: string,
-	position: number,
-	entry: PathText,
-	cap: number,
-): Array<string> {
-	return review_diff_parts.part_texts(entry.relative, entry.text, cap).map((part, index) => {
-		const file = path.join(directory, part_name(position, entry.relative, index))
+	writeFileSync(file, bundle.text, { flag: 'wx', mode: FILE_MODE })
 
-		writeFileSync(file, part, { flag: 'wx', mode: FILE_MODE })
-
-		return file
-	})
+	return file
 }
 
 function fresh_directory(root: string): string {
@@ -86,9 +79,17 @@ async function write_parts(request: DiffRequest, directory?: string): Promise<Di
 		paths.map(async (relative) => ({ relative, text: await path_diff(root, base, relative) })),
 	)
 	const target = directory ?? fresh_directory(root)
+	const entries = texts.map(({ relative, text }) => ({
+		relative,
+		parts: review_diff_parts.part_texts(relative, text, cap),
+	}))
+	const bundles = review_diff_pack.pack(entries, cap)
 
-	return Object.fromEntries(
-		texts.map((entry, position) => [entry.relative, write_path(target, position, entry, cap)]),
+	return review_diff_pack.parts_of(
+		bundles.map((bundle, position) => ({
+			file: write_bundle(target, bundle, position),
+			paths: bundle.paths,
+		})),
 	)
 }
 
