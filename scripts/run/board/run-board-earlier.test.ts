@@ -1,6 +1,9 @@
+import { stripVTControlCharacters } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { run_board_earlier } from './run-board-earlier'
+import { run_board_fit } from './run-board-fit'
 import type { BoardRow } from './run-board-layout'
+import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 
@@ -8,7 +11,9 @@ import type { ItemStatus } from './run-board-status'
 // earlier run's, and a lane with no lane state record is drawn unknown with the command that writes it.
 
 const { EMPTY_LAYOUT, GB, NOW, board_usage, header, lines_of } = run_board_render_fixture
-const { UNKNOWN_TAIL, is_live, rows_of } = run_board_earlier
+const { UNKNOWN_TAIL, earlier_marked, is_live, rows_of } = run_board_earlier
+const { width_of } = run_board_fit
+const { render } = run_board_render
 const EARLIER = 4173
 const PAUSED = 4180
 const UNKNOWN = 4190
@@ -87,5 +92,70 @@ describe('run_board_render.render an earlier run’s lane row', () => {
 		expect(lines.find((line) => line.includes('Earlier'))).toMatch(
 			/20\.0 +1\.6 +0\.2 4173 +Earlier/u,
 		)
+	})
+})
+
+// joshuafolkken/kit#7098: 🧳 follows the title, where the phase's icon was hidden behind it.
+describe('run_board_earlier.earlier_marked', () => {
+	const OVER = 'over budget +3′'
+
+	it.each([
+		[
+			['🚦 0″', OVER],
+			['🧳 🚦 0″', OVER],
+		],
+		[[''], ['🧳']],
+		[[], ['🧳']],
+	])('leads an earlier run’s tail %j with 🧳', (tail, marked) => {
+		expect(earlier_marked(EARLIER_ROW, tail)).toStrictEqual(marked)
+	})
+
+	it('leaves this run’s own row’s tail as it is', () => {
+		expect(earlier_marked({ ...EARLIER_ROW, is_earlier: undefined }, ['lint'])).toStrictEqual([
+			'lint',
+		])
+	})
+})
+
+function line_of(lines: ReadonlyArray<string>, issue: number): string {
+	return lines.find((line) => line.includes(` ${String(issue)} `)) ?? ''
+}
+
+// The terminal column a row's cut title ends in.
+function cut_end(line: string): number {
+	return width_of(line.slice(0, line.indexOf('…')))
+}
+
+describe('run_board_render.render an earlier run’s lane row on a narrow pane', () => {
+	const LONG = 'A title long enough to be cut on a narrow pane, and then some more'
+	const NARROW = 90
+	// Narrow enough that the pane, not the title's own limit, cuts the title.
+	const NARROWER = 60
+	const own: BoardRow = { ...EARLIER_ROW, number: OWN, title: LONG, is_earlier: undefined }
+	const earlier: BoardRow = { ...EARLIER_ROW, title: LONG }
+
+	const ROWS = 60
+
+	it('cuts its title to end in the column this run’s own row’s does, keeping 🧳', () => {
+		const board = header({ layout: { ...EMPTY_LAYOUT, active: [own], earlier: [earlier] } })
+		const drawn = render({ header: board, notes: [], size: { columns: NARROW, rows: ROWS } })
+		const lines = drawn.map((line) => stripVTControlCharacters(line))
+		const earlier_line = line_of(lines, EARLIER)
+
+		expect(earlier_line.trimEnd()).toMatch(/… {2}🧳$/u)
+		expect(cut_end(earlier_line)).toBe(cut_end(line_of(lines, OWN)))
+	})
+
+	// A paused row draws no tail of its own; its 🧳 alone still keeps its line whole and its title
+	// ending where its section's running row's does.
+	it('keeps 🧳 on a paused earlier row, its title ending with the running row’s', () => {
+		const paused: BoardRow = { ...earlier, number: PAUSED, state: 'paused', status: FROZEN }
+		const board = header({ layout: { ...EMPTY_LAYOUT, earlier: [earlier, paused] } })
+		const drawn = render({ header: board, notes: [], size: { columns: NARROWER, rows: ROWS } })
+		const lines = drawn.map((line) => stripVTControlCharacters(line))
+		const paused_line = line_of(lines, PAUSED)
+
+		expect(paused_line.trimEnd()).toMatch(/… {2}🧳$/u)
+		expect(cut_end(paused_line)).toBe(cut_end(line_of(lines, EARLIER)))
 	})
 })

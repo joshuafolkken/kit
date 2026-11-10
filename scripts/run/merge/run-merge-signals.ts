@@ -67,7 +67,19 @@ async function retry_cause(
 
 // An outage child is re-dispatched only so many times: one that ends the same way on every dispatch is
 // parked, since merges in other lanes reset the run-wide outage streak and would never stop it. Its park
-// says so (`run-merge-cap.ts`).
+// says so (`run-merge-cap.ts`). While that streak holds launches, an API outage is the environment's,
+// not the child's: the cap waits, so the hold keeps growing rather than a park resetting it (#7078).
+async function is_capped(child: string, cause: 'api' | 'exempt'): Promise<boolean> {
+	const events = await run_event_stream_emit.current_events()
+
+	if (run_merge_cap.outages(events, child) < run_merge.CONSECUTIVE_OUTAGE_LIMIT) return false
+
+	if (cause !== 'api') return true
+	const record = await run_merge_steps.read_record()
+
+	return !run_merge.is_outage_guard_tripped(record?.carry.outages ?? 0)
+}
+
 async function read_retryable(
 	child: string,
 	output: string | undefined,
@@ -76,10 +88,10 @@ async function read_retryable(
 
 	if (cause === undefined) return { is_outage: false, is_streak_exempt: false }
 
-	const events = await run_event_stream_emit.current_events()
-	const limit = run_merge.CONSECUTIVE_OUTAGE_LIMIT
+	if (await is_capped(child, cause)) {
+		const events = await run_event_stream_emit.current_events()
+		const limit = run_merge.CONSECUTIVE_OUTAGE_LIMIT
 
-	if (run_merge_cap.outages(events, child) >= limit) {
 		return { is_outage: false, capped_note: run_merge_cap.note_of(events, child, limit) }
 	}
 

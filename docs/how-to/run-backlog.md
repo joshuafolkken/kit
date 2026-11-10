@@ -27,5 +27,5 @@ On battery a closed lid still sleeps the machine, and the run waits until it wak
 ## Common failures
 
 - An Issue is never picked up: it lacks `auto-ok` and is not under an opted-in epic, or it waits on an open dependency or a `run:solo` Issue (`josh backlog:next` answers `wait` and says which).
-- The run stops early: it stops at 30 children, 10 filed Issues or 3 consecutive child failures, and on a `needs-human-review` Issue ([where the run stops](../maintainers/backlogrun-driver.md#where-the-run-stops)).
+- The run stops early: it stops at 30 children or 10 filed Issues, and on a `needs-human-review` Issue ([where the run stops](../maintainers/backlogrun-driver.md#where-the-run-stops)).
 - The session was cut part-way: see [Recover a stopped run](./recover-a-run.md).

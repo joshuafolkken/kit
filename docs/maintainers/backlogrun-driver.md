@@ -101,12 +101,13 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   unreadable listing. With the watch on, all three wait instead — **right after a merge too**: the
   driver asks `run:merge --driver` for no offer (it answers `deferred`, joshuafolkken/kit#4406), so
   no `backlog:next` `stop` (only person-waiting issues left) reaches it; the next pass asks
-  `backlog:offer`, and `backlog:budget` decides (joshuafolkken/kit#3781). Only `run:merge`'s own control `stop` — the failure guard, or a failed
-  child left unparked — ends the run there (`run_merge_token.is_control_stop`).
+  `backlog:offer`, and `backlog:budget` decides (joshuafolkken/kit#3781). Only `run:merge`'s own control `stop` — a failed child left
+  unparked — ends the run there (`run_merge_token.is_control_stop`).
 - **The guards in `backlogrun.md` → "Guards"**, counted over the whole `backlogrun`; whichever binds
   first ends the run.
 - **A `needs-human-review` child stops only its lane** before its commit; the parent continues in free lanes (`needs-human-review.md`).
-- **Parking is not stopping.** Only the consecutive-failure guard can turn repeated parks into a stop.
+- **Parking is not stopping.** Repeated parks never stop the run: every third failure in a row checks
+  `main` instead (`run-merge-health.ts`).
 - **A driver that cannot read the carry record asks again before it ends** (joshuafolkken/kit#3697).
   `backlog:drive` checks the record before every offer, merge and launch; a read that is not
   `carried` is repeated up to 6 times at the 180-second offer interval, each failed read logged with
