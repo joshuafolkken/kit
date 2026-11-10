@@ -394,15 +394,23 @@ function credit(reading: RuleReading, state: RuleState): void {
 	reading.rewrites += state.is_rewritten ? 1 : 0
 }
 
+// A state the reading counts. Any other adds nothing, so a kept run may drop it.
+function is_credited(state: RuleState): boolean {
+	return state.is_triggered || state.is_reached
+}
+
 function reading_to_credit(
 	readings: Map<string, RuleReading>,
 	id: string,
 	state: RuleState,
 ): RuleReading | undefined {
-	return state.is_triggered || state.is_reached ? readings.get(id) : undefined
+	return is_credited(state) ? readings.get(id) : undefined
 }
 
-function apply_run(readings: Map<string, RuleReading>, states: Map<string, RuleState>): void {
+function apply_run(
+	readings: Map<string, RuleReading>,
+	states: ReadonlyMap<string, RuleState>,
+): void {
 	for (const [id, state] of states) {
 		const reading = reading_to_credit(readings, id, state)
 
@@ -436,10 +444,18 @@ function unaided_rate(reading: RuleReading): number | undefined {
 
 // **Runs, not files.** Each element is every transcript belonging to one run, so a caller may read
 // one run at a time and never hold the corpus.
-function measure(runs: Iterable<ReadonlyArray<string>>): ReadonlyArray<RuleReading> {
+function* states_of(runs: Iterable<ReadonlyArray<string>>): Generator<Map<string, RuleState>> {
+	for (const texts of runs) yield read_run(texts)
+}
+
+// The reading from each run's states, however they were obtained — read now by `read_run` or kept
+// from an earlier reading (`rule-value-runs.ts`), since a run adds to the reading on its own.
+function measure_states(
+	runs: Iterable<ReadonlyMap<string, RuleState>>,
+): ReadonlyArray<RuleReading> {
 	const readings = blank_readings()
 
-	for (const texts of runs) apply_run(readings, read_run(texts))
+	for (const states of runs) apply_run(readings, states)
 
 	// Enumeration order, so a caller's table matches the registry rather than insertion order.
 	return delivered_rules.MEASURED_RULES.map((rule) => readings.get(rule.id)).filter(
@@ -447,7 +463,18 @@ function measure(runs: Iterable<ReadonlyArray<string>>): ReadonlyArray<RuleReadi
 	)
 }
 
-const rule_value = { REASON_SIGNATURE_LENGTH, measure, unaided_rate }
+function measure(runs: Iterable<ReadonlyArray<string>>): ReadonlyArray<RuleReading> {
+	return measure_states(states_of(runs))
+}
 
-export type { RuleReading }
+const rule_value = {
+	REASON_SIGNATURE_LENGTH,
+	is_credited,
+	measure,
+	measure_states,
+	read_run,
+	unaided_rate,
+}
+
+export type { RuleReading, RuleState }
 export { rule_value }

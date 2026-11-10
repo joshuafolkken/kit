@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it, vi } from 'vitest'
@@ -10,6 +11,7 @@ import { piped_verification_shapes } from './piped-verification-shapes'
 import { rule_value_cache } from './rule-value-cache'
 import { rule_value_cli } from './rule-value-cli'
 import { rule_value_fixture } from './rule-value-fixture'
+import { rule_value_runs, type RunSummary } from './rule-value-runs'
 
 // A body read reaches the issue-comments trigger; the comments read in front of it is what keeping
 // the rule looks like, so this run reaches and keeps it. The force push reaches `git-force`, which
@@ -146,37 +148,28 @@ describe('rule_value_cli.group_by_run — a run owns every transcript that share
 	})
 })
 
-describe('rule_value_cli.runs_of — one run read at a time', () => {
-	it('reads the next run only when it is asked for', () => {
+// The grouped runs summarized with no store, every run read.
+function summarized(files: ReadonlyArray<SessionFile>): Array<RunSummary> {
+	return rule_value_runs.summaries_of(rule_value_cli.group_by_run(files), stamped_memo.create())
+}
+
+describe('rule_value_cli.render_summaries — the grouped files read as the materialized runs', () => {
+	it('reads each run whole and skips its unreadable files', () => {
 		const read = spy_readers()
 		const files = sample_files()
 
 		try {
-			const runs = rule_value_cli.runs_of(rule_value_cli.group_by_run(files).values())
+			const tables = rule_value_cli.render_summaries(summarized(files))
 
-			expect(runs.next().value).toStrictEqual(['parent', 'unit'])
-			expect(read).toStrictEqual(files.slice(0, 3))
-			expect(runs.next().value).toStrictEqual(['other'])
-			expect(read).toStrictEqual(files.slice(0, 4))
-		} finally {
-			vi.restoreAllMocks()
-		}
-	})
-
-	it('skips unreadable files and never yields a run with no readable text', () => {
-		spy_readers()
-
-		try {
-			const runs = [...rule_value_cli.runs_of(rule_value_cli.group_by_run(sample_files()).values())]
-
-			expect(runs).toStrictEqual([['parent', 'unit'], ['other']])
+			expect(read).toStrictEqual(files)
+			expect(tables).toStrictEqual(rule_value_cli.render_parts([['parent', 'unit'], ['other']]))
 		} finally {
 			vi.restoreAllMocks()
 		}
 	})
 })
 
-describe('rule_value_cli.render — a lazy source reads as the materialized one', () => {
+describe('rule_value_cli.render_summaries — the table of the grouped files', () => {
 	it('renders the same table as the materialized runs it replaces', () => {
 		spy_readers()
 		const comments = fake_file(rule_value_fixture.session(COMMENTS_READ), 'run1')
@@ -191,11 +184,9 @@ describe('rule_value_cli.render — a lazy source reads as the materialized one'
 		]
 
 		try {
-			const lazy = rule_value_cli.runs_of(
-				rule_value_cli.group_by_run([comments, body, lone]).values(),
-			)
+			const { table } = rule_value_cli.render_summaries(summarized([comments, body, lone]))
 
-			expect(rule_value_cli.render(lazy)).toBe(rule_value_cli.render(materialized))
+			expect(table).toBe(rule_value_cli.render(materialized))
 		} finally {
 			vi.restoreAllMocks()
 		}
@@ -205,11 +196,9 @@ describe('rule_value_cli.render — a lazy source reads as the materialized one'
 		spy_readers()
 
 		try {
-			const runs = rule_value_cli.runs_of(
-				rule_value_cli.group_by_run([fake_file(undefined, 'run1')]).values(),
-			)
+			const { table } = rule_value_cli.render_summaries(summarized([fake_file(undefined, 'run1')]))
 
-			expect(rule_value_cli.render(runs)).toBe(rule_value_cli.NO_TARGETS)
+			expect(table).toBe(rule_value_cli.NO_TARGETS)
 		} finally {
 			vi.restoreAllMocks()
 		}
@@ -250,6 +239,17 @@ describe('rule_value_cli.run_rule_value — --refresh fills the loop-head cache'
 		} finally {
 			vi.restoreAllMocks()
 		}
+	})
+
+	it('keeps the per-run counts for the next refresh, versioned by the counting code', () => {
+		const cwd = make_directory(TEMPORARY_PREFIX)
+
+		rule_value_cli.run_rule_value(['--refresh'], cwd)
+
+		const stored = readFileSync(rule_value_cache.cache_path(cwd, 'rule-value-runs.json'), 'utf8')
+		const version = rule_value_runs.version_of(rule_value_runs.counting_sources())
+
+		expect(JSON.parse(stored)).toStrictEqual(expect.objectContaining({ version }))
 	})
 
 	it('prints the reading to stdout and leaves the cache alone without --refresh', () => {

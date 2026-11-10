@@ -136,7 +136,16 @@ function store(text: string, cwd: string = process.cwd()): void {
 	write_cache_file(cwd, CACHE_FILE, `${text}\n`)
 }
 
-const rule_value_cache = { CACHE_FILE, REFRESH_MS, STAMP_FILE, cache_path, emit, read_fresh, store }
+const rule_value_cache = {
+	CACHE_FILE,
+	REFRESH_MS,
+	STAMP_FILE,
+	cache_path,
+	emit,
+	is_linked_work_tree,
+	read_fresh,
+	store,
+}
 
 export type { CachePorts, FreshReading }
 export { rule_value_cache }
