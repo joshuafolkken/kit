@@ -1,0 +1,7 @@
+{
+	"reason": "The review fix splits the josh launcher pattern so bare josh calls stay out of the other-command table, adding runs_josh to time-shell",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 42
+	}
+}

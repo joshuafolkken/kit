@@ -22,9 +22,12 @@ function root_with(...contents: ReadonlyArray<string>): string {
 	return root
 }
 
-async function report_of(root: string): Promise<string> {
+// 2026-11-10T12:00Z, so a 7-day period starts on 2026-11-03.
+const NOW_MS = Date.parse('2026-11-10T12:00:00Z')
+
+async function report_of(root: string, argv: ReadonlyArray<string> = []): Promise<string> {
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-	const code = await review_findings_cli.run(root)
+	const code = await review_findings_cli.run(argv, root, NOW_MS)
 	const printed = String(info.mock.calls[0]?.[0])
 
 	info.mockRestore()
@@ -66,4 +69,57 @@ describe('review_findings_cli.run', () => {
 	it('reports nothing recorded for a missing ledger', async () => {
 		expect(await report_of(path.join(TEST_DIR, 'absent'))).toBe(review_findings_cli.NO_FINDINGS)
 	})
+})
+
+// One issue file before the 7-day boundary, one on and after it, and zero rounds on both sides.
+const ledger = [
+	'- rf:tests | low | a.ts | 2026-11-02 | #1\n',
+	'- rf:tests | low | a.ts | 2026-11-03 | #2\n- rf:bug-risks | high | b.ts | 2026-11-09 | #2\n',
+	'- rf:none | none | - | 2026-11-10 | #3\n- rf:none | none | - | 2026-11-01 | #4\n',
+]
+
+// joshuafolkken/kit#7130: `--period` narrows to the last days and splits by severity.
+describe('review_findings_cli.run --period', () => {
+	it('prints the in-period counts by severity, medium and up first, with the zero rounds', async () => {
+		expect(await report_of(root_with(...ledger), ['--period', '7'])).toBe(
+			[
+				'findings by category and severity since 2026-11-03:',
+				'  bug-risks: high 1 · medium 0 · low 0',
+				'  tests: high 0 · medium 0 · low 1',
+				'zero-finding rounds recorded: 1',
+			].join('\n'),
+		)
+	})
+
+	it('reports nothing recorded when the period holds no line', async () => {
+		expect(await report_of(root_with(ledger[0] ?? ''), ['--period', '1'])).toBe(
+			review_findings_cli.NO_FINDINGS,
+		)
+	})
+
+	it('starts a period reaching past the date range at the epoch rather than throwing', async () => {
+		expect(await report_of(root_with(ledger[0] ?? ''), ['--period', '200000000'])).toBe(
+			'findings by category and severity since 1970-01-01:\n  tests: high 0 · medium 0 · low 1\nzero-finding rounds recorded: 0',
+		)
+	})
+
+	it('leaves the run with no argument on the all-time category counts', async () => {
+		expect(await report_of(root_with(...ledger))).toBe(
+			'findings by category:\n  tests: 2\n  bug-risks: 1\nzero-finding rounds recorded: 2',
+		)
+	})
+})
+
+describe('review_findings_cli.run --period refusal', () => {
+	it.each([['0'], ['-3'], ['1.5'], ['week']])(
+		'prints the usage and fails for --period %s',
+		async (value) => {
+			const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+			const code = await review_findings_cli.run(['--period', value], root_with(), NOW_MS)
+
+			expect(code).toBe(1)
+			expect(error).toHaveBeenCalledWith(review_findings_cli.USAGE)
+			error.mockRestore()
+		},
+	)
 })

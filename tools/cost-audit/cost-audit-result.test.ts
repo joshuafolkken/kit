@@ -6,6 +6,9 @@ import { cost_audit_result } from './cost-audit-result'
 
 const { request_line } = cost_audit_fixture
 const { BRANCH, result_line } = time_transcript_fixture
+const X_PATH = '/x.ts'
+const JOSH_STEP = 'pnpm josh run:step 1'
+const GIT_STATUS = 'git status'
 
 function with_effort(line: string, effort: string): string {
 	return line.replace('"type":"assistant"', (type) => `${type},"effort":"${effort}"`)
@@ -48,7 +51,7 @@ describe('cost_audit_result.breakdown_of efforts', () => {
 describe('cost_audit_result.breakdown_of tool results', () => {
 	it('charges each result to the call it answers, by tool and by josh subcommand', () => {
 		const result = breakdown_of([
-			request_line(1, 'a', 1, [read('/x.ts'), bash('pnpm josh run:step 1')]),
+			request_line(1, 'a', 1, [read(X_PATH), bash(JOSH_STEP)]),
 			result_line(2, BRANCH, 'a-Read', 'x'.repeat(30)),
 			result_line(2, BRANCH, 'a-Bash', 'y'.repeat(10)),
 		])
@@ -62,7 +65,7 @@ describe('cost_audit_result.breakdown_of tool results', () => {
 
 	it('counts a result once when a resumed session repeats it', () => {
 		const lines = [
-			request_line(1, 'a', 1, [read('/x.ts')]),
+			request_line(1, 'a', 1, [read(X_PATH)]),
 			result_line(2, BRANCH, 'a-Read', 'x'.repeat(30)),
 		]
 		const result = breakdown_of(lines, lines)
@@ -77,16 +80,38 @@ describe('cost_audit_result.breakdown_of tool results', () => {
 	})
 })
 
+describe('cost_audit_result.breakdown_of command and Read file rows', () => {
+	it('keys other Bash commands by their leading words and Reads by file, josh in its own rows only', () => {
+		const result = breakdown_of([
+			request_line(1, 'a', 1, [read(X_PATH), bash(JOSH_STEP)]),
+			request_line(2, 'b', 1, [read(X_PATH), bash('cd /repo && git status --short')]),
+			request_line(3, 'c', 1, [read('/.y-lanes/7/y.ts'), bash(GIT_STATUS)]),
+			result_line(4, BRANCH, 'a-Read', 'x'.repeat(30)),
+			result_line(4, BRANCH, 'a-Bash', 'y'.repeat(10)),
+			result_line(4, BRANCH, 'b-Read', 'x'.repeat(20)),
+			result_line(4, BRANCH, 'b-Bash', 'y'.repeat(7)),
+			result_line(4, BRANCH, 'c-Read', 'x'.repeat(40)),
+			result_line(4, BRANCH, 'c-Bash', 'y'.repeat(3)),
+		])
+
+		expect(result.commands).toEqual([{ key: GIT_STATUS, results: 2, chars: 10 }])
+		expect(result.reads).toEqual([
+			{ key: X_PATH, results: 2, chars: 50 },
+			{ key: '/y/y.ts', results: 1, chars: 40 },
+		])
+	})
+})
+
 describe('cost_audit_result.breakdown_of repeated Reads', () => {
 	it('counts a Read of a path its session already read, never one another session read', () => {
 		const first = [
-			request_line(1, 'a', 1, [read('/x.ts')]),
+			request_line(1, 'a', 1, [read(X_PATH)]),
 			result_line(2, BRANCH, 'a-Read', 'x'.repeat(4)),
-			request_line(3, 'b', 1, [read('/x.ts')]),
+			request_line(3, 'b', 1, [read(X_PATH)]),
 			result_line(4, BRANCH, 'b-Read', 'x'.repeat(6)),
 		]
 		const second = [
-			request_line(5, 'c', 1, [read('/x.ts')]),
+			request_line(5, 'c', 1, [read(X_PATH)]),
 			result_line(6, BRANCH, 'c-Read', 'x'.repeat(8)),
 		]
 
@@ -101,6 +126,8 @@ describe('cost_audit_result.result_lines', () => {
 			efforts: [{ effort: 'medium', usd: 3 }],
 			tools: [{ key: 'Read', results: 2, chars: 3000 }],
 			josh: [],
+			commands: [{ key: GIT_STATUS, results: 1, chars: 40 }],
+			reads: [{ key: X_PATH, results: 2, chars: 3000 }],
 			duplicate_reads: { files: 1, reads: 2, chars: 1500 },
 		})
 
@@ -113,6 +140,10 @@ describe('cost_audit_result.result_lines', () => {
 			'    Read: 3,000 chars, 2 results, 1,500 avg',
 			'  result characters by josh subcommand (top 10):',
 			'    none',
+			'  result characters by other Bash command (top 10):',
+			'    git status: 40 chars, 1 results, 40 avg',
+			'  result characters by Read file (top 10):',
+			'    /x.ts: 3,000 chars, 2 results, 1,500 avg',
 			'  repeated Reads of a file the session already read: 2 reads of 1 files, 1,500 chars',
 		])
 	})

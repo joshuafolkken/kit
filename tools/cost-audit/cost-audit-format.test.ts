@@ -25,6 +25,8 @@ const NO_RESULTS: ResultBreakdown = {
 	efforts: [],
 	tools: [],
 	josh: [],
+	commands: [],
+	reads: [],
 	duplicate_reads: { files: 0, reads: 0, chars: 0 },
 }
 
