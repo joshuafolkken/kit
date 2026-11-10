@@ -1,6 +1,7 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { lane_gap_stats } from './lane-gap-stats'
+import { lane_hand_back_held } from './lane-hand-back-held'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_stats } from './lane-stats'
 import { lane_yield } from './lane-yield'
@@ -164,6 +165,18 @@ describe('lane_gap_stats.table -- park → offer', () => {
 	it('ends a park at the next dispatch', () => {
 		const events = [event('park', `#${String(ISSUE)} parked`, 60)]
 		const entries: Array<LedgerEntry> = [
+			{ kind: 'dispatch', at: seconds_before_now(30), issue: OTHER },
+		]
+
+		expect(row_of(entries, events, PARK)).toBe(`| ${PARK} | 1 | 30 | 30 | 0 |`)
+	})
+
+	// joshuafolkken/kit#7121: a lane freed while no driver runs holds, but no driver offered anything.
+	it('runs a park past a driverless hand-back hold to the next offer answer', () => {
+		const events = [event('park', `#${String(ISSUE)} parked`, 60)]
+		const driverless = `${lane_hand_back_held.DRIVERLESS_PREFIX}hand-back:window`
+		const entries: Array<LedgerEntry> = [
+			{ kind: 'held', at: seconds_before_now(50), reason: driverless },
 			{ kind: 'dispatch', at: seconds_before_now(30), issue: OTHER },
 		]
 
