@@ -5,12 +5,9 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { run_park } from './run-park'
 import { run_park_body } from './run-park-body'
 import { run_park_lane } from './run-park-lane'
-import { run_park_release } from './run-park-release'
 
-// The park's write, shared by `josh run:park` (`run-park-cli.ts`) and `backlog:drive`'s yield-cap
-// park, which imports it here because the CLI module carries a main guard.
-
-const FAILURE_EXIT_CODE = 1
+// The park's write for `josh run:park` (`run-park-cli.ts`). `backlog:drive`'s yield-cap park is a
+// mechanical `run:stalled` stop instead (joshuafolkken/kit#7076, `backlog-yield-cap.ts`).
 
 // **A park carries the child's recommendation** (joshuafolkken/kit#6669): a body off the schema is
 // refused before any write, naming the missing piece and the schema.
@@ -39,17 +36,6 @@ async function write(request: CommentRequest, directory: string): Promise<boolea
 	return is_parked
 }
 
-// **A system stop is no question the Issue could answer** (joshuafolkken/kit#6531): `backlog:drive`'s
-// yield-cap park skips the answered-question judgment — a failed launch would leave the capped issue
-// unlabelled — and, with no agent to read it, the next-step section.
-async function system_stop(request: CommentRequest, directory: string): Promise<number> {
-	if (is_refused(request.body)) return FAILURE_EXIT_CODE
-
-	const is_parked = await write(request, directory)
-
-	return is_parked ? await run_park_release.release(request.issue_number) : FAILURE_EXIT_CODE
-}
-
-const run_park_write = { is_refused, system_stop, write }
+const run_park_write = { is_refused, write }
 
 export { run_park_write }

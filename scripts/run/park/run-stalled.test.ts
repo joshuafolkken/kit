@@ -28,6 +28,32 @@ describe('run_stalled.cause_of', () => {
 	})
 })
 
+// joshuafolkken/kit#7076: the drive's auto-retry reads a park's cause back off its event text.
+describe('run_stalled.cause_in', () => {
+	it("reads back the cause park_event wrote, park_event's inverse", () => {
+		expect(run_stalled.cause_in(run_stalled.park_event(CHILD, CAUSE))).toBe(CAUSE)
+	})
+
+	it('answers undefined for a park text with no run:stalled cause', () => {
+		expect(run_stalled.cause_in(`#${CHILD} parked`)).toBeUndefined()
+		expect(run_stalled.cause_in(`#${CHILD} parked (needs-decision)`)).toBeUndefined()
+	})
+})
+
+describe('run_stalled.class_of', () => {
+	it("reads a session-unfinished cause carrying the child's message as its class", () => {
+		const { short } = run_stalled.session_unfinished('Done, PR opened.\nAnother line.')
+
+		expect(short).toBe('session unfinished: Done, PR opened.')
+		expect(run_stalled.class_of(short)).toBe(run_stalled.SESSION_UNFINISHED.short)
+	})
+
+	it('keeps any other cause as it is', () => {
+		expect(run_stalled.class_of(CAUSE)).toBe(CAUSE)
+		expect(run_stalled.class_of(run_stalled.SESSION_UNFINISHED.short)).toBe('session unfinished')
+	})
+})
+
 // joshuafolkken/kit#6864: a park records the ship stop it was taken at, and an older park reads as none.
 describe('run_stalled.stop_of', () => {
 	const PARK = { pos: 1, at: '2026-11-09T00:00:00.000Z', kind: 'park', text: '#4188 parked' }

@@ -59,7 +59,7 @@ describe('unfinished session event', () => {
 		})
 
 		expect(run_board_ending_reason.park_row_reason(Number(CHILD), reason ?? '', true)).toBe(
-			`→ resume: pnpm josh run:add ${CHILD} --retry (${MESSAGE})`,
+			`→ resume: pnpm josh run:add ${CHILD} --retry (session unfinished: ${MESSAGE})`,
 		)
 	})
 

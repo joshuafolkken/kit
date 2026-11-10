@@ -76,7 +76,8 @@ interface DriveState extends OfferTiming {
 	in_flight: Array<string>
 	// Every child merged, fed back to `backlog:offer` because GitHub closes a merged issue late. A parked
 	// child is left out: its labels classify it, so one a person released is offered again — except one
-	// the yield cap parked (`backlog-yield-cap.ts`), which stays out whether or not its park went through.
+	// the yield cap parked (`backlog-yield-cap.ts`), which stays out of the pool's offer whether or not
+	// its park went through; the auto-retry re-offers it by name (`backlog-drive-stalled-retry.ts`).
 	exclude: Array<string>
 	// The issues whose measurement declaration had no sample yet: kept out of the offer, not merged.
 	waiting?: Array<string> | undefined
