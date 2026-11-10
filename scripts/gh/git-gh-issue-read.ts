@@ -510,4 +510,10 @@ const git_gh_issue_read = {
 }
 
 export type { IssueRead, IssueReadFailure, IssueReadReason, IssueWithComments }
-export { git_gh_issue_read, read_blocked_by, NOT_FOUND_STATUS, STATE_AND_RELATIONS_FIELDS }
+export {
+	git_gh_issue_read,
+	read_blocked_by,
+	NOT_FOUND_STATUS,
+	PLAN_FIELDS,
+	STATE_AND_RELATIONS_FIELDS,
+}
