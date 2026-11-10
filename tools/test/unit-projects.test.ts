@@ -3,6 +3,7 @@ import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { RETRY_PENDING_KEY, RETRY_PENDING_VALUE } from '#scripts/gh/git-gh-comments-unreadable'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
+import { review_pair } from '#scripts/review/review-pair'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { PURE_FILES } from '#tools/test/pure-files'
 import { unit_projects, type UnitProject } from '#tools/test/unit-projects'
@@ -191,6 +192,17 @@ describe('the unit environment blanks the agent profile keys', () => {
 
 		expect(Object.hasOwn(environment, 'JOSH_MODEL')).toBe(false)
 		expect(Object.hasOwn(environment, 'JOSH_WORKER_MODELS')).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7035: a session exporting `JOSH_REVIEWER_PAIRED=1` turned the run:review suites red,
+// because the paired review reached a stamp-file mock without `stamp_path`.
+describe('the unit environment blanks the paired review switch', () => {
+	it('turns an inherited paired review off', () => {
+		const environment = unit_environment({ [review_pair.PAIRED_ENV]: '1' })
+
+		expect(environment[review_pair.PAIRED_ENV]).toBe('')
+		expect(review_pair.is_enabled(environment)).toBe(false)
 	})
 })
 
