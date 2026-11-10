@@ -1,4 +1,5 @@
 import { issue_merged } from '#scripts/issue/issue-merged'
+import { lane_ledger_archive } from '#scripts/lane/lane-ledger-archive'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -14,6 +15,9 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 }))
 vi.mock('./run-tidy-lanes', () => ({ run_tidy_lanes: { tidy_lanes: vi.fn() } }))
 vi.mock('./run-tidy-stashes', () => ({ run_tidy_stashes: { tidy_stashes: vi.fn() } }))
+vi.mock('#scripts/lane/lane-ledger-archive', () => ({
+	lane_ledger_archive: { rotate_target: vi.fn() },
+}))
 vi.mock('#scripts/lane/lane-ledger-write', () => ({
 	lane_ledger_write: { record_ship_lap: vi.fn() },
 }))
@@ -33,6 +37,7 @@ beforeEach(() => {
 	vi.mocked(run_event_stream_emit.current_events).mockResolvedValue([])
 	vi.mocked(run_tidy_lanes.tidy_lanes).mockResolvedValue([])
 	vi.mocked(run_tidy_stashes.tidy_stashes).mockResolvedValue([])
+	vi.mocked(lane_ledger_archive.rotate_target).mockResolvedValue(0)
 })
 
 describe('run_tidy_cli.sweep timing', () => {
@@ -94,6 +99,22 @@ describe('run_tidy_cli.sweep', () => {
 
 		await expect(run_tidy_cli.sweep()).resolves.toBeUndefined()
 		expect(errors.join('\n')).toContain('run:tidy could not finish')
+	})
+})
+
+// joshuafolkken/kit#7038: the sweep rotates the lane ledger, and a failed rotation is a note.
+describe('run_tidy_cli.sweep — the lane ledger', () => {
+	it('rotates the lane ledger after the residue', async () => {
+		await run_tidy_cli.sweep()
+
+		expect(lane_ledger_archive.rotate_target).toHaveBeenCalledOnce()
+	})
+
+	it('notes a failed rotation instead of throwing', async () => {
+		vi.mocked(lane_ledger_archive.rotate_target).mockRejectedValue(new Error('disk full'))
+
+		await expect(run_tidy_cli.sweep()).resolves.toBeUndefined()
+		expect(errors.join('\n')).toContain('could not rotate the lane ledger')
 	})
 })
 

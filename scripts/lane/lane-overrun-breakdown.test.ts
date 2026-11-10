@@ -21,10 +21,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock(import('./lane-ledger'), async (import_original) => {
 	const { lane_ledger } = await import_original()
 
+	// The archive beside the ledger (`lane-ledger-archive.ts`) holds nothing here.
+	function read_entries(file: string): ReadonlyArray<LedgerEntry> {
+		return file.endsWith('-archive.jsonl') ? [] : mocks.read_entries(file)
+	}
+
 	return {
 		lane_ledger: {
 			...lane_ledger,
-			read_entries: mocks.read_entries,
+			read_entries,
 			target: async () => '/ledger.jsonl',
 		},
 	}
