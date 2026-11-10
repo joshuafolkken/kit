@@ -1,3 +1,4 @@
+import { ALREADY_DONE_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import type { ClosedIssue } from './run-board-closed'
@@ -38,6 +39,16 @@ function read_closed(closed: ClosedIssue | undefined): OpenRead {
 	}
 }
 
+// An open listing read after the launch that still holds the child, with its labels.
+function read_open(labels: ReadonlyArray<string>): OpenRead {
+	return {
+		open_numbers: new Set([ISSUE]),
+		read_ms: T1,
+		closed: new Map(),
+		labels: new Map([[ISSUE, labels]]),
+	}
+}
+
 function settle(state: ItemStatus['state'], read: OpenRead): ItemStatus | undefined {
 	return run_board_status.settle_closed(statuses(state), read).get(ISSUE)
 }
@@ -74,6 +85,9 @@ describe('run_board_status.settle_closed with a parked child', () => {
 	it.each<[string, Partial<ClosedIssue>]>([
 		['withdrawn', { is_not_planned: true }],
 		['merged', { is_merged: true }],
+		// joshuafolkken/kit#7095 (ac-38bbacca): closed by `josh issue:already-done`, its label kept.
+		['already_done', { labels: [ALREADY_DONE_LABEL] }],
+		['done', {}],
 	])('draws a parked child read closed as %s, timed to its close', (state, closed) => {
 		expect(settle_read_closed('parked', closed)).toStrictEqual({
 			state,
@@ -94,15 +108,9 @@ describe('run_board_status.settle_closed with a parked child', () => {
 
 	it.each<[string, OpenRead]>([
 		['not read closed though gone from the listing', read_closed(undefined)],
-		[
-			'still open and labelled with no in-progress',
-			{
-				open_numbers: new Set([ISSUE]),
-				read_ms: T1,
-				closed: new Map(),
-				labels: new Map([[ISSUE, []]]),
-			},
-		],
+		['still open and labelled with no in-progress', read_open([])],
+		// joshuafolkken/kit#7095 (ac-b055a6a2): the label alone, on an open issue, settles nothing.
+		['still open and labelled already-done', read_open([ALREADY_DONE_LABEL])],
 	])('keeps a parked child parked when it is %s', (_label, read) => {
 		expect(settle('parked', read)).toStrictEqual({ state: 'parked', started_ms: T0 })
 	})

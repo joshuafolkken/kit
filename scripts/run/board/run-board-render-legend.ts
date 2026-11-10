@@ -72,6 +72,7 @@ const SETTLED_STATES: LeadWords = [
 	...states_of([
 		['unknown', 'unknown'],
 		['done', 'done'],
+		['already_done', 'already_done'],
 		['withdrawn', 'withdrawn'],
 	]),
 ]

@@ -22,7 +22,7 @@ const PLAN: BoardPlan = {
 	labels: new Map(),
 }
 
-function line_of(state: ItemStatus['state'], reason?: string, columns = WIDTH): string {
+function board_of(state: ItemStatus['state'], reason?: string, columns = WIDTH): Array<string> {
 	const status = { state, reason, started_ms: STARTED, ended_ms: NOW - MINUTE }
 	const layout = run_board_layout.layout_of(PLAN, new Map([[ISSUE, status]]))
 	const lines = run_board_render.render({
@@ -31,7 +31,11 @@ function line_of(state: ItemStatus['state'], reason?: string, columns = WIDTH): 
 		size: { columns, rows: WIDTH },
 	})
 
-	return stripVTControlCharacters(lines.find((line) => line.includes(String(ISSUE))) ?? '')
+	return lines.map((line) => stripVTControlCharacters(line))
+}
+
+function line_of(state: ItemStatus['state'], reason?: string, columns = WIDTH): string {
+	return board_of(state, reason, columns).find((line) => line.includes(String(ISSUE))) ?? ''
 }
 
 describe('run_board_render — finished reasons', () => {
@@ -50,6 +54,15 @@ describe('run_board_render — finished reasons', () => {
 		expect(line_of('done')).toMatch(/nothing to do · done: closed without a PR to merge$/u)
 	})
 
+	// joshuafolkken/kit#7095: an issue `josh issue:already-done` closed — ⏩ in the done section, not 🏁.
+	it('draws an already-done row with ⏩ and its own tail, apart from a done one (ac-38bbacca)', () => {
+		const line = line_of('already_done')
+
+		expect(line).toMatch(/^\s+⏩ /u)
+		expect(line).not.toContain('🏁')
+		expect(line).toMatch(/nothing to do · already done: closed with verified evidence$/u)
+	})
+
 	it('preserves a merged row without adding a reason (ac-6fb88544)', () => {
 		expect(line_of('merged')).toBe(
 			'    ✅ 10-08 11:09 6227       Explain why each finished run needs no further …  2°09′00″',
@@ -63,5 +76,17 @@ describe('run_board_render — finished reasons', () => {
 		expect(line).toMatch(/… {2}.*nothing to do/u)
 		expect(line.endsWith(REASON)).toBe(true)
 		expect(run_board_fit.width_of(line)).toBeLessThanOrEqual(WIDTH)
+	})
+})
+
+// joshuafolkken/kit#7095: an already-done row is finished as a done one is — drawn under the done heading.
+describe('run_board_render — already done finishes as done does (ac-932de729)', () => {
+	it.each(['done', 'already_done'] as const)('draws a %s row under the done heading', (state) => {
+		const lines = board_of(state)
+		const heading = lines.findIndex((line) => line.includes('✅ done'))
+
+		expect(run_board_layout.is_finished(state)).toBe(true)
+		expect(heading).toBeGreaterThan(-1)
+		expect(lines.findIndex((line) => line.includes(String(ISSUE)))).toBeGreaterThan(heading)
 	})
 })

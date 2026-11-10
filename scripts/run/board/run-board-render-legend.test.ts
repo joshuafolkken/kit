@@ -70,6 +70,7 @@ const EVERY_STATE: Array<ItemState> = [
 	'paused',
 	'stopped',
 	'done',
+	'already_done',
 ]
 
 describe('run_board_render_legend.legend_of order', () => {
@@ -78,7 +79,7 @@ describe('run_board_render_legend.legend_of order', () => {
 		const leads = new Set([...rows.map((entry) => STATE_ICONS[entry.state]), '🔨'])
 
 		expect(legend_of(rows, { leads, icons: leads, named: [OPERATION] })).toStrictEqual([
-			`🔨 implement  ${OPERATION}  💤 parked  🧊 paused  🛑 stopped  🏁 done  🚫 withdrawn  🐛 fix`,
+			`🔨 implement  ${OPERATION}  💤 parked  🧊 paused  🛑 stopped  🏁 done  ⏩ already done  🚫 withdrawn  🐛 fix`,
 		])
 	})
 
