@@ -1,0 +1,7 @@
+{
+	"reason": "#7141 adds the in-process issue read memo (git-gh-issue-memo.ts) and routes issue writes through one clearing wrapper",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 38
+	}
+}

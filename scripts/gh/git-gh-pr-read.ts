@@ -3,6 +3,7 @@ import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { note_unreadable_comments } from './git-gh-comments-unreadable'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
+import { git_gh_issue_memo } from './git-gh-issue-memo'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 import { git_gh_pr_too_large } from './git-gh-pr-too-large'
 import { to_gh_state } from './git-gh-rest-state'
@@ -152,11 +153,13 @@ async function start_pr_number_read(branch_name: string): Promise<PullNumberRead
 	}
 }
 
-// Defined after the maps it clears, so the memos are declared before anything reaches them.
+// Defined after the maps it clears, so the memos are declared before anything reaches them. The
+// issue reads go too: a merge closes the issues it names, and a pull request is an issue to REST.
 function forget_pr_numbers(): void {
 	pr_number_by_branch.clear()
 	pending_pr_number_by_branch.clear()
 	pull_by_number.clear()
+	git_gh_issue_memo.forget()
 }
 
 async function read_pr_number(branch_name: string): Promise<PullNumberRead> {
