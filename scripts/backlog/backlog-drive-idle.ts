@@ -4,9 +4,6 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_any_label, NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
-import { size_estimate } from '#scripts/issue/size-estimate'
-import type { SizeMeasurements } from '#scripts/lane/lane-implement-rate-read'
-import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -26,21 +23,18 @@ const BLOCKED_ANSWER = 'blocked'
 const DECISION_HEADING = `Waiting on a decision (${NEEDS_DECISION_LABEL}):`
 const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
 const UNTRUSTED_HEADING = 'Waiting on a person to vouch for the body (author without write access):'
-const OVER_CAP_HEADING =
-	'Waiting on a person to split it or declare it one deliverable (over the size cap or the implement budget, no reason declared):'
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
 const IDLE_RECOVERY =
 	'Decide the parked issues, fix and release the stalled ones, or start the next run with `backlogrun`.'
 
 interface IdlePorts {
 	read_issues: () => Promise<ReadonlyArray<OpenIssueData> | undefined>
-	read_measurements: () => Promise<SizeMeasurements>
 	emit: (compose: () => Promise<string>) => Promise<string | undefined>
 	send: (body: string) => Promise<boolean>
 	now_ms: () => number
 }
 
-interface IdleReading extends Partial<SizeMeasurements> {
+interface IdleReading {
 	merged: number
 	// The `auto-ok` pool, or `undefined` when it could not be read.
 	issues: ReadonlyArray<OpenIssueData> | undefined
@@ -85,17 +79,6 @@ function untrusted_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 		.map((issue) => cited(issue))
 }
 
-// `backlog:next` holds one declared over the size cap, or projected over the implement budget, until a
-// person splits it or declares it one deliverable (joshuafolkken/kit#5502, joshuafolkken/kit#6602,
-// joshuafolkken/kit#7006).
-function over_cap_lines(issues: ReadonlyArray<OpenIssueData>, reading: IdleReading): Array<string> {
-	return issues
-		.filter((issue) =>
-			size_estimate.is_issue_over_cap(issue, reading.implement_rate, reading.growth),
-		)
-		.map((issue) => cited(issue))
-}
-
 function dated_lines(issues: ReadonlyArray<OpenIssueData>, now_ms: number): Array<string> {
 	const lines: Array<string> = []
 
@@ -119,7 +102,6 @@ function remaining_lines(reading: IdleReading): Array<string> {
 		...section(DECISION_HEADING, labelled_lines(reading.issues, NEEDS_DECISION_LABEL)),
 		...section(STALLED_HEADING, labelled_lines(reading.issues, RUN_STALLED_LABEL)),
 		...section(UNTRUSTED_HEADING, untrusted_lines(reading.issues)),
-		...section(OVER_CAP_HEADING, over_cap_lines(reading.issues, reading)),
 		...section('Waiting on a date:', dated_lines(reading.issues, reading.now_ms)),
 	]
 
@@ -150,7 +132,6 @@ async function send_idle(body: string): Promise<boolean> {
 
 const DEFAULT_PORTS: IdlePorts = {
 	read_issues: read_pool,
-	read_measurements: lane_net_read.measurements,
 	emit: emit_idle,
 	send: send_idle,
 	now_ms: () => Date.now(),
@@ -162,7 +143,6 @@ async function notify(state: DriveState, ports: IdlePorts = DEFAULT_PORTS): Prom
 	try {
 		const body = await ports.emit(async () =>
 			describe({
-				...(await ports.read_measurements()),
 				merged: state.exclude.length,
 				issues: await ports.read_issues(),
 				now_ms: ports.now_ms(),

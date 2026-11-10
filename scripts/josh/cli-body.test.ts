@@ -6,27 +6,20 @@ import { describe, expect, it, vi } from 'vitest'
 import { cli_body } from './cli-body'
 import { cli_body_repository } from './cli-body-repository-fixture'
 
-// The one export this file replaces, in the shape `cli_body` calls it. The rest of `node:fs` is
-// spread through untouched at run time — only the type is narrowed to what is being wrapped.
-interface FsReader {
-	readFileSync: (target: number | string, encoding: BufferEncoding) => string
-}
-
 // **The stdin form cannot be exercised through the runner's own descriptor 0.** A vitest worker
-// inherits it, so reading it would block on a terminal or an open pipe and hang the suite. The read
-// is wrapped instead: descriptor 0 answers with a known body and every path-shaped read still reaches
-// the real file system, so what is pinned is the one thing `-` decides — file or descriptor.
-const STDIN = vi.hoisted(() => ({ BODY: 'a body piped in\n', FD: 0 }))
+// inherits it, so reading it would block on a terminal or an open pipe and hang the suite. The stdin
+// reader is replaced instead and every path-shaped read still reaches the real file system, so what
+// is pinned is the one thing `-` decides — file or descriptor. The read itself, a late writer on a
+// real pipe included, is `stdin-text.test.ts`'s.
+const STDIN = vi.hoisted(() => ({ BODY: 'a body piped in\n' }))
 
-vi.mock('node:fs', async (import_original) => {
-	const actual = await import_original<FsReader>()
-
-	function read_file_sync(target: number | string, encoding: BufferEncoding): string {
-		return target === STDIN.FD ? STDIN.BODY : actual.readFileSync(target, encoding)
-	}
-
-	return { ...actual, readFileSync: read_file_sync }
-})
+vi.mock('#scripts/lib/stdin-text', () => ({
+	stdin_text: {
+		read_all(): string {
+			return STDIN.BODY
+		},
+	},
+}))
 
 // joshuafolkken/kit#1198: an Issue or PR body handed to a command inside shell double quotes is
 // evaluated before the command runs — a backtick runs as command substitution, and the substituted

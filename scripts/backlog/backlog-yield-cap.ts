@@ -1,17 +1,21 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { lane_yield } from '#scripts/lane/lane-yield'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
-import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_park_write } from '#scripts/run/park/run-park-write'
+import { run_park_release } from '#scripts/run/park/run-park-release'
+import { run_stalled } from '#scripts/run/park/run-stalled'
+import { run_stalled_park } from '#scripts/run/park/run-stalled-park'
 import type { DriveState } from './backlog-drive'
 
 // The stop on a yield loop (joshuafolkken/kit#6799). A yielded child stays in the run and is offered
 // again once its holder ends, so a holder read wrongly re-dispatches the same issue every offer — on
 // 2026-11-08 once a minute, each round spending dozens of GitHub REST calls. Whatever the cause, an
-// issue that gave its lane back `YIELD_CAP` times within `WINDOW_MINUTES` is parked for a person and
-// left out of the rest of the run, and the trip is noted on the run's event stream.
+// issue that gave its lane back `YIELD_CAP` times within `WINDOW_MINUTES` is parked `run:stalled` with
+// the cause `TRIP_CAUSE` and left out of the pool's offers; the drive's auto-retry re-offers it once the
+// window has passed, up to its cap (joshuafolkken/kit#7076, `backlog-drive-stalled-retry.ts`).
 //
 // **The bounds**: an honest yield waits on a holder lane, which runs far longer than a few minutes, so
 // three yields in fifteen are no queue moving — at the observed one a minute the loop stops on its third
@@ -24,12 +28,12 @@ const YIELD_CAP = 3
 const WINDOW_MINUTES = 15
 const WINDOW_MS = WINDOW_MINUTES * MS_PER_MINUTE
 const YIELDED_OUTCOME = 'yielded'
-const PERSON_PERMISSION = '   - 必要な権限: 人'
+const TRIP_CAUSE = 'yield cap'
 
 interface YieldCapPorts {
 	// When this run's lanes on the issue gave their lane back — the stream's yield notes in production.
 	yields: (issue: string) => Promise<ReadonlyArray<string>>
-	// Parks the issue for a person and notes the trip on the stream in production.
+	// Parks the issue `run:stalled`, its park event naming `TRIP_CAUSE`, in production.
 	park: (issue: string, body: string) => Promise<void>
 	now: () => Date
 }
@@ -52,23 +56,11 @@ function trip_text(issue: string): string {
 	return `${issue_cite.plain_for('program', issue)} parked by backlog:drive: it gave its lane back ${String(YIELD_CAP)} times within ${String(WINDOW_MINUTES)} minutes`
 }
 
-// A person's park (`run_park_body`): no option is the parent's own, so `backlog:drive` never takes one.
+// A mechanical stop's comment, as `run:merge` writes for one: why, and the next action.
 function body_of(issue: string): string {
-	const release = `\`pnpm josh run:park ${issue} --clear\``
-
 	return [
-		`${trip_text(issue)}, so the run stopped re-dispatching it.`,
-		`This run and its \`resume:\` line keep it excluded, so a release takes effect in a fresh \`backlog:drive\` without \`--exclude ${issue}\`.`,
-		'',
-		'### 選択肢',
-		`1. Find why \`lane:plan\` keeps reading a holder, then release it with ${release}`,
-		'   - 層: B',
-		PERSON_PERMISSION,
-		`2. Release it as it is with ${release}`,
-		'   - 層: A',
-		PERSON_PERMISSION,
-		'### 推奨',
-		'1 a release before the cause is known loops again',
+		`Parked with \`${RUN_STALLED_LABEL}\`: ${trip_text(issue)}, so the run stopped re-dispatching it.`,
+		`- Next: the drive re-offers it itself once ${String(WINDOW_MINUTES)} minutes pass, up to its auto-retry cap; past the cap, find why \`lane:plan\` keeps reading a holder, ${run_stalled.next_step(issue)}.`,
 	].join('\n')
 }
 
@@ -93,21 +85,17 @@ async function yields(issue: string): Promise<ReadonlyArray<string>> {
 	return times_of(await run_event_stream_emit.current_events(), issue)
 }
 
-// A system stop, not a question: `system_stop` writes the park without the answered-question
-// judgment `josh run:park` runs (joshuafolkken/kit#6531).
+// A mechanical stop, not a question: the label and its park event, then the lane's hold released as
+// `run:park` releases one (`run-park-release.ts`).
 async function park(issue: string, body: string): Promise<void> {
-	const code = await run_park_write.system_stop({ issue_number: issue, body }, process.cwd())
-
-	await run_event_stream_emit.emit(
-		run_event_stream.EVENT_KIND.NOTE,
-		`${trip_text(issue)} · run:park exit: ${String(code)}`,
-	)
+	if (await run_stalled_park.apply(issue, body, TRIP_CAUSE)) await run_park_release.release(issue)
 }
 
 const PORTS: Omit<YieldCapPorts, 'now'> = { yields, park }
 
 const backlog_yield_cap = {
 	PORTS,
+	TRIP_CAUSE,
 	WINDOW_MS,
 	YIELD_CAP,
 	body_of,

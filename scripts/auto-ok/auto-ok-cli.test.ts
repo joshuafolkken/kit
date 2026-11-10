@@ -1,6 +1,5 @@
 import { listing_of, listing_outcome } from '#scripts/gh/git-gh-issue-list-fixture'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
-import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
 import {
@@ -33,33 +32,12 @@ vi.spyOn(console, 'info').mockImplementation(streams.info)
 vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
-	vi.spyOn(lane_net_read, 'measurements').mockResolvedValue({
-		implement_rate: undefined,
-		growth: {},
-	})
 	// The default answer for a call the case did not queue one for. Every wrapper answers
 	// `{ json, is_capped }` since joshuafolkken/kit#1067, so a bare `vi.fn()` returning `undefined`
 	// is a shape no caller can be handed — and the failed-read path is what an unqueued call means.
 	issue_list.mockResolvedValue(listing_outcome(undefined))
 	epic_list.mockResolvedValue(listing_outcome(epic_listing([])))
 	streams.reset()
-})
-
-describe('josh auto-ok:next — measured growth', () => {
-	it('uses measured files and lines growth without an implement rate', async () => {
-		vi.mocked(lane_net_read.measurements).mockResolvedValue({
-			implement_rate: undefined,
-			growth: { files: 1, lines: 1 },
-		})
-		const body = '## 背景\n\n- 規模見積もり: 約 8 ファイル / 200 行（テスト除く）'
-
-		issue_list.mockResolvedValueOnce(
-			listing_of([{ ...issue(OLD_ISSUE_NUMBER, CREATED_EARLIER), body }]),
-		)
-
-		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
-	})
 })
 
 describe('josh auto-ok:next — the token on standard output', () => {
@@ -125,9 +103,9 @@ describe('josh auto-ok:next — what it refuses to run', () => {
 	})
 })
 
-// joshuafolkken/kit#5502: one declared over the size cap waits on a person, as `backlog:next` holds it.
+// joshuafolkken/kit#7074: the size cap holds nothing — the lane's `lane:plan` splits or keeps it.
 describe('josh auto-ok:next — an estimate over the size cap', () => {
-	it('passes over an issue declared over the size cap', async () => {
+	it('offers an issue declared over the size cap', async () => {
 		const body = '## 背景\n\n- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）\n'
 
 		issue_list.mockResolvedValueOnce(
@@ -138,7 +116,7 @@ describe('josh auto-ok:next — an estimate over the size cap', () => {
 		)
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
+		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
 	})
 })
 

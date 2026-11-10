@@ -14,9 +14,9 @@ const MOVED = [LEFT_ONE, LEFT_ONE_TAIL, LEFT_TWO]
 const PROSE = 'prose that is not a declaration'
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
 const SPLIT_ROUTE = 'route:split'
-// The same slow rate `size-estimate-budget.test.ts` projects 2 files / 110 lines over the budget at.
+// A slow rate projecting 2 files / 110 lines over the size bar (joshuafolkken/kit#7074).
 const SLOW: ImplementRate = { median: 10, lanes: 4 }
-const OVER_BUDGET = 'over the 9-minute implement budget'
+const OVER_BUDGET = 'over the 18-minute size bar'
 
 const BODY = [
 	'## 背景',
