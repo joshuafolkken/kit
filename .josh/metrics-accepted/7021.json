@@ -1,0 +1,9 @@
+{
+	"reason": "#7021 adds the figure-source warning to issue:lint, the shared premise-line parse, the measured-figures principle and the premise template row",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 42,
+		"rules.lines": 6,
+		"ai_cost.on_demand_bytes": 839
+	}
+}

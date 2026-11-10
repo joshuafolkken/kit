@@ -3,6 +3,7 @@ import { aggregation_split } from './aggregation-split'
 import { behavior_change_lint } from './behavior-change-lint'
 import { enforcement_lint } from './enforcement-lint'
 import { expected_effect_lint } from './expected-effect-lint'
+import { figure_source_lint } from './figure-source-lint'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
@@ -61,7 +62,10 @@ function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<s
 		.map((problem) => with_template(problem))
 }
 
+// Warnings print whichever way the verdict goes and never change the exit code.
 function report(found: ReadonlyArray<string>, body: string): number {
+	for (const warning of figure_source_lint.warnings(body)) console.warn(`⚠ ${warning}`)
+
 	if (found.length === 0) {
 		console.info(OK_MESSAGE)
 		console.info(`labels: ${issue_classification.required_labels(body).join(', ') || NO_LABELS}`)
