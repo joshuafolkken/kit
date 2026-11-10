@@ -515,7 +515,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs',
 		category: 'AI tools',
 		reference: [
-			'--period <days> [--limit <lane-limit> | --sinks [<minutes>] | --over <minutes> | --why <minutes> | --pairs]',
+			'(--period <days> | --since <instant>) [--limit <lane-limit> | --sinks [<minutes>] | --over <minutes> | --why <minutes> | --pairs]',
 			'maintainer',
 			['none'],
 		],
@@ -527,6 +527,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '--period 1 --over 40', note: 'ledger chains of lanes over 40 net min' },
 				{ arguments: '--period 1 --why 40', note: 'cause groups of lanes over 40 net min' },
 				{ arguments: '--period 7 --pairs', note: "a 7-day period's scoped pair runs" },
+				{ arguments: '--since 2026-11-10T01:00Z --why 40', note: 'cause groups since an instant' },
 			],
 		},
 	},

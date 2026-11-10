@@ -14,7 +14,7 @@ import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_sinks } from './lane-sinks'
 import { lane_sinks_issues } from './lane-sinks-issues'
 import { lane_stats, type StatsWindow } from './lane-stats'
-import { lane_stats_request, type StatsRequest } from './lane-stats-request'
+import { lane_stats_request, type StatsRequest, type StatsStart } from './lane-stats-request'
 import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
@@ -50,6 +50,7 @@ const USAGE = [
 	'       josh lane:stats --period <days> --over <minutes>',
 	'       josh lane:stats --period <days> --why <minutes>',
 	'       josh lane:stats --period <days> --pairs',
+	'       josh lane:stats --since <instant> … — any form above, the window opened at the instant',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
 	`       josh lane:value ${CELL_METRIC} --table <title> [--row <label>] [--where <header>=<text>] --column <header> [--item <label>] [--zero] --since <instant>`,
 	'       josh lane:net <issue>',
@@ -168,10 +169,17 @@ async function stats_text(
 
 	const records = await period_records(context, window)
 	const limit = await lane_limit_history.label(request.limit, records.entries, window)
-	const row = lane_stats.row(records.entries, window, { limit, period_days: request.period_days })
+	const row = lane_stats.row(records.entries, window, { limit })
 	const tables = lane_stats_tables.tables_of(records, window)
 
 	return [`${lane_stats.header()}\n${row}`, ...tables].join('\n\n')
+}
+
+// `--since` opens the window at its instant; `--period` opens it that many days before now.
+function window_of(start: StatsStart, now_ms: number): StatsWindow {
+	if ('since_ms' in start) return { since_ms: start.since_ms, until_ms: now_ms }
+
+	return lane_stats.window_of(start.period_days, now_ms)
 }
 
 async function stats_command(
@@ -182,7 +190,7 @@ async function stats_command(
 
 	if (request === undefined) return refuse()
 
-	const window = lane_stats.window_of(request.period_days, context.now_ms ?? Date.now())
+	const window = window_of(request.start, context.now_ms ?? Date.now())
 
 	console.info(await stats_text(request, context, window))
 
@@ -202,12 +210,6 @@ interface AddressFlags {
 	where?: string | undefined
 	item?: string | undefined
 	zero?: boolean | undefined
-}
-
-function since_of(text = ''): number | undefined {
-	const since_ms = Date.parse(text)
-
-	return Number.isNaN(since_ms) ? undefined : since_ms
 }
 
 function is_known(name: string): boolean {
@@ -254,7 +256,10 @@ function value_request(rest: ReadonlyArray<string>): ValueRequest | undefined {
 
 	if (parsed === undefined) return undefined
 
-	const request = request_of(metric_of(parsed.positionals), since_of(parsed.values.since))
+	const request = request_of(
+		metric_of(parsed.positionals),
+		lane_stats_request.since_of(parsed.values.since),
+	)
 
 	if (request?.metric !== CELL_METRIC) return request
 

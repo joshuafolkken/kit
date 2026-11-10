@@ -83,7 +83,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// into pages of their own, each at its smallest block.
 	{ path: 'docs/josh-commands-run.md', bytes: 53_248 },
 	{ path: 'docs/josh-commands-board.md', bytes: 20_480 },
-	{ path: 'docs/josh-commands-lane.md', bytes: 28_672 },
+	// `lane:stats --since`'s usage example (joshuafolkken/kit#7007) crossed the 28672 block.
+	{ path: 'docs/josh-commands-lane.md', bytes: 32_768 },
 	// `cost:audit`'s dated period and usage breakdown (joshuafolkken/kit#7042) crossed the 16384 block.
 	{ path: 'docs/josh-commands-session.md', bytes: 20_480 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
