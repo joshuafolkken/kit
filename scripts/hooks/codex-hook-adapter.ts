@@ -165,7 +165,7 @@ async function write_pretool_outcome(raw_payload: string): Promise<void> {
 
 	hook_decision.emit_outcome(outcome)
 	await pretool_guard.mark_phase(outcome, judged, context)
-	await pretool_guard.record_refusal(judged, outcome)
+	await pretool_guard.record_refusal(judged, outcome, context)
 }
 
 // Codex's payload reaches this adapter, not `respond_from_stdin`, so it is captured here, untranslated.
