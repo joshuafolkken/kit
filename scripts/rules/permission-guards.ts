@@ -1,3 +1,4 @@
+import { delivered_rules_guard } from './delivered-rules-guard'
 import { destructive_command } from './destructive-command'
 import { direct_pr_create } from './direct-pr-create'
 import { egress_guard } from './egress-guard'
@@ -20,7 +21,7 @@ import { repo_admin } from './repo-admin'
 const ROWS = [
 	index_guard.ROW,
 	destructive_command.ROW,
-	protected_files.ROW,
+	delivered_rules_guard.call_only(protected_files.ROW),
 	direct_pr_create.ROW,
 	pr_merge.ROW,
 	repo_admin.ROW,
