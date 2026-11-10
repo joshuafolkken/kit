@@ -13,6 +13,8 @@ const WORKSPACE_PREFIX = 'kit-prose-stale-'
 const CODE = 'scripts/a.ts'
 const GONE_DOC = 'docs/gone.md'
 const GONE_CODE = 'scripts/gone.ts'
+const KEPT = 'scripts/kept.ts'
+const DOC_B = 'docs/b.md'
 
 const { git, MAIN_BRANCH } = git_fixture_workspace
 
@@ -100,18 +102,35 @@ describe('prose_stale_read.references — a name an unchanged line still declare
 	it(
 		'keeps PATH the kept file still declares, and reports SIZE no file declares',
 		async () => {
-			const kept = 'scripts/kept.ts'
-
 			await write(GONE_CODE, 'const PATH = 1\n')
-			await write(kept, 'const PATH = 2\nconst SIZE = 3\n')
-			await write('docs/b.md', 'PATH and SIZE.\n')
+			await write(KEPT, 'const PATH = 2\nconst SIZE = 3\n')
+			await write(DOC_B, 'PATH and SIZE.\n')
 			await commit('constants')
 			await rm(path.join(fixture.root, GONE_CODE))
-			await write(kept, 'const PATH = 2\n')
+			await write(KEPT, 'const PATH = 2\n')
 
 			const found = await found_references()
 
 			expect(prose_stale_scan.report(found).text).toBe('docs/b.md:1 constant SIZE')
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'keeps a name one changed file removed and another still declares on an unchanged line',
+		async () => {
+			const shared = 'function shared_name(): void {}\n'
+
+			await write(CODE, shared)
+			await write(KEPT, `${shared}const other = 1\n`)
+			await write(DOC_B, 'Call shared_name.\n')
+			await commit('both declare')
+			await write(CODE, '')
+			await write(KEPT, shared)
+
+			const found = await found_references()
+
+			expect(prose_stale_scan.report(found).text).not.toContain('shared_name')
 		},
 		TIMEOUT_MS,
 	)
@@ -152,6 +171,56 @@ describe('prose_stale_read.references — a deleted file', () => {
 			const found = await found_references()
 
 			expect(prose_stale_scan.report(found).text).toBe('docs/c.md:1 name gone_name')
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// joshuafolkken/kit#7048: a deleted namespace's members, `record` of which `ledger` outside the change
+// still declares.
+async function delete_namespace(ledger = 'scripts/ledger.ts'): Promise<Array<Reference>> {
+	await write(
+		GONE_CODE,
+		'function record(): void {}\nfunction gone_only(): void {}\nexport const gone = { record, gone_only }\n',
+	)
+	await write(ledger, 'function record(): void {}\n')
+	await write('docs/d.md', 'Call `record`.\n')
+	await write('docs/e.md', 'gone_only\n')
+	await commit('namespace')
+	await rm(path.join(fixture.root, GONE_CODE))
+
+	return await found_references()
+}
+
+describe('prose_stale_read.references — a deleted name a live module still declares', () => {
+	it(
+		'does not count prose naming `record`, which the live ledger still declares',
+		async () => {
+			const found = await delete_namespace()
+
+			expect(prose_stale_scan.report(found).text).not.toContain('record')
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'still counts prose naming `gone_only`, which only the deleted file declared',
+		async () => {
+			const found = await delete_namespace()
+
+			expect(prose_stale_scan.report(found).text).toBe('docs/e.md:1 name gone_only')
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'still counts prose naming `record` when only a test file declares it',
+		async () => {
+			const found = await delete_namespace('scripts/ledger.test.ts')
+
+			expect(prose_stale_scan.report(found).text).toBe(
+				'docs/d.md:1 name record\ndocs/e.md:1 name gone_only',
+			)
 		},
 		TIMEOUT_MS,
 	)

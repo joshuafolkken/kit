@@ -6,6 +6,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckRecords } from './check-reuse'
+import { gate_plan } from './gate-plan'
 import { gate_test_fixture } from './gate-test-fixture'
 import { gate_tree, type GateTree } from './gate-tree'
 import type { GateOptions } from './verification-gate'
@@ -32,9 +33,9 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const RECORDS = gate_test_fixture.suite_records('check-reuse')
 const make_directory = temporary_directory('suite')
 const TREE: GateTree = { files: { [path.join('scripts', 'a.ts')]: 'digest-a' }, base: 'base-a' }
-// lint, the type check, cspell (joshuafolkken/kit#5156), exports, metrics and — through the test-read
-// map — the unit step (joshuafolkken/kit#4314).
-const SCOPED_CHECKS = 6
+// lint, the type check, cspell (joshuafolkken/kit#5156) and — through the test-read map — the unit step
+// (joshuafolkken/kit#4314). Exports and metrics are the ship's and CI's (joshuafolkken/kit#7030).
+const SCOPED_CHECKS = 4
 
 function check_records(): CheckRecords {
 	const directory = make_directory('verification-gate-check-reuse-test-checks-')
@@ -52,8 +53,8 @@ async function fake_execa(): Promise<ReturnType<typeof gate_test_fixture.fake_re
 	return gate_test_fixture.fake_result(0, '')
 }
 
-// How many checks a green gate started, its whole-gate record cleared afterwards.
-async function processes_started(options: GateOptions): Promise<number> {
+// How many checks a green gate started, its whole-gate record left in place.
+async function processes_kept(options: GateOptions): Promise<number> {
 	mocked_execa.mockClear()
 	const stdout = gate_test_fixture.capture_stdout()
 
@@ -61,10 +62,18 @@ async function processes_started(options: GateOptions): Promise<number> {
 		await verification_gate.run_verification_gate({ ...RECORDS, ...options })
 	} finally {
 		stdout.restore()
-		RECORDS.clear()
 	}
 
 	return check_processes()
+}
+
+// How many checks a green gate started, its whole-gate record cleared afterwards.
+async function processes_started(options: GateOptions): Promise<number> {
+	try {
+		return await processes_kept(options)
+	} finally {
+		RECORDS.clear()
+	}
 }
 
 beforeEach(() => {
@@ -102,5 +111,30 @@ describe('run_verification_gate — the per-check records', () => {
 		await processes_started({ check_records: check_records_of, is_unit_included: false })
 
 		await expect(processes_started({ check_records: check_records_of })).resolves.toBe(full)
+	})
+})
+
+// joshuafolkken/kit#7030: a lane's green gate never ran exports or metrics, so the ship's `--whole-tree`
+// gate reuses that record only once both checks' own records are reusable too.
+describe('run_verification_gate — a --whole-tree gate over a green lane gate', () => {
+	const whole_tree = gate_plan.whole_tree_labels().length
+
+	it('runs the whole-tree checks on top of a lane rerun when their records are missing', async () => {
+		const options = { check_records: check_records() }
+
+		await processes_started(options)
+		const lane_rerun = await processes_kept(options)
+
+		await expect(processes_started({ ...options, is_whole_tree_included: true })).resolves.toBe(
+			lane_rerun + whole_tree,
+		)
+	})
+
+	it('reuses the green record once the whole-tree checks have records of their own', async () => {
+		const options = { check_records: check_records(), is_whole_tree_included: true }
+
+		await processes_kept(options)
+
+		await expect(processes_started(options)).resolves.toBe(0)
 	})
 })

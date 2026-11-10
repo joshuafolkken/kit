@@ -5,9 +5,10 @@ import { COMMAND_MAP } from './josh-command-map'
 const GATE_USAGE = [
 	'```bash',
 	'pnpm josh gate',
-	"pnpm josh gate --verbose   # every check's output, passing ones included",
-	'pnpm josh gate --force     # re-run even on a tree already recorded green',
-	'pnpm josh gate --no-unit   # the static checks only (CI only)',
+	"pnpm josh gate --verbose      # every check's output, passing ones included",
+	'pnpm josh gate --force        # re-run even on a tree already recorded green',
+	'pnpm josh gate --no-unit      # the static checks only (CI only)',
+	"pnpm josh gate --whole-tree   # add the whole-tree checks (the ship's gate on the final tree)",
 	'```',
 ].join('\n')
 const UNKNOWN_NAME = 'not-a-command'

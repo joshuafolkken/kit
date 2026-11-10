@@ -45,6 +45,17 @@ interface GateCheck {
 	// entry's own `is_kit_only`, because the command map imports this module; `gate-plan.test.ts` pins
 	// that the two agree.
 	is_kit_only?: boolean
+	// A check that reads the whole repository however small the change (joshuafolkken/kit#7030): a lane's
+	// own gate leaves it out, and the ship's gate on the final tree and CI run it.
+	is_whole_tree?: boolean
+}
+
+// Which of the checks one gate runs. Unset fields are the lane's own local gate: the unit suite in,
+// the whole-tree checks out unless the unit suite is elsewhere (CI's shape).
+interface CheckSelection {
+	is_unit_included?: boolean
+	is_kit_repository?: boolean
+	is_whole_tree_included?: boolean | undefined
 }
 
 const {
@@ -74,16 +85,15 @@ const {
 // `--no-unit` set stays "the whole gate minus the unit suite", and a CI runner — which has no recorded
 // transcripts — runs it as a trivial green rather than skipping it.
 //
-// **The three reserving weights are `core_weights.CORE_WEIGHTS`**, the same
-// numbers the `josh lint`, `josh check` and `josh cspell:dot` commands claim when run directly.
+// **The reserving weights are `core_weights.CORE_WEIGHTS`**, the same numbers the `josh lint`,
+// `josh check`, `josh cspell:dot`, `josh exports:unused` and metrics commands claim when run directly.
 //
-// **The two zero weights are measured, and they stay zero.** These are warm runs on the 11-core
-// machine. `behavior` took 0.6s of wall for 0.7s of CPU, which
-// is node starting up. `exports:unused` took 5.5s of wall for 9.0s of CPU, about 1.6 cores. Rounded
-// up, that would be two cores, but a reservation lasts the whole gate's plan, not the check's five
-// seconds. It would raise `RESERVED_CORES` from 5 to 7 and cut the solo unit cap from 6 workers to 4
-// for the full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
-// that trade, so the measured shape stays.
+// **The behavior check's zero weight is measured.** A warm run on the 11-core machine took 0.6s of wall
+// for 0.7s of CPU, which is node starting up.
+//
+// **The two whole-tree checks reserve cores** (joshuafolkken/kit#7030). Six lanes ran them on every gate
+// at a zero weight, so the core budget's admission never saw them. They now run only where they verify
+// the tree that merges — the ship's gate and CI — and reserve what they hold there.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	// **The lint reads the branch's changed files, not the whole tree** (joshuafolkken/kit#4085), and
 	// falls back to the whole tree in CI and on a changed configuration (`lint-gate-scope.ts`).
@@ -107,22 +117,25 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		memory_mb: core_weights.MEMORY_MB.spell_check,
 	},
 	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
-	// **The unused-member check reserves no core**: it builds one TypeScript
-	// program and walks it for about 5s, and it is over well before lint and the type check. A
-	// reservation would only take a place from the four-core CI runner's fan-out and a worker from the
-	// unit suite for the whole gate.
-	{ label: EXPORTS_LABEL, target: 'exports:unused', reserved_cores: 0 },
+	// **The unused-member check builds one TypeScript program, as the type check does**, and reserves
+	// what the type check reserves: measured warm at 5.5s of wall for 9.0s of CPU, 1.6 cores rounded up.
+	{
+		label: EXPORTS_LABEL,
+		target: 'exports:unused',
+		reserved_cores: core_weights.CORE_WEIGHTS.type_check,
+		is_whole_tree: true,
+	},
 	// **The metrics ratchet is kit's own**: it holds kit's repository-wide
-	// totals to the merge-base's. It is one in-process eslint pass with only `max-lines` enabled, over
-	// in a few seconds, so it reserves no core for the reason the unused-member check above does not.
-	// It times no startup here: beside the unit suite that reads the load, not josh.
+	// totals to the merge-base's. It is the whole-tree eslint scan with only `max-lines` enabled, so it
+	// reserves that scan's weight. It times no startup here: beside the unit suite that reads the load, not josh.
 	{
 		label: METRICS_LABEL,
 		target: METRICS_LABEL,
 		args: ['--no-startup'],
-		reserved_cores: 0,
+		reserved_cores: core_weights.CORE_WEIGHTS.eslint_scan,
 		memory_mb: core_weights.MEMORY_MB.metrics,
 		is_kit_only: true,
+		is_whole_tree: true,
 	},
 	// The lockfile policy check is network-bound and usually instant: it verifies only when the
 	// lockfile or `pnpm-workspace.yaml` moved from the merge-base (joshuafolkken/kit#4090), so it
@@ -151,13 +164,37 @@ const GATE_CHECKS: ReadonlyArray<GateCheck> = [
 // gate can never tell `josh review:brief` that the unit suite passed on this tree.
 //
 // A consumer's gate also drops the kit-only checks, whose commands its installed kit does not have.
+// The whole-tree checks are in by default only where the unit suite is out: CI's gate has always run
+// them, and a lane's local gate leaves them to the ship (joshuafolkken/kit#7030).
 function select_gate_checks(
 	is_unit_included: boolean,
 	is_kit_repository = true,
+	is_whole_tree_included = !is_unit_included,
 ): ReadonlyArray<GateCheck> {
 	const checks = is_unit_included ? GATE_CHECKS : STATIC_CHECKS
 
-	return is_kit_repository ? checks : checks.filter((check) => check.is_kit_only !== true)
+	return checks.filter(
+		(check) =>
+			(is_kit_repository || check.is_kit_only !== true) &&
+			(is_whole_tree_included || check.is_whole_tree !== true),
+	)
+}
+
+// What a lane's own `josh gate` runs with no flag: the plan's defaults size this set.
+const LANE_GATE_CHECKS: ReadonlyArray<GateCheck> = select_gate_checks(true, true, false)
+
+function selected_checks(selection: CheckSelection): ReadonlyArray<GateCheck> {
+	const { is_unit_included = true, is_kit_repository = true, is_whole_tree_included } = selection
+
+	return select_gate_checks(is_unit_included, is_kit_repository, is_whole_tree_included)
+}
+
+// The whole-tree checks' labels in this repository, the records a ship's gate must find before it
+// reuses a lane gate's green record (`whole-tree-reuse.ts`).
+function whole_tree_labels(is_kit_repository = true): ReadonlyArray<string> {
+	return select_gate_checks(false, is_kit_repository, true)
+		.filter((check) => check.is_whole_tree === true)
+		.map((check) => check.label)
 }
 
 // Asked of the plan rather than of the flag, so the one question "did this gate run the unit suite"
@@ -166,13 +203,13 @@ function has_unit_check(checks: ReadonlyArray<GateCheck>): boolean {
 	return checks.some((check) => check.label === UNIT_LABEL)
 }
 
-// What the non-elastic checks hold between them: 2 + 2 + 1. Reduced over `STATIC_CHECKS`
-// rather than over every check, because that is the set the sentence above names: `resolve_unit_worker_cap`
-// spends this as the cores the unit suite must leave to its siblings, so summing the unit check into
-// it would have the suite subtract its own reservation from its own budget the day that reservation
-// stops being zero. The two sets give the same number today, which is exactly why the narrower one
-// has to be the declared one.
-const RESERVED_CORES: number = STATIC_CHECKS.reduce(
+// What the lane gate's non-elastic checks hold between them: 2 + 2 + 1. Reduced over the lane gate's
+// static checks rather than over every check: `resolve_unit_worker_cap` spends this as the cores the
+// unit suite must leave to its siblings, so summing the unit check into it would have the suite
+// subtract its own reservation from its own budget the day that reservation stops being zero. The
+// whole-tree checks are left out: the cap is sized for the lane's own gate, the one that runs beside
+// other lanes, and the ship's gate claims them through the core budget.
+const RESERVED_CORES: number = select_gate_checks(false, true, false).reduce(
 	(total, check) => total + check.reserved_cores,
 	0,
 )
@@ -268,7 +305,7 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 function resolve_concurrency(
 	available_cores: number,
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
-	checks: ReadonlyArray<GateCheck> = GATE_CHECKS,
+	checks: ReadonlyArray<GateCheck> = LANE_GATE_CHECKS,
 ): number {
 	const share = shared_cores(available_cores, concurrent_runs)
 	const ordered = lightest_first(checks, (check) => check.reserved_cores)
@@ -451,7 +488,7 @@ function unit_cap_for(
 function plan_of(
 	concurrency: number,
 	unit_worker_cap?: number,
-	checks: ReadonlyArray<GateCheck> = GATE_CHECKS,
+	checks: ReadonlyArray<GateCheck> = LANE_GATE_CHECKS,
 ): GatePlan {
 	return { checks, concurrency, unit_worker_cap }
 }
@@ -463,10 +500,9 @@ function plan_of(
 function resolve_gate_plan(
 	available_cores: number = availableParallelism(),
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
-	is_unit_included = true,
-	is_kit_repository = true,
+	selection: CheckSelection = {},
 ): GatePlan {
-	const checks = select_gate_checks(is_unit_included, is_kit_repository)
+	const checks = selected_checks(selection)
 
 	return {
 		checks,
@@ -520,6 +556,7 @@ const gate_plan = {
 	DIRECT_UNIT_CLAIM,
 	FILES_PER_WORKER,
 	GATE_CHECKS,
+	LANE_GATE_CHECKS,
 	MEASURED_CORES,
 	RESERVED_CORES,
 	STATIC_CHECKS,
@@ -537,7 +574,8 @@ const gate_plan = {
 	scoped_unit_weight,
 	select_gate_checks,
 	unit_memory,
+	whole_tree_labels,
 }
 
-export type { GateCheck, GatePlan }
+export type { CheckSelection, GateCheck, GatePlan }
 export { gate_plan }
