@@ -36,7 +36,7 @@ what.
   the body's criteria say; name the Issue it went to in the completion report.
 - **A comment saying the Issue no longer has a reason to exist** — the defect does not reproduce, or it
   was fixed elsewhere — takes the exit in "When the work turns out to be already merged". Closing an
-  Issue is Tier C.
+  Issue any other way is Tier C.
 
 Everything else, **a widened scope included**, is ordinary work; a widening into several
 separately-mergeable deliverables is the split assessment's business (`split-assessment.md`).
@@ -47,12 +47,16 @@ separately-mergeable deliverables is the split assessment's business (`split-ass
 satisfied in merged code — one procedure either way. **Parking it is not the place**: `needs-decision`
 means "waiting for an answer", and here the answer exists.
 
-**The exit is the `already-done` label.** `epic:next`, `backlog:next` and `auto-ok:next` stop offering
-the Issue (`scripts/issue/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` →
-`human`), and `epic:busy` stops counting it. **Only a person removes it, by closing the Issue.**
+**The exit closes the Issue as `completed` when the evidence cites the merge** — a pull request
+(`PR #N`, `pull request #N`, `merged in #N`, a `/pull/N` link) or a commit SHA; a reopen undoes it.
+**Evidence citing neither gets the `already-done` label instead**: `epic:next`, `backlog:next` and
+`auto-ok:next` stop offering the Issue (`scripts/issue/issue-labels.ts` →
+`NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` → `human`), `epic:busy` stops counting it, and only
+a person removes it, by closing the Issue.
 
 **Commit nothing, push nothing, open no pull request** — run one command; it posts the evidence,
-applies `already-done` and releases the hold, in that order, stopping at the first failure:
+closes the Issue or applies `already-done`, and releases the hold, in that order, stopping at the
+first failure:
 
 ```bash
 pnpm josh issue:already-done <N> --evidence-file .josh/tmp/evidence.md
@@ -61,9 +65,10 @@ pnpm josh issue:already-done <N> --evidence-file .josh/tmp/evidence.md
 **The evidence file names the merging pull request or commit and, per acceptance criterion, the
 `file:line` that satisfies it.** **A claim with no citations is not the finding this exit is for.**
 
-Then behave as the entry point does for a parked child: a typed `fullrun` / `halfrun` sends a
-`confirmation` Telegram naming the Issue and the covering merge, and stops; a `backlogrun` child is
-park-and-continue (`backlogrun-park.md` → "park and continue"). **Never close the Issue** — Tier C.
+A closed Issue ends the run. A labelled one is handled like a parked child: a typed `fullrun` /
+`halfrun` sends a `confirmation` Telegram naming the Issue and the covering merge, and stops; a
+`backlogrun` child is park-and-continue (`backlogrun-park.md` → "park and continue"). **Never close
+it by any other path** — Tier C.
 
 **Looking familiar is no license to skip the work**: a criterion you cannot point at merged code for is
 one this run still owes.
