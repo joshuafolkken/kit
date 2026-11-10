@@ -82,7 +82,8 @@ describe('investigation handoff', () => {
 	it('caps the reply length and shape', () => {
 		const document = read(AGENT_PATH)
 
-		expect(document).toContain('Keep the reply within 60 lines')
+		// joshuafolkken/kit#7113: a numeric character cap beside the line cap.
+		expect(document).toContain('Keep the reply within 60 lines and 3,000 characters')
 		expect(document).toContain('one bullet per claim with its citations')
 	})
 })

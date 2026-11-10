@@ -26,4 +26,5 @@ its `review:attest` step.
 - Keep the review to the rubric's items: a finding's problem and minimal fix in at most three lines
   (its other sites one list of citations), a category with no finding in one proof line, and no
   walkthrough of the diff.
-- Reply with the review file's path and the finding lines you submitted, not the review again.
+- Reply within 2,000 characters: the review file's path on the first line, then the finding lines
+  you submitted, one per line (`none` when there is none) — not the review again.
