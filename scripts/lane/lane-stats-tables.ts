@@ -3,6 +3,7 @@ import { lane_chain_stop_stats } from './lane-chain-stop-stats'
 import { lane_check_stats } from './lane-check-stats'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
 import { lane_claim_stats } from './lane-claim-stats'
+import { lane_concurrency_stats } from './lane-concurrency-stats'
 import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_cut_stats } from './lane-cut-stats'
 import { lane_early_push_stats } from './lane-early-push-stats'
@@ -88,6 +89,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_test_related_stats.table(entries, window),
 		lane_test_related_stats.trigger_table(entries, window),
 		lane_transcript_stats.table(calls, window),
+		lane_concurrency_stats.table(entries, calls, window),
 	]
 }
 

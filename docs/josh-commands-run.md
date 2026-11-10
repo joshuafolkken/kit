@@ -359,7 +359,9 @@ A body on the schema is then judged against the Issue's trusted sources before a
 - **Answered** — exit `1`, no write: `Park refused: …` with each quote and its source, then record `Auto-decided: …` with `issue:comment` and continue.
 - **Failed** — exit `1`, no write: `Park failed: <cause>.` and `Retry: <how>`; follow the printed `Retry:` line.
 
-The parent reads the tiers and the recommendation with `backlog:triage --apply <N> --adopt <k>` (`docs/josh-commands-backlog.md` → "`josh backlog:triage`"): a tier A or B option of a recommending park is the parent's; `推奨なし` or a tier C option stays a person's (`backlogrun-park.md` → "A park left for a person").
+The parent reads the tiers and the recommendation with `backlog:triage --apply <N> --adopt <k>` (`docs/josh-commands-backlog.md` → "`josh backlog:triage`"): a tier A or B option of a recommending park is the parent's.
+
+`backlog:drive` decides a `推奨なし` park over a reversible option needing no permission or size approval (`backlogrun-park.md` → "A park the driver decides"); any other `推奨なし` park or a tier C option stays a person's (`backlogrun-park.md` → "A park left for a person").
 
 The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
 

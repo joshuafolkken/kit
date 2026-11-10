@@ -3,6 +3,7 @@ import { aggregation_split } from './aggregation-split'
 import { behavior_change_lint } from './behavior-change-lint'
 import { enforcement_lint } from './enforcement-lint'
 import { expected_effect_lint } from './expected-effect-lint'
+import { figure_source_lint } from './figure-source-lint'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
@@ -61,7 +62,15 @@ function problems(body: string, labels?: ReadonlyArray<string>): ReadonlyArray<s
 		.map((problem) => with_template(problem))
 }
 
+// The body's warnings, printed by every command that lints a body whichever way its verdict goes; they
+// never change an exit code.
+function warn(body: string): void {
+	for (const warning of figure_source_lint.warnings(body)) console.warn(`⚠ ${warning}`)
+}
+
 function report(found: ReadonlyArray<string>, body: string): number {
+	warn(body)
+
 	if (found.length === 0) {
 		console.info(OK_MESSAGE)
 		console.info(`labels: ${issue_classification.required_labels(body).join(', ') || NO_LABELS}`)
@@ -86,6 +95,6 @@ async function run(body_path: string | undefined): Promise<number> {
 	return report(problems(body), body)
 }
 
-const issue_lint_cli = { problems, run }
+const issue_lint_cli = { problems, run, warn }
 
 export { issue_lint_cli }

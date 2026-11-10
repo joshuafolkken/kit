@@ -107,8 +107,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
 	// The priority declaration and its criteria (joshuafolkken/kit#4383) crossed the 8192 block; the
-	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one.
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 16_384 },
+	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one; the
+	// premise row (joshuafolkken/kit#7021) crossed the 16384 one.
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/lane-instructions.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/measurement.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 12_288 },
