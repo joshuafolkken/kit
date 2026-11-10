@@ -543,7 +543,7 @@ the supervisor's driver runs the idle watch — `pnpm josh retrospective` at a d
 at the cut cap, `stop` once the session has handed the record off, and `unknown` (exit 1, with the usage
 on stderr) in a lane child or when no record is this session's.
 
-When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
+When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines — once per session while the block reads the same (`run:entry`'s bundle counts), then one line naming `pnpm josh run:prep <N>`.
 
 A lane child whose plan `lane:plan` has not cleared gets `pnpm josh lane:plan <N> <paths>` under `implement`, its plan comment's paths (`<path>...` with none) — already run when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
 All three print it with a line naming `--imports`.
