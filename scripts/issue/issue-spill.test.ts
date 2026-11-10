@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expected_effect_lint } from './expected-effect-lint'
 import { issue_spill } from './issue-spill'
 
 const ESTIMATE = '- 規模見積もり: 約 2 ファイル / 40 行（テスト除く）'
@@ -116,6 +117,41 @@ describe('issue_spill.follow_up_body', () => {
 
 	it('titles the follow-up after the original', () => {
 		expect(issue_spill.follow_up_title(SUBJECT)).toBe('Follow up #5999: Add a thing')
+	})
+})
+
+describe('issue_spill.follow_up_body expected effect', () => {
+	const effect = [
+		expected_effect_lint.HEADING,
+		'',
+		'- 効く率: 週 3 回',
+		'- 1 回あたりの得: 2 分',
+		'- 外れたときの損: 0 秒',
+		'- 出典: lane:stats',
+		'',
+	]
+	const timed = [
+		'## 背景',
+		'',
+		expected_effect_lint.DECLARATION_LINE,
+		'',
+		...effect,
+		ACCEPTANCE,
+		'',
+		LEFT_ONE,
+	].join('\n')
+
+	it('carries the expected-effect section a run-time-shortening aim requires', () => {
+		const body = issue_spill.follow_up_body({ ...SUBJECT, body: timed }, ESTIMATE)
+
+		expect(body).toContain(effect.join('\n'))
+		expect(expected_effect_lint.problems(body)).toStrictEqual([])
+	})
+
+	it('writes no expected-effect section when the original has none', () => {
+		expect(issue_spill.follow_up_body(SUBJECT, ESTIMATE)).not.toContain(
+			expected_effect_lint.HEADING,
+		)
 	})
 })
 
