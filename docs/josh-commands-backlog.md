@@ -358,10 +358,10 @@ pnpm josh plan:consumers lane:pause run:paused   # one block per identifier, one
 
 <!-- usage: issue:already-done -->
 
-Exit an issue whose work is already merged: post the evidence, apply already-done, close it when a cited PR is merged, release the hold.
+Exit an issue whose work is already merged: post the evidence, apply already-done, close it when a cited PR is merged or a cited commit is on main, release the hold.
 
 ```bash
-pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # comment, label, close on a merged PR, release — in that order
+pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # comment, label, close on a merged PR or a commit on main, release — in that order
 ```
 
 **Options:**

@@ -16,6 +16,7 @@ describe('run_board_row_yield.yield_of', () => {
 	it.each([
 		['merged', 'finished'],
 		['done', 'finished'],
+		['already_done', 'finished'],
 		['waiting', 'pending'],
 		['human', 'decision'],
 		['parked', 'parked'],

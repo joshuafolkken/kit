@@ -90,7 +90,7 @@ Which steps run at a lowered effort:
 
 - Lowered to `low` — a step that decides nothing: the lane once it reaches the gate (`josh ship`, `josh ship:wait`, the followup), and the `investigator` agent (`effort: low` in `.claude/agents/investigator.md`), which reports what the code does.
 - Kept at the role's effort — a step that decides: the plan and implementation, the review fix, round 1 (`reviewer`), the verification pass (`reviewer-verification`), and the `design-consultant`.
-- Capped by shape instead — the `reviewer` writes each finding in at most three lines and replies with the review file and finding lines; the `investigator` replies within 60 lines.
+- Capped by shape instead — the `reviewer` writes each finding in at most three lines and replies within 2,000 characters with the review file and finding lines; the `investigator` replies within 60 lines and 3,000 characters.
 - Measured — each row of `Lane children by phase` and `Lane subagents by agent type` in [`josh cost:audit`](./josh-commands-session.md) counts its calls with output over 2,000 tokens.
 
 ### Runs

@@ -10,6 +10,7 @@ import type { ItemState } from './run-board-status'
 const YIELD_STAGES: Readonly<Record<ItemState, YieldStage>> = {
 	merged: 'finished',
 	done: 'finished',
+	already_done: 'finished',
 	withdrawn: 'finished',
 	waiting: 'pending',
 	human: 'decision',
