@@ -112,7 +112,7 @@ pnpm josh pretool:guard   # run by the PreToolUse hook, the pending tool call as
 
 <!-- /usage -->
 
-It also runs the duplicate-read guard. A refusal leaves through `hookSpecificOutput.permissionDecision`; a call no guard claims writes nothing.
+It also runs the duplicate-read and large-read guards. A refusal leaves through `hookSpecificOutput.permissionDecision`; a call no guard claims writes nothing.
 
 Only a launcher-assigned `worker` may edit source. Other roles retain explicit record writes and
 recognized reads/operations; unverified shell or patch inputs are refused on every attempt.
@@ -200,6 +200,15 @@ Refuses a second whole-file read of a path whose content has not changed since t
 - One refusal per accumulation: a run reading on anyway is not refused again, and the refusal re-arms when a fresh successful read of the target lands — the same shape as the investigation guard.
 - **In a dispatched lane child it is a `notice`, not a refusal** (`JOSH_LANE_CHILD`). See the `pretool:guard` lane-child enumeration above.
 - Set `JOSH_DUPLICATE_READ_GUARD` to `off` / `0` / `false` / `no` to disable.
+
+#### The large-read guard
+
+Refuses a whole-file read (no `offset` or `limit`) of a file over 32 KB: its result stays in context and is re-billed on every later call. Grep for the part needed and read it with `offset` / `limit`.
+
+- The repeat goes through: a whole read of a file whose latest read in the transcript was refused — by this guard or the duplicate-read guard — is allowed, so a run that needs the whole file issues the call again. A read of another file in between does not change that.
+- A failed stat (missing file, glob) allows the call.
+- **In a dispatched lane child it is a `notice`, not a refusal**, sharing the duplicate-read row of the lane-child enumeration.
+- Set `JOSH_LARGE_READ_GUARD` to `off` / `0` / `false` / `no` to disable.
 
 #### The rule guard
 

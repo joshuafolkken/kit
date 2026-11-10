@@ -2,6 +2,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json } from '#scripts/git/parse-json-array'
 import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
+import { lane_ledger_archive } from '#scripts/lane/lane-ledger-archive'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { z } from 'zod'
@@ -150,7 +151,7 @@ async function read_breakdowns(
 	sessions: ReadonlyArray<AuditSession>,
 ): Promise<Map<number, Breakdown>> {
 	const [entries, events] = await Promise.all([
-		lane_net_read.read_ledger({}),
+		lane_ledger_archive.read_history({}),
 		lane_net_read.read_events({}),
 	])
 	const issues = new Set(sessions.flatMap((session) => session.issue ?? []))
