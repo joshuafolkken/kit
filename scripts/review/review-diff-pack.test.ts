@@ -40,6 +40,16 @@ describe('review_diff_pack.pack — fewer files, the same text', () => {
 		}
 	})
 
+	it('shares a file when the parts fill the cap exactly', () => {
+		const half = 'y'.repeat(CAP / 2)
+		const exact = [
+			{ relative: 'a.ts', parts: [half] },
+			{ relative: 'b.ts', parts: [half] },
+		]
+
+		expect(review_diff_pack.pack(exact, CAP)).toHaveLength(1)
+	})
+
 	it('joins back to exactly the parts in order', () => {
 		const joined = review_diff_pack
 			.pack(ENTRIES, CAP)

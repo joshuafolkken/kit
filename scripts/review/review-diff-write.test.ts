@@ -129,7 +129,8 @@ describe('review_diff_write.write_parts — the whole change, under the cap', ()
 
 	it('packs a change that fits the cap into one file for both paths', async () => {
 		const parts = await write_change_parts(WIDE_CAP)
+		const [file] = Object.values(parts).flat()
 
-		expect(new Set(Object.values(parts).flat()).size).toBe(1)
+		expect(parts).toStrictEqual({ [EDITED]: [file], [ADDED]: [file] })
 	})
 })
