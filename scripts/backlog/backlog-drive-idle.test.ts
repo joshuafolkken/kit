@@ -136,9 +136,24 @@ describe('backlog_drive_idle.describe — an estimate over the size cap', () => 
 		const text = backlog_drive_idle.describe({ merged: 0, issues: [...POOL, over], now_ms: NOW_MS })
 
 		expect(text).toContain(
-			`(over the size cap, no reason declared):\n- #${String(OVER_CAP)} Issue ${String(OVER_CAP)}`,
+			`(over the size cap or the implement budget, no reason declared):\n- #${String(OVER_CAP)} Issue ${String(OVER_CAP)}`,
 		)
 		expect(text).not.toContain(`- #${String(READY)}`)
+	})
+
+	// joshuafolkken/kit#7006: one within the cap but projected over the implement budget is held too.
+	it('lists an issue projected over the implement budget alone', () => {
+		const body = `## 背景\n\n- 規模見積もり: 約 1 ファイル / 70 行（テスト除く）\n`
+		const over = issue(OVER_CAP, { body })
+		const implement_rate = { median: 10, lanes: 4 }
+		const text = backlog_drive_idle.describe({
+			merged: 0,
+			issues: [over],
+			now_ms: NOW_MS,
+			implement_rate,
+		})
+
+		expect(text).toContain(`implement budget, no reason declared):\n- #${String(OVER_CAP)}`)
 	})
 })
 
