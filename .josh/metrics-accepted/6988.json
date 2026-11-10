@@ -1,0 +1,7 @@
+{
+	"reason": "lane:stats --why splits implement and other overruns into a row per cause key (#6988)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 33
+	}
+}
