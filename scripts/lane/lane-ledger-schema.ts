@@ -197,6 +197,10 @@ const test_related_schema = z.object({
 	// The widest of them in the run's own change, the hub that put the run past the cap
 	// (joshuafolkken/kit#5699); absent when main or the map's tree brought them all (joshuafolkken/kit#5756).
 	over_cap_hub: z.string().optional(),
+	// The branch change read beside the run, by half and by base (joshuafolkken/kit#6982).
+	branch_tracked: z.number().optional(),
+	branch_untracked: z.number().optional(),
+	branch_base: z.enum(['merge_base', 'fallback']).optional(),
 	elapsed_ms: z.number(),
 })
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
