@@ -1,0 +1,7 @@
+{
+	"reason": "Implement-stage signals recorded at the gate and read back by lane:why as cause keys (#6983), plus the round-1 review fixes",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 194
+	}
+}

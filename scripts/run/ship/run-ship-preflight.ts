@@ -17,6 +17,7 @@ import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_planned } from './run-ship-planned'
+import { run_ship_preflight_reuse, type PreflightKey } from './run-ship-preflight-reuse'
 import { run_ship_scoped } from './run-ship-scoped'
 
 // `josh ship`'s first stage. The commit stage (`git -y`'s preflight) and the merge (`followup`'s
@@ -173,7 +174,7 @@ async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> 
 	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned]
 }
 
-async function stage(request: PreflightRequest): Promise<PreflightResult> {
+async function asked_stage(request: PreflightRequest): Promise<PreflightResult> {
 	const problems = await run_ship_lap.timed(
 		run_ship_lap.STEP.PRECONDITIONS,
 		async () => await asked_problems(request),
@@ -186,6 +187,22 @@ async function stage(request: PreflightRequest): Promise<PreflightResult> {
 	if (scoped.code === SUCCESS_EXIT_CODE) return { code: SUCCESS_EXIT_CODE, out: 'ready' }
 
 	return { ...scoped, preconditions: [PRECONDITION.SCOPED] }
+}
+
+// The title and the body this ship delivers key the reuse; an unreadable body is asked every time.
+async function reuse_key(request: PreflightRequest): Promise<PreflightKey | undefined> {
+	const [branch, body] = await Promise.all([git_branch.current(), readable_body(request.body_path)])
+	const issue = git_issue.branch_number(branch)
+
+	if (issue === undefined || body === UNREADABLE) return undefined
+
+	return { issue, inputs: `${request.title}\n${body ?? ''}` }
+}
+
+async function stage(request: PreflightRequest): Promise<PreflightResult> {
+	const key = await reuse_key(request)
+
+	return await run_ship_preflight_reuse.run(key, async () => await asked_stage(request))
 }
 
 async function classification_problems(issue_number: string): Promise<Array<Unmet>> {
