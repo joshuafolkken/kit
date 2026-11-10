@@ -56,6 +56,11 @@ const MERGE_UNCONFIRMED_MESSAGE =
 	'gh api could not read the pull request back after the merge request failed'
 const MERGE_READ_BACK_ATTEMPTS = 3
 const MERGE_READ_BACK_INTERVAL_MS = 1000
+// GitHub's 405 body for a merge it is still carrying out — typically the earlier request of a pair
+// whose first answer was a 504. The read-back then waits for it to land, about a minute at most.
+const MERGE_IN_PROGRESS_MESSAGE = 'Merge already in progress'
+const MERGE_IN_PROGRESS_ATTEMPTS = 30
+const MERGE_IN_PROGRESS_INTERVAL_MS = 2000
 // `PUT pulls/{N}/merge` with a `sha` that is no longer the branch head.
 const HEAD_MOVED_STATUS = 409
 const PR_NUMBER_PATTERN = /\/pull\/([1-9]\d*)$/u
@@ -214,6 +219,23 @@ async function read_merge_state(
 	}
 }
 
+function is_merge_in_progress(error: unknown): boolean {
+	return error instanceof Error && error.message.includes(MERGE_IN_PROGRESS_MESSAGE)
+}
+
+// **"Not merged" is not a verdict while GitHub says the merge is still running** (#7171), so only an
+// answer of merged ends the wait early. Out of attempts it answers false, and the caller rethrows the
+// 405 itself.
+async function has_in_progress_merge_landed(
+	branch_name: string,
+	pr_number: number,
+): Promise<boolean> {
+	return await poll.poll_until(
+		async () => (await read_merge_state(branch_name, pr_number)) === true,
+		{ attempts: MERGE_IN_PROGRESS_ATTEMPTS, interval_ms: MERGE_IN_PROGRESS_INTERVAL_MS },
+	)
+}
+
 // Whether the merge is actually there, asked only after the request failed.
 //
 // **The read-back is retried, because the outage that killed the merge request is the one most
@@ -230,6 +252,10 @@ async function has_merge_landed(
 	pr_number: number,
 	merge_error: unknown,
 ): Promise<boolean> {
+	if (is_merge_in_progress(merge_error)) {
+		return await has_in_progress_merge_landed(branch_name, pr_number)
+	}
+
 	const is_merged = await poll.poll_for(
 		async () => await read_merge_state(branch_name, pr_number),
 		{ attempts: MERGE_READ_BACK_ATTEMPTS, interval_ms: MERGE_READ_BACK_INTERVAL_MS },
@@ -289,4 +315,10 @@ const git_gh_pr = {
 	is_head_moved,
 }
 
-export { git_gh_pr, MERGE_COMMIT_METHOD, MERGE_REQUEST_TIMEOUT_MS, MERGE_UNCONFIRMED_MESSAGE }
+export {
+	git_gh_pr,
+	MERGE_COMMIT_METHOD,
+	MERGE_IN_PROGRESS_ATTEMPTS,
+	MERGE_REQUEST_TIMEOUT_MS,
+	MERGE_UNCONFIRMED_MESSAGE,
+}
