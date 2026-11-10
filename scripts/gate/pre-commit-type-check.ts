@@ -7,6 +7,7 @@ import { core_budget } from './core-budget'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
 import { hook_gate_reuse } from './hook-gate-reuse'
+import { TSC_ARGS } from './tsc-arguments'
 import { DEFAULT_TYPE_CHECK_ARGS, type_check_step } from './type-check-step'
 
 // The pre-commit hook's type check, which no longer re-runs a project-wide `tsc --noEmit` that a green
@@ -38,10 +39,6 @@ import { DEFAULT_TYPE_CHECK_ARGS, type_check_step } from './type-check-step'
 const FORCE_ENV = 'JOSH_PRE_COMMIT_FORCE'
 
 const PNPM = 'pnpm'
-
-// Exactly what `lefthook/base.yml` ran before this wrapper existed. **The set of checks is unchanged**:
-// what changes is only whether an already-passed check is executed again on an unchanged tree.
-const TYPE_CHECK_ARGUMENTS: ReadonlyArray<string> = ['exec', 'tsc', '--noEmit']
 
 // What an argument this command does not take exits with. A type error's own code comes from `tsc`.
 const REFUSED_EXIT_CODE = 1
@@ -139,7 +136,7 @@ function format_skip(taken_at: string): string {
 // produced a code — `tsc` missing from PATH — is reported as such instead of being reported as a type
 // error. Either way it is non-zero and the commit is blocked.
 async function run_type_check(): Promise<number> {
-	const result = await execa(PNPM, [...TYPE_CHECK_ARGUMENTS], { stdio: 'inherit', reject: false })
+	const result = await execa(PNPM, [...TSC_ARGS], { stdio: 'inherit', reject: false })
 
 	return resolve_spawn_exit(PNPM, result)
 }
@@ -189,7 +186,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const pre_commit_type_check = {
 	FORCE_ENV,
-	TYPE_CHECK_ARGUMENTS,
 	run_pre_commit_type_check,
 }
 

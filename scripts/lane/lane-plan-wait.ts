@@ -1,6 +1,7 @@
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_ledger_archive } from './lane-ledger-archive'
 import { lane_plan_signals } from './lane-plan-signals'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats } from './lane-stats'
@@ -80,7 +81,7 @@ function facts_from(
 async function entries_of(): Promise<ReadonlyArray<LedgerEntry>> {
 	const ledger = await lane_ledger.target()
 
-	return ledger === undefined ? [] : lane_ledger.read_entries(ledger)
+	return ledger === undefined ? [] : lane_ledger_archive.history_at(ledger)
 }
 
 // The deadline `issue` waits on `holder` until, read off the ledger and the branch; a fact it cannot

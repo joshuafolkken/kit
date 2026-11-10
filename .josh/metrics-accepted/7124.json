@@ -1,0 +1,7 @@
+{
+	"reason": "TSC_ARGS moves to its own module scripts/gate/tsc-arguments.ts so the pre-commit hook can import it without importing a main-guarded script; the import and export lines add one code line net",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 1
+	}
+}

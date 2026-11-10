@@ -1,5 +1,6 @@
 import { duplicate_read_outcome } from '#scripts/delegation/duplicate-read-guard'
 import { investigation_outcome } from '#scripts/delegation/investigation-guard'
+import { large_read_outcome } from '#scripts/delegation/large-read-guard'
 import { issue_watch_hook } from '#scripts/issue/issue-watch-hook'
 import { hook_decision, type GuardOutcome, type TranscriptGuard } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -123,10 +124,10 @@ function clocked(
 const READ_ONLY_TOOLS: ReadonlySet<string> = new Set(['Read', 'Glob', 'Grep'])
 
 // The synchronous guards, in refusal order, and whether each acts on a read-only tool: batching
-// and investigation count one, duplicate-read refuses a re-read. The edit guards are skipped there
-// by tool name (joshuafolkken/kit#6041) — safe because neither records a stamp, and neither fires
-// on a read. The rule rows stay on every
-// call: their `consultation-investigation` row is triggered by `Glob` / `Grep`.
+// and investigation count one, duplicate-read refuses a re-read, large-read a whole large file. The
+// edit guards are skipped there by tool name (joshuafolkken/kit#6041) — safe because neither records
+// a stamp, and neither fires on a read. The rule rows stay on every call: their
+// `consultation-investigation` row is triggered by `Glob` / `Grep`.
 const SYNC_GUARDS: ReadonlyArray<{
 	outcome: (raw_payload: string, context: HookContext) => GuardOutcome
 	reads: boolean
@@ -135,6 +136,7 @@ const SYNC_GUARDS: ReadonlyArray<{
 	{ outcome: clocked(batch_outcome), reads: true },
 	{ outcome: clocked(investigation_outcome), reads: true },
 	{ outcome: clocked(duplicate_read_outcome), reads: true },
+	{ outcome: clocked(large_read_outcome), reads: true },
 	{ outcome: lane_plan_outcome, reads: false },
 ]
 
