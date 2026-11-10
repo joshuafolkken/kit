@@ -19,7 +19,9 @@ const FAILED_CONCLUSIONS = new Set([
 ])
 const FAILED_STATES = new Set(['failure', 'error'])
 
-const PR_NUMBER_PATTERN = /^#?\d+$/u
+// A bare number is a pull request only below a short sha's 7 characters, so an all-digit sha is still
+// read as a commit; `#N` names a pull request at any length.
+const PR_NUMBER_PATTERN = /^(?:#\d+|\d{1,6})$/u
 const SHA_PATTERN = /^[\da-f]{7,40}$/iu
 const NO_URL = '(no URL)'
 const NO_HEAD_SHA_MESSAGE = 'gh api answered a pull request with no head commit'
@@ -62,8 +64,8 @@ async function current_pr_number(): Promise<number> {
 	return await require_pr_number(await git_branch.current())
 }
 
-// No target → the current branch's pull request; a number (`#` optional) → that pull request's head;
-// a hex string → the commit itself.
+// No target → the current branch's pull request; `#N` or a number of up to 6 digits → that pull
+// request's head; a 7-to-40-character hex string → the commit itself.
 async function resolve_sha(target: string | undefined): Promise<string> {
 	if (target === undefined) return await head_sha_of(await current_pr_number())
 

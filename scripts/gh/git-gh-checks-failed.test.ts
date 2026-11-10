@@ -29,6 +29,7 @@ vi.mock('#scripts/git/git-branch', () => ({
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 const OTHER_SHA = 'abc1234'
+const ALL_DIGIT_SHA = '4815162'
 const ACTIONS_URL = 'https://github.com/o/r/actions/runs/1/job/2'
 const STATUS_URL = 'https://ci.example.com/build/3'
 
@@ -81,6 +82,22 @@ describe('git_gh_checks_failed.list_failed_checks — target', () => {
 		expect(result.failed.map((check) => check.name)).toStrictEqual(['unit'])
 	})
 
+	it('reads a #-prefixed number as a pull request', async () => {
+		route(pr_routes({}, commit_routes(PR_HEAD_SHA, [FAILED_RUN])))
+
+		const result = await git_gh_checks_failed.list_failed_checks(`#${String(PR_NUMBER)}`)
+
+		expect(result.sha).toBe(PR_HEAD_SHA)
+	})
+
+	it('reads an all-digit sha of 7 characters or more as a commit, not a pull request', async () => {
+		route(commit_routes(ALL_DIGIT_SHA, [FAILED_RUN]))
+
+		const result = await git_gh_checks_failed.list_failed_checks(ALL_DIGIT_SHA)
+
+		expect(result.sha).toBe(ALL_DIGIT_SHA)
+	})
+
 	it('reads a commit sha as given, with no pull request lookup', async () => {
 		route(commit_routes(OTHER_SHA, [FAILED_RUN]))
 
@@ -119,6 +136,17 @@ describe('git_gh_checks_failed.list_failed_checks — filtering', () => {
 			{ name: EXTERNAL_CI, conclusion: 'error', url: STATUS_URL },
 		])
 	})
+
+	it.each(['timed_out', 'cancelled', 'action_required', 'startup_failure'])(
+		'lists a run concluded %s as failing',
+		async (conclusion) => {
+			route(commit_routes(OTHER_SHA, [{ ...FAILED_RUN, conclusion }]))
+
+			const { failed } = await git_gh_checks_failed.list_failed_checks(OTHER_SHA)
+
+			expect(failed.map((check) => check.conclusion)).toStrictEqual([conclusion])
+		},
+	)
 
 	it('drops a failed run superseded by a newer run of the same check', async () => {
 		const rerun = { ...FAILED_RUN, id: 9, conclusion: 'success' }

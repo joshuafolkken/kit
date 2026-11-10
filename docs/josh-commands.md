@@ -759,6 +759,8 @@ pnpm josh checks:failed c0ffee1   # a commit by sha
 
 <!-- /usage -->
 
+`#N` or a number of up to 6 digits names a pull request; 7 to 40 hex characters name a commit.
+
 **Output / exit codes:** one `- <name> — <conclusion> — <URL>` line per failing check run (`failure`, `timed_out`, `cancelled`, `action_required`, `startup_failure`; the newest run per name) or commit status (`failure`, `error`); `No failing checks on <sha>.` when none. Exits 0 either way, 1 when the checks cannot be read.
 
 ## Versioning
