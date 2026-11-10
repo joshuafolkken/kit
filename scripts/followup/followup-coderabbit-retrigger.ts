@@ -11,12 +11,14 @@ import type { CodeRabbitState } from '#scripts/run/event/run-event-checks'
 import { followup_checks_event } from './followup-checks-event'
 import { followup_coderabbit_wait, type CodeRabbitWait } from './followup-coderabbit-wait'
 
-// A rate-limited CodeRabbit, retriggered once by `followup` itself (joshuafolkken/kit#5289): read the
+// A rate-limited CodeRabbit, retriggered by `followup` itself (joshuafolkken/kit#5289): read the
 // window off CodeRabbit's own notice, wait it out, post `@coderabbitai review`, and wait for the check
-// again. **Once per pull request** — a retrigger comment older than the latest notice means the one
-// attempt was spent, and a second rate limit is the person's call (bypassing it is Tier C); one newer
-// than it, whoever posted it, is a review still to come and is waited for, not posted again. The pull
-// request, not the ledger, answers "already retriggered", so a re-run `followup` reads the same answer.
+// again. **Up to `RETRIGGER_CAP` times per pull request** (joshuafolkken/kit#7079) — a retrigger
+// comment older than the latest notice was answered with another rate limit, so the next window is
+// waited out and retriggered; past the cap the run ends unfinished and is parked `run:stalled`.
+// **The check is never bypassed** — that weakens a verification gate. A retrigger newer than the
+// latest notice, whoever posted it, is a review still to come and is waited for, not posted again. The
+// pull request, not the ledger, counts the retriggers, so a re-run `followup` reads the same answer.
 
 const RETRIGGER_BODY = '@coderabbitai review'
 // CodeRabbit's own notice supplies the wait, so the window follows the service's rate limit.
@@ -48,9 +50,11 @@ const NO_TIME = 0
 const FIRST = 0
 const NEXT = 1
 const RATE_LIMITED: CodeRabbitState = 'rate-limited'
-const TIER_C = 'bypassing it is Tier C — explicit user instruction only'
-const BY_HAND = `wait it out, post \`${RETRIGGER_BODY}\` and rerun followup; ${TIER_C}`
-const AGAIN_NOTE = `CodeRabbit rate-limited again after the one \`${RETRIGGER_BODY}\` (kit#5289): ${TIER_C}`
+const RETRIGGER_CAP = 3
+const NO_BYPASS = 'never bypass the check'
+const BY_HAND = `wait it out, post \`${RETRIGGER_BODY}\` and rerun followup; ${NO_BYPASS}`
+const AGAIN_NOTE = `CodeRabbit rate-limited again after \`${RETRIGGER_BODY}\` (kit#7079): rerun followup, which retriggers up to ${String(RETRIGGER_CAP)} times per pull request; ${NO_BYPASS}`
+const CAP_NOTE = `CodeRabbit rate-limited after ${String(RETRIGGER_CAP)} \`${RETRIGGER_BODY}\` (kit#7079): end the run unfinished, parked \`run:stalled\` at stage followup; ${NO_BYPASS}`
 const UNREADABLE_NOTE = `CodeRabbit rate-limited with no window readable from its comments (kit#5289): no retrigger posted — ${BY_HAND}`
 const UNFINISHED_NOTE = `CodeRabbit still reviewing after \`${RETRIGGER_BODY}\` (kit#5289): the merge goes ahead without it`
 
@@ -138,11 +142,11 @@ function window_end_ms(comments: ReadonlyArray<PullComment>): number | undefined
 
 // A retrigger written after the latest notice is still to be answered; one before it was answered
 // with another rate limit. Either time unreadable reads as the second.
-function decide_after_retrigger(comments: ReadonlyArray<PullComment>): Decision {
+function is_awaiting(comments: ReadonlyArray<PullComment>): boolean {
 	const retrigger_ms = latest_ms(comments, is_retrigger) ?? NO_TIME
 	const notice_ms = latest_ms(comments, is_notice) ?? retrigger_ms
 
-	return retrigger_ms > notice_ms ? { kind: 'await' } : { kind: 'stop', note: AGAIN_NOTE }
+	return retrigger_ms > notice_ms
 }
 
 function too_long_note(wait_ms: number): string {
@@ -151,8 +155,11 @@ function too_long_note(wait_ms: number): string {
 	return `CodeRabbit rate-limited for ${minutes} more minutes, over followup's ${String(WINDOW_CAP_MINUTES)} minute wait (kit#5289): no retrigger posted — ${BY_HAND}`
 }
 
+// With no retrigger on the pull request, `is_awaiting` reads both times as none and answers false.
 function decide(comments: ReadonlyArray<PullComment>, now_ms: number): Decision {
-	if (comments.some((comment) => is_retrigger(comment))) return decide_after_retrigger(comments)
+	if (is_awaiting(comments)) return { kind: 'await' }
+	const spent = comments.filter((comment) => is_retrigger(comment)).length
+	if (spent >= RETRIGGER_CAP) return { kind: 'stop', note: CAP_NOTE }
 	const end_ms = window_end_ms(comments)
 	if (end_ms === undefined) return { kind: 'stop', note: UNREADABLE_NOTE }
 	const wait_ms = Math.max(NO_TIME, end_ms - now_ms) + MARGIN_MS
@@ -224,17 +231,41 @@ async function retrigger(
 	return { is_retriggered: true, notes: await wait_for_review(branch_name, wait) }
 }
 
+async function follow(
+	branch_name: string,
+	wait: CodeRabbitWait,
+	decision: Exclude<Decision, { kind: 'stop' }>,
+): Promise<Retrigger> {
+	if (decision.kind === 'retrigger') return await retrigger(branch_name, wait, decision.wait_ms)
+
+	return { is_retriggered: true, notes: await wait_for_review(branch_name, wait) }
+}
+
+// A retriggered review rate-limited again — this run's retrigger or one already pending — is decided
+// afresh from the pull request's comments, which now count the retrigger; `rounds_left` bounds the
+// loop should a posted retrigger not read back, and running out of it is the cap. A stop after a
+// retrigger still reports it, so the checks are read again and the completion report names it.
+async function attempt(
+	branch_name: string,
+	wait: CodeRabbitWait,
+	rounds_left: number,
+	is_retriggered: boolean,
+): Promise<Retrigger> {
+	const decision = decide(await read_comments(branch_name), Date.now())
+	if (decision.kind === 'stop') return { is_retriggered, notes: [decision.note] }
+
+	const outcome = await follow(branch_name, wait, decision)
+	if (!outcome.notes.includes(AGAIN_NOTE)) return outcome
+	if (rounds_left <= 1) return { is_retriggered: true, notes: [CAP_NOTE] }
+
+	return await attempt(branch_name, wait, rounds_left - 1, true)
+}
+
 // Runs only when the check wait last saw CodeRabbit rate-limited; anything else is untouched.
 async function run(branch_name: string, wait: CodeRabbitWait): Promise<Retrigger> {
 	if (wait.last?.state !== RATE_LIMITED) return { is_retriggered: false, notes: [] }
-	const decision = decide(await read_comments(branch_name), Date.now())
-	if (decision.kind === 'stop') return { is_retriggered: false, notes: [decision.note] }
 
-	if (decision.kind === 'await') {
-		return { is_retriggered: true, notes: await wait_for_review(branch_name, wait) }
-	}
-
-	return await retrigger(branch_name, wait, decision.wait_ms)
+	return await attempt(branch_name, wait, RETRIGGER_CAP, false)
 }
 
 // The checks after a retriggered review are read again, so the merge and the skip notes read the
@@ -253,7 +284,9 @@ async function settle<T>(
 
 const followup_coderabbit_retrigger = {
 	AGAIN_NOTE,
+	CAP_NOTE,
 	RETRIGGER_BODY,
+	RETRIGGER_CAP,
 	UNFINISHED_NOTE,
 	UNREADABLE_NOTE,
 	decide,

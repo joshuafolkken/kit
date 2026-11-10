@@ -79,6 +79,24 @@ describe('measure_declaration.problems', () => {
 	})
 })
 
+// joshuafolkken/kit#7021: a premise line is read as the declaration is, every one of them.
+describe('measure_declaration.problems on premise lines', () => {
+	it('refuses every malformed premise line with a premise example', () => {
+		const body = `${BACKGROUND}- 前提: \`echo 1\` <= 5\n- 前提: about 35\n- 前提: \`echo <n>\` < 2\n`
+		const found = measure_declaration.problems(body)
+
+		expect(found).toStrictEqual([
+			expect.stringContaining(`\`${measure_declaration.PREMISE_PREFIX}\` must be written`),
+			expect.stringContaining('`<n>`'),
+		])
+		expect(found.every((problem) => problem.split('\n').at(-1)?.startsWith('- 前提: `'))).toBe(true)
+	})
+
+	it('reads no premise line as the measurement declaration', () => {
+		expect(measure_declaration.parse(`${BACKGROUND}- 前提: \`echo 1\` <= 5\n`)).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#5144: a follow-up states its measurement — a declaration line, or a reason for none.
 describe('measure_declaration.is_stated', () => {
 	it.each([

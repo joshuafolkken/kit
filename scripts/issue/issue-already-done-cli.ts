@@ -8,16 +8,29 @@ import { session_cite } from '#scripts/issue/session-cite'
 
 // `josh issue:already-done <N> --evidence-file <path>` — the exit for an Issue whose work is already
 // merged (`issue-comments.md` → "When the work turns out to be already merged"): the evidence
-// comment, the `already-done` label and the `run:release`, in that order (`issue-evidence-exit.ts`).
+// comment, the close or the `already-done` label, and the `run:release`, in that order
+// (`issue-evidence-exit.ts`).
 //
-// The label is provisioned by `josh start`, so nothing here creates it.
-// **The Issue is never closed**: closing is a person's (Tier C), and the label is the run's exit.
+// **Evidence citing the merge closes the Issue as `completed`** (joshuafolkken/kit#7079): a pull
+// request (`PR #N`, `pull request #N`, `merged in #N`, a `/pull/N` link) or a commit SHA. A reopen undoes the close and
+// the comment records why, so it is Tier A. Evidence citing neither leaves it OPEN with the label,
+// for a person to close. The label is provisioned by `josh start`, so nothing here creates it.
 //
 // **A follow-up measurement is refused before anything is written** (joshuafolkken/kit#4504): its body
 // declares the sample wait (`issue_sample_gate.DECLARATION`, read as `not-before` reads it), and its
 // exit is `josh issue:measured`, which closes it — this one would leave it OPEN and the lane parked.
 
 const ARGV_OFFSET = 2
+const MERGE_CITATIONS = [
+	/\b(?:PR|pull request|merged (?:in|by|via))\s*#\d+/iu,
+	/\/pull\/\d+/u,
+	// A commit SHA: seven or more hex characters with a letter and a digit, so no plain number or word.
+	/\b(?=[\da-f]*[a-f])(?=[\da-f]*\d)[\da-f]{7,40}\b/u,
+]
+
+function cites_merge(evidence: string): boolean {
+	return MERGE_CITATIONS.some((citation) => citation.test(evidence))
+}
 
 function refusal_of(issue_number: string, body: string | undefined): string | undefined {
 	const cite = session_cite.issue(issue_number)
@@ -43,10 +56,19 @@ async function apply_label(issue_number: string): Promise<boolean> {
 	return write.is_applied
 }
 
+async function close_or_label(issue_number: string, evidence: string): Promise<boolean> {
+	if (!cites_merge(evidence)) return await apply_label(issue_number)
+	const is_closed = await git_gh_command.issue_close(issue_number, undefined, 'completed')
+
+	if (!is_closed) console.error(`Issue ${session_cite.issue(issue_number)} not closed`)
+
+	return is_closed
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await issue_evidence_exit.run(argv, {
 		command: 'issue:already-done',
-		finish: apply_label,
+		finish: close_or_label,
 		admit,
 	})
 }
