@@ -27,6 +27,9 @@ const NO_STAMP_REASON =
 	'no record of a `josh latest` run in this checkout — update rather than assume the dependencies are current'
 const HOURS_PRECISION = 1
 const PIN_CHECK_RANGE = 'HEAD'
+// Apart from 1 (a failed step) and 2 (a spawn error), so `latest:if-required` reads a full update
+// with an overrides block to restore rather than a `josh latest` that fell over.
+const OVERRIDES_MOVED_EXIT_CODE = 3
 
 type LatestScope = typeof REQUIRED_SCOPE | typeof SKIPPED_SCOPE
 
@@ -101,7 +104,8 @@ function print_decision(decision: Decision, is_json: boolean): void {
 // direction, and the one the write's own guards were built to fall in.
 //
 // The overrides verdict against HEAD ends the chain (`josh adopt` inherits it through its own `josh
-// latest` step): an overrides block the update moved must be restored, so it exits non-zero.
+// latest` step): an overrides block the update moved must be restored, so it exits non-zero, on its
+// own code.
 function record(): number {
 	try {
 		console.error(`recorded this josh latest run at ${latest_stamp.write_stamp()}`)
@@ -109,7 +113,7 @@ function record(): number {
 		console.error(`could not record this josh latest run: ${String(error)}`)
 	}
 
-	return overrides_diff_report.judge_overrides(PIN_CHECK_RANGE) ? 0 : FAILURE_EXIT_CODE
+	return overrides_diff_report.judge_overrides(PIN_CHECK_RANGE) ? 0 : OVERRIDES_MOVED_EXIT_CODE
 }
 
 function run(argv: ReadonlyArray<string>): number {
@@ -130,6 +134,7 @@ const latest_scope_cli = {
 	decide,
 	JSON_KEY,
 	NO_STAMP_REASON,
+	OVERRIDES_MOVED_EXIT_CODE,
 	RECORD_FLAG,
 	REQUIRED_SCOPE,
 	run,

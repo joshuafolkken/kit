@@ -162,11 +162,13 @@ describe('latest_scope_cli.run --record', () => {
 		expect(judge).toHaveBeenCalledWith('HEAD')
 	})
 
-	it('exits non-zero when the overrides are not kept', () => {
+	it('exits on its own non-zero code when the overrides are not kept', () => {
 		vi.spyOn(latest_stamp, 'write_stamp').mockReturnValue(STAMP_PATH)
 		vi.spyOn(overrides_diff_report, 'judge_overrides').mockReturnValue(false)
 		capture()
 
-		expect(latest_scope_cli.run([latest_scope_cli.RECORD_FLAG])).toBe(1)
+		expect(latest_scope_cli.run([latest_scope_cli.RECORD_FLAG])).toBe(
+			latest_scope_cli.OVERRIDES_MOVED_EXIT_CODE,
+		)
 	})
 })
