@@ -8,7 +8,7 @@
 
 ```bash
 pnpm josh issue:comment <N> --body-file .josh/tmp/comment.md
-gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@.josh/tmp/body.md
+pnpm josh issue:body <N> --body-file .josh/tmp/body.md
 pnpm josh followup "<title> #<N>" --notify-message-file .josh/tmp/notify.md
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file .josh/tmp/notify.md --recommended "<choice>"
 ```
@@ -19,7 +19,7 @@ PR コメントも `pnpm josh issue:comment <N> --body-file .josh/tmp/comment.md
 
 自リポジトリへの `gh issue comment` / `gh api` コメント投稿 → `direct-issue-comment` 行が拒否する（`scripts/rules/direct-issue-comment.ts`）。
 
-`-f body=@<path>` は `@<path>` というリテラルを投稿するので、`raw-field-body` 行が拒否する。Issue body 書き換えの `--field body=@<path>` は安全なのでそのまま使う。
+`-f body=@<path>` は `@<path>` というリテラルを投稿するので、`raw-field-body` 行が拒否する。Issue 本文の書き換えは `pnpm josh issue:body`（エピック以外は `issue:lint` を通った本文だけ書く）。コンサルセッションは GET 以外の `gh api` を拒否するので、`gh api -X PATCH` では書けない。
 
 `--body-file` / `--notify-message-file` は `-` で標準入力を読む（実装は `scripts/josh/cli-body.ts`）。`--body` と `--body-file` の同時指定は拒否される。
 

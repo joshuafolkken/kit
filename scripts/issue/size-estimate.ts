@@ -326,6 +326,7 @@ const size_estimate = {
 	declared_size: parse,
 	exceeded,
 	guide_problem,
+	is_epic,
 	is_issue_over_cap,
 	over_budget,
 	over_cap,
