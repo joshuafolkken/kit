@@ -48,6 +48,12 @@ interface GhFailure {
 // `Error` distinguished by a field, and one subclass among them would be a second convention.
 const GH_FAILURE_FIELD = 'gh_failure'
 
+// execa attaches the captured output to the error it throws, which is where the status line lands
+// when `gh api` exits non-zero — the case the whole probe exists for.
+function has_stdout_field(error: unknown): error is Error & { stdout: string } {
+	return error instanceof Error && 'stdout' in error && typeof error.stdout === 'string'
+}
+
 function has_gh_failure(error: unknown): error is Error & { gh_failure: GhFailure } {
 	return error instanceof Error && Object.hasOwn(error, GH_FAILURE_FIELD)
 }
@@ -94,7 +100,15 @@ function failure_of(error: unknown): GhFailure | undefined {
 	return has_gh_failure(error) ? error.gh_failure : undefined
 }
 
-const gh_failure = { attach, classify_stdout, failure_of, parse_response_status }
+// The response body a failed `gh api` request wrote, kept on the execa error `git-gh-exec.ts` wraps:
+// `gh` exits non-zero on a GraphQL document that carries `errors`, even beside answered `data`.
+function body_of(error: unknown): string | undefined {
+	const cause = error instanceof Error ? error.cause : undefined
+
+	return has_stdout_field(cause) ? cause.stdout : undefined
+}
+
+const gh_failure = { attach, body_of, classify_stdout, failure_of, parse_response_status }
 
 export type { GhFailure }
-export { gh_failure, GH_FAILURE_FIELD }
+export { gh_failure, GH_FAILURE_FIELD, has_stdout_field }

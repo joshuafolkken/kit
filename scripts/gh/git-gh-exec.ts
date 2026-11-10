@@ -7,7 +7,7 @@ import { execa, execaSync } from 'execa'
 import { gh_call_kind } from './gh-call-kind'
 import { gh_request_tally } from './gh-request-tally'
 import { check_gh_installed } from './git-gh-check'
-import { gh_failure } from './git-gh-failure'
+import { gh_failure, has_stdout_field } from './git-gh-failure'
 import { gh_retry } from './git-gh-retry'
 import { GH_SPAWN_CONCURRENCY } from './git-gh-spawn-width'
 
@@ -117,12 +117,6 @@ const GH_REQUEST_TIMEOUT_MESSAGE = 'gh request timed out'
 
 function has_stderr_field(error: unknown): error is Error & { stderr: string } {
 	return error instanceof Error && 'stderr' in error && typeof error.stderr === 'string'
-}
-
-// execa attaches the captured output to the error it throws, which is where the status line lands
-// when `gh api` exits non-zero — the case the whole probe exists for.
-function has_stdout_field(error: unknown): error is Error & { stdout: string } {
-	return error instanceof Error && 'stdout' in error && typeof error.stdout === 'string'
 }
 
 // `has_timed_out` is shared with the push transport rather than restated here: execa marks a spawn
@@ -475,7 +469,9 @@ const git_gh_exec = {
 }
 
 export type { GhApiRequest }
-export { git_gh_exec, has_stderr_field, has_stdout_field }
+export { git_gh_exec, has_stderr_field }
 export { BODY_FROM_STDIN, GH_REQUEST_TIMEOUT_MESSAGE, GH_REQUEST_TIMEOUT_MS }
 
 export { GH_SPAWN_CONCURRENCY } from './git-gh-spawn-width'
+
+export { has_stdout_field } from './git-gh-failure'
