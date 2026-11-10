@@ -9,6 +9,7 @@ import { run_board_fresh } from './run-board-fresh'
 import { run_board_issue_count, type IssueCount } from './run-board-issue-count'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
+import type { BoardLinks } from './run-board-link'
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_now, type NowLine } from './run-board-now'
 import type { SessionOperations } from './run-board-operation-read'
@@ -69,8 +70,9 @@ interface BoardUsage {
 }
 
 // Claude's and Codex's usage-limit windows and GitHub's core rate limit are the usage row's
-// (`run-board-render-quota.ts`).
-interface BoardHeader extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 'rate_limit'> {
+// (`run-board-render-quota.ts`). Its links are made where the terminal opens one (`run-board-link.ts`).
+interface BoardHeader
+	extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 'rate_limit'>, BoardLinks {
 	now_ms: number
 	// A single run's name (`run-board-single.ts`); `undefined` draws `backlogrun`.
 	run_name?: string | undefined
@@ -120,11 +122,6 @@ interface BoardHeader extends Pick<QuotaView, 'quotas' | 'scheduler_provider' | 
 	repo: string | undefined
 	// The repository's open and closed issues, `undefined` where none was read.
 	issue_count?: IssueCount | undefined
-	// An issue reference as the board draws it — `3450` or `owner/repo#12` — made a link where the
-	// terminal opens one.
-	link: (reference: string) => string
-	// A pull request's number, made a link to it where the terminal opens one (joshuafolkken/kit#4625).
-	pull_link: (number: number) => string
 }
 
 interface BoardCounts {
@@ -197,7 +194,7 @@ function repo_part(header: BoardHeader, mark: RunMark): string {
 	const name = header.repo?.split(REPO_SEPARATOR).at(-1) ?? ''
 	const indent = run_board_fit.width_of(RUN_MARKS[mark].glyph) + BLANK.length
 
-	return `${BLANK.repeat(indent)}${name}`
+	return `${BLANK.repeat(indent)}${header.repo_link(name, 'home')}`
 }
 
 // A part aged as the `💓` is: yellow once stale, red once alarming — a row's newest activity too
@@ -382,7 +379,7 @@ function progress_part(counts: BoardCounts, header: BoardHeader): string {
 		loading_part(header),
 		warning_of(WORDS.plan, header.plan_failed_ms),
 		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
-		run_board_issue_count.part_of(header.repo, header.issue_count),
+		run_board_issue_count.part_of(header.repo, header.issue_count, header.repo_link),
 	]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
