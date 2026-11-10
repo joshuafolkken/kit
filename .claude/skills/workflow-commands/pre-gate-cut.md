@@ -37,8 +37,6 @@ pnpm josh run:cut <N>
 **Follow the printed `next:` line.** The verdict stays on stdout; its next action is on stderr.
 **`cut` is the only verdict that ends the turn.**
 
-A scoped check's `split notice` past the implement budget → the way out it prints, `budget-over`'s (`scripts/split/split-early-notice.ts`).
-
 ### The gate refuses until the cut has been taken
 
 The `pre-gate-cut` row of `pnpm josh rule:list` **refuses `pnpm josh gate`** in a lane with no cut record carried, handing back

@@ -3,7 +3,7 @@ import type { DeclaredSize } from '#scripts/split/split-assess'
 import { size_estimate } from './size-estimate'
 
 // An Issue's declared size estimate (`size_estimate.declared_size`), read from its body: what the split notice's bar
-// grows from (`split-early-notice.ts`) and what `lane:stats` calibrates against (`lane-size-record.ts`).
+// grows from (`split-resolution.ts`) and what `lane:stats` calibrates against (`lane-size-record.ts`).
 // A body with no estimate is `undefined`; a read that failed (missing, rate-limited, unreachable)
 // throws, so a caller that keeps the answer never keeps a passing failure as "no declaration".
 async function read(issue: string): Promise<DeclaredSize | undefined> {

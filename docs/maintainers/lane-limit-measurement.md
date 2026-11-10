@@ -244,13 +244,11 @@ Under the round-2 table, `lane:stats` prints how many lanes got a split notice i
 (`noticed lanes`), and how many of those filed a split child (`split`), whenever it was filed.
 
 The `all` row counts each lane once. The rows below it count by `reason`: `files`, `hunks` and
-`lines` for the axis `josh lane:plan` answered `split` on (`lane-plan-size.ts`), `diff` for the
-measured-diff notice, and `budget` for the implement-budget notice.
+`lines` for the axis `josh lane:plan` answered `split` on (`lane-plan-size.ts`). `diff` and `budget`
+count only older entries, from the notices scoped checks and `main:merge` printed before
+joshuafolkken/kit#7009.
 
-The first showing of the diff notice writes a `split-notice` entry with the Issue and the measured
-files and lines (`split-early-notice.ts`); the first showing of the implement-budget notice writes one
-with `reason: budget`. Each `split` from `lane:plan` writes one that also carries
-its `reason`. `josh issue:file --route split` from a lane writes a `split-filed` entry
+Each `split` from `lane:plan` writes a `split-notice` entry that carries its `reason`. `josh issue:file --route split` from a lane writes a `split-filed` entry
 (`split-resolution.ts`).
 
 ## Why a free lane stayed empty
