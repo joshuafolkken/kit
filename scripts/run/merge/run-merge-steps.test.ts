@@ -210,7 +210,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	})
 
 	it('stashes the work, records it on the issue, then closes the lane', async () => {
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(true)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(true)
 
 		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
@@ -220,7 +220,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	})
 
 	it('closes a clean lane as before, with nothing stashed', async () => {
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(false)
 
 		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
@@ -230,7 +230,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	})
 
 	it('leaves the lane on disk when the stash push fails', async () => {
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(true)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(true)
 		spies.push.mockRejectedValue(new Error('stash failed'))
 		vi.spyOn(console, 'error').mockReturnValue()
 
@@ -244,7 +244,7 @@ describe('run_merge_steps.do_merged — primary checkout sync', () => {
 	it('synchronizes the primary checkout before closing the merged lane', async () => {
 		const spies = stub_lane_close()
 
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(false)
 
 		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
@@ -269,7 +269,7 @@ describe('run_merge_steps.do_merged — a failed primary checkout sync (joshuafo
 	beforeEach(() => {
 		spies = stub_lane_close()
 		vi.spyOn(poll, 'sleep').mockResolvedValue()
-		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
+		vi.spyOn(git_stash, 'has_work').mockResolvedValue(false)
 	})
 
 	it('retries a transient sync failure and carries on with the merged lane', async () => {
@@ -302,7 +302,7 @@ describe('run_merge_steps.do_merged — a failed primary checkout sync (joshuafo
 describe('run_merge_steps.do_merged — a lane directory that is no work tree', () => {
 	it('closes the remnant of an interrupted close without reading its status', async () => {
 		const spies = stub_lane_close()
-		const status_read = vi.spyOn(git_stash, 'has_changes')
+		const status_read = vi.spyOn(git_stash, 'has_work')
 
 		vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
 			existing: undefined,
