@@ -10,8 +10,10 @@ import { consultation_investigation } from './consultation-investigation'
 import { credential_body } from './credential-body'
 import { delivered_rules_guard } from './delivered-rules-guard'
 import { direct_filing } from './direct-filing'
+import { direct_git_status } from './direct-git-status'
 import { direct_issue_comment } from './direct-issue-comment'
 import { direct_issue_read } from './direct-issue-read'
+import { direct_vitest_run } from './direct-vitest-run'
 import { early_heartbeat } from './early-heartbeat'
 import { file_edit_rows } from './file-edit-rows'
 import { git_force } from './git-force'
@@ -226,6 +228,9 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	consultation_handoff.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
+	// Before `timed-rerun` and `lane-direct-tool`, its overlaps (a timed or lane `vitest run`):
+	// `test:related` replaces the direct run, so neither the record nor the reservation comes first.
+	direct_vitest_run.ROW,
 	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first
 	// act, and `lane-direct-tool` delivers on the reissue of a `time`-prefixed tool.
 	timed_rerun.ROW,
@@ -240,6 +245,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	...file_edit_rows.SHELL_ROWS,
 	...permission_guards.ROWS,
 	poll_loop.ROW,
+	// After the safety rows: a harmless read is steered only once nothing on the line is refused.
+	direct_git_status.ROW,
 	// Before `rule-body`, its one overlap: the cut is the right first act, and `rule-body` delivers on
 	// the reissue in the fresh process.
 	implementation_cut.ROW,

@@ -181,7 +181,7 @@ describe('permission guards — the index, destructive and protected-file rows',
 
 	// joshuafolkken/kit#5818: the josh path that removes a blocked-by relation passes.
 	it.each([
-		'git status',
+		'git diff --stat',
 		'rm -r dist',
 		'pnpm josh backlog:triage --apply 5767 --unblock 5562 --reason x',
 	])(SILENT_TITLE, (command) => {

@@ -49,6 +49,8 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'direct-pr-create': [SEMICOLON, HEREDOC],
 	'pr-merge': [SEMICOLON, HEREDOC],
 	'poll-loop': [],
+	'direct-git-status': [SEMICOLON],
+	'direct-vitest-run': [],
 }
 
 // The lane-scoped rules — read in the dispatched lane child the test pins, so each rule reaches its

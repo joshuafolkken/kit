@@ -1,0 +1,8 @@
+{
+	"reason": "two new delivered rules (direct-git-status, direct-vitest-run) with their tests, and an operating-rules example now naming tree:status #7144",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 135,
+		"ai_cost.on_demand_bytes": 3
+	}
+}

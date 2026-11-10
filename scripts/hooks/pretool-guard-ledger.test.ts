@@ -34,7 +34,7 @@ const { pretool_guard } = await import('./pretool-guard')
 const WORK_DIRECTORY = temporary_directory('suite')('pretool-guard-ledger-')
 const TRANSCRIPT = path.join(WORK_DIRECTORY, 'session.jsonl')
 const HOOK = 'pretool-guard'
-const ALLOWED_COMMAND = 'git status'
+const ALLOWED_COMMAND = 'git rev-parse HEAD'
 
 writeFileSync(TRANSCRIPT, '')
 

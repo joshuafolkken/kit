@@ -34,7 +34,7 @@
 
 上記 "git-rules" の細則。index には履歴がなく、上書きされたステージ状態は復元できない。
 
-- **調査目的の staging はしない。** 読み取り専用コマンドを使う: `git status --short`、`git diff` / `git diff --stat` / `git diff HEAD`、`git diff --staged`、未追跡ファイルは `git diff --no-index /dev/null <new-file>` か直接読む
+- **調査目的の staging はしない。** 読み取り専用コマンドを使う: `pnpm josh tree:status`、`git diff` / `git diff --stat` / `git diff HEAD`、`git diff --staged`、未追跡ファイルは `git diff --no-index /dev/null <new-file>` か直接読む
 - staging してよいのは次の 2 ケースだけ。それ以外は実行せずに確認する:
   1. ユーザーがそのターンで明示的にステージを指示した
   2. 承認済みのコミットフロー（`pnpm josh git`、`fullrun` / `backlogrun` のコミット手順。`halfrun` は含まない）
