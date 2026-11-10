@@ -1,4 +1,5 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { lane_chain_stop_stats } from './lane-chain-stop-stats'
 import { lane_check_stats } from './lane-check-stats'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
 import { lane_claim_stats } from './lane-claim-stats'
@@ -50,6 +51,21 @@ function call_tables(
 	]
 }
 
+// The tables of where a lane stopped and waited — `josh ship`'s stops, `run:chain`'s, and the gaps and
+// cuts between a lane's runs.
+function stop_tables(
+	entries: PeriodRecords['entries'],
+	events: ReadonlyArray<RunEvent>,
+	window: StatsWindow,
+): Array<string> {
+	return [
+		lane_stop_stats.table(entries, window, events),
+		lane_chain_stop_stats.table(entries, window),
+		lane_gap_stats.table(entries, window, events),
+		lane_cut_stats.table(entries, window, events),
+	]
+}
+
 // The tables under the period's row, in the order `lane:stats` prints them.
 function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindow): Array<string> {
 	return [
@@ -57,9 +73,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_ship_lap_stats.table(entries, window),
 		lane_ci_path_stats.table(entries, window),
 		...call_tables(entries, calls, window),
-		lane_stop_stats.table(entries, window, events),
-		lane_gap_stats.table(entries, window, events),
-		lane_cut_stats.table(entries, window, events),
+		...stop_tables(entries, events, window),
 		lane_round_one_stats.table(entries, window),
 		lane_round_two_stats.table(entries, window),
 		lane_early_push_stats.table(entries, window),

@@ -225,6 +225,22 @@ lane whose open pull request changes a path its own change does (`run-ship-overl
 The entry names the lanes, the shared paths, `waited_ms` and whether the wait cleared. Read it against
 the `conflict` row of the same period.
 
+## Why `run:chain` stopped
+
+Under the ship-stop table, `lane:stats` prints one row per cause a `josh run:chain` stopped on: the
+stage and why, `check:related (exit)` for a non-zero exit, `review:attest --join (hold)` for a hold
+notice after exit 0.
+
+- `stops` — how many runs stopped on the cause
+- `to re-run (min)`, `median (min)` — the minutes from each stop to the next `run:chain` on its issue
+- `not re-run` — the stops no run followed
+
+Every run writes one `chain` entry: its end, its length, and on a stop the stage and the reason, so
+the re-run's start is its end less its length (joshuafolkken/kit#7024).
+
+**The decision the table is for**: which `run:chain` stop to remove next — the cause with the largest
+`to re-run (min)` leads.
+
 ## Why round 2 ran or was skipped
 
 Under the stop table, `lane:stats` prints one row per round-2 verdict and reason code, most frequent

@@ -2,9 +2,10 @@
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_ship_args } from '#scripts/run/ship/run-ship-args'
-import { run_chain, type ChainStage } from './run-chain'
+import { run_chain, type ChainStage, type ChainStop } from './run-chain'
 import { run_chain_join } from './run-chain-join'
 
 // `josh run:chain <N>` — `main:merge` (none in a lane child), `review:selfcheck`, `check:related` and `run:review` in one call
@@ -35,7 +36,13 @@ interface ChainValues {
 interface ChainArguments {
 	issue: string
 	from?: string
+	is_join: boolean
 	stages: ReadonlyArray<ChainStage>
+}
+
+interface StopFields {
+	stage?: string
+	reason?: 'exit' | 'hold'
 }
 
 // A lane child merges main in ship's sync, so its opening half is the review stages alone
@@ -76,6 +83,7 @@ function arguments_from(
 	return {
 		issue,
 		...(values.from !== undefined && { from: values.from }),
+		is_join: values.is_join,
 		stages: stages_of(issue, values),
 	}
 }
@@ -101,6 +109,31 @@ function refuse(message: string): number {
 	return FAILURE_EXIT_CODE
 }
 
+// A stage that exited 0 stops the run only on its hold notice.
+function stop_fields(stop: ChainStop | undefined): StopFields {
+	if (stop === undefined) return {}
+
+	return {
+		stage: stop.stage.name,
+		reason: stop.code === run_chain.SUCCESS_EXIT_CODE ? 'hold' : 'exit',
+	}
+}
+
+// One ledger line per run, done or stopped, so `lane:stats` counts the stops by stage and reason and
+// the wait until the next run (joshuafolkken/kit#7024).
+async function record_run(
+	parsed: ChainArguments,
+	started_ms: number,
+	stop: ChainStop | undefined,
+): Promise<void> {
+	await lane_ledger_write.record_chain({
+		issue: Number(parsed.issue),
+		elapsed_ms: Date.now() - started_ms,
+		join: parsed.is_join,
+		...stop_fields(stop),
+	})
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = parse(argv)
 
@@ -108,10 +141,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const stages = run_chain.stages_from(parsed.stages, parsed.from)
 
 	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
+	const started_ms = Date.now()
 	const stop = await run_chain.run_stages(stages, parsed.issue, (text) => {
 		console.info(text)
 	})
 
+	await record_run(parsed, started_ms, stop)
 	if (stop !== undefined) return refuse(run_chain.stop_report(stop, parsed.issue))
 	console.info(run_chain.done_report(stages, parsed.issue))
 

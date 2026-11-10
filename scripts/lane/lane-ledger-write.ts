@@ -24,10 +24,11 @@ import type {
 	UnitFileRecord,
 	UnplannedNoticeRecord,
 } from './lane-ledger-schema'
+import type { ChainRecord } from './lane-ledger-schema-ship'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
-// `josh ship` stage, per stopped `josh ship`, per round-2 decision, per core-budget wait, per
+// `josh ship` stage, per stopped `josh ship`, per `josh run:chain`, per round-2 decision, per core-budget wait, per
 // `josh test:related` run and per lane-limit start or change (`limit`), read back by
 // `josh lane:stats` through `lane-ledger.ts`. Each line's shape is `lane-ledger-schema.ts`.
 //
@@ -149,6 +150,10 @@ async function record_stop(stop: StopRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.STOP, at: now_iso(), ...stop }, path)
 }
 
+async function record_chain(chain: ChainRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.CHAIN, at: now_iso(), ...chain }, path)
+}
+
 async function record_overlap(overlap: OverlapRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.OVERLAP, at: now_iso(), ...overlap }, path)
 }
@@ -248,6 +253,7 @@ const lane_ledger_write = {
 	ROUND_ONE_REUSED,
 	append,
 	record,
+	record_chain,
 	record_core_wait,
 	record_dispatch,
 	record_gate,

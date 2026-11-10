@@ -1,4 +1,5 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
@@ -175,5 +176,43 @@ describe('run_chain_cli.run — refusals', () => {
 
 		expect(josh_run_mock).not.toHaveBeenCalled()
 		expect(error_lines.join('\n')).toContain('no stage run:cut')
+	})
+})
+
+// joshuafolkken/kit#7024: every run writes one `chain` ledger line, a stop naming its stage and reason.
+function recorded(): ReturnType<typeof vi.spyOn> {
+	return vi.spyOn(lane_ledger_write, 'record_chain').mockResolvedValue()
+}
+
+describe('run_chain_cli.run — the ledger line', () => {
+	it('records a stage that exited non-zero as an exit stop at that stage', async () => {
+		const record = recorded()
+
+		stop_at(CHECK_RELATED)
+		await run_chain_cli.run([ISSUE])
+
+		expect(record).toHaveBeenCalledWith(
+			expect.objectContaining({ issue: 5630, join: false, stage: CHECK_RELATED, reason: 'exit' }),
+		)
+	})
+
+	it('records a finished run with no stage or reason', async () => {
+		const record = recorded()
+
+		await run_chain_cli.run([ISSUE])
+
+		expect(record).toHaveBeenCalledWith({
+			issue: 5630,
+			join: false,
+			elapsed_ms: expect.any(Number) as number,
+		})
+	})
+
+	it('records nothing when the arguments are refused', async () => {
+		const record = recorded()
+
+		await run_chain_cli.run([ISSUE, FROM, RUN_CUT])
+
+		expect(record).not.toHaveBeenCalled()
 	})
 })

@@ -8,6 +8,7 @@ const KIND = {
 	DISPATCH: 'dispatch',
 	STAGE: 'stage',
 	STOP: 'stop',
+	CHAIN: 'chain',
 	OVERLAP: 'overlap',
 	HELD: 'held',
 	RELEASED: 'released',
