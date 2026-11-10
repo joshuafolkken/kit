@@ -1,3 +1,4 @@
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
@@ -41,10 +42,10 @@ function fires_once(transcript: string, now_ms: number): boolean {
 
 // The guard is off when its switch is disabled or when this session is a dispatched lane child, which
 // runs no watcher of its own.
-function is_active(): boolean {
+function is_active(context: HookContext): boolean {
 	return (
 		hook_decision.is_switch_enabled(SWITCH_ENV_KEY) &&
-		lane_child_marker.marked_issue() === undefined
+		lane_child_marker.marked_issue(context.env) === undefined
 	)
 }
 
@@ -64,9 +65,10 @@ async function stale_reason(transcript: string, now_ms: number): Promise<string 
 // record are read from disk; the composing hook already awaits.
 async function watcher_hook_reason(
 	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
 	now_ms: number = Date.now(),
 ): Promise<string | undefined> {
-	if (!is_active()) return undefined
+	if (!is_active(context)) return undefined
 
 	const transcript = transcript_of(raw_payload)
 

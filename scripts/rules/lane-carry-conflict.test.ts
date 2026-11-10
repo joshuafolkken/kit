@@ -1,8 +1,9 @@
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_carry_conflict } from './lane-carry-conflict'
 
@@ -38,7 +39,7 @@ const WRITTEN_TRANSCRIPTS = new Set<string>()
 // row claims a `gh` / `git` / `notify` / `gate` call, never `run:merge` / `run:carry`.
 function rules_claiming(command: string): number {
 	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: BASH, input: { command } }),
+		rule.is_trigger({ name: BASH, input: { command } }, hook_context.from_process()),
 	).length
 }
 
@@ -144,19 +145,33 @@ describe('invokes_budget_command — a redirected state root', () => {
 })
 
 describe('is_carry_conflict', () => {
+	// The marker read is stubbed to answer by directory, so each context reads as what it names.
+	const child: HookContext = { cwd: '/lanes/child', env: {} }
+	const person: HookContext = { cwd: '/lanes/person', env: {} }
+
+	beforeEach(() => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockImplementation(
+			(directory) => directory === child.cwd,
+		)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	// The dispatched-child case the refusal exists for.
 	it('fires on a budget command from a dispatched lane child', () => {
-		expect(lane_carry_conflict.is_carry_conflict(MERGE_COMMAND, true)).toBe(true)
+		expect(lane_carry_conflict.is_carry_conflict(MERGE_COMMAND, child)).toBe(true)
 	})
 
 	// **A person working in the lane carries no dispatch mark, so the rule stays silent for them.**
 	it('says nothing about a budget command that is not a lane child', () => {
-		expect(lane_carry_conflict.is_carry_conflict(MERGE_COMMAND, false)).toBe(false)
+		expect(lane_carry_conflict.is_carry_conflict(MERGE_COMMAND, person)).toBe(false)
 	})
 
 	// A lane child running its own legitimate commands is not touching the parent's budget.
 	it('says nothing about a non-budget command even in a lane child', () => {
-		expect(lane_carry_conflict.is_carry_conflict(CUT_COMMAND, true)).toBe(false)
+		expect(lane_carry_conflict.is_carry_conflict(CUT_COMMAND, child)).toBe(false)
 	})
 })
 

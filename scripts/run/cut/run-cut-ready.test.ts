@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_cut_ready, type CutTree } from './run-cut-ready'
 
 // joshuafolkken/kit#3881: the implementation-cut guard refused edits on a run held on the default
 // branch, where `run:cut --impl` could only answer `unready`. Both now read this one predicate.
 
 const DEFAULT_BRANCH = 'main'
+const LANE_ROOT = '/repo/.kit-lanes/6973'
 
 function tree(branch: string, is_dirty: boolean): CutTree {
 	return { branch, default_branch: DEFAULT_BRANCH, is_dirty }
@@ -38,6 +40,28 @@ describe('run_cut_ready.tree_of', () => {
 
 	it('answers nothing for output with no branch header', () => {
 		expect(run_cut_ready.tree_of('', DEFAULT_BRANCH)).toBeUndefined()
+	})
+})
+
+describe('run_cut_ready.read_tree_sync', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('asks git in the given directory, clear of the git location variables', () => {
+		const read = vi.spyOn(git_spawn_sync, 'read').mockReturnValue('# branch.head 6973-lane\n')
+
+		run_cut_ready.read_tree_sync(LANE_ROOT)
+
+		for (const call of read.mock.calls) {
+			expect(call[1]).toStrictEqual(git_spawn_sync.located(LANE_ROOT))
+		}
+	})
+
+	it('answers nothing when git cannot read the status', () => {
+		vi.spyOn(git_spawn_sync, 'read').mockReturnValue(undefined)
+
+		expect(run_cut_ready.read_tree_sync(LANE_ROOT)).toBeUndefined()
 	})
 })
 

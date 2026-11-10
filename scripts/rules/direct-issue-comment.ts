@@ -1,5 +1,6 @@
 import type { RepoIdentity } from '#scripts/discovery/repo-origin'
 import { repo_party } from '#scripts/discovery/repo-party'
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { bash_triggers } from './bash-triggers'
 import { direct_pr_create } from './direct-pr-create'
 import { gh_api } from './gh-api'
@@ -96,6 +97,13 @@ function is_direct_issue_comment(
 	)
 }
 
+// The row's trigger: the checkout's repository read under the hook call's own cwd and environment.
+function is_direct_issue_comment_in(command: string, context: HookContext): boolean {
+	return is_direct_issue_comment(command, () =>
+		repo_party.current_repository(context.cwd, context.env),
+	)
+}
+
 // `pnpm josh issue:comment` — the act that keeps the rule, segment-wise so a spelling quoted inside
 // another command's body is not read as one.
 const COMMENT_NAMES: ReadonlySet<string> = new Set(['issue:comment'])
@@ -119,7 +127,7 @@ const DIRECT_ISSUE_COMMENT_REASON =
 
 const ROW = {
 	id: 'direct-issue-comment',
-	is_trigger: bash_triggers.on_bash_command(is_direct_issue_comment),
+	is_trigger: bash_triggers.on_bash_command(is_direct_issue_comment_in),
 	reason: DIRECT_ISSUE_COMMENT_REASON,
 	decide: (): boolean => true,
 	keeps: bash_triggers.on_bash_command(is_josh_comment),

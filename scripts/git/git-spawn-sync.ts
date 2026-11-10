@@ -51,16 +51,20 @@ function read(args: ReadonlyArray<string>, options: GitSyncOptions = {}): string
 	return result.exit_code === SUCCESS_EXIT_CODE ? result.stdout.trim() : undefined
 }
 
-// The configured `origin` URL, or undefined when the repository has none.
+// The options that make `cwd` the repository that answers; none without a `cwd`.
 //
 // **The git location variables are cleared, so `cwd` is the repository that answers.** A hook exports
 // `GIT_DIR`, which beats `cwd` outright — a caller reached from inside `pre-push` would otherwise be
-// told the `origin` of the repository being pushed rather than of the directory it named.
+// told about the repository being pushed rather than the directory it named.
+function located(cwd: string | undefined): GitSyncOptions {
+	if (cwd === undefined) return {}
+
+	return { cwd, env: git_location_environment.location_free_environment() }
+}
+
+// The configured `origin` URL, or undefined when the repository has none.
 function origin_url(cwd: string): string | undefined {
-	return read(['config', '--get', 'remote.origin.url'], {
-		cwd,
-		env: git_location_environment.location_free_environment(),
-	})
+	return read(['config', '--get', 'remote.origin.url'], located(cwd))
 }
 
 // The absolute repository (or worktree) root, asked under the C locale so a caller can tell "not a
@@ -69,7 +73,7 @@ function toplevel(timeout: number = GIT_TIMEOUT_MS): GitSyncResult {
 	return run(['rev-parse', '--show-toplevel'], { env: C_LOCALE, timeout })
 }
 
-const git_spawn_sync = { GIT_TIMEOUT_MS, C_LOCALE, run, read, origin_url, toplevel }
+const git_spawn_sync = { GIT_TIMEOUT_MS, C_LOCALE, run, read, located, origin_url, toplevel }
 
 export { git_spawn_sync }
 export type { GitSyncOptions, GitSyncResult }

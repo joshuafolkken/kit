@@ -1,5 +1,6 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
+import { hook_context } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -57,7 +58,7 @@ function pin_lane_world(): void {
 function rule_fires(rule_id: string, command: string): boolean | undefined {
 	const rule = delivered_rules.DELIVERED_RULES.find((row) => row.id === rule_id)
 
-	return rule?.is_trigger({ name: 'Bash', input: { command } })
+	return rule?.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process())
 }
 
 function cases_of<T>(answers: ShapeExpectations<T>): Array<[ShellShapeId, string, T]> {

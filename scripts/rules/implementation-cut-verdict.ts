@@ -57,7 +57,7 @@ function cached_verdict(target: string, now_ms: number): CostVerdict | undefined
 // edits racing the write from tearing the record.
 function reused_verdict(
 	read: () => CostVerdict,
-	directory: string = process.cwd(),
+	directory: string,
 	now_ms: number = Date.now(),
 ): CostVerdict {
 	const target = cache_path(directory)
