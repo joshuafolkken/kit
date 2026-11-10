@@ -8,7 +8,7 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { lane_limit_history } from './lane-limit-history'
 import { lane_net_read } from './lane-net-read'
-import { lane_over } from './lane-over'
+import { lane_over_causes } from './lane-over-causes'
 import { lane_pairs } from './lane-pairs'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_sinks } from './lane-sinks'
@@ -137,7 +137,7 @@ type LedgerTable = typeof lane_sinks.table
 // The `--over` or `--sinks` table with its threshold, `undefined` for the period's row and tables.
 function table_choice(request: StatsRequest): { table: LedgerTable; minutes: number } | undefined {
 	if (request.why !== undefined) return { table: lane_why_period.table, minutes: request.why }
-	if (request.over !== undefined) return { table: lane_over.table, minutes: request.over }
+	if (request.over !== undefined) return { table: lane_over_causes.view, minutes: request.over }
 
 	return request.sinks === undefined
 		? undefined

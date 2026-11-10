@@ -64,6 +64,7 @@ function keys_of(
 	return [...new Set([...log_keys(log), ...ledger])]
 }
 
+// The open Issues whose title names `key` or one of its known title words.
 function issues_of(key: string, issues: ReadonlyArray<OpenIssue>): Array<OpenIssue> {
 	const words = [key, ...(KNOWN.find((known) => known.key === key)?.title ?? [])]
 
@@ -96,6 +97,6 @@ function unfiled_cell(
 	return keys.filter((key) => issues_of(key, issues).length === 0).join(NAME_SEPARATOR)
 }
 
-const lane_why_causes = { keys_of, open_cell, unfiled_cell }
+const lane_why_causes = { keys_of, issues_of, open_cell, unfiled_cell }
 
 export { lane_why_causes }
