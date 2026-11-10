@@ -1,3 +1,5 @@
+import path from 'node:path'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { metrics_command } from './metrics-command'
 
@@ -81,5 +83,20 @@ describe('metrics_command.parse_arguments — the rerecord form', () => {
 		})
 		expect(metrics_command.parse_arguments([RERECORD])).toBeUndefined()
 		expect(metrics_command.parse_arguments([RERECORD, TOTALS_ONLY])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7013: the map is TypeScript, loaded through tsx so a pre-built metrics reads it too.
+describe('metrics_command.command_names', () => {
+	it("names every command of the tree's command map", async () => {
+		const names = await metrics_command.command_names(process.cwd())
+
+		expect(names).toStrictEqual(Object.keys(COMMAND_MAP))
+	})
+
+	it('names nothing for a tree with no command map', async () => {
+		const names = await metrics_command.command_names(path.join(process.cwd(), 'docs'))
+
+		expect(names).toStrictEqual([])
 	})
 })

@@ -12,6 +12,7 @@ import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
 import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
+import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_lap } from './run-ship-lap'
 import { run_ship_overlap } from './run-ship-overlap'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -22,8 +23,8 @@ import { run_ship_stop_cause, type Cause } from './run-ship-stop-cause'
 // merging the default branch again usually resolves it.
 //
 // So the merge happens mechanically: before the gate (`sync_stage`), again before the push when the
-// default branch moved since (`catch_up`), and when the followup fails after it moved again
-// (`followup_stage`). A conflict only on
+// default branch moved since with a conflict (`catch_up`; a clean move is left to the merge ref's CI),
+// and when the followup fails after it moved again (`followup_stage`). A conflict only on
 // the files `main-merge-regenerate.ts` lists is resolved by the merge itself; any other conflict
 // stops the ship as `conflict`, naming the unmerged paths so the resumed session goes straight to them.
 
@@ -45,6 +46,8 @@ const PUSH_FAILED_NOTE =
 	'the push ahead of the gate failed; the commit stage pushes after the gate:'
 const PAIR_RED_NOTE =
 	'the scoped pair is red on the merged tree; the commit stage pushes after the gate'
+const LEFT_TO_CI_NOTE =
+	'the default branch moved since the sync without a conflict — not merged again; the pull request CI checks the merge ref'
 const MERGED_AGAIN_NOTE =
 	'followup: the default branch moved under the failed checks — merged it again; gating and pushing the merged tree, no re-ship'
 
@@ -202,8 +205,9 @@ async function sync_stage(issue: string, title: string, is_dirty: boolean): Prom
 }
 
 // The tree merged with a default branch that moved is gated before it is pushed: a tree only the
-// combined change breaks — two lanes each growing one document inside its cap — stops here, reproduced
-// locally rather than met on CI's merge ref (joshuafolkken/kit#4825). The push then carries the tree
+// combined change breaks — two lanes each growing one document inside its cap — stops here
+// (joshuafolkken/kit#4825); a clean move over a green gate skips this merge and leaves that break to
+// CI's merge ref (`catch_up`, joshuafolkken/kit#7058). The push then carries the tree
 // the gate's record describes, so the pre-push hook reuses it rather than re-running the unit suite.
 // Its red is tagged a check, so the stage's infrastructure retry never reads test output as an outage.
 async function gate_merged(): Promise<StepResult | undefined> {
@@ -216,18 +220,55 @@ async function gate_merged(): Promise<StepResult | undefined> {
 	return { ...gate, out, cause: run_ship_stop_cause.CAUSE.CHECK }
 }
 
-// Before the commit stage pushes: a default branch that moved since the sync stage is merged again and
-// the merged tree gated, so the stop lands while the lane still waits on the ship. An unmoved one
-// merges nothing and re-runs no gate; a refusal leaves the merge to the followup, as the sync does.
-// A tree with no green gate record is gated whatever the merge answered: a re-run commit stage finds
-// the merge its red gate stopped on already made, and must not push it without a gate.
-async function catch_up(): Promise<StepResult | undefined> {
+// Whether origin's default branch holds a commit the branch lacks. An unreadable count reads as moved,
+// so the skipped merge is still said on the ship log.
+async function is_behind_default(): Promise<boolean> {
+	try {
+		const default_branch = await git_command.get_default_branch()
+
+		return (await git_command.commit_count_beyond('HEAD', `origin/${default_branch}`)) > 0
+	} catch {
+		return true
+	}
+}
+
+// A default branch that merges into the branch without a conflict is left to CI: the pull request's
+// checks run on the merge ref, the tree combined with the default branch, so a tree only the combined
+// change breaks still turns them red, and the followup merges again (`merge_again`). A probe that
+// cannot tell answers no, keeping the merge and its gate.
+async function is_merge_left_to_ci(): Promise<boolean> {
+	const conflicts = await run_ship_conflict_probe.read_conflicts()
+
+	if (conflicts?.length !== 0) return false
+	if (await is_behind_default()) console.error(LEFT_TO_CI_NOTE)
+
+	return true
+}
+
+// A conflict stops the ship while the lane still waits on it. A refusal leaves the merge to the
+// followup, as the sync does. A tree with no green gate record is gated whatever the merge answered: a
+// re-run commit stage finds the merge its red gate stopped on already made, and must not push it
+// without a gate.
+async function merge_and_gate(is_green: boolean): Promise<StepResult | undefined> {
 	const outcome = await merge_outcome()
 
 	if (outcome.kind === 'conflict') return conflict_result(outcome.files, '')
-	if (outcome.kind !== 'merged' && (await run_ship_scoped.is_gate_green())) return undefined
+	if (is_green && outcome.kind !== 'merged') return undefined
 
 	return await gate_merged()
+}
+
+// Before the commit stage pushes, over a green gate record, a default branch that moved since the sync
+// stage without a conflict is not merged again: the push carries the gated tree, and the merge ref's CI
+// checks the combined one (joshuafolkken/kit#7058, replacing joshuafolkken/kit#4825's local gate —
+// main moves faster than a scoped gate laps, so the ship never caught up). A conflicting move, or one
+// the probe cannot read, is merged and the merged tree gated as before.
+async function catch_up(): Promise<StepResult | undefined> {
+	const is_green = await run_ship_scoped.is_gate_green()
+
+	if (is_green && (await is_merge_left_to_ci())) return undefined
+
+	return await merge_and_gate(is_green)
 }
 
 async function push_merged(title: string): Promise<StepResult | undefined> {
@@ -353,6 +394,7 @@ async function followup_stage(
 
 const run_ship_sync = {
 	CONFLICT_NOTE,
+	LEFT_TO_CI_NOTE,
 	MAX_MERGE_RETRIES,
 	MERGED_AGAIN_NOTE,
 	MERGED_GATE_NOTE,

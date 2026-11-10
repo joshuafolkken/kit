@@ -145,9 +145,15 @@ function problems(body: string): ReadonlyArray<string> {
 	return parse(body) === undefined ? [MALFORMED] : []
 }
 
+// Whether the body declares why it stays one Issue — the only excuse from the implement budget
+// (joshuafolkken/kit#7005).
+function is_reasoned(body: string): boolean {
+	return (declared(body, REASON_PREFIX) ?? '') !== ''
+}
+
 // A split filing, or one that declares why it stays one Issue, passes over the guide.
 function is_excused(body: string, route: string | undefined): boolean {
-	return route === SPLIT_ROUTE_LABEL || (declared(body, REASON_PREFIX) ?? '') !== ''
+	return route === SPLIT_ROUTE_LABEL || is_reasoned(body)
 }
 
 // The counts and any guide overrun, shared by filing refusals and `backlog:next`'s offer note.
@@ -225,18 +231,6 @@ function route_of(labels: ReadonlyArray<string>): string | undefined {
 	return labels.includes(SPLIT_ROUTE_LABEL) ? SPLIT_ROUTE_LABEL : undefined
 }
 
-// Whether an open Issue is declared over the cap — `backlog:next`, `auto-ok:next` and the idle
-// notice all hold it for a person through this one check.
-function is_issue_over_cap(
-	issue: Pick<OpenIssueData, 'body' | 'labels'>,
-	rate?: ImplementRate,
-	growth?: SizeRatios,
-): boolean {
-	const labels = issue.labels?.map((label) => label.name) ?? []
-
-	return over_cap(issue.body ?? '', route_of(labels), rate, growth) !== undefined
-}
-
 // The counts against the cap, shared by the filing refusal and `backlog:next`'s withheld note.
 function capped(estimate: SizeMeasurement, rate?: ImplementRate, growth?: SizeRatios): string {
 	const { cap } = guide_for(rate)
@@ -265,33 +259,49 @@ function budget_refusal(
 	const minutes = Math.round(projected_minutes(estimate, rate, growth))
 	const measured = `${rate.median.toFixed(1)} implement min / 100 lines over ${String(rate.lanes)} lane(s)`
 
-	return `${exceeded(estimate, rate, growth)} and projects ${String(minutes)} implement minute(s) at ${measured}, over the ${String(IMPLEMENT_BUDGET)}-minute implement budget — file it split (\`--route split\`) or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${exceeded(estimate, rate, growth)} and projects ${String(minutes)} implement minute(s) at ${measured}, over the ${String(IMPLEMENT_BUDGET)}-minute implement budget — split it into children each within the budget or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // joshuafolkken/kit#6025: an estimate whose projected implement time exceeds the stage
-// budget — the filing refuses it and `backlog:next` notes it (joshuafolkken/kit#6066);
-// `undefined` for a split filing, one declaring why it stays one deliverable (joshuafolkken/kit#6602),
-// with no measured rate, or within the budget.
+// budget — the filing refuses it and `backlog:next` holds it (joshuafolkken/kit#7006);
+// `undefined` for one declaring why it stays one deliverable (joshuafolkken/kit#6602), with no
+// measured rate, or within the budget. A split filing is judged too — its exemption is the guide's
+// alone (joshuafolkken/kit#7005).
 function over_budget(
 	body: string,
-	route: string | undefined,
 	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	const estimate = is_excused(body, route) ? undefined : parse(body, rate, growth)
+	const estimate = is_reasoned(body) ? undefined : parse(body, rate, growth)
 
 	if (estimate === undefined || rate === undefined) return undefined
 
 	return projected_minutes(estimate, rate, growth) > IMPLEMENT_BUDGET ? estimate : undefined
 }
 
+// Whether an open Issue is declared over the cap, or projected over the implement budget at `rate`
+// (joshuafolkken/kit#7006) — `backlog:next`, `auto-ok:next` and the idle notice all hold it for a
+// person through this one check, so the size is settled before a lane starts it.
+function is_issue_over_cap(
+	issue: Pick<OpenIssueData, 'body' | 'labels'>,
+	rate?: ImplementRate,
+	growth?: SizeRatios,
+): boolean {
+	const body = issue.body ?? ''
+	const labels = issue.labels?.map((label) => label.name) ?? []
+
+	return (
+		over_cap(body, route_of(labels), rate, growth) !== undefined ||
+		over_budget(body, rate, growth) !== undefined
+	)
+}
+
 function budget_problem(
 	body: string,
-	route: string | undefined,
 	rate: ImplementRate | undefined,
 	growth?: SizeRatios,
 ): string | undefined {
-	const estimate = over_budget(body, route, rate, growth)
+	const estimate = over_budget(body, rate, growth)
 
 	return estimate === undefined || rate === undefined
 		? undefined
@@ -312,7 +322,7 @@ function guide_problem(
 	const estimate = over_guide(body, route, rate, growth)
 	const guide_refusal = estimate === undefined ? undefined : refusal(estimate, rate, growth)
 
-	return budget_problem(body, route, rate, growth) ?? guide_refusal
+	return budget_problem(body, rate, growth) ?? guide_refusal
 }
 
 // The declared file count, or `undefined` when there is no estimate or it does not parse.
@@ -326,6 +336,7 @@ const size_estimate = {
 	declared_size: parse,
 	exceeded,
 	guide_problem,
+	is_epic,
 	is_issue_over_cap,
 	over_budget,
 	over_cap,

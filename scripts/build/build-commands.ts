@@ -5,25 +5,23 @@ import { BUNDLED_COMMAND_DIRECTORY, josh_in_process } from '#scripts/josh/josh-i
 import { build } from 'esbuild'
 import { build_inputs, place_build, source_recorder } from './build-hooks'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
+import { source_location, SOURCE_LOCATION_DEFINE } from './source-location'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const OUT_DIR = path.join(PACKAGE_DIR, BUNDLED_COMMAND_DIRECTORY)
 
-// Each `is_bundled` command is pre-built to its own `dist/commands/<script basename>.js`, so a
-// consumer's `dist/josh.js` imports it under plain node instead of spawning tsx for its `.ts`
-// (`docs/maintainers/runtime-bundling.md`).
+// Every script command is pre-built to its own `dist/commands/<script basename>.js` in one build, so
+// `dist/josh.js` imports it under plain node instead of spawning tsx for its `.ts`
+// (`docs/maintainers/runtime-bundling.md`). Code splitting moves what the commands share into
+// `chunk-*.js` files beside them, so the common code is built once rather than into every command.
 //
-// **No code splitting, and that is why the import closure is checked.** Every entry is one
-// self-contained file, so every module it imports shares the entry's `import.meta.url`; a second
-// `process.argv[1] === fileURLToPath(import.meta.url)` guard inside the closure would fire with the
-// entry's own. `build-commands.test.ts` refuses a bundled command whose closure carries one.
-//
-// The bundle sits two levels under the package root, exactly as its source does under `scripts/`,
-// so a module that finds the package from its own `import.meta.url` resolves the same directory.
+// **Each module keeps its source location** (`source-location.ts`): its `import.meta.url` names its
+// source file, not the chunk it landed in, so a main guard fires only for the launched script and a
+// path worked out from the module's own location resolves as it does from the source.
 function bundled_scripts(): Array<string> {
-	return Object.values(COMMAND_MAP)
-		.filter((entry) => entry.is_bundled === true)
-		.map((entry) => entry.script ?? '')
+	const scripts = Object.values(COMMAND_MAP).flatMap((entry) => entry.script ?? [])
+
+	return [...new Set(scripts)]
 }
 
 function entry_point(script: string): { in: string; out: string } {
@@ -36,19 +34,19 @@ function entry_point(script: string): { in: string; out: string } {
 // Prune removed entries after placement so a launch never finds an emptied directory.
 async function build_commands(out_directory: string = OUT_DIR): Promise<string> {
 	const sources = build_inputs(fileURLToPath(import.meta.url))
-	const entries = bundled_scripts().map((script) => entry_point(script))
-	const entry_paths = new Set(entries.map((entry) => entry.in))
 	const { outputFiles: files } = await build({
 		absWorkingDir: PACKAGE_DIR,
-		entryPoints: entries,
+		entryPoints: bundled_scripts().map((script) => entry_point(script)),
 		outdir: out_directory,
 		bundle: true,
+		splitting: true,
 		platform: 'node',
 		format: 'esm',
 		target: 'node22',
 		packages: 'external',
+		define: SOURCE_LOCATION_DEFINE,
 		write: false,
-		plugins: [source_recorder(sources, entry_paths)],
+		plugins: [source_recorder(sources, source_location(out_directory))],
 	})
 	const stamp = hook_bundle_stamp.stamp_text(
 		sources,

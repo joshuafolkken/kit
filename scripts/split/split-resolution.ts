@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { issue_declared_size } from '#scripts/issue/issue-declared-size'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import {
@@ -9,8 +10,7 @@ import {
 } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { error_text } from '#scripts/lib/error-message'
-import { split_assess } from './split-assess'
-import { split_early_notice } from './split-early-notice'
+import { split_assess, type DeclaredSize } from './split-assess'
 import { split_measure } from './split-measure'
 import { split_verified_single } from './split-verified-single'
 
@@ -58,12 +58,21 @@ async function warning(
 	return warning_text(notice)
 }
 
+// The Issue's declared size, or none when its body cannot be read — the bar is then the guide.
+async function declared_of(issue: number): Promise<DeclaredSize | undefined> {
+	try {
+		return await issue_declared_size.read(String(issue))
+	} catch {
+		return undefined
+	}
+}
+
 // Whether the branch still passes the notice bar; a failed measurement keeps the notice.
-async function is_still_over(): Promise<boolean> {
+async function is_still_over(issue: number): Promise<boolean> {
 	try {
 		const measurement = await split_measure.read_branch()
 
-		return split_assess.notice(measurement, await split_early_notice.declared()) !== undefined
+		return split_assess.notice(measurement, await declared_of(issue)) !== undefined
 	} catch {
 		return true
 	}
@@ -76,7 +85,7 @@ async function ledger_warning(issue: number): Promise<string | undefined> {
 	const note =
 		ledger === undefined ? undefined : await warning(issue, lane_ledger.read_entries(ledger))
 
-	if (note === undefined || !(await is_still_over())) return undefined
+	if (note === undefined || !(await is_still_over(issue))) return undefined
 
 	return (await split_verified_single.verified(issue)) ? undefined : note
 }

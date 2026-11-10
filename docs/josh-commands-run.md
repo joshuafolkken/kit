@@ -214,6 +214,7 @@ Adds to this repository's live `backlogrun` at the next free lane, without inter
 - Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, a run-held `in-progress`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
 - Each `add` event wakes `run:progress --wait`.
 - `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
+- A live `backlog:drive` runs `--retry` itself on the `run:stalled` causes it can re-offer, 2 times per issue ([labels and run states](./labels-and-run-states.md)); any other cause, or one at that cap, waits for this command.
 
 **Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, `tracking #E · <where>`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
 
@@ -352,7 +353,7 @@ The body follows one schema (`scripts/run/park/run-park-body.ts`): numbered opti
 
 A body off the schema is refused before any write, naming the missing piece and printing the schema; the usage prints it too.
 
-A body on the schema is then judged against the Issue's trusted sources before any write (`scripts/run/park/run-park-answered.ts`); `--clear` and the `backlog:drive` yield-cap park, a system stop, are not judged.
+A body on the schema is then judged against the Issue's trusted sources before any write (`scripts/run/park/run-park-answered.ts`); `--clear` is not judged, and the `backlog:drive` yield-cap park is a `run:stalled` stop, not a `run:park`.
 
 - **Unanswered** — parks as below.
 - **Answered** — exit `1`, no write: `Park refused: …` with each quote and its source, then record `Auto-decided: …` with `issue:comment` and continue.
@@ -705,21 +706,23 @@ pnpm josh ship --log <N>                                          # a detached s
 
 <!-- /usage -->
 
-It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate stops the ship before the followup merges; a sync that merged the default branch pushes onto an open pull request ahead of the gate, and the commit stage pushes the gated tree. The report names the stopped step.
+It runs `git -y`, `followup` and `run:tail` in order, under one header per step. A red gate stops the ship before the followup merges; a sync that merged the default branch pushes onto an open pull request ahead of the gate, and the commit stage pushes the gated tree. The report names the stopped step.
 
 The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run, forwarded to `run:tail` after the closed issue.
 
 A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate. A pass is reused on an unchanged tree, base, title and body.
 
-A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped …` (`run-ship-reship.ts`). A `--review` ship still runs its `test:pinned` there; the supervised preflight and gate still run.
+A detached re-ship (`--detach`, or any lane child's) after a review failure (`check` / `finding`) or a followup `check`, on an unmoved base, skips the pre-detach preflight and fast checks, printing `pre-detach: skipped …`. A `--review` ship still runs its `test:pinned` there; the supervised preflight and gate still run.
 
-A followup red after a main move is merged, gated and pushed inside the followup stage, printing `followup: the default branch moved under the failed checks — …`; only a red there stops.
+Over a green gate, a clean main move is not merged before the push (`… not merged again; …`): PR CI on the merge ref catches a combined break. A conflicting or unreadable one is merged and gated.
+
+A followup red after a main move is merged, gated and pushed in the followup, printing `followup: the default branch moved …`; only a red there stops.
 
 One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
 
-In scope, run the `lane:plan` command the stop prints (every path, as a re-run replaces the record) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.
+In scope, run the `lane:plan` command the stop prints (every path) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.
 
-The notice is the same answer, printed ahead of the ship by `check:related`, `run:review --join` and a lane child's `review:record` after round 1's fixes — a file a fix added is planned before the ship.
+`check:related`, `run:review --join` and a lane child's `review:record` print the same notice ahead of the ship, so a file a fix added is planned first.
 
 A re-run resumes: a per-issue stage record, honored only where git state corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
 
@@ -729,7 +732,7 @@ Round 2 re-runs only on a moved tree or base, or a stale review.
 
 The review stage's `ship-stage` line carries the reason after `|` (`reused: …` or `ran: … — <cause>`), and `lane:breakdown` prints it beside the stage.
 
-A supervisor whose `sync` changed its own code hands the stages after it to a successor on that code (the wake supervisor's take-over, same launch record); a successor that does not take over leaves it running on.
+A supervisor whose `sync` changed its own code hands the stages after it to a successor on that code (same launch record); a successor that does not take over leaves it running on.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in detail".
 

@@ -55,10 +55,20 @@ function next_step(child: number | string, cause = ''): string {
 	return `${recovery}, then use \`${resume_of(child, true)}\` in the live backlogrun or resume it with \`${resume_of(child, false)}\``
 }
 
+const SESSION_UNFINISHED_LEAD = `${SESSION_UNFINISHED.short}: `
+
+// The child's first message line rides behind its class, so a reader keyed on the class still finds it.
 function session_unfinished(message: string): StallCause {
 	const first = message.split(/\r?\n/u, 1)[0]?.trim() ?? ''
 
-	return first === '' ? SESSION_UNFINISHED : { short: first, why: first }
+	return first === ''
+		? SESSION_UNFINISHED
+		: { short: `${SESSION_UNFINISHED_LEAD}${first}`, why: first }
+}
+
+// The class a park's cause names: `session unfinished` for one carrying the child's message too.
+function class_of(cause: string): string {
+	return cause.startsWith(SESSION_UNFINISHED_LEAD) ? SESSION_UNFINISHED.short : cause
 }
 
 function park_event(child: number | string, cause: string): string {
@@ -71,6 +81,15 @@ function cause_of(reason: string): string | undefined {
 	if (reason === RUN_STALLED_LABEL) return ''
 
 	return reason.startsWith(CAUSE_LEAD) ? reason.slice(CAUSE_LEAD.length) : undefined
+}
+
+// The cause a park event's text carries — `park_event`'s inverse — or `undefined` for a text that is
+// no `run:stalled` park with a cause.
+function cause_in(text: string): string | undefined {
+	const lead = ` parked (${CAUSE_LEAD}`
+	const start = text.indexOf(lead)
+
+	return start === -1 || !text.endsWith(')') ? undefined : text.slice(start + lead.length, -1)
 }
 
 // The ship stop a park event records — its stage and `Cause` class (joshuafolkken/kit#6864) — or
@@ -96,7 +115,9 @@ const run_stalled = {
 	CUT_NOT_RELAUNCHED,
 	SESSION_UNFINISHED,
 	STALE_HANDOFF,
+	cause_in,
 	cause_of,
+	class_of,
 	next_step,
 	park_event,
 	resume_of,

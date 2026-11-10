@@ -116,6 +116,7 @@ const RUNS: ReadonlyArray<string> = [
 	'pnpm josh check',
 	'pnpm josh run:handoff',
 	'pnpm josh issue:comment 1 --body x',
+	'pnpm josh issue:body 6982 --body-file .josh/tmp/issue-6982-body.md',
 	'node scripts/probe.ts',
 	'xargs cat',
 ]

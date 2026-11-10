@@ -6,6 +6,7 @@ import { lane_sinks } from './lane-sinks'
 
 const STATS_OPTIONS = {
 	period: { type: 'string' },
+	since: { type: 'string' },
 	limit: { type: 'string' },
 	sinks: { type: 'boolean' },
 	over: { type: 'string' },
@@ -21,8 +22,17 @@ interface StatsFlags {
 	pairs?: boolean | undefined
 }
 
+// Where the window opens: `--period <days>` before now, or the `--since <instant>` itself
+// (joshuafolkken/kit#7007).
+type StatsStart = { period_days: number } | { since_ms: number }
+
+interface StartFlags {
+	period?: string | undefined
+	since?: string | undefined
+}
+
 interface StatsRequest {
-	period_days: number
+	start: StatsStart
 	limit: string | undefined
 	// The `--sinks` threshold in minutes, `undefined` for the period's row and tables.
 	sinks: number | undefined
@@ -38,6 +48,30 @@ function positive(text: string | undefined): number | undefined {
 	const value = Number(text)
 
 	return text !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+// An ISO 8601 instant in epoch milliseconds, `undefined` for one `Date.parse` cannot read.
+function since_of(text = ''): number | undefined {
+	const since_ms = Date.parse(text)
+
+	return Number.isNaN(since_ms) ? undefined : since_ms
+}
+
+function since_start(text: string): StatsStart | undefined {
+	const since_ms = since_of(text)
+
+	return since_ms === undefined ? undefined : { since_ms }
+}
+
+// Exactly one of `--period` and `--since`; both, neither or an unreadable value refuses the request.
+function start_of(values: StartFlags): StatsStart | undefined {
+	if (values.since !== undefined) {
+		return values.period === undefined ? since_start(values.since) : undefined
+	}
+
+	const period_days = positive(values.period)
+
+	return period_days === undefined ? undefined : { period_days }
 }
 
 // The sinks table labels no lane limit, so `--limit` beside `--sinks` is refused.
@@ -115,15 +149,15 @@ function stats_request(rest: ReadonlyArray<string>): StatsRequest | undefined {
 
 	if (parsed === undefined) return undefined
 
-	const period_days = positive(parsed.values.period)
+	const start = start_of(parsed.values)
 	const table = table_flags(parsed.values, parsed.positionals)
 
-	if (period_days === undefined || table === undefined) return undefined
+	if (start === undefined || table === undefined) return undefined
 
-	return { period_days, limit: parsed.values.limit, ...table }
+	return { start, limit: parsed.values.limit, ...table }
 }
 
-const lane_stats_request = { positive, stats_request }
+const lane_stats_request = { positive, since_of, stats_request }
 
 export { lane_stats_request }
-export type { StatsRequest }
+export type { StatsRequest, StatsStart }

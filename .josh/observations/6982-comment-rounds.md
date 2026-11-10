@@ -1,0 +1,3 @@
+- rf:none | none | - | 2026-11-10 | #6982
+- rf:performance | low | scripts/test/test-related.ts:384 | 2026-11-10 | #6982
+- rf:performance | low | scripts/test/test-related.ts:384 | 2026-11-10 | #6982

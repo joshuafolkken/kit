@@ -153,11 +153,9 @@ function create_refusal_stamp(prefix: string): RefusalStamp {
 	return { path, last_ms: last_refusal_ms, record: record_refusal }
 }
 
-// **`.env` is loaded here rather than through the dispatcher's `tsx_arguments`**, and the reason —
-// declaring any `tsx_arguments` disqualifies a command from in-process dispatch — is now shared with
-// every other command that has to stay in-process, so the loader lives in `josh-environment-file.ts` rather
-// than here. Re-exported under this namespace because that is where the
-// hooks reach for it.
+// **`.env` is loaded here rather than through the dispatcher's `tsx_arguments`**; the loader lives in
+// `josh-environment-file.ts`, shared with the other commands that read the file themselves.
+// Re-exported under this namespace because that is where the hooks reach for it.
 //
 // **Call it only on the real hook path**, never inside the pure refusal function, so a developer's
 // own `.env` cannot decide what the unit tests see.
@@ -414,28 +412,6 @@ function emit_outcome(outcome: GuardOutcome): void {
 	else if (fault !== undefined) process.stdout.write(`${notice_envelope(fault)}\n`)
 }
 
-// The synchronous path: load `.env`, run the rule, emit. A wrapper around `emit_outcome` so both paths
-// write the same envelopes.
-function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutcome): void {
-	load_environment_file()
-
-	emit_outcome(outcome(raw_payload))
-}
-
-// The refusal-only shape, kept so the guards not yet moved across keep working unchanged. It is a
-// wrapper rather than a second implementation, so both paths write the same envelopes.
-//
-// **A guard still calling this discards any fault it raised** — `investigation-guard.ts` is the one
-// that does, so a stamp it could not write there is still silent — the gap the batching guard no
-// longer has. Moving another hook across belongs with its own test.
-function write_decision(raw_payload: string, refusal: (raw: string) => string | undefined): void {
-	write_outcome(raw_payload, (raw) => ({
-		reason: refusal(raw),
-		notice: undefined,
-		fault: undefined,
-	}))
-}
-
 // Run from a terminal there is no payload coming, and waiting for one looks like a hang.
 function report_no_payload(command: string): void {
 	process.stderr.write(
@@ -470,19 +446,15 @@ const hook_decision = {
 	create_transcript_guard,
 	deny_envelope,
 	emit_outcome,
-	fault_notice,
 	flow_rewrite_envelope,
 	is_switch_enabled,
 	is_switch_opt_in,
 	load_environment_file,
 	notice_envelope,
 	parse_hook_payload,
-	report_no_payload,
 	respond_from_stdin,
 	rewrite_envelope,
 	stamp_fault,
-	write_decision,
-	write_outcome,
 }
 
 export type { GuardOutcome, GuardRun, TranscriptGuard, TranscriptGuardSpec }

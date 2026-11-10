@@ -1,3 +1,4 @@
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { error_text } from '#scripts/lib/error-message'
 import { time_josh_names } from '#scripts/time-runtime/time-josh-names'
@@ -137,9 +138,15 @@ async function poll_reason(
 }
 
 // It fails open: an unreadable transcript or carry record allows the call rather than wedging the run.
-async function safe_poll_reason(raw_payload: string): Promise<string | undefined> {
+async function safe_poll_reason(
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): Promise<string | undefined> {
 	try {
-		return await poll_reason(raw_payload)
+		return await poll_reason(
+			raw_payload,
+			async () => await run_headless.is_backlog_parent(context.env, context.ancestry),
+		)
 	} catch (error) {
 		error_text.trace_swallowed('run_poll_hook.poll_reason', error)
 

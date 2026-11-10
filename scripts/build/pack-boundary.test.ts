@@ -77,6 +77,7 @@ const SHIPPED_UNREACHABLE = new Set([
 	'scripts/build/build-library.ts',
 	'scripts/build/hook-bundle-stamp.ts',
 	'scripts/build/build.ts',
+	'scripts/build/source-location.ts',
 	'scripts/managed-marker/index.ts',
 	'scripts/self-sync-guard/index.ts',
 	'scripts/version/index.ts',

@@ -53,10 +53,10 @@ const PREFLIGHT_STEP: Step = {
 		await run_ship_preflight.stage({ title: args.title, body_path: args.body_path }),
 }
 
-// The gate stage. **A gate that only reused the tree's green record is not timed**: after `--review`
-// launched the gate itself, this stage ends in seconds without running a check, and those seconds
-// would pull the `gate` row `lane:stats` reads for `JOSH_LANE_LIMIT` toward zero. The record is asked
-// for before the stage runs — afterwards every green gate has one.
+// The gate stage. **A gate that only reused the tree's green record is not timed**: once the lane gate
+// and the whole-tree checks are green on this tree, this stage ends in seconds without running a
+// check, and those seconds would pull the `gate` row `lane:stats` reads for `JOSH_LANE_LIMIT` toward
+// zero. The record is asked for before the stage runs — afterwards every green gate has one.
 async function gate_stage(args: ShipArguments): Promise<StepResult> {
 	const is_skipped = await run_ship_scoped.is_gate_green()
 	const result = await run_ship_scoped.scoped_gate()
@@ -70,7 +70,8 @@ async function gate_stage(args: ShipArguments): Promise<StepResult> {
 // a clean merge goes on without waking anyone. A merge after the gate would move the merge base the
 // gate's record pins, so the pre-push hook could not reuse that record. **With `--review` it runs before
 // round 1 too**: the gate round 1 launches then reads the base the commit carries, so a clean round
-// leaves the gate stage a reuse rather than a whole second gate over a moved base (joshuafolkken/kit#4442).
+// leaves the gate stage reusing its records rather than a whole second gate over a moved base
+// (joshuafolkken/kit#4442).
 const SYNC_STEP: Step = {
 	stage: STAGE.SYNC,
 	header: run_ship.SYNC_HEADER,
@@ -78,9 +79,10 @@ const SYNC_STEP: Step = {
 		await run_ship_sync.sync_stage(args.number, args.title, state.is_dirty === true),
 }
 
-// A default branch that moved since the sync stage is merged and gated again before the push
-// (`run_ship_sync.catch_up`, joshuafolkken/kit#4825). A resumed ship with nothing left to push leaves
-// that to the followup, which pushes what it merges; a pushed branch with new work still catches up.
+// A default branch that moved since the sync stage with a conflict is merged and gated again before
+// the push; a clean move is left to the merge ref's CI (`run_ship_sync.catch_up`,
+// joshuafolkken/kit#7058). A resumed ship with nothing left to push leaves that to the followup,
+// which pushes what it merges; a pushed branch with new work still catches up.
 // The commit's hooks claim cores with priority (`core-priority.ts`): a short closing stage need not
 // queue behind other lanes' heavy checks (joshuafolkken/kit#5767). `josh git` and its hooks time their
 // own steps under the commit's lap (joshuafolkken/kit#5831).
@@ -163,8 +165,9 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 	},
 ]
 
-// `--review` puts the supervised round-1 review in front of the gate: it launches the gate itself, so
-// the gate stage that follows reuses that tree's green record unless the round changed the tree. It
+// `--review` puts the supervised round-1 review in front of the gate: it launches the lane gate itself,
+// so the gate stage that follows — `josh gate --whole-tree` — reuses that gate's per-check records and
+// runs only the whole-tree checks, unless the round changed the tree. It
 // also joins round 2 beside the gate. The green gate pushes the committed tree and opens its PR
 // while round 2 finishes; the commit stage sends only subsequent changes. Sync and round 1 finish
 // first, so neither can move the review's checkout.

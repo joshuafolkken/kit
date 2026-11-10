@@ -1,0 +1,7 @@
+{
+	"reason": "Record the test:related branch change by half and base in the lane ledger (#6982)",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 33
+	}
+}

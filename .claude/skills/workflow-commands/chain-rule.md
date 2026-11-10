@@ -66,9 +66,6 @@ Recommendations are informational; severity decides. A CodeRabbit rate-limit war
    round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`).
    A preflight stop `unplanned: <files>` → take one of the two ways out it prints, then re-detach
    — unless its `lane:plan` answers `yield` (`docs/josh-commands-run.md` → "`josh ship`").
-   `run:cut` `budget-over`, or a scoped check's `split notice` past the implement budget with a
-   criterion met → the `issue:spill` it prints, then this step on the current tree, no resume
-   (`pre-gate-cut.md` → "Taking the cut").
    `failed` → step 1.
 
 ## Orchestration facts single-sourced here

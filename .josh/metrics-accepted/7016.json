@@ -1,0 +1,7 @@
+{
+	"reason": "#7016 adds the per-tick snapshot module (backlog-drive-tick.ts), the stream tick reader the issue asks for, the idle-tick guard that skips the process table read, and the ports_of export that pins the tick wiring",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 89
+	}
+}

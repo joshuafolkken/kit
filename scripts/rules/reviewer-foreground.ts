@@ -1,3 +1,4 @@
+import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -41,16 +42,13 @@ function is_foreground(call: GuardedCall): boolean {
 	return json_value.is_record(call.input) && call.input[BACKGROUND_FIELD] === false
 }
 
-function is_background_reviewer(
-	call: GuardedCall,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
-): boolean {
+function is_background_reviewer(call: GuardedCall, is_lane_child: boolean): boolean {
 	return is_lane_child && is_reviewer(call) && !is_foreground(call)
 }
 
 function foreground_input(
 	call: GuardedCall,
-	is_lane_child: boolean = lane_child_marker.is_child_of(process.cwd()),
+	is_lane_child: boolean,
 ): Record<string, unknown> | undefined {
 	if (!is_background_reviewer(call, is_lane_child) || !json_value.is_record(call.input)) {
 		return undefined
@@ -61,12 +59,18 @@ function foreground_input(
 
 const ROW = {
 	id: 'reviewer-foreground',
-	is_trigger: (call: GuardedCall): boolean => is_background_reviewer(call),
+	is_trigger: (call: GuardedCall, context: HookContext): boolean =>
+		is_background_reviewer(call, lane_child_marker.is_child_of(context.cwd, context.env)),
 	reason: REVIEWER_FOREGROUND_REASON,
 	decide: (): boolean => true,
 	keeps: (call: GuardedCall): boolean => is_reviewer(call) && is_foreground(call),
 	reaches: is_reviewer,
-	rewrite: (call: GuardedCall): Record<string, unknown> | undefined => foreground_input(call),
+	rewrite: (
+		call: GuardedCall,
+		_tail: () => string,
+		context: HookContext,
+	): Record<string, unknown> | undefined =>
+		foreground_input(call, lane_child_marker.is_child_of(context.cwd, context.env)),
 	rewrite_note: REVIEWER_FOREGROUND_NOTE,
 	about: {
 		title: 'Lane child reviewer dispatched in the foreground',

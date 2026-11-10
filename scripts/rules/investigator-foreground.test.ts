@@ -367,7 +367,10 @@ describe('investigator_foreground.ROW — delivered by the rule guard', () => {
 
 	it('is the one delivered row whose trigger fires on a background investigator', () => {
 		const call = agent_call({ subagent_type: INVESTIGATOR })
-		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) => rule.is_trigger(call))
+		const context = hook_context.from_process()
+		const claiming = delivered_rules.DELIVERED_RULES.filter((rule) =>
+			rule.is_trigger(call, context),
+		)
 
 		expect(claiming.map((rule) => rule.id)).toEqual(['investigator-foreground'])
 	})

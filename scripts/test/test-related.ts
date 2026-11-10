@@ -20,6 +20,7 @@ import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
 import { test_related_verdict } from './test-related-verdict'
+import { test_related_whole } from './test-related-whole'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
 // The narrowing itself is `test-related-scope.ts` over the shared
@@ -33,9 +34,7 @@ import { test_related_verdict } from './test-related-verdict'
 
 // A failure answers `undefined` rather than an empty list: the two are opposite inputs to
 // `resolve_scope`, and only one of them means "could not tell".
-async function read_or_undefined(
-	read: () => Promise<ReadonlyArray<string>>,
-): Promise<ReadonlyArray<string> | undefined> {
+async function read_or_undefined<T>(read: () => Promise<T>): Promise<T | undefined> {
 	try {
 		return await read()
 	} catch {
@@ -228,8 +227,8 @@ function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> 
 }
 
 // A file every test imports, or one past the reach cap, narrows to its direct importers (`capped`)
-// unless the run keeps the whole suite: the gate's unit leg, and the gate's reuse of it, pass
-// `test_related_cap.NO_CAP` (`gate_labels.KEEP_WHOLE_SUITE_FLAG`).
+// unless the run keeps the whole suite: the gate's unit leg outside a lane, and the gate's reuse of
+// it, pass `test_related_cap.NO_CAP` (`test_related_whole.is_whole_suite_kept`).
 async function scope_of(
 	root: string,
 	change: ChangeReading,
@@ -380,12 +379,14 @@ async function run_fresh(
 	const command_arguments = given.filter((argument) => argument !== KEEP_WHOLE_SUITE_FLAG)
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const before = command_arguments.length === 0 ? tree : undefined
-	const is_whole = given.includes(KEEP_WHOLE_SUITE_FLAG)
+	const is_whole = test_related_whole.is_whole_suite_kept(given, root)
 	const input = await read_run_input(root, command_arguments, is_whole, before)
+	// The branch change by half and base, for the ledger alone (joshuafolkken/kit#6982).
+	const branch_parts = await read_or_undefined(changed_paths.read_changed_parts)
 
 	report_unhanded(root, command_arguments, input)
 
-	return await test_related_run.run_and_vouch(input, command_arguments, before)
+	return await test_related_run.run_and_vouch({ ...input, branch_parts }, command_arguments, before)
 }
 
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {

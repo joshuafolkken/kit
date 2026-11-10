@@ -11,15 +11,15 @@ import type { PoolContext } from './backlog-gate-scope'
 import { backlog_pool } from './backlog-pool'
 
 // An offered Issue whose declared estimate is over the split guide, with no reason it stays one —
-// judged by the same `size_estimate.over_guide` `issue:file` refuses on (and, reason or not, its
-// `over_budget` at the pool's measured rate — joshuafolkken/kit#6066), so a body edited past the
+// judged by the same `size_estimate.over_guide` `issue:file` refuses on, so a body edited past the
 // guide after filing is still seen before a lane starts it (joshuafolkken/kit#5384). A split child
 // passes the guide at filing, yet is warned on here too: lanes land past the doubled declaration
 // (joshuafolkken/kit#5935).
 //
-// One over the cap with no declared reason is not offered at all: it waits on a person to split it or
-// declare it one deliverable (joshuafolkken/kit#5502, joshuafolkken/kit#6602). `size_estimate.over_cap`
-// is the filing's own bar.
+// One over the cap, or projected over the implement budget, with no declared reason is not offered at
+// all: it waits on a person to split it or declare it one deliverable (joshuafolkken/kit#5502,
+// joshuafolkken/kit#6602, joshuafolkken/kit#7006). `size_estimate.over_cap` and `over_budget` are the
+// filing's own bars.
 
 // What the note asks of the issue: a further split for a split child, else the reason it stays one.
 function remedy_of(route: string | undefined): string {
@@ -30,7 +30,7 @@ function remedy_of(route: string | undefined): string {
 
 // An estimate projected over the implement budget (joshuafolkken/kit#6066); a declared reason excuses
 // it, as it does the cap (joshuafolkken/kit#6602).
-const BUDGET_REMEDY = `and is projected over the implement budget with no \`${split_assess.REASON_PREFIX}\``
+const BUDGET_REASON = `and is projected over the implement budget with no \`${split_assess.REASON_PREFIX}\``
 
 interface Warning {
 	estimate: SizeMeasurement
@@ -47,10 +47,7 @@ function warning_of(
 		size_estimate.over_guide(body, route, rate, growth) ??
 		size_estimate.split_over_guide(body, route, rate, growth)
 
-	if (guide !== undefined) return { estimate: guide, remedy: remedy_of(route) }
-	const budget = size_estimate.over_budget(body, route, rate, growth)
-
-	return budget === undefined ? undefined : { estimate: budget, remedy: BUDGET_REMEDY }
+	return guide === undefined ? undefined : { estimate: guide, remedy: remedy_of(route) }
 }
 
 function note_of(issue: OpenIssueData, context: PoolContext): string | undefined {
@@ -84,23 +81,32 @@ interface CapRow {
 	labels: ReadonlyArray<string>
 }
 
-function capped_of(
+// Why a row is held: its counts against the cap, else its projection over the implement budget.
+function held_reason_of(
 	row: Pick<CapRow, 'body' | 'labels'>,
 	rate?: ImplementRate,
 	growth?: SizeRatios,
-): SizeMeasurement | undefined {
-	return size_estimate.over_cap(row.body ?? '', size_estimate.route_of(row.labels), rate, growth)
+): string | undefined {
+	const body = row.body ?? ''
+	const capped = size_estimate.over_cap(body, size_estimate.route_of(row.labels), rate, growth)
+
+	if (capped !== undefined) return size_estimate.capped(capped, rate, growth)
+	const budget = size_estimate.over_budget(body, rate, growth)
+
+	return budget === undefined
+		? undefined
+		: `${size_estimate.exceeded(budget, rate, growth)} ${BUDGET_REASON}`
 }
 
-// The withheld note: the counts against the cap and what a person does about it.
+// The withheld note: why the row is held and what a person does about it.
 function warn_capped(row: CapRow, rate?: ImplementRate, growth?: SizeRatios): void {
-	const estimate = capped_of(row, rate, growth)
+	const reason = held_reason_of(row, rate, growth)
 
-	if (estimate === undefined) return
+	if (reason === undefined) return
 	const cited = session_cite.issue(row.number, undefined, row.repo)
 
 	console.error(
-		`${cited} not offered: ${size_estimate.capped(estimate, rate, growth)} — split it; split-assessment.md → "${split_assess.QUESTION_SECTION}"`,
+		`${cited} not offered: ${reason} — split it and file the parts again, or declare \`${split_assess.REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`,
 	)
 }
 
@@ -122,15 +128,15 @@ function warn_over_cap(context: PoolContext): void {
 	}
 }
 
-// The keys of the open epic children over the cap, each reported on stderr — held for a person the
-// way an untrusted author's child is.
+// The keys of the open epic children over the cap or the implement budget, each reported on stderr —
+// held for a person the way an untrusted author's child is.
 function held_children(
 	children: ReadonlyArray<EpicChild>,
 	rate?: ImplementRate,
 	growth?: SizeRatios,
 ): ReadonlySet<string> {
 	const held = children.filter(
-		(child) => child.state === 'OPEN' && capped_of(child, rate, growth) !== undefined,
+		(child) => child.state === 'OPEN' && held_reason_of(child, rate, growth) !== undefined,
 	)
 
 	for (const child of held) warn_capped(child, rate, growth)

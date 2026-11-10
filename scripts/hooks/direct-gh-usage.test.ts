@@ -1,8 +1,9 @@
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { gh_usage_log } from '#scripts/gh/gh-usage-log'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { run_carry } from '#scripts/run/carry/run-carry'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { direct_gh_usage } from './direct-gh-usage'
@@ -19,7 +20,10 @@ vi.mock('#scripts/run/run-watcher-hook', () => ({
 }))
 
 vi.mock('#scripts/run/run-parent-cut-hook', () => ({
-	run_parent_cut_hook: { parent_cut_reason: vi.fn().mockResolvedValue(undefined) },
+	run_parent_cut_hook: {
+		current_state: vi.fn(),
+		parent_cut_reason: vi.fn().mockResolvedValue(undefined),
+	},
 }))
 
 vi.mock('#scripts/issue/issue-watch-hook', () => ({
@@ -40,7 +44,7 @@ writeFileSync(TRANSCRIPT, '')
 beforeEach(() => {
 	vi.stubEnv('VITEST', undefined)
 	vi.spyOn(lane_child_marker, 'marked_issue').mockReturnValue(undefined)
-	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(WORK_DIRECTORY)
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(WORK_DIRECTORY)
 	vi.spyOn(hook_ledger, 'record_reason').mockResolvedValue(undefined)
 })
 
@@ -130,6 +134,34 @@ describe('direct_gh_usage.record — the calls a command line launches', () => {
 		expect(await written_lines('gh run view 9')).toEqual([
 			expect.objectContaining({ command: 'direct:run view', issue: LANE_ISSUE }),
 		])
+	})
+})
+
+// joshuafolkken/kit#6973: the log, the test-run check and the lane issue come from the call's context.
+describe('direct_gh_usage.record — the call context', () => {
+	const context = hook_context_fixture.of('/call/checkout', {
+		[lane_child_marker.KEY]: String(LANE_ISSUE),
+	})
+
+	it("logs under the context cwd's repository with the context's lane issue", async () => {
+		vi.mocked(lane_child_marker.marked_issue).mockRestore()
+		const append = vi.spyOn(gh_usage_log, 'append').mockReturnValue(undefined)
+
+		await direct_gh_usage.record(bash_payload(PR_CHECKS), context)
+
+		expect(git_common_directory.repository).toHaveBeenCalledWith(context.cwd)
+		expect(append.mock.calls[0]?.[1]).toMatchObject({ issue: LANE_ISSUE })
+	})
+
+	it('writes nothing when the context marks a test run', async () => {
+		const append = vi.spyOn(gh_usage_log, 'append').mockReturnValue(undefined)
+
+		await direct_gh_usage.record(
+			bash_payload(PR_CHECKS),
+			hook_context_fixture.of('/x', { VITEST: 'true' }),
+		)
+
+		expect(append).not.toHaveBeenCalled()
 	})
 })
 

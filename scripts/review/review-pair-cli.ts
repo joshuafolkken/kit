@@ -57,12 +57,17 @@ function refuse(text: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-// A delegated unit's transcript is `<session>/subagents/agent-<id>.jsonl` (`cost-transcript.ts`).
+// A delegated unit's transcript is `<session>/subagents/agent-<id>.jsonl` (`cost-transcript.ts`); a
+// headless reviewer the ship or a lane's broker started is a session of its own (joshuafolkken/kit#7020).
+function is_agent_session(session_id: string, agent: string): boolean {
+	return session_id === agent || session_id.endsWith(`/agent-${agent}`)
+}
+
 function agent_cost(agent: string): AgentCost {
 	const directories = cost_transcript.transcript_directories(process.cwd())
 	const file = cost_transcript
 		.list_sessions_across(directories)
-		.find((session) => session.session_id.endsWith(`/agent-${agent}`))
+		.find((session) => is_agent_session(session.session_id, agent))
 	if (file === undefined) return {}
 	const { records } = cost_transcript.read_session(file)
 
@@ -146,7 +151,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = run(process.argv.slice(ARGV_OFFSET))
 }
 
-const review_pair_cli = { findings_of, run }
+const review_pair_cli = { agent_cost, findings_of, is_agent_session, run }
 
 export type { PairSources }
 export { review_pair_cli }

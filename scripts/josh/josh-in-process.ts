@@ -1,7 +1,6 @@
 import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { CommandEntry } from './josh-command-types'
 
 // `pnpm josh <script command>` started tsx twice — once for this dispatcher, once for the script it
 // spawned. Measured on 2026-09-04, the second start was about 0.16 s of the 0.55 s a
@@ -20,7 +19,7 @@ function is_typescript_dispatcher(dispatcher_url: string): boolean {
 	return dispatcher_url.endsWith(TYPESCRIPT_EXTENSION)
 }
 
-// A command marked `is_bundled` is pre-built to `dist/commands/<script basename>.js` by
+// Every script command is pre-built to `dist/commands/<script basename>.js` by
 // `scripts/build/build-commands.ts`. The path is derived here, in a module
 // the dispatcher bundle already carries, so the build and the dispatcher cannot name two locations.
 function bundled_script_path(package_directory: string, script: string): string {
@@ -29,24 +28,26 @@ function bundled_script_path(package_directory: string, script: string): string 
 	return path.join(package_directory, BUNDLED_COMMAND_DIRECTORY, name)
 }
 
-// The file this dispatcher imports in its own process, or `undefined` to spawn tsx instead.
-// `tsx_arguments` are node flags the script needs *before* its own code runs — today every one of
-// them a form of `--env-file`, which the dispatcher loads into the child's environment just before
-// it spawns (`josh_environment_file.apply_node_flags`). Those commands (`doctor`, `latest:scope`, `followup`, `notify`) keep a
-// process of their own; each runs at most a few times per run, so none of them is where the cost
-// this saves accumulates. Under plain node, which cannot load a `.ts` script at all, only a
-// pre-built command runs in-process; every other one keeps spawning tsx.
+// What the dispatcher imports, and the script the command runs as. They differ under plain node,
+// which cannot load a `.ts` script at all and imports the pre-built command instead; the build keeps
+// every module's `import.meta.url` on its source (`scripts/build/source-location.ts`), so the
+// script stays the source either way.
+interface InProcessTarget {
+	module_path: string
+	script_path: string
+}
+
 function in_process_target(
-	entry: CommandEntry,
+	script: string,
 	package_directory: string,
 	dispatcher_url: string,
-): string | undefined {
-	if (entry.script === undefined || entry.tsx_arguments !== undefined) return undefined
-	if (is_typescript_dispatcher(dispatcher_url)) return path.join(package_directory, entry.script)
+): InProcessTarget {
+	const script_path = path.join(package_directory, script)
+	const module_path = is_typescript_dispatcher(dispatcher_url)
+		? script_path
+		: bundled_script_path(package_directory, script)
 
-	return entry.is_bundled === true
-		? bundled_script_path(package_directory, entry.script)
-		: undefined
+	return { module_path, script_path }
 }
 
 // `process.exitCode` is typed `number | string | undefined`. Only the numeric form is an exit code
@@ -75,15 +76,13 @@ function resolve_real_path(script_path: string): string {
 // restored afterwards: the script is the program from here on, and anything it deferred past module
 // evaluation would otherwise read the dispatcher's argv instead of its own.
 async function run_in_process(
-	script_path: string,
+	target: InProcessTarget,
 	script_arguments: ReadonlyArray<string>,
 ): Promise<number> {
-	const resolved_path = resolve_real_path(script_path)
-
-	process.argv = [process.execPath, resolved_path, ...script_arguments]
+	process.argv = [process.execPath, resolve_real_path(target.script_path), ...script_arguments]
 
 	try {
-		await import(pathToFileURL(resolved_path).href)
+		await import(pathToFileURL(resolve_real_path(target.module_path)).href)
 	} catch (error) {
 		// A spawned tsx printed the stack and exited 1; the same failure has to look the same here.
 		console.error(error)
@@ -96,4 +95,5 @@ async function run_in_process(
 
 const josh_in_process = { bundled_script_path, in_process_target, run_in_process }
 
+export type { InProcessTarget }
 export { BUNDLED_COMMAND_DIRECTORY, FAILURE_EXIT_CODE, josh_in_process }

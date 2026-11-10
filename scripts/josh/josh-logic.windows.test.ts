@@ -11,11 +11,9 @@ vi.mock('node:fs', () => ({
 	readFileSync: vi.fn().mockReturnValue('{"version":"0.0.0"}'),
 }))
 
-const { josh_logic, resolve_tsx_executable } = await import('./josh-logic')
+const { resolve_tsx_executable } = await import('./josh-logic')
 
 const ORIGINAL_PLATFORM = process.platform
-const SPAWN_SUCCESS = { exitCode: 0 }
-const SCRIPT_FILE_ARGS = ['script.ts']
 
 afterEach(() => {
 	Object.defineProperty(process, 'platform', { value: ORIGINAL_PLATFORM, configurable: true })
@@ -54,26 +52,5 @@ describe('resolve_tsx_executable on non-win32', () => {
 		)
 
 		expect(resolve_tsx_executable()).not.toMatch(/\.cmd$/u)
-	})
-})
-
-// The shell would hand the arguments to cmd.exe unescaped; execa runs a `.cmd` shim itself and
-// escapes them, so no platform or executable turns the shell on.
-describe('josh_logic.spawn_script shell option', () => {
-	it.each([
-		['win32', 'tsx.cmd'],
-		['win32', process.execPath],
-		['darwin', 'tsx'],
-	])('never passes a shell to execaSync on %s spawning %s', (platform, executable) => {
-		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
-		Object.defineProperty(process, 'platform', { value: platform, configurable: true })
-
-		josh_logic.spawn_script(executable, SCRIPT_FILE_ARGS)
-
-		expect(execa_sync_mock).toHaveBeenCalledWith(
-			executable,
-			SCRIPT_FILE_ARGS,
-			expect.not.objectContaining({ shell: true }),
-		)
 	})
 })

@@ -10,7 +10,8 @@ import { related_scope } from './test-related-scope'
 // **A change whose imports reach more than `test_pinned_logic.MAX_TEST_FILES` test files runs only the
 // tests importing its widest files directly** (joshuafolkken/kit#5532, #5702), as a file every test imports does
 // (`direct-importers.ts`): the tests past them stay unchecked here, for `josh gate`'s whole suite and
-// CI to run. `--keep-whole-suite` (the gate's unit leg) lifts the cap, and so does a missing graph.
+// CI to run. `--keep-whole-suite` (the gate's unit leg) lifts the cap outside a lane
+// (`test-related-whole.ts`), and so does a missing graph.
 
 type CountReader = (files: ReadonlyArray<string>) => Promise<Array<ReachedCount> | undefined>
 

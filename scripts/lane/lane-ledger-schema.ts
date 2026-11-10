@@ -73,6 +73,11 @@ const load_schema = z.object({
 	processes: z.array(process_kind_schema).optional(),
 	// The resident apps' summed size (`lane_process_load.RESIDENT_APPS`, joshuafolkken/kit#5658).
 	resident_mb: z.number().optional(),
+	// The host's sleep since boot (`lane-load.ts`, joshuafolkken/kit#7026).
+	slept_ms: z.number().optional(),
+	// The boot and last-wake instants, epoch ms (`kern.boottime`, `kern.waketime`).
+	booted_ms: z.number().optional(),
+	woke_ms: z.number().optional(),
 })
 // A lane child started on `issue` — the instant its implementation is timed from.
 const dispatch_schema = z.object({
@@ -197,6 +202,13 @@ const test_related_schema = z.object({
 	// The widest of them in the run's own change, the hub that put the run past the cap
 	// (joshuafolkken/kit#5699); absent when main or the map's tree brought them all (joshuafolkken/kit#5756).
 	over_cap_hub: z.string().optional(),
+	// The branch change read beside the run, by half and by base (joshuafolkken/kit#6982).
+	branch_tracked: z.number().optional(),
+	branch_untracked: z.number().optional(),
+	branch_base: z.enum(['merge_base', 'fallback']).optional(),
+	// `changed` split by whether that branch change holds the file (joshuafolkken/kit#7066).
+	changed_in_branch: z.number().optional(),
+	changed_off_branch: z.number().optional(),
 	elapsed_ms: z.number(),
 })
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache

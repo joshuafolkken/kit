@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { ChangedParts } from '#scripts/git/changed-paths'
 import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
@@ -37,6 +38,8 @@ interface RunInput {
 	// The changed files past the reach cap, narrowed to their direct importers, widest reach first
 	// (`test-related-cap.ts`).
 	over_cap?: ReadonlyArray<string>
+	// The branch change by half and base, read beside the run; `undefined` where git could not answer.
+	branch_parts?: ChangedParts | undefined
 }
 
 interface RunResult {
@@ -153,10 +156,31 @@ function over_cap_record(
 	return hub === undefined ? count : { ...count, over_cap_hub: hub }
 }
 
+// joshuafolkken/kit#6982: a run whose `changed` swelled to ~1,500 left nothing that told an untracked
+// flood from a base that fell back to the default branch — nor (joshuafolkken/kit#7066) the branch
+// change from named files or moves since the last green.
+function branch_parts_record(
+	parts: ChangedParts | undefined,
+	own: ReadonlyArray<string>,
+): Partial<TestRelatedRecord> {
+	if (parts === undefined) return {}
+	const branch = new Set([...parts.tracked, ...parts.untracked])
+	const in_branch = own.filter((file) => branch.has(file)).length
+
+	return {
+		branch_tracked: parts.tracked.length,
+		branch_untracked: parts.untracked.length,
+		branch_base: parts.base,
+		changed_in_branch: in_branch,
+		changed_off_branch: own.length - in_branch,
+	}
+}
+
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const { own, synced, since_map } = parts_of(input)
 	const record = {
 		...reuse_record(input.reuse),
+		...branch_parts_record(input.branch_parts, own),
 		scope: input.kind ?? related_scope.scope_kind(input.scope),
 		changed: own.length,
 		synced: synced.length,

@@ -18,7 +18,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh exports:unused` · `josh eu` | — | developer | none | Report exported namespace members nothing reads (kit only; a consumer project skips it) |
 | `josh format` · `josh f` | — | developer | files, processes | Format code with prettier and eslint (skips a tool a basic project lacks) |
 | `josh format:edited` | — | automation | files, processes | Claude Code hook: format the file just edited (reads the tool call on stdin) |
-| `josh gate` · `josh ga` | `[--verbose\|--force\|--no-unit\|--static-group=<group>]` | developer | files, processes | Run lint, type check, spell check and unit tests concurrently |
+| `josh gate` · `josh ga` | `[--verbose\|--force\|--no-unit\|--whole-tree\|--static-group=<group>]` | developer | files, processes | Run lint, type check, spell check and unit tests concurrently |
 | `josh hook:ledger` · `josh hkl` | `--period <days> [--demote [--apply]] \| --restore <rule>` | maintainer | network, files | Print Claude Code hook refusals per hook and rule over a period: refusals, the same call passing later, and route:interrupt issues naming the rule; list, demote or restore rules that mostly refuse allowed work |
 | `josh lines` · `josh ln` | `<files...>` | developer | none | Print a file's code lines against the max-lines limit and the headroom left |
 | `josh lint` · `josh l` | `[--changed]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
@@ -140,7 +140,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh cases` | `<path...>` | automation | files | Read changed paths and print the boundaries crossed and their mandatory abnormal cases: network \| process \| fs \| time \| state \| env \| none |
 | `josh clone:scan` | — | automation | files | Count code duplication across files and first-party repositories, printing each clone as file:line pairs |
 | `josh cost` | `(--cut \| --over <tokens-per-request>) [--path <dir>]` | automation | none | Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over) |
-| `josh cost:audit` · `josh ca` · **kit only** | `[--period <days>] [--density]` | maintainer | none | Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before |
+| `josh cost:audit` · `josh ca` · **kit only** | `[--period <days> \| --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]` | maintainer | none | Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before |
 | `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed what a defect issue names, as candidates for its origin line |
 | `josh defect:report` | — | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
 | `josh delegate` | `<step> \| --list` | automation | none | Say whether a run step may go to a cheaper execution tier |
@@ -159,6 +159,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh fanout` | `<unit-files> <unit-files> [<unit-files> …]` | automation | none | Say whether proposed implementation units are file-disjoint, so they may run in parallel |
 | `josh issue:ack` | `<issue>` | automation | network | Record that the run read a person's update to its issue, printing the update it acknowledges |
 | `josh issue:already-done` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold |
+| `josh issue:body` | `<issue> --body-file <path>` | automation | network | Replace an issue's body with a file that passes issue:lint |
 | `josh issue:cite` | `<issue...> [--repo <owner/repo>]` | automation | network | Print the paste-ready number-link citation line for each issue, in one call |
 | `josh issue:comment` | `<issue> --body <text> \| --body-file <path>` | automation | network | Post one comment to an issue from a file, so no shell expands the body |
 | `josh issue:consolidate` | `<target> <duplicate>... [--title <title>] [--body-file <path>] [--demote]` | automation | network | Fold duplicates into a target: untrack, close as not planned; a failed write lists the writes done |
@@ -168,12 +169,12 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
 | `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
 | `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |
-| `josh issue:priority` | `<issue> [--critical --reason <text>]` | automation | network | Raise an issue to the priority its body declares or reaches after filing |
+| `josh issue:priority` | `<issue> [--critical\|--high\|--normal --reason <text>]` | automation | network | Raise an issue to the priority its body declares or reaches, or set the one a person instructs |
 | `josh issue:read` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
 | `josh issue:release-class` | `<issue> <enhancement\|other-change>` | automation | network | Write the issue body's one release classification line, replacing any earlier one |
 | `josh issue:scout` | `<title> [--body <summary> \| --body-file <path>]` | automation | network | Before filing: say whether an issue like this exists and which epic it belongs to |
-| `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行" [--distinct <N,…>]` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
+| `josh issue:spill` | `<issue> --estimate "<F> ファイル / <L> 行" [--reason "<理由>"] [--distinct <N,…>]` | automation | network | Move an issue's unchecked acceptance criteria into a follow-up filed by `issue:file --route split`, placed after it in its epic (or a new one), leaving one link line |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |
 | `josh issue:tick` | `<issue> <ac-id>...` | automation | network | Tick selected acceptance checkboxes by their plan identifiers |
 | `josh lane:adopt` · `josh lad` | `<issue> \| --all` | developer | files, git, processes, network | Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched |
@@ -194,7 +195,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lane:restart` · `josh lrs` | `<issue>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure |
 | `josh lane:resume` · `josh lru` | `<issue> \| --all` | developer | processes | Let a paused lane child carry on from where it stopped (SIGCONT) |
 | `josh lane:sample` · `josh lsm` | `[--every <seconds>]` | maintainer | files | Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one |
-| `josh lane:stats` · `josh lst` | `--period <days> [--limit <lane-limit> \| --sinks [<minutes>] \| --over <minutes> \| --why <minutes> \| --pairs]` | maintainer | none | Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs |
+| `josh lane:stats` · `josh lst` | `(--period <days> \| --since <instant>) [--limit <lane-limit> \| --sinks [<minutes>] \| --over <minutes> \| --why <minutes> \| --pairs]` | maintainer | none | Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs |
 | `josh lane:value` · `josh lva` | `<metric> --since <instant>` | maintainer | none | Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --where --column --item --zero), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit) |
 | `josh lane:why` · `josh lwy` | `<issue>` | maintainer | processes, network | Print a merged lane's stages over budget, one row each, beside the records that say why |
 | `josh lane:withdraw` · `josh lwd` | `<issue> --reason <text>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and close the lane, leaving its issue open for the next run — booked withdrawn, not as an outage or a failure |

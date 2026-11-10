@@ -29,10 +29,12 @@ type NamedCase = readonly [string, () => Promise<void> | void]
 // Through the dispatcher's own in-process import, so the guard is exercised as `josh` runs it. The
 // module cache is reset first: an entry evaluates once per import, and a case reruns it.
 async function run_entry(entry: string, argv: ReadonlyArray<string>): Promise<number> {
+	const script_path = path.resolve(entry)
+
 	vi.resetModules()
 
 	try {
-		return await josh_in_process.run_in_process(path.resolve(entry), argv)
+		return await josh_in_process.run_in_process({ module_path: script_path, script_path }, argv)
 	} finally {
 		process.argv = ORIGINAL_ARGV
 		process.exitCode = ORIGINAL_EXIT_CODE

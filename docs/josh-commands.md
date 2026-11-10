@@ -24,14 +24,18 @@ Run lint, type check, spell check and unit tests concurrently.
 
 ```bash
 pnpm josh gate
-pnpm josh gate --verbose   # every check's output, passing ones included
-pnpm josh gate --force     # re-run even on a tree already recorded green
-pnpm josh gate --no-unit   # the static checks only (CI only)
+pnpm josh gate --verbose      # every check's output, passing ones included
+pnpm josh gate --force        # re-run even on a tree already recorded green
+pnpm josh gate --no-unit      # the static checks only (CI only)
+pnpm josh gate --whole-tree   # add the whole-tree checks (the ship's gate on the final tree)
 ```
 
 <!-- /usage -->
 
-Also runs [behavior](#josh-behavior), [unused namespace members](#josh-exportsunused), the [metrics ratchet](#josh-metrics) and the [lockfile policy](josh-commands-automation.md#josh-lockfilepolicy) (kit only).
+Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-automation.md#josh-lockfilepolicy) (kit only).
+
+- The whole-tree checks — [unused namespace members](#josh-exportsunused) and the [metrics ratchet](#josh-metrics) (kit only) — run only with `--whole-tree` or `--no-unit`: the ship's gate and CI run them; a lane's own gate does not.
+- A `--whole-tree` gate reuses a green record only while both checks' own records are reusable (`scripts/gate/whole-tree-reuse.ts`).
 
 - Static checks: `pnpm josh lint`, `cspell:dot`, `behavior`, `exports:unused`, `metrics` (kit only); the unit leg is `pnpm josh test:related`; the type check resolves to a toolkit `check:ci` / `check` when installed, else `pnpm josh check`.
 - A tree recorded green is reused unless `--force` or the changed-file map moved; otherwise `lint`, `check`, `exports` and `metrics` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`), and `test:unit` while `josh test:related` would run no test for what moved (no test-read map, or one git can no longer diff against, runs it); the header reads `reused — inputs unchanged since it passed at <time>`.
@@ -40,7 +44,7 @@ Also runs [behavior](#josh-behavior), [unused namespace members](#josh-exportsun
 - `--static-group=<lint|types|rest>` implies `--no-unit`: one part of the static set per CI matrix leg (`scripts/gate/gate-static-group.ts`).
 - **On failure, a line per failed check with the command to re-run is printed just above the verdict**, so a `tail` keeps every failure.
 - **The last line is the verdict, counting ran apart from skipped**: `✔ verification gate passed (6 checks) in 41.2s.`, or `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` — which exits `0` but writes no green record.
-- Exit `1` if any check failed. Refuses any argument other than the three flags and `--static-group=<group>`.
+- Exit `1` if any check failed. Refuses any argument other than the four flags and `--static-group=<group>`.
 - [`josh test:related`](#josh-testrelated) narrows the unit leg; CI runs the whole sharded suite regardless.
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
@@ -316,8 +320,9 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
 - A changed module the vitest config or a setup file imports (`IMPORTED_BY_EVERY_TEST` in `scripts/test/whole-suite-files.ts`) runs only the test files importing it directly, and none when no test does; `josh gate`'s `test:unit` passes `--keep-whole-suite` to run the whole suite for it, as CI does. `josh test:pinned`'s probe narrows by the same rule and leaves out the same heavy files.
 - A changed file whose imports reach more test files than `test_pinned_logic.MAX_TEST_FILES` (150) narrows the same way, to the test files importing it directly, and prints `<N> over cap`, the hub, the count of test files run in place of the reach, and the files (`scripts/test/test-related-cap.ts`).
+- `--keep-whole-suite` does nothing in a lane: its gate leaves the whole suite to CI's required `Checks` (`scripts/test/test-related-whole.ts`).
 - The hub is the capped file of the widest reach in the branch's own change, left off where a main merge or the map's tree brought every capped file.
-- The lane ledger row records `<N>` as `over_cap` and the hub as `over_cap_hub`; `josh lane:breakdown` prints the widest run's count, the one its summary line printed. `--keep-whole-suite` lifts the cap; `josh gate` and CI run the rest.
+- The lane ledger row records `<N>` as `over_cap` and the hub as `over_cap_hub`; `josh lane:breakdown` prints the widest run's count, the one its summary line printed. `--keep-whole-suite` lifts the cap outside a lane; `josh gate` there and CI run the rest.
 - An entries-only edit of `tools/test/pure-files.ts` runs the moved entries and the list's own tests; a `.josh/` run record reaches only a test that read it by name.
 - A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.v<version>.json`, one file per map version so lanes on different kits keep their own; a write removes another version's file unwritten for a week); with no map the changed set is the branch diff.
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.

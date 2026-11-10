@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/hooks/pretool-guard.ts:147 | 2026-11-09 | #6591

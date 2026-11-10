@@ -128,7 +128,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Report AI cost over a period by session kind, tool category and guard, with cost per merge and regressions against the period before',
 		category: 'AI tools',
-		reference: ['[--period <days>] [--density]', 'maintainer', ['none']],
+		reference: [
+			'[--period <days> | --since <YYYY-MM-DD> --until <YYYY-MM-DD>] [--density]',
+			'maintainer',
+			['none'],
+		],
 		// Kit-only: it reads kit's own transcript store, like `josh retrospective`, which carries its
 		// summary line.
 		is_kit_only: true,
@@ -139,6 +143,10 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '', note: 'the last 7 days against the 7 before' },
 				{ arguments: '--period 30', note: 'the last 30 days against the 30 before' },
 				{
+					arguments: '--since 2026-10-27 --until 2026-11-10',
+					note: 'those 15 UTC days against the 15 before',
+				},
+				{
 					arguments: '--density',
 					note: 'the lane-child calls per request alone, as the last line',
 				},
@@ -147,6 +155,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--period <days>'],
 					description: 'the length of each period, a positive whole number of days (default 7).',
+				},
+				{
+					names: ['--since <YYYY-MM-DD>', '--until <YYYY-MM-DD>'],
+					description:
+						'a fixed period instead, from the first UTC date through the second, both included; given together and never beside `--period`.',
 				},
 				{
 					names: ['--density'],
@@ -502,7 +515,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs',
 		category: 'AI tools',
 		reference: [
-			'--period <days> [--limit <lane-limit> | --sinks [<minutes>] | --over <minutes> | --why <minutes> | --pairs]',
+			'(--period <days> | --since <instant>) [--limit <lane-limit> | --sinks [<minutes>] | --over <minutes> | --why <minutes> | --pairs]',
 			'maintainer',
 			['none'],
 		],
@@ -514,6 +527,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '--period 1 --over 40', note: 'ledger chains of lanes over 40 net min' },
 				{ arguments: '--period 1 --why 40', note: 'cause groups of lanes over 40 net min' },
 				{ arguments: '--period 7 --pairs', note: "a 7-day period's scoped pair runs" },
+				{ arguments: '--since 2026-11-10T01:00Z --why 40', note: 'cause groups since an instant' },
 			],
 		},
 	},

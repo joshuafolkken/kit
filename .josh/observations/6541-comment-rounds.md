@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/lane/lane-why-ship.ts:46 | 2026-11-09 | #6541
+- rf:bug-risks | low | scripts/lane/lane-net-time.ts:174 | 2026-11-09 | #6541

@@ -3,11 +3,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { build, type OutputFile } from 'esbuild'
-import { build_inputs, source_recorder } from './build-hooks'
+import { build_inputs, source_recorder, strip_guards } from './build-hooks'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const ENTRY_POINT = path.join(PACKAGE_DIR, 'scripts', 'josh', 'josh.ts')
+const ENTRY_POINTS: ReadonlySet<string> = new Set([ENTRY_POINT])
 const OUTFILE = path.join(PACKAGE_DIR, 'dist', 'josh.js')
 const NODE_BANNER = '#!/usr/bin/env node'
 const BIN_MODE = 0o755
@@ -30,7 +31,7 @@ async function build_bin(outfile: string = OUTFILE): Promise<void> {
 		packages: 'external',
 		banner: { js: NODE_BANNER },
 		write: false,
-		plugins: [source_recorder(sources, new Set([ENTRY_POINT]))],
+		plugins: [source_recorder(sources, strip_guards(ENTRY_POINTS))],
 	})
 	for (const file of files) place_output(file)
 	atomic_write.replace_file(

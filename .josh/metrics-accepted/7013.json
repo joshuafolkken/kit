@@ -1,0 +1,7 @@
+{
+	"reason": "source-location.ts keeps each chunked module's import.meta.url on its source, which pre-building every command with shared chunks needs (#7013); the tsx spawn path it replaces is removed",
+	"date": "2026-11-10",
+	"growth": {
+		"scripts.code_lines": 39
+	}
+}

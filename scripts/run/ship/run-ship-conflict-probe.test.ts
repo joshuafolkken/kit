@@ -143,3 +143,29 @@ describe('run_ship_conflict_probe.probe on a branch that merges cleanly', () => 
 		TIMEOUT_MS,
 	)
 })
+
+// joshuafolkken/kit#7058: the ship's push-time catch-up tells a clean merge (`[]`) from a probe that
+// could not answer (`undefined`) — only the first skips the merge.
+describe('run_ship_conflict_probe.read_conflicts', () => {
+	it(
+		'reads no conflicting path when origin/main moved only other files',
+		async () => {
+			await main_moves(OTHER_FILE, MAIN_VALUE)
+			await write(SHARED_FILE, LANE_VALUE)
+
+			await expect(run_ship_conflict_probe.read_conflicts()).resolves.toStrictEqual([])
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'reads no answer at all when the fetch fails',
+		async () => {
+			await main_moves(OTHER_FILE, MAIN_VALUE)
+			vi.mocked(git_command.fetch_branch).mockRejectedValue(new Error('offline'))
+
+			await expect(run_ship_conflict_probe.read_conflicts()).resolves.toBeUndefined()
+		},
+		TIMEOUT_MS,
+	)
+})

@@ -1,12 +1,13 @@
 import { gh_call_kind } from '#scripts/gh/gh-call-kind'
 import { gh_usage_log } from '#scripts/gh/gh-usage-log'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { hook_tool_payload } from '#scripts/josh/hook-tool-payload'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import { git_argv } from '#scripts/rules/git-argv'
 import { nested_commands } from '#scripts/rules/nested-commands'
-import { run_carry } from '#scripts/run/carry/run-carry'
 import { time_shell } from '#scripts/time-runtime/time-shell'
+import { hook_context, type HookContext } from './hook-context'
 
 // The `gh` calls a session types into Bash, one gh usage line each (joshuafolkken/kit#6781). They never
 // pass the exec layer `gh_request_tally` counts, so this hook is the only place that sees them. The
@@ -76,16 +77,20 @@ function calls_of(raw_payload: string): Array<DirectCall> {
 }
 
 // `undefined` outside a repository and under a test run, so a hook suite never writes the real log.
-async function log_target(): Promise<string | undefined> {
-	if (process.env['VITEST'] !== undefined) return undefined
+function log_target(context: HookContext): string | undefined {
+	if (context.env['VITEST'] !== undefined) return undefined
 
-	const repository = await run_carry.repository_directory()
+	const repository = git_common_directory.repository(context.cwd)
 
 	return repository === undefined ? undefined : gh_usage_log.target_of(repository)
 }
 
-function append_all(target: string, calls: ReadonlyArray<DirectCall>): void {
-	const marked = lane_child_marker.marked_issue()
+function append_all(
+	target: string,
+	calls: ReadonlyArray<DirectCall>,
+	environment: HookContext['env'],
+): void {
+	const marked = lane_child_marker.marked_issue(environment)
 	const issue = marked === undefined ? undefined : Number(marked)
 
 	for (const { command, kind } of calls) {
@@ -105,12 +110,16 @@ function append_all(target: string, calls: ReadonlyArray<DirectCall>): void {
 }
 
 // Only a line that launches `gh` looks up the repository, so every other call stays as fast as it was.
-async function record(raw_payload: string): Promise<void> {
+// The log and the lane child's issue come from `context`, the call's cwd and environment.
+async function record(
+	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
+): Promise<void> {
 	try {
 		const calls = calls_of(raw_payload)
-		const target = calls.length === 0 ? undefined : await log_target()
+		const target = calls.length === 0 ? undefined : log_target(context)
 
-		if (target !== undefined) append_all(target, calls)
+		if (target !== undefined) append_all(target, calls, context.env)
 	} catch (error) {
 		error_text.trace_swallowed('direct_gh_usage.record', error)
 	}

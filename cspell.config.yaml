@@ -2,6 +2,11 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The POSIX named-pipe command the resident hook daemon and its launcher create FIFOs with (#6683).
+  - mkfifo
+  # The POSIX checksum command and shell-depth variable that key the hook daemon by its environment (#6683).
+  - cksum
+  - SHLVL
   # The `git diff` summary flag an issue reproduction runs (#6586).
   - shortstat
   # A subshell written without a space after the parenthesis, as a review finding names it (#6586).
@@ -67,6 +72,14 @@ words:
   - numer
   # The macOS `sysctl` memory-pressure key the core budget reads available memory from (#3371).
   - memorystatus
+  # The macOS `sysctl` timebase and wake-clock keys a load sample reads the host's sleep from (#7026).
+  - tbfrequency
+  - machdep
+  - abstime
+  - boottime
+  - waketime
+  - usec
+  - conttime
   # British spellings review findings record verbatim (#6577).
   - memoising
   - behaviour

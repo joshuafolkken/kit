@@ -1,3 +1,4 @@
+import { hook_context } from '#scripts/hooks/hook-context'
 import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -176,7 +177,7 @@ afterAll(() => {
 
 function claiming_ids(command: string): Array<string> {
 	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: 'Bash', input: { command } }),
+		rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 	).map((rule) => rule.id)
 }
 

@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
+import type { HookContext } from './hook-context'
 import { hook_ledger } from './hook-ledger'
 
 // The guard rules demoted from blocking to notice (joshuafolkken/kit#6591). `josh hook:ledger --demote
@@ -28,8 +29,8 @@ function read_rules(file = DEMOTED_FILE): ReadonlySet<string> {
 }
 
 // Under a test run the tracked file is not read, so a guard suite never depends on what was demoted.
-function rules(): ReadonlySet<string> {
-	return process.env['VITEST'] === undefined ? read_rules() : new Set()
+function rules(environment: HookContext['env'] = process.env): ReadonlySet<string> {
+	return environment['VITEST'] === undefined ? read_rules() : new Set()
 }
 
 async function write_rules(demoted: ReadonlySet<string>, file = DEMOTED_FILE): Promise<void> {

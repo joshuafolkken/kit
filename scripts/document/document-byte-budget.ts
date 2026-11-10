@@ -81,10 +81,13 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// The run reference crossed a block in eleven lanes (joshuafolkken/kit#4775 …
 	// joshuafolkken/kit#6540), so joshuafolkken/kit#6676 split its board, lane and session commands
 	// into pages of their own, each at its smallest block.
-	{ path: 'docs/josh-commands-run.md', bytes: 53_248 },
+	// The drive's own `run:stalled` retry under `run:add --retry` (joshuafolkken/kit#7076) crossed the 53248 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 57_344 },
 	{ path: 'docs/josh-commands-board.md', bytes: 20_480 },
-	{ path: 'docs/josh-commands-lane.md', bytes: 28_672 },
-	{ path: 'docs/josh-commands-session.md', bytes: 16_384 },
+	// `lane:stats --since`'s usage example (joshuafolkken/kit#7007) crossed the 28672 block.
+	{ path: 'docs/josh-commands-lane.md', bytes: 32_768 },
+	// `cost:audit`'s dated period and usage breakdown (joshuafolkken/kit#7042) crossed the 16384 block.
+	{ path: 'docs/josh-commands-session.md', bytes: 20_480 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
 	// (joshuafolkken/kit#5547) crossed the 65536 block; solo evidence in `backlog:triage`
@@ -96,7 +99,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub
 	// (joshuafolkken/kit#6193) crossed the 65536 block.
 	{ path: 'docs/josh-commands.md', bytes: 69_632 },
-	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
+	// The auto-retry of every `run:stalled` cause (joshuafolkken/kit#7076) crossed the 8192 block.
+	{ path: 'docs/labels-and-run-states.md', bytes: 12_288 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 4096 },

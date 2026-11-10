@@ -75,6 +75,8 @@ const HOOK_BUNDLES: ReadonlyArray<HookBundle> = [
 // Kit's own launch of those hooks (`scripts/hooks/run-hook.sh`): built beside them so a fresh build
 // runs without TypeScript, and kept out of `HOOK_BUNDLES` because no hook config launches it.
 const LAUNCH_GATE: HookBundle = { source: 'tools/hooks/hook-bundle-fast.ts', out: 'ready' }
+// The resident pretool-guard daemon the launcher hands a call to (#6683), built the same way.
+const HOOK_DAEMON: HookBundle = { source: 'tools/hooks/hook-daemon.ts', out: 'daemon' }
 
 function entry_point(bundle: HookBundle): { in: string; out: string } {
 	return { in: path.join(PACKAGE_DIR, bundle.source), out: bundle.out }
@@ -101,10 +103,12 @@ function prune_stale_outputs(out_directory: string, outputs: ReadonlyArray<strin
 // launched entry runs a main, so every other module's guard is built as `false`.
 const SELF_INVOKE_GUARD = 'process.argv[1] === fileURLToPath(import.meta.url)'
 
-function loaded_contents(contents: Uint8Array, is_entry: boolean): string {
-	const source = Buffer.from(contents).toString('utf8')
+type SourceTransform = (source: string, file_path: string) => string
 
-	return is_entry ? source : source.replaceAll(SELF_INVOKE_GUARD, 'false')
+function strip_guards(entries: ReadonlySet<string>): SourceTransform {
+	return function strip(source: string, file_path: string): string {
+		return entries.has(file_path) ? source : source.replaceAll(SELF_INVOKE_GUARD, 'false')
+	}
 }
 
 function is_dependency_file(file_path: string): boolean {
@@ -148,16 +152,17 @@ function record(sources: Map<string, Uint8Array>, file_path: string, contents: U
 // inlined dependency is loaded as esbuild reads it and left out of the record: the lockfile and pnpm's
 // install record among the toolchain inputs already change with it, and every recorded input is
 // stat-ed on every hook launch.
-function source_recorder(sources: Map<string, Uint8Array>, entries: ReadonlySet<string>): Plugin {
+function source_recorder(sources: Map<string, Uint8Array>, transform: SourceTransform): Plugin {
 	return {
 		name: 'hook-source-recorder',
 		setup(plugin_build: PluginBuild): void {
 			plugin_build.onLoad({ filter: ANY_PATH, namespace: 'file' }, function load(args: OnLoadArgs) {
 				const contents = readFileSync(args.path)
+				const source = Buffer.from(contents).toString('utf8')
 
 				record(sources, args.path, contents)
 
-				return { contents: loaded_contents(contents, entries.has(args.path)), loader: 'default' }
+				return { contents: transform(source, args.path), loader: 'default' }
 			})
 		},
 	}
@@ -234,19 +239,19 @@ async function bundle_pass(
 		format: 'esm',
 		target: 'node22',
 		write: false,
-		plugins: [dependency_boundary(), source_recorder(sources, entries)],
+		plugins: [dependency_boundary(), source_recorder(sources, strip_guards(entries))],
 	})
 
 	return files
 }
 
-// The launch gate is built unsplit: a launch that read the previous `ready.js` would otherwise link
+// The launch gates are built unsplit: a launch that read the previous `ready.js` would otherwise link
 // chunks a background rebuild had just pruned, and fail open. Both passes share one stamp.
 async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 	const sources = build_inputs()
 	const passes = await Promise.all([
 		bundle_pass(HOOK_BUNDLES, true, sources, out_directory),
-		bundle_pass([LAUNCH_GATE], false, sources, out_directory),
+		bundle_pass([LAUNCH_GATE, HOOK_DAEMON], false, sources, out_directory),
 	])
 	const files = passes.flat()
 	const stamp = hook_bundle_stamp.stamp_text(
@@ -257,12 +262,13 @@ async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 	place_build(out_directory, files, stamp)
 }
 
-export type { HookBundle }
+export type { HookBundle, SourceTransform }
 export {
 	build_hooks,
 	build_inputs,
 	place_build,
 	source_recorder,
+	strip_guards,
 	HOOK_BUNDLES,
 	INLINED_PACKAGES,
 	OUT_DIR,

@@ -1,3 +1,4 @@
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { json_value } from '#scripts/lib/json-value'
@@ -41,18 +42,22 @@ function fires_once(transcript: string, now_ms: number): boolean {
 
 // The guard is off when its switch is disabled or when this session is a dispatched lane child, which
 // runs no watcher of its own.
-function is_active(): boolean {
+function is_active(context: HookContext): boolean {
 	return (
 		hook_decision.is_switch_enabled(SWITCH_ENV_KEY) &&
-		lane_child_marker.marked_issue() === undefined
+		lane_child_marker.marked_issue(context.env) === undefined
 	)
 }
 
 // The guard's note when the watcher is stale and this call is the once-per-run one that refuses, or
 // `undefined` when the watcher is fresh (or the refusal was already spent this run). No session is asked
 // to relay the run's stream — the watch pane does.
-async function stale_reason(transcript: string, now_ms: number): Promise<string | undefined> {
-	const result = await run_watcher_guard.check(await run_progress_read.live_target())
+async function stale_reason(
+	transcript: string,
+	now_ms: number,
+	ancestry: () => ReadonlySet<number>,
+): Promise<string | undefined> {
+	const result = await run_watcher_guard.check(await run_progress_read.live_target(), ancestry)
 
 	if (result.kind === 'ok') return undefined
 
@@ -64,15 +69,16 @@ async function stale_reason(transcript: string, now_ms: number): Promise<string 
 // record are read from disk; the composing hook already awaits.
 async function watcher_hook_reason(
 	raw_payload: string,
+	context: HookContext = hook_context.from_process(),
 	now_ms: number = Date.now(),
 ): Promise<string | undefined> {
-	if (!is_active()) return undefined
+	if (!is_active(context)) return undefined
 
 	const transcript = transcript_of(raw_payload)
 
 	if (transcript === undefined) return undefined
 
-	return await stale_reason(transcript, now_ms)
+	return await stale_reason(transcript, now_ms, context.ancestry)
 }
 
 const run_watcher_hook = { transcript_of, watcher_hook_reason }

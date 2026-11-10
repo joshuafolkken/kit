@@ -32,6 +32,7 @@ const HALF = 2
 // Half the sampler's interval: two samples closer than this are not one interval apart.
 const MIN_RATE_GAP_MS = lane_sampler.SAMPLE_INTERVAL_MS / HALF
 const DECIMALS = 1
+const DAY_DIGITS = 3
 const MISSING = '—'
 const CELL_SEPARATOR = ' | '
 
@@ -62,11 +63,16 @@ interface StatsWindow {
 
 interface RowLabel {
 	limit: string
-	period_days: number
 }
 
 function window_of(period_days: number, now_ms: number): StatsWindow {
 	return { since_ms: now_ms - period_days * MS_PER_DAY, until_ms: now_ms }
+}
+
+// The window's length in days to three significant digits, so a `--period` reads back as given
+// (`0.04`, `1.25`) and a `--since` window as the time since its instant (joshuafolkken/kit#7007).
+function days_of(window: StatsWindow): string {
+	return String(Number(((window.until_ms - window.since_ms) / MS_PER_DAY).toPrecision(DAY_DIGITS)))
 }
 
 function in_window<T extends { at: string }>(
@@ -315,7 +321,7 @@ function row(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow, label: Ro
 
 	return to_row([
 		label.limit,
-		String(label.period_days),
+		days_of(window),
 		...throughput_cells(period),
 		...lane_cells(entries, period),
 		...gate_cells(period),

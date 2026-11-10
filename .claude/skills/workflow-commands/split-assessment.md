@@ -44,14 +44,17 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 
 ## Over the guide before the gate
 
-**Trigger: `pnpm josh main:merge` prints a `split notice`** — the branch's diff, untracked files
-included, passes the Issue's declared size × the growth factor, capped at the guide (no declaration:
-the guide), on either axis; the first `pnpm josh lint:related` or `pnpm josh test:related` past that bar prints it earlier,
-once per Issue. The notice is a warning, not a stop: go on implementing;
-`run:cut`, `run:chain`, review and ship print it and proceed.
+**Size is judged at filing (`issue:file`) and at `lane:plan` only.
+Once implementation has started, the run never splits, spills or stops for size.**
+
+**Trigger: `run:cut` or `run:chain` repeats the size notice `lane:plan` recorded** while the
+branch's diff, untracked files included, still passes the Issue's declared size × the growth factor,
+capped at the guide (no declaration: the guide), on either axis. Scoped checks and `main:merge` print
+none. The notice is a warning, not a stop: go on implementing;
+review and ship print it and proceed.
 
 - Split again only for an independent added requirement, or scope growth this Issue cannot verify:
-  file it with `pnpm josh issue:file --route split --found-during <N>`.
+  file it with `pnpm josh issue:file --route split --found-during <N>`, and finish this Issue.
   On its direction refusal → `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.
   On its duplicate refusal → `issue-fold-existing.md`, applying with `--apply <M> --found-during <N>`.
 - Size alone is never that reason; a re-plan needs no `--size-approval`.
@@ -82,7 +85,7 @@ is the non-closing home for the split rationale.
 
 **Each split child is filed with the `route:split` label** —
 `pnpm josh issue:file "<sub-title>" --body-file .josh/tmp/body.md --route split` — and judged for
-`auto-ok` like any filing (`kickoff.md` → "Words typed after `new`").
+`auto-ok` and the implement budget like any filing (`kickoff.md` → "Words typed after `new`").
 
 ## Promote, or create a new epic
 

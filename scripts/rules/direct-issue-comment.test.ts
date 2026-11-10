@@ -1,3 +1,6 @@
+import { hook_context } from '#scripts/hooks/hook-context'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { direct_issue_comment } from './direct-issue-comment'
@@ -9,6 +12,9 @@ import { direct_issue_comment } from './direct-issue-comment'
 // (joshuafolkken/kit#4737: its `owner/repo` spelled out is the checkout's own repository too).
 
 const OWN = { owner: 'joshuafolkken', repo: 'kit' }
+const OUTSIDE_REPOSITORY = temporary_directory('suite')('direct-issue-comment-')
+const OWN_SPELLED_OUT_WRITE =
+	'gh api repos/joshuafolkken/kit/issues/4709/comments -F body=@/tmp/x.md'
 
 function resolve_own(): typeof OWN {
 	return OWN
@@ -77,7 +83,7 @@ describe('direct-issue-comment delivery', () => {
 	it('claims the raw post before the body rows do', () => {
 		const command = 'gh api repos/{owner}/{repo}/issues/5/comments -f body="$(cat b.md)"'
 		const claiming = delivered_rules.DELIVERED_RULES.find((rule) =>
-			rule.is_trigger({ name: 'Bash', input: { command } }),
+			rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 		)
 
 		expect(claiming?.id).toBe(direct_issue_comment.ROW.id)
@@ -86,11 +92,22 @@ describe('direct-issue-comment delivery', () => {
 	// The real resolver, read from this kit checkout (`origin` is joshuafolkken/kit), so the default
 	// `resolve_own` the guard runs with is pinned and not only an injected one.
 	it("claims a write to the checkout's own repository spelled out", () => {
-		const command = 'gh api repos/joshuafolkken/kit/issues/4709/comments -F body=@/tmp/x.md'
+		const command = OWN_SPELLED_OUT_WRITE
 		const claiming = delivered_rules.DELIVERED_RULES.find((rule) =>
-			rule.is_trigger({ name: 'Bash', input: { command } }),
+			rule.is_trigger({ name: 'Bash', input: { command } }, hook_context.from_process()),
 		)
 
 		expect(claiming?.id).toBe(direct_issue_comment.ROW.id)
+	})
+
+	// joshuafolkken/kit#6973: the checkout is the hook call's cwd, not the process's — a cwd outside any
+	// repository has no own repository, so the owner spelled out is not the checkout's.
+	it("reads the checkout's repository under the call context's cwd", () => {
+		const command = OWN_SPELLED_OUT_WRITE
+		const context = hook_context_fixture.of(OUTSIDE_REPOSITORY, process.env)
+
+		expect(direct_issue_comment.ROW.is_trigger({ name: 'Bash', input: { command } }, context)).toBe(
+			false,
+		)
 	})
 })

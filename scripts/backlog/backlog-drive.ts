@@ -76,7 +76,8 @@ interface DriveState extends OfferTiming {
 	in_flight: Array<string>
 	// Every child merged, fed back to `backlog:offer` because GitHub closes a merged issue late. A parked
 	// child is left out: its labels classify it, so one a person released is offered again — except one
-	// the yield cap parked (`backlog-yield-cap.ts`), which stays out whether or not its park went through.
+	// the yield cap parked (`backlog-yield-cap.ts`), which stays out of the pool's offer whether or not
+	// its park went through; the auto-retry re-offers it by name (`backlog-drive-stalled-retry.ts`).
 	exclude: Array<string>
 	// The issues whose measurement declaration had no sample yet: kept out of the offer, not merged.
 	waiting?: Array<string> | undefined
@@ -392,6 +393,9 @@ interface LoopConfig {
 
 interface LoopPorts extends DrivePorts {
 	sleep: (milliseconds: number) => Promise<void>
+	// Called first in every tick with the lanes in flight: the snapshot the tick's answers share
+	// (`backlog_drive_tick.tick_share` in production, joshuafolkken/kit#7016).
+	begin_tick: (in_flight: ReadonlyArray<string>) => Promise<void>
 	// Whether `run:add` handed the run an issue at or after the given instant —
 	// `backlog_arrival_added.is_added_since` in production.
 	added_since: (since_ms: number) => Promise<boolean>
@@ -410,6 +414,7 @@ type LoopStep = { kind: 'end'; end: DriveEnd } | { kind: 'next'; run: LoopRun }
 
 // When a pass asks is `backlog_offer_timing.is_due`'s; a collected child can still ask immediately.
 async function loop_step(run: LoopRun, config: LoopConfig, ports: LoopPorts): Promise<LoopStep> {
+	await ports.begin_tick(run.state.in_flight)
 	const now_ms = ports.now().getTime()
 	const is_due = await backlog_offer_timing.is_due(run, config, ports, now_ms)
 	const result = await run_pass(run.state, is_due, ports)

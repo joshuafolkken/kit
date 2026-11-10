@@ -1,0 +1,3 @@
+- rf:bug-risks | medium | scripts/followup/followup-job-needs.ts:96 | 2026-11-09 | #6923 | fixed
+- rf:comments | low | scripts/followup/followup-job-needs.ts:13 | 2026-11-09 | #6923 | fixed
+- rf:none | none | - | 2026-11-09 | #6923

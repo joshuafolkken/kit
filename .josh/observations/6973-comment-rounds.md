@@ -1,0 +1,3 @@
+- rf:comments | low | scripts/run/run-parent-cut-hook.ts:44 | 2026-11-10 | #6973
+- rf:tests | low | scripts/hooks/pretool-guard-context.test.ts:140 | 2026-11-10 | #6973
+- rf:tests | low | scripts/hooks/pretool-guard-context.test.ts:173 | 2026-11-10 | #6973

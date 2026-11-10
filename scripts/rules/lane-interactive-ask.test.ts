@@ -1,8 +1,10 @@
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { hook_context, type HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { hook_context_fixture } from '#tools/hooks/hook-context-fixture'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_interactive_ask } from './lane-interactive-ask'
 
@@ -35,7 +37,7 @@ const WRITTEN_TRANSCRIPTS = new Set<string>()
 // this row may, since every other row self-gates on the `Bash` tool name.
 function rules_claiming_ask(): number {
 	return delivered_rules.DELIVERED_RULES.filter((rule) =>
-		rule.is_trigger({ name: ASK_TOOL, input: ASK_INPUT }),
+		rule.is_trigger({ name: ASK_TOOL, input: ASK_INPUT }, hook_context.from_process()),
 	).length
 }
 
@@ -79,19 +81,33 @@ describe('cwd isolation', () => {
 })
 
 describe('is_interactive_ask', () => {
+	// The marker read is stubbed to answer by directory, so each context reads as what it names.
+	const child: HookContext = hook_context_fixture.of('/lanes/child', {})
+	const person: HookContext = hook_context_fixture.of('/lanes/person', {})
+
+	beforeEach(() => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockImplementation(
+			(directory) => directory === child.cwd,
+		)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	// The dispatched-child case the refusal exists for.
 	it('fires on an interactive ask from a dispatched lane child', () => {
-		expect(lane_interactive_ask.is_interactive_ask(ASK_CALL, true)).toBe(true)
+		expect(lane_interactive_ask.is_interactive_ask(ASK_CALL, child)).toBe(true)
 	})
 
 	// **A person working in the lane carries no dispatch mark, so the rule stays silent for them.**
 	it('says nothing about an interactive ask that is not a lane child', () => {
-		expect(lane_interactive_ask.is_interactive_ask(ASK_CALL, false)).toBe(false)
+		expect(lane_interactive_ask.is_interactive_ask(ASK_CALL, person)).toBe(false)
 	})
 
 	// A lane child using any other tool is not asking a person.
 	it('says nothing about a non-interactive tool even in a lane child', () => {
-		expect(lane_interactive_ask.is_interactive_ask({ name: BASH, input: {} }, true)).toBe(false)
+		expect(lane_interactive_ask.is_interactive_ask({ name: BASH, input: {} }, child)).toBe(false)
 	})
 })
 

@@ -1,10 +1,14 @@
 import { session_cite } from '#scripts/issue/session-cite'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import type { Stage } from './lane-breakdown'
+import { lane_breakdown_implement } from './lane-breakdown-implement'
+import { lane_breakdown_text } from './lane-breakdown-text'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_net_time } from './lane-net-time'
 import { lane_sinks, type SinkRecords } from './lane-sinks'
 import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
+import { lane_stage_budget } from './lane-stage-budget'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_yield_split, type IssueYield } from './lane-yield-split'
@@ -12,10 +16,11 @@ import { lane_yield_split, type IssueYield } from './lane-yield-split'
 // `josh lane:stats --over` (joshuafolkken/kit#5988): one row per lane of the period over a threshold,
 // its net and waited minutes beside the ledger chain that explains it — the split notices and filed
 // children, a blocking round 1, the unplanned notices, each yield with its holder and redispatch gap,
-// and the hub that put `test:related` past its cap. The open Issues are matched against the lane's
-// longest stage, as `--sinks` matches each of its rows.
+// and the hub that put `test:related` past its cap. Each `lane:breakdown` stage past its budget follows
+// as `<stage> <minutes>/<budget>` (joshuafolkken/kit#7008). The open Issues are matched against the
+// lane's longest stage, as `--sinks` matches each of its rows.
 
-const COLUMNS = ['lane', 'net min', 'wait min', 'chain', 'top stage', 'open issues']
+const COLUMNS = ['lane', 'net min', 'wait min', 'chain', 'over budget', 'top stage', 'open issues']
 const SEPARATOR = ' · '
 const NO_CHAIN = '-'
 const GAP_OPEN = 'gap open'
@@ -95,6 +100,26 @@ function chain_of(records: SinkRecords, issue: number): string {
 	return parts.length === 0 ? NO_CHAIN : parts.join(SEPARATOR)
 }
 
+function budget_text({ name, ms }: Stage): Array<string> {
+	const budget = lane_breakdown_text.budget_of(name)
+
+	if (budget === undefined || lane_stage_budget.over_minutes(budget, ms) === undefined) return []
+
+	const minutes = (ms / MS_PER_MINUTE).toFixed(1)
+
+	return [`${name} ${minutes}/${String(lane_stage_budget.BUDGET_MINUTES[budget])}`]
+}
+
+// The lane's net stages past their budget in one cell, `-` when none is — the breakdown `lane:breakdown`
+// prints, its implementation opened at the first edit where no event opened it; the driver followup
+// stands apart from the net stages and is left out.
+function over_budget_of({ entries, events }: SinkRecords, issue: number): string {
+	const stages = lane_breakdown_implement.breakdown_of(entries, events, issue)?.stages ?? []
+	const parts = stages.flatMap((stage) => budget_text(stage))
+
+	return parts.length === 0 ? NO_CHAIN : parts.join(SEPARATOR)
+}
+
 // The lane's dispatch-to-merge time its net time leaves out.
 function wait_ms(records: SinkRecords, issue: number, net_ms: number): number | undefined {
 	const span = lane_net_time.span_of(records.entries, issue)
@@ -120,6 +145,7 @@ function lane_row(
 		lane_stage_stats.cell(net_ms),
 		lane_stage_stats.cell(wait_ms(records, issue, net_ms)),
 		chain_of(records, issue),
+		over_budget_of(records, issue),
 		stage,
 		top === undefined
 			? lane_sinks_issues.NONE
@@ -146,6 +172,6 @@ function table(
 	].join('\n')
 }
 
-const lane_over = { chain_of, table }
+const lane_over = { chain_of, over_budget_of, table }
 
 export { lane_over }

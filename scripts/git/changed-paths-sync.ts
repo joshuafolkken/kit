@@ -1,6 +1,5 @@
 import { changed_paths } from './changed-paths'
 import { git_diff_reads } from './git-diff-reads'
-import { git_location_environment } from './git-location-environment'
 import { git_spawn_sync, type GitSyncOptions } from './git-spawn-sync'
 
 // The synchronous counterpart of `changed_paths.read_changed_paths(false)` — the branch diff since
@@ -8,14 +7,6 @@ import { git_spawn_sync, type GitSyncOptions } from './git-spawn-sync'
 // argument lists `git-diff-reads.ts` spawns, so the two readings agree on what "changed" is — through
 // a merge of the default branch in progress too, measured from the base `change_base.resolved_through_merge`
 // answers (joshuafolkken/kit#5309). Any failure is the empty list.
-
-// With an explicit `cwd`, the git location variables are cleared so that directory is what git
-// answers for, as in `git_spawn_sync.origin_url`.
-function options_of(cwd: string | undefined): GitSyncOptions {
-	if (cwd === undefined) return {}
-
-	return { cwd, env: git_location_environment.location_free_environment() }
-}
 
 function default_branch_reference(options: GitSyncOptions): string {
 	const output = git_spawn_sync.read([...git_diff_reads.DEFAULT_BRANCH_ARGUMENTS], options)
@@ -49,7 +40,7 @@ function change_base(options: GitSyncOptions): string {
 
 // Repository-root-relative paths, as the asynchronous reading returns them.
 function read_changed_paths(cwd?: string): ReadonlyArray<string> {
-	const options = options_of(cwd)
+	const options = git_spawn_sync.located(cwd)
 	const tracked = git_spawn_sync.read(
 		git_diff_reads.names_since_arguments(change_base(options)),
 		options,

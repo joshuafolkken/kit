@@ -152,7 +152,7 @@ async function write_posttool_context(raw_payload: string): Promise<void> {
 	if (envelope !== undefined) process.stdout.write(`${envelope}\n`)
 }
 
-// The environment file is loaded before the verdict, as `write_outcome` does, so the lane-child marker
+// The environment file is loaded before the verdict, as `respond_from_stdin` does, so the lane-child marker
 // the phase mark reads is in place; the mark follows the written envelope. A consultation session's
 // shell is stamped here for the `PostToolUse` revert, as `pretool_guard.respond` does on Claude.
 async function write_pretool_outcome(raw_payload: string): Promise<void> {
@@ -165,7 +165,7 @@ async function write_pretool_outcome(raw_payload: string): Promise<void> {
 
 	hook_decision.emit_outcome(outcome)
 	await pretool_guard.mark_phase(outcome, judged, context)
-	await pretool_guard.record_refusal(judged, outcome)
+	await pretool_guard.record_refusal(judged, outcome, context)
 }
 
 // Codex's payload reaches this adapter, not `respond_from_stdin`, so it is captured here, untranslated.
