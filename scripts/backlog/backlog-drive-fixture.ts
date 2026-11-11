@@ -14,6 +14,7 @@ const CONFIG = {
 	poll_ms: POLL_MS,
 	offer_ms: OFFER_MS,
 	idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+	check_ms: backlog_budget.LISTING_CHECK_INTERVAL_MS,
 	window_ms: undefined,
 }
 const FIRST_CHILD = '2400'
@@ -80,6 +81,8 @@ interface Script {
 	raised_at_ms?: number
 	// Whether a named issue is left to dispatch; unset reads as none.
 	is_named_left?: boolean
+	// When the `auto-ok` listing changed, in ms from the start; unset reads as never.
+	listed_at_ms?: number
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -242,14 +245,32 @@ function is_seen_since(at_ms: number | undefined, since_ms: number, now: () => D
 	return event_ms >= since_ms && event_ms <= now().getTime()
 }
 
-type RecordPorts = Pick<LoopPorts, 'added_since' | 'raised_since' | 'named_left'>
+type RecordPorts = Pick<
+	LoopPorts,
+	'added_since' | 'raised_since' | 'named_left' | 'listing_changed'
+>
 
-// The run's own records: a `run:add` or a `lane:limit` raise reads as written once the clock reaches it.
+// The `auto-ok` listing's ETag check: the change reads once, at the first check the clock has reached it.
+function listing_port(script: Script, now: () => Date): LoopPorts['listing_changed'] {
+	const read = { since_ms: -Infinity }
+
+	return async () => {
+		const is_changed = is_seen_since(script.listed_at_ms, read.since_ms, now)
+
+		read.since_ms = now().getTime() + 1
+
+		return is_changed
+	}
+}
+
+// The run's own records: a `run:add`, a `lane:limit` raise or a listing change reads as written once
+// the clock reaches it.
 function record_ports(script: Script, now: () => Date): RecordPorts {
 	return {
 		added_since: async (since_ms) => is_seen_since(script.added_at_ms, since_ms, now),
 		raised_since: async (since_ms) => is_seen_since(script.raised_at_ms, since_ms, now),
 		named_left: async () => script.is_named_left === true,
+		listing_changed: listing_port(script, now),
 	}
 }
 

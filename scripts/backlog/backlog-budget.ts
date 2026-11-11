@@ -47,6 +47,13 @@ const OFFER_INTERVAL_MS = OFFER_INTERVAL_SECONDS * MS_PER_SECOND
 const IDLE_OFFER_INTERVAL_SECONDS = 30
 const IDLE_OFFER_INTERVAL_MS = IDLE_OFFER_INTERVAL_SECONDS * MS_PER_SECOND
 
+// **How often a free seat checks the `auto-ok` listing between two asks** (joshuafolkken/kit#7227).
+// The check reads the listing's first page by its ETag, and a 304 spends no REST core, so the floor is
+// the drive's own poll (`backlog-drive-cli.ts` → `POLL_MS`); a changed listing asks at once, an unchanged one waits out the intervals
+// above.
+const LISTING_CHECK_INTERVAL_SECONDS = 10
+const LISTING_CHECK_INTERVAL_MS = LISTING_CHECK_INTERVAL_SECONDS * MS_PER_SECOND
+
 const RUN_VERDICT = 'run'
 const WATCH_VERDICT = 'watch'
 const STOP_VERDICT = 'stop'
@@ -248,6 +255,7 @@ const backlog_budget = {
 	DEFAULT_IDLE_MS,
 	IDLE_OFFER_INTERVAL_MS,
 	IDLE_WAIT_HOURS,
+	LISTING_CHECK_INTERVAL_MS,
 	OFFER_INTERVAL_MS,
 	RUN_VERDICT,
 	STOP_VERDICT,
