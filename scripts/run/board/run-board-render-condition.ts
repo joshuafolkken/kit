@@ -3,6 +3,7 @@ import { run_board_fresh } from './run-board-fresh'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardRow, type RowReason } from './run-board-layout'
+import { run_board_render_title } from './run-board-render-title'
 
 // A queued, waiting or done row's condition column, and the issues its wait names after its title
 // (joshuafolkken/kit#4288, #4292) — pure. The column is one width in every section, the widest value's
@@ -35,6 +36,15 @@ function issue_value_of(issues: ReadonlyArray<string>, header: BoardHeader): str
 	return first === '' ? '' : `${header.link(first)}${more_of(issues)}`
 }
 
+// The text with the reason's pull request number at its end linked to it, where the text keeps the
+// number whole — a cut text ends on an ellipsis and stays plain, so no escape is cut and the drawn
+// width stays the plain text's (joshuafolkken/kit#7181).
+function pr_linked(text: string, pr: number | undefined, header: BoardHeader): string {
+	if (pr === undefined || !text.endsWith(String(pr))) return text
+
+	return `${text.slice(0, -String(pr).length)}${header.pull_link(pr)}`
+}
+
 // The wait's issues, else how long a stage has stood, else the wait's own figure.
 function value_of(reason: RowReason, header: BoardHeader): string {
 	const { issues = [], since_ms } = reason
@@ -42,7 +52,13 @@ function value_of(reason: RowReason, header: BoardHeader): string {
 	if (issues.length > 0) return issue_value_of(issues, header)
 	if (since_ms !== undefined) return run_board_labels.span_of(header.now_ms - since_ms)
 
-	return reason.value ?? ''
+	return pr_linked(reason.value ?? '', reason.pr, header)
+}
+
+// The row's reason after its title, `cut` columns given up as `reason_text` gives them, its pull
+// request linked.
+function tail_of(row: BoardRow, cut: number, header: BoardHeader): string {
+	return pr_linked(run_board_render_title.reason_text(row, cut) ?? '', row.reason?.pr, header)
 }
 
 // A finished row's end, `MM-DD HH:MM`, emphasized while fresh (joshuafolkken/kit#4292); blank where
@@ -91,6 +107,6 @@ function waits_of(row: BoardRow, header: BoardHeader, is_conditioned = false): s
 	return blockers === undefined ? undefined : `${run_board_labels.WAITS_ICON} ${blockers}`
 }
 
-const run_board_render_condition = { CONDITION_WIDTH, condition_of, waits_of }
+const run_board_render_condition = { CONDITION_WIDTH, condition_of, tail_of, waits_of }
 
 export { run_board_render_condition }

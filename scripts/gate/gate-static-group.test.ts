@@ -12,14 +12,26 @@ const STATIC_LABELS = gate_plan.STATIC_CHECKS.map((check) => check.label)
 const GROUP_NAMES = Object.keys(gate_static_group.STATIC_GROUPS)
 const GROUPED_LABELS = Object.values(gate_static_group.STATIC_GROUPS).flat()
 const MATRIX_JOB = 'static-checks'
+// joshuafolkken/kit#7108: the whole-tree lint leg is gone; its shards run in its place.
 const LINT_GROUP = 'lint'
-// joshuafolkken/kit#7018: the lint shard groups stay out of the matrix until CI runs them (#7108).
 const SHARD_GROUPS = Object.entries(gate_static_group.LINT_SHARD_GROUPS)
 const SHARD_GROUP_NAMES = Object.keys(gate_static_group.LINT_SHARD_GROUPS)
+const FIRST_SHARD_GROUP = 'lint-1'
+
+// The lint check is split by tree, not by check, so each shard group holds it once.
+function expected_holders(label: string): number {
+	return label === gate_labels.LINT_LABEL ? lint_shard.SHARDS.length : 1
+}
 
 describe('the static groups partition the static checks', () => {
-	it.each(STATIC_LABELS)('puts %j in exactly one group', (label) => {
-		expect(GROUPED_LABELS.filter((grouped) => grouped === label)).toHaveLength(1)
+	it.each(STATIC_LABELS)('puts %j in exactly one group, the lint check once per shard', (label) => {
+		expect(GROUPED_LABELS.filter((grouped) => grouped === label)).toHaveLength(
+			expected_holders(label),
+		)
+	})
+
+	it('runs each lint shard group as a matrix group', () => {
+		expect(GROUP_NAMES).toEqual(expect.arrayContaining(SHARD_GROUP_NAMES))
 	})
 
 	it('names no label the static set does not have', () => {
@@ -42,12 +54,14 @@ describe('group_of', () => {
 		)
 	})
 
-	it.each([`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}nope`, '--verbose', LINT_GROUP])(
-		'reads no group from %j',
-		(argument) => {
-			expect(gate_static_group.group_of(argument)).toBeUndefined()
-		},
-	)
+	it.each([
+		`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}nope`,
+		`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${LINT_GROUP}`,
+		'--verbose',
+		FIRST_SHARD_GROUP,
+	])('reads no group from %j', (argument) => {
+		expect(gate_static_group.group_of(argument)).toBeUndefined()
+	})
 
 	it.each(SHARD_GROUP_NAMES)('reads the lint shard group %j from its flag', (name) => {
 		expect(gate_static_group.group_of(`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${name}`)).toBe(
@@ -85,8 +99,8 @@ describe('narrow_checks', () => {
 	})
 
 	it('finds the group among the other arguments', () => {
-		const flag = `${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${LINT_GROUP}`
+		const flag = `${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${FIRST_SHARD_GROUP}`
 
-		expect(gate_static_group.find_group(['--verbose', '--no-unit', flag])).toBe(LINT_GROUP)
+		expect(gate_static_group.find_group(['--verbose', '--no-unit', flag])).toBe(FIRST_SHARD_GROUP)
 	})
 })
