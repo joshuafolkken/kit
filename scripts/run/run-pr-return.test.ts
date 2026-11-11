@@ -2,6 +2,7 @@ import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_gh_pr_snapshot } from '#scripts/gh/git-gh-pr-snapshot'
 import type { PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
 import { git_command } from '#scripts/git/git-command'
+import { git_spawn } from '#scripts/git/git-spawn'
 import { issue_watch_diff, type WatchComment } from '#scripts/issue/issue-watch-diff'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_pr_return } from './run-pr-return'
@@ -57,24 +58,23 @@ describe('run_pr_return.red_required_checks', () => {
 	})
 })
 
-describe('run_pr_return.comments_since_run', () => {
-	it("keeps a person's comment after the run's last own comment", () => {
-		const fix = comment(3, FIX_BODY)
-		const comments = [comment(1, FIX_BODY), comment(2, RUN_BODY), fix]
+describe('run_pr_return.comments_since', () => {
+	const SINCE_MS = Date.parse('2026-11-11T02:00:00Z')
 
-		expect(run_pr_return.comments_since_run(comments)).toStrictEqual([fix])
+	it("keeps a person's comment after the run's last commit, marked by josh or not", () => {
+		const plain = comment(3, FIX_BODY)
+		const marked = comment(4, RUN_BODY, { is_automated: true })
+		const comments = [comment(1, FIX_BODY), comment(2, FIX_BODY), plain, marked]
+
+		expect(run_pr_return.comments_since(comments, SINCE_MS)).toStrictEqual([plain, marked])
 	})
 
-	it('keeps nothing when the run commented last, or only an outsider or a bot spoke since', () => {
+	it('keeps nothing written before the commit, or by an outsider or a bot since', () => {
 		const outsider = comment(3, FIX_BODY, { is_trusted: false })
-		const bot = comment(4, FIX_BODY, { is_automated: true })
+		const bot = comment(4, FIX_BODY, { author: 'coderabbitai[bot]' })
 
-		expect(
-			run_pr_return.comments_since_run([comment(1, FIX_BODY), comment(2, RUN_BODY)]),
-		).toStrictEqual([])
-		expect(run_pr_return.comments_since_run([comment(2, RUN_BODY), outsider, bot])).toStrictEqual(
-			[],
-		)
+		expect(run_pr_return.comments_since([comment(1, FIX_BODY)], SINCE_MS)).toStrictEqual([])
+		expect(run_pr_return.comments_since([outsider, bot], SINCE_MS)).toStrictEqual([])
 	})
 })
 
@@ -94,37 +94,43 @@ describe('run_pr_return.format', () => {
 	})
 })
 
-describe('run_pr_return.read', () => {
-	const BRANCH = '7313-lane'
+const BRANCH = '7313-lane'
+const LAST_COMMIT = ['log', '--first-parent', '--no-merges', '-1', '--format=%cI']
+const RED = { __typename: 'CheckRun', name: REQUIRED, status: 'COMPLETED', conclusion: 'FAILURE' }
+const RAW = JSON.stringify({ statusCheckRollup: [RED], requiredContexts: [REQUIRED] })
 
+describe('run_pr_return.read', () => {
 	beforeEach(() => {
 		vi.spyOn(git_command, 'branch').mockResolvedValue(BRANCH)
+		vi.spyOn(git_spawn, 'read').mockResolvedValue('2026-11-11T01:30:00Z')
 	})
 
-	it('reads the red required checks of the branch and the comments since the run', async () => {
-		const check = {
-			__typename: 'CheckRun',
-			name: REQUIRED,
-			status: 'COMPLETED',
-			conclusion: 'FAILURE',
-		}
-		const raw = { statusCheckRollup: [check], requiredContexts: [REQUIRED] }
+	it('reads the red required checks of the branch and the comments since the last commit', async () => {
 		const snapshot_spy = vi
 			.spyOn(git_gh_pr_snapshot, 'pr_get_state_snapshot')
-			.mockResolvedValue(JSON.stringify(raw))
-		const list_spy = vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
+			.mockResolvedValue(RAW)
 
+		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
 		vi.spyOn(issue_watch_diff, 'parse_comments').mockResolvedValue([
-			comment(1, RUN_BODY),
-			comment(2, FIX_BODY),
+			comment(1, FIX_BODY),
+			comment(2, RUN_BODY),
 		])
 
 		const read = await run_pr_return.read('7313')
 
 		expect(snapshot_spy).toHaveBeenCalledExactlyOnceWith(BRANCH)
-		expect(list_spy).toHaveBeenCalledExactlyOnceWith('7313')
 		expect(read.red_checks).toStrictEqual([REQUIRED])
 		expect(read.comments.map((item) => item.id)).toStrictEqual([2])
+	})
+
+	it("asks for the issue's comments and the newest non-merge commit on the first-parent line", async () => {
+		const list_spy = vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
+
+		vi.spyOn(git_gh_pr_snapshot, 'pr_get_state_snapshot').mockResolvedValue('{}')
+		await run_pr_return.read('7313')
+
+		expect(list_spy).toHaveBeenCalledExactlyOnceWith('7313')
+		expect(git_spawn.read).toHaveBeenCalledExactlyOnceWith(LAST_COMMIT)
 	})
 
 	it('counts a comment listing that cannot be read as none', async () => {

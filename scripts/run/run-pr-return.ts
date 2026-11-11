@@ -7,11 +7,12 @@ import {
 	type PrStateSnapshot,
 } from '#scripts/gh/git-pr-checks-parse'
 import { git_command } from '#scripts/git/git-command'
+import { git_spawn } from '#scripts/git/git-spawn'
 import { issue_watch_diff, type WatchComment } from '#scripts/issue/issue-watch-diff'
 
 // Whether an open pull request was returned for a fix (joshuafolkken/kit#7313): a required check
-// failed on it, or a person commented on the issue after the run's own last comment — the fix asked
-// for once the run stopped. Either sends the resumed run to implementation instead of the gate, and
+// failed on it, or a person commented on the issue after the run's last commit — the fix asked for
+// once the run stopped. Either sends the resumed run to implementation instead of the gate, and
 // both are printed so it reads what to fix. A comment listing that cannot be read counts as none:
 // the red checks still decide, and the issue section the entry prints carries every comment.
 
@@ -33,18 +34,27 @@ function red_required_checks(snapshot: PrStateSnapshot): ReadonlyArray<string> {
 		.map((check) => check.name)
 }
 
-function is_run_comment(comment: WatchComment): boolean {
-	return comment.is_trusted === true && comment.body.includes(issue_watch_diff.RUN_MARKER)
+// The comments after `since_ms` that a person wrote, marked or not: a person's `josh issue:comment`
+// carries the run marker too, so the marker cannot tell it from the run's own. A failed write-access
+// lookup still counts, as `issue-watch-diff.ts` counts it.
+function comments_since(
+	comments: ReadonlyArray<WatchComment>,
+	since_ms: number,
+): ReadonlyArray<WatchComment> {
+	return comments.filter(
+		(comment) =>
+			comment.is_trusted !== false &&
+			!comment.author.endsWith(issue_watch_diff.BOT_SUFFIX) &&
+			Date.parse(comment.created_at) > since_ms,
+	)
 }
 
-// The comments after the run's last own one that a person wrote — a failed write-access lookup still
-// counts, as `issue-watch-diff.ts` counts it.
-function comments_since_run(comments: ReadonlyArray<WatchComment>): ReadonlyArray<WatchComment> {
-	const last_run = comments.findLastIndex((comment) => is_run_comment(comment))
+// When the run last committed its own work: the newest non-merge commit on the branch's own line,
+// so a merge of main (and the commits it brings) does not move it past a comment already written.
+async function last_work_ms(): Promise<number> {
+	const date = await git_spawn.read(['log', '--first-parent', '--no-merges', '-1', '--format=%cI'])
 
-	return comments
-		.slice(last_run + 1)
-		.filter((comment) => comment.is_trusted !== false && !comment.is_automated)
+	return Date.parse(date)
 }
 
 function is_returned(pr_return: PrReturn): boolean {
@@ -71,18 +81,19 @@ async function read_comments(issue: string): Promise<ReadonlyArray<WatchComment>
 
 async function read(issue: string): Promise<PrReturn> {
 	const branch = await git_command.branch()
-	const [snapshot_json, comments] = await Promise.all([
+	const [snapshot_json, comments, since_ms] = await Promise.all([
 		git_gh_pr_snapshot.pr_get_state_snapshot(branch),
 		read_comments(issue),
+		last_work_ms(),
 	])
 
 	return {
 		red_checks: red_required_checks(parse_pr_state_snapshot(snapshot_json)),
-		comments: comments_since_run(comments),
+		comments: comments_since(comments, since_ms),
 	}
 }
 
-const run_pr_return = { comments_since_run, format, read, red_required_checks }
+const run_pr_return = { comments_since, format, read, red_required_checks }
 
 export type { PrReturn }
 export { run_pr_return }
