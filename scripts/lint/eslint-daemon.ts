@@ -25,6 +25,8 @@ import { eslint_heap } from './eslint-heap'
 
 const ESLINT_DAEMON = 'eslint_d'
 const DAEMON_STOP = 'stop'
+// How long a stop may hold the edit hook before it is given up (joshuafolkken/kit#7246).
+const STOP_TIMEOUT_MS = 10_000
 // The pnpm argument list every eslint caller here already builds. The daemon takes what follows it.
 const PNPM_EXEC = 'exec'
 const ESLINT_BIN = 'eslint'
@@ -316,6 +318,20 @@ async function run_current(
 	return { ...outcome, daemon }
 }
 
+// Stops this checkout's daemon so the next run starts a fresh one; whether it stopped. No cli
+// resolves for a borrowed install, whose daemon belongs to the lending checkout. A stop that fails
+// or never answers within the bound reports false, so the caller warms no second daemon.
+async function stop(project_root: string): Promise<boolean> {
+	const cli = resolve_daemon_cli(project_root)
+	if (cli === undefined) return false
+	const outcome = await spawn_daemon(cli, [DAEMON_STOP], {
+		project_root,
+		timeout_ms: STOP_TIMEOUT_MS,
+	})
+
+	return outcome.exit_code === 0
+}
+
 // The run through the warm daemon, or nothing when there is no daemon to reach or it failed to
 // start — the caller then runs its own cold route, so a project without the daemon lints as before.
 async function run(
@@ -367,6 +383,7 @@ const eslint_daemon = {
 	resolve_daemon_cli,
 	run,
 	run_or_cold,
+	stop,
 	ESLINT_DAEMON,
 }
 
