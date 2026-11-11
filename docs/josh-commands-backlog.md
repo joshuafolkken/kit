@@ -369,6 +369,24 @@ pnpm josh plan:scaffold 123 scripts/a.ts scripts/b.ts   # the files this plan to
 
 <!-- /usage -->
 
+### `josh issue:premise-unmet`
+
+<!-- usage: issue:premise-unmet -->
+
+Exit an issue whose declared close condition holds: post the verdict, close it as not planned, release the hold.
+
+```bash
+pnpm josh issue:premise-unmet 7249 --evidence-file .josh/tmp/premise-unmet.md   # comment, not-planned close, release — in that order
+```
+
+**Options:**
+
+- `--evidence-file <path>` — the verdict comment: the measured values and why the close condition holds; an empty file is refused
+
+<!-- /usage -->
+
+See `issue-comments.md` → "When a declared close condition holds".
+
 ### `josh issue:already-done`
 
 <!-- usage: issue:already-done -->
@@ -385,7 +403,7 @@ pnpm josh issue:already-done 4130 --evidence-file .josh/tmp/already-done.md   # 
 
 <!-- /usage -->
 
-See `issue-comments.md` → "When the work turns out to be already merged". Steps stop at the first failure. The Issue is never closed. A follow-up measurement — a body declaring `- 実施可能条件: #<PR> のマージ後 <K> マージ` — or a body that cannot be read is refused before anything is written; a measurement exits with `josh issue:measured`.
+See `issue-comments.md` → "When the work turns out to be already merged". Steps stop at the first failure. A follow-up measurement — a body declaring `- 実施可能条件: #<PR> のマージ後 <K> マージ` — or a body that cannot be read is refused before anything is written; a measurement exits with `josh issue:measured`.
 
 ### `josh issue:measured`
 

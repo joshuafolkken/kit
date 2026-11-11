@@ -147,6 +147,30 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'issue:premise-unmet': {
+		script: 'scripts/issue/issue-premise-unmet-cli.ts',
+		description:
+			'Exit an issue whose declared close condition holds: post the verdict, close it as not planned, release the hold',
+		category: 'AI tools',
+		// Releasing the hold runs `run:hold`, which reaches the stop confirmation.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		reference: [EVIDENCE_REFERENCE, 'automation', ['network', 'files']],
+		usage: {
+			examples: [
+				{
+					arguments: '7249 --evidence-file .josh/tmp/premise-unmet.md',
+					note: 'comment, not-planned close, release — in that order',
+				},
+			],
+			flags: [
+				{
+					names: [EVIDENCE_FILE],
+					description:
+						'the verdict comment: the measured values and why the close condition holds; an empty file is refused',
+				},
+			],
+		},
+	},
 	'issue:already-done': {
 		script: 'scripts/issue/issue-already-done-cli.ts',
 		description:

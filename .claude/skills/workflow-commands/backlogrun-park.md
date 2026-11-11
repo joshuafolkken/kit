@@ -34,6 +34,9 @@ pnpm josh run:park <N> --body-file .josh/tmp/park.md   # body schema: docs/josh-
 
 Return to step 1.
 
+A finding that meets the body's declared `- 中止条件:` is not a park —
+`issue-comments.md` → "When a declared close condition holds".
+
 **What happens to a parked child's lane** — `backlogrun-lanes.md` → "What happens to a lane".
 
 **Parking keeps the stop's rule** — file upstream defects; never work around them.
