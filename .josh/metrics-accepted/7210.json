@@ -1,0 +1,9 @@
+{
+	"reason": "English column for issue-body keys/headings plus round-1 review fixes: written_* section readers so display text stays as filed",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 110,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 188
+	}
+}

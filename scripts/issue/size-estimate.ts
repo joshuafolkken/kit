@@ -25,13 +25,10 @@ const EPIC_HEADING = '## Split rationale'
 const PREFIX = issue_body_keys.prefix('size')
 const HEADING_PREFIX = '## '
 const { REASON_PREFIX } = split_assess
-const DECLARATION = `${PREFIX} 約 <N> ファイル / <M> 行（テスト除く）`
-// Full- or half-width parentheses alike: the two read the same to the person typing the line.
-const VALUE_PATTERN =
-	/^約\s*(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行\s*[（(]テスト除く[）)]$/u
+const DECLARATION = `${PREFIX} ${issue_body_keys.size_value('<N>', '<M>')}`
 const MISSING = `missing size estimate: declare \`${DECLARATION}\` under ${BACKGROUND_HEADING}`
 // The refusal ends in a line ready to paste (joshuafolkken/kit#5225).
-const EXAMPLE = `${PREFIX} 約 3 ファイル / 60 行（テスト除く）`
+const EXAMPLE = `${PREFIX} ${issue_body_keys.size_value('3', '60')}`
 const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 const estimate_schema = z.object({ files: z.coerce.number(), lines: z.coerce.number() })
 const IMPLEMENT_BUDGET = lane_stage_budget.BUDGET_MINUTES.implement
@@ -53,7 +50,10 @@ function declared(body: string, prefix: string): string | undefined {
 function is_estimate_line(text: string): boolean {
 	const trimmed = text.trim()
 
-	return trimmed.startsWith(PREFIX) && VALUE_PATTERN.test(trimmed.slice(PREFIX.length).trim())
+	return (
+		trimmed.startsWith(PREFIX) &&
+		issue_body_keys.size_counts(trimmed.slice(PREFIX.length).trim()) !== undefined
+	)
 }
 
 // joshuafolkken/kit#5758: a decision that widens an Issue's scope states the new estimate in its
@@ -85,7 +85,7 @@ function restated(body: string, line: string): string {
 	const at = declared_index(markdown_section.unfenced_lines(body))
 	const current = lines[at]
 	if (current === undefined) return body
-	lines[at] = `${current.slice(0, current.indexOf(PREFIX))}${line}`
+	lines[at] = `${current.slice(0, current.length - current.trimStart().length)}${line}`
 
 	return lines.join('\n')
 }
@@ -110,7 +110,7 @@ function parse(
 	rate?: ImplementRate,
 	growth?: SizeRatios,
 ): SizeMeasurement | undefined {
-	const read = estimate_schema.safeParse(VALUE_PATTERN.exec(declared(body, PREFIX) ?? '')?.groups)
+	const read = estimate_schema.safeParse(issue_body_keys.size_counts(declared(body, PREFIX) ?? ''))
 
 	if (!read.success) return undefined
 	const { files, lines } = read.data
