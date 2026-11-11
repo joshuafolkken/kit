@@ -13,7 +13,7 @@ import { run_board_usage_read } from '#scripts/run/board/run-board-usage-read'
 import { run_board_usage_top } from '#scripts/run/board/run-board-usage-top'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
-import { run_board_profile, type Piece, type ProfilePorts } from './run-board-profile'
+import { run_board_profile, type Piece } from './run-board-profile'
 
 // The measurement #7257 asks for, run by hand in a checkout whose run has started:
 // `node --expose-gc --max-semi-space-size=256 --import tsx tools/metrics/run-board-profile-main.ts [runs]`.
@@ -21,38 +21,25 @@ import { run_board_profile, type Piece, type ProfilePorts } from './run-board-pr
 // collection from landing inside a read, so the heap growth is what the read allocated.
 
 const ARGV_OFFSET = 2
-const DEFAULT_RUNS = 20
-const US_PER_MS = 1000
 const { LOCAL_READ_MS, MACHINE_SAMPLE_MS } = run_board_gather
 const PER_SECOND = MS_PER_MINUTE / MACHINE_SAMPLE_MS
 const PER_LOCAL_READ = MS_PER_MINUTE / LOCAL_READ_MS
 const PER_TOP = MS_PER_MINUTE / run_board_usage_top.TOP_INTERVAL_MS
 
-const LIVE: ProfilePorts = {
-	now: () => performance.now(),
-	cpu_ms: () => {
-		const { user, system } = process.cpuUsage()
-
-		return (user + system) / US_PER_MS
-	},
-	heap_bytes: () => {
-		const usage = process.memoryUsage()
-
-		return usage.heapUsed + usage.external
-	},
-	// A no-op where the process was started without `--expose-gc`.
-	settle: () => {
-		globalThis.gc?.()
-	},
-}
-
-// The redraw alone: the frame is drawn from one read taken beforehand, and written nowhere.
+// The redraw alone: the frame is drawn from one read taken beforehand, and written nowhere. One
+// settled tick first waits for the GitHub reads, so none lands inside a later piece's measurement,
+// and no snapshot store is given, so the live board's kept GitHub reads are not rewritten.
 async function redraw_piece(): Promise<Piece> {
 	const live = run_board_gather_live.ports_of(false)
 	const read = await run_board_gather.frame_gatherer(live)('background')
-	// eslint-disable-next-line @typescript-eslint/no-empty-function -- the frame is measured, not shown
-	const ports = { ...run_board_cli.LIVE_PORTS, gather: async () => read, write: () => {} }
-	let state = run_board_tick.FRESH_STATE
+	const ports = {
+		...run_board_cli.LIVE_PORTS,
+		gather: async () => read,
+		// eslint-disable-next-line @typescript-eslint/no-empty-function -- the frame is measured, not shown
+		write: () => {},
+		snapshot: undefined,
+	}
+	let state = await run_board_tick.tick(run_board_tick.FRESH_STATE, ports, 'settled')
 
 	async function run(): Promise<void> {
 		// eslint-disable-next-line require-atomic-updates -- measure_all awaits each run before the next
@@ -62,14 +49,18 @@ async function redraw_piece(): Promise<Piece> {
 	return { label: 'redraw', per_minute: PER_SECOND, run }
 }
 
-// One worker round, the whole of what the live board reads each second.
+// One worker round, the whole of what the live board reads each second. The rounds run back to back,
+// so the round's clock is moved a second per round: the local read then falls due on every fifth
+// round, as on the live board, rather than once in the whole measurement.
 function round_piece(): Piece {
-	const ports = run_board_gather_live.ports_of(true)
+	const clock = { ms: Date.now() }
+	const ports = { ...run_board_gather_live.ports_of(true), now: () => clock.ms }
 	let state = run_board_gather.FRESH_GATHER
 
 	async function run(): Promise<void> {
 		// eslint-disable-next-line require-atomic-updates -- measure_all awaits each run before the next
 		state = await run_board_gather.gather(state, ports, 'background')
+		clock.ms += MACHINE_SAMPLE_MS
 	}
 
 	return { label: 'gather round (all reads)', per_minute: PER_SECOND, run }
@@ -116,11 +107,11 @@ function local_pieces(repository: string): Array<Piece> {
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
-	const runs = Number(argv[0] ?? DEFAULT_RUNS)
+	const runs = run_board_profile.runs_of(argv[0])
 	const repository = await run_carry.repository_directory()
 	const local = repository === undefined ? [] : local_pieces(repository)
 	const pieces = [await redraw_piece(), round_piece(), ...machine_pieces(), ...local]
-	const samples = await run_board_profile.measure_all(pieces, runs, LIVE)
+	const samples = await run_board_profile.measure_all(pieces, runs, run_board_profile.LIVE_PORTS)
 
 	process.stdout.write(`${run_board_profile.format(samples)}\n`)
 }

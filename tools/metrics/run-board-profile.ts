@@ -7,6 +7,8 @@
 const KIB = 1024
 const MIB = KIB * KIB
 const DECIMALS = 2
+const US_PER_MS = 1000
+const DEFAULT_RUNS = 20
 const HEADER = ['read', 'calls/min', 'wall ms', 'cpu ms', 'cpu ms/min', 'heap KiB', 'heap MiB/min']
 
 interface ProfilePorts {
@@ -15,6 +17,32 @@ interface ProfilePorts {
 	heap_bytes: () => number
 	// A full collection before each read, where the process allows one, so the growth is the read's.
 	settle?: (() => void) | undefined
+}
+
+const LIVE_PORTS: ProfilePorts = {
+	now: () => performance.now(),
+	cpu_ms: () => {
+		const { user, system } = process.cpuUsage()
+
+		return (user + system) / US_PER_MS
+	},
+	heap_bytes: () => {
+		const usage = process.memoryUsage()
+
+		return usage.heapUsed + usage.external
+	},
+	// A no-op where the process was started without `--expose-gc`.
+	settle: () => {
+		globalThis.gc?.()
+	},
+}
+
+// The runs asked for, or the default where the argument is not a positive whole number: no run would
+// leave nothing to average, and a count that never reaches zero would never end.
+function runs_of(argument: string | undefined): number {
+	const runs = Number(argument)
+
+	return Number.isSafeInteger(runs) && runs > 0 ? runs : DEFAULT_RUNS
 }
 
 interface Piece {
@@ -98,7 +126,7 @@ function format(samples: ReadonlyArray<Sample>): string {
 		.join('\n')
 }
 
-const run_board_profile = { format, measure, measure_all }
+const run_board_profile = { DEFAULT_RUNS, LIVE_PORTS, format, measure, measure_all, runs_of }
 
 export { run_board_profile }
 export type { Piece, ProfilePorts, Sample }

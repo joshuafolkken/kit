@@ -70,6 +70,33 @@ describe('run_board_profile.measure', () => {
 	})
 })
 
+describe('run_board_profile.runs_of', () => {
+	it('takes a positive whole number as the runs', () => {
+		expect(run_board_profile.runs_of('5')).toBe(5)
+	})
+
+	it.each([undefined, 'abc', '0', '-3', '2.5'])('falls back to the default for %s', (argument) => {
+		expect(run_board_profile.runs_of(argument)).toBe(run_board_profile.DEFAULT_RUNS)
+	})
+})
+
+describe('run_board_profile.LIVE_PORTS', () => {
+	const { LIVE_PORTS } = run_board_profile
+
+	it('reads a clock and this process CPU time that never go back', () => {
+		const before = { now: LIVE_PORTS.now(), cpu: LIVE_PORTS.cpu_ms() }
+
+		expect(LIVE_PORTS.now()).toBeGreaterThanOrEqual(before.now)
+		expect(LIVE_PORTS.cpu_ms()).toBeGreaterThanOrEqual(before.cpu)
+		expect(before.cpu).toBeGreaterThan(0)
+	})
+
+	it('reads the heap in use and settles without --expose-gc', () => {
+		expect(LIVE_PORTS.heap_bytes()).toBeGreaterThan(0)
+		expect(() => LIVE_PORTS.settle?.()).not.toThrow()
+	})
+})
+
 describe('run_board_profile.format', () => {
 	it('puts the read with the most CPU per minute first, weighted by its calls', () => {
 		const table = format([sample_of('git', 1), sample_of('stream', 3)])

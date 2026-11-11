@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_profile } from './run-board-profile'
 
-vi.mock(import('./run-board-profile'), () => ({
-	run_board_profile: { format: vi.fn(), measure: vi.fn(), measure_all: vi.fn() },
-}))
+vi.mock(import('./run-board-profile'), async (import_original) => {
+	const original = await import_original()
+
+	return { run_board_profile: { ...original.run_board_profile, measure_all: vi.fn() } }
+})
 
 describe('run-board-profile-main', () => {
 	it('measures nothing when it is imported rather than run', async () => {
