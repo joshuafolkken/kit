@@ -6,6 +6,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { release_history } from './release-history'
 import { release_plan, type ReleasePlan } from './release-plan'
 import { release_publish } from './release-publish'
+import { release_workflow_check } from './release-workflow-check'
 
 // `pnpm josh release` — the one place that decides a version.
 //
@@ -66,6 +67,7 @@ async function run(is_dry_run: boolean): Promise<number> {
 	}
 
 	console.info(release_plan.format_plan(plan))
+	await release_workflow_check.assert_release_workflow(tip)
 
 	if (is_dry_run) return SUCCESS_EXIT_CODE
 

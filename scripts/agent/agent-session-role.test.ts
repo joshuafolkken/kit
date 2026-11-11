@@ -45,3 +45,13 @@ describe('agent_session_role', () => {
 		expect(agent_session_role.is_launched(source)).toBe(expected)
 	})
 })
+
+// joshuafolkken/kit#7293: the consultation scope must not read as unconditional filing permission.
+describe('agent_session_role.scope_line', () => {
+	it('grants filing only on the user’s explicit instruction outside a worker lane', () => {
+		const line = agent_session_role.scope_line({})
+
+		expect(line).toContain('filing only on the user’s explicit instruction')
+		expect(line).not.toContain('consultation, filing and operations')
+	})
+})

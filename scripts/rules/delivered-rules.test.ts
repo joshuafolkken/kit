@@ -1,5 +1,6 @@
 import { mkdirSync, realpathSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { read_unwrapped } from '#scripts/document/ai-document-fixture'
 import { hook_context } from '#scripts/hooks/hook-context'
 import { hook_decision } from '#scripts/josh/hook-decision'
@@ -110,6 +111,9 @@ beforeEach(() => {
 	// The lane-child block sets `JOSH_LANE_CHILD`; clearing it here, beside the cwd reset, keeps it from
 	// leaking into any case that runs after — the same reset-before-every-case discipline as the cwd.
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
+	// A kit-launched session carries the headless mark; clearing it runs every case as an interactive
+	// session wherever vitest was launched, so `unasked-filing` reads the same locally and in CI.
+	Reflect.deleteProperty(process.env, agent_headless.KEY)
 	process.chdir(WORK_DIRECTORY)
 })
 
@@ -223,7 +227,10 @@ describe('delivered_rules.delivery — the comments rule stands down when it sho
 // joshuafolkken/kit#3423: the WIP cap and the fold question are `issue:file`'s own steps, so a run's
 // first filing reaches the command on its first call rather than after a refusal and a reissue.
 describe('delivered_rules.delivery — the call that files', () => {
+	// joshuafolkken/kit#7293: an interactive session's unasked filing is refused, so the run is headless.
 	it('lets a first filing through to the command', () => {
+		Object.assign(process.env, agent_headless.environment())
+
 		expect(delivered_rules.delivery(payload_of('filing', FILING_COMMAND), NOW_MS)).toBeUndefined()
 	})
 })
@@ -385,8 +392,15 @@ describe('DELIVERED_RULES — the enumeration', () => {
 describe('DELIVERED_RULES — trigger overlap', () => {
 	// joshuafolkken/kit#4750 took the filing cap into `issue:file`, the last rule that claimed a filing
 	// after joshuafolkken/kit#3423 took the WIP cap and the fold question there.
-	it('leaves an `issue:file` filing to the command, claimed by no rule', () => {
+	// joshuafolkken/kit#7293: `unasked-filing` claims it in an interactive session only.
+	it('leaves an unattended `issue:file` filing to the command, claimed by no rule', () => {
+		Object.assign(process.env, agent_headless.environment())
+
 		expect(rules_claiming(FILING_COMMAND)).toBe(0)
+	})
+
+	it('claims an interactive `issue:file` filing by exactly one rule', () => {
+		expect(rules_claiming(FILING_COMMAND)).toBe(1)
 	})
 
 	it.each([

@@ -18,6 +18,7 @@ const MULTILINE_FIELD: ShellShapeId = 'multiline-quoted-field'
 const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'third-party-write': [MULTILINE_FIELD, HEREDOC],
 	'direct-filing': [HEREDOC],
+	'unasked-filing': [],
 	'direct-issue-comment': [HEREDOC],
 	'direct-issue-read': [HEREDOC],
 	'issue-comments': [],
