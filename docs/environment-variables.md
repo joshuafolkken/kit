@@ -109,6 +109,11 @@ Which steps run at a lowered effort:
   ([`josh lane:open`](./josh-commands-lane.md#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune)).
 - `josh.gate.steps`: a list of `{ name, command, paths? }`, unset by default; `josh gate` runs each
   command after its fixed checks and reports it under its name ([`josh gate`](./josh-commands.md#josh-gate)).
+- `josh.format`: `"auto" | "all"`, default `"auto"`; what Prettier formats and checks in a basic
+  project (`josh format`, `josh lint`, `josh lint:related`). `auto` formats only the HTML, CSS and
+  JavaScript files that enabled Prettier; `all` formats every file type Prettier reads, such as
+  Markdown, JSON and YAML. A full project always formats every type. Not an environment variable,
+  so local runs and CI format the same files.
 
 | Variable                         | Required | Default                                                          | Used when                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

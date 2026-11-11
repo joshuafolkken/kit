@@ -1,6 +1,8 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { temporary_directory } from '#tools/test/temporary-directory'
+import { execa } from 'execa'
 import { describe, expect, it } from 'vitest'
 import { project_checks } from './project-checks'
 
@@ -198,5 +200,68 @@ describe('project_checks optional configuration', () => {
 		writeFileSync(path.join(root, 'cspell.config.json'), '{}')
 		expect(project_checks.has_config(nested, project_checks.ESLINT_CONFIGS)).toBe(true)
 		expect(project_checks.has_config(nested, project_checks.CSPELL_CONFIGS)).toBe(true)
+	})
+})
+
+const UNFORMATTED_MARKDOWN = '* item\n'
+const UNFORMATTED_SCRIPT = 'const a  =  1\n'
+
+function format_project(josh: Record<string, unknown>): string {
+	const root = fixture()
+
+	writeFileSync(path.join(root, PACKAGE_JSON), JSON.stringify({ josh }))
+	writeFileSync(path.join(root, 'README.md'), UNFORMATTED_MARKDOWN)
+	writeFileSync(path.join(root, 'site.js'), UNFORMATTED_SCRIPT)
+
+	return root
+}
+
+async function run_prettier_write(root: string): Promise<void> {
+	const prettier = find_local_bin_upwards(process.cwd(), 'prettier') ?? 'prettier'
+	const targets = project_checks.prettier_targets(root, ['.'])
+
+	await execa(prettier, ['--write', ...targets], { cwd: root })
+}
+
+function read_text(root: string, name: string): string {
+	return readFileSync(path.join(root, name), 'utf8')
+}
+
+describe('project_checks prettier targets on a JS and Markdown project', () => {
+	it('leaves Markdown alone under the default auto scope and formats it under all', async () => {
+		const auto_root = format_project({ profile: 'basic' })
+		const all_root = format_project({ profile: 'basic', format: 'all' })
+
+		await run_prettier_write(auto_root)
+		await run_prettier_write(all_root)
+		expect(read_text(auto_root, 'README.md')).toBe(UNFORMATTED_MARKDOWN)
+		expect(read_text(auto_root, 'site.js')).not.toBe(UNFORMATTED_SCRIPT)
+		expect(read_text(all_root, 'README.md')).not.toBe(UNFORMATTED_MARKDOWN)
+		expect(read_text(all_root, 'site.js')).not.toBe(UNFORMATTED_SCRIPT)
+	})
+})
+
+describe('project_checks prettier targets', () => {
+	it.each([{}, { format: 'auto' }, { format: 'all' }])(
+		'keeps every target on a full project with %o',
+		(settings) => {
+			const root = format_project({ profile: 'full', ...settings })
+
+			expect(project_checks.prettier_targets(root, ['.'])).toEqual(['.'])
+			expect(project_checks.prettier_targets(root, ['a.md'])).toEqual(['a.md'])
+		},
+	)
+
+	it('keeps only the Web files of a list under auto, and every Web file when none is left', () => {
+		const root = format_project({ profile: 'basic' })
+
+		expect(project_checks.prettier_targets(root, ['a.md', 'b.css', 'c.json'])).toEqual(['b.css'])
+		expect(project_checks.prettier_targets(root, ['a.md'])).toEqual([project_checks.WEB_FILES])
+	})
+
+	it('reads an unknown josh.format as the default auto', () => {
+		const root = format_project({ profile: 'basic', format: 'none' })
+
+		expect(project_checks.prettier_targets(root, ['.'])).toEqual([project_checks.WEB_FILES])
 	})
 })
