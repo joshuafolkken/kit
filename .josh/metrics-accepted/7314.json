@@ -1,0 +1,7 @@
+{
+	"reason": "One pinned test path added to REGISTRY_TESTS so command-table changes select josh-in-process.test.ts (#7314)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 1
+	}
+}
