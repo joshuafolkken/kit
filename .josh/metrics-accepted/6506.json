@@ -1,7 +1,0 @@
-{
-	"reason": "Read current park state and keep caused-park dependency recording relation-only; reuses existing state reader and parked-label predicate.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

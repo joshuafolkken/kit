@@ -1,7 +1,0 @@
-{
-	"reason": "issue:spill gains --distinct pass-through and carries the expected-effect section (#6992)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}

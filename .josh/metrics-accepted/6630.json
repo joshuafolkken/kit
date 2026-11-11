@@ -1,8 +1,0 @@
-{
-	"reason": "issue:fold-existing --found-during records a fold as the split child so run:cut accepts it (#6630); split-assessment.md names the fold path",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 48,
-		"ai_cost.on_demand_bytes": 121
-	}
-}

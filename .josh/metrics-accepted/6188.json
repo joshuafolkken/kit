@@ -1,7 +1,0 @@
-{
-	"reason": "#6188 adds the implement read breakdown table to lane:stats (a new module and its tests)",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 129
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#5835: ack stamps the landed time of the update it takes in (landed_times / landed_at) and lane:breakdown opens implement at the first edit (first_edit_ms / breakdown_of / edit_markers), +66 code lines",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 66
-	}
-}

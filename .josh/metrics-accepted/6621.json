@@ -1,7 +1,0 @@
-{
-	"reason": "#6621 draws GitHub's core allowance as a usage gauge row and gauge-form summary (allowance_of + summary helper)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 21
-	}
-}

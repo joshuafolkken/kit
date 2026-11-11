@@ -1,7 +1,0 @@
-{
-	"reason": "Generated PURE_FILES list gains 99 classifier-pure entries (scripts/issue, scripts/review, scripts/test) moved from the isolated project #6926",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 99
-	}
-}

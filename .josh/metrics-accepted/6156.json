@@ -1,8 +1,0 @@
-{
-	"reason": "#6156 adds the one paragraph the issue requires: the disposition of prose-only rules in residency.md",
-	"date": "2026-11-03",
-	"growth": {
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 226
-	}
-}

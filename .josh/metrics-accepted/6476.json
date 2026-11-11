@@ -1,7 +1,0 @@
-{
-	"reason": "Add three code lines for effect:audit write-flag metadata and its shared read-only exclusion; keeps consultation classification in one place (#6476)",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

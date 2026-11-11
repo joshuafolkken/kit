@@ -1,7 +1,0 @@
-{
-	"reason": "#7029: dedupe scout candidates, hold a filing only on title matches, rank them ahead of cited-only rows (+20 code lines)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

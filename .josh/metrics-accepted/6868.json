@@ -1,7 +1,0 @@
-{
-	"reason": "#6868 adds the poll lead step and the PR completion schedules (A-D), with their interval tests",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 34
-	}
-}

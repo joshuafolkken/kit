@@ -1,7 +1,0 @@
-{
-	"reason": "Add the direct lane-child release refusal and regression coverage for #6448; reuse the existing internal release implementation.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

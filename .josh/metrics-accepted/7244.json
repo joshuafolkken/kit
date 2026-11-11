@@ -1,7 +1,0 @@
-{
-	"reason": "#7244 adds the compressed-inclusive footprint to lane:stats' process table (pid-keyed proc_pid_rusage read, ledger field, table column) and moves the load schema out of the capped lane-ledger-schema.ts",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 52
-	}
-}

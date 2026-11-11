@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6286 adds persisted round findings and Git blob fix-hunk scoping with shared existing parsers; the +205 code lines implement the required conservative fallback and finding correspondence.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 205
-	}
-}

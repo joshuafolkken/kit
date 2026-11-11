@@ -1,7 +1,0 @@
-{
-	"reason": "#7048: prose:stale looks up a deleted file's reachable names in live modules (git grep + declaration read), plus its git tests",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "New issue:consolidate command (#6609): consolidate core, CLI, close state_reason; untrack before target rewrite",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 248
-	}
-}

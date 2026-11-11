@@ -1,7 +1,0 @@
-{
-	"reason": "run:pickup is a new command (#5856): its CLI adds the code lines",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6612 adds the shared gh spawn limiter (bounded_pool.limiter) and its new limit test file; +42 code lines are the limiter, the three spawn wrappers and the test",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 42
-	}
-}

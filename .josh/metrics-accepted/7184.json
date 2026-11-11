@@ -1,9 +1,0 @@
-{
-	"reason": "The near-cap filing check adds its declaration rows and refactor-first route to the issue template and the issue:file reference (#7184), including the 先行リファクタ declaration that lets the refile pass",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 99,
-		"rules.lines": 4,
-		"ai_cost.on_demand_bytes": 719
-	}
-}

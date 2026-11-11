@@ -1,7 +1,0 @@
-{
-	"reason": "Round 2 fixes: restore sample waits after a hand-back and tell an ambiguous cell address apart from a missing sample (#6503)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 77
-	}
-}

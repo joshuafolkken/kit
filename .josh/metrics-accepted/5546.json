@@ -1,7 +1,0 @@
-{
-	"reason": "New josh upstream:interrupt command (CLI, main entry, registration) and issue:file main-entry split replace a five-step manual procedure",
-	"date": "2026-10-31",
-	"growth": {
-		"scripts.code_lines": 229
-	}
-}

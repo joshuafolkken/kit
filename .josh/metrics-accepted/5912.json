@@ -1,7 +1,0 @@
-{
-	"reason": "Two new entry files (epic-main.ts, epic-audit-main.ts) carry the main guards moved out of importable modules (#5912)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

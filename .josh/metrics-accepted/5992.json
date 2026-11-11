@@ -1,7 +1,0 @@
-{
-	"reason": "#5992: the split-direction check reads the josh commands a split-off file registers or names",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 23
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6625: the github row's name cell now goes through name_of for the scheduler mark width; the longer call wraps the map callback onto its own lines",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

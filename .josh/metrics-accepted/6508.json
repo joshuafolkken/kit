@@ -1,9 +1,0 @@
-{
-	"reason": "停止中の課題を既存の整理対象に追加し、重複除去と4つの復旧経路の案内を実装するため。手順書にも対象と復旧経路を明記する。",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 10,
-		"ai_cost.on_demand_bytes": 356,
-		"prose.long_paragraphs": 1
-	}
-}

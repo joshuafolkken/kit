@@ -1,7 +1,0 @@
-{
-	"reason": "#6577: stopped lane rows keep their stop time and reason (lane-stop, settle, memoised lane-result split) with tests",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 166
-	}
-}

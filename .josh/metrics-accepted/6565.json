@@ -1,7 +1,0 @@
-{
-	"reason": "#6565: implementation-cut prices the hook's own transcript (session-scoped verdict + cache) so a resumed lane is not re-cut by its predecessor's usage",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 45
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6724: the split notice counts lane:plan's module-and-importer units, so without_relocations returns the added files and three test mocks return the new shape",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "#6594 shares measured files/lines growth with all size consumers (+155 code lines) and documents axis-specific fallback independently of speed (+92 on-demand bytes).",
-	"date": "2026-11-06",
-	"growth": {
-		"scripts.code_lines": 155,
-		"ai_cost.on_demand_bytes": 92
-	}
-}

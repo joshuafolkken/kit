@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6268 adds one shared transcript decision classifier and park routing so human questions do not count as mechanical failures; regression coverage reuses the shared fixtures.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 109
-	}
-}

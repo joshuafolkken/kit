@@ -1,7 +1,0 @@
-{
-	"reason": "Shared dependency-free change classification adds 76 code lines to skip unit shards, SonarQube and auto-tag dispatch when inputs are unchanged; package files and toolchain inputs remain single-sourced.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 76
-	}
-}

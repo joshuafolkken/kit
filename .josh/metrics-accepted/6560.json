@@ -1,7 +1,0 @@
-{
-	"reason": "#6560 adds the disk-backed ETag read layer (git-gh-etag-read) the listings and epic bodies read through",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 57
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "per-agent-type cost rows in cost:audit (#5971): meta.json read and the agent table",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

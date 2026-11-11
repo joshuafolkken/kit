@@ -1,7 +1,0 @@
-{
-	"reason": "Codex adapter now stamps and reverts consultation exec_command writes through bash-revert (#6813), merging the revert block into the single PostToolUse envelope",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

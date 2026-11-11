@@ -1,7 +1,0 @@
-{
-	"reason": "Adopt the existing clean join-to-ship command while retaining finding stops, interaction recording and extra-option fallback (#6386).",
-	"date": "2026-11-04",
-	"growth": {
-		"ai_cost.on_demand_bytes": 303
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6551 keeps lane launch failure detail on the outcome and the no-child event, capped for the board header",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

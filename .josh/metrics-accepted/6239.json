@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6239 adds the shared freshness launcher and build stamps; typed tsx registration fixes the gate type error. Existing freshness logic stays single-sourced (+62 runtime code lines).",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 68
-	}
-}

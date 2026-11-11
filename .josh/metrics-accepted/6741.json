@@ -1,8 +1,0 @@
-{
-	"reason": "#6741: issue:file converts a parked finder's needs-decision into a blocked-by wait (new code path + one-line pointer in backlogrun-park.md)",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 40,
-		"ai_cost.on_demand_bytes": 224
-	}
-}

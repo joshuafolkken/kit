@@ -1,7 +1,0 @@
-{
-	"reason": "#7139: the backlogrun parent read set derives its stage sections from run:step's table (+22 code lines)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 23
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "run:board reads and draws the repository's open/closed issue count (#7088): a new GraphQL read module, its gather/snapshot wiring and the header chip",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 114
-	}
-}

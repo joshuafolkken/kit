@@ -1,8 +1,0 @@
-{
-	"reason": "The required lane boundary uses the shared marker in the handoff CLI, prompt guidance, and consultation entry guard; +14 code lines and +1 on-demand byte close the round-1 dead end without new state or cloned detection.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 14,
-		"ai_cost.on_demand_bytes": 1
-	}
-}

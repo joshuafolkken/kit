@@ -1,7 +1,0 @@
-{
-	"reason": "PROFILE_KEYS derives the agent model/effort env keys the unit suite blanks, single-sourced from agent-role-profile (#5863)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}

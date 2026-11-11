@@ -1,7 +1,0 @@
-{
-	"reason": "Project gate steps claim cores in the machine-wide budget, with an optional per-step cores weight (#7206)",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

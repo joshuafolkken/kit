@@ -1,7 +1,0 @@
-{
-	"reason": "#6792 adds the batched GraphQL child read (git-gh-issue-batch-graphql.ts) and its wiring in epic-fetch, within the issue's ~150-line estimate",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 153
-	}
-}

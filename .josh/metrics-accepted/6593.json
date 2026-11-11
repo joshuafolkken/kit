@@ -1,7 +1,0 @@
-{
-	"reason": "Keep the shared budget-only size message accurate when the fallback floor makes the guide verdict single; the added early return prevents a false guide-overrun claim.",
-	"date": "2026-11-06",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

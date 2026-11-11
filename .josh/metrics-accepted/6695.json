@@ -1,7 +1,0 @@
-{
-	"reason": "#6695 adds the gh-usage event kind and its writer (gh-usage-event.ts), the third step of epic #6566",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 58
-	}
-}

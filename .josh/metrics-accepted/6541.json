@@ -1,7 +1,0 @@
-{
-	"reason": "#6541 adds the followup interval to lane net time and the driver followup row to breakdown, stats and why",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 59
-	}
-}

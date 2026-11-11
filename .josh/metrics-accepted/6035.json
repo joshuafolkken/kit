@@ -1,9 +1,0 @@
-{
-	"reason": "#6035: the lint-prose generator replaces a 279-line sync test (tests are not counted), and command:derive fills its spans before writing; the span markers add bytes to CLAUDE.md and prompts/refactoring.md",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 79,
-		"ai_cost.resident_bytes": 43,
-		"ai_cost.on_demand_bytes": 42
-	}
-}

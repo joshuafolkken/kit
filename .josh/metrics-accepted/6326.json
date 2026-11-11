@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6326 adds verified split-child recovery and propagates ledger write failures; round 1 adds the known repository set needed for dotted origin references and regression tests for recovery and the guarded CLI entry.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 102
-	}
-}

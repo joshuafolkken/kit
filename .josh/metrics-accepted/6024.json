@@ -1,7 +1,0 @@
-{
-	"reason": "The ship log names a reused scoped pair (#6024)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

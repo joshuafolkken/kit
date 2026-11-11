@@ -1,8 +1,0 @@
-{
-	"reason": "Add issue:tick with shared criterion parsing, raw section preservation, CLI validation and failure handling; replace the manual checkbox update procedure.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 102,
-		"ai_cost.on_demand_bytes": 20
-	}
-}

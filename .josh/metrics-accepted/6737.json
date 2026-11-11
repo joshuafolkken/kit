@@ -1,7 +1,0 @@
-{
-	"reason": "prose-stale-scan gains the test-file and code-use checks, with import and list shapes, that stop false stale reports (#6737)",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 23
-	}
-}

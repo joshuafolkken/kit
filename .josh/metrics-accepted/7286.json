@@ -1,9 +1,0 @@
-{
-	"reason": "#7286 adds the issue:premise-unmet command, its tests, and the trigger-plus-pointer lines in issue-comments.md, backlogrun-park.md and the issue template",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 76,
-		"rules.lines": 4,
-		"ai_cost.on_demand_bytes": 1164
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "CI-infra stop cause, its park notice and the cap exclusion (#6848)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 36
-	}
-}

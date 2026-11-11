@@ -1,7 +1,0 @@
-{
-	"reason": "Regression hints require candidate-test metadata and shared formatting for normal, logged and recorded diagnostics (#6290).",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

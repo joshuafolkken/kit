@@ -1,7 +1,0 @@
-{
-	"reason": "#5920: the driver hand-off carries its governing sections (DRIVER_SECTIONS table, section_text reader) and their tests",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6267 keeps the raw stall cause and selects the resume command at render time from the existing live run state; the 28 added code lines cover that behavior without new reads or duplicated command logic.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

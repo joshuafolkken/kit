@@ -1,7 +1,0 @@
-{
-	"reason": "Fixes #6187: single-sources the over-cap hub between the test:related summary line and the lane ledger, and adds the fixed test",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

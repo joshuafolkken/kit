@@ -1,7 +1,0 @@
-{
-	"reason": "Label comment trust and serialize review findings at the existing output boundary to prevent comment text being treated as instructions (#6247).",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

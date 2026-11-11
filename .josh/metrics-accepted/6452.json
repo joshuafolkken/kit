@@ -1,7 +1,0 @@
-{
-	"reason": "The completion command adds a strict argument parser and reuses the existing command-name source; its 24 runtime code lines implement the requested CLI contract.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

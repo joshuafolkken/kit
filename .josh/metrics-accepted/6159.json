@@ -1,7 +1,0 @@
-{
-	"reason": "#6159: three import lines route readers through the alias-expanding time-josh-names layer",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

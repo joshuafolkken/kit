@@ -1,7 +1,0 @@
-{
-	"reason": "#7247 splits the shared eslint_d launch switches out of daemon_environment so the edit hook launches the daemon with the same heap (+3 lines)",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Confirm an unsuccessful merge before applying the shared bounded transient retry; preserve checked-head binding and stop on unreadable outcomes.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

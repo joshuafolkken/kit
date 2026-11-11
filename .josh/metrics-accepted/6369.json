@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6369 adds explicit full-change round selection and propagates it to local and broker reviewer launches; the shared round module replaces duplicated parsing and adds 32 runtime code lines.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 32
-	}
-}

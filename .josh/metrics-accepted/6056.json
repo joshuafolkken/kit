@@ -1,7 +1,0 @@
-{
-	"reason": "#6056: refusal tests per body-file reader, the shared cli_body scratch-repo fixture, and ship's --body-file - refusal",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 48
-	}
-}

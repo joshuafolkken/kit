@@ -1,7 +1,0 @@
-{
-	"reason": "Reuse native entry reach for pin selection and cache bases; preserve subprocess regression coverage",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 44
-	}
-}

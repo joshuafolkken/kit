@@ -1,7 +1,0 @@
-{
-	"reason": "#5952 adds cost:audit --density and read:set --bytes, two new single-number outputs",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 29
-	}
-}

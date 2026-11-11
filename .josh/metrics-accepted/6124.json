@@ -1,7 +1,0 @@
-{
-	"reason": "lane:why gains the longest CI job and step in its followup CI cell (#6124)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 43
-	}
-}

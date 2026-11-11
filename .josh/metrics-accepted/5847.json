@@ -1,7 +1,0 @@
-{
-	"reason": "release:scope prints the open release Issue and the request line, replacing a raw gh api step in followup.md (#5847)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 43
-	}
-}

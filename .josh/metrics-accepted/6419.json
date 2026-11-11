@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6419: add shared TS-loader Worker options and expose them for regression coverage; reuse the existing loader without duplicating detection",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

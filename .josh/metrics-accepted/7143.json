@@ -1,7 +1,0 @@
-{
-	"reason": "#7143: the poll round reuses the snapshot query's review decision (pr_read_review_decision) plus its tests",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

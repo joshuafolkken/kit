@@ -1,7 +1,0 @@
-{
-	"reason": "#5943: the #N entry's stash message names its command without 'new' (one line)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

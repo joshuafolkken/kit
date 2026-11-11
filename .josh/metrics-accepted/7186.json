@@ -1,7 +1,0 @@
-{
-	"reason": "lane:breakdown --timeline: new lane-timeline.ts module, its CLI routing and the registry flag entry; tests are in excluded test files",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 219
-	}
-}

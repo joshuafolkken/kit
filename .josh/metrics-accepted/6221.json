@@ -1,9 +1,0 @@
-{
-	"reason": "Issue #6221 binds workflow comparisons to immutable commits and records human-merge waits; added validation closes the reviewed head-switch race.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 110,
-		"ai_cost.on_demand_bytes": 394,
-		"prose.excess_bold": 1
-	}
-}

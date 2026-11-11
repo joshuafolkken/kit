@@ -1,9 +1,0 @@
-{
-	"reason": "New josh code:symbol command (#7140): its parser and CLI add code lines, including the round-1 fixes (CRLF blank line, empty-name usage guard), the output-bounds pointer adds on-demand bytes, and its command-doc section uses the standard Behavior label",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 173,
-		"ai_cost.on_demand_bytes": 55,
-		"prose.excess_bold": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "issue:priority raises to the declared level (critical included) via a new raise_label helper #6757",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

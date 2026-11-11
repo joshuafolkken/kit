@@ -1,7 +1,0 @@
-{
-	"reason": "#6791 adds the batched GraphQL read of run:board's closed children (alias reader + closed mapping) so a tick spends no REST core",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 191
-	}
-}

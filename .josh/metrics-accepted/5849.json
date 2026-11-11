@@ -1,8 +1,0 @@
-{
-	"reason": "New josh pin:verify command (#5849): CLI replaces the hand-typed gh api SHA check in followup.md",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 93,
-		"ai_cost.on_demand_bytes": 6
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "lane:plan size approval gains a both-axes scope member so one json can bound lines and files (#6657)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

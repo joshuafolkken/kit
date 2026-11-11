@@ -1,7 +1,0 @@
-{
-	"reason": "#7052: test:related gets its own named set (branch change where a shared test meets it) instead of lint's merge overlap; per-check phases in run-ship-scoped",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 53
-	}
-}

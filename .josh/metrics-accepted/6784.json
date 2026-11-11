@@ -1,7 +1,0 @@
-{
-	"reason": "New per-session GitHub transport switch (git-gh-transport.ts) replaces per-reader GraphQL fallbacks and adds the transport to gh:usage and the run board #6784",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 98
-	}
-}

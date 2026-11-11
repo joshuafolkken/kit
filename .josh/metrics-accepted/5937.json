@@ -1,7 +1,0 @@
-{
-	"reason": "#5937 adds the is_read_only entry declaration and its two uses so a consultation session can run cost:audit and read:set",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

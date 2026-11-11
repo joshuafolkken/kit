@@ -1,7 +1,0 @@
-{
-	"reason": "Six retired-phrase rows guard the backlogrun duplicates #5843 removed from creeping back",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

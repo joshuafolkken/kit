@@ -1,7 +1,0 @@
-{
-	"reason": "Extract the gauge cell renderer from cell_of so the github row can share it (#6620, prerequisite of #6621)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

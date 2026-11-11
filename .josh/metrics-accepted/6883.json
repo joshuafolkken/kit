@@ -1,7 +1,0 @@
-{
-	"reason": "#6883: the named offer returns the pool state that excludes yield-held named issues, and waits instead of asking the pool when only a lane outside the run holds one (the pool would read the drain)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}

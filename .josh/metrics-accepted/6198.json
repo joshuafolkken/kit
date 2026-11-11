@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats --sinks matches the scoped pair row against the period's over-cap hubs (#6198)",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 44
-	}
-}

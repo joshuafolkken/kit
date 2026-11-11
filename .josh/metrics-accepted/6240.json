@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6240 adds 74 runtime code lines for command-specific read checks, conservative quoted-argument validation, stdin operand handling, and time-wrapper outputs; existing shell tokenization stays shared. The extra 14 lines fix the three confirmed review bypasses.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 74
-	}
-}

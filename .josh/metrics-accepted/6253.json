@@ -1,7 +1,0 @@
-{
-	"reason": "Decision tails share the existing board renderer; blocker reads, cache fields and the outside-human boundary fix require 197 additional runtime code lines.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 197
-	}
-}

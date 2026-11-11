@@ -1,7 +1,0 @@
-{
-	"reason": "Splitting the gate check list into gate-checks.ts adds its imports, namespace object, re-exports and a pure-files entry (#7207)",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

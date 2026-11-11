@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats --since (#7007): the start union, its parser, the window it opens and its usage line",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

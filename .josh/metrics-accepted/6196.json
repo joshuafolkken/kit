@@ -1,7 +1,0 @@
-{
-	"reason": "the scoped pair's lap carries its named-file count and split failure for lane:stats --pairs (#6196)",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

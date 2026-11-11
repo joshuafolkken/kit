@@ -1,7 +1,0 @@
-{
-	"reason": "A single 21-line temporary-directory helper replaces duplicated setup and cleanup across 181 test files, reducing the tracked test diff by 338 lines.",
-	"date": "2026-11-06",
-	"growth": {
-		"scripts.code_lines": 21
-	}
-}

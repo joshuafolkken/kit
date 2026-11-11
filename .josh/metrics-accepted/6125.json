@@ -1,8 +1,0 @@
-{
-	"reason": "kit#6125 names the .josh/tmp/ path the two argument-less --body-file flags take; the added argument tips one existing paragraph over the long-paragraph line",
-	"date": "2026-11-03",
-	"growth": {
-		"ai_cost.on_demand_bytes": 73,
-		"prose.long_paragraphs": 1
-	}
-}

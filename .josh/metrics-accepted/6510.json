@@ -1,7 +1,0 @@
-{
-	"reason": "#6510 adds package-scout-reuse.ts and its tests: pkg:scout reads the target Issue's reuse decision through the shared answer judgment, records it once and settles a re-run on that record unless a later comment follows it — a new capability with no existing code to fold into",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 183
-	}
-}

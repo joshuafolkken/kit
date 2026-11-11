@@ -1,7 +1,0 @@
-{
-	"reason": "Fix #6659: epic --add --before splices in front of a fan-out point on every chain (shared-predecessor check and multi-chain splice)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Wire the rate-limit hold into offer_for (absorbs #6632): an uncalled module fails the pack-boundary gate",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 26
-	}
-}

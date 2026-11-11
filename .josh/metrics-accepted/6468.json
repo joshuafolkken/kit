@@ -1,7 +1,0 @@
-{
-	"reason": "Reuse the existing epic label and body contract before checking split direction; the eleven added runtime lines replace a body-only read and preserve ordinary issue protection.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

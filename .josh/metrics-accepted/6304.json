@@ -1,7 +1,0 @@
-{
-	"reason": "Record a missing dispatch through the existing ledger reader and writer after a successful entry hold; keep explicit dispatch append behavior unchanged.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6979: per-lane keep lock, deletions-only work check and stash:pop by hash",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 63
-	}
-}

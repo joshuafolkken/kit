@@ -1,8 +1,0 @@
-{
-	"reason": "Stopped lane adopters must release their saved cut; the lifecycle operation and recovery documentation add the required resume behavior.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 26,
-		"ai_cost.on_demand_bytes": 246
-	}
-}

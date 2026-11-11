@@ -1,7 +1,0 @@
-{
-	"reason": "Expose occupied lane identities from the existing snapshot alongside the count; seven runtime code lines cover the field and its return path.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

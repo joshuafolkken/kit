@@ -1,7 +1,0 @@
-{
-	"reason": "lane:resolve --record adds a new command mode (#5922): the record module and its CLI routing",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 61
-	}
-}

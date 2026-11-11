@@ -1,7 +1,0 @@
-{
-	"reason": "run:add reads the issue's existing labels so it keeps an existing priority label instead of stacking priority:high (#6787)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

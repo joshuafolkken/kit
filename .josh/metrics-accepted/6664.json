@@ -1,7 +1,0 @@
-{
-	"reason": "josh hook:ledger: new read-only command and its ledger reader, with round-1 review fixes (#6664)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 245
-	}
-}

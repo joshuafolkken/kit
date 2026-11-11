@@ -1,7 +1,0 @@
-{
-	"reason": "Built fast-path hook launcher (dist/hooks/ready.js) so kit's own hooks skip TS type stripping when bundles are fresh #6948",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

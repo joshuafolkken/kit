@@ -1,7 +1,0 @@
-{
-	"reason": "A lane:limit raise port beside run:add's: the shared event-kind reader, the raised_since port and its production wiring (#6861)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

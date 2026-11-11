@@ -1,7 +1,0 @@
-{
-	"reason": "Add holder-aware yield withdrawal reasons while sharing the existing holder parser; 20 net runtime lines implement the accepted behavior.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

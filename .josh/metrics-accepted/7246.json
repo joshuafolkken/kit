@@ -1,7 +1,0 @@
-{
-	"reason": "#7246 adds the footprint-based eslint_d restart (eslint-trim.ts) and the daemon stop it calls",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 42
-	}
-}

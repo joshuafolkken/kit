@@ -1,7 +1,0 @@
-{
-	"reason": "followup reruns a job red on an action download failure (#6673): one log check and its pattern",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

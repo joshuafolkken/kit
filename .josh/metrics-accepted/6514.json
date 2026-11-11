@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6514 adds the epic child removal plan and focused unit coverage; the 63 runtime code lines reuse existing epic parsers, body rewriting and validation.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 63
-	}
-}

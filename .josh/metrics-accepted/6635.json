@@ -1,7 +1,0 @@
-{
-	"reason": "lane:plan groups a new scripts module with its same-directory importer on the files axis (#6635)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 29
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "cost:audit gains the usage breakdown section and the --since/--until absolute period (#7042)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 219
-	}
-}

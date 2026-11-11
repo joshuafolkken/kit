@@ -1,7 +1,0 @@
-{
-	"reason": "followup reruns a needs gate that failed though every needed job passed (#6924): gate-step reading in the needs graph, its judgment, and skipped/unlisted needs counted as passed",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 52
-	}
-}

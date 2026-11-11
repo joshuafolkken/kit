@@ -1,7 +1,0 @@
-{
-	"reason": "#5946: the lane child's step 0 gets its own heading in chain-rule.md (+29 B on-demand); each role is now printed only its own section, lowering read:set fullrun by 2,806 B",
-	"date": "2026-11-02",
-	"growth": {
-		"ai_cost.on_demand_bytes": 29
-	}
-}

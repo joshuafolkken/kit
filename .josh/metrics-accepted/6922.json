@@ -1,7 +1,0 @@
-{
-	"reason": "#6922 adds the truncated-run rerun branch to followup-run-rerun",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

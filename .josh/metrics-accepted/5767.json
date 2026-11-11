@@ -1,7 +1,0 @@
-{
-	"reason": "core-budget priority mark for ship's commit stage (#5767): new core-priority module, admission ordering, and the whole-suite exemption (unit, e2e)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}

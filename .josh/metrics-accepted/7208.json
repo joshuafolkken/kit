@@ -1,7 +1,0 @@
-{
-	"reason": "New feature: project gate steps from package.json josh.gate.steps (#7208) adds a module, its schema and reserved-label validation",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 88
-	}
-}

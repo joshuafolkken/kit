@@ -1,8 +1,0 @@
-{
-	"reason": "overrides --diff: a git-revision check of both overrides blocks replacing the dependency-update skill's by-eye git diff (#5853)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 102,
-		"prose.long_paragraphs": 1
-	}
-}

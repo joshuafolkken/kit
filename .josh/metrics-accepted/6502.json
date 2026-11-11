@@ -1,7 +1,0 @@
-{
-	"reason": "#6502 adds run-merge-github-limit.ts: run:merge reads GitHub rate-limit and gh auth-expiry stops (errored gh tool results only) as outages and holds launches until the latest reset",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 66
-	}
-}

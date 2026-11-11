@@ -1,8 +1,0 @@
-{
-	"reason": "#6097 generates two more lint-prose spans (refactor-scan rules, English-only exemption) in place of two hand-synced document tests",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 16,
-		"ai_cost.on_demand_bytes": 66
-	}
-}

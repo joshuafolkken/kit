@@ -1,7 +1,0 @@
-{
-	"reason": "#6748: followup reruns jobs red on a setup curl or CodeQL bundle 5xx (two download patterns)",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

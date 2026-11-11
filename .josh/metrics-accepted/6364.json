@@ -1,7 +1,0 @@
-{
-	"reason": "Reassess stale split notices with the existing measurement and declaration APIs for #6364; regression tests cover under-bar, over-bar and measurement failure.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

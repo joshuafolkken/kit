@@ -1,8 +1,0 @@
-{
-	"reason": "#5891 adds the comment fingerprint step to issue-fold-existing.md and its --fingerprint mode",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 42,
-		"ai_cost.on_demand_bytes": 148
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "issue:file one pass moved into issue-file-pass.ts plus --check",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 41
-	}
-}

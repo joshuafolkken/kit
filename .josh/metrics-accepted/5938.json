@@ -1,8 +1,0 @@
-{
-	"reason": "run:review waits on a green gate before round 1 (#5938), with its own shorter open wait cap and still-running stop so run:chain's 600 s Bash budget is never the one that ends it (round-1 finding)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 16,
-		"ai_cost.on_demand_bytes": 58
-	}
-}

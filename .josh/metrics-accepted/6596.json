@@ -1,7 +1,0 @@
-{
-	"reason": "Add the independently bounded file-count approval required to register the human-approved ten-file #6596 plan; reuse the existing trusted evidence loader and path scope checks while preserving line, hunk and overlap gates.",
-	"date": "2026-11-06",
-	"growth": {
-		"scripts.code_lines": 147
-	}
-}

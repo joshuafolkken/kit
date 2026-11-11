@@ -1,7 +1,0 @@
-{
-	"reason": "#6022 adds the issue:spill command (body logic, CLI, entry) plus round-1 fixes — one new command, no existing code to shrink",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 308
-	}
-}

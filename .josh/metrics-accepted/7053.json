@@ -1,7 +1,0 @@
-{
-	"reason": "Reuse a red scoped pair's verdict within one ship instead of rerunning it on the unmoved tree (#7053)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 36
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats --over adds lane-over.ts, the early-redispatch yield state and their tests (#5988)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 176
-	}
-}

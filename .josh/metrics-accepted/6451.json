@@ -1,8 +1,0 @@
-{
-	"reason": "Solo verdict requests must refuse before relationship and park writes; the two CLI usages and solo procedure must name all three required affirmative answers.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 6,
-		"ai_cost.on_demand_bytes": 438
-	}
-}

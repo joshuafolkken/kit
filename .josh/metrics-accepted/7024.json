@@ -1,7 +1,0 @@
-{
-	"reason": "New run:chain ledger record, its lane:stats stop-cause table and the hold-reason test (#7024)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 139
-	}
-}

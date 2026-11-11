@@ -1,7 +1,0 @@
-{
-	"reason": "The lint and eslint_scan reservations rise from 2400 MB to the 8590 MB eslint heap cap, so under concurrent lanes' memory pressure the gate's checks wait longer for the core budget (#6684)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 5
-	}
-}

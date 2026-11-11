@@ -1,7 +1,0 @@
-{
-	"reason": "#5826: per-task spend counts the lanes done across the rise, reading lane logs back past the sample; regression tests for the resumed-lane case",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 104
-	}
-}

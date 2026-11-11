@@ -1,7 +1,0 @@
-{
-	"reason": "Carry the measured guide with branch measurements and preserve legacy defaults for reasons and notices (#6466).",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

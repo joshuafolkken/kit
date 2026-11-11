@@ -1,7 +1,0 @@
-{
-	"reason": "Serialize the gate's lint and type check so one lane holds one TypeScript program at a time #7031",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 42
-	}
-}

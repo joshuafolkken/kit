@@ -1,9 +1,0 @@
-{
-	"reason": "New enforcement-lint module and its two template declaration rows (#6029)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 38,
-		"rules.lines": 4,
-		"ai_cost.on_demand_bytes": 713
-	}
-}

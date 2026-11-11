@@ -1,7 +1,0 @@
-{
-	"reason": "test:related record reuse in pre-push-unit and the scoped pair before ship's early push",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 29
-	}
-}

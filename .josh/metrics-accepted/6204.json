@@ -1,7 +1,0 @@
-{
-	"reason": "#6204: findings_of keeps review:submit --none from waiting on an open stdin",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "lane:plan hub split axis (#6543): hubs_of judging each file's own reach, relative_counts helper, hub split text and lane:stats hub row",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 44
-	}
-}

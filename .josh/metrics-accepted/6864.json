@@ -1,7 +1,0 @@
-{
-	"reason": "Park events record the ship stop stage and cause class (#6864): a schema field, an emit fields argument, the writer and its reader",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}
