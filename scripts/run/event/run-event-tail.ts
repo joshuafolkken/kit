@@ -12,6 +12,9 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 // bytes just before the cached end are compared instead — each line carries a position no other line
 // holds, so a dropped or replaced line shifts them and the read falls back to a whole read. A shorter
 // file reads whole too.
+//
+// **A stream at `EVENT_CAP` reads whole once per write**: there every append drops a middle line, so
+// the read after it fails the check. The ticks between writes still reuse the cache.
 
 const FILE_START = 0
 const NEWLINE = 0x0a
