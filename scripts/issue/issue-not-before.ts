@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { issue_sample_gate } from './issue-sample-gate'
 import { markdown_section } from './markdown-section'
 import { measure_declaration } from './measure-declaration'
@@ -9,8 +10,8 @@ import { measure_declaration } from './measure-declaration'
 // A body may instead wait on samples recorded after a pull request merged (`issue-sample-gate.ts`);
 // this module answers for both, so every reader holds an issue back the same way.
 
-const BACKGROUND_HEADING = '## 背景'
-const PREFIX = '- 実施可能日:'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const PREFIX = issue_body_keys.prefix('not_before')
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u
 // What `toISOString` writes after the minutes the declaration spells.
 const ISO_TAIL = ':00.000Z'
@@ -26,7 +27,7 @@ const MAX_WAIT_MS = MAX_WAIT_DAYS * DAY_MS
 // `YYYY-MM-DDTHH:MM` — the part of `toISOString` the declaration spells.
 const MINUTES_LENGTH = 16
 const TOO_LATE = `\`${PREFIX}\` of a measurement follow-up must be at most ${String(MAX_WAIT_DAYS)} days after filing — wait on samples with \`${issue_sample_gate.DECLARATION}\` instead`
-const BOTH = `a measurement follow-up declares one of \`${PREFIX}\` and \`- 実施可能条件:\`, not both — keep the condition`
+const BOTH = `a measurement follow-up declares one of \`${PREFIX}\` and \`${issue_body_keys.prefix('sample_gate')}\`, not both — keep the condition`
 const HEADING_MARKS = /^#{1,6}\s+/u
 // joshuafolkken/kit#4438: a start condition written as its own heading is never read — every reader
 // sees only the declaration line under the background heading — so the issue is offered at once.

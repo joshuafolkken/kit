@@ -3,6 +3,7 @@ import { epic_parse } from '#scripts/epic/epic-parse'
 import { epic_shape } from '#scripts/epic/epic-shape'
 import { epic_validate } from '#scripts/epic/epic-validate'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { markdown_section } from '#scripts/issue/markdown-section'
@@ -20,7 +21,7 @@ import { test_related_pins } from '#scripts/test/test-related-pins'
 // #5953's criteria named `run:cut`, which the relay passes on, and never its module); a hit refuses
 // the independent split and points at `run:split --prerequisite`.
 
-const KEPT_HEADINGS = ['## 期待結果', '## 受け入れ条件']
+const KEPT_HEADINGS = [issue_body_keys.heading('expected'), issue_body_keys.heading('criteria')]
 const CODE_SPAN = /`([^`]+)`/gu
 const NOT_A_NAME = /[\s:]/u
 const LINE_SUFFIX = /:\d+(?:[-:]\d+)?$/u

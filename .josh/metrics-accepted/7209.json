@@ -1,0 +1,9 @@
+{
+	"reason": "#7209: the issue-body-keys table is the new single source of Issue body keys and headings (one row per key), and issue-template.md names it; the literals it replaces are one-line constants, so the table outweighs them",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 151,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 172
+	}
+}

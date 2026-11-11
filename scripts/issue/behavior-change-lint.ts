@@ -1,5 +1,6 @@
 import { firing_point } from '#scripts/rules/firing-point'
 import { baseline_measure } from './baseline-measure'
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 import { reproduction_measure } from './reproduction-measure'
 
@@ -12,10 +13,10 @@ import { reproduction_measure } from './reproduction-measure'
 
 // The body declares itself a behavior-change Issue with this exact line under its opening heading.
 // Read from the declaration, never inferred, so a code-only Issue is never held to the headings.
-const DECLARATION_LINE = '- 種別: 振る舞い変更'
-const FIRING_POINT_HEADING = '## 発火点'
-const BASELINE_HEADING = '## ベースライン'
-const REPRODUCTION_HEADING = '## 再現'
+const DECLARATION_LINE = issue_body_keys.line('kind', 'behavior_change')
+const FIRING_POINT_HEADING = issue_body_keys.heading('trigger')
+const BASELINE_HEADING = issue_body_keys.heading('baseline')
+const REPRODUCTION_HEADING = issue_body_keys.heading('reproduction')
 const REQUIRED_HEADINGS: ReadonlyArray<string> = [
 	FIRING_POINT_HEADING,
 	BASELINE_HEADING,

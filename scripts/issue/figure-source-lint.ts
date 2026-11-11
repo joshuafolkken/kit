@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
 // joshuafolkken/kit#7021: a number a decision rests on names the command that measured it, or says it is
@@ -5,8 +6,8 @@ import { markdown_section } from './markdown-section'
 // a backticked command nor the prediction word is warned about — never refused, since a figure is not
 // always a decision.
 
-const BACKGROUND_HEADING = '## 背景'
-const EFFECT_HEADING = '## 期待効果'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const EFFECT_HEADING = issue_body_keys.heading('expected_effect')
 const PREDICTION = '予測'
 // A backticked command: a code span with an argument, so a bare name such as a file path is no source.
 const COMMAND = /`[^`\s]+\s[^`]*`/u
@@ -16,17 +17,19 @@ const NOT_A_FIGURE = /#\d+|\d{4}-\d{2}-\d{2}|^\d+\.\s/gu
 const DIGIT = /\d/u
 // The background declarations whose numbers the template already sources, marks an estimate or reads
 // as a date or rule (`issue-template.md`'s declaration table); any other keyed bullet is read as prose.
-const DECLARATIONS = [
-	'- 規模見積もり:',
-	'- 原因のレーン:',
-	'- 原因の損失:',
-	'- 優先度:',
-	'- 実施可能条件:',
-	'- 実施可能日:',
-	'- 計測宣言なし:',
-	'- 計測:',
-	'- 判定規則:',
-]
+const DECLARATIONS = (
+	[
+		'size',
+		'cause_lane',
+		'cause_loss',
+		'priority',
+		'sample_gate',
+		'not_before',
+		'measure_absent',
+		'measurement',
+		'decision_rule',
+	] as const
+).map((key) => issue_body_keys.prefix(key))
 
 function text_lines(body: string, heading: string): ReadonlyArray<string> {
 	const section = markdown_section.section_lines(body, heading).join('\n')

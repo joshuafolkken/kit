@@ -1,6 +1,7 @@
 import { pr_classification } from '#scripts/ci/pr-classification'
 import { error_text } from '#scripts/lib/error-message'
 import { defect_origin_line } from './defect-origin-line'
+import { issue_body_keys } from './issue-body-keys'
 import { issue_bug_label } from './issue-bug-label'
 import {
 	BREAKING_CHANGE_LABEL,
@@ -11,9 +12,14 @@ import {
 } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
-const FEATURE_DECLARATIONS = ['- 目的: 機能追加', '- 目的: 機能改善', '- 目的: 時間短縮']
-const BREAKING_DECLARATION = '- 互換性: 破壊的変更'
-const NON_BUG_DECLARATION = '- 種別: 非不具合'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const FEATURE_DECLARATIONS = [
+	issue_body_keys.line('purpose', 'feature'),
+	issue_body_keys.line('purpose', 'improvement'),
+	issue_body_keys.line('purpose', 'time_saving'),
+]
+const BREAKING_DECLARATION = issue_body_keys.line('compatibility', 'breaking')
+const NON_BUG_DECLARATION = issue_body_keys.line('kind', 'non_bug')
 const NON_BUG_LINE = new RegExp(String.raw`^ {0,3}${NON_BUG_DECLARATION}[ \t]*$`, 'mu')
 const CLASSIFICATION_LABELS = [BUG_LABEL, ENHANCEMENT_LABEL, BREAKING_CHANGE_LABEL]
 const CONFLICT = 'bug and enhancement declarations cannot be combined'
@@ -22,7 +28,7 @@ const CONFLICTING_BUG_CLASSIFICATIONS = 'conflicting bug classifications'
 
 function required_labels(body: string): ReadonlyArray<string> {
 	const labels: Array<string> = []
-	const background = markdown_section.section_lines(body, '## 背景').join('\n')
+	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
 
 	if (issue_bug_label.is_bug_fix(body)) labels.push(BUG_LABEL)
 
@@ -44,7 +50,7 @@ function labels_for(body: string, existing: ReadonlyArray<string>): ReadonlyArra
 }
 
 function bug_classification_problem(body: string): string | undefined {
-	const background = markdown_section.section_lines(body, '## 背景').join('\n')
+	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
 	const has_bug = issue_bug_label.is_bug_fix(body)
 	const has_non_bug = markdown_section.has_unfenced_line(background, NON_BUG_DECLARATION)
 

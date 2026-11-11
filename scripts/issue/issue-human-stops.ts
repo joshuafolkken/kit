@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import {
 	ALREADY_DONE_LABEL,
 	NEEDS_DECISION_LABEL,
@@ -71,8 +72,7 @@ const HUMAN_STOPS: ReadonlyArray<HumanStop> = [
 	},
 	{
 		key: 'filing-exclusion',
-		reason:
-			"`release`, `breaking-change`, `deferred`, `epic` and `- 人の判断: 要` keep an issue out of the pool by a person's choice (`issue-auto-ok.ts`).",
+		reason: `\`release\`, \`breaking-change\`, \`deferred\`, \`epic\` and \`${issue_body_keys.line('judgement', 'needed')}\` keep an issue out of the pool by a person's choice (\`issue-auto-ok.ts\`).`,
 	},
 ]
 
