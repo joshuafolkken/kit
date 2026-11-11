@@ -14,6 +14,30 @@ Most commands are a TypeScript file under `scripts/`; the rest are a shell line 
 
 A new josh script keeps the canonical main guard `process.argv[1] === fileURLToPath(import.meta.url)`, or none at all. `scripts/josh/josh-in-process.test.ts` asserts the shape for every script command.
 
+## Launching a tool through `pnpm exec`
+
+Measured on 2026-11-11 (pnpm 12.17.0, Node 26.12.1, macOS arm64; median of 15 `<tool> --version` runs, under load average 7–9) ([#7255](https://github.com/joshuafolkken/kit/issues/7255)):
+
+| Tool     | `pnpm exec` | `node_modules/.bin` shim | `node <bin entry>` |
+| -------- | ----------- | ------------------------ | ------------------ |
+| vitest   | 101 ms      | 49 ms                    | 37 ms              |
+| prettier | 107 ms      | 57 ms                    | 45 ms              |
+| eslint   | 139 ms      | 82 ms                    | 76 ms              |
+| cspell   | 265 ms      | 208 ms                   | —                  |
+
+The wrapper costs about 55–65 ms per launch, not the 0.3–0.5 s once estimated, and leaves one pnpm process alive per running tool.
+
+What `pnpm exec` adds over a direct launch, and what that loses:
+
+- `node_modules/.bin` on `PATH` — the shim does not add it. A tool that spawns another package's bin by name needs it; vitest, prettier, eslint and cspell spawn none by name.
+- `npm_command`, `npm_config_user_agent`, `npm_execpath`, `npm_node_execpath`, `INIT_CWD`, `PNPM_PACKAGE_NAME`, `pnpm_config_verify_deps_before_run` — of the four tools, only vitest reads one (`npm_config_user_agent`, to pick the package manager it suggests for a missing optional dependency).
+- The dependency check before the run (`verify-deps-before-run`) — a direct launch runs on a stale install without the warning.
+- `NODE_OPTIONS` — pnpm sets none; the callers set it (`scripts/lint/eslint-heap.ts`). `.npmrc` holds only a scoped registry, read at install time.
+
+The shim itself exports `NODE_PATH`; `node <bin entry>` (`resolve_package_bin`, `scripts/build/local-bin.ts`) does not, and pnpm's symlinked layout resolves the tools' own dependencies without it. cspell's `exports` map hides `cspell/package.json`, so `resolve_package_bin` returns nothing for it and the shim is its direct route.
+
+`scripts/hooks/format-edited-file.ts` and `scripts/hooks/edited-cspell.ts` use `pnpm exec` only as the last fallback, when the `node_modules/.bin` shim is missing.
+
 ## `josh gate`'s core budget
 
 Each check claims a place in a machine-wide weighted core budget before it starts (joshuafolkken/kit#2351). The weights are the same measured table the plan already uses — the static checks' reserved cores and the unit suite's worker cap — so a lone gate's four claims sum to exactly the core count and, on a machine with room, every one is admitted at once: a solo run's concurrency and worker count are unchanged. Under concurrency the machine-wide sum is what bounds admission, so overlapping gates can no longer each reserve the whole machine, and the "whoever started first took everything" asymmetry is gone — a later gate waits rather than shrinking everyone.
