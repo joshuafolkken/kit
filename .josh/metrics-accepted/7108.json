@@ -1,0 +1,7 @@
+{
+	"reason": "#7108: STATIC_GROUPS now builds its lint-1/lint-2 entries from LINT_SHARD_GROUPS",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}

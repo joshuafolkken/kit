@@ -1,5 +1,6 @@
 import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_static_group } from '#scripts/gate/gate-static-group'
+import { lint_shard } from '#scripts/lint/lint-shard'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture } from './ci-yml-fixture'
 
@@ -109,26 +110,58 @@ describe.each(WORKFLOW_CASES)('static-check caches in $relative_path', (workflow
 
 // joshuafolkken/kit#5215: the runtime job is a matrix of static groups, and a leg that restored a cache
 // its checks never write would save it back unchanged under the same sha key, racing the leg that
-// writes it. So each cache restores only on the leg whose group holds the check that writes the file.
-const RUNTIME_CACHE_WRITERS: ReadonlyArray<readonly [string, string]> = [
-	[ESLINT_CACHE_STEP, gate_labels.LINT_LABEL],
-	[PRETTIER_CACHE_STEP, gate_labels.LINT_LABEL],
-	[TS_BUILD_CACHE_STEP, gate_labels.TYPE_CHECK_LABEL],
-	[CSPELL_CACHE_STEP, gate_labels.SPELL_CHECK_LABEL],
-]
+// writes it. So each cache restores only on the legs whose group holds the check that writes the file.
+// joshuafolkken/kit#7108: the lint check runs on two shard legs, and only the formatting shard writes
+// `.prettiercache`, so a step's `if` is read for the legs it holds on rather than matched as text.
+const GROUP_NAMES = Object.keys(gate_static_group.STATIC_GROUPS)
+const GROUP_CONDITION =
+	/^(?:matrix\.group == '(?<name>[^']+)'|startsWith\(matrix\.group, '(?<prefix>[^']+)'\))$/u
+const FIRST_LINT_LEG = "matrix.group == 'lint-1'"
+const ANY_LINT_LEG = "startsWith(matrix.group, 'lint-')"
 
-function group_holding(label: string): string | undefined {
-	return Object.entries(gate_static_group.STATIC_GROUPS).find(([, labels]) =>
-		labels.includes(label),
-	)?.[0]
+function groups_holding(label: string): ReadonlyArray<string> {
+	return GROUP_NAMES.filter((group) => gate_static_group.STATIC_GROUPS[group]?.includes(label))
 }
 
-describe.each(RUNTIME_CACHE_WRITERS)('the runtime %s', (step_id, writer_label) => {
-	it('restores only on the matrix leg that writes it', () => {
-		const group = group_holding(writer_label) ?? ''
+function formatting_groups(): ReadonlyArray<string> {
+	return groups_holding(gate_labels.LINT_LABEL).filter((group) =>
+		lint_shard.checks_formatting(gate_static_group.LINT_SHARD_GROUPS[group]),
+	)
+}
 
-		expect(group).not.toBe('')
-		expect(cache_step(RUNTIME_WORKFLOW_CASE, step_id)?.if).toBe(`matrix.group == '${group}'`)
+function holds_on(condition: string, group: string): boolean {
+	const { name, prefix } = GROUP_CONDITION.exec(condition)?.groups ?? {}
+
+	if (name !== undefined) return group === name
+
+	return prefix !== undefined && group.startsWith(prefix)
+}
+
+const RUNTIME_CACHE_WRITERS: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
+	[ESLINT_CACHE_STEP, groups_holding(gate_labels.LINT_LABEL)],
+	[PRETTIER_CACHE_STEP, formatting_groups()],
+	[TS_BUILD_CACHE_STEP, groups_holding(gate_labels.TYPE_CHECK_LABEL)],
+	[CSPELL_CACHE_STEP, groups_holding(gate_labels.SPELL_CHECK_LABEL)],
+]
+
+describe.each(RUNTIME_CACHE_WRITERS)('the runtime %s', (step_id, writer_groups) => {
+	it('restores only on the matrix legs that write it', () => {
+		const condition = cache_step(RUNTIME_WORKFLOW_CASE, step_id)?.if ?? ''
+
+		expect(writer_groups).not.toEqual([])
+		expect(GROUP_NAMES.filter((group) => holds_on(condition, group))).toEqual(writer_groups)
+	})
+})
+
+describe('holds_on', () => {
+	it.each([
+		[FIRST_LINT_LEG, 'lint-1', true],
+		[FIRST_LINT_LEG, 'lint-2', false],
+		[ANY_LINT_LEG, 'lint-2', true],
+		[ANY_LINT_LEG, 'types', false],
+		['always()', 'types', false],
+	])('reads %j on the %j leg as %j', (condition, group, expected) => {
+		expect(holds_on(condition, group)).toBe(expected)
 	})
 })
 
