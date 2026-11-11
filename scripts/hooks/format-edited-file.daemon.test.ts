@@ -21,16 +21,32 @@ afterEach(() => {
 // refreshed; a `.json` module prettier alone formats keeps its old entry and restarts the daemon
 // (joshuafolkken/kit#4867).
 const LINTED_FILE = 'refreshed.ts'
+const FORMATTED_FILE = 'formatted.json'
 
 describe('format_edited_file — the daemon fingerprint refresh', () => {
 	it.each([
 		['a .ts edit eslint linted', LINTED_FILE, LINTED_FILE],
-		['a .json edit only prettier formatted', 'formatted.json', undefined],
+		['a .json edit only prettier formatted', FORMATTED_FILE, undefined],
 	])('names %s', async (_label, name, expected) => {
 		const remember = vi.spyOn(eslint_daemon, 'remember_after_edit').mockReturnValue()
 
 		await format_edited_file(payload_for(write_fixture(name)), recording_runner([]), TEST_DIRECTORY)
 
 		expect(remember).toHaveBeenCalledWith(TEST_DIRECTORY, expect.anything(), expected)
+	})
+
+	// joshuafolkken/kit#7245: an edit eslint linted is one file fed to the daemon.
+	it.each([
+		['records', LINTED_FILE, 1],
+		['records nothing for', FORMATTED_FILE, 0],
+	])('%s the call of an edit to %s', async (_label, name, calls) => {
+		vi.spyOn(eslint_daemon, 'remember_after_edit').mockReturnValue()
+		const record_call = vi.spyOn(eslint_daemon, 'record_call').mockReturnValue()
+
+		await format_edited_file(payload_for(write_fixture(name)), recording_runner([]), TEST_DIRECTORY)
+
+		expect(record_call.mock.calls).toEqual(
+			calls === 0 ? [] : [[TEST_DIRECTORY, { caller: 'edit-hook', files: 1 }]],
+		)
 	})
 })

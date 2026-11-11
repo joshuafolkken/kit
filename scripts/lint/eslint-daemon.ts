@@ -10,6 +10,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import type { BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { execa } from 'execa'
+import { eslint_daemon_calls, type DaemonCall } from './eslint-daemon-calls'
 import { eslint_daemon_sources } from './eslint-daemon-sources'
 import { eslint_heap } from './eslint-heap'
 
@@ -82,6 +83,8 @@ interface DaemonRecord {
 interface DaemonRunOptions {
 	project_root: string
 	timeout_ms?: number
+	// Who asked and over how many files, recorded beside the daemon (`eslint-daemon-calls.ts`).
+	call?: DaemonCall | undefined
 }
 
 // `eslint_d` keys its one daemon on the record beside the eslint it resolves, so a project that
@@ -244,6 +247,15 @@ function remember_after_edit(
 	else if (edited !== undefined) remember_read(project_root, after, edited)
 }
 
+// The call as the daemon that answered it saw it. A borrowed install's daemon belongs to the lending
+// checkout, whose lint volume this call is not.
+function record_call(project_root: string, call: DaemonCall | undefined): void {
+	const directory = eslint_directory(project_root)
+	if (call === undefined || directory === undefined || is_borrowed_install(project_root)) return
+
+	eslint_daemon_calls.record(directory, read_text(path.join(directory, DAEMON_RECORD)), call)
+}
+
 // `cwd` decides which eslint installation and which flat config answer, and `ESLINT_D_MISS=fail`
 // refuses the bundled eslint the daemon would otherwise fall back to. The daemon keeps the environment
 // it started under, so the untyped switch set here holds for its whole life (`eslint/untyped-environment.js`).
@@ -293,6 +305,7 @@ async function run_current(
 	const outcome = await spawn_daemon(cli, eslint_arguments, options)
 	if (is_start_failure(outcome)) return undefined
 	remember(project_root, current)
+	record_call(project_root, options.call)
 
 	return { ...outcome, daemon }
 }
@@ -314,9 +327,12 @@ async function run(
 // The warm run from the current directory, read as a buffered child's result, or the cold
 // `pnpm exec eslint` when the daemon cannot answer — the one fallback `josh lint:related` and the
 // pre-commit hook both take.
-async function run_or_cold(pnpm_arguments: ReadonlyArray<string>): Promise<WarmRunResult> {
+async function run_or_cold(
+	pnpm_arguments: ReadonlyArray<string>,
+	call?: DaemonCall,
+): Promise<WarmRunResult> {
 	const started_at = performance.now()
-	const outcome = await run(pnpm_arguments, { project_root: process.cwd() })
+	const outcome = await run(pnpm_arguments, { project_root: process.cwd(), call })
 
 	if (outcome === undefined) {
 		const cold = await eslint_heap.run_cold(pnpm_arguments)
@@ -338,6 +354,7 @@ const eslint_daemon = {
 	is_config_input,
 	is_stale,
 	read_record,
+	record_call,
 	record_text,
 	remember_after_edit,
 	resolve_daemon_cli,
@@ -346,5 +363,6 @@ const eslint_daemon = {
 	ESLINT_DAEMON,
 }
 
+export type { DaemonCall } from './eslint-daemon-calls'
 export type { DaemonOutcome, DaemonRecord, DaemonState }
 export { eslint_daemon }

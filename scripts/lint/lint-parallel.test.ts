@@ -191,7 +191,7 @@ describe('run_lint_checks', () => {
 
 const ESLINT = ['exec', 'eslint', TARGET]
 const PRETTIER = ['exec', 'prettier', TARGET]
-const WARM = { warm_daemon: true }
+const WARM = { warm_daemon: true, call: { caller: 'lint:related', files: 1 } } as const
 const LINT_RELATED_LABEL = 'josh lint:related'
 const DAEMON_REUSED: DaemonState = 'daemon reused'
 
@@ -209,7 +209,7 @@ describe('run_lint_checks — the warm eslint daemon', () => {
 		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		expect(await run_lint_checks(PRETTIER, ESLINT, RELATED_CACHE_FILE, WARM)).toBe(1)
-		expect(mocked_run_or_cold).toHaveBeenCalledWith(ESLINT)
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(ESLINT, WARM.call)
 		expect(mocked_execa).toHaveBeenCalledOnce()
 	})
 

@@ -14,7 +14,7 @@ import {
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { eslint_cache_dependencies, type CacheDrop } from './eslint-cache-dependencies'
-import { eslint_daemon, type DaemonState } from './eslint-daemon'
+import { eslint_daemon, type DaemonCall, type DaemonState } from './eslint-daemon'
 import { eslint_heap } from './eslint-heap'
 import { lint_gate_scope } from './lint-gate-scope'
 import { lint_shard, type LintShard } from './lint-shard'
@@ -66,6 +66,7 @@ interface EslintRun {
 	args: ReadonlyArray<string>
 	cache_file: string
 	warm_daemon: boolean
+	call?: DaemonCall | undefined
 }
 
 // The name a run's timing line carries and what it read (`lint-timing.ts`).
@@ -80,6 +81,8 @@ interface LintRunTiming {
 interface LintRunOptions {
 	warm_daemon: boolean
 	timing?: LintRunTiming | undefined
+	// What a warm run records beside the daemon (`eslint-daemon-calls.ts`).
+	call?: DaemonCall | undefined
 }
 
 const COLD_RUN: LintRunOptions = { warm_daemon: false }
@@ -100,7 +103,7 @@ interface LintPair {
 
 // The warm daemon when asked for and reachable, else the cold `pnpm exec eslint` it falls back to.
 async function run_eslint_process(eslint: EslintRun): Promise<EslintResult> {
-	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args)
+	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args, eslint.call)
 
 	return await eslint_heap.run_cold(eslint.args)
 }

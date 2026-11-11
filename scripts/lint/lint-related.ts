@@ -15,6 +15,7 @@ import { tree_verdict } from '#scripts/gate/tree-verdict'
 import { verification_tail } from '#scripts/gate/verification-tail'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { eslint_daemon_calls } from './eslint-daemon-calls'
 import { lint_parallel, type LintRunTiming } from './lint-parallel'
 import { lint_related_scope } from './lint-related-scope'
 
@@ -58,7 +59,14 @@ async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
 		lint_related_scope.prettier_arguments(scope.files),
 		lint_related_scope.eslint_arguments(scope.files),
 		lint_related_scope.RELATED_CACHES.eslint_file,
-		{ warm_daemon: true, timing: timing_of(`${String(scope.files.length)} file(s)`) },
+		{
+			warm_daemon: true,
+			timing: timing_of(`${String(scope.files.length)} file(s)`),
+			call: {
+				caller: eslint_daemon_calls.DAEMON_CALLER.LINT_RELATED,
+				files: scope.files.length,
+			},
+		},
 	)
 }
 

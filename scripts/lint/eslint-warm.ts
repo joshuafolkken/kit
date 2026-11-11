@@ -4,6 +4,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { resolve_tsx_runner } from '#scripts/josh/josh-logic'
 import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { eslint_daemon } from './eslint-daemon'
+import { eslint_daemon_calls } from './eslint-daemon-calls'
 
 // Warms a fresh checkout's eslint daemon before its first edit (joshuafolkken/kit#4720). A cold
 // daemon took 5–8 s on the first edit hook's lint and 0.1–1.3 s once warm; `eslint_d start` alone
@@ -35,6 +36,7 @@ async function warm(project_root: string): Promise<void> {
 	await eslint_daemon.run(['exec', 'eslint', warm_target(project_root)], {
 		project_root,
 		timeout_ms: LINT_TIMEOUT_MS,
+		call: { caller: eslint_daemon_calls.DAEMON_CALLER.WARM, files: 1 },
 	})
 }
 
