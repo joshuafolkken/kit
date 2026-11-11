@@ -24,6 +24,7 @@ import type {
 	UnitFileRecord,
 	UnplannedNoticeRecord,
 } from './lane-ledger-schema'
+import type { OfferRecord } from './lane-ledger-schema-offer'
 import type { ChainRecord } from './lane-ledger-schema-ship'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
@@ -178,6 +179,10 @@ async function record_offerable(is_offerable: boolean, path?: string): Promise<v
 	await record({ kind: KIND.OFFERABLE, at: now_iso(), is_offerable }, path)
 }
 
+async function record_offer(offer: OfferRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.OFFER, at: now_iso(), ...offer }, path)
+}
+
 async function record_round_one(round_one: RoundOneRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.ROUND_ONE, at: now_iso(), ...round_one }, path)
 }
@@ -262,6 +267,7 @@ const lane_ledger_write = {
 	record_released,
 	record_merge,
 	record_overlap,
+	record_offer,
 	record_offerable,
 	record_push_miss,
 	record_early_push,

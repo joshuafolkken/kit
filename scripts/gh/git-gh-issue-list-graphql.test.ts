@@ -22,9 +22,11 @@ vi.mock('./git-gh-exec', () => ({
 }))
 
 // The page reads go through `exec_gh_api` here, so every REST request is one counted call.
-vi.mock('./git-gh-etag-read', () => ({
-	git_gh_etag_read: { read: async (path: string) => await git_gh_exec.exec_gh_api({ path }) },
-}))
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
 
 // joshuafolkken/kit#6785: on a session GraphQL is allowed for, the `backlog:next` pool — the
 // `auto-ok` listing and each row's blockers — is one GraphQL query and no REST core request. The
