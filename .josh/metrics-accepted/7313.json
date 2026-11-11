@@ -1,0 +1,8 @@
+{
+	"reason": "New pr-returned stage: run-pr-return.ts reads red required checks and person comments so a returned PR resumes at implementation (#7313); fullrun-lane.md points at it",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 88,
+		"ai_cost.on_demand_bytes": 95
+	}
+}

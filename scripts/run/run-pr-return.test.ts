@@ -1,0 +1,137 @@
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
+import { git_gh_pr_snapshot } from '#scripts/gh/git-gh-pr-snapshot'
+import type { PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
+import { git_command } from '#scripts/git/git-command'
+import { issue_watch_diff, type WatchComment } from '#scripts/issue/issue-watch-diff'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_pr_return } from './run-pr-return'
+
+// joshuafolkken/kit#7313: a pull request dispatched back for a fix resumed at the gate, read neither its
+// red checks nor the comment asking for the fix, and shipped unfixed.
+
+const PERSON = 'joshuafolkken'
+const RUN_BODY = `Plan posted.\n\n${issue_watch_diff.RUN_MARKER}`
+const FIX_BODY = 'CI is red: fix the publish step.'
+const REQUIRED = 'CI'
+
+function comment(id: number, body: string, overrides: Partial<WatchComment> = {}): WatchComment {
+	const is_automated = body.includes(issue_watch_diff.RUN_MARKER)
+
+	return {
+		id,
+		author: PERSON,
+		is_trusted: true,
+		is_automated,
+		created_at: `2026-11-11T0${String(id)}:00:00Z`,
+		body,
+		...overrides,
+	}
+}
+
+function snapshot(rollup: PrStateSnapshot['rollup']): PrStateSnapshot {
+	return {
+		rollup,
+		merge_state_status: 'BLOCKED',
+		review_decision: undefined,
+		required_contexts: [REQUIRED],
+	}
+}
+
+describe('run_pr_return.red_required_checks', () => {
+	it('names a failed required check, its suite jobs included', () => {
+		const read = snapshot([
+			{ name: 'CI / test', status: 'fail' },
+			{ name: 'CI / lint', status: 'pass' },
+		])
+
+		expect(run_pr_return.red_required_checks(read)).toStrictEqual(['CI / test'])
+	})
+
+	it('leaves out a failed optional check and a required one still running', () => {
+		const read = snapshot([
+			{ name: 'CodeRabbit', status: 'fail' },
+			{ name: REQUIRED, status: 'pending' },
+		])
+
+		expect(run_pr_return.red_required_checks(read)).toStrictEqual([])
+	})
+})
+
+describe('run_pr_return.comments_since_run', () => {
+	it("keeps a person's comment after the run's last own comment", () => {
+		const fix = comment(3, FIX_BODY)
+		const comments = [comment(1, FIX_BODY), comment(2, RUN_BODY), fix]
+
+		expect(run_pr_return.comments_since_run(comments)).toStrictEqual([fix])
+	})
+
+	it('keeps nothing when the run commented last, or only an outsider or a bot spoke since', () => {
+		const outsider = comment(3, FIX_BODY, { is_trusted: false })
+		const bot = comment(4, FIX_BODY, { is_automated: true })
+
+		expect(
+			run_pr_return.comments_since_run([comment(1, FIX_BODY), comment(2, RUN_BODY)]),
+		).toStrictEqual([])
+		expect(run_pr_return.comments_since_run([comment(2, RUN_BODY), outsider, bot])).toStrictEqual(
+			[],
+		)
+	})
+})
+
+describe('run_pr_return.format', () => {
+	it('prints nothing for a pull request nothing returned', () => {
+		expect(run_pr_return.format({ red_checks: [], comments: [] })).toBeUndefined()
+	})
+
+	it('names each red check and each comment to read', () => {
+		const text = run_pr_return.format({
+			red_checks: ['CI / test'],
+			comments: [comment(3, FIX_BODY)],
+		})
+
+		expect(text).toContain('red required check: CI / test')
+		expect(text).toContain(`read the comment by ${PERSON} at 2026-11-11T03:00:00Z`)
+	})
+})
+
+describe('run_pr_return.read', () => {
+	const BRANCH = '7313-lane'
+
+	beforeEach(() => {
+		vi.spyOn(git_command, 'branch').mockResolvedValue(BRANCH)
+	})
+
+	it('reads the red required checks of the branch and the comments since the run', async () => {
+		const check = {
+			__typename: 'CheckRun',
+			name: REQUIRED,
+			status: 'COMPLETED',
+			conclusion: 'FAILURE',
+		}
+		const raw = { statusCheckRollup: [check], requiredContexts: [REQUIRED] }
+		const snapshot_spy = vi
+			.spyOn(git_gh_pr_snapshot, 'pr_get_state_snapshot')
+			.mockResolvedValue(JSON.stringify(raw))
+		const list_spy = vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue('[]')
+
+		vi.spyOn(issue_watch_diff, 'parse_comments').mockResolvedValue([
+			comment(1, RUN_BODY),
+			comment(2, FIX_BODY),
+		])
+
+		const read = await run_pr_return.read('7313')
+
+		expect(snapshot_spy).toHaveBeenCalledExactlyOnceWith(BRANCH)
+		expect(list_spy).toHaveBeenCalledExactlyOnceWith('7313')
+		expect(read.red_checks).toStrictEqual([REQUIRED])
+		expect(read.comments.map((item) => item.id)).toStrictEqual([2])
+	})
+
+	it('counts a comment listing that cannot be read as none', async () => {
+		vi.spyOn(git_gh_pr_snapshot, 'pr_get_state_snapshot').mockResolvedValue('{}')
+		vi.spyOn(git_gh_issue_read, 'issue_list_comments').mockResolvedValue(undefined)
+		vi.spyOn(issue_watch_diff, 'parse_comments').mockResolvedValue(undefined)
+
+		expect(await run_pr_return.read('7313')).toStrictEqual({ red_checks: [], comments: [] })
+	})
+})

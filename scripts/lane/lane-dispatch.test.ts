@@ -51,6 +51,7 @@ const cancel_supervisor = vi.spyOn(openai_lane_supervisor, 'cancel')
 
 // The launch record is `lane-dispatch-launch-event.test.ts`'s; here it stays off the real stream.
 vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
+vi.spyOn(git_gh_command, 'issue_clear_label').mockResolvedValue(true)
 
 function lane(output: string | undefined): LaneInfo {
 	return {
