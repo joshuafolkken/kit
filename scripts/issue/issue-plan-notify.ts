@@ -26,7 +26,7 @@ interface PlanNotice {
 
 // The change section up to its first sub-heading.
 function section_body(section: ReadonlyArray<string>): ReadonlyArray<string> {
-	const lines = markdown_section.fence_free_lines(section.join('\n'))
+	const lines = markdown_section.written_fence_free_lines(section.join('\n'))
 	const end = lines.findIndex((line) => ANY_HEADING.test(line.trim()))
 
 	return end === -1 ? lines : lines.slice(0, end)
@@ -35,11 +35,11 @@ function section_body(section: ReadonlyArray<string>): ReadonlyArray<string> {
 // The section's first top-level items, as written; fenced lines never count. A plan without the
 // section gives its own first items, so the message never shrinks to the `Next:` line alone.
 function summary_of(plan: string): ReadonlyArray<string> {
-	const section = markdown_section.section_lines_matching(plan, (line) =>
+	const section = markdown_section.written_section_lines_matching(plan, (line) =>
 		CHANGE_HEADING.test(line.trim()),
 	)
 	const lines =
-		section.length === 0 ? markdown_section.fence_free_lines(plan) : section_body(section)
+		section.length === 0 ? markdown_section.written_fence_free_lines(plan) : section_body(section)
 	const items = lines.map((line) => TOP_LEVEL_ITEM.exec(line)?.groups?.['text'])
 
 	return items.filter((item) => item !== undefined).slice(0, SUMMARY_ITEMS)

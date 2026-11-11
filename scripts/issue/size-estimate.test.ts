@@ -259,6 +259,16 @@ describe('size_estimate.restated', () => {
 		expect(body).toBe(body_with(estimate(11, 300)))
 	})
 
+	// joshuafolkken/kit#7210: a line in either language is replaced whole, its indentation kept.
+	it.each([
+		'  - 規模見積もり: 約 2 ファイル / 60 行（テスト除く）',
+		'  - Size estimate: about 2 files / 60 lines (excluding tests)',
+	])('replaces the estimate line %s whatever its language', (line) => {
+		const body = size_estimate.restated(body_with(line), estimate(11, 300))
+
+		expect(body).toBe(body_with(`  ${estimate(11, 300)}`))
+	})
+
 	it('leaves an estimate outside the background section alone', () => {
 		const body = ['## 背景', '', 'x', '', '## 現象', '', estimate(2, 60)].join('\n')
 
