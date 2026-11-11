@@ -22,7 +22,7 @@ const mocked_held = vi.mocked(changed_paths.read_held_at)
 const ROOT = process.cwd()
 const READER = path.join('scripts', 'test', 'test-related.test.ts')
 const READ_DOCUMENT = 'README.md'
-const UNREAD_DOCUMENT = 'CONTRIBUTING.md'
+const UNREAD_DOCUMENT = 'NOT-READ-BY-ANY-TEST.md'
 const SOURCE = path.join('scripts', 'test', 'test-related.ts')
 // A real source whose text names the document, as a file-system read of it does.
 const NAMING_SOURCE = path.join('scripts', 'doctor', 'doctor-logic.ts')

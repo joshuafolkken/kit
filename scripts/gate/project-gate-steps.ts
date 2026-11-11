@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { gate_checks } from './gate-checks'
 import type { GateStep, GateStepResult } from './gate-report'
 import { gate_run_steps } from './gate-run-steps'
+import { project_step_reuse, type StepRecords } from './project-step-reuse'
 
 // The project's own gate steps, declared in its `package.json` (`josh.gate.steps`), run after the
 // fixed checks (joshuafolkken/kit#7208).
@@ -15,7 +16,7 @@ import { gate_run_steps } from './gate-run-steps'
 // Each step is one shell command run through `pnpm exec --shell-mode` from the project root, one at a
 // time in declared order, and reported under its `name` like any fixed check. A definition the schema
 // rejects is not skipped: it comes back as one failed result, so the gate is red and says why.
-// `paths` is read and validated here; the gate does not narrow by it yet.
+// A step with `paths` runs only when a path it names moved since it last passed (`project-step-reuse.ts`).
 
 const DEFINITION_LABEL = 'josh.gate.steps'
 const SEQUENTIAL = 1
@@ -32,14 +33,36 @@ const RESERVED_LABELS = new Set([
 	DEFINITION_LABEL,
 ])
 
+// The name is also part of the step's green record file name (`check-reuse.ts`), so a `/` or a leading
+// `.` would point that record outside the record directory.
+const STEP_NAME = /^\w[\w.-]*$/u
+
+function names_of(steps: ReadonlyArray<GateStepDefinition>): string {
+	return steps.map((step) => step.name).join(', ')
+}
+
+// Why the step names are refused, or `undefined` when every name is usable.
+function name_refusal(steps: ReadonlyArray<GateStepDefinition>): string | undefined {
+	const reserved = steps.filter((step) => RESERVED_LABELS.has(step.name))
+
+	if (reserved.length > 0) {
+		return `step names ${names_of(reserved)} are the gate's own check labels; the reserved names are ${[...RESERVED_LABELS].join(', ')}`
+	}
+
+	const unsafe = steps.filter((step) => !STEP_NAME.test(step.name))
+
+	return unsafe.length > 0
+		? `step names ${names_of(unsafe)} must start with a letter, digit or _ and hold only those, . and -`
+		: undefined
+}
+
 function steps_of(manifest: GateStepsManifest): ReadonlyArray<GateStepDefinition> {
 	const steps = manifest.josh?.gate?.steps ?? []
-	const reserved = steps.filter((step) => RESERVED_LABELS.has(step.name))
-	if (reserved.length === 0) return steps
+	const refusal = name_refusal(steps)
 
-	throw new Error(
-		`step names ${reserved.map((step) => step.name).join(', ')} are the gate's own check labels; the reserved names are ${[...RESERVED_LABELS].join(', ')}`,
-	)
+	if (refusal !== undefined) throw new Error(refusal)
+
+	return steps
 }
 
 function describe_error(error: unknown): string {
@@ -76,32 +99,60 @@ function to_gate_step(name: string, command: string, directory: string): GateSte
 	return { label: name, command_args: [...SHELL_ARGUMENTS, command], cwd: directory }
 }
 
+async function run_steps(
+	steps: ReadonlyArray<GateStepDefinition>,
+	reused: ReadonlyMap<string, string>,
+	directory: string,
+): Promise<ReadonlyArray<GateStepResult>> {
+	return await bounded_pool.bounded_map(steps, SEQUENTIAL, async (step) => {
+		const gate_step = to_gate_step(step.name, step.command, directory)
+		const reused_at = reused.get(step.name)
+
+		if (reused_at !== undefined) return gate_run_steps.reused_result(gate_step, reused_at)
+
+		return await gate_run_steps.run_gate_step(gate_step)
+	})
+}
+
 /**
  * Run the project's `josh.gate.steps` in declared order and answer their results.
  *
  * Unset, nothing runs and the gate is what it always was. An invalid definition answers one failed
- * `josh.gate.steps` result naming what the schema rejected.
+ * `josh.gate.steps` result naming what the schema rejected. With `reuse`, a step whose `paths` no path
+ * moved under since it last passed is reused rather than run (`project-step-reuse.ts`).
  */
 async function run_project_steps(
 	directory: string = process.cwd(),
+	reuse?: StepRecords,
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const read = read_project_steps(directory)
 	if ('error' in read) return [definition_failure(directory, read.error)]
+	if (reuse === undefined) return await run_steps(read.steps, new Map(), directory)
 
-	return await bounded_pool.bounded_map(
-		read.steps,
-		SEQUENTIAL,
-		async (step) =>
-			await gate_run_steps.run_gate_step(to_gate_step(step.name, step.command, directory)),
-	)
+	const reused = await project_step_reuse.reusable_steps(read.steps, reuse)
+	const results = await run_steps(read.steps, reused, directory)
+
+	await project_step_reuse.record_green_steps(read.steps, results, reuse)
+
+	return results
+}
+
+interface StepRun {
+	static_group?: string | undefined
+	is_forced?: boolean | undefined
 }
 
 // A CI matrix splits the static checks into legs (`gate-static-group.ts`); the project steps run once,
 // on the light `rest` leg, rather than on every leg.
-async function run_for(static_group: string | undefined): Promise<ReadonlyArray<GateStepResult>> {
+async function run_for(
+	run: StepRun,
+	reuse: Omit<StepRecords, 'is_forced'>,
+): Promise<ReadonlyArray<GateStepResult>> {
+	const { static_group } = run
+
 	if (static_group !== undefined && static_group !== PROJECT_STEPS_GROUP) return []
 
-	return await run_project_steps()
+	return await run_project_steps(process.cwd(), { ...reuse, is_forced: run.is_forced === true })
 }
 
 const project_gate_steps = { run_for, run_project_steps }

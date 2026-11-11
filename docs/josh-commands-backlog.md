@@ -717,7 +717,7 @@ pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes   # one child per free 
 **Options:**
 
 - `--repo <owner/repo>` — answer for one repository; stdout carries one token (an issue number, or `wait`/`stop`/`complete`), everything else on stderr.
-- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 8. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in `josh backlog:next`).
+- `--lanes` — print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 4. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in `josh backlog:next`).
 
 <!-- /usage -->
 
@@ -729,7 +729,7 @@ Several leading epic arguments merge into one candidate pool per repository. `ru
 
 **Priority and duplicates:** the order the epics were named, then each epic's task-list order (its declared chain still decides what is runnable). A child two epics track enters once, under the epic named earlier. Reordering with `josh epic --add … --order-before` / `--order-after` leaves declarations and `blocked-by` relations as they were.
 
-**Lanes:** free places are `JOSH_LANE_LIMIT` (default 8) minus `backlog_occupied`'s count; at zero, `wait` names holders on stderr. Lanes without a worker, paused or merge-waiting hold no place. Human-review stops retain their tree and hold. Launches also wait for shared-core memory.
+**Lanes:** free places are `JOSH_LANE_LIMIT` (default 4) minus `backlog_occupied`'s count; at zero, `wait` names holders on stderr. Lanes without a worker, paused or merge-waiting hold no place. Human-review stops retain their tree and hold. Launches also wait for shared-core memory.
 
 **Nested epics:** a child that is itself an epic is never offered and waits on a person. The test is the child's `epic` label, not how its row is written: a cross-repository `owner/repo#N` row that is not an epic stays runnable. A parent epic over an epic never auto-closes; `epic:audit` reports the row.
 

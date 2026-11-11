@@ -11,18 +11,22 @@ import { lane_seed_policy } from './lane-seed'
 // is what would have to be undone the first time two epics run together, which is why the scheduler
 // is epic-free.
 //
-// **It is a ceiling, not a prediction.** Eight lanes does not say eight children will run at once; it
-// says a ninth will not start. What actually runs is bounded by what is runnable, by the port
+// **It is a ceiling, not a prediction.** Four lanes does not say four children will run at once; it
+// says a fifth will not start. What actually runs is bounded by what is runnable, by the port
 // seats `lane-seed.ts` can allocate, and by the machine.
 
-// Eight rather than the nine seats `lane_seed_policy` can allocate: the seats are the hard structural
-// bound, this is the one a person tunes, and leaving headroom between them means raising the limit
-// never lands on "the ports ran out" as its first symptom. joshuafolkken/kit#3788 lowered it from
-// six: a week of `lane:stats` showed 1.5 effective lanes, while the hours at five or six lanes held
-// the swap peak, the slowest gates and most of the gate and commit failures.
-// joshuafolkken/kit#5409 raises it to eight with launch memory admission in the same core budget
-// ledger as the gates: memory bounds starts while gate reservations bound overlapping heavy work.
-const DEFAULT_LANE_LIMIT = 8
+// Below the nine seats `lane_seed_policy` can allocate: the seats are the hard structural bound,
+// this is the one a person tunes, and leaving headroom between them means raising the limit never
+// lands on "the ports ran out" as its first symptom. joshuafolkken/kit#3788 lowered it from six: a
+// week of `lane:stats` showed 1.5 effective lanes, while the hours at five or six lanes held the
+// swap peak, the slowest gates and most of the gate and commit failures. joshuafolkken/kit#5409
+// raised it to eight with launch memory admission in the same core budget ledger as the gates:
+// memory bounds starts while gate reservations bound overlapping heavy work.
+// joshuafolkken/kit#7234 lowers it to four: the default fits a consumer's development machine, not
+// kit's own. A consumer reported eight cold builds of about six minutes each running at once on an
+// eight-core M1 Pro (joshuafolkken/kit#7212). A larger machine, kit's own included, raises it with
+// `JOSH_LANE_LIMIT`.
+const DEFAULT_LANE_LIMIT = 4
 const LANE_LIMIT_KEY = 'JOSH_LANE_LIMIT'
 const NO_LANES = 0
 
