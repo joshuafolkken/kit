@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
+import { DIRECT_LAUNCH_FILE } from '#tools/test/local-bin-mock'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +10,7 @@ import { test_unit_guard } from './test-unit-guard'
 import { unit_share_fixture } from './unit-share-fixture'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/changed-file-scope', () => ({
 	changed_file_scope: { repository_root_or_cwd: vi.fn() },
 }))
@@ -57,7 +59,7 @@ describe('test_unit_guard.run_guarded_unit — a filter after the update flag', 
 			test_unit_guard.run_guarded_unit(ctx.project_directory, ['-u', FILTER]),
 		).resolves.toBe(0)
 		expect(execa).toHaveBeenCalledWith(
-			'pnpm',
+			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', 'run', FILTER, '-u'],
 			expect.objectContaining({ reject: false }),
 		)
@@ -70,7 +72,7 @@ describe('test_unit_guard.run_guarded_unit — a filter after the update flag', 
 		await test_unit_guard.run_guarded_unit(ctx.project_directory, ['-u', 'all', FILTER])
 
 		expect(execa).toHaveBeenCalledWith(
-			'pnpm',
+			DIRECT_LAUNCH_FILE,
 			['exec', 'vitest', 'run', '-u', 'all', FILTER],
 			expect.objectContaining({ reject: false }),
 		)
