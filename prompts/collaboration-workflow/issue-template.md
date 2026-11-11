@@ -100,6 +100,10 @@
 | `- 実施順: 最後`                                         | なし                                   | 触るファイルが事前に読めない広域 upgrade など、列の末尾でまとめて走らせたい作業。緊急・高と同居しない     |
 | `- 規模見積もり: 約 <N> ファイル / <M> 行（テスト除く）` | なし                                   | epic 以外は必須。目安の判定は `issue:file`（`scripts/issue/size-estimate.ts`）                            |
 | `- 分割しない理由: <理由>`                               | なし                                   | 目安・cap・予算を超える見積もりを 1 件のまま起票する（`split-assessment.md` → "The question"）            |
+| `- 行を増やさない: <理由>`                               | なし                                   | 実コード行が上限の 90% 以上のファイルを名指すが、行を足さない（`scripts/issue/issue-cap-files.ts`）       |
+| `- 先行リファクタ: #<N>`                                 | なし                                   | 同じファイルを先に分割する Issue を待つ（`scripts/issue/issue-cap-files.ts`）                             |
+
+名指すファイルが実コード行で上限の 90% 以上 → 先に分割のリファクタ Issue を起票し、依存に登録する（`issue:file` が拒否して手順を出す。`scripts/issue/issue-cap-files.ts`）。
 
 集計・計測（`計測` / `before` / `変更前後`）を Issue コメントに記録する受け入れ条件と実装の見積もりを併せ持つ本文 → 集計・計測を `--route split` の先行 Issue に分け、そのコメントを `## 背景` に引く（`issue:lint` が拒否する。`scripts/issue/aggregation-split.ts`）。
 

@@ -1,9 +1,11 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
+import { issue_cap_files } from '#scripts/issue/issue-cap-files'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
+import type { FileBudget } from '#scripts/lines/line-budget'
 import { split_assess } from '#scripts/split/split-assess'
 import type { PoolContext } from './backlog-gate-scope'
 
@@ -75,14 +77,29 @@ function note_of(row: EpicChild, context: PoolContext): string | undefined {
 	return `${cited} ${note} — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
-// One stderr line per offered row over its size — a standalone issue and an epic child alike; the
-// stdout tokens stay bare numbers.
-function warn_over_guide(offered: ReadonlyArray<EpicChild>, context: PoolContext): void {
-	for (const row of offered) {
-		const note = note_of(row, context)
+// A named file near its code-line cap, warned on and offered anyway (joshuafolkken/kit#7184).
+function cap_note_of(row: EpicChild, near: ReadonlyArray<FileBudget> = []): string | undefined {
+	const note = issue_cap_files.note(near)
 
-		if (note !== undefined) console.error(note)
-	}
+	return note === undefined
+		? undefined
+		: `${session_cite.issue(row.number, undefined, row.repo)} ${note}`
+}
+
+// One stderr line per offered row over its size, and one per row naming a file near its cap — a
+// standalone issue and an epic child alike; the stdout tokens stay bare numbers.
+async function warn_over_guide(
+	offered: ReadonlyArray<EpicChild>,
+	context: PoolContext,
+): Promise<void> {
+	const bodies = offered.map((row) => row.body ?? '')
+	const near = await issue_cap_files.near_cap_by_body(bodies, process.cwd())
+	const notes = offered.flatMap((row, index) => [
+		note_of(row, context),
+		cap_note_of(row, near[index]),
+	])
+
+	for (const note of notes) if (note !== undefined) console.error(note)
 }
 
 const backlog_next_size = { warn_over_guide }

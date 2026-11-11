@@ -1,6 +1,7 @@
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { issue_cap_files } from './issue-cap-files'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
 import { issue_file_pass, type Filing } from './issue-file-pass'
@@ -108,6 +109,37 @@ describe('issue_file_pass.labels_in_one_pass — every refusal in one call', () 
 	it('answers the labels when no step refuses', async () => {
 		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeDefined()
 		expect(console.error).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7184: a named file near its code-line cap refuses a filing into this repository
+// alone — another repository's files are not in this checkout.
+describe('issue_file_pass.labels_in_one_pass — a named file near its cap', () => {
+	const CAP_PROBLEM = 'names a.ts, at or past 90% of the code-line limit'
+
+	beforeEach(() => {
+		vi.spyOn(issue_cap_files, 'near_cap').mockResolvedValue([
+			{ file_path: 'a.ts', limit: 300, budget: undefined },
+		])
+		vi.spyOn(issue_cap_files, 'problem').mockReturnValue(CAP_PROBLEM)
+	})
+
+	afterEach(() => {
+		vi.mocked(issue_cap_files.near_cap).mockRestore()
+		vi.mocked(issue_cap_files.problem).mockRestore()
+	})
+
+	it('refuses a filing into this repository and prints the refactor-first route', async () => {
+		expect(await issue_file_pass.labels_in_one_pass(filing_of(CLEAR_BODY))).toBeUndefined()
+		expect(printed()).toContain(`✖ ${CAP_PROBLEM}`)
+	})
+
+	it('does not weigh a filing into another repository', async () => {
+		const filing = { ...filing_of(CLEAR_BODY), target: 'joshuafolkken/other' }
+
+		await issue_file_pass.labels_in_one_pass(filing)
+
+		expect(printed()).not.toContain(CAP_PROBLEM)
 	})
 })
 

@@ -157,7 +157,7 @@ function warn_wait_causes(result: EpicNextResult, context: PoolContext): void {
 	}
 }
 
-function report(result: EpicNextResult, context: PoolContext): number {
+async function report(result: EpicNextResult, context: PoolContext): Promise<number> {
 	warn_gaps(context, result.verdict === 'run')
 	// The explanation names epics and children as `#N` (`tracked by epic #N`); linkified so the text a
 	// run reads carries clickable references rather than bare ones. The stdout
@@ -171,7 +171,7 @@ function report(result: EpicNextResult, context: PoolContext): number {
 	const tokens = tokens_of(result, context.repo)
 
 	if (tokens[0] === VERDICT_TOKENS.wait) warn_wait_causes(result, context)
-	backlog_next_size.warn_over_guide(offered_of(result, context.repo), context)
+	await backlog_next_size.warn_over_guide(offered_of(result, context.repo), context)
 	for (const token of tokens) console.info(token)
 
 	return SUCCESS_EXIT_CODE
@@ -397,7 +397,7 @@ async function report_held(
 
 	if (!has_offer(gated, context.repo)) return report_triage(context, untriaged)
 
-	report(gated, context)
+	await report(gated, context)
 	console.error(epic_triage.held_message(untriaged, context.repo))
 	console.info(VERDICT_TOKENS.triage)
 
@@ -414,7 +414,7 @@ async function answer_pool(context: PoolContext): Promise<number> {
 
 	if (untriaged.length > 0) return await report_held(result, context, untriaged)
 
-	return report(await gate_solo(result, context), context)
+	return await report(await gate_solo(result, context), context)
 }
 
 // A backlog nobody has opted into answers `none` before either listing below is asked for.
