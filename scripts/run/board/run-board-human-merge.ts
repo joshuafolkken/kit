@@ -57,6 +57,7 @@ function pr_reason(issue: number, prs: BoardPlan['human_merge_prs']): RowReason 
 		icon,
 		value: `PR ${String(pr)}`,
 		tail: `→ merge PR ${issue_cite.plain_for('terminal', pr)}`,
+		pr,
 	}
 }
 
