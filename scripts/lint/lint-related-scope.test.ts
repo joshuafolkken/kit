@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {
 	ESLINT_CACHE_FLAGS,
@@ -5,6 +6,7 @@ import {
 	PRETTIER_CACHE_FLAGS,
 	PRETTIER_RELATED_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
+import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { lint_related_scope } from './lint-related-scope'
 
@@ -18,6 +20,7 @@ const DOCUMENT_FILE = path.join(ROOT, 'docs', 'thing.md')
 const FILES: ReadonlyArray<string> = [SOURCE_FILE, DOCUMENT_FILE]
 const IMAGE_FILE = path.join(ROOT, 'static', 'logo.png')
 const WHOLE_TREE = '.'
+const make_directory = temporary_directory()
 
 function present(): boolean {
 	return true
@@ -55,6 +58,16 @@ describe('lint_related_scope.prettier_arguments', () => {
 		expect(args).toContain('--check')
 		expect(args).toEqual(expect.arrayContaining([...FILES]))
 		expect(args).not.toContain(WHOLE_TREE)
+	})
+
+	it('keeps a basic project to its Web files under the default josh.format', () => {
+		const root = make_directory('josh-lint-related-scope-')
+
+		writeFileSync(path.join(root, 'package.json'), '{"josh":{"profile":"basic"}}')
+		const args = lint_related_scope.prettier_arguments(['a.md', 'b.js'], undefined, root)
+
+		expect(args).toContain('b.js')
+		expect(args).not.toContain('a.md')
 	})
 
 	it('skips a file prettier cannot parse instead of failing on it', () => {

@@ -315,7 +315,7 @@ Why the AI files take this shape: `docs/maintainers/init-rationale.md` → "The 
 After all files are processed, `josh init` runs:
 
 1. **`pnpm install`** — installs the development dependencies it added. The `prepare` script it runs installs the git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
-2. **`josh format`** — formats every file, including the ones `josh init` just wrote.
+2. **`josh format`** — formats every file, including the ones `josh init` just wrote; a basic project formats only its HTML, CSS and JavaScript files unless `josh.format` is `"all"` ([Package settings](./environment-variables.md#package-settings)).
 
 A failed install skips the format, and `josh init` exits non-zero with the commands to re-run by hand; `josh start` then stops before its commit. A failed format is only a warning. `josh gate` is not run, since in an existing project it can fail on the project's own code.
 

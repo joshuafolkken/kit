@@ -415,7 +415,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/lib/bash-output-cap.test.ts',
 	'scripts/lib/poll.test.ts',
 	'scripts/lib/schemas.test.ts',
-	'scripts/lint/lint-related-scope.test.ts',
 	'scripts/managed-marker/managed-marker-logic.test.ts',
 	'tools/metrics/metrics-command.test.ts',
 	'tools/metrics/metrics-duration-load.test.ts',

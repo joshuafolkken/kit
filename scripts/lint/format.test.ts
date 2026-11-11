@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { project_checks } from '#scripts/gate/project-checks'
 import { ESLINT_CACHE_FILE } from '#scripts/josh/josh-command-types'
 import { fake_result } from '#tools/test/execa-result'
 import { temporary_directory } from '#tools/test/temporary-directory'
@@ -121,6 +122,17 @@ describe('josh format', () => {
 
 		expect(await format.run([], root)).toBe(0)
 		expect(invoked_tools()).toEqual(['prettier', 'eslint'])
+	})
+})
+
+describe('josh format targets', () => {
+	it('writes only the Web files of a basic project under the default josh.format', async () => {
+		const root = write_project({ josh: { profile: 'basic' } })
+
+		install_prettier(root)
+		await format.run_format(root)
+		expect(mocked_execa.mock.calls[0]?.[1]).toContain(project_checks.WEB_FILES)
+		expect(mocked_execa.mock.calls[0]?.[1]).not.toContain('.')
 	})
 })
 
