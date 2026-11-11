@@ -1,0 +1,7 @@
+{
+	"reason": "draws_row keeps the plan's more N off an empty queued head, plus its fit test (#7281 round-1 fix)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}

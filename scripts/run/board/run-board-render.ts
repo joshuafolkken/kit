@@ -58,7 +58,7 @@ const { width_of } = run_board_fit
 const { padded } = run_board_fresh
 const { condition_of, tail_of, waits_of } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
-const { ROW_INDENT, done_section, keyed, plan_section } = run_board_render_section
+const { ROW_INDENT, done_section, kept_section, keyed, plan_section } = run_board_render_section
 const GAP = '  '
 // The fewest columns a done row's end is cut to before its title gives them up: its minutes and a cut
 // start of what follows.
@@ -328,12 +328,13 @@ function frame_of(
 }
 
 // The rows not yet started under one heading, in the order they are offered: a running batch starts
-// each once a lane and its paths are free, never wave by wave (joshuafolkken/kit#4137).
+// each once a lane and its paths are free, never wave by wave (joshuafolkken/kit#4137); kept at none.
 function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
-	return plan_section(
-		`${STATE_ICONS.waiting} ${WORDS.queued}`,
-		layout.queued.flatMap((entry) => entry_lines(entry, { ...frame, is_conditioned: true })),
+	const lines = layout.queued.flatMap((entry) =>
+		entry_lines(entry, { ...frame, is_conditioned: true }),
 	)
+
+	return [kept_section(`${STATE_ICONS.waiting} ${WORDS.queued}`, lines)]
 }
 
 // The column the lane rows' titles end in as drawn, cut as `fitted` cuts them, where every rule ends
