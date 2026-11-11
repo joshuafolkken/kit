@@ -79,6 +79,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 | key     | リリース分類   | Release classification |
 | key     | 人の判断       | Human judgement        |
 | key     | 判定規則       | Decision rule          |
+| key     | 中止条件       | Close condition        |
 | key     | 優先度         | Priority               |
 | key     | セキュリティ   | Security               |
 | key     | 原因の park    | Cause park             |
