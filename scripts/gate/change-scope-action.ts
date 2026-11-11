@@ -61,6 +61,11 @@ function consumer_input(file: string, before: Manifest, after: Manifest): boolea
 	)
 }
 
+// The version bump is the release itself, so it publishes even though it runs no checks.
+function version_changed(before: Manifest, after: Manifest): boolean {
+	return before.version !== after.version
+}
+
 function classify(paths: Array<string>, before: Manifest, after: Manifest): ChangeScope {
 	const changed = paths.filter(
 		(file) => file !== PACKAGE_JSON || metadata(before) !== metadata(after),
@@ -70,7 +75,8 @@ function classify(paths: Array<string>, before: Manifest, after: Manifest): Chan
 		runtime: changed.some((file) =>
 			DOCUMENTATION.every((pattern) => !path.matchesGlob(file, pattern)),
 		),
-		publish: changed.some((file) => consumer_input(file, before, after)),
+		publish:
+			version_changed(before, after) || changed.some((file) => consumer_input(file, before, after)),
 	}
 }
 
