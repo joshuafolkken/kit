@@ -6,10 +6,13 @@ import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GateStep, GateStepResult } from './gate-report'
 import { gate_run_steps } from './gate-run-steps'
+import type { GateTree } from './gate-tree'
 import { DEFINITION_LABEL, project_gate_steps } from './project-gate-steps'
+import { project_step_reuse } from './project-step-reuse'
 
 const CARGO = { name: 'cargo', command: 'cargo test', paths: ['src/**/*.rs'] }
 const GODOT = { name: 'godot', command: 'godot --check' }
+const TREE: GateTree = { files: {}, base: undefined }
 
 // A fresh project root, with a `package.json` holding `manifest` unless it is undefined.
 function project_root(manifest?: unknown): string {
@@ -114,14 +117,35 @@ describe('run_project_steps — invalid definitions', () => {
 	})
 })
 
+describe('run_project_steps — reuse', () => {
+	it('reuses the steps whose records hold and runs the rest', async () => {
+		const ran = stub_runs()
+		const at = '2026-11-11T00:00:00.000Z'
+		const reuse = { tree: TREE, records: undefined, is_forced: false }
+
+		vi.spyOn(project_step_reuse, 'reusable_steps').mockResolvedValue(new Map([[CARGO.name, at]]))
+		const record = vi.spyOn(project_step_reuse, 'record_green_steps').mockResolvedValue()
+
+		const results = await project_gate_steps.run_project_steps(
+			project_root(steps_manifest([CARGO, GODOT])),
+			reuse,
+		)
+
+		expect(ran.map((step) => step.label)).toStrictEqual([GODOT.name])
+		expect(results.map((result) => result.reused_at)).toStrictEqual([at, undefined])
+		expect(record).toHaveBeenCalledWith([CARGO, GODOT], results, reuse)
+	})
+})
+
 describe('run_for', () => {
 	it('runs the project steps on a whole gate and the rest leg only', async () => {
 		vi.spyOn(process, 'cwd').mockReturnValue(project_root(steps_manifest([GODOT])))
 		const ran = stub_runs()
+		const reuse = { tree: TREE, records: undefined }
 
-		await project_gate_steps.run_for('types')
-		await project_gate_steps.run_for('rest')
-		await project_gate_steps.run_for(undefined)
+		await project_gate_steps.run_for({ static_group: 'types' }, reuse)
+		await project_gate_steps.run_for({ static_group: 'rest' }, reuse)
+		await project_gate_steps.run_for({}, reuse)
 
 		expect(ran.map((step) => step.label)).toStrictEqual([GODOT.name, GODOT.name])
 	})
