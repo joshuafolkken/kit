@@ -20,7 +20,8 @@ import { backlog_drive_unit } from './backlog-drive-unit'
 //
 // **A split promotes the issue** (`epic --promote`), never `run:split`: no run exists to set aside —
 // its stash and release would act on the driver's own checkout — and a `run:split` child stays open and
-// unlabelled, so the read after the unit could not tell it was split.
+// unlabelled, so the read after the unit could not tell it was split. A pass's units run side by side
+// in that one checkout, so each child body is named for its issue rather than `.josh/tmp/body.md`.
 //
 // **Only a split answers `split`**: the issue now an epic, or closed. A recorded reason it stays one
 // (`split_assess.REASON_PREFIX`) takes it out of `size_estimate.over_budget`, so this and every later offer
@@ -44,7 +45,7 @@ function brief_of(issue: string): string {
 		`Split-only unit for ${issue_cite.plain_for('program', issue)}: its declared size is over the size bar. Implement nothing.`,
 		`Read it with \`pnpm josh issue:read ${issue}\` and answer only question 1 of`,
 		`\`pnpm josh doc:section .claude/skills/workflow-commands/split-assessment.md "${split_assess.QUESTION_SECTION}"\`.`,
-		'Separately-mergeable parts → file each child with `pnpm josh issue:file ... --route split`, then',
+		`Separately-mergeable parts → file each child k with \`pnpm josh issue:file "<title>" --body-file .josh/tmp/split-${issue}-<k>.md --route split\`, then`,
 		`\`pnpm josh epic --promote ${issue} <N1> <N2> ... [--ordered]\`.`,
 		`One deliverable → add \`${split_assess.REASON_PREFIX} <理由>\` under 背景 with \`pnpm josh issue:body ${issue} --body-file -\`.`,
 		'Nobody answers this session: end it once either is written.',

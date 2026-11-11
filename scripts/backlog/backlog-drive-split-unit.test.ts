@@ -72,6 +72,7 @@ describe('backlog_drive_split_unit.run — over the size bar', () => {
 		expect(requests).toHaveLength(1)
 		expect(JSON.stringify(requests[0]?.argv)).toContain(`epic --promote ${ISSUE}`)
 		expect(JSON.stringify(requests[0]?.argv)).not.toContain('run:split')
+		expect(JSON.stringify(requests[0]?.argv)).toContain(`.josh/tmp/split-${ISSUE}-<k>.md`)
 		expect(requests[0]?.log_path).toContain(`-split-${ISSUE}-1.log`)
 	})
 
