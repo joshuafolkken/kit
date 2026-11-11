@@ -19,7 +19,7 @@ const REUSE_JOB = 'reuse-pr-checks'
 const RESTORE_STEP = 'eslint-cache'
 const SHA_SUFFIX = '${{ github.sha }}'
 const CACHE_PATH = '.eslintcache'
-// joshuafolkken/kit#5215: `static-checks` is a matrix, and only its lint leg restores and writes the cache.
+// joshuafolkken/kit#5215: `static-checks` is a matrix, and only its lint legs restore and write the cache.
 const PULL_REQUEST_ONLY = "github.event_name == 'pull_request' && startsWith(matrix.group, 'lint-')"
 const PREFIX_FILE = 'eslint-cache-prefix'
 // joshuafolkken/kit#7126: the artifact, the key and the seed and warm legs all carry the matrix group, so

@@ -78,7 +78,7 @@ describe('the static-checks job runs the verification gate', () => {
 
 	// joshuafolkken/kit#6684: a lane's gate lints only its changed files, so the whole-tree lint is
 	// the one GitHub's own `CI` variable selects on this job — overriding it would drop the last one.
-	it('leaves GitHub’s CI variable alone, so its lint leg lints the whole tree', () => {
+	it('leaves GitHub’s CI variable alone, so its lint legs lint their whole shards', () => {
 		const workflow = ci_yml_fixture.load_workflow(ci_yml_fixture.RUNTIME_CI_YML)
 		const scopes = [workflow, workflow.jobs[RUNTIME_GATE_JOB], ...checks_steps()]
 
