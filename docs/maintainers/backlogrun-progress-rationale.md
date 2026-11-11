@@ -139,6 +139,16 @@ Two cases ask sooner (joshuafolkken/kit#6788). The poll after a `run:add` asks a
 runs and a named issue is left, the interval is 30 seconds: that stretch ends at the dispatch, and no
 lane spends the allowance beside it (`backlog-budget.ts` → `IDLE_OFFER_INTERVAL_SECONDS`).
 
+A new `auto-ok` issue asks sooner too (joshuafolkken/kit#7227). A free lane checks the listing's ETag
+every 10 seconds, running or idle: a 304 spends no REST core, and only a first page holding an issue
+number the previous read lacked asks at once (`backlog-budget.ts` → `LISTING_CHECK_INTERVAL_SECONDS`).
+
+The number, not the ETag, decides: a running lane's own comments and label edits change the ETag too; read as a change, they would ask
+every 10 seconds instead of at the 180-second floor (joshuafolkken/kit#6718).
+
+The 180 and 30 seconds stay the floor for what that ETag does not show: a blocker closed, a later page,
+an epic.
+
 **Why a silent unit is measured by unchanged output.** A working unit rewrites its transcript
 continuously, so unchanged output — not the child's duration — is the signal.
 

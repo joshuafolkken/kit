@@ -83,7 +83,7 @@ the epic body; what merged the epic's task list.
 
 | Setting | Value | Meaning |
 | --- | --- | --- |
-| Re-ask floor | 60 s | **In flight, never a clock — the wait is `backlog:drive` or `lane:await`**, and the wake is their exit or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** A `backlogrun` idle watch re-asks every 180 s, every 30 s while a named issue is left to dispatch, and at the next poll after `run:add`. |
+| Re-ask floor | 60 s | **In flight, never a clock — the wait is `backlog:drive` or `lane:await`**, and the wake is their exit or the watcher's arrival exit, never a report. **With nothing in flight no wake comes: it is the parent's own clock.** A `backlogrun` idle watch re-asks every 180 s, every 30 s while a named issue is left to dispatch, at the next poll after `run:add`, and when the `auto-ok` listing a free lane checks every 10 s holds a new issue number. |
 | Silent delegated unit | 30 min | The time its output has gone **unchanged**. Past it, ask `run:liveness` and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Past it, the other session is gone. |
 | `backlogrun` idle watch | 8 h | Counted from when the run's hands became free; `pnpm josh backlog:budget` decides it. |

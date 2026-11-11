@@ -29,7 +29,7 @@ const HANDED_OFF: CarryRead = {
 		is_handed_off: true,
 	},
 }
-const NO_WINDOW = { poll_ms: 0, offer_ms: 0, idle_offer_ms: 0, window_ms: undefined }
+const NO_WINDOW = { poll_ms: 0, offer_ms: 0, idle_offer_ms: 0, check_ms: 0, window_ms: undefined }
 const FREE_LANES = 6
 
 interface World {
@@ -48,12 +48,16 @@ function offered(world: World, state: DriveState): OfferRead {
 	}
 }
 
-// The run's own records: nothing added, raised or named.
-const NO_RECORD: Pick<DrivePorts, 'begin_tick' | 'added_since' | 'raised_since' | 'named_left'> = {
+// The run's own records: nothing added, raised, named or listed.
+const NO_RECORD: Pick<
+	DrivePorts,
+	'begin_tick' | 'added_since' | 'raised_since' | 'named_left' | 'listing_changed'
+> = {
 	begin_tick: async () => undefined,
 	added_since: async () => false,
 	raised_since: async () => false,
 	named_left: async () => false,
+	listing_changed: async () => false,
 }
 
 function drive_ports(world: World): DrivePorts {
