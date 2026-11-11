@@ -53,14 +53,24 @@ function read_workflow(): z.infer<typeof WORKFLOW_SCHEMA> {
 // joshuafolkken/kit#4633: the tag is chosen in the credential-free `pack`, so the jobs holding the
 // publish rights run no repository code.
 describe('publish tag selection', () => {
-	it('selects the registry tag in pack, which holds no credentials', () => {
+	it('selects the registry tag in pack, which holds no publish credentials', () => {
 		const { pack } = read_workflow().jobs
 		const commands = pack.steps.map((step) => step.run ?? '').join('\n')
 
-		expect(pack.permissions).toEqual({ contents: 'read' })
+		expect(pack.permissions).toEqual({ contents: 'read', packages: 'read' })
 		expect(pack.outputs['tag']).toBe('${{ steps.publish-tag.outputs.tag }}')
 		expect(commands).toContain(LATEST_LOOKUP)
-		expect(commands).toContain('publish-tag-cli.ts')
+	})
+
+	// #7303: a kit that publishes may have no tsx of its own; josh runs the CLI through kit's tsx, and
+	// `--silent` keeps pnpm's script echo out of the captured tag.
+	it('selects the tag through josh rather than a tsx the repository may lack', () => {
+		const commands = read_workflow()
+			.jobs.pack.steps.map((step) => step.run ?? '')
+			.join('\n')
+
+		expect(commands).toContain('tag=$(pnpm --silent josh release:tag "$version" "$LATEST")')
+		expect(commands).not.toContain('tsx')
 	})
 
 	it.each(PUBLISH_JOB_NAMES)(

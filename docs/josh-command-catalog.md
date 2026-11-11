@@ -90,6 +90,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh release` · `josh re` | `[--dry-run]` | maintainer | git, network, release | Release the merges main has taken since the version last changed |
 | `josh release:github` | — | automation | network, release | Create the GitHub Release for a published tag, with generated notes |
 | `josh release:scope` | `[--json]` | automation | none | Say whether a release is owed, from the unreleased merges on main |
+| `josh release:tag` | `<version> <latest>` | automation | none | Print the npm dist-tag a version publishes under, given the current latest |
 | `josh version` · `josh v` | `[--upgrade]` | developer | files, network, processes | Show kit versions; --upgrade updates the global and project install |
 
 ## Maintenance

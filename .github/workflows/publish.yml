@@ -9,7 +9,7 @@ on:
 
 # The jobs holding the publish rights install nothing and run no repository code: a compromised
 # dependency would otherwise publish with valid provenance (joshuafolkken/kit#4633). Every install
-# and every `tsx` run happens in `pack`, which holds no credentials, behind the same hash-verified
+# and every `tsx` run happens in `pack`, which holds no publish credentials, behind the same hash-verified
 # safe-chain scan as CI (joshuafolkken/kit#2982). Its store cache is off: a cache entry another run
 # saved never reaches the tarball the publish jobs receive.
 
@@ -21,8 +21,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # `packages: read` lets a published kit that installs @joshuafolkken/kit from GitHub Packages run
+    # the install; it reads packages and publishes none.
     permissions:
       contents: read
+      packages: read
     # One dist-tag for both registries, chosen against npmjs, whose `latest` needs no credentials to
     # read: both receive the same tarball in the same run, so they move in step. `pack` runs outside
     # the `package-publish` queue, so the publish jobs re-check `latest` against its choice (see there).
@@ -60,15 +63,15 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
         with:
           cache: 'false'
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Select publish tag
         id: publish-tag
-        # kit runs its own source; a kit that publishes runs the copy its installed kit ships.
+        # josh runs the selection through kit's own tsx, which a kit that publishes may not depend on;
+        # `--silent` keeps pnpm's script echo out of the captured tag.
         run: |
           version=$(node -p "require('./package.json').version")
-          cli=scripts/release/publish-tag-cli.ts
-          [ -f "$cli" ] || cli="node_modules/@joshuafolkken/kit/$cli"
-          tag=$(pnpm exec tsx "$cli" "$version" "$LATEST")
+          tag=$(pnpm --silent josh release:tag "$version" "$LATEST")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
         env:

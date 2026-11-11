@@ -97,6 +97,17 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	// Run by publish.yml, kit's and the one sync distributes: josh runs it through kit's own tsx, which
+	// a kit that publishes may not have as a dependency of its own (#7303).
+	'release:tag': {
+		script: 'scripts/release/publish-tag-cli.ts',
+		description: 'Print the npm dist-tag a version publishes under, given the current latest',
+		category: 'Versioning',
+		reference: ['<version> <latest>', 'automation', ['none']],
+		usage: {
+			examples: [{ arguments: '1.2.0 1.1.0', note: '→ latest' }],
+		},
+	},
 }
 
 export { VERSIONING_COMMANDS }

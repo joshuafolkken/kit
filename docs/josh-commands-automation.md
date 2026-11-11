@@ -921,6 +921,18 @@ Releases are created in version order: a later tag waits for the nearest lower o
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh release:github` in detail".
 
+### `josh release:tag`
+
+<!-- usage: release:tag -->
+
+Print the npm dist-tag a version publishes under, given the current latest.
+
+```bash
+pnpm josh release:tag 1.2.0 1.1.0   # → latest
+```
+
+<!-- /usage -->
+
 ## Maintenance
 
 ### `josh ruleset:check`
