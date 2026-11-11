@@ -113,6 +113,25 @@ describe('test_related_record.record_of — reuse evidence', () => {
 	})
 })
 
+// joshuafolkken/kit#7248: the test selection's own time, apart from vitest's.
+describe('test_related_record.record_of — the test selection time', () => {
+	it('records the selection time rounded to a whole millisecond', () => {
+		const input = { ...related_input(), select_elapsed_ms: ELAPSED_MS }
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record.select_elapsed_ms).toBe(Math.round(ELAPSED_MS))
+	})
+
+	it('leaves the selection time out where the run measured none', () => {
+		const record = test_related_record.record_of(related_input(), {
+			elapsed_ms: 0,
+			test_files: undefined,
+		})
+
+		expect(record).not.toHaveProperty('select_elapsed_ms')
+	})
+})
+
 // joshuafolkken/kit#5532: a changed file whose reach passed the cap is counted, an uncapped run is not.
 describe('test_related_record.record_of — the reach cap', () => {
 	it('counts the over-cap files, and leaves the count out of a run that was not capped', () => {

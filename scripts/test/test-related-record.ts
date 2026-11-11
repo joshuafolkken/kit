@@ -40,6 +40,8 @@ interface RunInput {
 	over_cap?: ReadonlyArray<string>
 	// The branch change by half and base, read beside the run; `undefined` where git could not answer.
 	branch_parts?: ChangedParts | undefined
+	// How long selecting the tests took — the import graph and the importer index (joshuafolkken/kit#7248).
+	select_elapsed_ms?: number
 }
 
 interface RunResult {
@@ -143,6 +145,10 @@ function reuse_record(reuse: TestReuse | undefined): Partial<TestRelatedRecord> 
 	}
 }
 
+function select_record(select_elapsed_ms: number | undefined): Partial<TestRelatedRecord> {
+	return select_elapsed_ms === undefined ? {} : { select_elapsed_ms: Math.round(select_elapsed_ms) }
+}
+
 // How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699) — the one the run's
 // summary line names (`test_related_cap.hub_of`).
 function over_cap_record(
@@ -188,6 +194,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
 		...over_cap_record(input.over_cap, own),
+		...select_record(input.select_elapsed_ms),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 

@@ -162,6 +162,7 @@ const test_related_schema = z.object({
 	reuse_missed: z.number().optional(),
 	reuse_reason: z.string().optional(),
 	reuse_elapsed_ms: z.number().optional(),
+	select_elapsed_ms: z.number().optional(),
 	kind: z.literal(KIND.TEST_RELATED),
 	at: z.string(),
 	issue: z.number().optional(),
