@@ -1,0 +1,9 @@
+{
+	"reason": "Fresh-machine dlx pattern and its local-registry module (#7218) add scripts and doc prose",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 72,
+		"prose.long_paragraphs": 1,
+		"prose.excess_bold": 1
+	}
+}

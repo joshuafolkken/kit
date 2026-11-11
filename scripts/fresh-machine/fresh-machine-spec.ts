@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 // A scenario is everything one `josh fresh:run` needs to know: the files that are in the project
 // before anything is installed, the commands a person would type, and the probes recorded after
-// them. kit's own six patterns and a consumer toolkit's spec file are the same shape, so the machine
+// them. kit's own seven patterns and a consumer toolkit's spec file are the same shape, so the machine
 // and the log are shared and nothing about them is kit's alone (joshuafolkken/kit#3714).
 //
 // Inside the container a command reads `$RUN_NAME` (the numbered project and repository name),

@@ -72,7 +72,7 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		],
 		usage: {
 			examples: [
-				{ arguments: '--list', note: "kit's six patterns" },
+				{ arguments: '--list', note: "kit's seven patterns" },
 				{ arguments: 'kit-test-html-init', note: 'one pattern, the packed checkout' },
 				{
 					arguments: 'kit-test-html-start',
