@@ -8,7 +8,7 @@ import { expect, it } from 'vitest'
 const make_directory = temporary_directory()
 const SCRIPT = package_path('scripts/gate/change-scope-action.ts')
 const MANIFEST = 'package.json'
-const SKIPPED = 'runtime=false\npublish=false\n'
+const RELEASED = 'runtime=false\npublish=true\n'
 
 function git(root: string, args: Array<string>): string {
 	return execFileSync(
@@ -46,8 +46,8 @@ it('classifies Git history and writes the action output for a version-only bump'
 	writeFileSync(path.join(root, MANIFEST), JSON.stringify({ version: '1.0.1', files: ['src'] }))
 	git(root, ['commit', '--quiet', '-am', 'Bump version'])
 
-	expect(run(root, base)).toBe(SKIPPED)
-	expect(readFileSync(path.join(root, 'outputs'), 'utf8')).toBe(SKIPPED)
+	expect(run(root, base)).toBe(RELEASED)
+	expect(readFileSync(path.join(root, 'outputs'), 'utf8')).toBe(RELEASED)
 })
 
 it('fails instead of skipping checks when the base revision cannot be read', () => {
