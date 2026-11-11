@@ -84,6 +84,41 @@ describe('git_gh_etag_read.read — the previous ETag', () => {
 	})
 })
 
+// joshuafolkken/kit#7226: `backlog:drive` asks whether the listing changed since the previous process.
+describe('git_gh_etag_read.read_detail — whether the body changed', () => {
+	it('answers the kept body as unchanged on a 304 with the kept ETag', async () => {
+		answer_with({ kind: 'changed', etag: ETAG, body: BODY }, UNCHANGED)
+
+		await git_gh_etag_read.read_detail(PATH)
+
+		expect(await git_gh_etag_read.read_detail(PATH)).toStrictEqual({
+			body: BODY,
+			is_unchanged: true,
+		})
+		expect(sent_etags()).toStrictEqual([undefined, ETAG])
+	})
+
+	it('answers the new body as changed and keeps its ETag', async () => {
+		answer_with(
+			{ kind: 'changed', etag: ETAG, body: BODY },
+			{ kind: 'changed', etag: NEW_ETAG, body: NEW_BODY },
+			UNCHANGED,
+		)
+
+		await git_gh_etag_read.read_detail(PATH)
+
+		expect(await git_gh_etag_read.read_detail(PATH)).toStrictEqual({
+			body: NEW_BODY,
+			is_unchanged: false,
+		})
+		expect(await git_gh_etag_read.read_detail(PATH)).toStrictEqual({
+			body: NEW_BODY,
+			is_unchanged: true,
+		})
+		expect(sent_etags()).toStrictEqual([undefined, ETAG, NEW_ETAG])
+	})
+})
+
 // joshuafolkken/kit#6754: a lookup inside a hook's own timeout bounds its request.
 describe('git_gh_etag_read.read — the timeout', () => {
 	it("passes the caller's timeout to the conditional request", async () => {
