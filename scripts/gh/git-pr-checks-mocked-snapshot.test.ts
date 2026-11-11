@@ -18,6 +18,10 @@ vi.mock('./git-gh-pr-snapshot', () => ({
 		pr_read_review_decision: vi.fn(),
 	},
 }))
+// The gate's probe answers unread, so every poll here reads its snapshot (joshuafolkken/kit#7238).
+vi.mock('./git-gh-conditional', () => ({
+	git_gh_conditional: { read_conditional: vi.fn(async () => ({ kind: 'unreadable' })) },
+}))
 
 const read_merged = vi.mocked(git_gh_pr_auto_merge.pr_is_merged)
 const fetch_checks = vi.mocked(git_gh_pr_snapshot.pr_get_checks_snapshot)

@@ -12,10 +12,20 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 //
 // **CPU is in cores** — `ps`'s share of one core over a hundred — so the column reads against the load
 // average and the machine's core count without a conversion.
+//
+// **The footprint peak counts compressed pages**, which the resident peak leaves out
+// (joshuafolkken/kit#7244); a kind whose samples recorded no footprint prints it as missing.
 
 const RSS_PEAK = 'rss peak (GB)'
 const SAMPLES = 'samples'
-const COLUMNS = ['process', 'cpu mean (cores)', 'cpu peak (cores)', RSS_PEAK, SAMPLES] as const
+const COLUMNS = [
+	'process',
+	'cpu mean (cores)',
+	'cpu peak (cores)',
+	RSS_PEAK,
+	'footprint peak (GB)',
+	SAMPLES,
+] as const
 const RESIDENT_COLUMNS = ['resident apps', 'rss median (GB)', RSS_PEAK, SAMPLES] as const
 // Not the names: a sample sums the apps `JOSH_LANE_RESIDENT_APPS` named when it ran, which the ledger does
 // not keep, so names read at print time could label sizes another set of apps made (joshuafolkken/kit#5690).
@@ -60,14 +70,20 @@ function cell(value: number | undefined): string {
 	return value === undefined ? lane_stats.MISSING : value.toFixed(DECIMALS)
 }
 
-function kind_cells(row: KindRow): Array<string> {
-	const rss_peak = lane_stats.peak(row.readings.map((reading) => reading.rss_mb))
+// The largest of `sizes` in gigabytes, `undefined` where none was recorded.
+function peak_gb(sizes: ReadonlyArray<number>): number | undefined {
+	const peak = lane_stats.peak(sizes)
 
+	return peak === undefined ? undefined : peak / MB_PER_GB
+}
+
+function kind_cells(row: KindRow): Array<string> {
 	return [
 		row.kind,
 		cell(mean_cores(row)),
 		cell(lane_stats.peak(cores(row.readings))),
-		cell(rss_peak === undefined ? undefined : rss_peak / MB_PER_GB),
+		cell(peak_gb(row.readings.map((reading) => reading.rss_mb))),
+		cell(peak_gb(row.readings.flatMap((reading) => reading.footprint_mb ?? []))),
 		String(row.readings.length),
 	]
 }

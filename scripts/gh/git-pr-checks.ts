@@ -12,6 +12,11 @@ import {
 	REQUIRED_CHECKS,
 	type PrEvaluation,
 } from './git-pr-checks-eval'
+import {
+	git_pr_checks_gate,
+	type PrStateFetcher,
+	type ReviewDecisionPredicate,
+} from './git-pr-checks-gate'
 import { blocked_cause, missing_context_error } from './git-pr-checks-missing'
 import { parse_pr_state_snapshot, read_string, type PrStateSnapshot } from './git-pr-checks-parse'
 
@@ -80,20 +85,10 @@ function is_pr_checks_timeout(error: unknown): boolean {
 	return error instanceof Error && error.message === PR_CHECKS_TIMEOUT_MESSAGE
 }
 
-// Whether this poll has to read the review listing, asked of the snapshot *without* one. It is a
-// question about the current poll rather than a cache key: answering `false` skips one request now
-// and nothing is carried into the next poll.
-type ReviewDecisionPredicate = (snapshot: PrStateSnapshot) => boolean
-
 // The conservative answer, and the one every evaluator that does not say gets: read it every poll.
 function should_always_read_review_decision(): boolean {
 	return true
 }
-
-type PrStateFetcher = (
-	branch_name: string,
-	should_read_review_decision: ReviewDecisionPredicate,
-) => Promise<PrStateSnapshot>
 
 // What the loop asks of each snapshot, and what it says when the answer is `failure`.
 //
@@ -348,14 +343,16 @@ async function default_fetch_pr_state(
 // stream from it (joshuafolkken/kit#3770). It decides nothing: the wait reads the same snapshot.
 type SnapshotObserver = (snapshot: PrStateSnapshot) => Promise<void>
 
+// Gated per wait: a poll where the head's checks did not move reuses the last snapshot (#7238).
 function observed_fetcher(observe: SnapshotObserver | undefined): PrStateFetcher {
-	if (observe === undefined) return default_fetch_pr_state
+	const fetch_gated = git_pr_checks_gate.gate_fetcher(default_fetch_pr_state)
+	if (observe === undefined) return fetch_gated
 
 	return async function fetch_observed(
 		branch_name: string,
 		should_read_review_decision: ReviewDecisionPredicate,
 	): Promise<PrStateSnapshot> {
-		const snapshot = await default_fetch_pr_state(branch_name, should_read_review_decision)
+		const snapshot = await fetch_gated(branch_name, should_read_review_decision)
 
 		await observe(snapshot)
 
@@ -374,7 +371,7 @@ async function wait_for_pr_success_default(
 		fetcher: observed_fetcher(observe),
 		interval_ms: CHECK_WAIT_INTERVAL_MS,
 		max_attempts: CHECK_MAX_ATTEMPTS,
-		backoff: PR_POLL_SCHEDULES.checks,
+		backoff: PR_POLL_SCHEDULES.checks_gated,
 		required_stable_reads,
 		before_poll,
 	})
@@ -450,13 +447,7 @@ export {
 	MERGE_GATE_EVALUATOR,
 	should_always_read_review_decision,
 }
-export type {
-	MergeProgress,
-	PrStateFetcher,
-	PrStateEvaluator,
-	ReviewDecisionPredicate,
-	SnapshotObserver,
-}
+export type { MergeProgress, PrStateEvaluator, SnapshotObserver }
 export {
 	collect_blocking_failures,
 	describe_pr_failure,
@@ -465,3 +456,5 @@ export {
 export type { PrEvaluation } from './git-pr-checks-eval'
 export { parse_pr_state_snapshot } from './git-pr-checks-parse'
 export type { RollupCheck, PrStateSnapshot } from './git-pr-checks-parse'
+
+export { type PrStateFetcher, type ReviewDecisionPredicate } from './git-pr-checks-gate'

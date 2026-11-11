@@ -1,0 +1,9 @@
+{
+	"reason": "The English issue template issue-template.en.md (the en column of the template, written in the forms issue:lint reads, and its key correspondence table, held to issue-body-keys.ts by a test) is the deliverable of #7211; the code growth is the template path picked by the session language",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 8,
+		"rules.lines": 125,
+		"ai_cost.on_demand_bytes": 6252
+	}
+}

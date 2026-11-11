@@ -115,7 +115,7 @@ Which steps run at a lowered effort:
 - `josh.lane.setup`: one shell command, unset by default; `josh lane:open` runs it in the new lane
   after the install and cache seeding, with `JOSH_MAIN_CHECKOUT` set
   ([`josh lane:open`](./josh-commands-lane.md#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune)).
-- `josh.gate.steps`: a list of `{ name, command, paths? }`, unset by default; `josh gate` runs each
+- `josh.gate.steps`: a list of `{ name, command, paths?, cores? }`, unset by default; `josh gate` runs each
   command after its fixed checks and reports it under its name ([`josh gate`](./josh-commands.md#josh-gate)).
 - `josh.format`: `"auto" | "all"`, default `"auto"`; what Prettier formats and checks in a basic
   project (`josh format`, `josh lint`, `josh lint:related`). `auto` formats only the HTML, CSS and

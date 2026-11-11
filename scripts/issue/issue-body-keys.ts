@@ -1,7 +1,7 @@
 import { session_language } from '#scripts/josh/session-language'
 
 // joshuafolkken/kit#7209: the single source of the Issue body's declaration keys, their fixed
-// values and the template's headings, as `issue-template.md` writes them. Each row
+// values and the template's headings, as `issue-template.md` and `issue-template.en.md` write them. Each row
 // holds one column per body language, so a language is a column added here rather than a literal
 // changed across `scripts/`; the scan in `issue-body-keys.test.ts` keeps the literals here.
 // joshuafolkken/kit#7210: a body is written in the `JOSH_SESSION_LANG` column and read in either —
@@ -201,8 +201,12 @@ function canonical_line(raw: string): string {
 	return canonical_heading(raw) ?? canonical_declaration(raw) ?? raw
 }
 
+// Every row, for `issue-template.en.md`'s correspondence table to be held to (joshuafolkken/kit#7211).
+const TABLES = { keys: KEYS, values: VALUES, headings: HEADINGS }
+
 const issue_body_keys = {
 	canonical_line,
+	column,
 	heading,
 	line,
 	line_variants,
@@ -210,8 +214,9 @@ const issue_body_keys = {
 	prefix_variants,
 	size_counts,
 	size_value,
+	TABLES,
 	value,
 }
 
-export type { IssueBodyHeading, IssueBodyKey, IssueBodyValue }
+export type { Column, IssueBodyHeading, IssueBodyKey, IssueBodyValue }
 export { issue_body_keys }

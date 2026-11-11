@@ -31,8 +31,8 @@ describe('lane_process_stats.table', () => {
 		]
 
 		expect(rows_of(lane_process_stats.table(entries, WINDOW))).toStrictEqual([
-			'| vitest | 3.0 | 4.0 | 3.0 | 2 |',
-			'| eslint | 1.0 | 1.0 | 1.0 | 1 |',
+			'| vitest | 3.0 | 4.0 | 3.0 | — | 2 |',
+			'| eslint | 1.0 | 1.0 | 1.0 | — | 1 |',
 		])
 	})
 
@@ -49,6 +49,22 @@ describe('lane_process_stats.table', () => {
 
 		expect(table.split('\n')).toHaveLength(HEADER_LINES)
 		expect(table).toContain('cpu mean (cores)')
+		expect(table).toContain('footprint peak (GB)')
+	})
+})
+
+// joshuafolkken/kit#7244: the footprint, compressed pages included, beside the resident peak.
+describe('lane_process_stats.table footprint', () => {
+	it('prints the footprint peak over the samples that recorded one', () => {
+		const entries = [1024, 2048, undefined].map((footprint_mb, index) =>
+			sample(NOW - index - 1, [
+				{ kind: 'eslint', cpu_percent: 0, rss_mb: 52, footprint_mb, count: 1 },
+			]),
+		)
+
+		expect(rows_of(lane_process_stats.table(entries, WINDOW))).toStrictEqual([
+			'| eslint | 0.0 | 0.0 | 0.1 | 2.0 | 3 |',
+		])
 	})
 })
 
@@ -73,9 +89,9 @@ describe('lane_process_stats.table resident apps', () => {
 		const table = lane_process_stats.table([sample(NOW - 1, processes)], WINDOW)
 
 		expect(table.split('\n')).toStrictEqual([
-			'| process | cpu mean (cores) | cpu peak (cores) | rss peak (GB) | samples |',
-			'| --- | --- | --- | --- | --- |',
-			'| vitest | 1.0 | 1.0 | 1.0 | 1 |',
+			'| process | cpu mean (cores) | cpu peak (cores) | rss peak (GB) | footprint peak (GB) | samples |',
+			'| --- | --- | --- | --- | --- | --- |',
+			'| vitest | 1.0 | 1.0 | 1.0 | — | 1 |',
 		])
 	})
 })

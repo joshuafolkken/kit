@@ -111,6 +111,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// The priority declaration and its criteria (joshuafolkken/kit#4383) crossed the 8192 block; the
 	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one; the
 	// premise row (joshuafolkken/kit#7021) crossed the 16384 one.
+	// The template's en column (joshuafolkken/kit#7211).
+	{ path: 'prompts/collaboration-workflow/issue-template.en.md', bytes: 8192 },
 	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 20_480 },
 	{ path: 'prompts/collaboration-workflow/lane-instructions.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/measurement.md', bytes: 4096 },
