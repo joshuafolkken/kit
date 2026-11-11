@@ -852,6 +852,15 @@ It raises the version by one minor per merge, opens and merges a `release/v<vers
 
 A `private: true` package skips the npm stage.
 
+In a consumer repository the release runs through workflows kit syncs:
+
+1. The `release/v<version>` pull request merges into main.
+2. `auto-tag.yml` tags `vX.Y.Z` once main's CI passes.
+3. `production.yml` merges the tag into the `production` branch.
+4. `github-release.yml` creates the GitHub Release; its notes are grouped by the labels in `.github/release.yml` (breaking changes, features, bug fixes, other).
+
+All three workflows ship with kit v1.1093.0 or later (see [What gets synced](sync.md#ai-files-overwritten)); on an older install, run `pnpm josh sync` first.
+
 **Runs in its own work tree, never the root checkout**, so it can run beside a [`backlogrun`](how-to/run-issues.md) on a dirty root.
 
 Watch budgets (default 30 minutes each): `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (tag), `JOSH_RELEASE_NPM_TIMEOUT_SECONDS` (npm publish), `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` (GitHub Release).
