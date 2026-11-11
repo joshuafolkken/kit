@@ -19,6 +19,7 @@ import { gate_static_group } from './gate-static-group'
 import { build_gate_step, build_gate_steps, UNIT_WORKER_FLAG } from './gate-steps'
 import { gate_tree, type GateTree } from './gate-tree'
 import { project_checks } from './project-checks'
+import { project_gate_steps } from './project-gate-steps'
 import { scoped_green, type ScopedSources } from './scoped-green'
 import { whole_tree_reuse } from './whole-tree-reuse'
 
@@ -356,7 +357,8 @@ async function run_checked_gate(
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run.
 	async function run_and_settle(): Promise<number> {
-		const results = await gate_run_steps.run_gate_steps(plan, budget, reused)
+		const fixed = await gate_run_steps.run_gate_steps(plan, budget, reused)
+		const results = [...fixed, ...(await project_gate_steps.run_for(options.static_group))]
 
 		return await settle_gate(plan, results, tree, { ...options, started_at, ledger })
 	}
