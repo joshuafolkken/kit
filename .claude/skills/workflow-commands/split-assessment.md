@@ -87,6 +87,8 @@ is the non-closing home for the split rationale.
 `pnpm josh issue:file "<sub-title>" --body-file .josh/tmp/body.md --route split` — and judged like any
 filing (`kickoff.md` → "Words typed after `new`").
 
+Over the bar before dispatch → a split-only unit answers question 1 (`scripts/backlog/backlog-drive-split-unit.ts`).
+
 ## Promote, or create a new epic
 
 `kickoff #N` and the `#N` runs have one branch, and it is Tier A — decide it and record the reasoning

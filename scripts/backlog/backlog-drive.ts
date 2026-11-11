@@ -125,7 +125,7 @@ interface DrivePorts extends YieldCapPorts {
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
 	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken) —
 	// or `measured` / `unsampled`, the issue closed by its declaration or waiting for its sample, with
-	// no lane taken.
+	// no lane taken, or `split`, an issue over the size bar its split-only unit split.
 	launch: (issue: string) => Promise<DriveLaunch>
 	// Parks a launch the pass hands back with `run:stalled` — `backlog_drive_record.record_ports` in production.
 	stall: (issue: string, outcome: DriveLaunch) => Promise<void>

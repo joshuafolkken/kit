@@ -1,18 +1,12 @@
-import { agent_provider, type AgentEnvironment } from '#scripts/agent/agent-provider'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { durable_state } from '#scripts/josh/durable-state'
+import type { AgentEnvironment } from '#scripts/agent/agent-provider'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import {
-	detached_launch,
-	type AttachedLaunchResult,
-	type LaunchRequest,
-} from '#scripts/run/detached-launch'
+import type { AttachedLaunchResult, LaunchRequest } from '#scripts/run/detached-launch'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
-import { run_handoff_launch } from '#scripts/run/handoff/run-handoff-launch'
+import { backlog_drive_unit } from './backlog-drive-unit'
 
 // The retrospective unit `backlog:drive` runs at a drain that owes one (joshuafolkken/kit#6745): a
-// headless model child built as `run:handoff` builds its child, and waited on to its exit as that
-// command's `kickoff` is. The improvement picks are judgments, so a model runs them, not the driver.
+// headless model child (`backlog-drive-unit.ts`), waited on to its exit as `run:handoff`'s `kickoff`
+// is. The improvement picks are judgments, so a model runs them, not the driver.
 //
 // **Only the run record's retrospective mark is success.** A unit that exited 0 on a question for a
 // person, or whose close was refused, marked nothing; that — and no repository, a refused provider or
@@ -41,41 +35,23 @@ interface UnitPorts {
 	now: () => number
 }
 
-function log_path(git_directory: string, now: number): string {
-	const suffix = `-retrospective-${String(now)}.log`
+const LOG_LABEL = 'retrospective'
 
-	return durable_state.path(durable_state.PREFIX.HANDOFF_LOG, git_directory, suffix)
-}
-
-// The retrospective is the parent's planning work, so the unit runs as the scheduler.
 function request_of(
 	ports: UnitPorts,
 	git_directory: string,
 	owner: string,
 ): LaunchRequest | undefined {
-	const selected = agent_provider.resolve_provider(ports.environment)
+	const log = backlog_drive_unit.log_path(git_directory, LOG_LABEL, ports.now())
 
-	if (selected.kind === 'rejected') return undefined
-
-	const child = {
-		prompt: brief_of(owner),
-		role: agent_role_profile.SCHEDULER,
-		provider: selected.provider,
-		cwd: ports.cwd,
-	}
-	const built = run_handoff_launch.argv_of(child, ports.environment)
-
-	if (built.kind === 'rejected') return undefined
-
-	return run_handoff_launch.request_of(built, ports.cwd, log_path(git_directory, ports.now()))
+	return backlog_drive_unit.request_of(brief_of(owner), ports, log)
 }
 
 function production_ports(): UnitPorts {
 	return {
 		repository_directory: run_carry.repository_directory,
 		emit: run_event_setup.emit,
-		launch_attached: async (request) =>
-			await detached_launch.launch_attached(request, (note) => process.stderr.write(`${note}\n`)),
+		launch_attached: backlog_drive_unit.launch_attached,
 		is_marked: (git_directory) =>
 			run_carry.retrospective_done_of(run_carry.read_carry(run_carry.carry_path(git_directory))),
 		environment: process.env,

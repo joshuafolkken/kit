@@ -6,6 +6,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_drive_launch } from './backlog-drive-launch'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_drive_split_unit } from './backlog-drive-split-unit'
 import { backlog_measure_close } from './backlog-measure-close'
 
 const OWNER = '4242'
@@ -29,6 +30,42 @@ beforeEach(() => {
 	vi.spyOn(run_event_setup, 'emit').mockResolvedValue()
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 	vi.spyOn(backlog_measure_close, 'outcome').mockResolvedValue('launch')
+	vi.spyOn(backlog_drive_split_unit, 'run').mockResolvedValue('launch')
+})
+
+// joshuafolkken/kit#7182: an issue over the size bar goes to its split-only unit before any lane.
+describe('backlog_drive_launch.launch — the split-only unit', () => {
+	it('answers split without opening a lane or a stage when the unit split the issue', async () => {
+		vi.mocked(backlog_drive_split_unit.run).mockResolvedValue('split')
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('split')
+		expect(backlog_drive_split_unit.run).toHaveBeenCalledWith(FIRST)
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
+	})
+
+	it('opens the lane when the unit answers launch', async () => {
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe('launched')
+		expect(lane_launch_cli.launch_ready_lane).toHaveBeenCalledOnce()
+	})
+
+	it('opens no lane when the driver lost its owner while the unit ran', async () => {
+		vi.mocked(backlog_drive_owner.assert_current)
+			.mockResolvedValueOnce(CARRY)
+			.mockRejectedValueOnce(new Error(LOST_OWNER))
+
+		await expect(backlog_drive_launch.launch(FIRST, OWNER)).rejects.toThrow(LOST_OWNER)
+		expect(backlog_drive_split_unit.run).toHaveBeenCalledWith(FIRST)
+		expect(lane_launch_cli.launch_ready_lane).not.toHaveBeenCalled()
+		expect(run_event_setup.emit).not.toHaveBeenCalled()
+	})
+
+	it('runs no unit for a measured close', async () => {
+		vi.mocked(backlog_measure_close.outcome).mockResolvedValue('closed')
+
+		await backlog_drive_launch.launch(FIRST, OWNER)
+		expect(backlog_drive_split_unit.run).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#4621: an issue its measurement declaration closed takes no lane.
