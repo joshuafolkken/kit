@@ -1,7 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { find_local_bin_upwards, resolve_local_bin, resolve_package_bin } from './local-bin'
+import {
+	direct_launch,
+	find_local_bin_upwards,
+	resolve_local_bin,
+	resolve_package_bin,
+} from './local-bin'
 
 const resolve_mock = vi.hoisted(() => vi.fn())
 
@@ -158,4 +163,53 @@ describe('resolve_package_bin — a miss answers instead of throwing', () => {
 
 		expect(resolve_tsx()).toBeUndefined()
 	})
+})
+
+const TSX_EXEC = ['exec', TSX, 'watch', 'main.ts']
+
+// `pnpm exec` leaves a wrapper process beside every tool it starts (joshuafolkken/kit#7256), so a
+// lint tool is launched by its CLI entry, then its shim, with the same arguments either way.
+describe('direct_launch', () => {
+	beforeEach(() => {
+		set_platform('darwin')
+	})
+
+	it('runs the package CLI entry under this node with the tool arguments', () => {
+		arrange_manifest(STRING_BIN)
+
+		expect(direct_launch(PROJECT_ROOT, TSX_EXEC)).toEqual({
+			file: process.execPath,
+			args: [CLI_ENTRY, 'watch', 'main.ts'],
+		})
+	})
+
+	// cspell's `exports` map hides its manifest, so its entry never resolves (#7255).
+	it('runs the shim pnpm would find when the entry does not resolve', () => {
+		const shim = resolve_local_bin(PROJECT_ROOT, TSX)
+
+		arrange_manifest(STRING_BIN)
+		resolve_mock.mockImplementation(() => {
+			throw new Error('ERR_PACKAGE_PATH_NOT_EXPORTED')
+		})
+		mocked_exists.mockImplementation((candidate: unknown) => String(candidate) === shim)
+
+		expect(direct_launch(NESTED, TSX_EXEC)).toEqual({ file: shim, args: ['watch', 'main.ts'] })
+	})
+
+	it('leaves the list to pnpm when the tool is not installed', () => {
+		arrange_manifest(STRING_BIN)
+		mocked_exists.mockReturnValue(false)
+
+		expect(direct_launch(PROJECT_ROOT, TSX_EXEC)).toEqual({ file: 'pnpm', args: TSX_EXEC })
+	})
+
+	it.each([[['install', '--frozen-lockfile']], [['exec']]])(
+		'leaves a list that execs no tool to pnpm: %j',
+		(pnpm_arguments) => {
+			expect(direct_launch(PROJECT_ROOT, pnpm_arguments)).toEqual({
+				file: 'pnpm',
+				args: pnpm_arguments,
+			})
+		},
+	)
 })

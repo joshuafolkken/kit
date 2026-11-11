@@ -6,14 +6,14 @@ import {
 } from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
 import { fake_result } from '#tools/test/execa-result'
+import { DIRECT_LAUNCH_FILE } from '#tools/test/local-bin-mock'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { DaemonState } from './eslint-daemon'
 import type { LintRunTiming } from './lint-parallel'
 import { lint_shard } from './lint-shard'
 
-vi.mock('execa', () => ({
-	execa: vi.fn(),
-}))
+vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/lane/lane-cache-run', () => ({
 	lane_cache_run: {
 		run: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
@@ -89,7 +89,7 @@ describe('run_lint_parallel_checks', () => {
 
 		await run_lint_parallel_checks()
 
-		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(PRETTIER_ARGS)
+		expect(mocked_execa.mock.calls[0]?.slice(0, 2)).toEqual([DIRECT_LAUNCH_FILE, PRETTIER_ARGS])
 		expect(PRETTIER_ARGS.join(' ')).toContain(PRETTIER_CACHE_FLAGS.join(' '))
 		expect(mocked_cache_run).not.toHaveBeenCalledWith(PRETTIER_CACHE_FILE, expect.any(Function))
 	})

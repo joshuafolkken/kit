@@ -5,12 +5,12 @@ import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
-vi.mock('#scripts/build/local-bin', () => ({ resolve_package_bin: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/git-spawn-sync', () => ({ git_spawn_sync: { read: vi.fn() } }))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
-const { resolve_package_bin } = await import('#scripts/build/local-bin')
+const { DIRECT_LAUNCH_FILE, resolve_package_bin } = await import('#tools/test/local-bin-mock')
 const mocked_resolve = vi.mocked(resolve_package_bin)
 const { git_spawn_sync } = await import('#scripts/git/git-spawn-sync')
 const mocked_git_read = vi.mocked(git_spawn_sync.read)
@@ -383,11 +383,11 @@ describe('eslint_daemon.run_or_cold', () => {
 		])
 	})
 
-	it('runs the cold pnpm eslint when the daemon cannot answer', async () => {
+	it('launches the cold eslint directly when the daemon cannot answer', async () => {
 		mocked_resolve.mockReturnValue(undefined)
 		mocked_execa.mockResolvedValueOnce(answer(0, 'cold'))
 
 		expect(await eslint_daemon.run_or_cold(PNPM_ESLINT)).toMatchObject({ exit_code: 0 })
-		expect(mocked_execa).toHaveBeenCalledExactlyOnceWith('pnpm', PNPM_ESLINT, expect.anything())
+		expect(mocked_execa.mock.calls).toEqual([[DIRECT_LAUNCH_FILE, PNPM_ESLINT, expect.anything()]])
 	})
 })

@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { buffered_process } from '#scripts/lib/buffered-process'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { eslint_heap, ESLINT_HEAP_MIB } from './eslint-heap'
 
@@ -52,5 +53,23 @@ describe('eslint_heap.environment', () => {
 		)
 
 		expect(limit).toBeGreaterThanOrEqual(ESLINT_HEAP_MIB * MIB)
+	})
+})
+
+// joshuafolkken/kit#7256: the cold eslint runs without pnpm's wrapper process, under the heap.
+describe('eslint_heap.run_cold', () => {
+	it('launches the eslint list directly with the heap and the memory hook', async () => {
+		const run_direct = vi
+			.spyOn(buffered_process, 'run_buffered_direct')
+			.mockResolvedValue({ output: '', exit_code: 0, elapsed_ms: 0 })
+		const eslint_list = ['exec', 'eslint', '.']
+
+		await eslint_heap.run_cold(eslint_list)
+
+		expect(run_direct).toHaveBeenCalledWith(eslint_list, {
+			environment: expect.objectContaining({
+				NODE_OPTIONS: expect.stringMatching(/--max-old-space-size=\d+ --import=file:/u),
+			}),
+		})
 	})
 })
