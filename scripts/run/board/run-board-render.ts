@@ -52,11 +52,11 @@ const { state_icon } = run_board_render_icon
 const { NOTE_LIMIT } = run_board_render_notes
 const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
 const { indent_of, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
-const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, fitted_limit, reason_text, row_overrun, title_of } =
+const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, fitted_limit, row_overrun, title_of } =
 	run_board_render_title
 const { width_of } = run_board_fit
 const { padded } = run_board_fresh
-const { condition_of, waits_of } = run_board_render_condition
+const { condition_of, tail_of, waits_of } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const { ROW_INDENT, done_section, keyed, plan_section } = run_board_render_section
 const GAP = '  '
@@ -200,10 +200,10 @@ function room_after(indent: string, head: string, frame: RowFrame): number | und
 // (`run-board-render-tail.ts`), a done row on what was filed during it (`run-board-render-found.ts`),
 // and a row with nothing after its padded columns ends where its text does.
 function row_text(indent: string, row: BoardRow, frame: RowFrame): string {
-	const { header } = frame
+	const { header, reason_cut } = frame
 	const head = tailed_head(row, frame)
 	const found = run_board_render_found.found_fitted(room_after(indent, head, frame), row, header)
-	const notes = [waits_of(row, header, frame.is_conditioned), reason_text(row, frame.reason_cut)]
+	const notes = [waits_of(row, header, frame.is_conditioned), tail_of(row, reason_cut, header)]
 
 	return `${indent}${joined([head, found, ...notes]).trimEnd()}`
 }
