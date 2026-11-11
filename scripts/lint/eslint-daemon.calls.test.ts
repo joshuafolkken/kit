@@ -68,6 +68,8 @@ describe('eslint_daemon — the call record', () => {
 	it('records nothing beside a daemon a borrowed install belongs to', () => {
 		const lender = make_directory('eslint-daemon-calls-lender-')
 
+		// An eslint the borrowing checkout resolves, so only the borrowed-install guard holds the record back.
+		write_file(lender, 'eslint/package.json', '{}')
 		write_file(lender, 'eslint/.eslint_d', DAEMON)
 		symlinkSync(lender, path.join(project_root, 'node_modules'), 'dir')
 
