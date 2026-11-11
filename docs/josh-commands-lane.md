@@ -53,7 +53,18 @@ pnpm josh lane:prune
 
 <!-- /usage -->
 
-`lane:open` branches from default, installs dependencies, copies main's gate caches/hooks.
+`lane:open` branches from default, installs dependencies, copies main's gate caches/hooks, then runs the project's `josh.lane.setup`.
+
+Project setup, `josh.lane.setup` in the lane's `package.json`:
+
+- One shell command, run through `pnpm exec --shell-mode` in the new lane after the install and cache seeding.
+- `JOSH_MAIN_CHECKOUT` holds the main checkout's path, for example to copy or link a build directory such as `target/`.
+- Unset, nothing runs.
+- A non-zero exit fails `lane:open` as a failed install does: its output is on stderr, and the work tree stays for a rerun or `lane:close`.
+
+```json
+{ "josh": { "lane": { "setup": "cp -R \"$JOSH_MAIN_CHECKOUT/target\" target" } } }
+```
 
 Unreadable `.env`: report lane/reason on stderr; check ports before allocating other seats. Failed process/socket probes refuse allocation.
 
@@ -74,7 +85,7 @@ Codex hooks in a lane: Codex runs the main checkout's `.codex/hooks.json` in eve
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
 - `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 8); applied by `josh epic:next`. A live `lane:limit` override takes precedence; memory admission may hold starts below the limit.
 
-**Output / exit codes:** `lane:open` prints its directory on stdout, reasons on stderr; refusal exits non-zero with empty stdout. Seats `1..9` (main: 0) are claimed atomically. Install failure fails; warming is best-effort. `lane:list`: one row per lane — issue, seat, ports, branch, state, directory, output path, profile.
+**Output / exit codes:** `lane:open` prints its directory on stdout, reasons on stderr; refusal exits non-zero with empty stdout. Seats `1..9` (main: 0) are claimed atomically. Install or `josh.lane.setup` failure fails; warming is best-effort. `lane:list`: one row per lane — issue, seat, ports, branch, state, directory, output path, profile.
 
 **`in-progress` / lane:** `lane:list` reports label/lane mismatches on stderr without changing labels.
 
