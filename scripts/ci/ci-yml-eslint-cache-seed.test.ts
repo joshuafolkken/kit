@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { gate_static_group } from '#scripts/gate/gate-static-group'
+import { lint_shard } from '#scripts/lint/lint-shard'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
@@ -18,12 +20,14 @@ const RESTORE_STEP = 'eslint-cache'
 const SHA_SUFFIX = '${{ github.sha }}'
 const CACHE_PATH = '.eslintcache'
 // joshuafolkken/kit#5215: `static-checks` is a matrix, and only its lint leg restores and writes the cache.
-const PULL_REQUEST_ONLY = "github.event_name == 'pull_request' && matrix.group == 'lint'"
+const PULL_REQUEST_ONLY = "github.event_name == 'pull_request' && startsWith(matrix.group, 'lint-')"
 const PREFIX_FILE = 'eslint-cache-prefix'
 // joshuafolkken/kit#7126: the artifact, the key and the seed and warm legs all carry the matrix group, so
 // two lint legs can hand over a cache each without colliding.
 const UPLOAD_ARTIFACT = 'eslint-cache-${{ github.event.pull_request.number }}-${{ matrix.group }}'
-const LINT_GROUPS = ['lint']
+// joshuafolkken/kit#7108: the lint legs are the lint shard groups.
+const LINT_GROUPS = Object.keys(gate_static_group.LINT_SHARD_GROUPS)
+const MATRIX_GROUP = '${{ matrix.group }}'
 const ON_REUSE = "needs.reuse-pr-checks.outputs.reuse == 'true'"
 const CACHE_ACTION = 'actions/cache@'
 
@@ -145,11 +149,10 @@ describe("a reused main push warms the runner's Node.js lineage", () => {
 		expect(warm_step(RESTORE_STEP)?.uses).toContain(CACHE_ACTION)
 	})
 
-	it('lints the whole tree only when the exact key missed, and never turns the push red', () => {
+	it('lints only when the exact key missed, and never turns the push red', () => {
 		const lint = warm_step('lint')
 
 		expect(lint?.if).toBe(ON_MISS)
-		expect(ci_yml_fixture.step_run(lint)).toBe('pnpm josh lint')
 		expect(ci_yml_fixture.step_continue_on_error(lint)).toBe(true)
 	})
 })
@@ -168,7 +171,7 @@ describe('each lint group hands over its own cache', () => {
 	})
 
 	it('downloads the artifact of the leg’s own group', () => {
-		expect(download_environment('GROUP')).toBe('${{ matrix.group }}')
+		expect(download_environment('GROUP')).toBe(MATRIX_GROUP)
 	})
 })
 
@@ -178,7 +181,7 @@ describe('each lint group hands over its own cache', () => {
 // reads what the script actually does rather than what its text contains.
 const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR']
 const UNTRUSTED = ['CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'NONE', '']
-const STUB_GROUP = 'lint'
+const STUB_GROUP = 'lint-1'
 const STUB_PREFIX = `Linux-eslint-cache-${STUB_GROUP}-v24.1.0-0a1b-2c3d-`
 const make_directory = temporary_directory()
 
@@ -243,5 +246,40 @@ describe('the seed promotes only a trusted author association', () => {
 
 		expect(did_download).toBe(false)
 		expect(output).toBe('')
+	})
+})
+
+// joshuafolkken/kit#7108: a leg's lineage holds only its shard's files, so its warm lint is that shard.
+// The step runs under `bash -e` with a stub `pnpm` that prints its arguments, so a row reads the
+// command the runner actually starts.
+const SHARD_FLAGS = Object.entries(gate_static_group.LINT_SHARD_GROUPS).map(
+	([group, shard]) => [lint_shard.shard_flag(shard), group] as const,
+)
+
+function warm_lint_command(group: string): string {
+	const directory = make_directory('warm-eslint-lineage-run-')
+	const stub = path.join(directory, 'pnpm')
+
+	writeFileSync(stub, '#!/bin/sh\necho "pnpm $*"\n')
+	chmodSync(stub, 0o755)
+	const result = spawnSync('bash', ['-e', '-c', ci_yml_fixture.step_run(warm_step('lint'))], {
+		env: {
+			...process.env,
+			PATH: `${directory}${path.delimiter}${process.env['PATH'] ?? ''}`,
+			GROUP: group,
+		},
+		encoding: 'utf8',
+	})
+
+	return result.stdout.trim()
+}
+
+describe('the warm job lints its own shard', () => {
+	it('reads the shard from the leg’s group', () => {
+		expect(warm_step('lint')?.env?.['GROUP']).toBe(MATRIX_GROUP)
+	})
+
+	it.each(SHARD_FLAGS)('runs pnpm josh lint %s on the %s leg', (flag, group) => {
+		expect(warm_lint_command(group)).toBe(`pnpm josh lint ${flag}`)
 	})
 })

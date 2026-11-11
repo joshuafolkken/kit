@@ -258,12 +258,14 @@ jobs:
   # unguarded. So the two halves run under new names and `Checks` stays exactly what the ruleset
   # already requires: a job that is green only when both halves are.
   #
-  # **The static half is a matrix of three legs** (joshuafolkken/kit#5215). On one runner its seven
+  # **The static half is a matrix of legs** (joshuafolkken/kit#5215). On one runner its seven
   # checks took 4.1 minutes while every unit shard was done in about two, so it was the critical path
   # to `Checks`. Each leg is still `josh gate`, narrowed by `--static-group` to the partition
   # `scripts/gate/gate-static-group.ts` defines, and restores only the caches its checks write — a leg
   # that restored a cache it never writes would save it back unchanged under the same sha-keyed name,
   # racing the leg that does write it. `needs.static-checks.result` is `success` only when every leg is.
+  # joshuafolkken/kit#7108: lint runs as two legs, `lint-1` and `lint-2`, one `josh lint --shard` each —
+  # one leg linted the whole tree in 156 s at the median and about 220 s after a core-module change.
   static-checks:
     name: Static Checks (${{ matrix.group }})
     needs: reuse-pr-checks
@@ -273,7 +275,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [lint, types, rest]
+        group: [lint-1, lint-2, types, rest]
     permissions:
       contents: read
       packages: read
@@ -295,7 +297,7 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup ESLint cache
-        if: matrix.group == 'lint'
+        if: startsWith(matrix.group, 'lint-')
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: eslint-cache
         with:
@@ -367,9 +369,10 @@ jobs:
       # the whole tree cold on every run. Prettier hashes each file's absolute path into its entry
       # (`scripts/josh/josh-command-types.ts` → `GATE_CACHE_SPECS`), which is why no lane shares it,
       # but the runner checks out to the same path on every run, so an earlier run's entries hit. The
-      # key is the eslint cache's shape: lockfile and prettier config hashes, then the sha.
+      # key is the eslint cache's shape: lockfile and prettier config hashes, then the sha. Only the
+      # `lint-1` leg checks formatting (`scripts/lint/lint-shard.ts`), so only it writes the file.
       - name: Setup prettier cache
-        if: matrix.group == 'lint'
+        if: matrix.group == 'lint-1'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: prettier-cache
         with:
@@ -442,13 +445,13 @@ jobs:
       # transient artifact-service error must not turn this required job red; it continues on error.
       - name: Write ESLint cache prefix
         id: eslint-cache-prefix
-        if: github.event_name == 'pull_request' && matrix.group == 'lint'
+        if: github.event_name == 'pull_request' && startsWith(matrix.group, 'lint-')
         env:
           ESLINT_CACHE_PREFIX: ${{ runner.os }}-eslint-cache-${{ matrix.group }}-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ hashFiles('pnpm-lock.yaml') }}-
         run: printf '%s\n' "${ESLINT_CACHE_PREFIX}" > eslint-cache-prefix
 
       - name: Upload ESLint cache
-        if: github.event_name == 'pull_request' && matrix.group == 'lint'
+        if: github.event_name == 'pull_request' && startsWith(matrix.group, 'lint-')
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -480,7 +483,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [lint]
+        group: [lint-1, lint-2]
     steps:
       - name: Download the reused run's ESLint cache
         id: download
@@ -539,7 +542,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [lint]
+        group: [lint-1, lint-2]
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -569,11 +572,14 @@ jobs:
         with:
           node-auth-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # joshuafolkken/kit#7108: each leg lints only its group's shard, the files its lineage holds.
       - name: Lint to write this release's lineage
         id: lint
         if: steps.eslint-cache.outputs.cache-hit != 'true'
         continue-on-error: true
-        run: pnpm josh lint
+        run: pnpm josh lint "--shard=${GROUP#lint-}"
+        env:
+          GROUP: ${{ matrix.group }}
 
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
