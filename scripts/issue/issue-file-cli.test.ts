@@ -89,7 +89,7 @@ function listing_of(count: number): { json: string; is_capped: boolean } {
 	return { json: JSON.stringify(rows), is_capped: false }
 }
 
-const OVER_CAP_LISTING = listing_of(issue_wip.WIP_CAP + 1)
+const OVER_CAP_LISTING = listing_of(issue_wip.DEFAULT_WIP_CAP + 1)
 const OVER_CAP_FLAG = '--over-cap'
 
 function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<string> {

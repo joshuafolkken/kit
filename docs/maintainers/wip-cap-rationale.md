@@ -1,4 +1,4 @@
-# The open-Issue WIP cap (30) — rationale
+# The open-Issue WIP cap (default 30) — rationale
 
 Rationale behind `prompts/collaboration-workflow/wip-cap.md`.
 
@@ -130,5 +130,5 @@ production carries on.**
 ## Why the three landed in one commit
 
 A cap without stopping the production side stops only execution while production carries on. So joshuafolkken/kit#1469
-landed the split-assessment default, the default for review round 2's leftovers and the 30-Issue WIP
+landed the split-assessment default, the default for review round 2's leftovers and the default 30-Issue WIP
 cap together in one commit.
