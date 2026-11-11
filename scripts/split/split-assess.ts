@@ -284,11 +284,11 @@ const NOTICE_SECTION = 'Over the guide before the gate'
 const QUESTION_SECTION = 'The question'
 // The filing's reason line (`size_estimate`); it does not answer a later split notice.
 const REASON_PREFIX = '- 分割しない理由:'
-const NOTICE_ACTION = `go on; file a split child with \`pnpm josh issue:file --route split --found-during <N>\` only for an independent added requirement or scope growth this Issue cannot verify — split-assessment.md → "${NOTICE_SECTION}"`
+const NOTICE_ACTION = `go on to the end; a started Issue is never split, and the merge records the overrun as a pre-split miss — split-assessment.md → "${NOTICE_SECTION}"`
 
-// The pre-gate notice `josh main:merge` prints for a diff past `notice_bar` on either axis — strictly
-// greater than, as the guide is — and a diff at or under it prints nothing. It is a warning: size
-// alone never stops the run (joshuafolkken/kit#6602).
+// The notice for a diff past `notice_bar` on either axis — strictly greater than, as the guide is — and
+// a diff at or under it gives none. A merge past it is recorded as a pre-split miss
+// (`lane-size-record.ts`, joshuafolkken/kit#7183); size alone never stops the run (joshuafolkken/kit#6602).
 function notice(
 	measurement: SizeMeasurement,
 	declared?: DeclaredSize,

@@ -328,12 +328,23 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` i
 Print a merged lane's net time by stage, longest first, the implementation split by its tool calls.
 
 ```bash
-pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation comments on the lane
+pnpm josh lane:breakdown 4970              # the breakdown the overrun investigation comments on the lane
+pnpm josh lane:breakdown 4970 --timeline   # when each stage ran and where the lane waited
 ```
+
+**Options:**
+
+- `--timeline` — prints the lane in time order instead, one line a stage, wait or event, the stage lines adding up to the net time.
 
 <!-- /usage -->
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
+
+`--timeline` prints the lane one line an event, oldest first: start (UTC), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
+
+- `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, sleep).
+- `[driver]` — the followup's CI wait.
+- `[event]` — a main merge-in (the ship's `merge` lap), a split or `unplanned` notice, a split, a ship launch, a review round.
 
 A ship stop closes the ship stage open at it. A blocking `lane:plan` wait on a holder is its own `lane:plan wait (#<M>)` row, cut out of the stage it fell in (`lane-plan-wait-event.ts`).
 
@@ -426,6 +437,8 @@ Hunks over twice declared files or declared lines × recent ratio over 200 also 
 A planned `test:related` hub (reach over the test-file cap, `scripts/test/test-related-cap.ts`) also splits, as `split (hub)` naming it; with no dependency graph none reads as a hub. Related: [#6180](https://github.com/joshuafolkken/kit/issues/6180) splits the hubs themselves.
 
 A `--single` plan, or a re-plan after the lane started (`sized`), past any axis is recorded with a `size warning` and logged, never refused; the clash and unread checks still apply.
+
+A dispatched lane's plan (its child mark names the issue) never answers `split`: its first plan past any axis prints one `size warning`, notes nothing on the ledger, and its re-plans print none.
 
 A first plan re-runs each `- 前提:` line of its issue's trusted body (`scripts/lane/lane-plan-premise.ts`), printing `premise: <declaration> measured <value>` on stderr. One that does not hold, or an untrusted body, answers `premise`, exit 4, unrecorded: park the lane. No premise line runs nothing; a re-plan never re-runs them.
 

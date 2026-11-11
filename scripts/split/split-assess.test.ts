@@ -182,15 +182,15 @@ describe('reason', () => {
 // joshuafolkken/kit#4302: the pre-gate notice fires past the guide when the Issue declares no size.
 describe('notice', () => {
 	// joshuafolkken/kit#6602: size alone is a warning; a split child is only for an independent requirement.
-	it('names the measurement as a warning and keeps the split for an independent requirement', () => {
+	it('names the measurement as a warning that never splits the started Issue', () => {
 		const notice = split_assess.notice({ files: 12, lines: 500, verdict: 'split' })
 
 		expect(notice).toContain('12 changed file(s), 500 changed line(s)')
 		expect(notice).toContain('a warning, not a stop: go on')
 		expect(notice).not.toContain('stop implementation')
 		expect(notice).not.toContain(split_assess.REASON_PREFIX)
-		expect(notice).toContain('pnpm josh issue:file --route split --found-during <N>')
-		expect(notice).toContain('only for an independent added requirement')
+		expect(notice).not.toContain('--route split')
+		expect(notice).toContain('records the overrun as a pre-split miss')
 		expect(notice).toContain('Over the guide before the gate')
 	})
 
