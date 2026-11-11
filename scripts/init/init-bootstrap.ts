@@ -13,6 +13,9 @@ const NODE_MODULES = 'node_modules'
 // The basic template lists exactly the build scripts kit's own dependency tree carries, which is
 // what installing kit alone needs approved.
 const KIT_BUILDS_TEMPLATE = 'templates/pnpm-workspace.basic.yaml'
+const WORKSPACE_FILE = 'pnpm-workspace.yaml'
+const NPMRC_FILE = '.npmrc'
+const RELEASE_AGE_KEY = 'minimumReleaseAge'
 const HANDOFF_FAILURE = 'josh init from the project-installed kit failed — see the output above'
 // Set on the handed-off run, so a kit that still does not find itself installed in the project — pnpm
 // put it somewhere else — stops instead of installing and handing off again without end.
@@ -50,13 +53,18 @@ function has_kit_dependency(project_root: string): boolean {
 	return names.includes(KIT_PACKAGE_NAME)
 }
 
-// A project that already lists kit keeps the version it chose; otherwise pnpm picks it, under the
-// project's own `minimumReleaseAge`, so the version installed is never the cache's decision.
+// A project that already lists kit keeps the version it chose; otherwise pnpm picks it under the
+// `minimumReleaseAge` `ensure_release_age` wrote first, so the version installed is never the cache's
+// decision — a kit published inside the wait leaves the one before it installed.
 function kit_install_step(has_kit: boolean, template: string): InstallStep {
 	if (has_kit) return { label: 'pnpm install', command: 'pnpm', args: ['install'] }
 	const args = ['add', '-D', ...kit_build_flags(template), KIT_PACKAGE_NAME]
 
 	return { label: `pnpm ${args.join(' ')}`, command: 'pnpm', args }
+}
+
+function install_failure(install: InstallStep): string {
+	return `${install.label} failed — ${init_install.TOO_NEW_DEPENDENCY_HINT}`
 }
 
 function handoff_step(args: ReadonlyArray<string>): InstallStep {
@@ -80,6 +88,32 @@ function ensure_project_manifest(project_root: string): void {
 	file_content.write_contained(manifest_path, init_basic.initial_manifest())
 }
 
+function read_optional(file: string): string {
+	return existsSync(file) ? readFileSync(file, 'utf8') : ''
+}
+
+// The template's wait, with a project's own `.npmrc` value carried the way `josh init` carries it,
+// so the later merge finds the key already holding the value it would have written.
+function release_age_block(project_root: string, template: string): string {
+	const block = `${init_logic_workspace.extract_yaml_block(template, RELEASE_AGE_KEY)}\n`
+	const npmrc = read_optional(path.join(project_root, NPMRC_FILE))
+
+	return init_logic_workspace.carry_npmrc_settings(block, npmrc)
+}
+
+// `josh init` writes the wait only after kit is installed, so without it here the first install
+// resolves kit's whole tree with no wait and the lockfile pins versions later installs refuse (#7200).
+function ensure_release_age(project_root: string, template: string): void {
+	const workspace_path = path.join(project_root, WORKSPACE_FILE)
+	const existing = read_optional(workspace_path)
+	const block = release_age_block(project_root, template)
+	const merged = init_logic_workspace.merge_workspace_yaml(existing, block)
+
+	if (merged === existing) return
+
+	file_content.write_contained(workspace_path, merged)
+}
+
 function is_handed_off(): boolean {
 	return process.env[HANDOFF_ENV] !== undefined
 }
@@ -96,7 +130,8 @@ function hand_off(
 	const install = kit_install_step(has_kit_dependency(project_root), template)
 
 	ensure_project_manifest(project_root)
-	if (!init_install.did_step_succeed(install, project_root)) return `${install.label} failed`
+	ensure_release_age(project_root, template)
+	if (!init_install.did_step_succeed(install, project_root)) return install_failure(install)
 	if (!init_install.did_step_succeed(handoff_step(args), project_root)) return HANDOFF_FAILURE
 
 	return undefined
