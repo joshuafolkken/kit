@@ -104,6 +104,9 @@ Which steps run at a lowered effort:
 - `josh.review_gate`: `"ci" | "local"`, default `"local"`; overridden by `JOSH_REVIEW_GATE`.
 - `josh.progress_interval_minutes`: a positive number of minutes, default `20`; overridden by
   `JOSH_PROGRESS_INTERVAL_MINUTES`.
+- `josh.lane.setup`: one shell command, unset by default; `josh lane:open` runs it in the new lane
+  after the install and cache seeding, with `JOSH_MAIN_CHECKOUT` set
+  ([`josh lane:open`](./josh-commands-lane.md#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune)).
 
 | Variable                         | Required | Default                                                          | Used when                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -201,6 +204,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_LANE_CHILD`           | a `backlogrun` dispatch        | This session is a dispatched lane child.                                                                                                 |
 | `JOSH_LANE_OVERRUN`         | a merged lane's overrun launch | This session investigates a merged lane's overrun; `josh issue:file` records its filings as the investigation's.                         |
 | `JOSH_LANE_SEAT`            | `josh lane:open` / dispatch    | The last assigned seat (`1`–`9`), added to the port offset; reacquired before each start or re-dispatch.                                 |
+| `JOSH_MAIN_CHECKOUT`        | `josh lane:open`               | The main checkout's path, in the environment of the project's `josh.lane.setup` command.                                                 |
 | `JOSH_LANE_OUTPUT`          | `josh lane:open`               | Where the lane's child writes its output.                                                                                                |
 | `JOSH_LANE_AGENT_PROVIDER`  | a `backlogrun` dispatch        | The provider the lane's child was launched with.                                                                                         |
 | `JOSH_LANE_AGENT_ROLE`      | a `backlogrun` dispatch        | The role the lane's child was launched as.                                                                                               |

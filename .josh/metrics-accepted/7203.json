@@ -1,0 +1,7 @@
+{
+	"reason": "New lane:open feature (#7203): lane-setup.ts runner, its tests, and lane-open-git-fixture.ts split from lane-open.test.ts to fit the wiring test under the file cap",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 65
+	}
+}
