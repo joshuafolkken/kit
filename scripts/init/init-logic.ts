@@ -118,7 +118,8 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 		dest: '.github/workflows/dependabot-auto-merge.yml',
 	},
 	// A template rather than a copy of kit's own file: kit releases from its publish.yml, so the file
-	// must not run in kit as well.
+	// must not run in kit as well. Repositories public npm carries also receive kit's publish.yml
+	// (npm-publish-files.ts), which skips its GitHub Release steps where this file exists.
 	{ src: 'templates/workflows/github-release.yml', dest: '.github/workflows/github-release.yml' },
 ]
 

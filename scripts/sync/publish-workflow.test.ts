@@ -133,7 +133,7 @@ describe('dual registry publishing', () => {
 		const commands = job.steps.map((step) => step.run ?? '').join('\n')
 
 		expect(job.permissions['packages']).toBe('write')
-		expect(commands).toContain('cd "$RUNNER_TEMP" && npm publish kit.tgz')
+		expect(commands).toContain('cd "$RUNNER_TEMP" && npm publish "$TARBALL"')
 		expect(commands).toContain('--registry https://npm.pkg.github.com')
 	})
 
@@ -142,7 +142,7 @@ describe('dual registry publishing', () => {
 		const commands = job.steps.map((step) => step.run ?? '').join('\n')
 
 		expect(job.permissions['id-token']).toBe('write')
-		expect(commands).toContain('cd "$RUNNER_TEMP" && npm publish kit.tgz --access public')
+		expect(commands).toContain('cd "$RUNNER_TEMP" && npm publish "$TARBALL" --access public')
 		expect(commands).toContain('--registry https://registry.npmjs.org')
 		expect(commands).toContain('--userconfig /dev/null')
 	})

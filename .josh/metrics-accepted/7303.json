@@ -1,0 +1,7 @@
+{
+	"reason": "npm-publish-files.ts adds the registry-decided publish.yml distribution and published_package_name replaces the private flag (#7303)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}

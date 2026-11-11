@@ -850,7 +850,7 @@ It raises the version by one minor per merge, opens and merges a `release/v<vers
 🎉 Release vX.Y.Z complete
 ```
 
-A `private: true` package skips the npm stage.
+A repository whose `@joshuafolkken/` package public npm does not carry skips the npm stage; the registry decides, not `private` in `package.json`.
 
 In a consumer repository the release runs through workflows kit syncs:
 
@@ -900,7 +900,7 @@ pnpm josh release:github   # run by CI with GH_TOKEN, RELEASE_TAG and GITHUB_REP
 
 <!-- /usage -->
 
-The notes come from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives.
+The notes come from `.github/release.yml`. Run by CI — kit's `publish.yml`, and the `github-release.yml` every consumer receives. `josh sync` also distributes kit's `publish.yml` to repositories public npm carries; there it skips the GitHub Release steps when `github-release.yml` exists.
 
 It takes no arguments: `--help` / `-h` prints the usage line and exits 0 without reading the environment; any other argument is refused with the usage line and a non-zero exit, before anything is released.
 

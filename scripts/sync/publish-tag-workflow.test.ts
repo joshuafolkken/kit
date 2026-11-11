@@ -16,7 +16,8 @@ const PUBLISH_TAG_ARGUMENT = '--tag "$PUBLISH_TAG"'
 const LATEST_LOOKUP = 'dist-tags.latest'
 const KIT_SCOPE = '@joshuafolkken'
 const GITHUB_PACKAGES_REGISTRY = 'https://npm.pkg.github.com'
-const LATEST_VIEW = `npm view ${KIT_SCOPE}/kit dist-tags.latest`
+// The package name comes from package.json through `$PACKAGE`, so any published kit reuses the workflow (#7303).
+const LATEST_VIEW = 'npm view "$PACKAGE" dist-tags.latest'
 // What `npm config get` prints for a key no config sets — an npm that failed to run prints nothing.
 const UNSET_CONFIG = 'undefined'
 const SCOPE_REGISTRY_READ = `npm config get ${KIT_SCOPE}:registry`
@@ -99,12 +100,17 @@ describe('publish queue latest check', () => {
 			entry.run?.includes(LATEST_LOOKUP),
 		)
 
-		expect(step?.env).toEqual({ VERSION: '${{ needs.pack.outputs.version }}' })
+		expect(step?.env).toEqual({
+			PACKAGE: '${{ needs.pack.outputs.package }}',
+			VERSION: '${{ needs.pack.outputs.version }}',
+		})
 		expect(step?.run).toContain('--registry https://registry.npmjs.org --userconfig /dev/null')
 		expect(step?.run).toContain(VERSION_ORDER_CHECK)
 		expect(step?.run).toContain('exit 1')
 	})
+})
 
+describe('publish queue version order', () => {
 	it.each([
 		['an older tag published in between', '1.9.0', '1.10.0', true],
 		['this run already published', '1.10.0', '1.10.0', true],

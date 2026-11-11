@@ -27,6 +27,8 @@ jobs:
     # read: both receive the same tarball in the same run, so they move in step. `pack` runs outside
     # the `package-publish` queue, so the publish jobs re-check `latest` against its choice (see there).
     outputs:
+      package: ${{ steps.package.outputs.package }}
+      tarball: ${{ steps.package.outputs.tarball }}
       tag: ${{ steps.publish-tag.outputs.tag }}
       version: ${{ steps.publish-tag.outputs.version }}
     steps:
@@ -36,13 +38,24 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      # kit and every kit that publishes to npm run this one file (`josh sync` distributes it), so the
+      # package and tarball names come from package.json rather than being written here.
+      - name: Read package name
+        id: package
+        run: |
+          package=$(node -p "require('./package.json').name")
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "tarball=${package##*/}.tgz" >> "$GITHUB_OUTPUT"
+
       # Read before setup-pnpm puts the safe-chain shims on PATH: safe-chain hides recent versions from
       # registry metadata and prints a notice to stdout, which corrupts the value (joshuafolkken/kit#3060).
       - name: Read registry latest
         id: registry-latest
         run: |
-          latest=$(cd "$(mktemp -d)" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
+          latest=$(cd "$(mktemp -d)" && npm view "$PACKAGE" dist-tags.latest --registry https://registry.npmjs.org)
           echo "latest=$latest" >> "$GITHUB_OUTPUT"
+        env:
+          PACKAGE: ${{ steps.package.outputs.package }}
 
       - uses: ./.github/actions/setup-pnpm
         with:
@@ -50,22 +63,27 @@ jobs:
 
       - name: Select publish tag
         id: publish-tag
+        # kit runs its own source; a kit that publishes runs the copy its installed kit ships.
         run: |
           version=$(node -p "require('./package.json').version")
-          tag=$(pnpm exec tsx scripts/release/publish-tag-cli.ts "$version" "$LATEST")
+          cli=scripts/release/publish-tag-cli.ts
+          [ -f "$cli" ] || cli="node_modules/@joshuafolkken/kit/$cli"
+          tag=$(pnpm exec tsx "$cli" "$version" "$LATEST")
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
         env:
           LATEST: ${{ steps.registry-latest.outputs.latest }}
 
-      - run: pnpm pack --out "$RUNNER_TEMP/kit.tgz"
+      - run: pnpm pack --out "$RUNNER_TEMP/$TARBALL"
+        env:
+          TARBALL: ${{ steps.package.outputs.tarball }}
 
       # Kept as long as GitHub lets a run be re-run, so re-running a failed publish job still finds
       # the tarball instead of forcing a full re-run that republishes an existing version.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: kit-package
-          path: ${{ runner.temp }}/kit.tgz
+          name: npm-package
+          path: ${{ runner.temp }}/${{ steps.package.outputs.tarball }}
           if-no-files-found: error
           retention-days: 30
 
@@ -92,7 +110,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: kit-package
+          name: npm-package
           path: ${{ runner.temp }}
 
       # `pack` chose `latest` outside this queue, so another tag's run may have moved npmjs' `latest`
@@ -107,22 +125,24 @@ jobs:
       - name: Confirm npm latest is not newer
         if: needs.pack.outputs.tag == 'latest'
         run: |
-          latest=$(cd "$(mktemp -d)" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org --userconfig /dev/null)
+          latest=$(cd "$(mktemp -d)" && npm view "$PACKAGE" dist-tags.latest --registry https://registry.npmjs.org --userconfig /dev/null)
           if ! printf '%s\n%s\n' "$latest" "$VERSION" | sort -V -C; then
             echo "::error::npm latest moved to $latest, above $VERSION, after pack chose the tag; re-run all jobs"
             exit 1
           fi
         env:
+          PACKAGE: ${{ needs.pack.outputs.package }}
           VERSION: ${{ needs.pack.outputs.version }}
 
       # The tag reaches the command through the environment rather than expanded into it, so a step
       # output is never parsed as shell (joshuafolkken/kit#3084). setup-node's user config carries
       # the GitHub Packages token, so it is kept here.
       - name: Publish to GitHub Packages
-        run: cd "$RUNNER_TEMP" && npm publish kit.tgz --tag "$PUBLISH_TAG" --registry https://npm.pkg.github.com
+        run: cd "$RUNNER_TEMP" && npm publish "$TARBALL" --tag "$PUBLISH_TAG" --registry https://npm.pkg.github.com
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_TAG: ${{ needs.pack.outputs.tag }}
+          TARBALL: ${{ needs.pack.outputs.tarball }}
 
   publish-npm:
     needs: pack
@@ -146,25 +166,27 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: kit-package
+          name: npm-package
           path: ${{ runner.temp }}
 
       # The same check as publish-github's, for the same reason.
       - name: Confirm npm latest is not newer
         if: needs.pack.outputs.tag == 'latest'
         run: |
-          latest=$(cd "$(mktemp -d)" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org --userconfig /dev/null)
+          latest=$(cd "$(mktemp -d)" && npm view "$PACKAGE" dist-tags.latest --registry https://registry.npmjs.org --userconfig /dev/null)
           if ! printf '%s\n%s\n' "$latest" "$VERSION" | sort -V -C; then
             echo "::error::npm latest moved to $latest, above $VERSION, after pack chose the tag; re-run all jobs"
             exit 1
           fi
         env:
+          PACKAGE: ${{ needs.pack.outputs.package }}
           VERSION: ${{ needs.pack.outputs.version }}
 
       - name: Publish to npm
-        run: cd "$RUNNER_TEMP" && npm publish kit.tgz --access public --tag "$PUBLISH_TAG" --registry https://registry.npmjs.org --userconfig /dev/null
+        run: cd "$RUNNER_TEMP" && npm publish "$TARBALL" --access public --tag "$PUBLISH_TAG" --registry https://registry.npmjs.org --userconfig /dev/null
         env:
           PUBLISH_TAG: ${{ needs.pack.outputs.tag }}
+          TARBALL: ${{ needs.pack.outputs.tarball }}
 
   update-production:
     needs: [publish-github, publish-npm]
@@ -190,14 +212,27 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-node
+      # A repository `josh sync` gave the `GitHub Release` workflow gets its release there, once this
+      # workflow has succeeded; opening it here as well would race that run. kit has none, so its
+      # release is opened here.
+      - name: Check for the GitHub Release workflow
+        id: owner
+        run: |
+          if [ ! -f .github/workflows/github-release.yml ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - uses: ./.github/actions/setup-pnpm
+      - if: steps.owner.outputs.release == 'true'
+        uses: ./.github/actions/setup-node
+
+      - if: steps.owner.outputs.release == 'true'
+        uses: ./.github/actions/setup-pnpm
         with:
           cache: 'false'
 
       # Tags through v1.887.0 predate automatic GitHub Releases and must not block the first new one.
       - name: Publish GitHub Release
+        if: steps.owner.outputs.release == 'true'
         run: pnpm josh release:github
         env:
           GH_TOKEN: ${{ github.token }}

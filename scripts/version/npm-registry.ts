@@ -1,4 +1,5 @@
 import { json_value } from '#scripts/lib/json-value'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { COMMAND_TIMEOUT_MS, FETCH_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execaSync } from 'execa'
 import semver from 'semver'
@@ -45,6 +46,8 @@ const FETCH_SCRIPT = [
 const version_schema = z.string().refine((value) => semver.valid(value) === value)
 const latest_schema = z.looseObject({ 'dist-tags': z.looseObject({ latest: version_schema }) })
 const times_schema = z.looseObject({ time: release_age.release_times_schema })
+const name_schema = z.looseObject({ name: z.string().optional() })
+const PUBLISHING_SCOPE = '@joshuafolkken/'
 
 // The packument URL for a package name; a scoped name keeps its `@` and encodes the separator, the
 // form the registry documents for scoped packages.
@@ -127,6 +130,21 @@ function has_public_version(package_name: string, version: string): boolean {
 	return parsed.success && parsed.data.time[version] !== undefined
 }
 
+// **The one answer to "does this repository publish to npm"**: its package name when public npm
+// already carries it under kit's scope, otherwise nothing. Neither GitHub visibility nor `private`
+// decides it — a forgotten `private: true` must not turn publishing on — and the scope keeps a
+// consumer whose name collides with someone else's package from reading as published. No name,
+// another scope, and a registry that cannot answer all read as "does not publish". A new kit's first
+// version is published by hand: npm trusted publishing needs the package to exist.
+function published_package_name(cwd: string): string | undefined {
+	const name = package_manifest.read_manifest_if_valid(cwd, name_schema)?.name
+	if (name?.startsWith(PUBLISHING_SCOPE) !== true) return undefined
+
+	return latest_schema.safeParse(read_packument(name, ABBREVIATED_ACCEPT)).success
+		? name
+		: undefined
+}
+
 // A `pnpm view` answer, for a question that has to see what the package manager sees: the
 // checkout's own registry routing, and safe-chain's minimum-age filter when it is shimmed on PATH.
 // `pnpm` rather than `npm`, because npm refuses to run at all inside a project whose
@@ -150,6 +168,7 @@ function valid_version(value: string): string | undefined {
 const npm_registry = {
 	has_public_version,
 	packument_url,
+	published_package_name,
 	read_latest,
 	read_release_times,
 	valid_version,

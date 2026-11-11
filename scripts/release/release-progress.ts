@@ -1,11 +1,9 @@
 import path from 'node:path'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { poll } from '#scripts/lib/poll'
 import { file_reader } from '#scripts/lib/read-file'
 import { npm_registry } from '#scripts/version/npm-registry'
-import { z } from 'zod'
 import { release_publish_run } from './release-publish-run'
 import { release_tag } from './release-tag'
 
@@ -28,26 +26,7 @@ const HTML_URL_FILTER = '.html_url'
 const PUBLISH_WORKFLOW_PATH = '.github/workflows/publish.yml'
 const RELEASE_WORKFLOW_PATH = '.github/workflows/github-release.yml'
 
-// `private: true` is the manifest's own "never published to npm" — `josh release` is distributed to
-// consumers whose packages are not on npm, so the npm stage is skipped for them rather than timed out.
-// Only the npm stage reads the name, so a private manifest needs none — the basic profile's
-// `josh init` writes `{ "private": true }` without one.
-const manifest_schema = z.looseObject({
-	name: z.string().optional(),
-	private: z.boolean().optional(),
-})
-
-type ReleaseManifest = { is_private: true } | { is_private: false; name: string }
 type NpmState = { kind: 'published' } | { kind: 'failed'; run_id: number } | { kind: 'pending' }
-
-function read_manifest(cwd: string): ReleaseManifest {
-	const manifest = package_manifest.read_manifest_if_valid(cwd, manifest_schema) ?? {}
-
-	if (manifest.private === true) return { is_private: true }
-	if (manifest.name === undefined) throw new Error(`${PACKAGE_JSON} in ${cwd} has no package name.`)
-
-	return { is_private: false, name: manifest.name }
-}
 
 function pr_opened_line(pr_url: string): string {
 	return `📝 Release PR opened: ${pr_url}`
@@ -150,18 +129,21 @@ async function npm_state(package_name: string, version: string): Promise<NpmStat
 	return run_id === undefined ? { kind: 'pending' } : { kind: 'failed', run_id }
 }
 
-async function wait_for_npm(manifest: ReleaseManifest, version: string): Promise<boolean> {
-	if (manifest.is_private) return true
+// `josh release` is distributed to consumers whose packages are not on npm, so a repository that does
+// not publish there (`npm_registry.published_package_name`, the one answer `josh sync` distributes
+// `publish.yml` on) skips the npm stage rather than timing it out.
+async function wait_for_npm(package_name: string | undefined, version: string): Promise<boolean> {
+	if (package_name === undefined) return true
 	// `poll_until` answers only whether it stopped, so the state the last read found is kept here.
 	const seen: { state: NpmState } = { state: { kind: 'pending' } }
 
 	await poll.poll_until(async () => {
-		seen.state = await npm_state(manifest.name, version)
+		seen.state = await npm_state(package_name, version)
 
 		return seen.state.kind !== 'pending'
 	}, release_tag.poll_options_for(NPM_TIMEOUT_ENV))
 
-	console.info(npm_outcome_line(manifest.name, version, seen.state))
+	console.info(npm_outcome_line(package_name, version, seen.state))
 
 	return seen.state.kind === 'published'
 }
@@ -187,9 +169,12 @@ async function wait_for_github_release(cwd: string, version: string): Promise<bo
 // `publish.yml`'s order, and a stage that is not reached ends the run: what follows it is gated on it.
 async function wait_for_distribution(version: string): Promise<number> {
 	const cwd = process.cwd()
-	const manifest = read_manifest(cwd)
+	const package_name = npm_registry.published_package_name(cwd)
 
-	if (!(await wait_for_npm(manifest, version)) || !(await wait_for_github_release(cwd, version))) {
+	if (
+		!(await wait_for_npm(package_name, version)) ||
+		!(await wait_for_github_release(cwd, version))
+	) {
 		return FAILURE_EXIT_CODE
 	}
 
@@ -202,7 +187,6 @@ const release_progress = {
 	npm_package_url,
 	pr_merged_line,
 	pr_opened_line,
-	read_manifest,
 	wait_for_distribution,
 	GITHUB_RELEASE_TIMEOUT_ENV,
 	NPM_TIMEOUT_ENV,
