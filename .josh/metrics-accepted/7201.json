@@ -1,0 +1,8 @@
+{
+	"reason": "JOSH_WIP_CAP: the cap reader, its four-case tests and the wip-cap.md / environment reference lines for the new setting (#7201)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 33,
+		"ai_cost.on_demand_bytes": 220
+	}
+}
