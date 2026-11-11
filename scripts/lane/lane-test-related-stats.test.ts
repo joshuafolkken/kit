@@ -25,6 +25,15 @@ const NARROW: TestRelatedRecord = {
 	elapsed_ms: 20_000,
 }
 
+const WIDE: TestRelatedRecord = {
+	...NARROW,
+	changed: 6,
+	synced: 60,
+	since_map: 9,
+	test_files: 50,
+	elapsed_ms: 100_000,
+}
+
 function run(record: TestRelatedRecord, at = AT): LedgerEntry {
 	return { kind: 'test-related', at, ...record }
 }
@@ -40,14 +49,14 @@ function row_of(entries: ReadonlyArray<LedgerEntry>, scope: string): Array<strin
 }
 
 describe('lane_test_related_stats.table', () => {
-	it('reduces a scope to its runs and the medians of its input, test files and seconds', () => {
+	it('reduces a scope to its runs and the medians of its input, test files, selection and seconds', () => {
 		const entries = [
-			run(NARROW),
+			run({ ...NARROW, select_elapsed_ms: 1000 }),
 			run({ ...NARROW, changed: 4, synced: 30, since_map: 8, test_files: 30, elapsed_ms: 60_000 }),
-			run({ ...NARROW, changed: 6, synced: 60, since_map: 9, test_files: 50, elapsed_ms: 100_000 }),
+			run({ ...WIDE, select_elapsed_ms: 3000 }),
 		]
 
-		expect(row_of(entries, RELATED)).toStrictEqual(['3', '4', '30', '8', '1', '30', '60.0'])
+		expect(row_of(entries, RELATED)).toStrictEqual(['3', '4', '30', '8', '1', '30', '2.0', '60.0'])
 	})
 
 	it('keeps each scope on its own row', () => {
@@ -60,6 +69,7 @@ describe('lane_test_related_stats.table', () => {
 			'0',
 			'1',
 			'1790',
+			NOT_MEASURED,
 			'20.0',
 		])
 	})
@@ -72,6 +82,19 @@ describe('lane_test_related_stats.table', () => {
 
 	it('leaves out runs outside the window', () => {
 		expect(row_of([run(NARROW, OUTSIDE)], RELATED)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#7248: the test selection's median, apart from vitest's.
+describe('lane_test_related_stats.table — the test selection', () => {
+	it('heads the selection column between the test files and the duration', () => {
+		const [header] = lane_test_related_stats.table([], WINDOW).split('\n', 1)
+
+		expect(header).toContain('| test files | select (s) | median (s) |')
+	})
+
+	it('prints the selection as not measured where no run recorded it', () => {
+		expect(row_of([run(NARROW)], RELATED)?.[6]).toBe(NOT_MEASURED)
 	})
 })
 
