@@ -5,8 +5,8 @@ Every filing asks whether the work already exists and which epic owns it; the co
 `issue:scout` scan first and prints what holds the filing:
 
 ```bash
-pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md [--route <route>]
-pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md --distinct 2801,2795
+pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md [--route <route>] [--over-cap]
+pnpm josh issue:file "<title>" --body-file .josh/tmp/body.md [--route <route>] [--over-cap] --distinct 2801,2795
 ```
 
 - **`Duplicates:` is read, not skimmed.** Open each candidate and apply `issue-fold-existing.md`

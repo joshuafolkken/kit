@@ -43,7 +43,8 @@ interface FileArguments {
 	// long lane the parent investigated, the Issue a prerequisite or an observation came out of. The
 	// filing cap counts per origin (`issue-file-cap.ts`); absent, the finder is read (`issue-file-fold.ts`).
 	found_during: string | undefined
-	// `--over-cap`: the run is blocked by this filing, so the WIP cap does not hold it (`issue-wip.ts`).
+	// `--over-cap`: the run is blocked by this filing, or a user typed `new`, so the WIP cap does not
+	// hold it (`issue-wip.ts`, `wip-cap.md`).
 	is_over_cap: boolean
 	// `--no-auto-ok`: the Issue needs a person's judgement, so `auto-ok` is not applied (`issue-auto-ok.ts`).
 	is_auto_ok_opted_out: boolean
