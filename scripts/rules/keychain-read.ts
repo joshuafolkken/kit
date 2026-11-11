@@ -23,7 +23,7 @@ const SECRET_SUBCOMMANDS: ReadonlySet<string> = new Set([
 ])
 
 interface GlobalOptions {
-	interactive: boolean
+	is_interactive: boolean
 	// The index of the subcommand: the first word past the options and the prompt they name.
 	subcommand: number
 }
@@ -49,13 +49,13 @@ function cluster_of(word: string): Cluster {
 function global_options(args: ReadonlyArray<string>): GlobalOptions {
 	const [word = ''] = args
 
-	if (!word.startsWith(FLAG_PREFIX)) return { interactive: false, subcommand: 0 }
+	if (!word.startsWith(FLAG_PREFIX)) return { is_interactive: false, subcommand: 0 }
 
 	const { flags, step } = cluster_of(word)
 	const rest = global_options(args.slice(step))
 
 	return {
-		interactive: flags.includes(INTERACTIVE_FLAG) || rest.interactive,
+		is_interactive: flags.includes(INTERACTIVE_FLAG) || rest.is_interactive,
 		subcommand: step + rest.subcommand,
 	}
 }
@@ -63,9 +63,9 @@ function global_options(args: ReadonlyArray<string>): GlobalOptions {
 function is_keychain_read(_segment: string, call: ProgramCall): boolean {
 	if (call.name !== SECURITY_COMMAND) return false
 
-	const { interactive, subcommand } = global_options(call.args)
+	const { is_interactive, subcommand } = global_options(call.args)
 
-	return interactive || SECRET_SUBCOMMANDS.has(call.args[subcommand] ?? '')
+	return is_interactive || SECRET_SUBCOMMANDS.has(call.args[subcommand] ?? '')
 }
 
 const keychain_read = { is_keychain_read }
