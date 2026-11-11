@@ -69,14 +69,18 @@ interface IssueListRequest {
 	sort?: ListingSort
 }
 
-function listing_query(request: IssueListRequest): string {
+// What a listing's path is built from: a caller reading a page on its own — the `auto-ok` probe,
+// joshuafolkken/kit#7226 — builds the same path the listing reads without a whole request.
+type ListingFilter = Pick<IssueListRequest, 'label' | 'repo' | 'sort' | 'state'>
+
+function listing_query(request: ListingFilter): string {
 	const state = request.state ?? DEFAULT_STATE
 	const sort = request.sort ?? DEFAULT_SORT
 
 	return `state=${state}&sort=${sort}&${LISTING_DIRECTION}`
 }
 
-function listing_path(request: IssueListRequest, page: number): string {
+function listing_path(request: ListingFilter, page: number): string {
 	const label = request.label === undefined ? '' : `&labels=${encodeURIComponent(request.label)}`
 	const paging = `&per_page=${String(PER_PAGE)}&page=${String(page)}`
 
@@ -325,7 +329,8 @@ async function issue_list(request: IssueListRequest): Promise<IssueListOutcome> 
 // it — `git-gh-issue.ts` records that decision, caller by caller.
 const git_gh_issue_list = {
 	issue_list,
+	listing_path,
 }
 
 export type { IssueListOutcome, IssueListRequest }
-export { git_gh_issue_list, MAX_PAGES, MAX_SCANNED, PER_PAGE }
+export { FIRST_PAGE, git_gh_issue_list, MAX_PAGES, MAX_SCANNED, PER_PAGE }
