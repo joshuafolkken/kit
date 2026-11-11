@@ -98,8 +98,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
 	// (joshuafolkken/kit#5664) crossed the 61440 block; `test:related`'s own-change hub
-	// (joshuafolkken/kit#6193) crossed the 65536 block.
-	{ path: 'docs/josh-commands.md', bytes: 69_632 },
+	// (joshuafolkken/kit#6193) crossed the 65536 block; project gate steps narrowed by `paths`
+	// (joshuafolkken/kit#7205) crossed the 69632 block.
+	{ path: 'docs/josh-commands.md', bytes: 73_728 },
 	// The auto-retry of every `run:stalled` cause (joshuafolkken/kit#7076) crossed the 8192 block.
 	{ path: 'docs/labels-and-run-states.md', bytes: 12_288 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },
