@@ -60,6 +60,7 @@ describe('test_related_touched.touched_tests', () => {
 		expect(test_related_touched.touched_tests(ROOT, [command_table], LIST)).toEqual([
 			'scripts/josh/josh-logic.test.ts',
 			'scripts/josh/josh-command-map.test.ts',
+			'scripts/josh/josh-in-process.test.ts',
 		])
 	})
 
