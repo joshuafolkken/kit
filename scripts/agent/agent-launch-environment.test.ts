@@ -1,123 +1,66 @@
-import { existsSync, mkdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { agent_headless } from './agent-headless'
 import { agent_launch_environment } from './agent-launch-environment'
 import { agent_role_profile } from './agent-role-profile'
 import { agent_session_role } from './agent-session-role'
 
-const CWD = path.join(process.cwd(), 'node_modules', '.cache', 'agent-launch-environment-test')
-const SOURCE = path.join(process.cwd(), 'node_modules', '.cache', 'agent-launch-source-test')
-const NEXT_SOURCE = `${SOURCE}-next`
-const TOKEN = 'secret-token-for-test'
 const MARKER = '2080'
-const EXPLICIT_TOKEN = 'caller-token-for-test'
 const EXPLICIT_TMPDIR = '/caller/tmp'
-const AUTH_FILE = 'auth.json'
-const CONFIG_FILE = 'config.toml'
-const REVIEWER_HOME = ['node_modules', '.cache', 'josh', 'openai', 'reviewer-home']
-
-const get = vi.spyOn(gh_cli_token, 'get')
-
-afterEach(() => {
-	rmSync(CWD, { force: true, recursive: true })
-	rmSync(SOURCE, { force: true, recursive: true })
-	rmSync(NEXT_SOURCE, { force: true, recursive: true })
-})
+const CALLER_HOME = '/caller/codex-home'
 
 describe('OpenAI detached launch environment', () => {
-	it('passes the parent gh token only through the child environment', () => {
-		get.mockReturnValue(TOKEN)
-
-		const environment = agent_launch_environment.build(
-			CWD,
-			agent_role_profile.OPENAI_PROFILES.worker,
-			{ JOSH_LANE_CHILD_ISSUE: MARKER },
-		)
-
-		expect(environment['GH_TOKEN']).toBe(TOKEN)
-		expect(environment['JOSH_LANE_CHILD_ISSUE']).toBe(MARKER)
-	})
-
-	it('creates TMPDIR under the platform temporary root and outside the child work tree', () => {
-		get.mockReturnValue(undefined)
-
-		const environment = agent_launch_environment.build(
-			CWD,
-			agent_role_profile.OPENAI_PROFILES.scheduler,
-		)
+	it('creates TMPDIR under the platform temporary root and outside the work tree', () => {
+		const environment = agent_launch_environment.build(agent_role_profile.OPENAI_PROFILES.scheduler)
 
 		expect(environment['TMPDIR']).toBe(PLATFORM_TEMP_ROOT)
-		expect(path.relative(CWD, environment['TMPDIR'] ?? '')).toMatch(/^\.\./u)
+		expect(path.relative(process.cwd(), environment['TMPDIR'] ?? '')).toMatch(/^\.\./u)
 		expect(existsSync(environment['TMPDIR'] ?? '')).toBe(true)
 		expect(platform_temporary.is_writable_directory(environment['TMPDIR'] ?? '')).toBe(true)
-		expect(environment).not.toHaveProperty('GH_TOKEN')
 	})
 
-	it('keeps explicit caller auth and TMPDIR values', () => {
-		get.mockReturnValue(TOKEN)
+	it('keeps an explicit caller TMPDIR', () => {
+		const environment = agent_launch_environment.build(agent_role_profile.OPENAI_PROFILES.worker, {
+			TMPDIR: EXPLICIT_TMPDIR,
+		})
 
-		const environment = agent_launch_environment.build(
-			CWD,
-			agent_role_profile.OPENAI_PROFILES.worker,
-			{ GH_TOKEN: EXPLICIT_TOKEN, TMPDIR: EXPLICIT_TMPDIR },
-		)
-
-		expect(environment['GH_TOKEN']).toBe(EXPLICIT_TOKEN)
 		expect(environment['TMPDIR']).toBe(EXPLICIT_TMPDIR)
 	})
 })
 
-describe('OpenAI reviewer state', () => {
-	it('keeps mutable state in the lane and links the existing auth and config', () => {
-		mkdirSync(SOURCE, { recursive: true })
-		writeFileSync(path.join(SOURCE, AUTH_FILE), 'test-auth')
-		writeFileSync(path.join(SOURCE, CONFIG_FILE), 'test-config')
+// joshuafolkken/kit#7196: an OpenAI child reads gh's keyring and the real Codex home as a Claude
+// child does, so no launch injects a GH_TOKEN or points CODEX_HOME into the work tree.
+describe('OpenAI child credentials', () => {
+	it.each(Object.values(agent_role_profile.OPENAI_PROFILES))(
+		'passes neither GH_TOKEN nor CODEX_HOME to the $role launch',
+		(profile) => {
+			const environment = agent_launch_environment.build(profile, {
+				JOSH_LANE_CHILD_ISSUE: MARKER,
+			})
+
+			expect(environment).not.toHaveProperty('GH_TOKEN')
+			expect(environment).not.toHaveProperty('CODEX_HOME')
+			expect(environment['JOSH_LANE_CHILD_ISSUE']).toBe(MARKER)
+		},
+	)
+
+	it('keeps the caller CODEX_HOME for the reviewer launch', () => {
 		const environment = agent_launch_environment.build(
-			CWD,
 			agent_role_profile.OPENAI_PROFILES.reviewer,
-			{ CODEX_HOME: SOURCE },
+			{ CODEX_HOME: CALLER_HOME },
 		)
-		const home = environment['CODEX_HOME'] ?? ''
 
-		expect(home).toBe(path.join(CWD, ...REVIEWER_HOME))
-		expect(readlinkSync(path.join(home, AUTH_FILE))).toBe(path.join(SOURCE, AUTH_FILE))
-		expect(readlinkSync(path.join(home, CONFIG_FILE))).toBe(path.join(SOURCE, CONFIG_FILE))
-		expect(existsSync(path.join(home, 'installation_id'))).toBe(false)
-	})
-})
-
-describe('OpenAI reviewer home switch', () => {
-	it('updates auth and config links when the source home changes', () => {
-		mkdirSync(SOURCE, { recursive: true })
-		mkdirSync(NEXT_SOURCE, { recursive: true })
-
-		for (const name of [AUTH_FILE, CONFIG_FILE]) {
-			writeFileSync(path.join(SOURCE, name), 'first')
-			writeFileSync(path.join(NEXT_SOURCE, name), 'second')
-		}
-
-		agent_launch_environment.build(CWD, agent_role_profile.OPENAI_PROFILES.reviewer, {
-			CODEX_HOME: SOURCE,
-		})
-		const next = agent_launch_environment.build(CWD, agent_role_profile.OPENAI_PROFILES.reviewer, {
-			CODEX_HOME: NEXT_SOURCE,
-		})
-		const home = next['CODEX_HOME'] ?? ''
-
-		expect(readlinkSync(path.join(home, AUTH_FILE))).toBe(path.join(NEXT_SOURCE, AUTH_FILE))
-		expect(readlinkSync(path.join(home, CONFIG_FILE))).toBe(path.join(NEXT_SOURCE, CONFIG_FILE))
+		expect(environment['CODEX_HOME']).toBe(CALLER_HOME)
 	})
 })
 
 describe('Anthropic detached launch environment', () => {
-	it('keeps explicit child environment and does not read gh auth', () => {
+	it('keeps explicit child environment and adds no OpenAI variables', () => {
 		const input = { JOSH_LANE_CHILD_ISSUE: MARKER }
 
 		const environment = agent_launch_environment.build(
-			CWD,
 			agent_role_profile.DEFAULT_PROFILES.worker,
 			input,
 		)
@@ -127,8 +70,6 @@ describe('Anthropic detached launch environment', () => {
 			...agent_session_role.env_for(agent_role_profile.WORKER),
 			...input,
 		})
-		expect(get).not.toHaveBeenCalled()
-		expect(existsSync(CWD)).toBe(false)
 	})
 })
 
@@ -138,15 +79,13 @@ describe('headless agent mark', () => {
 		['Anthropic', agent_role_profile.DEFAULT_PROFILES.reviewer],
 		['OpenAI', agent_role_profile.OPENAI_PROFILES.worker],
 	])('marks every %s agent launch as headless', (_provider, profile) => {
-		get.mockReturnValue(undefined)
-
-		expect(agent_headless.is_headless(agent_launch_environment.build(CWD, profile))).toBe(true)
+		expect(agent_headless.is_headless(agent_launch_environment.build(profile))).toBe(true)
 	})
 
 	it('leaves a launch with no agent profile unmarked', () => {
 		const input = { JOSH_LANE_CHILD_ISSUE: MARKER }
 
-		expect(agent_launch_environment.build(CWD, undefined, input)).toEqual({
+		expect(agent_launch_environment.build(undefined, input)).toEqual({
 			...input,
 			[agent_session_role.KEY]: undefined,
 		})
@@ -159,7 +98,7 @@ describe('agent session role mark', () => {
 	it.each(Object.values(agent_role_profile.DEFAULT_PROFILES))(
 		'overwrites an inherited worker role with the launcher role $role',
 		(profile) => {
-			const environment = agent_launch_environment.build(CWD, profile, {
+			const environment = agent_launch_environment.build(profile, {
 				...agent_session_role.env_for(agent_role_profile.WORKER),
 			})
 
@@ -168,7 +107,7 @@ describe('agent session role mark', () => {
 	)
 
 	it('clears inherited authority without a profile', () => {
-		const environment = agent_launch_environment.build(CWD, undefined, {
+		const environment = agent_launch_environment.build(undefined, {
 			...agent_session_role.env_for(agent_role_profile.WORKER),
 		})
 
@@ -180,18 +119,14 @@ describe('agent session role mark', () => {
 		['Anthropic', agent_role_profile.DEFAULT_PROFILES.reviewer],
 		['OpenAI', agent_role_profile.OPENAI_PROFILES.reviewer],
 	])('marks an %s reviewer launch as a reviewer session', (_provider, profile) => {
-		get.mockReturnValue(undefined)
-
-		expect(agent_session_role.is_reviewer(agent_launch_environment.build(CWD, profile))).toBe(true)
+		expect(agent_session_role.is_reviewer(agent_launch_environment.build(profile))).toBe(true)
 	})
 
 	it.each([
 		['worker', agent_role_profile.DEFAULT_PROFILES.worker],
 		['scheduler', agent_role_profile.OPENAI_PROFILES.scheduler],
 	])('marks a %s launch with its own role, not the reviewer one', (role, profile) => {
-		get.mockReturnValue(undefined)
-
-		const environment = agent_launch_environment.build(CWD, profile)
+		const environment = agent_launch_environment.build(profile)
 
 		expect(environment[agent_session_role.KEY]).toBe(role)
 		expect(agent_session_role.is_reviewer(environment)).toBe(false)
