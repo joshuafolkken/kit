@@ -219,8 +219,6 @@ describe('main — followup opens on its governing section', () => {
 	})
 })
 
-// joshuafolkken/kit#3023. A pull request a person merged by hand is finished by re-running `followup`;
-// the gates guard a merge this run no longer makes, and a ledger commit would land on a merged branch.
 // joshuafolkken/kit#7312. The human-merge stop waits for green CI in `before_merge`, so a red PR fails as red.
 it('leaves the human-merge stop to the post-CI guard', async () => {
 	vi.mocked(followup_human_merge.assert_allowed).mockClear()
@@ -235,6 +233,8 @@ it('leaves the human-merge stop to the post-CI guard', async () => {
 	expect(git_followup_flush.commit_ledger_step).toHaveBeenCalledOnce()
 })
 
+// joshuafolkken/kit#3023. A pull request a person merged by hand is finished by re-running `followup`;
+// the gates guard a merge this run no longer makes, and a ledger commit would land on a merged branch.
 describe('prepare_merge — a pull request that has already merged', () => {
 	const ISSUE = '3023'
 	const BRANCH = 'merged-branch'
