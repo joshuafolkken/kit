@@ -64,3 +64,43 @@ describe('run_board_keys.read_keys', () => {
 		expect(keys.calls).toStrictEqual(['raw true', 'interrupt', 'raw false', 'close'])
 	})
 })
+
+// joshuafolkken/kit#7213: the folds are kept across launches through the keyboard's store.
+describe('run_board_keys.read_keys store', () => {
+	it('starts from the stored folds and saves each fold that changes them', () => {
+		const keys = fake_keys()
+		const saved: Array<Array<string>> = []
+		const reading = read_keys({
+			...keys.input,
+			store: {
+				load: () => new Set(['usage']),
+				save: (folded) => {
+					saved.push([...folded])
+				},
+			},
+		})
+
+		expect([...(reading.folded?.() ?? [])]).toStrictEqual(['usage'])
+		keys.type('q')
+		keys.type('x')
+		keys.type('u')
+		expect(saved).toStrictEqual([['usage', 'queued'], ['queued']])
+	})
+
+	it('neither loads nor saves where stdin is not a terminal', () => {
+		const calls: Array<string> = []
+		const store = {
+			load: (): ReadonlySet<never> => {
+				calls.push('load')
+
+				return new Set()
+			},
+			save: () => {
+				calls.push('save')
+			},
+		}
+
+		read_keys({ ...fake_keys(false).input, store })
+		expect(calls).toStrictEqual([])
+	})
+})
