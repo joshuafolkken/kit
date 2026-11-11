@@ -221,6 +221,7 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'tools/exports/unused-members.test.ts',
 	'scripts/gate/cspell-config.test.ts',
 	'scripts/gate/eval-removed-from-gate.test.ts',
+	'scripts/gate/gate-checks.test.ts',
 	'scripts/gate/gate-plan.test.ts',
 	'scripts/gate/gate-report.test.ts',
 	'scripts/gh/fix-gh-packages-logic.test.ts',
