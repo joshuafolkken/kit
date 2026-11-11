@@ -161,4 +161,19 @@ describe('lane_ledger_schema.entry_schema — the ci-wait critical path', () => 
 
 		expect(entry_schema.safeParse(row).data).toStrictEqual(row)
 	})
+
+	// joshuafolkken/kit#7202: a wait with a rerun is marked so lane:stats can leave it out.
+	it('keeps the rerun mark on a stage row', () => {
+		const row = {
+			kind: KIND.STAGE,
+			at: AT,
+			stage: 'ci-wait',
+			elapsed_ms: 9,
+			last_check: 'test',
+			check_ms: { test: 8 },
+			has_rerun: true,
+		}
+
+		expect(entry_schema.safeParse(row).data).toStrictEqual(row)
+	})
 })

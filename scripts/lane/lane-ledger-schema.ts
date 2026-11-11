@@ -90,6 +90,7 @@ const dispatch_schema = z.object({
 // CI wait where the run did not know its issue. On that `ci-wait` row,
 // `check_ms` is each check seen pending and then settled, by the time it settled into the wait, and
 // `last_check` the one that settled last — the wait's critical path (joshuafolkken/kit#5295).
+// `has_rerun` marks a wait where a settled check was seen pending again (joshuafolkken/kit#7202).
 const stage_schema = z.object({
 	kind: z.literal(KIND.STAGE),
 	at: z.string(),
@@ -98,6 +99,7 @@ const stage_schema = z.object({
 	issue: z.number().optional(),
 	last_check: z.string().optional(),
 	check_ms: z.record(z.string(), z.number()).optional(),
+	has_rerun: z.literal(true).optional(),
 })
 // A `josh ship` on `issue` whose actual change overlapped the open pull requests of `lanes` on `paths`
 // before its sync: it waited `waited_ms` for their ships to end, and `is_cleared` is false where the

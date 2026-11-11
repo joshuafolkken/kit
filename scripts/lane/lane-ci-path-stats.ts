@@ -6,7 +6,8 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // The followup's critical path (joshuafolkken/kit#5295): over the period's `ci-wait` rows, which check
 // settled last — how often, and the median and maximum of when it settled into the wait — printed by
 // `josh lane:stats`. A row from before the field, or a wait no check was seen to settle in, names none
-// and is left out.
+// and is left out. So is a row marked `has_rerun` (joshuafolkken/kit#7202): its time spans a failed
+// attempt and the rerun's queue, not a check's own run.
 
 const COLUMNS = ['followup critical path', 'runs', 'median (s)', 'max (s)'] as const
 
@@ -46,6 +47,7 @@ function name_row(name: string, lasts: ReadonlyArray<LastCheck>): string {
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
 	const lasts = lane_stats
 		.in_window(entries, window)
+		.filter((entry) => entry.kind !== lane_ledger.KIND.STAGE || entry.has_rerun !== true)
 		.map((entry) => last_check_of(entry))
 		.filter((last) => last !== undefined)
 	const names = [...new Set(lasts.map((last) => last.name))]
