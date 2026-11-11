@@ -1,7 +1,9 @@
+import path from 'node:path'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { poll } from '#scripts/lib/poll'
+import { file_reader } from '#scripts/lib/read-file'
 import { npm_registry } from '#scripts/version/npm-registry'
 import { z } from 'zod'
 import { release_publish_run } from './release-publish-run'
@@ -14,7 +16,8 @@ import { release_tag } from './release-tag'
 // publishing jobs pass. Stopping at the tag would call the release published ahead of both, so the
 // command waits for each, prints one line per stage reached, and prints the completion line only
 // when every stage has — a stage that times out, or whose Publish run fails first, is named with ❌
-// and the run exits non-zero.
+// and the run exits non-zero. In a consumer, which has no `publish.yml`, the distributed `GitHub
+// Release` workflow opens the release instead.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -22,6 +25,8 @@ const NPM_TIMEOUT_ENV = 'JOSH_RELEASE_NPM_TIMEOUT_SECONDS'
 const GITHUB_RELEASE_TIMEOUT_ENV = 'JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS'
 const NPM_PACKAGE_PAGE = 'https://www.npmjs.com/package'
 const HTML_URL_FILTER = '.html_url'
+const PUBLISH_WORKFLOW_PATH = '.github/workflows/publish.yml'
+const RELEASE_WORKFLOW_PATH = '.github/workflows/github-release.yml'
 
 // `private: true` is the manifest's own "never published to npm" — `josh release` is distributed to
 // consumers whose packages are not on npm, so the npm stage is skipped for them rather than timed out.
@@ -89,11 +94,28 @@ function failed_publish_line(version: string, run_id: number): string {
 	].join('\n')
 }
 
-function missed_release_line(version: string): string {
-	return [
-		`❌ No GitHub Release: ${release_tag.tag_name(version)} never got one.`,
-		`  Check the Publish run for ${release_tag.tag_name(version)}: its create-release job did not finish.`,
-	].join('\n')
+function has_workflow(cwd: string, workflow_path: string): boolean {
+	return file_reader.read_if_readable(path.join(cwd, workflow_path)) !== undefined
+}
+
+// kit opens its GitHub Release from `publish.yml`; a consumer has none, and its release comes from the
+// `GitHub Release` workflow `josh sync` distributes — so the hint names the run that repository has.
+function missed_release_hint(cwd: string, tag: string): string {
+	if (has_workflow(cwd, PUBLISH_WORKFLOW_PATH)) {
+		return `  Check the Publish run for ${tag}: its create-release job did not finish.`
+	}
+
+	if (has_workflow(cwd, RELEASE_WORKFLOW_PATH)) {
+		return `  Check the GitHub Release ${tag} run: it did not create the release.`
+	}
+
+	return `  ${RELEASE_WORKFLOW_PATH} is missing: run pnpm josh sync to install the GitHub Release workflow.`
+}
+
+function missed_release_line(cwd: string, version: string): string {
+	const tag = release_tag.tag_name(version)
+
+	return [`❌ No GitHub Release: ${tag} never got one.`, missed_release_hint(cwd, tag)].join('\n')
 }
 
 // REST answers 404 until the release exists, which `exec_gh_api` throws on — so a failure here is
@@ -143,7 +165,7 @@ async function wait_for_npm(manifest: ReleaseManifest, version: string): Promise
 	return seen.state.kind === 'published'
 }
 
-async function wait_for_github_release(version: string): Promise<boolean> {
+async function wait_for_github_release(cwd: string, version: string): Promise<boolean> {
 	// `poll_until` answers only whether it succeeded, so the URL the last read found is kept here.
 	const found: { url: string | undefined } = { url: undefined }
 
@@ -154,7 +176,7 @@ async function wait_for_github_release(version: string): Promise<boolean> {
 	}, release_tag.poll_options_for(GITHUB_RELEASE_TIMEOUT_ENV))
 
 	console.info(
-		found.url === undefined ? missed_release_line(version) : github_release_line(found.url),
+		found.url === undefined ? missed_release_line(cwd, version) : github_release_line(found.url),
 	)
 
 	return found.url !== undefined
@@ -163,9 +185,10 @@ async function wait_for_github_release(version: string): Promise<boolean> {
 // Runs in the release work tree, whose manifest names the package being released. The stages run in
 // `publish.yml`'s order, and a stage that is not reached ends the run: what follows it is gated on it.
 async function wait_for_distribution(version: string): Promise<number> {
-	const manifest = read_manifest(process.cwd())
+	const cwd = process.cwd()
+	const manifest = read_manifest(cwd)
 
-	if (!(await wait_for_npm(manifest, version)) || !(await wait_for_github_release(version))) {
+	if (!(await wait_for_npm(manifest, version)) || !(await wait_for_github_release(cwd, version))) {
 		return FAILURE_EXIT_CODE
 	}
 
