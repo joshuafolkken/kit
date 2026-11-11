@@ -5,7 +5,7 @@ import { find_package_directory } from '#scripts/josh/package-directory'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
 // ESLint takes its heap from here in `josh lint`, `josh format` and the refactor scan: the cold
-// `pnpm exec eslint`, direct launches and the eslint_d forwarder, whose launcher hands its
+// eslint (`run_cold`), direct launches and the eslint_d forwarder, whose launcher hands its
 // environment on to the daemon. CI sets nothing of its own; its `josh gate` / `josh lint` arrive
 // here too. The size is the core budget's (`core-weights.ts`), which reserves it for each lint.
 const { ESLINT_HEAP_MIB } = core_weights

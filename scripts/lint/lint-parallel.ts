@@ -101,7 +101,7 @@ interface LintPair {
 	eslint: EslintResult
 }
 
-// The warm daemon when asked for and reachable, else the cold `pnpm exec eslint` it falls back to.
+// The warm daemon when asked for and reachable, else the cold eslint it falls back to.
 async function run_eslint_process(eslint: EslintRun): Promise<EslintResult> {
 	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args, eslint.call)
 

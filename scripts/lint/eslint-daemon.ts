@@ -347,7 +347,7 @@ async function run(
 }
 
 // The warm run from the current directory, read as a buffered child's result, or the cold
-// `pnpm exec eslint` when the daemon cannot answer — the one fallback `josh lint:related` and the
+// eslint (`eslint_heap.run_cold`) when the daemon cannot answer — the one fallback `josh lint:related` and the
 // pre-commit hook both take.
 async function run_or_cold(
 	pnpm_arguments: ReadonlyArray<string>,

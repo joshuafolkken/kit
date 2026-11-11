@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { direct_launch, resolve_package_bin } from './local-bin-mock'
+import { direct_launch, DIRECT_LAUNCH_FILE, resolve_package_bin } from './local-bin-mock'
 
 const PNPM_EXEC = ['exec', 'eslint', '--quiet', 'src/a.ts']
 
 describe('local-bin-mock', () => {
-	it('holds direct_launch at the pnpm fallback with the list unchanged', () => {
-		expect(direct_launch('/repo', PNPM_EXEC)).toEqual({ file: 'pnpm', args: PNPM_EXEC })
+	it('keeps the list unchanged under a file other than pnpm', () => {
+		expect(direct_launch('/repo', PNPM_EXEC)).toEqual({ file: DIRECT_LAUNCH_FILE, args: PNPM_EXEC })
+		expect(DIRECT_LAUNCH_FILE).not.toBe('pnpm')
 	})
 
 	it('leaves resolve_package_bin unanswered until a test answers it', () => {
