@@ -35,7 +35,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Order the whole opted-in backlog: auto-ok issues and the descendants of auto-ok epics, transitively through nested epics',
 		category: 'AI tools',
-		reference: ['[--exclude <n>[,<n>...]] [--repo <owner/repo>]', 'automation', ['network']],
+		reference: ['[--exclude <n>[,<n>...]]', 'automation', ['network']],
 		usage: {
 			examples: [{ arguments: '' }, { arguments: EXCLUDE_1630, note: JUST_MERGED }],
 			flags: [
