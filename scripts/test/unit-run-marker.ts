@@ -1,14 +1,9 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
-import { git_directory } from '#scripts/discovery/git-directory'
-import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { durable_state_root } from '#scripts/josh/durable-state-root'
-import { PLATFORM_TEMP_ROOT, platform_temporary } from '#scripts/josh/platform-temporary'
+import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { lane_paths, type LaneEnvironment } from '#scripts/lane/lane-paths'
-import { lane_state_record } from '#scripts/lane/lane-state-record'
 import { json_value } from '#scripts/lib/json-value'
 
 // The run markers that count the unit runs in flight, and the division of the machine by that count —
@@ -16,7 +11,8 @@ import { json_value } from '#scripts/lib/json-value'
 //
 // **Kept apart from `unit-worker-share.ts` because the config imports it** (joshuafolkken/kit#4572).
 // Every module the vitest config imports is a whole-suite file (`whole-suite-files.ts`), and the
-// capacity and claim bounds of the share change often; held here, only this stable part is one.
+// capacity and claim bounds of the share change often; held here, only this stable part is one. The
+// lane count is apart for the same reason (`unit-lane-count.ts`, joshuafolkken/kit#7254).
 
 // A record that means something only while it exists, in the shape `stamp-file.ts` already keeps for
 // the in-flight gate marker. Keyed by pid rather than by checkout: `josh gate`'s unit step and a
@@ -139,50 +135,6 @@ function resolve_unit_workers(available_cores: number, runs: number): number | u
 	return Math.max(MIN_WORKERS, Math.floor(available_cores / runs))
 }
 
-// A lane whose lane-state record says it opens no suite — paused, human-review or ended — read from the
-// common git directory its `.git` file names, without asking git (joshuafolkken/kit#6916). A directory
-// with no work tree or no readable record is not idle, so it keeps the place the directory gave it —
-// as does a common directory spelled otherwise than `git rev-parse` spells it (a symlinked path), whose
-// record key then names no file.
-function is_idle_lane(lanes_root: string, issue: string, environment: LaneEnvironment): boolean {
-	const common = git_directory.resolve_git_directory(path.join(lanes_root, issue))
-
-	if (common === undefined) return false
-
-	const override = environment[platform_temporary.TEMP_ROOT_KEY]
-	const state_root = durable_state_root.state_root(override, () => common)
-
-	return lane_state_record.is_idle(state_root, common, issue)
-}
-
-// The lane `checkout` sits in, if any: it is about to open a suite, whatever its record says.
-function own_lane(checkout: string, environment: LaneEnvironment): string | undefined {
-	return lane_paths.lane_issue_of(lane_paths.checkout_of(path.resolve(checkout)), environment)
-}
-
-// The lanes open on this machine: the issue-number directories under the lanes root `checkout`
-// belongs to (joshuafolkken/kit#6682), less those whose lane-state record says they are idle — never
-// the asking lane itself, which a person may gate while its record still says `human-review`. A stray
-// directory or one with no record is still counted, an upper bound. **Unreadable counts none**, which
-// leaves the division to the run count as it was — a lanes root that does not exist, as on CI, among them.
-function live_lane_count(
-	checkout: string = process.cwd(),
-	environment: LaneEnvironment = process.env,
-): number {
-	try {
-		const lanes_root = lane_paths.lanes_root_of(checkout, environment)
-		const own = own_lane(checkout, environment)
-		const issues = readdirSync(lanes_root).filter((name) =>
-			issue_number_shape.ISSUE_NUMBER_PATTERN.test(name),
-		)
-
-		return issues.filter((issue) => issue === own || !is_idle_lane(lanes_root, issue, environment))
-			.length
-	} catch {
-		return 0
-	}
-}
-
 // **Each live lane is held a share before its suite starts** (joshuafolkken/kit#6682). The run count
 // sees a lane only once its suite is in flight, so the first of several lanes took the whole machine
 // and the next ones divided what it left; dividing by the lanes as well keeps every lane's workers —
@@ -209,7 +161,6 @@ const unit_run_marker = {
 	RUN_PREFIX,
 	SOLO_RUNS,
 	is_nested_run,
-	live_lane_count,
 	live_run_count,
 	mark_run_started,
 	marker_path,

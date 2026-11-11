@@ -14,6 +14,14 @@ const WORKER_SETUP: ReadonlyArray<string> = [
 	...unit_setup_files.WORKER_GUARDS,
 	...unit_setup_files.READ_RECORDER,
 ]
+const LANE_COUNT_FILES: ReadonlyArray<string> = [
+	'scripts/test/unit-lane-count.ts',
+	'scripts/discovery/git-directory.ts',
+	'scripts/issue/issue-number-shape.ts',
+	'scripts/josh/durable-state-root.ts',
+	'scripts/lane/lane-paths.ts',
+	'scripts/lane/lane-state-record.ts',
+]
 
 async function import_graph(entries: ReadonlyArray<string>): Promise<Array<string>> {
 	const result = await build({
@@ -59,6 +67,18 @@ describe('whole_suite_files — every file vitest widens the whole suite on', ()
 
 		expect(graph).not.toContain(path.normalize('scripts/test/unit-worker-share.ts'))
 	})
+
+	// joshuafolkken/kit#7254: the config counts the lanes in a child process, so the lane reading and
+	// what it imports stay out of every test's dependencies — and a change to one narrows to its tests.
+	it.each(LANE_COUNT_FILES)(
+		'keeps %s out of the config imports and the whole suite',
+		async (file) => {
+			const graph = await import_graph([MAIN_CONFIG])
+
+			expect(graph).not.toContain(path.normalize(file))
+			expect(whole_suite_files.WHOLE_SUITE_FILES.has(path.normalize(file))).toBe(false)
+		},
+	)
 
 	it('names the network guard itself', () => {
 		expect(whole_suite_files.WHOLE_SUITE_FILES).toContain(
