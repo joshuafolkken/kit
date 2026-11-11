@@ -1,3 +1,4 @@
+import type { RusageReading } from '#scripts/run/board/run-board-usage-rusage'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_process_load } from './lane-process-load'
 
@@ -9,16 +10,35 @@ const execa = vi.hoisted(() => vi.fn(async (): Promise<{ stdout: string }> => ({
 vi.mock('execa', () => ({ execa }))
 
 const KB_PER_MB = 1024
+const BYTES_PER_MB = KB_PER_MB * KB_PER_MB
+const VITEST_PID = 101
+const WORKER_PID = 102
+const ESLINT_PID = 103
 const LISTING = [
-	`${String(512 * KB_PER_MB)} 150.0 node /repo/node_modules/.pnpm/vitest/vitest.mjs run`,
-	`${String(256 * KB_PER_MB)} 60.4 node /repo/node_modules/.pnpm/vitest/dist/workers/forks.js`,
-	`${String(1024 * KB_PER_MB)} 90.0 node /repo/node_modules/eslint/bin/eslint.js .`,
-	`${String(64 * KB_PER_MB)} 2.0 node /repo/node_modules/tsx/dist/cli.mjs scripts/josh/josh.ts gate`,
-	`${String(2048 * KB_PER_MB)} 1.0 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
-	`${String(16 * KB_PER_MB)} 0.5 /usr/bin/login`,
-	`${String(32 * KB_PER_MB)} 0.0 /Users/me/.local/bin/claude --output-format stream-json`,
+	`${String(VITEST_PID)} ${String(512 * KB_PER_MB)} 150.0 node /repo/node_modules/.pnpm/vitest/vitest.mjs run`,
+	`${String(WORKER_PID)} ${String(256 * KB_PER_MB)} 60.4 node /repo/node_modules/.pnpm/vitest/dist/workers/forks.js`,
+	`${String(ESLINT_PID)} ${String(1024 * KB_PER_MB)} 90.0 node /repo/node_modules/eslint/bin/eslint.js .`,
+	`104 ${String(64 * KB_PER_MB)} 2.0 node /repo/node_modules/tsx/dist/cli.mjs scripts/josh/josh.ts gate`,
+	`105 ${String(2048 * KB_PER_MB)} 1.0 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
+	`106 ${String(16 * KB_PER_MB)} 0.5 /usr/bin/login`,
+	`107 ${String(32 * KB_PER_MB)} 0.0 /Users/me/.local/bin/claude --output-format stream-json`,
 	'not a ps line',
 ].join('\n')
+// The footprints a `proc_pid_rusage` reader answers, by pid: the eslint daemon's compressed pages lift its
+// footprint far past its resident size, and an unreadable process (another user's) answers nothing.
+const FOOTPRINT_MB = new Map([
+	[VITEST_PID, 600],
+	[WORKER_PID, 300.4],
+	[ESLINT_PID, 1619],
+])
+
+function fake_footprint(pid: number): RusageReading | undefined {
+	const footprint_mb = FOOTPRINT_MB.get(pid)
+
+	return footprint_mb === undefined
+		? undefined
+		: { cpu_ms: 0, footprint_bytes: footprint_mb * BYTES_PER_MB }
+}
 
 beforeEach(() => {
 	execa.mockReset()
@@ -90,10 +110,37 @@ describe('lane_process_load.summarize', () => {
 	})
 })
 
+// joshuafolkken/kit#7244: the footprint `top`'s MEM shows, compressed pages included, read by pid.
+describe('lane_process_load.summarize footprint', () => {
+	it('sums each kind over the processes whose footprint was read', () => {
+		expect(lane_process_load.summarize(LISTING, fake_footprint).slice(0, 2)).toStrictEqual([
+			{ kind: 'vitest', cpu_percent: 210, rss_mb: 768, footprint_mb: 900, count: 2 },
+			{ kind: 'eslint', cpu_percent: 90, rss_mb: 1024, footprint_mb: 1619, count: 1 },
+		])
+	})
+
+	it('leaves the footprint out of a kind none of whose processes could be read', () => {
+		expect(lane_process_load.summarize(LISTING, fake_footprint)[2]).toStrictEqual({
+			kind: 'josh',
+			cpu_percent: 2,
+			rss_mb: 64,
+			count: 1,
+		})
+	})
+
+	it('looks each process up by the pid ps printed', () => {
+		const footprint = vi.fn(fake_footprint)
+
+		lane_process_load.summarize(LISTING, footprint)
+
+		expect(footprint).toHaveBeenCalledWith(ESLINT_PID)
+	})
+})
+
 // joshuafolkken/kit#5658: the IDE and browser a person keeps open, summed by command-line name.
 describe('lane_process_load.resident_mb', () => {
-	const VSCODE = `${String(1024 * KB_PER_MB)} 3.0 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app`
-	const TESTING = `${String(512 * KB_PER_MB)} 9.0 /cache/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`
+	const VSCODE = `201 ${String(1024 * KB_PER_MB)} 3.0 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app`
+	const TESTING = `202 ${String(512 * KB_PER_MB)} 9.0 /cache/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`
 
 	it('sums every process a resident app runs', () => {
 		expect(
@@ -173,5 +220,20 @@ describe('lane_process_load.read', () => {
 		execa.mockRejectedValue(new Error('ps: not found'))
 
 		await expect(lane_process_load.read()).resolves.toBeUndefined()
+	})
+})
+
+describe('lane_process_load.read footprint', () => {
+	it('asks ps for the pid and carries the footprint it reads', async () => {
+		execa.mockResolvedValue({ stdout: LISTING })
+
+		const reading = await lane_process_load.read([], fake_footprint)
+
+		expect(reading?.processes[0]?.footprint_mb).toBe(900)
+		expect(execa).toHaveBeenCalledWith(
+			'ps',
+			['-A', '-o', 'pid=,rss=,%cpu=,args='],
+			expect.anything(),
+		)
 	})
 })
