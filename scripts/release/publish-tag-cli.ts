@@ -12,3 +12,7 @@ function main(argv: ReadonlyArray<string>): void {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv)
+
+const publish_tag_cli = { main }
+
+export { publish_tag_cli }

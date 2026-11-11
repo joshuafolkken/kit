@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { npm_registry } from '#scripts/version/npm-registry'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -26,6 +27,8 @@ const PRETTIER_IGNORE = '.prettierignore'
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const CI_WORKFLOW = '.github/workflows/ci.yml'
 const CODERABBIT = '.coderabbit.yaml'
+const PUBLISH_WORKFLOW = '.github/workflows/publish.yml'
+const PUBLISHED_PACKAGE = '@joshuafolkken/app-kit'
 const AGENT_POINTERS = ['AGENTS', 'GEMINI']
 const CLAUDE_SETTINGS = '.claude/settings.json'
 const OWN_PERMISSION = 'Bash(python -m unittest)'
@@ -193,6 +196,27 @@ describe('josh sync AI files in a full project', () => {
 		expect(existsSync(project_file(CODERABBIT))).toBe(true)
 		expect(read_project_file(CLAUDE_MD)).toContain(FULL_IMPORT)
 		expect(read_project_file(PRETTIER_IGNORE)).toBe(read_repository_file(PRETTIER_IGNORE))
+	})
+
+	it('copies kit publish.yml when npm already carries the package', async () => {
+		write_manifest('full')
+		vi.spyOn(npm_registry, 'published_package_name').mockReturnValue(PUBLISHED_PACKAGE)
+		const { sync_ai_files } = await import('./sync-ai-files')
+
+		sync_ai_files.sync_ai_copy_all(false)
+
+		// The copy gains the managed-workflow header above kit's file.
+		expect(read_project_file(PUBLISH_WORKFLOW)).toContain(read_repository_file(PUBLISH_WORKFLOW))
+	})
+
+	it('leaves publish.yml out when npm does not carry the package', async () => {
+		write_manifest('full')
+		vi.spyOn(npm_registry, 'published_package_name').mockReturnValue(undefined)
+		const { sync_ai_files } = await import('./sync-ai-files')
+
+		sync_ai_files.sync_ai_copy_all(false)
+
+		expect(existsSync(project_file(PUBLISH_WORKFLOW))).toBe(false)
 	})
 
 	it.each(AGENT_POINTERS)('still writes the %s.md that names the hook rules', async (name) => {

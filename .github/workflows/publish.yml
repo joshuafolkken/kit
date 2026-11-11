@@ -191,6 +191,10 @@ jobs:
           PUBLISH_TAG: ${{ needs.pack.outputs.tag }}
           TARBALL: ${{ needs.pack.outputs.tarball }}
 
+  # kit's production.yml skips auto-tag's dispatch, so this call is kit's only production update. A
+  # consumer also gets that dispatch, so the tag is merged twice; the second merge is a no-op queued
+  # behind the first in `production-update`. Left without a condition because create-release needs this job,
+  # and a skipped need would skip the consumer's release too.
   update-production:
     needs: [publish-github, publish-npm]
     permissions:
