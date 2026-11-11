@@ -1,0 +1,7 @@
+{
+	"reason": "Dispatch reads the lane:plan record of a running lane outside the opted-in listing (#7185)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 24
+	}
+}
