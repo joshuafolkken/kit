@@ -208,8 +208,10 @@ function report_none(): number {
 const backlog_next_report = {
 	RETRY_MESSAGE,
 	VERDICT_TOKENS,
+	offered_of,
 	report,
 	report_retry,
+	tokens_of,
 	without_untriaged,
 	report_held,
 	report_none,

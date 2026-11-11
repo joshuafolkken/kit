@@ -2,7 +2,7 @@ import { epic_bundle_referenced } from '#scripts/epic/epic-bundle-referenced'
 import { issue_read_cli } from '#scripts/issue/issue-read-cli'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { GH_SPAWN_CONCURRENCY, git_gh_exec } from './git-gh-exec'
+import { GH_SPAWN_CONCURRENCY } from './git-gh-exec'
 import { git_gh_issue_list } from './git-gh-issue-list'
 import {
 	BLOCKED_BY_SEGMENT,
@@ -35,9 +35,11 @@ vi.mock('./git-gh-check', () => ({
 }))
 
 // The listing's page reads go through `exec_gh_api` here, as in `git-gh-issue-list-relations.test.ts`.
-vi.mock('./git-gh-etag-read', () => ({
-	git_gh_etag_read: { read: async (path: string) => await git_gh_exec.exec_gh_api({ path }) },
-}))
+vi.mock('./git-gh-etag-read', async () => {
+	const { git_gh_etag_read_fixture } = await import('./git-gh-etag-read-fixture')
+
+	return { git_gh_etag_read: git_gh_etag_read_fixture.through_exec }
+})
 
 const BURST = GH_SPAWN_CONCURRENCY * 3
 const SPAWN_MS = 2
