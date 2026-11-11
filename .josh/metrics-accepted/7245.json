@@ -1,0 +1,7 @@
+{
+	"reason": "#7245 adds the eslint_d per-call record (caller, files, running total) needed to attribute daemon growth",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 88
+	}
+}

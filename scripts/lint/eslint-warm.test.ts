@@ -14,7 +14,11 @@ vi.mock('./eslint-daemon', () => ({ eslint_daemon: { run: vi.fn() } }))
 
 const PROJECT_ROOT = '/lanes/4720'
 // joshuafolkken/kit#5047: bounded, so a daemon that never answers ends the detached warm-up.
-const BOUNDED = { project_root: PROJECT_ROOT, timeout_ms: LINT_TIMEOUT_MS }
+const BOUNDED = {
+	project_root: PROJECT_ROOT,
+	timeout_ms: LINT_TIMEOUT_MS,
+	call: { caller: 'warm', files: 1 },
+}
 
 interface FakeChild {
 	on: ReturnType<typeof vi.fn>

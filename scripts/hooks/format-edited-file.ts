@@ -7,6 +7,7 @@ import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { json_value } from '#scripts/lib/json-value'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
+import { eslint_daemon_calls } from '#scripts/lint/eslint-daemon-calls'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -390,12 +391,12 @@ async function format_edited_file(
 	]
 	const daemon_before = eslint_daemon.read_record(project_root)
 	const unfixed = await collect_unfixed(plan, runner, project_root)
+	const linted = linted_path(plan, file_path, project_root)
 
-	eslint_daemon.remember_after_edit(
-		project_root,
-		daemon_before,
-		linted_path(plan, file_path, project_root),
-	)
+	eslint_daemon.remember_after_edit(project_root, daemon_before, linted)
+	const call = { caller: eslint_daemon_calls.DAEMON_CALLER.EDIT_HOOK, files: 1 }
+
+	if (linted !== undefined) eslint_daemon.record_call(project_root, call)
 
 	return format_diagnostics(unfixed === '' ? undefined : unfixed)
 }
