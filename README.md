@@ -67,4 +67,4 @@ Check first: [what kit changes in your project](./docs/how-to/add-kit.md#what-ki
 
 [How-to](./docs/how-to.md) · [All docs](./docs/overview.md)
 
-[app-kit](https://github.com/joshuafolkken/app-kit) · [game-kit](https://github.com/joshuafolkken/game-kit) · [Releases](https://github.com/joshuafolkken/kit/releases) · [Contributing](./docs/maintainers/README.md)
+[app-kit](https://github.com/joshuafolkken/app-kit) · [game-kit](https://github.com/joshuafolkken/game-kit) · [Releases](https://github.com/joshuafolkken/kit/releases) · [Contributing](./CONTRIBUTING.md)
