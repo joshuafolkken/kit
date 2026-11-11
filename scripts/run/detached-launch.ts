@@ -258,7 +258,7 @@ async function attached_spawn(
 	on_spawn: (pid: number) => void,
 ): Promise<AttachedLaunchResult> {
 	return await new Promise((resolve) => {
-		const environment = agent_launch_environment.build(request.cwd, request.profile, request.env)
+		const environment = agent_launch_environment.build(request.profile, request.env)
 		const child = spawn(
 			request.argv.command,
 			[...request.argv.args],
@@ -303,7 +303,7 @@ function spawned(
 	on_error: (note: string) => void,
 ): LaunchResult {
 	const { command, args } = request.argv
-	const environment = agent_launch_environment.build(request.cwd, request.profile, request.env)
+	const environment = agent_launch_environment.build(request.profile, request.env)
 	const child = spawn(command, [...args], spawn_options(request.cwd, log, environment)) // NOSONAR — see above
 
 	child.on('error', (error) => {

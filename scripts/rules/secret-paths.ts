@@ -7,7 +7,8 @@ import path from 'node:path'
 // - `.env`, its `.env.*` variants and wrangler's `.dev.vars` — by name anywhere, since every checkout
 //   carries its own. The two tracked placeholders are not secrets.
 // - The tool credentials: gh's `hosts.yml`, Codex's `auth.json` (under `~/.codex`, `$CODEX_HOME` and
-//   the review's own `reviewer-home`) — by the path's end, wherever the config directory sits.
+//   the `reviewer-home` an OpenAI reviewer launch left behind before joshuafolkken/kit#7196, whose
+//   link still reaches the real one) — by the path's end, wherever the config directory sits.
 // - The home directory's `.netrc`, `.curlrc`, `.npmrc`, `.ssh/` and `.config/gh/` — only there, so a
 //   repository's own `.npmrc` stays readable. A shell word is not expanded, so `~/`, `$HOME/`,
 //   `${HOME}/` and the absolute home path all name the home directory.

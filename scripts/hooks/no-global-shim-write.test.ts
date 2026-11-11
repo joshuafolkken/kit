@@ -34,8 +34,8 @@ const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = [...SHARED_PATH_MARKERS,
 // is validated against the roots such a transcript can legitimately be under before anything stats it
 // (joshuafolkken/kit#1485). It stats and never puts a byte on disk, which is the price of the
 // exemption.
-// `codex-home-source` resolves the default Codex config location for a nested reviewer. It only
-// returns the path; the caller keeps reviewer state inside its own lane (joshuafolkken/kit#2528).
+// `codex-home-source` resolves the default Codex config location for the quota read. It only returns
+// the path and never writes there.
 const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
 	path.join('cost-runtime', 'cost-transcript.ts'),
 	path.join('run', 'run-liveness.ts'),
