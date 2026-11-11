@@ -1,3 +1,5 @@
+import { issue_body_keys } from './issue-body-keys'
+
 // The body lines that sit under one `## heading`, up to the next `## heading` or the end.
 // Both the firing-point check and the baseline parser read a section this
 // way, so the slicing lives in one place rather than being written twice.
@@ -36,13 +38,20 @@ function lines_of(body: string): ReadonlyArray<string> {
 	return body.split(LINE_BREAK_PATTERN)
 }
 
-// The body's lines with every fenced line, fences included, blanked. Indentation is kept, so a list
-// item's indented continuation survives.
-function fence_free_lines(body: string): ReadonlyArray<string> {
+// joshuafolkken/kit#7210: each line as the session language writes it, so a body written in either
+// language reads the same to every section reader. A writer keeps `lines_of`, so the filer's text
+// is never rewritten.
+function canonical_lines(body: string): ReadonlyArray<string> {
+	return lines_of(body).map((line) => issue_body_keys.canonical_line(line))
+}
+
+// `lines` with every fenced line, fences included, blanked. Indentation is kept, so a list item's
+// indented continuation survives.
+function blank_fences(lines: ReadonlyArray<string>): ReadonlyArray<string> {
 	let fence = ''
 	const visible: Array<string> = []
 
-	for (const line of lines_of(body)) {
+	for (const line of lines) {
 		const next = next_fence(line, fence)
 
 		visible.push(next === undefined && fence === '' ? line : '')
@@ -50,6 +59,15 @@ function fence_free_lines(body: string): ReadonlyArray<string> {
 	}
 
 	return visible
+}
+
+function fence_free_lines(body: string): ReadonlyArray<string> {
+	return blank_fences(canonical_lines(body))
+}
+
+// As `fence_free_lines`, each line as the filer wrote it — for a reader that shows the text.
+function written_fence_free_lines(body: string): ReadonlyArray<string> {
+	return blank_fences(lines_of(body))
 }
 
 // As `fence_free_lines`, with an indented code line (4 spaces or a tab) blanked too.
@@ -86,10 +104,20 @@ function section_lines_matching(
 	body: string,
 	is_target: (line: string) => boolean,
 ): ReadonlyArray<string> {
-	const lines = lines_of(body)
+	const lines = canonical_lines(body)
 	const [start, end] = section_bounds(body, is_target)
 
 	return lines.slice(start, end)
+}
+
+// As `section_lines_matching`, each line as the filer wrote it — for a reader that shows the text.
+function written_section_lines_matching(
+	body: string,
+	is_target: (line: string) => boolean,
+): ReadonlyArray<string> {
+	const [start, end] = section_bounds(body, is_target)
+
+	return lines_of(body).slice(start, end)
 }
 
 // Keep each raw line's terminator, including mixed LF/CRLF, when editing a section.
@@ -115,6 +143,7 @@ function section_lines(body: string, heading: string): ReadonlyArray<string> {
 }
 
 const markdown_section = {
+	canonical_lines,
 	map_section,
 	section_lines,
 	section_lines_matching,
@@ -123,6 +152,8 @@ const markdown_section = {
 	unfenced_lines,
 	has_line,
 	has_unfenced_line,
+	written_fence_free_lines,
+	written_section_lines_matching,
 }
 
 export { markdown_section }

@@ -49,7 +49,7 @@ const DECLARATIONS = [
 	issue_body_keys.line('purpose', 'bug_fix'),
 	issue_body_keys.line('judgement', 'not_needed'),
 	`${issue_body_keys.line('origin', 'unknown')}（found by the backlogrun health check, not traced yet）`,
-	`${issue_body_keys.prefix('size')} 約 1 ファイル / 20 行（テスト除く）`,
+	`${issue_body_keys.prefix('size')} ${issue_body_keys.size_value('1', '20')}`,
 ]
 const SYMPTOM = [
 	issue_body_keys.heading('symptom'),

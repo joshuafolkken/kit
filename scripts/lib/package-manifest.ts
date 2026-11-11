@@ -10,6 +10,7 @@ import { file_reader } from './read-file'
 // that cannot be read answers.
 const PACKAGE_JSON = 'package.json'
 const REVIEW_GATE_SCHEMA = z.enum(['ci', 'local'])
+const FORMAT_SCHEMA = z.enum(['auto', 'all'])
 const LANE_SCHEMA = z.object({ setup: z.string().min(1) })
 // A project gate step: its name is the label the gate reports it under, so names are unique.
 const GATE_STEP_SCHEMA = z.strictObject({
@@ -24,6 +25,7 @@ const GATE_STEPS_SCHEMA = z
 	})
 const GATE_SCHEMA = z.object({ steps: GATE_STEPS_SCHEMA.optional() })
 const josh_schemas = {
+	format: z.object({ josh: z.object({ format: FORMAT_SCHEMA.optional() }).optional() }),
 	gate_steps: z.object({ josh: z.object({ gate: GATE_SCHEMA.optional() }).optional() }),
 	lane_setup: z.object({ josh: z.object({ lane: LANE_SCHEMA.optional() }).optional() }),
 	progress_interval_minutes: z.object({
@@ -77,6 +79,7 @@ const package_manifest = {
 }
 
 type GateStepDefinition = z.infer<typeof GATE_STEP_SCHEMA>
+type FormatScope = z.infer<typeof FORMAT_SCHEMA>
 
-export type { GateStepDefinition }
+export type { FormatScope, GateStepDefinition }
 export { PACKAGE_JSON, REVIEW_GATE_SCHEMA, package_manifest }

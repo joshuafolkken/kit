@@ -1,0 +1,8 @@
+{
+	"reason": "josh.format adds the basic-profile Prettier scope reader, its target narrowing and a package setting doc entry (#7204)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 36,
+		"prose.long_paragraphs": 1
+	}
+}
