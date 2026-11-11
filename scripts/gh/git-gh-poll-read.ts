@@ -3,7 +3,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { FULL_PAGE_QUERY } from './git-gh-api-path'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
-import { git_gh_etag_read, type KeptAnswer } from './git-gh-etag-read'
+import { git_gh_etag_read, type KeptAnswer, type ReadDetail } from './git-gh-etag-read'
 import { git_gh_exec } from './git-gh-exec'
 
 // The merge gate's per-poll reads, each sent with the ETag of this process's previous answer
@@ -61,14 +61,9 @@ async function read(path: string): Promise<string> {
 	return body
 }
 
-interface PolledDetail {
-	body: string
-	is_unchanged: boolean
-}
-
 // `read`, saying whether the body is the kept one. A failure answers `undefined`, so the caller falls
 // back to its unconditional read and throws that read's own error.
-async function read_detail(path: string): Promise<PolledDetail | undefined> {
+async function read_detail(path: string): Promise<ReadDetail | undefined> {
 	const answer = await read_answer(path)
 	const body = settle_kept(path, answer)
 
