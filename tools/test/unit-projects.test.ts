@@ -1,9 +1,11 @@
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { RETRY_PENDING_KEY, RETRY_PENDING_VALUE } from '#scripts/gh/git-gh-comments-unreadable'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { review_pair } from '#scripts/review/review-pair'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { PURE_FILES } from '#tools/test/pure-files'
 import { unit_projects, type UnitProject } from '#tools/test/unit-projects'
@@ -209,6 +211,23 @@ describe('the unit environment blanks the paired review switch', () => {
 
 		expect(environment[review_pair.PAIRED_ENV]).toBe('')
 		expect(review_pair.is_enabled(environment)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7309: a lane carries the headless marks, so the unattended-filing rule passed the
+// gate there and failed in CI, which runs unmarked.
+describe('the unit environment blanks the headless agent and run marks', () => {
+	const MARKS: ReadonlyArray<string> = [agent_headless.KEY, ...run_headless_keys.MARK_KEYS]
+
+	it('blanks every inherited headless mark', () => {
+		const environment = unit_environment(Object.fromEntries(MARKS.map((key) => [key, '1'])))
+
+		expect(MARKS.map((key) => environment[key])).toStrictEqual(MARKS.map(() => ''))
+		expect(agent_headless.is_headless(environment)).toBe(false)
+	})
+
+	it('leaves no launcher headless mark in a test process', () => {
+		expect(MARKS.filter((key) => (process.env[key] ?? '') !== '')).toStrictEqual([])
 	})
 })
 

@@ -2,6 +2,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
 
 // The headless `backlogrun` parent. `run:wake` starts a cut's successor as
 // `claude -p`, and there a turn that ends is the process that ends: its background `lane:await` and
@@ -14,16 +15,8 @@ import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run
 // the headless parent dispatches inherits it but is exempted by its own mark — a child ends its turn at
 // its own boundaries, never on the parent's lanes.
 
-const HEADLESS_ENV_KEY = 'JOSH_RUN_HEADLESS'
+const { HEADLESS_ENV_KEY, HANDOFF_CHILD_KEY, BESIDE_CHILD_KEY } = run_headless_keys
 const HEADLESS_VALUE = '1'
-// A session `josh run:handoff` started. It runs under its launcher's process, so the launcher's carry
-// owner is its ancestor too; the mark keeps it from reading as the `backlogrun` parent the way a lane
-// child's own mark does (`driving_carry`).
-const HANDOFF_CHILD_KEY = 'JOSH_HANDOFF_CHILD'
-// A triage session `run:wake` started beside its driver (joshuafolkken/kit#7120). It runs under the
-// supervisor that owns the record, so without the mark its turn-end would cut the record the
-// still-running driver holds.
-const BESIDE_CHILD_KEY = 'JOSH_BESIDE_CHILD'
 const SESSION_CUT = { cuts: 1 }
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
