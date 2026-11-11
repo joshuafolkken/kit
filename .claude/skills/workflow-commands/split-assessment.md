@@ -20,7 +20,7 @@ Floor (also the unmeasured fallback):
 Past **the cap (1.5 × guide)** or the bar (2 × budget): split or say why.
 Merged lanes' median actual / declared ratios per axis, apart from speed; unmeasured: 2.
 First `lane:plan` answers `split` past declared files × files ratio (files, hunks), bar (lines);
-`--single` or a re-plan → `size warning` (`lane-plan-size.ts`).
+`--single`, a re-plan or a dispatched lane → `size warning` (`lane-plan-size.ts`).
 
 ## The same two questions decide the filing-time fold
 
@@ -44,23 +44,20 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 
 ## Over the guide before the gate
 
-**Size is judged at filing (`issue:file`) and at `lane:plan` only.
-Once implementation has started, the run never splits, spills or stops for size.**
+**Size is judged before dispatch: at filing (`issue:file`) and at `lane:plan` only.
+A dispatched lane is never split: it is finished to the end, and never splits, spills or stops for size.**
 
-**Trigger: `run:cut` or `run:chain` repeats the size notice `lane:plan` recorded** while the
-branch's diff, untracked files included, still passes the Issue's declared size × the growth factor,
-capped at the guide (no declaration: the guide), on either axis. Scoped checks and `main:merge` print
-none. The notice is a warning, not a stop: go on implementing;
-review and ship print it and proceed.
+**Trigger: a dispatched lane's first `lane:plan` is past its bar.** It answers `clear` with one
+`size warning` and nothing on the ledger; a re-plan, `run:cut` and `run:chain` print none. Go on implementing.
 
-- Split again only for an independent added requirement, or scope growth this Issue cannot verify:
-  file it with `pnpm josh issue:file --route split --found-during <N>`, and finish this Issue.
-  On its direction refusal → `docs/josh-commands-backlog.md` → "`josh issue:file`" step 2.
-  On its duplicate refusal → `issue-fold-existing.md`, applying with `--apply <M> --found-during <N>`.
-- Size alone is never that reason; a re-plan needs no `--size-approval`.
-- One verified deliverable (every ship-draft acceptance row `満たした`, `lint:related` and `test:related` green on this tree) silences the warning: `scripts/split/split-verified-single.ts`.
+- An independent new requirement found in the lane → file it as an observation, without `--route split`.
+  `issue:file --route split --found-during <N>` from lane `#N` is refused.
+- At the merge, a diff past the Issue's declared size × the growth factor, capped at the guide
+  (no declaration: the guide), on either axis, is recorded as a pre-split miss with its declared and
+  actual size (`scripts/lane/lane-size-record.ts`). `pnpm josh lane:stats --period <days>` counts and lists the misses;
+  use them to tune the pre-dispatch assessment.
 
-The quality gates, the clash and unread checks, and the review stay stops. The notice never creates an epic.
+The quality gates, the clash and unread checks, and the review stay stops. The warning never creates an epic.
 
 ## What each entry point does with the answer
 

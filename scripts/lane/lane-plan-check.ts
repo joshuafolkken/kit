@@ -7,6 +7,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { line_budget } from '#scripts/lines/line-budget'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
+import { lane_child_marker } from './lane-child-marker'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_plan_premise } from './lane-plan-premise'
@@ -43,7 +44,9 @@ import { lane_yield, type YieldAt } from './lane-yield'
 // (joshuafolkken/kit#5533, `lane-plan-size.ts`), ahead of the overlap check; so does one whose probed
 // hunks or projected lines outgrow it, the axis named in the refusal and noted on the ledger
 // (joshuafolkken/kit#5568). A plan declared one deliverable (`--single`) is recorded past the files axis,
-// its overrun noted on the ledger for the pre-gate `run:cut` (joshuafolkken/kit#6647).
+// its overrun noted on the ledger (joshuafolkken/kit#6647). **A dispatched lane never answers `split`**
+// (joshuafolkken/kit#7183): the size is judged before dispatch, so its overrun is warned once, on its
+// first plan, and the lane goes on to the end.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -126,13 +129,33 @@ async function note(plan: LanePlan, over: Oversize): Promise<void> {
 	})
 }
 
-// The split answer for `over`, else `undefined`. An overrun of a plan declared one deliverable, or of a
-// re-plan after the lane started, is noted and passes as a warning (joshuafolkken/kit#6602).
-async function refusal(plan: LanePlan, over: Oversize | undefined): Promise<number | undefined> {
-	if (over === undefined) return undefined
-	await note(plan, over)
+// Whether `plan` is the dispatched lane's own: its child mark names the plan's issue (joshuafolkken/kit#7183).
+function is_dispatched(plan: LanePlan): boolean {
+	return lane_child_marker.marked_issue() === String(plan.issue)
+}
 
-	if (!lane_plan_size.is_waived(plan, over)) return split(plan, over)
+function is_split(plan: LanePlan, over: Oversize | undefined): over is Oversize {
+	return over !== undefined && !is_dispatched(plan) && !lane_plan_size.is_waived(plan, over)
+}
+
+// A dispatched lane's re-plan is neither noted nor warned again: its first plan already was.
+function is_repeat(plan: LanePlan, directory: string): boolean {
+	return is_dispatched(plan) && lane_plan.read(plan.issue, directory) !== undefined
+}
+
+// The split answer for `over`, else `undefined`. An overrun of a plan declared one deliverable or of a
+// re-plan after the lane started is noted and passes as a warning (joshuafolkken/kit#6602); a
+// dispatched lane's passes as a warning unnoted, since no split child can answer that notice and its
+// merge's size entry records the overrun (`lane-size-record.ts`).
+async function refusal(
+	plan: LanePlan,
+	over: Oversize | undefined,
+	directory: string,
+): Promise<number | undefined> {
+	if (over === undefined || is_repeat(plan, directory)) return undefined
+	if (!is_dispatched(plan)) await note(plan, over)
+
+	if (is_split(plan, over)) return split(plan, over)
 	console.error(lane_plan_size.waiver_text(plan.issue, over))
 
 	return undefined
@@ -222,7 +245,7 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
 	const issues = await lane_plan_probe.opted_in()
 	const refused =
-		(await refusal(plan, await lane_plan_probe.oversize_of(plan, issues, directory))) ??
+		(await refusal(plan, await lane_plan_probe.oversize_of(plan, issues, directory), directory)) ??
 		(await premise_stop(plan, issues, directory))
 
 	if (refused !== undefined) return refused
@@ -241,7 +264,7 @@ async function probe_answer(plan: LanePlan, directory: string): Promise<number> 
 	const issues = await lane_plan_probe.opted_in()
 	const over = await lane_plan_probe.oversize_of(plan, issues, directory)
 
-	if (over !== undefined && !lane_plan_size.is_waived(plan, over)) return split(plan, over)
+	if (is_split(plan, over)) return split(plan, over)
 	const found = lane_plan_probe.probe(plan, issues, directory)
 
 	if (lane_plan_probe.is_unread(found)) return unread()

@@ -87,6 +87,8 @@ const ship_lap_schema = z.object({
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's
 // measured diff, test files excluded, so `lane:stats` reads how far estimates miss the guide's
 // counting (joshuafolkken/kit#5384). Written before the merge, while the branch is still checked out.
+// `missed` marks a diff past the split notice bar: a size the pre-dispatch assessment let through, as
+// the started lane is never split (joshuafolkken/kit#7183).
 const counts_schema = z.object({ files: z.number(), lines: z.number() })
 const size_schema = z.object({
 	kind: z.literal(KIND.SIZE),
@@ -94,6 +96,7 @@ const size_schema = z.object({
 	issue: z.number(),
 	declared: counts_schema,
 	actual: counts_schema,
+	missed: z.boolean().optional(),
 })
 
 type ChainEntry = z.infer<typeof chain_schema>

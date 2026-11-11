@@ -240,6 +240,7 @@ async function is_run_clear(filing: Filing): Promise<boolean> {
 	const prefix = issue_file_fold.reference_prefix(filing.target, filing.current)
 
 	return (
+		split_resolution.is_split_clear(filing.args) &&
 		(await issue_file_cap.is_cap_clear(filing.args.found_during)) &&
 		(await issue_file_fold.is_fold_clear(prefix, filing.args)) &&
 		(await split_direction.is_direction_clear(filing.args, filing.body))

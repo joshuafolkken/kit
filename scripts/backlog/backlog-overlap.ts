@@ -109,8 +109,13 @@ function claims_of(declared: Declared, holders: ReadonlyArray<number>): Map<stri
 	return new Map(pairs)
 }
 
+// The issues `read` names as running — none unless it read them.
+function running_numbers(read: BusyRead): Array<number> {
+	return read.kind === 'busy' ? read.issues.map((issue) => issue.number) : []
+}
+
 function running_claims(declared: Declared, read: BusyRead): Map<string, number> {
-	return claims_of(declared, read.kind === 'busy' ? read.issues.map((issue) => issue.number) : [])
+	return claims_of(declared, running_numbers(read))
 }
 
 function paths_of(child: EpicChild, declared: Declared, repo: string): ReadonlySet<string> {
@@ -240,6 +245,7 @@ const backlog_overlap = {
 	path_claims,
 	path_clash,
 	running_clash,
+	running_numbers,
 	separate,
 }
 

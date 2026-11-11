@@ -155,6 +155,24 @@ function with_plans(
 	return new Map(replaced)
 }
 
+// `declared` with the recorded plan of each of `holders` it has no entry for — a running lane outside
+// the opted-in listing, whose plan dispatch otherwise never reads (joshuafolkken/kit#7185).
+function with_holder_plans(
+	declared: Declared,
+	holders: ReadonlyArray<number>,
+	directory: string,
+): Declared {
+	const added = holders
+		.filter((issue) => !declared.has(issue))
+		.flatMap((issue): Array<[number, ReadonlySet<string>]> => {
+			const recorded = read(issue, directory)
+
+			return recorded === undefined ? [] : [[issue, new Set(recorded.paths)]]
+		})
+
+	return new Map([...declared, ...added])
+}
+
 // Whether `other` holds its files ahead of `plan`: it was cleared, or it planned first. A cleared lane
 // may already be editing, so a kept place in line never takes its files from it.
 function goes_before(other: LanePlan, plan: LanePlan): boolean {
@@ -217,6 +235,7 @@ const lane_plan = {
 	record,
 	release,
 	remove,
+	with_holder_plans,
 	with_plans,
 }
 

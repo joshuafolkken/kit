@@ -351,7 +351,8 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 
 	if (notice !== undefined) console.error(notice)
 
-	const gated = backlog_rank.gate(result, read, repo, await backlog_gate_scope.gate_scope(context))
+	const scope = await backlog_gate_scope.gate_scope(context, read)
+	const gated = backlog_rank.gate(result, read, repo, scope)
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 
