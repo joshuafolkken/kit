@@ -62,6 +62,7 @@ function apply_node_flags(flags: ReadonlyArray<string>): ReadonlyArray<string> {
 
 const josh_environment_file = {
 	apply_node_flags,
+	is_launch_only_key,
 	load_environment_file,
 }
 

@@ -1,0 +1,7 @@
+{
+	"reason": "New .env.example drift checker (environment-example-fixture.ts) and its tests, as #7224 asks: the docs table stays the single source and the checker holds .env.example to it",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 126
+	}
+}
