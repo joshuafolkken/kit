@@ -28,6 +28,7 @@ const ROOT_FILES: ReadonlyArray<string> = [
 // whole suite on any of these with no word of why. Named here, they print the reason instead.
 // `whole-suite-files.test.ts` holds the list to both graphs, so an import added to either fails there.
 const IMPORTED_BY_EVERY_TEST: ReadonlyArray<string> = [
+	'scripts/agent/agent-headless.ts',
 	'scripts/git/constants.ts',
 	'scripts/git/git-location-environment.ts',
 	'scripts/init/init-paths.ts',
@@ -41,6 +42,7 @@ const IMPORTED_BY_EVERY_TEST: ReadonlyArray<string> = [
 	'scripts/lib/json-value.ts',
 	'scripts/lib/read-file.ts',
 	'scripts/lib/timeouts.ts',
+	'scripts/run/run-headless-keys.ts',
 	'scripts/test/unit-durations.ts',
 	'scripts/test/unit-run-marker.ts',
 	'scripts/test/unit-setup-files.ts',

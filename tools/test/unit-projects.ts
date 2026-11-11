@@ -1,5 +1,7 @@
+import { agent_headless } from '#scripts/agent/agent-headless'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
+import { run_headless_keys } from '#scripts/run/run-headless-keys'
 import { unit_setup_files } from '#scripts/test/unit-setup-files'
 import { vitest_cli_excludes } from '#scripts/test/vitest-cli-excludes'
 import { PURE_FILES } from '#tools/test/pure-files'
@@ -69,6 +71,10 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // **The paired review switch is blanked as well** (joshuafolkken/kit#6902): a lane run with
 // `JOSH_REVIEWER_PAIRED=1` would make every `run:review` fixture write a paired brief its stubs never
 // planned. A suite about the paired review passes the environment itself.
+//
+// **The headless agent and run marks are blanked as well** (joshuafolkken/kit#7309): a lane carries
+// them, so every rule that reads "unattended" from them passed the gate there and failed in CI, which
+// runs unmarked. A suite about an unattended run sets the mark itself.
 const SHIP_MARK = /^JOSH_SHIP_[A-Z0-9_]+$/u
 const PROFILE_KEY = /^JOSH_[A-Z0-9_]+_(?:MODEL|EFFORT)$/u
 
@@ -90,6 +96,7 @@ function unit_environment(source: EnvironmentSource): Record<string, string> {
 		]),
 		...blank(inherited_marks(source)),
 		...blank(lane_child_mark_keys.MARK_KEYS),
+		...blank([agent_headless.KEY, ...run_headless_keys.MARK_KEYS]),
 		[agent_session_environment.AGENT_PID_KEY]: '',
 		CLAUDE_CODE_SESSION_ID: 'vitest-session',
 		CODEX_THREAD_ID: '',
