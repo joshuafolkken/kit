@@ -47,7 +47,7 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
 - Exit `1` if any check failed. Refuses any argument other than the four flags and `--static-group=<group>`.
 - [`josh test:related`](#josh-testrelated) narrows the unit leg; CI runs the whole sharded suite regardless.
 - Project steps (`josh.gate.steps` in `package.json`: `{ name, command, paths? }`) run after the fixed checks, in order, as `pnpm exec --shell-mode <command>`.
-  - `paths`: repo-relative globs (`path.matchesGlob`, e.g. `crates/core/**`). The step is `reused` until a path moved since its green record matches one (`check-reuse.ts`); no `paths` → always runs. It runs on a changed `command`/`paths`, no record, `--force` or `--no-unit`. One step per crate narrows per crate.
+  - `paths`: repo-relative globs or directories (`src/**/*.rs`, `crates/core`). The step is `reused` until a path moved since its green record matches one (`check-reuse.ts`); no `paths` → always runs. It runs on a changed `command`/`paths`, no record, `--force` or `--no-unit`. One step per crate narrows per crate.
   - A failed step makes the gate red under its `name`; later steps still run.
   - An invalid definition (a fixed check's label as `name` included) runs none and fails as one `josh.gate.steps` check naming the error.
   - With `--static-group`, only `rest` runs them.

@@ -106,6 +106,8 @@ describe('run_project_steps — invalid definitions', () => {
 		['empty paths', [{ ...GODOT, paths: [] }], 'paths'],
 		['a fixed check label', [{ ...GODOT, name: 'lint' }], "lint are the gate's own check labels"],
 		['the definition label', [{ ...GODOT, name: DEFINITION_LABEL }], DEFINITION_LABEL],
+		['a name with a slash', [{ ...GODOT, name: 'crates/core' }], 'crates/core must start'],
+		['a name starting with a dot', [{ ...GODOT, name: '..' }], '.. must start'],
 	])('rejects %s as one failed definition result, running nothing', async (_case, steps, named) => {
 		const ran = stub_runs()
 

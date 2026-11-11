@@ -87,6 +87,13 @@ describe('project_step_reuse — which steps a moved path reaches', () => {
 		await expect(reused(await recorded())).resolves.toStrictEqual([CARGO.name])
 	})
 
+	it('runs a step whose bare directory path holds a moved file', async () => {
+		base_moved('crates/core/src/lib.rs')
+		const crate = { name: 'core', command: 'cargo test -p core', paths: ['crates/core'] }
+
+		await expect(reused(await recorded([crate]), [crate])).resolves.toStrictEqual([])
+	})
+
 	it('always runs a step that declares no paths', async () => {
 		base_moved()
 

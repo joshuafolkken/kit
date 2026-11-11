@@ -1,8 +1,8 @@
-import path from 'node:path'
 import type { GateStepDefinition } from '#scripts/lib/package-manifest'
 import { check_reuse, type CheckInputs, type CheckRecords, type InputsOf } from './check-reuse'
 import type { GateStepResult } from './gate-report'
 import type { GateTree } from './gate-tree'
+import { path_glob } from './path-glob'
 
 // A project gate step's `paths` as its inputs to the gate's per-check green record (`check-reuse.ts`),
 // so a re-run starts only the steps a path moved under since each last passed (joshuafolkken/kit#7205).
@@ -21,7 +21,7 @@ interface StepRecords {
 }
 
 function touches(moved: ReadonlyArray<string>, patterns: ReadonlyArray<string>): boolean {
-	return moved.some((file) => patterns.some((pattern) => path.matchesGlob(file, pattern)))
+	return moved.some((file) => patterns.some((pattern) => path_glob.matches(file, pattern)))
 }
 
 function step_inputs(step: GateStepDefinition): CheckInputs | undefined {

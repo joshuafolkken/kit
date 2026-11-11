@@ -4,6 +4,8 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 // Native Node resolves the distributed source directly, without TypeScript's extension rewriting.
 // eslint-disable-next-line import/extensions
+import { path_glob } from './path-glob.ts'
+// eslint-disable-next-line import/extensions
 import { toolchain_inputs } from './toolchain-inputs.ts'
 
 interface Manifest {
@@ -38,9 +40,7 @@ function metadata(manifest: Manifest): string {
 	return JSON.stringify(rest)
 }
 
-function matches(file: string, pattern: string): boolean {
-	return path.matchesGlob(file, pattern) || path.matchesGlob(file, `${pattern}/**`)
-}
+const { matches } = path_glob
 
 function published(file: string, entries: Array<string> = []): boolean {
 	const included = entries.filter((entry) => !entry.startsWith('!'))

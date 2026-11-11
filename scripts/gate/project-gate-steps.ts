@@ -33,14 +33,36 @@ const RESERVED_LABELS = new Set([
 	DEFINITION_LABEL,
 ])
 
+// The name is also part of the step's green record file name (`check-reuse.ts`), so a `/` or a leading
+// `.` would point that record outside the record directory.
+const STEP_NAME = /^\w[\w.-]*$/u
+
+function names_of(steps: ReadonlyArray<GateStepDefinition>): string {
+	return steps.map((step) => step.name).join(', ')
+}
+
+// Why the step names are refused, or `undefined` when every name is usable.
+function name_refusal(steps: ReadonlyArray<GateStepDefinition>): string | undefined {
+	const reserved = steps.filter((step) => RESERVED_LABELS.has(step.name))
+
+	if (reserved.length > 0) {
+		return `step names ${names_of(reserved)} are the gate's own check labels; the reserved names are ${[...RESERVED_LABELS].join(', ')}`
+	}
+
+	const unsafe = steps.filter((step) => !STEP_NAME.test(step.name))
+
+	return unsafe.length > 0
+		? `step names ${names_of(unsafe)} must start with a letter, digit or _ and hold only those, . and -`
+		: undefined
+}
+
 function steps_of(manifest: GateStepsManifest): ReadonlyArray<GateStepDefinition> {
 	const steps = manifest.josh?.gate?.steps ?? []
-	const reserved = steps.filter((step) => RESERVED_LABELS.has(step.name))
-	if (reserved.length === 0) return steps
+	const refusal = name_refusal(steps)
 
-	throw new Error(
-		`step names ${reserved.map((step) => step.name).join(', ')} are the gate's own check labels; the reserved names are ${[...RESERVED_LABELS].join(', ')}`,
-	)
+	if (refusal !== undefined) throw new Error(refusal)
+
+	return steps
 }
 
 function describe_error(error: unknown): string {
