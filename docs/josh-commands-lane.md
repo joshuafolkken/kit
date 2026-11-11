@@ -328,12 +328,23 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` i
 Print a merged lane's net time by stage, longest first, the implementation split by its tool calls.
 
 ```bash
-pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation comments on the lane
+pnpm josh lane:breakdown 4970              # the breakdown the overrun investigation comments on the lane
+pnpm josh lane:breakdown 4970 --timeline   # when each stage ran and where the lane waited
 ```
+
+**Options:**
+
+- `--timeline` — prints the lane in time order instead, one line a stage, wait or event, the stage lines adding up to the net time.
 
 <!-- /usage -->
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
+
+`--timeline` prints the lane one line an event, oldest first: start (UTC), minutes since the dispatch, duration, name (`lane-timeline.ts`). Its stage lines are the same spans at their net minutes and add up to the net time.
+
+- `[excluded]` — a wait taken out, named by what opened it (park, outage, usage limit, split, yield, sleep).
+- `[driver]` — the followup's CI wait.
+- `[event]` — a main merge-in (the ship's `merge` lap), a split or `unplanned` notice, a split, a ship launch, a review round.
 
 A ship stop closes the ship stage open at it. A blocking `lane:plan` wait on a holder is its own `lane:plan wait (#<M>)` row, cut out of the stage it fell in (`lane-plan-wait-event.ts`).
 

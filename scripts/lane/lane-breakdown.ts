@@ -64,6 +64,9 @@ interface Breakdown {
 	// Each ship stage's spans and the spans between them, waits left in — the windows its laps and the
 	// fixes between stages are read in (joshuafolkken/kit#5294).
 	ship: ReadonlyArray<Segment>
+	// Every stage's spans in time order, waits left in, each with its net milliseconds — the rows
+	// `lane:breakdown --timeline` prints (joshuafolkken/kit#7186).
+	segments?: ReadonlyArray<NetSegment>
 	// The lane's parks, each naming the stretch between ship stages it fell in (joshuafolkken/kit#5646).
 	pauses?: ReadonlyArray<PauseMark>
 	// Why each ship stage last ran or was skipped, where its event line said (joshuafolkken/kit#5296).
@@ -72,6 +75,11 @@ interface Breakdown {
 
 interface Segment extends LaneSpan {
 	stage: string
+}
+
+// A segment and its length less what the time outside the lane covers of it.
+interface NetSegment extends Segment {
+	net_ms: number
 }
 
 // A ship stage's name, or the between-ship-stages bucket's.
@@ -296,14 +304,18 @@ function yields_of(
 
 // Each segment less what `outside` covers of it, longest first. The followup stage is all driver
 // time, so it is left out rather than listed at zero.
-function stages_of(
+function net_segments_of(
 	segments: ReadonlyArray<Segment>,
 	outside: ReadonlyArray<LaneSpan>,
-): Array<Stage> {
-	const parts = segments.map((segment) => ({
-		name: segment.stage,
-		ms: segment.to_ms - segment.from_ms - covered_ms(segment, outside),
+): Array<NetSegment> {
+	return segments.map((segment) => ({
+		...segment,
+		net_ms: segment.to_ms - segment.from_ms - covered_ms(segment, outside),
 	}))
+}
+
+function stages_of(segments: ReadonlyArray<NetSegment>): Array<Stage> {
+	const parts = segments.map((segment) => ({ name: segment.stage, ms: segment.net_ms }))
 
 	return ranked(parts.filter((part) => part.name !== FOLLOWUP_STAGE))
 }
@@ -330,14 +342,16 @@ function of(
 	const waits = lane_net_time.waits(entries, events, issue, span)
 	const outside = lane_net_time.outside(entries, events, issue, span)
 	const segments = lane_segments({ entries, events }, issue, span, edit_ms)
+	const net_segments = net_segments_of(segments, outside)
 
 	return {
-		stages: stages_of(segments, outside),
+		stages: stages_of(net_segments),
 		driver: driver_of(spans_ms(outside) - spans_ms(waits)),
 		excluded_ms: spans_ms(waits),
 		slept_ms: spans_ms(lane_net_time.slept(events, span)),
 		...yields_of(entries, events, issue, span),
 		waits,
+		segments: net_segments,
 		...windows_of(segments),
 		reasons: reasons_of(events, issue, span),
 		pauses: lane_breakdown_pause.of(events, issue, span),
