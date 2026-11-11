@@ -73,7 +73,7 @@
 
 起票は `pnpm josh issue:file "<title>" --body-file .josh/tmp/issue.md`（置き場は `shell-body.md`）。本文検査は `pnpm josh issue:lint <path>` と共通で、下表のラベルも付与する。宣言は起票者が選ぶ。`- 人の判断:` は必須で `auto-ok` 判定に使う（`scripts/issue/issue-auto-ok.ts`）。`不要` には `--label run:lane` も必須（kit 自身の検証が `main` で毎回誤判定する不具合なら `run:solo`。時々なら `run:lane` と `priority:critical`）。
 
-宣言のキー・固定値とテンプレートの見出しは `scripts/issue/issue-body-keys.ts` が単一ソースで、`scripts/` の検査はそこを参照する。
+宣言のキー・固定値とテンプレートの見出しは `scripts/issue/issue-body-keys.ts` が単一ソースで、`scripts/` の検査はそこを参照する。`en` の列のテンプレートと日英の対応表 → `issue-template.en.md`。
 
 | 宣言                                                     | 付くラベル                             | 選ぶ基準                                                                                                  |
 | -------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
