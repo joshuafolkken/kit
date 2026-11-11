@@ -10,11 +10,23 @@ import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-c
 import { execa } from 'execa'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 import { eslint_heap } from './eslint-heap'
+import { lint_shard } from './lint-shard'
 
 const COMMAND_NAME = 'format'
 const ARGV_OFFSET = 2
 const FAIL_EXIT_CODE = 1
-const PRETTIER_WRITE_ARGS = ['exec', 'prettier', '--write', '.', ...PRETTIER_CACHE_FLAGS] as const
+
+function prettier_write_args_of(targets: ReadonlyArray<string>): ReadonlyArray<string> {
+	return ['exec', 'prettier', '--write', ...targets, ...PRETTIER_CACHE_FLAGS]
+}
+
+const PRETTIER_WRITE_ARGS = prettier_write_args_of([lint_shard.WHOLE_TREE])
+
+// The whole tree as this project formats it (`project_checks.prettier_targets`).
+function prettier_write_args(directory: string): ReadonlyArray<string> {
+	return prettier_write_args_of(project_checks.prettier_targets(directory, [lint_shard.WHOLE_TREE]))
+}
+
 const ESLINT_FIX_ARGS = ['exec', 'eslint', '.', '--fix', ...ESLINT_CACHE_FLAGS] as const
 
 async function run_step(
@@ -53,7 +65,7 @@ async function run_format(directory: string): Promise<number> {
 	const prettier_exit_code = await run_unless_skipped(
 		'prettier',
 		prettier_reason,
-		PRETTIER_WRITE_ARGS,
+		prettier_write_args(directory),
 		directory,
 	)
 	if (prettier_exit_code !== 0) return prettier_exit_code

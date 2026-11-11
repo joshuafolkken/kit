@@ -32,13 +32,18 @@ const ESLINT_ARGS = eslint_args_of(undefined)
 
 // Prettier's cache stays this checkout's own, never shared through `lane_cache_run` as eslint's is:
 // its entries do not survive a move (`josh-command-types.ts` → `GATE_CACHE_SPECS`).
-const PRETTIER_ARGS = [
-	'exec',
-	'prettier',
-	'--check',
-	lint_shard.WHOLE_TREE,
-	...PRETTIER_CACHE_FLAGS,
-] as const
+function prettier_check_args(targets: ReadonlyArray<string>): ReadonlyArray<string> {
+	return ['exec', 'prettier', '--check', ...targets, ...PRETTIER_CACHE_FLAGS]
+}
+
+const PRETTIER_ARGS = prettier_check_args([lint_shard.WHOLE_TREE])
+
+// The whole tree as this project formats it (`project_checks.prettier_targets`).
+function project_prettier_args(): ReadonlyArray<string> {
+	return prettier_check_args(
+		project_checks.prettier_targets(process.cwd(), [lint_shard.WHOLE_TREE]),
+	)
+}
 
 // `undefined` is a shard that leaves formatting to the other one (`lint-shard.ts`).
 type PrettierArguments = ReadonlyArray<string> | undefined
@@ -51,7 +56,7 @@ const LEFT_TO_FORMATTING_SHARD: BufferedProcessResult = {
 }
 
 function prettier_args_of(shard: LintShard | undefined): PrettierArguments {
-	return lint_shard.checks_formatting(shard) ? PRETTIER_ARGS : undefined
+	return lint_shard.checks_formatting(shard) ? project_prettier_args() : undefined
 }
 
 const GATE_TIMING_LABEL = 'lint'
@@ -264,7 +269,7 @@ async function run_timed_lint_checks(
 }
 
 async function run_lint_parallel_checks(options: LintRunOptions = COLD_RUN): Promise<number> {
-	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, ESLINT_CACHE_FILE, options)
+	return await run_lint_checks(project_prettier_args(), ESLINT_ARGS, ESLINT_CACHE_FILE, options)
 }
 
 // `josh lint --changed`, the gate's lint: the branch's changed files on the gate's own caches, or the

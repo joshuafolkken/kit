@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { project_checks } from '#scripts/gate/project-checks'
 import {
 	changed_file_scope,
 	type ChangedFileScope,
@@ -109,11 +110,15 @@ const RELATED_CACHES: LintCaches = {
 
 // The scoped run's own cache file, for the reason eslint's below gives: prettier too rewrites its
 // cache file whole, so a narrowed run sharing the gate's would discard entries a concurrent gate wrote.
+// The files are the ones this project formats (`project_checks.prettier_targets`).
 function prettier_arguments(
 	files: ReadonlyArray<string>,
 	caches: LintCaches = RELATED_CACHES,
+	directory: string = process.cwd(),
 ): ReadonlyArray<string> {
-	return [...PRETTIER_ARGS, ...files, ...caches.prettier_flags]
+	const targets = project_checks.prettier_targets(directory, files)
+
+	return [...PRETTIER_ARGS, ...targets, ...caches.prettier_flags]
 }
 
 // The cache file is this command's own rather than the gate's, because the two run at the same time.

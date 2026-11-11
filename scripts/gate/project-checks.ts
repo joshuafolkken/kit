@@ -6,7 +6,7 @@ import { own_formatter } from '#scripts/init/own-formatter'
 import { project_profile } from '#scripts/init/project-profile'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { json_value } from '#scripts/lib/json-value'
-import { package_manifest } from '#scripts/lib/package-manifest'
+import { package_manifest, type FormatScope } from '#scripts/lib/package-manifest'
 import { NOT_USED_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
 import { z } from 'zod'
 
@@ -20,7 +20,10 @@ const IGNORED_DIRS = new Set([
 	'build',
 	'.svelte-kit',
 ])
-const WEB_FILES = '**/*.{html,css,js,jsx,mjs,cjs}'
+// The extensions that enable a basic project's Prettier, and what its default `josh.format` formats.
+const WEB_EXTENSIONS: ReadonlyArray<string> = ['html', 'css', 'js', 'jsx', 'mjs', 'cjs']
+const WEB_FILES = `**/*.{${WEB_EXTENSIONS.join(',')}}`
+const DEFAULT_FORMAT_SCOPE: FormatScope = 'auto'
 const SCRIPT_FILES = '**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}'
 const TYPE_FILES = '**/*.{ts,tsx,mts,cts}'
 const ESLINT_CONFIGS = [
@@ -155,6 +158,33 @@ function prettier_skip_reason(directory: string): string | undefined {
 	return missing_tool_reason(directory, 'prettier', 'prettier')
 }
 
+function format_scope(directory: string): FormatScope {
+	const manifest = package_manifest.read_manifest_if_valid(
+		project_root(directory),
+		package_manifest.josh_schemas.format,
+	)
+
+	return manifest?.josh?.format ?? DEFAULT_FORMAT_SCOPE
+}
+
+function is_web_file(file_path: string): boolean {
+	return WEB_EXTENSIONS.includes(path.extname(file_path).slice(1))
+}
+
+// Shared by `josh lint`, `josh lint:related` and `josh format`, so all three format the same files.
+// A basic project's `josh.format: "auto"`, the default, keeps Prettier to the Web files that enabled
+// it — the whole tree `.` becomes `WEB_FILES` — and `"all"` leaves Prettier's every file type. A list
+// left with no Web file becomes `WEB_FILES` too, a superset: Prettier given no file reads stdin.
+function prettier_targets(
+	directory: string,
+	targets: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	if (!is_basic(directory) || format_scope(directory) === 'all') return targets
+	const web_targets = targets.filter((target) => is_web_file(target))
+
+	return web_targets.length > 0 ? web_targets : [WEB_FILES]
+}
+
 // Shared by `josh lint`, `josh lint:related` and `josh format`, so a basic project without ESLint
 // is skipped for the same reason by all three.
 function eslint_skip_reason(directory: string): string | undefined {
@@ -177,6 +207,7 @@ const project_checks = {
 	is_basic,
 	is_kit_repository,
 	prettier_skip_reason,
+	prettier_targets,
 	project_root,
 	ran_notice,
 	read_manifest,
