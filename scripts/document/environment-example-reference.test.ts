@@ -62,10 +62,26 @@ describe('environment_example_drift', () => {
 			`missing: ${MODE_KEY}`,
 		])
 	})
+})
 
+describe('environment_example_drift on one entry', () => {
 	it('names a default the docs row does not give', () => {
 		expect(environment_example_drift(DOCUMENT, example_block('# Default: rest'))).toStrictEqual([
 			`${MODE_KEY}: default rest is not the docs auto`,
+		])
+	})
+
+	it('names a default that only begins with the docs one', () => {
+		expect(environment_example_drift(DOCUMENT, example_block('# Default: autos'))).toStrictEqual([
+			`${MODE_KEY}: default autos is not the docs auto`,
+		])
+	})
+
+	it('names a value the docs row has only in its prose', () => {
+		const head = '# Default: auto · Values: or'
+
+		expect(environment_example_drift(DOCUMENT, example_block(head))).toStrictEqual([
+			`${MODE_KEY}: value or is not in the docs row`,
 		])
 	})
 

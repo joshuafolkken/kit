@@ -7,7 +7,7 @@ import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 interface ReferenceRow {
 	key: string
 	default_text: string
-	row_text: string
+	code_values: ReadonlySet<string>
 }
 
 interface ExampleEntry {
@@ -36,7 +36,12 @@ const DEFAULT_PREFIX = '# Default: '
 const VALUES_SEPARATOR = ' · Values: '
 const VALUE_LIST_SEPARATOR = ', '
 const CODE_MARK = /`/gu
-const VALUE_TOKEN_SEPARATOR = /[^\w–-]+/u
+// An accepted value is one the row writes in a code span, alone or in a list such as
+// `planning,completion` — never a word of its prose.
+const CODE_SPAN = /`([^`]+)`/gu
+const CODE_VALUE_SEPARATOR = /[\s,/]+/u
+// The docs default may be followed by a qualifier, never by more of the value itself.
+const QUALIFIER_SEPARATOR = ' '
 
 function by_name(left: string, right: string): number {
 	return left.localeCompare(right)
@@ -72,6 +77,12 @@ function shell_only_keys(document: string): ReadonlySet<string> {
 	return new Set(keys.map((match) => match[1] ?? ''))
 }
 
+function code_values(line: string): ReadonlySet<string> {
+	const spans = [...line.matchAll(CODE_SPAN)].map((match) => match[1] ?? '')
+
+	return new Set(spans.flatMap((span) => span.split(CODE_VALUE_SEPARATOR)))
+}
+
 function reference_row(line: string): ReferenceRow | undefined {
 	const [, key = ''] = REFERENCE_ROW.exec(line) ?? []
 
@@ -79,7 +90,7 @@ function reference_row(line: string): ReferenceRow | undefined {
 
 	const default_cell = line.split(CELL_SEPARATOR).at(DEFAULT_CELL_INDEX) ?? ''
 
-	return { key, default_text: plain(default_cell).trim(), row_text: plain(line) }
+	return { key, default_text: plain(default_cell).trim(), code_values: code_values(line) }
 }
 
 function is_offered(line: string, shell_only: ReadonlySet<string>): boolean {
@@ -130,12 +141,17 @@ function key_drift(expected: ReadonlyArray<string>, listed: ReadonlyArray<string
 }
 
 function value_drift(entry: ExampleEntry, values: string, row: ReferenceRow): Array<string> {
-	const tokens = new Set(row.row_text.split(VALUE_TOKEN_SEPARATOR))
-
 	return values
 		.split(VALUE_LIST_SEPARATOR)
-		.filter((value) => !tokens.has(value))
+		.filter((value) => !row.code_values.has(value))
 		.map((value) => `${entry.key}: value ${value} is not in the docs row`)
+}
+
+function is_reference_default(default_text: string, reference_default: string): boolean {
+	return (
+		default_text === reference_default ||
+		default_text.startsWith(`${reference_default}${QUALIFIER_SEPARATOR}`)
+	)
 }
 
 function head_drift(entry: ExampleEntry, row: ReferenceRow): Array<string> {
@@ -144,7 +160,7 @@ function head_drift(entry: ExampleEntry, row: ReferenceRow): Array<string> {
 	const [default_text = '', values] = entry.head
 		.slice(DEFAULT_PREFIX.length)
 		.split(VALUES_SEPARATOR)
-	const default_problem = default_text.startsWith(row.default_text)
+	const default_problem = is_reference_default(default_text, row.default_text)
 		? []
 		: [`${entry.key}: default ${default_text} is not the docs ${row.default_text}`]
 

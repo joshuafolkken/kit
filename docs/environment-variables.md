@@ -20,6 +20,7 @@ Every other command — `josh gate`, `josh review:brief`, `josh clone:scan`, `jo
 - Release and metrics — `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`, `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS`, `JOSH_METRICS_BASE`.
 - Unit suite — `JOSH_UNIT_DURATIONS`, `JOSH_VITEST_CACHE_DIR`.
 - Evaluation and progress — `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`.
+- Read by every command — `JOSH_TEMP_ROOT`: from `.env` it would reach only the commands that load the file, splitting the run state and core budget between two roots.
 
 `.env.example` lists every other variable below, and `scripts/document/environment-example-reference.test.ts` holds it to this page.
 
