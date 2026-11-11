@@ -23,6 +23,8 @@ or more always means an epic", then
 "`josh run:split`"), which pauses `#<N>` as `run:pause` does (`prerequisite.md`). `epic #<E>` →
 **do not stop**, continue into the loop against `#<E>`; `needs-decision` → report.
 
+Over the size bar before dispatch → a split-only unit, not a lane (`scripts/backlog/backlog-drive-split-unit.ts`).
+
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
 - **Every guard applies unchanged** (`backlogrun.md` → "Guards").
 - **`fullrun` does not promote itself** — it files and **stops** (`split-assessment.md` → "Finding a

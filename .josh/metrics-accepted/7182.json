@@ -1,0 +1,8 @@
+{
+	"reason": "Split-only unit before backlog:drive dispatch (#7182): shared unit builder, split unit, owner re-assert after the unit",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 108,
+		"ai_cost.on_demand_bytes": 238
+	}
+}

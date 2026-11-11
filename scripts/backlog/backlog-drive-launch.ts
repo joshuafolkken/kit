@@ -3,10 +3,11 @@ import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-c
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_owner } from './backlog-drive-owner'
+import { backlog_drive_split_unit } from './backlog-drive-split-unit'
 import { backlog_drive_trace } from './backlog-drive-trace'
 import { backlog_measure_close } from './backlog-measure-close'
 
-const { MEASURED_LAUNCH, UNSAMPLED_LAUNCH } = backlog_drive_launch_pass
+const { MEASURED_LAUNCH, SPLIT_LAUNCH, UNSAMPLED_LAUNCH } = backlog_drive_launch_pass
 
 // The driver's lane launch. The parent that ran `josh latest` in the primary
 // checkout leaves its rewritten lock file in a stash under this message — `backlogrun-lanes.md` →
@@ -78,12 +79,17 @@ async function measured(issue: string): Promise<DriveLaunch | undefined> {
 	return outcome === 'wait' ? UNSAMPLED_LAUNCH : undefined
 }
 
+// An issue over the size bar that its split-only unit split takes no lane either
+// (`backlog-drive-split-unit.ts`). The unit runs for minutes, so ownership is asserted again after it:
+// a driver superseded meanwhile opens no lane.
 async function opened(issue: string, owner: string): Promise<DriveLaunch> {
 	await backlog_drive_owner.assert_current(owner)
 
 	const settled = await measured(issue)
 
 	if (settled !== undefined) return settled
+	if ((await backlog_drive_split_unit.run(issue)) === 'split') return SPLIT_LAUNCH
+	await backlog_drive_owner.assert_current(owner)
 	await run_event_setup.emit(run_event_setup.opening_lane(issue))
 
 	const outcome = await launch_ready(issue)

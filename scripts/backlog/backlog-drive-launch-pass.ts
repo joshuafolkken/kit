@@ -12,8 +12,12 @@ const MEASURED_LAUNCH = 'measured' as const
 // Its answer for an issue whose declaration has no sample yet: it waits, so this drive re-offers it no
 // more and a later drive measures it again (joshuafolkken/kit#6503).
 const UNSAMPLED_LAUNCH = 'unsampled' as const
+// Its answer for an issue over the size bar its split-only unit split into children
+// (`backlog-drive-split-unit.ts`): the parent is an epic now, so it is excluded as a measured close is.
+const SPLIT_LAUNCH = 'split' as const
 
-type DriveLaunch = LaunchOutcome['kind'] | typeof MEASURED_LAUNCH | typeof UNSAMPLED_LAUNCH
+type DriveLaunch =
+	LaunchOutcome['kind'] | typeof MEASURED_LAUNCH | typeof UNSAMPLED_LAUNCH | typeof SPLIT_LAUNCH
 
 interface Settled {
 	in_flight: Array<string>
@@ -68,13 +72,21 @@ function launched(state: DriveState, settled: Settled, ports: DrivePorts): Drive
 	return { ...state, in_flight, exclude, waiting, active: ports.now().toISOString() }
 }
 
-// Whether the launch settled the issue — into flight, closed by its measurement, or waiting for a sample.
+// Whether the launch settled the issue — into flight, closed by its measurement, split by its split-only
+// unit, or waiting for a sample.
+const SETTLED: ReadonlySet<DriveLaunch> = new Set([
+	MEASURED_LAUNCH,
+	LAUNCHED,
+	UNSAMPLED_LAUNCH,
+	SPLIT_LAUNCH,
+])
+
 function is_settled(outcome: DriveLaunch): boolean {
-	return outcome === MEASURED_LAUNCH || outcome === LAUNCHED || outcome === UNSAMPLED_LAUNCH
+	return SETTLED.has(outcome)
 }
 
 function settle(settled: Settled, issue: string, outcome: DriveLaunch): void {
-	if (outcome === MEASURED_LAUNCH) settled.measured.push(issue)
+	if (outcome === MEASURED_LAUNCH || outcome === SPLIT_LAUNCH) settled.measured.push(issue)
 	if (outcome === UNSAMPLED_LAUNCH) settled.unsampled.push(issue)
 	if (outcome === LAUNCHED) settled.in_flight.push(issue)
 }
@@ -107,7 +119,9 @@ async function launch_each(
 //
 // **The pass's launches run side by side** (joshuafolkken/kit#5519): one after another, four lanes took
 // 49 s. Their outcomes are then settled in offer order, so every lane that launched is in flight
-// whichever refused, and the first refusal in that order is the one the pass answers.
+// whichever refused, and the first refusal in that order is the one the pass answers. A split-only unit
+// holds the pass for its minutes (`backlog-drive-split-unit.ts`): accepted, since it runs once per
+// over-bar issue and its split changes what the next offer lists.
 async function launch_all(
 	issues: ReadonlyArray<string>,
 	state: DriveState,
@@ -126,7 +140,7 @@ async function launch_all(
 	return await refused(refusal.issue, refusal.outcome, next, ports)
 }
 
-const backlog_drive_launch_pass = { MEASURED_LAUNCH, UNSAMPLED_LAUNCH, launch_all }
+const backlog_drive_launch_pass = { MEASURED_LAUNCH, SPLIT_LAUNCH, UNSAMPLED_LAUNCH, launch_all }
 
 export type { DriveLaunch }
 export { backlog_drive_launch_pass }

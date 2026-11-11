@@ -16,8 +16,9 @@ import type { PoolContext } from './backlog-gate-scope'
 // (joshuafolkken/kit#5935).
 //
 // One over the cap or the size bar is offered too, with the same note (joshuafolkken/kit#7074): past
-// the size bar the lane's `lane:plan` answers `split`, and the lane splits off a separately-mergeable part or
-// keeps it one Issue, so the size never waits on a person. Holding it here stopped every lane once
+// the size bar `backlog:drive`'s split-only unit splits it before a lane opens
+// (`backlog-drive-split-unit.ts`), and a lane it still reaches answers `split` at `lane:plan`, so the
+// size never waits on a person. Holding it here stopped every lane once
 // the measured rate rose (joshuafolkken/kit#7006).
 
 // What the note asks of the issue: a further split for a split child, else the reason it stays one.

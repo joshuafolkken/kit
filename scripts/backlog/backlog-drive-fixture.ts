@@ -58,6 +58,8 @@ interface Script {
 	measured_launches?: ReadonlyArray<string>
 	// Issues whose measurement declaration had no sample yet, so the launch waited without a lane.
 	unsampled_launches?: ReadonlyArray<string>
+	// Issues over the size bar their split-only unit split, so the launch took no lane.
+	split_launches?: ReadonlyArray<string>
 	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
 	free_lanes?: ReadonlyArray<number>
 	// The limit-room answers in order, the last repeating; unset reads as the free-lane answers.
@@ -163,6 +165,7 @@ function launch_outcome(script: Script, issue: string): DriveLaunch {
 	const scripted: ReadonlyArray<[DriveLaunch, ReadonlyArray<string> | undefined]> = [
 		['measured', script.measured_launches],
 		['unsampled', script.unsampled_launches],
+		['split', script.split_launches],
 		['failed', script.failed_launches],
 		['unopened', script.unopened_launches],
 	]

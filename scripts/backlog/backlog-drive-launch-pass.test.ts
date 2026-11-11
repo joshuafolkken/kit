@@ -8,6 +8,22 @@ const { ACTIVE, OFFERED, OFFERED_TOO, harness, offer, state } = backlog_drive_fi
 const EARLIER = '2026-09-23T00:00:00.000Z'
 const LAUNCH_THREW = 'the launch threw'
 
+// joshuafolkken/kit#7182: an issue its split-only unit split is an epic now — out of flight and out of
+// later offers, as a measured close is, while the next offered issue still launches.
+describe('backlog_drive.run_pass — a split-only unit split the issue', () => {
+	it('keeps the split issue out of flight and out of later offers', async () => {
+		const { ports } = harness({
+			offers: [offer('run', [OFFERED, OFFERED_TOO])],
+			split_launches: [OFFERED],
+		})
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind).toBe('continue')
+		expect(result.state.in_flight).toStrictEqual([OFFERED_TOO])
+		expect(result.state.exclude).toStrictEqual([OFFERED])
+	})
+})
+
 describe('backlog_drive.run_pass — a measured close', () => {
 	it('keeps the measured issue out of flight and out of later offers', async () => {
 		const { ports, calls } = harness({
