@@ -150,6 +150,16 @@ describe('run_board_fit.fit order', () => {
 	})
 })
 
+// joshuafolkken/kit#7281: an empty section's kept head draws no row, so `more N` stays with the plan.
+describe('run_board_fit.fit an empty section under the plan', () => {
+	it('counts the plan’s cut rows after its last row, not under an empty section’s head', () => {
+		const empty = section([], ['', 'Q 0'])
+		const lines = fit_wide(parts_of([issues(5)], { below: [empty] }), 8)
+
+		expect(lines).toStrictEqual([...HEADER, '', '  1', '  2', '  more 3', '', 'Q 0'])
+	})
+})
+
 describe('run_board_fit.fit order of the rows that stay longest', () => {
 	it.each([
 		['the oldest parked row', 7, ['', '  1', '  3', '  5', '  more 5']],
