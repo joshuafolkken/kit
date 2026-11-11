@@ -28,6 +28,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 async function no_wait(): Promise<void> {
@@ -106,6 +107,26 @@ describe('run_project_steps — admission', () => {
 
 		expect(sleep).toHaveBeenCalled()
 		expect(held.map((claims) => claims.includes(BLOCKER))).toStrictEqual([false])
+	})
+})
+
+describe('run_project_steps — held mark', () => {
+	it('runs its steps under the held mark, so a weighted josh step claims nothing more', async () => {
+		declare_steps([CARGO])
+		vi.stubEnv(core_budget.HELD_KEY, '')
+		const marks: Array<boolean> = []
+
+		stub_runs()
+		vi.mocked(gate_run_steps.run_gate_step).mockImplementationOnce(async (step) => {
+			marks.push(core_budget.is_held())
+
+			return await { label: step.label, command: '', output: '', exit_code: 0, elapsed_ms: 0 }
+		})
+
+		await run_steps()
+
+		expect(marks).toStrictEqual([true])
+		expect(core_budget.is_held()).toBe(false)
 	})
 })
 
