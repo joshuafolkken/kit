@@ -4,7 +4,6 @@ import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
 	CHECK_WAIT_INTERVAL_MS,
 	compute_max_attempts,
-	default_fetch_pr_state,
 	DEFAULT_STABLE_READS,
 	PR_CHECKS_TIMEOUT_MESSAGE,
 	SECONDS_TO_MS,
@@ -250,13 +249,14 @@ describe('pr_checks_watch — what it asks the poll loop for', () => {
 
 		expect(wait.mock.calls[0]?.[0]).toMatchObject({
 			branch_name: BRANCH,
-			fetcher: default_fetch_pr_state,
+			// Gated per wait (#7238), so a fresh fetcher rather than the shared default.
+			fetcher: expect.any(Function),
 			interval_ms: CHECK_WAIT_INTERVAL_MS,
 			max_attempts: compute_max_attempts(
 				PR_CHECKS_WATCH_TIMEOUT_MS / SECONDS_TO_MS,
 				CHECK_WAIT_INTERVAL_MS,
 			),
-			backoff: PR_POLL_SCHEDULES.checks,
+			backoff: PR_POLL_SCHEDULES.checks_gated,
 			required_stable_reads: DEFAULT_STABLE_READS,
 			evaluator: CHECKS_SETTLED_EVALUATOR,
 		})

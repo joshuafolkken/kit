@@ -17,6 +17,7 @@ const NO_WINDOW = {
 	poll_ms: POLL_MS,
 	offer_ms: OFFER_MS,
 	idle_offer_ms: backlog_budget.IDLE_OFFER_INTERVAL_MS,
+	check_ms: backlog_budget.LISTING_CHECK_INTERVAL_MS,
 	window_ms: undefined,
 }
 const FREE_LANES = 6
@@ -75,15 +76,23 @@ function merge(world_state: World, issue: string): Awaited<ReturnType<LoopPorts[
 	return { token: 'none', is_offer: true, outcome: is_parked ? 'parked' : 'merged' }
 }
 
-// The run's own records and parks: nothing added, raised, named, yielded or parked.
+// The run's own records and parks: nothing added, raised, named, listed, yielded or parked.
 const NO_RECORD: Pick<
 	LoopPorts,
-	'begin_tick' | 'added_since' | 'raised_since' | 'named_left' | 'yields' | 'park' | 'stall'
+	| 'begin_tick'
+	| 'added_since'
+	| 'raised_since'
+	| 'named_left'
+	| 'listing_changed'
+	| 'yields'
+	| 'park'
+	| 'stall'
 > = {
 	begin_tick: async () => undefined,
 	added_since: async () => false,
 	raised_since: async () => false,
 	named_left: async () => false,
+	listing_changed: async () => false,
 	yields: async () => [],
 	park: async () => undefined,
 	stall: async () => undefined,
