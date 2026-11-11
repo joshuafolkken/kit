@@ -32,6 +32,7 @@ interface VerdictEntry {
 }
 
 const SHORT_HASH_LENGTH = 12
+const REUSED_PREFIX = 'reused: tree '
 
 function record_path(name: string): string {
 	return stamp_file.stamp_path(`josh-tree-verdict-${name}-`, PROJECT_ROOT)
@@ -64,9 +65,14 @@ function read(tree: GateTree | undefined, target: string): TreeVerdict | undefin
 function reused_line(verdict: TreeVerdict, target: string): string {
 	const is_green = verdict.exit_code === 0
 	const state = is_green ? 'green' : 'red'
-	const line = `reused: tree ${verdict.tree.slice(0, SHORT_HASH_LENGTH)} ${state} at ${verdict.at}`
+	const line = `${REUSED_PREFIX}${verdict.tree.slice(0, SHORT_HASH_LENGTH)} ${state} at ${verdict.at}`
 
 	return is_green ? line : `${line} — remove ${target} to run it again`
+}
+
+// Whether a check's output is a replayed verdict, which keeps the tail alone and not what the run read.
+function is_replay(out: string): boolean {
+	return out.includes(REUSED_PREFIX)
 }
 
 // `live` holds the notices the caller asks again rather than keeps: answers that read state outside the
@@ -99,7 +105,7 @@ async function record(
 	stamp_file.replace_stamp(target, { tree: tree_hash(before), exit_code, tail, at })
 }
 
-const tree_verdict = { read, record, record_path, replay, reused_line }
+const tree_verdict = { is_replay, read, record, record_path, replay, reused_line }
 
 export type { TreeVerdict, VerdictEntry }
 export { tree_verdict }
