@@ -32,19 +32,25 @@ function bash_call(command: string): { name: string; input: { command: string } 
 	return { name: 'Bash', input: { command } }
 }
 
-// A tail of the model's reply (when given) followed by the person's prompt.
-function is_satisfied(content: string, reply = ''): boolean {
-	const answer = JSON.stringify({
+function reply_line(text: string): string {
+	return JSON.stringify({
 		type: 'assistant',
-		message: { role: 'assistant', content: [{ type: 'text', text: reply }] },
+		message: { role: 'assistant', content: [{ type: 'text', text }] },
 	})
-	const prompt = JSON.stringify({
+}
+
+function prompt_line(content: string, is_meta = false): string {
+	return JSON.stringify({
 		type: 'user',
+		isMeta: is_meta,
 		timestamp: '2026-11-11T00:00:00.000Z',
 		message: { role: 'user', content },
 	})
+}
 
-	return unasked_filing.ROW.already_satisfied([answer, prompt].join('\n'))
+// A tail of the model's reply (when given) followed by the person's prompt.
+function is_satisfied(content: string, reply = ''): boolean {
+	return unasked_filing.ROW.already_satisfied([reply_line(reply), prompt_line(content)].join('\n'))
 }
 
 afterEach(() => {
@@ -110,7 +116,9 @@ describe('unasked_filing.ROW.already_satisfied', () => {
 			expect(is_satisfied(content)).toBe(false)
 		},
 	)
+})
 
+describe('unasked_filing.ROW.already_satisfied — a yes to a proposal', () => {
 	it.each(['はい', 'お願いします', 'yes', 'OK'])(
 		'stands down on a yes to a proposed Issue: %s',
 		(content) => {
@@ -118,8 +126,22 @@ describe('unasked_filing.ROW.already_satisfied', () => {
 		},
 	)
 
-	it('holds on a yes to something other than an Issue', () => {
-		expect(is_satisfied('はい', OTHER_REPLY)).toBe(false)
+	it.each([OTHER_REPLY, 'No issues found; shall I commit?', '起票は不要です。続けますか？'])(
+		'holds on a yes to a reply that proposes no Issue: %s',
+		(reply) => {
+			expect(is_satisfied('ok', reply)).toBe(false)
+		},
+	)
+
+	it('anchors on the person’s yes, past a skill body the harness wrote after it', () => {
+		const tail = [
+			reply_line(PROPOSAL_REPLY),
+			prompt_line('はい'),
+			reply_line('Loading the skill.'),
+			prompt_line('skill body', true),
+		].join('\n')
+
+		expect(unasked_filing.ROW.already_satisfied(tail)).toBe(true)
 	})
 })
 

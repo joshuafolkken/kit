@@ -37,7 +37,13 @@ const FILING_WORDS: ReadonlyArray<RegExp> = [
 // A short yes to the model's own proposal is the confirmation the refusal asks for.
 const AFFIRMATIVE = /^(?:はい|うん|お願い|どうぞ|進めて|yes|ok|okay|sure|please do|go ahead)/iu
 const SHORT_REPLY = 40
-const PROPOSAL = /起票|\bissues?\b/iu
+// The reply must ask to file, not merely mention an issue ("No issues found; shall I commit?").
+const PROPOSALS: ReadonlyArray<RegExp> = [
+	/起票(?:しますか|しましょうか|してよい|して良い|してもよい)/u,
+	/issue\s*に(?:しますか|しましょうか)/iu,
+	/\b(?:shall|should) I file\b/iu,
+	/\bfile (?:an? |this as an? |it as an? )?issues?\?/iu,
+]
 
 const ASSISTANT_LINE_SCHEMA = z.object({
 	type: z.literal('assistant'),
@@ -47,7 +53,6 @@ const ASSISTANT_LINE_SCHEMA = z.object({
 const CHECK_FLAG = /\s--check\b/u
 // A quoted argument (a title) never carries the flag, whatever it spells.
 const QUOTED = /"[^"]*"|'[^']*'/gu
-const FILING_NAMES: ReadonlySet<string> = new Set(['issue:file'])
 
 const UNASKED_FILING_REASON =
 	'⛔ unasked filing: this interactive session files an Issue only on the person’s explicit ' +
@@ -67,10 +72,15 @@ function reply_text(line: string): string {
 	return parsed.success ? time_reported_failure.result_text(parsed.data.message.content) : ''
 }
 
+// A prompt line the person wrote — not a skill body or a hand-back the harness wrote on a prompt line.
+function is_person_line(line: string): boolean {
+	return turn_filings.is_prompt_line(line) && last_prompt.person_prompt(line) !== undefined
+}
+
 // The model's last words before the person's last prompt — where the proposal a yes confirms sits.
 function reply_before_prompt(tail: string): string {
 	const lines = tail.split('\n')
-	const prompt_at = lines.findLastIndex((line) => turn_filings.is_prompt_line(line))
+	const prompt_at = lines.findLastIndex((line) => is_person_line(line))
 	const replies = lines.slice(0, Math.max(prompt_at, 0)).map((line) => reply_text(line))
 
 	return replies.findLast((text) => text !== '') ?? ''
@@ -79,8 +89,9 @@ function reply_before_prompt(tail: string): string {
 function is_confirmed(prompt: string, tail: string): boolean {
 	const trimmed = prompt.trim()
 	if (trimmed.length > SHORT_REPLY || !AFFIRMATIVE.test(trimmed)) return false
+	const reply = reply_before_prompt(tail)
 
-	return PROPOSAL.test(reply_before_prompt(tail))
+	return PROPOSALS.some((pattern) => pattern.test(reply))
 }
 
 // The person's last prompt asks for filing, or says yes to a proposed Issue — the stand-down that lets
@@ -107,7 +118,7 @@ function is_unattended(context: HookContext): boolean {
 }
 
 function is_writing_segment(segment: string): boolean {
-	if (!shell_segments.is_josh_command(segment, FILING_NAMES)) return false
+	if (!bash_triggers.is_issue_filing_segment(segment)) return false
 
 	return !CHECK_FLAG.test(segment.replaceAll(QUOTED, ''))
 }
