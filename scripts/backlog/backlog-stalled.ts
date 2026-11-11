@@ -3,6 +3,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { backlog_hold_text } from './backlog-hold-text'
 
 // When ready backlog work sits undispatched while lanes are free, nobody notices until a person asks.
 // This is the mechanical judge of that state: three facts read, never
@@ -113,10 +114,10 @@ function open_hold(entries: ReadonlyArray<LedgerEntry>): string | undefined {
 }
 
 // The one line a person reads in the notification and on the stream: what is waiting, how long, and the
-// driver's hold reason when it holds deliberately.
+// driver's hold, as a sentence, when it holds deliberately.
 function describe(reading: StallReading): string {
 	const minutes = Math.floor(reading.waiting_ms / MS_PER_MINUTE)
-	const held = reading.hold === undefined ? '' : ` (held: ${reading.hold})`
+	const held = reading.hold === undefined ? '' : ` (${backlog_hold_text.text_of(reading.hold)})`
 
 	return `${String(reading.ready_count)} ready, ${String(reading.free_lanes)} free lane(s), ${String(minutes)}m waiting with both${held}`
 }

@@ -1,3 +1,4 @@
+import { backlog_hold_codes } from '#scripts/backlog/backlog-hold-codes'
 import { lane_hand_back_hold } from './lane-hand-back-hold'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_ledger } from './lane-ledger'
@@ -16,7 +17,7 @@ import { lane_ledger_write } from './lane-ledger-write'
 //
 // Best-effort like every ledger write: a failure records nothing rather than failing the ship.
 
-const DRIVERLESS_PREFIX = 'driverless:'
+const { DRIVERLESS_PREFIX } = backlog_hold_codes
 
 function is_driverless(reason: string): boolean {
 	return reason.startsWith(DRIVERLESS_PREFIX)

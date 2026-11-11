@@ -30,6 +30,7 @@ import { backlog_drive_paused } from './backlog-drive-paused'
 import { backlog_drive_retrospective } from './backlog-drive-retrospective'
 import { backlog_drive_state } from './backlog-drive-state'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
+import { backlog_hold_codes } from './backlog-hold-codes'
 import { backlog_offer_timing, type LoopRun, type OfferTiming } from './backlog-offer-timing'
 import { backlog_yield_cap, type YieldCapPorts } from './backlog-yield-cap'
 
@@ -48,8 +49,6 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 	'wait',
 ])
 const JUDGE_REASON = 'judge'
-// The `hold` reason a pass held by a Claude usage limit records.
-const USAGE_LIMIT_REASON = 'usage-limit'
 const { launch_all } = backlog_drive_launch_pass
 const { is_drain_owed } = backlog_drive_retrospective
 const { initial_state, merge_stopped } = backlog_drive_state
@@ -279,7 +278,7 @@ function on_verdict(read: OfferRead, state: DriveState): PassResult {
 }
 
 async function usage_held(state: DriveState, ports: DrivePorts): Promise<PassResult> {
-	await ports.hold(USAGE_LIMIT_REASON)
+	await ports.hold(backlog_hold_codes.USAGE_LIMIT_REASON)
 
 	return { kind: 'continue', state }
 }
@@ -469,7 +468,6 @@ async function run_loop(
 const backlog_drive = {
 	HANDOFF_TOKENS,
 	TOKEN_HANDLING,
-	USAGE_LIMIT_REASON,
 	initial_state,
 	merge_stopped,
 	run_loop,
