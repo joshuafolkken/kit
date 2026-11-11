@@ -1,0 +1,7 @@
+{
+	"reason": "#7229 gates the arrival probe's backlog read on the auto-ok listing check; review fix keeps an empty listing baseline after a failed first read",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 43
+	}
+}

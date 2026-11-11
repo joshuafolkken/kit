@@ -1071,7 +1071,7 @@ pnpm josh lane:limit --reset   # clear the override; the run’s start limit app
 
 The run keeps the environment it started with, so this writes an override onto the run's record, read before `JOSH_LANE_LIMIT`.
 
-- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event: a running `backlog:drive` asks for work on its next tick, seconds later, to fill the freed lanes, and the parent's `run:progress --wait` watcher wakes within a minute.
+- The next lane allocation uses the new limit. Raising it writes a `lane-limit` event: a running `backlog:drive` asks for work on its next tick, seconds later, to fill the freed lanes, and the parent's `run:progress --wait` watcher wakes within ten seconds.
 - Lowering it stops no running child; a lane that finishes is not refilled.
 - The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A stopped lane keeps its tree and changes; its port seat becomes free once its owned processes and listeners are gone.
 - Every dispatch atomically acquires a seat and updates `.env` and the child's environment before starting. Kept trees are prioritized within the same free-seat limit as fresh launches.

@@ -3,8 +3,9 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
 // Whether the run's event stream holds an event of one kind since an instant: a `pnpm josh run:add`
 // addition, or a `lane:limit` raise the drive asks about early (joshuafolkken/kit#6861).
-// The arrival probe reads the backlog once a minute, and a `--only` run's pool is empty by definition, so
-// an added issue would otherwise wait for the minute — or never wake a `--only` parent at all. The event
+// The arrival probe reads the backlog only once the `auto-ok` listing changes, and a `--only` run's pool
+// is empty by definition, so an added issue would otherwise wait for that — or never wake a `--only`
+// parent at all. The event
 // stream is a local file, so this is read on every tick rather than on the probe's interval.
 
 type EventReader = () => Promise<ReadonlyArray<RunEvent>>
