@@ -26,7 +26,7 @@ const LOG_PATH = stamp_file.stamp_path(
 	PROJECT_ROOT,
 	gate_log.GATE_LOG_SUFFIX,
 )
-const LINT_RELATED = 'lint:related'
+const LINT_RELATED = gate_labels.LINT_TARGET
 const TEST_RELATED = 'test:related'
 // The verdict `lint:related` itself prints last, under its own label.
 const LINT_PASSED = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, [])

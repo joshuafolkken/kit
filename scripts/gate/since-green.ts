@@ -21,13 +21,20 @@ import { verification_inputs } from './verification-inputs'
 // says nothing under the new one. An empty list is
 // the positive fact that nothing moved: the gate's unit step on the tree the preflight just passed.
 
+const SINCE_GREEN = 'since its last green run on this checkout'
 // Why a command that found nothing moved ran nothing, in the words both scoped commands print.
-const UNMOVED_REASON = 'nothing moved since its last green run on this checkout'
+const UNMOVED_REASON = `nothing moved ${SINCE_GREEN}`
 
 // The narrowing line each command prints before it runs, so a since-green run is never read as one
 // over the whole branch.
 function describe(label: string, moved: ReadonlyArray<string>): string {
-	return `${label}: reading only the ${String(moved.length)} file(s) changed since its last green run on this checkout.`
+	return `${label}: reading only the ${String(moved.length)} file(s) changed ${SINCE_GREEN}.`
+}
+
+// Whether a run's output says it read less than the whole branch change: a since-green narrowing or
+// an unmoved run, both of which lean on an earlier green run.
+function is_narrowed(out: string): boolean {
+	return out.includes(SINCE_GREEN)
 }
 
 // **Why a check read the whole branch change, in one word** (joshuafolkken/kit#5531): printed on the
@@ -110,6 +117,7 @@ const since_green = {
 	describe,
 	fallback_line,
 	fallbacks_of,
+	is_narrowed,
 	read_moved_parts,
 	read_verdict,
 }
