@@ -44,6 +44,7 @@ import { shell_body_trigger } from './shell-body-trigger'
 import { test_declared_commit } from './test-declared-commit'
 import { third_party_write } from './third-party-write'
 import { timed_rerun } from './timed-rerun'
+import { unasked_filing } from './unasked-filing'
 import { worktree_guard } from './worktree-guard'
 
 // The rules delivered by a `PreToolUse` refusal at the moment they bind, rather than carried resident
@@ -135,6 +136,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// The direct call only. The filing cap, the WIP cap and the fold question are `issue:file`'s own
 	// steps, so no row gates them.
 	direct_filing.ROW,
+	// An interactive session's `issue:file` the person did not ask for; unattended runs never fire it.
+	unasked_filing.ROW,
 	// Before the body rows: a comment posted by hand is refused whatever its body, and the command it
 	// points at takes the body by path, so the body rows have nothing left to say.
 	direct_issue_comment.ROW,
