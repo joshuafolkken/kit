@@ -1,0 +1,2 @@
+- rf:project-conventions | low | docs/maintainers/wip-cap-rationale.md:112 | 2026-11-11 | #7201
+- rf:tests | low | scripts/issue/issue-file-cli-source.test.ts | 2026-11-11 | #7201
