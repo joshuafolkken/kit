@@ -36,11 +36,14 @@ const LIVE: ProfilePorts = {
 		return (user + system) / US_PER_MS
 	},
 	heap_bytes: () => {
-		const { heapUsed, external } = process.memoryUsage()
+		const usage = process.memoryUsage()
 
-		return heapUsed + external
+		return usage.heapUsed + usage.external
 	},
-	settle: globalThis.gc,
+	// A no-op where the process was started without `--expose-gc`.
+	settle: () => {
+		globalThis.gc?.()
+	},
 }
 
 // The redraw alone: the frame is drawn from one read taken beforehand, and written nowhere.

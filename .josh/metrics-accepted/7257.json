@@ -2,6 +2,6 @@
 	"reason": "Adds tools/metrics/run-board-profile, the per-read CPU and allocation probe #7257 asks for",
 	"date": "2026-11-11",
 	"growth": {
-		"scripts.code_lines": 173
+		"scripts.code_lines": 175
 	}
 }
