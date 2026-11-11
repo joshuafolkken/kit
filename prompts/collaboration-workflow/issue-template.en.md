@@ -1,21 +1,21 @@
 ## Step 1: Issue template (en)
 
-The `en` column of `issue-template.md`'s template; its rules and label table → `issue-template.md`. Keys, fixed values and headings → `scripts/issue/issue-body-keys.ts`, mirrored in the table below.
+The `en` column of `issue-template.md`'s template; its rules and label table → `issue-template.md`. Keys, fixed values and headings → `scripts/issue/issue-body-keys.ts`, mirrored in the table below. The parentheses `（）`, the minute unit `分` and the `## Expected effect` labels stay as `issue:lint` reads them.
 
 ````md
 ## Background
 
 <`- Type: defect` for a defect, else `- Type: non-defect`>
-<for a defect `- Cause: #<PR>`, or `- Cause: unknown (<reason>)` when it cannot be traced>
-<`- Human judgement: not needed` or `- Human judgement: needed (<policy decision / external account / visual check>)`>
-<when a measurement picks: `- Decision rule: <condition> then <A>, else <B> (#<measurement Issue>)`, with `Human judgement: not needed`>
-<for a cause that lengthened a lane: `- Cause lane: <minutes> minutes (#<N>)`; the minutes from `pnpm josh lane:net <N>`>
-<the minutes this Issue's cause could save: `- Cause loss: <minutes> minutes`, one line per recurrence>
+<for a defect `- Cause: #<PR>`, or `- Cause: unknown（<reason>）` when it cannot be traced>
+<`- Human judgement: not needed` or `- Human judgement: needed（<policy decision / external account / visual check>）`>
+<when a measurement picks: `- Decision rule: <condition> then <A>, else <B>（#<measurement Issue>）`, with `Human judgement: not needed`>
+<for a cause that lengthened a lane: `- Cause lane: <minutes> 分（#<N>）`; the minutes from `pnpm josh lane:net <N>`>
+<the minutes this Issue's cause could save: `- Cause loss: <minutes> 分`, one line per recurrence>
 <for a security finding: `- Security: <the bypassed gate, guard or permission>`>
 <for a run-machinery defect that parked an Issue or stopped a run: `- Cause park: #<N>`, one line per number, same repository only>
 <for a behavior change: `- Enforcement: <the hook, lint or gate that stops it>` (none: `- Enforcement: measurement only`)>
 <for a behavior change: `- Measurement: <the number that shows a violation (command name)>`>
-<optional: `- Priority: critical (condition <1-3>)`, `- Priority: high (<basis>)` or `- Priority: normal`>
+<optional: `- Priority: critical（condition <1-3>）`, `- Priority: high（<basis>）` or `- Priority: normal`>
 <the diff estimate: `- Size estimate: about <N> files / <M> lines (excluding tests)`, counting docs, snapshots and command listings>
 <past the guide, cap or bar (`split-assessment.md` → "The question") as one Issue: `- No-split reason: <reason>`>
 <each figure a decision used: ``- Premise: `<command>` <comparison> <figure>`` (one figure per line)>
@@ -47,7 +47,7 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 
 ## Reproduction
 
-<only for an Issue that changes AI behavior, or a defect with `- Cause: unknown (<reason>)`: a command and its actual output, fenced (``` or ~~~)>
+<only for an Issue that changes AI behavior, or a defect with `- Cause: unknown（<reason>）`: a command and its actual output, fenced (``` or ~~~)>
 
 - `<reproduction command>`
 
@@ -59,10 +59,10 @@ The `en` column of `issue-template.md`'s template; its rules and label table →
 
 <only for `- Purpose: time saving`; the source is a command and its value>
 
-- Hit rate: <value>
-- Gain per hit: <value>
-- Loss per miss: <value>
-- Source: <`pnpm josh lane:stats` → value>
+- 効く率: <hit rate>
+- 1 回あたりの得: <gain per hit>
+- 外れたときの損: <loss per miss>
+- 出典: <`pnpm josh lane:stats` → value>
 
 ## Origin
 

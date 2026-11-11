@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { defect_origin_line } from './defect-origin-line'
+import { expected_effect_lint } from './expected-effect-lint'
 import { issue_body_keys } from './issue-body-keys'
 
 const DOCUMENT_ROOT = path.join(
@@ -19,6 +21,8 @@ const HEADING_PREFIX = '## '
 const CELL_SEPARATOR = '|'
 // A declaration key as the template writes it: `- <key>:` inside a code span.
 const DECLARATION_KEY = /`- (?<key>[^:`]+):/gu
+// The template's unknown-cause example, as a filer copies it.
+const UNKNOWN_CAUSE = /`(?<line>- Cause: unknown[^`]*)`/u
 const KINDS = { keys: 'key', values: 'value', headings: 'heading' } as const
 const KIND_NAMES: ReadonlySet<string> = new Set(Object.values(KINDS))
 
@@ -79,5 +83,24 @@ describe(ENGLISH_TEMPLATE, () => {
 
 		expect(named.filter((key) => key === undefined || !english_keys.has(key))).toStrictEqual([])
 		expect(named.length).toBeGreaterThan(0)
+	})
+})
+
+describe(`${ENGLISH_TEMPLATE} examples under issue:lint`, () => {
+	it('writes the expected-effect items with the labels expected-effect-lint.ts reads', () => {
+		const labels = template_lines(ENGLISH)
+			.slice(template_lines(ENGLISH).indexOf(`${HEADING_PREFIX}Expected effect`))
+			.filter((line) => line.startsWith('- '))
+			.map((line) => line.slice('- '.length, line.indexOf(':')))
+
+		expect(labels).toStrictEqual(expected_effect_lint.ITEM_LABELS)
+	})
+
+	it('writes an unknown cause that defect-origin-line.ts parses', () => {
+		const example = UNKNOWN_CAUSE.exec(ENGLISH)?.groups?.['line'] ?? ''
+
+		expect(
+			defect_origin_line.parse(`${issue_body_keys.heading('background')}\n\n${example}`),
+		).toStrictEqual({ kind: 'unknown', reason: '<reason>' })
 	})
 })
