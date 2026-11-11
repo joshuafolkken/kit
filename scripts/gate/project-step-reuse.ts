@@ -31,7 +31,7 @@ function step_inputs(step: GateStepDefinition): CheckInputs | undefined {
 
 	return {
 		fingerprint: () => JSON.stringify({ command, paths }),
-		touches: async (moved) => await touches(moved, paths),
+		touches: async (moved) => touches(moved, paths),
 	}
 }
 
