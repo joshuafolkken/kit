@@ -1,4 +1,5 @@
 import { backlog_hold_codes } from './backlog-hold-codes'
+import { backlog_wait_cause, type WaitCause } from './backlog-wait-cause'
 
 // A ledger hold reason as a sentence a person reads (joshuafolkken/kit#7287): what keeps a free lane
 // empty and who fills it. The ledger keeps the code — `lane:stats` and the gap readers key on it — so
@@ -30,15 +31,20 @@ const HAND_BACK_TEXT: ReadonlyMap<string, string> = new Map([
 // `offer:<verdict>:<detail>`: the offer started nothing, for its cause or its answer.
 const OFFER_TEXT: ReadonlyMap<string, string> = new Map([
 	['solo', 'a run:solo issue must finish first'],
-	['chain', 'queued issues wait on other issues'],
-	['gate', 'queued issues wait for a start date or condition'],
-	['chain+gate', 'queued issues wait on other issues or a start condition'],
 	['blocked', 'every queued issue is blocked'],
 	['exhausted', 'the backlog has nothing left to start'],
 	['untriaged', AWAIT_TRIAGE],
 	['parked', 'parked issues await your decision'],
 	['unreadable', 'the backlog could not be read'],
 ])
+
+// A wait-cause detail (`chain`, `gate+lane`, …, `backlog-wait-cause.ts`) names each of its causes.
+const CAUSE_TEXT: Readonly<Record<WaitCause, string>> = {
+	chain: 'other issues',
+	gate: 'a start condition',
+	lane: 'a running lane',
+}
+const CAUSE_JOINER = ' or '
 
 const MEMORY_TEXT = 'memory pressure is high; lanes resume when it eases'
 const USAGE_LIMIT_TEXT = 'the usage limit is reached; lanes resume when it resets'
@@ -55,12 +61,20 @@ function hand_back_text(reason: string): string {
 	return HAND_BACK_TEXT.get(reason) ?? `the driver paused (${reason}); the session restarts it`
 }
 
-// `rest` is `<verdict>[:<detail>]`; a detail the table does not know names the whole of it.
+function cause_text(detail: string): string | undefined {
+	const causes = backlog_wait_cause.causes_of_tag(detail)
+
+	if (causes === undefined) return undefined
+
+	return `queued issues wait on ${causes.map((cause) => CAUSE_TEXT[cause]).join(CAUSE_JOINER)}`
+}
+
+// `rest` is `<verdict>[:<detail>]`; a detail neither the table nor a wait cause knows names the whole.
 function offer_text(rest: string): string {
 	const index = rest.indexOf(REASON_SEPARATOR)
 	const detail = index === NOT_FOUND ? '' : rest.slice(index + REASON_SEPARATOR.length)
 
-	return OFFER_TEXT.get(detail) ?? `the backlog is waiting (${rest})`
+	return OFFER_TEXT.get(detail) ?? cause_text(detail) ?? `the backlog is waiting (${rest})`
 }
 
 function prefixed_text(code: string): string | undefined {

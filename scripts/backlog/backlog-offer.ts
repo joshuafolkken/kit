@@ -42,9 +42,9 @@ interface OfferAnswer {
 	not_before_ms?: number
 	// Why a `wait` answer started nothing, where `backlog:next` said: `solo` for the `run:solo` gate,
 	// so `lane:stats` rows that wait apart from every other one (joshuafolkken/kit#4396); `chain`,
-	// `gate` or `chain+gate` for the waits `backlog-wait-cause.ts` names (joshuafolkken/kit#4513).
+	// `gate`, `lane` or their `+` joins for the waits `backlog-wait-cause.ts` names (joshuafolkken/kit#4513).
 	cause?: string
-	// The issues a `chain` / `gate` cause waited on, recorded with the hold.
+	// The issues a `chain` / `gate` / `lane` cause waited on, recorded with the hold.
 	waiting?: ReadonlyArray<number> | undefined
 	// Whether `backlog:next` held an untriaged candidate back while offering the triaged ones — its
 	// trailing `triage` line — so the judgment session is started beside the lanes.
