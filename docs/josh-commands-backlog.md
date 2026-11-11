@@ -161,7 +161,7 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
 - `--found-during <N>` — the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 2); step 7 never holds it as a candidate here. #N gets a deferral comment.
-- `--over-cap` — the run is blocked by this filing; the WIP cap lets it through.
+- `--over-cap` — the run is blocked by this filing, or a user typed `new` (`kickoff` / `fullrun` / `halfrun` / `prrun new`, whose filing commands carry it); the WIP cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 - `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.

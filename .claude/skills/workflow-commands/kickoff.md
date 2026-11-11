@@ -37,7 +37,7 @@ checked out here. A third-party owner is Tier C: stop rather than file.
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
   deliverable takes the **single-issue path**, several the **multi-issue split path**.
   - **Single-issue path**: (1) Derive an English title, or use the one given. (2) `pnpm josh issue:file
-    "<title>" --body-file .josh/tmp/body.md` plus the labels the words typed after `new` name
+    "<title>" --body-file .josh/tmp/body.md --over-cap` plus the labels the words typed after `new` name
     ("Words typed after `new`", below; body per `prompts/collaboration-workflow/issue-template.md`) —
     its duplicate scan runs first, and a candidate covering the same work stops the run (`SKILL.md` →
     `issue-scout.md`). Capture `<N>`. (3) Post the plan as `kickoff #<N>` does — its `--planned` sends the Telegram. (4)

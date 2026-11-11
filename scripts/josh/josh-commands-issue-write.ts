@@ -261,7 +261,8 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--over-cap'],
-					description: 'the run is blocked by this filing; the WIP cap lets it through.',
+					description:
+						'the run is blocked by this filing, or a user typed `new` (`kickoff` / `fullrun` / `halfrun` / `prrun new`, whose filing commands carry it); the WIP cap lets it through.',
 				},
 				{
 					names: ['--no-auto-ok'],
