@@ -73,7 +73,7 @@ afterEach(() => {
 })
 
 describe('fresh_machine_cli.run — choosing the scenario', () => {
-	it('lists the six patterns of kit and runs nothing', async () => {
+	it('lists the seven patterns of kit and runs nothing', async () => {
 		await expect(fresh_machine_cli.run(['--list'])).resolves.toBe(0)
 
 		expect(printed(console.info).split('\n')).toStrictEqual([
@@ -83,6 +83,7 @@ describe('fresh_machine_cli.run — choosing the scenario', () => {
 			START_PATTERN,
 			'kit-test-svelte-init',
 			'kit-test-svelte-start',
+			'kit-test-lua-dlx',
 		])
 		expect(fresh_machine_run.run).not.toHaveBeenCalled()
 	})

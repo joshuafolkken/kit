@@ -430,7 +430,7 @@ It refuses, changing nothing and exiting `1`, unless the directory:
 Run an install scenario in a Docker container of a machine with nothing installed, and keep the log.
 
 ```bash
-pnpm josh fresh:run --list                        # kit's six patterns
+pnpm josh fresh:run --list                        # kit's seven patterns
 pnpm josh fresh:run kit-test-html-init            # one pattern, the packed checkout
 pnpm josh fresh:run kit-test-html-start           # a GitHub pattern, the latest published version
 pnpm josh fresh:run --spec fresh/html-init.json   # a scenario another toolkit wrote
