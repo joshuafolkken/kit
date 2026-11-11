@@ -17,6 +17,7 @@ import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { backlog_auto_triage } from './backlog-auto-triage'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
+import { backlog_next_offer } from './backlog-next-offer'
 import { backlog_next_report } from './backlog-next-report'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank } from './backlog-rank'
@@ -221,25 +222,35 @@ async function answer_held(
 	context: PoolContext,
 	untriaged: ReadonlyArray<EpicChild>,
 ): Promise<number> {
-	const gated = await gate_solo(
-		backlog_next_report.without_untriaged(result, context.repo),
-		context,
-	)
+	const pre_gate = backlog_next_report.without_untriaged(result, context.repo)
+	const gated = await gate_solo(pre_gate, context)
+
+	await backlog_next_offer.record_answer(context, { pre_gate, gated }, untriaged)
 
 	return await backlog_next_report.report_held(gated, context, untriaged)
 }
 
+// Each answer is recorded once in the lane ledger before it is printed (`backlog-next-offer.ts`).
 async function answer_pool(context: PoolContext): Promise<number> {
 	const resolved = await resolve(context)
 
 	if (resolved === undefined) return FAILURE_EXIT_CODE
-	if (is_transport_failure(resolved)) return backlog_next_report.report_retry(context)
+
+	if (is_transport_failure(resolved)) {
+		await backlog_next_offer.record_retry(context)
+
+		return backlog_next_report.report_retry(context)
+	}
 
 	const { result, untriaged } = await backlog_auto_triage.untriaged_of(resolved, context.repo)
 
 	if (untriaged.length > 0) return await answer_held(result, context, untriaged)
 
-	return await backlog_next_report.report(await gate_solo(result, context), context)
+	const gated = await gate_solo(result, context)
+
+	await backlog_next_offer.record_answer(context, { pre_gate: result, gated }, [])
+
+	return await backlog_next_report.report(gated, context)
 }
 
 // The two reads that stand between the opted-in listing and the pool. Extracted for the same reason
@@ -275,7 +286,11 @@ async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promis
 	// read still takes a passed label off.
 	await issue_not_before_label.sweep(opted_in.issues)
 
-	if (opted_in.issues.length === 0) return backlog_next_report.report_none()
+	if (opted_in.issues.length === 0) {
+		await backlog_next_offer.record_none(opted_in)
+
+		return backlog_next_report.report_none()
+	}
 
 	const context = await context_of(opted_in, exclude)
 

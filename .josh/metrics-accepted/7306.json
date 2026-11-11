@@ -1,0 +1,7 @@
+{
+	"reason": "Offer record per backlog:next ask, plus the round-1 fixes: solo reason for gate-withheld children and the every-page-304 tests",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 154
+	}
+}

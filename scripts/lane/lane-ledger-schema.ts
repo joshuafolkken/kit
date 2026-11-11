@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
 import { lane_ledger_schema_load } from './lane-ledger-schema-load'
+import { lane_ledger_schema_offer } from './lane-ledger-schema-offer'
 import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
@@ -259,6 +260,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	round_one_schema,
 	round_two_schema,
 	offerable_schema,
+	lane_ledger_schema_offer.offer_schema,
 	core_wait_schema,
 	unit_files_schema,
 	test_related_schema,
