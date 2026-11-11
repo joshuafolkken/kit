@@ -178,13 +178,9 @@ function references_of(
 function direct_dependencies(context: GraphContext, file: string): ReadonlyArray<Dependency> {
 	const known = context.store.memo.all.get(file)
 	if (known !== undefined) return known
-	const found = references_of(context, file, file_reader.read_if_readable(file) ?? '').filter(
-		(dependency) => dependency !== undefined,
-	)
+	const references = references_of(context, file, file_reader.read_if_readable(file) ?? '')
 
-	context.store.memo.all.set(file, found)
-
-	return found
+	return import_graph_store.remember(context.store, 'all', file, references)
 }
 
 // The direct dependencies the test runner follows: the imports left once the transpiler drops the
@@ -193,14 +189,11 @@ function runtime_dependencies(context: GraphContext, file: string): ReadonlyArra
 	const known = context.store.memo.runtime.get(file)
 	if (known !== undefined) return known
 	const content = file_reader.read_if_readable(file) ?? ''
-	const found = type_only_imports
+	const references = type_only_imports
 		.runtime_specifiers(context.typescript, file, content)
 		.map((specifier) => resolve_module(context, specifier, file))
-		.filter((dependency) => dependency !== undefined)
 
-	context.store.memo.runtime.set(file, found)
-
-	return found
+	return import_graph_store.remember(context.store, 'runtime', file, references)
 }
 
 // A file reaches files that never import it when it is a script or declares a global or a module —

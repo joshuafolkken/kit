@@ -23,6 +23,16 @@ const EXPORT_A = 'export const a = 1\n'
 const STORED_A = `["${A_FILE}",false]`
 const STORED_OTHER = `["${OTHER}",false]`
 const WITH_OTHER = { [READER]: IMPORT_A, [A_FILE]: EXPORT_A, [OTHER]: EXPORT_A }
+const MAPPED_TSCONFIG = JSON.stringify({
+	compilerOptions: {
+		module: 'esnext',
+		moduleResolution: 'bundler',
+		paths: { '#lib/*': ['./lib/*'] },
+	},
+	include: ['**/*.ts'],
+})
+const MAPPED_FILE = 'lib/b.ts'
+const IMPORT_MAPPED = "import { a } from '#lib/b'\nexport const r = a\n"
 
 const make_directory = temporary_directory()
 
@@ -127,5 +137,20 @@ describe('import_graph_store — a resolution that no longer holds is resolved a
 		rmSync(path.join(root, A_FILE))
 
 		expect(await importers_of(root, A_INDEX)).toStrictEqual([A_INDEX, READER])
+	})
+})
+
+describe('import_graph_store — an import that resolved to nothing', () => {
+	it('follows a mapped import that resolved to nothing to the file created since', async () => {
+		const root = project({
+			[TSCONFIG]: MAPPED_TSCONFIG,
+			[READER]: IMPORT_MAPPED,
+			[OTHER]: EXPORT_A,
+		})
+
+		expect(await importers_of(root, OTHER)).toStrictEqual([OTHER])
+		write(root, MAPPED_FILE, EXPORT_A)
+
+		expect(await importers_of(root, MAPPED_FILE)).toStrictEqual([MAPPED_FILE, READER])
 	})
 })

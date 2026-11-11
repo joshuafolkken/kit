@@ -17,7 +17,8 @@ import { z } from 'zod'
 // compiler options, the `package.json` imports, the installed packages — so the store answers only
 // under the digest of those it was written with. Within one, an entry stops holding when a file it
 // resolved to is gone, or when a file new to the store could take a resolution from one: `./a` once
-// `a/index.ts`, a new `a.ts`.
+// `a/index.ts`, a new `a.ts`. A file with an import that resolved to nothing is never stored, since the
+// file that would answer it — `#scripts/lib/a` before `a.ts` exists — leaves no trace in its entry.
 
 type EdgeName = 'all' | 'runtime'
 
@@ -61,6 +62,8 @@ interface EdgeStore {
 	files: Record<string, StoredFile> | undefined
 	seeded: Set<EdgeName>
 	memo: Record<EdgeName, Memo>
+	// The files whose resolution left an import unresolved, kept out of the store.
+	unresolved: Record<EdgeName, Set<string>>
 	content_hashes: Map<string, string>
 }
 
@@ -93,8 +96,25 @@ function open(root: string, config_files: ReadonlyArray<string>): EdgeStore {
 		files: undefined,
 		seeded: new Set(),
 		memo: { all: new Map(), runtime: new Map() },
+		unresolved: { all: new Set(), runtime: new Set() },
 		content_hashes: new Map(),
 	}
+}
+
+// A file's resolved imports memoized under `name`; `references` holds `undefined` for each import that
+// resolved to nothing.
+function remember(
+	store: EdgeStore,
+	name: EdgeName,
+	file: string,
+	references: ReadonlyArray<Dependency | undefined>,
+): Array<Dependency> {
+	const found = references.filter((dependency) => dependency !== undefined)
+
+	if (found.length < references.length) store.unresolved[name].add(file)
+	store.memo[name].set(file, found)
+
+	return found
 }
 
 function content_hash(store: EdgeStore, file: string): string {
@@ -178,7 +198,7 @@ function seed(store: EdgeStore, name: EdgeName, universe: ReadonlyArray<string>)
 
 function entry_of(store: EdgeStore, name: EdgeName, file: string): StoredFile | undefined {
 	const dependencies = store.memo[name].get(file)
-	if (dependencies === undefined) return undefined
+	if (dependencies === undefined || store.unresolved[name].has(file)) return undefined
 	const hash = content_hash(store, file)
 	const known = files_of(store)[path.relative(store.root, file)]
 	const entry: StoredFile = known?.hash === hash ? { ...known } : { hash }
@@ -219,7 +239,7 @@ function keep(store: EdgeStore, name: EdgeName, missing: ReadonlyArray<string>):
 	write(store, store.file_path)
 }
 
-const import_graph_store = { content_hash, keep, open, seed, store_path }
+const import_graph_store = { content_hash, keep, open, remember, seed, store_path }
 
 export type { Dependency, EdgeName, EdgeStore }
 export { import_graph_store }
