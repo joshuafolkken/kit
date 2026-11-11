@@ -18,9 +18,25 @@ const RUNS_PATH = '/actions/workflows/publish.yml/runs'
 // The default npm wait, long enough that a test reaching its end would time out.
 const DEFAULT_NPM_TIMEOUT_SECONDS = '1800'
 const MISSED_NPM = '❌ Not published to npm'
+const MISSED_RELEASE = '❌ No GitHub Release: v1.342.0'
+const WORKFLOWS_DIRECTORY = '.github/workflows/'
+const PUBLISH_WORKFLOW = 'publish.yml'
+const RELEASE_WORKFLOW = 'github-release.yml'
+const PUBLISH_RUN = 'Publish run'
 
 function given_manifest(manifest: object): void {
 	vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(JSON.stringify(manifest))
+}
+
+// The manifest reads as given; a workflow file under `.github/workflows/` exists only when named.
+function given_workflows(...workflows: ReadonlyArray<string>): void {
+	const manifest = JSON.stringify({ name: PACKAGE, version: VERSION })
+
+	vi.spyOn(file_reader, 'read_if_readable').mockImplementation((file_path) => {
+		if (!file_path.includes(WORKFLOWS_DIRECTORY)) return manifest
+
+		return workflows.some((workflow) => file_path.endsWith(workflow)) ? 'on: push' : undefined
+	})
 }
 
 function given_npm(is_published: boolean): void {
@@ -124,7 +140,7 @@ describe('release_progress.wait_for_distribution when a stage is not reached', (
 
 		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
 		expect(printed()).toContain('📦 Published to npm')
-		expect(printed()).toContain('❌ No GitHub Release: v1.342.0')
+		expect(printed()).toContain(MISSED_RELEASE)
 		expect(printed()).not.toContain('🎉')
 	})
 
@@ -137,6 +153,43 @@ describe('release_progress.wait_for_distribution when a stage is not reached', (
 		expect(npm_registry.has_public_version).not.toHaveBeenCalled()
 		expect(printed()).not.toContain('npm')
 		expect(printed()).toContain(COMPLETE_LINE)
+	})
+})
+
+describe('release_progress.wait_for_distribution hint when the GitHub Release times out', () => {
+	beforeEach(() => {
+		given_npm(true)
+		given_release(undefined)
+	})
+
+	// kit's own layout: publish.yml's create-release job opens the release.
+	it('points at the Publish run when the repository has publish.yml', async () => {
+		given_workflows(PUBLISH_WORKFLOW)
+
+		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
+		expect(printed()).toContain(
+			`${MISSED_RELEASE} never got one.\n  Check the Publish run for ${TAG}: its create-release job did not finish.`,
+		)
+	})
+
+	// The distributed workflow opens a consumer's release, even when it waits for the consumer's Publish.
+	it.each([
+		['no publish.yml', [RELEASE_WORKFLOW]],
+		['its own publish.yml', [PUBLISH_WORKFLOW, RELEASE_WORKFLOW]],
+	])('points at the GitHub Release run in a consumer with %s', async (_layout, workflows) => {
+		given_workflows(...workflows)
+
+		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
+		expect(printed()).toContain(`Check the GitHub Release ${TAG} run`)
+		expect(printed()).not.toContain(PUBLISH_RUN)
+	})
+
+	it('points at josh sync when the repository has neither release workflow', async () => {
+		given_workflows()
+
+		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
+		expect(printed()).toContain('run pnpm josh sync to install the GitHub Release workflow')
+		expect(printed()).not.toContain(PUBLISH_RUN)
 	})
 })
 
