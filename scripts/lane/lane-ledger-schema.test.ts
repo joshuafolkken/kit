@@ -28,6 +28,23 @@ describe('lane_ledger_schema.entry_schema — test reuse', () => {
 
 		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
 	})
+
+	// joshuafolkken/kit#7248
+	it('preserves the test selection time on a related run', () => {
+		const run = {
+			kind: KIND.TEST_RELATED,
+			at: AT,
+			scope: 'related',
+			changed: 1,
+			synced: 0,
+			since_map: 0,
+			readers: 0,
+			elapsed_ms: 5,
+			select_elapsed_ms: 2,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
 })
 
 describe('lane_ledger_schema runtime boundary', () => {
