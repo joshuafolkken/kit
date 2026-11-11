@@ -25,7 +25,8 @@ describe('keychain_read.is_keychain_read — refuses a secret subcommand', () =>
 		[['-i']],
 		[['-qi']],
 		[['-qp', 'prompt', DUMP]],
-		[['-p', '-i', LIST]],
+		[['-pp', DUMP]],
+		[['-qpp', GENERIC]],
 	])('refuses security %j', (args) => {
 		expect(reads(SECURITY, args)).toBe(true)
 	})
@@ -37,6 +38,8 @@ describe('keychain_read.is_keychain_read — leaves other calls alone', () => {
 		[SECURITY, ['find-certificate', '-a']],
 		[SECURITY, ['-p', DUMP, LIST]],
 		[SECURITY, [LIST, '-i']],
+		[SECURITY, ['-p', '-i', LIST]],
+		[SECURITY, ['-pi', LIST]],
 		[SECURITY, []],
 		['grep', [GENERIC]],
 	])('leaves %s %j alone', (name, args) => {

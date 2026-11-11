@@ -23,6 +23,8 @@ words:
   - xcrun
   # The option-parsing convention the #7198 review cites for `security -qi` flag clusters.
   - getopt
+  # `security -pstop`, an attached-prompt spelling the #7198 round-2 review quotes in its record.
+  - pstop
   # `josh review:selfcheck`, the self-check's questions 2, 4 and 10 run as one command (#5540).
   - selfcheck
   - uncomputable

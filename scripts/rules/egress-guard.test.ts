@@ -202,6 +202,9 @@ describe('egress_guard.is_egress — refuses a keychain secret read through secu
 		'security -qp x dump-keychain',
 		'xcrun security dump-keychain',
 		'xcrun --sdk macosx security find-generic-password -w',
+		'xcrun -sdk macosx security dump-keychain',
+		'xcrun -toolchain default security dump-keychain',
+		'security -pp dump-keychain',
 	])(REFUSES, (command) => {
 		expect(egress_guard.is_egress(command)).toBe(true)
 	})
