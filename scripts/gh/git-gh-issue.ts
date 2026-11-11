@@ -1,5 +1,6 @@
 import { gh_author_association } from './gh-author-association'
-import { git_gh_issue_list, type IssueListOutcome } from './git-gh-issue-list'
+import { git_gh_etag_read, type ReadDetail } from './git-gh-etag-read'
+import { FIRST_PAGE, git_gh_issue_list, type IssueListOutcome } from './git-gh-issue-list'
 import { git_gh_issue_read } from './git-gh-issue-read'
 import { BLOCKED_BY_COUNT_FIELD } from './git-gh-issue-rest'
 import { git_gh_issue_write } from './git-gh-issue-write'
@@ -149,6 +150,18 @@ async function issue_list_by_label_summary(
 	})
 }
 
+// The first page `issue_list_by_label_summary` reads over REST, saying whether it changed since the
+// previous process read it (joshuafolkken/kit#7226): `backlog:drive` asks it of the `auto-ok` listing
+// before an offer, and the `--wait` arrival probe asks the same. It answers for that one page only —
+// a change past its hundred rows reads as unchanged. The ETag is shared with the listing only where
+// the listing reads REST; on GraphQL it keeps its own. A failure throws, as
+// `git_gh_etag_read.read_detail` does.
+async function issue_list_label_first_page(label: string): Promise<ReadDetail> {
+	const path = git_gh_issue_list.listing_path({ label }, FIRST_PAGE)
+
+	return await git_gh_etag_read.read_detail(path)
+}
+
 // Open issues carrying `label` in one named repository — the read `epic:next` makes before it
 // offers a child, to see whether that repository already has one running.
 //
@@ -182,6 +195,7 @@ const git_gh_issue = {
 	issue_list_by_label,
 	issue_list_by_label_in_repo,
 	issue_list_by_label_summary,
+	issue_list_label_first_page,
 	issue_search_body,
 	issue_list_open_bodies,
 	issue_list_open_relations,

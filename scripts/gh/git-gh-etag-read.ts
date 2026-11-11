@@ -28,6 +28,13 @@ interface SettledAnswer {
 	kept?: KeptAnswer
 }
 
+// A body read with the ETag of a previous answer, saying whether it is that previous one — the shape
+// both the disk read here and the merge gate's in-process read answer (joshuafolkken/kit#7226).
+interface ReadDetail {
+	body: string
+	is_unchanged: boolean
+}
+
 // The body an answer stands for — the previous one where GitHub says it has not changed — and what to
 // keep for the next read. `undefined` is an answer with no body to give.
 function settle(
@@ -55,9 +62,10 @@ function unreadable(path: string, answer: ConditionalRead): unknown {
 	return cause ?? new Error(`${UNREADABLE_MESSAGE}: ${path}`)
 }
 
-// The answer for `path`, or the previous process's where GitHub says it has not changed. A failure
-// throws, the contract `exec_gh_api` has. `timeout_ms` bounds the request as `exec_gh_api`'s does.
-async function read(path: string, timeout_ms?: number): Promise<string> {
+// The answer for `path`, or the previous process's where GitHub says it has not changed, saying which.
+// A failure throws, the contract `exec_gh_api` has. `timeout_ms` bounds the request as
+// `exec_gh_api`'s does.
+async function read_detail(path: string, timeout_ms?: number): Promise<ReadDetail> {
 	const slot = slot_of(path)
 	const previous = shared_cache.read(slot, path, kept_schema, Date.now())
 	const answer = await git_gh_conditional.read_conditional(path, previous?.etag, timeout_ms)
@@ -66,7 +74,14 @@ async function read(path: string, timeout_ms?: number): Promise<string> {
 	if (settled === undefined) throw unreadable(path, answer)
 	if (settled.kept !== undefined) shared_cache.write(slot, path, settled.kept, Date.now())
 
-	return settled.body
+	return { body: settled.body, is_unchanged: answer.kind === 'unchanged' }
+}
+
+// `read_detail`'s body alone.
+async function read(path: string, timeout_ms?: number): Promise<string> {
+	const { body } = await read_detail(path, timeout_ms)
+
+	return body
 }
 
 // A listing whose first page holds `per_page` rows (joshuafolkken/kit#6699). The ETag covers one page
@@ -86,7 +101,7 @@ async function read_listing(
 	return await git_gh_exec.exec_gh_api({ path, should_paginate: true })
 }
 
-const git_gh_etag_read = { read, read_listing, settle, slot_of }
+const git_gh_etag_read = { read, read_detail, read_listing, settle, slot_of }
 
-export type { KeptAnswer }
+export type { KeptAnswer, ReadDetail }
 export { git_gh_etag_read }
