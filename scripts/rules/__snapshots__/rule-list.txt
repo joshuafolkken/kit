@@ -169,7 +169,7 @@
   - silent: `gh secret list`, `gh variable get`, a `gh api` read — a `DELETE` is `destructive-command`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Network egress or credential print** (`egress`, `SECURITY.md` → "Secrets")
-  - fires: `pnpm josh pretool:guard` — network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential or environment prints — in each shell segment and nested command. Every occurrence
+  - fires: `pnpm josh pretool:guard` — network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential, keychain or environment prints — in each shell segment and nested command. Every occurrence
   - silent: ordinary reads, `gh` reads against github.com, `git fetch`, `git push origin`, named scripts and `pnpm josh` routes. A plain `curl` / `wget` is still refused by the deny list; the hook allows local or GitHub destinations with known flags
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
