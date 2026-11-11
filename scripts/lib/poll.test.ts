@@ -250,9 +250,10 @@ describe('PR_POLL_SCHEDULES', () => {
 		])
 	})
 
-	it('reads the merge from 10 seconds, 1.5 times longer each tick, up to 30 seconds', async () => {
+	// #7237: the low cap bounds how late a landed merge is detected.
+	it('reads the merge from 10 seconds, then every 15 seconds at most', async () => {
 		await expect(first_waits_of(PR_POLL_SCHEDULES.merge)).resolves.toEqual([
-			10_000, 15_000, 22_500, 30_000, 30_000, 30_000,
+			10_000, 15_000, 15_000, 15_000, 15_000, 15_000,
 		])
 	})
 })
