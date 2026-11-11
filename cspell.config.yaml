@@ -311,6 +311,7 @@ words:
   # split it (joshuafolkken/kit#1313).
   - noemit
   - unstub
+  - unstubbed
   - vercel
   - winget
   - packument

@@ -110,10 +110,12 @@ beforeEach(() => {
 	report_for.mockResolvedValue(SUCCESS_EXIT_CODE)
 	ensure_labels.mockReturnValue([])
 	issue_list.mockResolvedValue(listing_of(1))
+	vi.stubEnv(issue_wip.WIP_CAP_KEY, '')
 })
 
 afterEach(() => {
 	Reflect.deleteProperty(process.env, 'GH_REPO')
+	vi.unstubAllEnvs()
 })
 
 afterAll(() => {
