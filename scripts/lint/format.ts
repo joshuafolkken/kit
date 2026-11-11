@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { direct_launch } from '#scripts/build/local-bin'
 import { project_checks } from '#scripts/gate/project-checks'
 import {
 	ESLINT_CACHE_FILE,
@@ -35,7 +36,8 @@ async function run_step(
 	directory: string,
 ): Promise<number> {
 	const environment = check === 'eslint' ? { env: eslint_heap.environment(), extendEnv: false } : {}
-	const result = await execa('pnpm', args, {
+	const launch = direct_launch(directory, args)
+	const result = await execa(launch.file, [...launch.args], {
 		cwd: directory,
 		stdio: 'inherit',
 		reject: false,

@@ -12,6 +12,7 @@ import { lint_parallel } from './lint-parallel'
 // changed files to both linters and fail on what they report; it must never narrow in CI.
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('#scripts/lane/lane-cache-run', () => ({

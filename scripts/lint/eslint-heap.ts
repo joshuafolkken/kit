@@ -36,11 +36,11 @@ function environment(): NodeJS.ProcessEnv {
 	return { ...child, [NODE_OPTIONS]: with_heap(child[NODE_OPTIONS]) }
 }
 
-// `pnpm exec eslint` as a buffered child under this heap.
+// A `pnpm exec eslint` list as a buffered child under this heap, launched without pnpm.
 async function run_cold(pnpm_arguments: ReadonlyArray<string>): Promise<BufferedProcessResult> {
 	const child = environment()
 
-	return await buffered_process.run_buffered_process(pnpm_arguments, {
+	return await buffered_process.run_buffered_direct(pnpm_arguments, {
 		environment: { ...child, [NODE_OPTIONS]: `${child[NODE_OPTIONS] ?? ''} ${MEMORY_IMPORT}` },
 	})
 }

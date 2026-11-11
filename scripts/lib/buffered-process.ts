@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { direct_launch, type LocalLaunch } from '#scripts/build/local-bin'
 import { execa } from 'execa'
 import { pnpm_reach } from './pnpm-reach'
 import { SUITE_TIMEOUT_MS } from './timeouts'
@@ -81,9 +82,9 @@ function child_environment(): NodeJS.ProcessEnv {
 	return environment
 }
 
-async function run_buffered_process(
-	command_args: ReadonlyArray<string>,
-	options: BufferedProcessOptions = {},
+async function run_buffered_launch(
+	launch: LocalLaunch,
+	options: BufferedProcessOptions,
 ): Promise<BufferedProcessResult> {
 	// `performance.now()` rather than `Date.now()`: it is monotonic, so a system clock adjusted
 	// mid-check cannot produce a negative or wildly inflated duration.
@@ -91,7 +92,7 @@ async function run_buffered_process(
 	// `cwd` is spread in rather than assigned: `exactOptionalPropertyTypes` refuses an explicit
 	// `undefined` for an optional `string`, and passing one anyway breaks execa's overload
 	// resolution — which silently widens `result.all` back to `string | undefined`.
-	const result = await execa(PNPM, [...command_args], {
+	const result = await execa(launch.file, [...launch.args], {
 		env: options.environment ?? child_environment(),
 		extendEnv: false,
 		all: true,
@@ -107,13 +108,35 @@ async function run_buffered_process(
 	}
 }
 
+async function run_buffered_process(
+	command_args: ReadonlyArray<string>,
+	options: BufferedProcessOptions = {},
+): Promise<BufferedProcessResult> {
+	return await run_buffered_launch({ file: PNPM, args: command_args }, options)
+}
+
+// A `pnpm exec <bin> …` list run without pnpm's wrapper process (`local_bin.direct_launch`).
+async function run_buffered_direct(
+	pnpm_arguments: ReadonlyArray<string>,
+	options: BufferedProcessOptions = {},
+): Promise<BufferedProcessResult> {
+	const launch = direct_launch(options.cwd ?? process.cwd(), pnpm_arguments)
+
+	return await run_buffered_launch(launch, options)
+}
+
 // Narrowed to the one field it reads, so a caller asking "did this fail" never has to invent the
 // two it does not — a duration fabricated to satisfy a parameter is a number nobody measured.
 function is_process_failed(result: Pick<BufferedProcessResult, 'exit_code'>): boolean {
 	return result.exit_code !== 0
 }
 
-const buffered_process = { child_environment, is_process_failed, run_buffered_process }
+const buffered_process = {
+	child_environment,
+	is_process_failed,
+	run_buffered_direct,
+	run_buffered_process,
+}
 
 export type { BufferedProcessResult }
 export { buffered_process, FAIL_EXIT_CODE }

@@ -146,7 +146,7 @@ async function run_prettier(
 	const reason = project_checks.prettier_skip_reason(directory)
 	if (reason !== undefined) return skipped('prettier', reason)
 
-	return await buffered_process.run_buffered_process(prettier_args)
+	return await buffered_process.run_buffered_direct(prettier_args)
 }
 
 async function run_checked_eslint(directory: string, eslint: EslintRun): Promise<EslintResult> {

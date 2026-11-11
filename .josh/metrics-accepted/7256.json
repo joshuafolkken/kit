@@ -1,0 +1,7 @@
+{
+	"reason": "direct_launch in local-bin.ts and run_buffered_direct in buffered-process.ts route the lint tools past pnpm's wrapper process (#7256); the shared local-bin test mock replaces per-file stubs",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 46
+	}
+}

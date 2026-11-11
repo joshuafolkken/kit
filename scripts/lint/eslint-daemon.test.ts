@@ -5,7 +5,7 @@ import { write_file } from '#tools/test/write-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
-vi.mock('#scripts/build/local-bin', () => ({ resolve_package_bin: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/git/git-spawn-sync', () => ({ git_spawn_sync: { read: vi.fn() } }))
 
 const execa_module = await import('execa')

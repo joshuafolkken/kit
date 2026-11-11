@@ -46,7 +46,7 @@ async function run(extra_arguments: ReadonlyArray<string> = []): Promise<number>
 
 	const result = await lane_cache_run.run(
 		CSPELL_CACHE_FILE,
-		async () => await buffered_process.run_buffered_process([...CSPELL_ARGS, ...extra_arguments]),
+		async () => await buffered_process.run_buffered_direct([...CSPELL_ARGS, ...extra_arguments]),
 	)
 	if (result.output) process.stdout.write(result.output)
 

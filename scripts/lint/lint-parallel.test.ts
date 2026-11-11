@@ -11,9 +11,8 @@ import type { DaemonState } from './eslint-daemon'
 import type { LintRunTiming } from './lint-parallel'
 import { lint_shard } from './lint-shard'
 
-vi.mock('execa', () => ({
-	execa: vi.fn(),
-}))
+vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/build/local-bin', async () => await import('#tools/test/local-bin-mock'))
 vi.mock('#scripts/lane/lane-cache-run', () => ({
 	lane_cache_run: {
 		run: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),

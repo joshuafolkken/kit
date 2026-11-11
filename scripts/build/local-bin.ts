@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { ancestor_directories } from '#scripts/lib/ancestor-directories'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
+import { pnpm_reach } from '#scripts/lib/pnpm-reach'
 import { package_bin_schema } from '#scripts/lib/schemas'
 
 const NODE_MODULES = 'node_modules'
@@ -84,4 +85,29 @@ function resolve_package_bin(
 	}
 }
 
-export { find_local_bin_upwards, resolve_local_bin, resolve_package_bin }
+interface LocalLaunch {
+	file: string
+	args: ReadonlyArray<string>
+}
+
+const PNPM_EXEC = 'exec'
+const PNPM_EXEC_PREFIX_LENGTH = 2
+
+// A `pnpm exec <bin> …` list launched without pnpm's wrapper process, which stays alive beside every
+// tool it starts (joshuafolkken/kit#7256). The package's CLI entry under this node comes first, then
+// the shim pnpm itself would find, and pnpm only when neither is installed. The wrapper's `npm_*`
+// variables are lost; none of the lint tools reads them (`docs/maintainers/josh-commands-rationale.md`).
+function direct_launch(project_root: string, pnpm_arguments: ReadonlyArray<string>): LocalLaunch {
+	const [subcommand, bin_name] = pnpm_arguments
+	const pnpm_launch = { file: pnpm_reach.PNPM, args: pnpm_arguments }
+	if (subcommand !== PNPM_EXEC || bin_name === undefined) return pnpm_launch
+	const tool_arguments = pnpm_arguments.slice(PNPM_EXEC_PREFIX_LENGTH)
+	const entry = resolve_package_bin(project_root, bin_name, bin_name)
+	if (entry !== undefined) return { file: process.execPath, args: [entry, ...tool_arguments] }
+	const shim = find_local_bin_upwards(project_root, bin_name)
+
+	return shim === undefined ? pnpm_launch : { file: shim, args: tool_arguments }
+}
+
+export type { LocalLaunch }
+export { direct_launch, find_local_bin_upwards, resolve_local_bin, resolve_package_bin }
