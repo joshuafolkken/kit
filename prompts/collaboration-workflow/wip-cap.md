@@ -10,7 +10,7 @@
 
 - **上限は既定 30。** 一次情報は `scripts/issue/issue-wip.ts` の `DEFAULT_WIP_CAP`（他の文書にこの数字を書かない）。env `JOSH_WIP_CAP` が正の整数なら上限をその値に、`off` なら上限を無効にする。それ以外の値は既定に戻さず、起票を拒否する（`docs/environment-variables.md`）。
 - コマンドは起票先（`--repo` 指定時はそのリポジトリ）のオープン Issue を epic 込みで数えて `wip:` 行に印字し、超過して免除が無ければ何も送らずに保留し、免除の問いを印字する。
-- 免除の宣言: `--route interrupt`（下の 3 条件）、`--route split` / `--route tier-a`（実行が詰まる起票）はルート自体が宣言になる。ルートの無い実行が詰まる起票（利用者が `new` と打った入口など）は `--over-cap` を付けて出し直す。裁量起票（`--route review-cap` を含む）に `--over-cap` を付けてはならない。
+- 免除の宣言: `--route interrupt`（下の 3 条件）、`--route split` / `--route tier-a`（実行が詰まる起票）はルート自体が宣言になる。利用者が `new` と打った入口は、手順書の起票コマンドが最初から `--over-cap` を付ける。そのほかのルートの無い実行が詰まる起票は `--over-cap` を付けて出し直す。裁量起票（`--route review-cap` を含む）に `--over-cap` を付けてはならない。
 
 ## 超過時の手順
 

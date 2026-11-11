@@ -7,6 +7,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { eslint_daemon } from '#scripts/lint/eslint-daemon'
 import { eslint_daemon_calls } from '#scripts/lint/eslint-daemon-calls'
+import { eslint_trim } from '#scripts/lint/eslint-trim'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -376,6 +377,15 @@ function linted_path(
 	return relative_to_root(project_root, file_path)
 }
 
+// The lint as the daemon's call record counts it, then the daemon restarted once it has grown
+// heavy (joshuafolkken/kit#7246).
+async function record_lint(project_root: string): Promise<void> {
+	const call = { caller: eslint_daemon_calls.DAEMON_CALLER.EDIT_HOOK, files: 1 }
+
+	eslint_daemon.record_call(project_root, call)
+	await eslint_trim.trim(project_root)
+}
+
 async function format_edited_file(
 	raw_payload: string,
 	runner: CommandRunner,
@@ -394,9 +404,7 @@ async function format_edited_file(
 	const linted = linted_path(plan, file_path, project_root)
 
 	eslint_daemon.remember_after_edit(project_root, daemon_before, linted)
-	const call = { caller: eslint_daemon_calls.DAEMON_CALLER.EDIT_HOOK, files: 1 }
-
-	if (linted !== undefined) eslint_daemon.record_call(project_root, call)
+	if (linted !== undefined) await record_lint(project_root)
 
 	return format_diagnostics(unfixed === '' ? undefined : unfixed)
 }
