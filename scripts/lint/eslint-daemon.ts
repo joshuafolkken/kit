@@ -258,13 +258,19 @@ function record_call(project_root: string, call: DaemonCall | undefined): void {
 
 // `cwd` decides which eslint installation and which flat config answer, and `ESLINT_D_MISS=fail`
 // refuses the bundled eslint the daemon would otherwise fall back to. The daemon keeps the environment
-// it started under, so the untyped switch set here holds for its whole life (`eslint/untyped-environment.js`).
-function daemon_environment(): NodeJS.ProcessEnv {
+// it started under, so the heap and the untyped switch set here hold for its whole life
+// (`eslint/untyped-environment.js`). Every path that may start it — this one and the edit hook —
+// launches with these, so whichever starts it first, the daemon gets the same heap.
+function launch_environment(): NodeJS.ProcessEnv {
 	return {
-		...eslint_heap.environment(),
+		NODE_OPTIONS: eslint_heap.with_heap(process.env['NODE_OPTIONS']),
 		ESLINT_D_MISS: 'fail',
 		...untyped_environment.environment(),
 	}
+}
+
+function daemon_environment(): NodeJS.ProcessEnv {
+	return { ...eslint_heap.environment(), ...launch_environment() }
 }
 
 async function spawn_daemon(
@@ -353,6 +359,7 @@ const eslint_daemon = {
 	fingerprint,
 	is_config_input,
 	is_stale,
+	launch_environment,
 	read_record,
 	record_call,
 	record_text,
