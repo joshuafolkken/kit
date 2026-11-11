@@ -854,7 +854,7 @@ A `private: true` package skips the npm stage.
 
 **Runs in its own work tree, never the root checkout**, so it can run beside a [`backlogrun`](how-to/run-issues.md) on a dirty root.
 
-It checks for a GitHub Release workflow first. After printing the plan, both a live run and `--dry-run` print the workflow found on `origin/<default>` (`github-release.yml` or `publish.yml`), When `.github/workflows/` holds neither, it exits non-zero before any branch, pull request or tag, `--dry-run` included. Fix: kit v1.1093.0 or later, then `pnpm josh sync`.
+After printing the plan, a live run and `--dry-run` alike check `origin/<default>` for a GitHub Release workflow: `github-release.yml` or `publish.yml` that runs `josh release:github`. They print the one found. With none, they exit non-zero before any branch, pull request or tag. Fix: kit v1.1093.0 or later, then `pnpm josh sync`.
 
 Watch budgets (default 30 minutes each): `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (tag), `JOSH_RELEASE_NPM_TIMEOUT_SECONDS` (npm publish), `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` (GitHub Release).
 

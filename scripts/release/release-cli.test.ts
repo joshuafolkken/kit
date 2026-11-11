@@ -90,6 +90,7 @@ function arrange_run(pending: number): void {
 	vi.spyOn(release_history, 'read_release_plan').mockResolvedValue({ ...PLAN, pending })
 	vi.spyOn(release_publish, 'publish').mockResolvedValue(release_publish.SUCCESS_EXIT_CODE)
 	vi.spyOn(git_command, 'tree_names_at').mockResolvedValue(GITHUB_RELEASE_WORKFLOW)
+	vi.spyOn(git_command, 'show_file').mockResolvedValue('run: pnpm josh release:github')
 }
 
 afterEach(() => {
