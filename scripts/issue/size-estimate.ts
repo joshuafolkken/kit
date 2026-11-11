@@ -363,6 +363,7 @@ function declared_files(body: string): number | undefined {
 const size_estimate = {
 	budget_note,
 	capped,
+	declared,
 	declared_files,
 	declared_lines_bar,
 	declared_size: parse,

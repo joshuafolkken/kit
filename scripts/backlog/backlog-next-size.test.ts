@@ -8,6 +8,7 @@ import {
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { issue_cap_files } from '#scripts/issue/issue-cap-files'
 import { IN_PROGRESS_LABEL, RUN_LANE_LABEL, SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
 import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
@@ -128,6 +129,22 @@ describe('backlog:next over the guide', () => {
 
 		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 		expect(stderr()).not.toContain(EXCEEDS_GUIDE)
+	})
+})
+
+// joshuafolkken/kit#7184: an issue naming a file near its code-line cap is warned on and offered.
+describe('backlog:next with a named file near its cap', () => {
+	it('offers the issue and warns it names a file near its cap', async () => {
+		const near = [{ file_path: 'a.ts', limit: 300, budget: undefined }]
+		const cap_note = 'names a.ts near its cap'
+
+		vi.spyOn(issue_cap_files, 'near_cap_by_body').mockResolvedValue([near])
+		vi.spyOn(issue_cap_files, 'note').mockReturnValue(cap_note)
+		backlog_fixture.stub_backlog({ opted_in: [sized(REASON)] })
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
+		expect(stderr()).toContain(cap_note)
 	})
 })
 

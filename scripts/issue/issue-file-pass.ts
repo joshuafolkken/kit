@@ -3,6 +3,7 @@ import type { ImplementRate } from '#scripts/lane/lane-implement-rate'
 import { lane_net_read } from '#scripts/lane/lane-net-read'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
 import { issue_auto_ok } from './issue-auto-ok'
+import { issue_cap_files } from './issue-cap-files'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_lane_hint } from './issue-file-lane-hint'
 import { issue_lint_cli } from './issue-lint-cli'
@@ -160,10 +161,22 @@ function labels_of(filing: Filing): ReadonlyArray<string> | undefined {
 	return undefined
 }
 
+// The files the body names near their code-line cap, weighed in this checkout — so only for a filing
+// into this repository (joshuafolkken/kit#7184).
+async function cap_refusals(filing: Filing): Promise<ReadonlyArray<string>> {
+	if (!issue_file.is_same_repository(filing.target, filing.current)) return []
+	const problem = issue_cap_files.problem(
+		await issue_cap_files.near_cap(filing.body, process.cwd()),
+	)
+
+	return problem === undefined ? [] : [`✖ ${problem}`]
+}
+
 // The size estimate is judged at the ledger's recent implement rate (joshuafolkken/kit#6025).
 async function is_admitted(filing: Filing): Promise<boolean> {
 	const { implement_rate, growth } = await lane_net_read.measurements()
-	const refusals = refusals_of(filing, implement_rate, growth)
+	const capped = await cap_refusals(filing)
+	const refusals = [...refusals_of(filing, implement_rate, growth), ...capped]
 
 	issue_lint_cli.warn(filing.body)
 	if (refusals.length === 0) return true

@@ -7,6 +7,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { issue_cap_files } from './issue-cap-files'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
@@ -53,6 +54,8 @@ beforeEach(() => {
 	vi.spyOn(repo_party, 'current_owner').mockReturnValue('joshuafolkken')
 	vi.spyOn(issue_file_cap, 'is_cap_clear').mockResolvedValue(true)
 	vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
+	// The body names a real file; counting it would start ESLint.
+	vi.spyOn(issue_cap_files, 'near_cap').mockResolvedValue([])
 	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
 	vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue({
 		report: 'Duplicates: none',
