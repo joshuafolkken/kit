@@ -28,20 +28,15 @@ const ROOT_FILES: ReadonlyArray<string> = [
 // whole suite on any of these with no word of why. Named here, they print the reason instead.
 // `whole-suite-files.test.ts` holds the list to both graphs, so an import added to either fails there.
 const IMPORTED_BY_EVERY_TEST: ReadonlyArray<string> = [
-	'scripts/discovery/git-directory.ts',
 	'scripts/git/constants.ts',
 	'scripts/git/git-location-environment.ts',
 	'scripts/init/init-paths.ts',
-	'scripts/issue/issue-number-shape.ts',
 	'scripts/josh/agent-session-environment.ts',
-	'scripts/josh/durable-state-root.ts',
 	'scripts/josh/platform-temporary.ts',
 	'scripts/josh/process-identity.ts',
 	'scripts/josh/process-owner.ts',
 	'scripts/josh/stamp-file.ts',
 	'scripts/lane/lane-child-mark-keys.ts',
-	'scripts/lane/lane-paths.ts',
-	'scripts/lane/lane-state-record.ts',
 	'scripts/lib/atomic-write.ts',
 	'scripts/lib/json-value.ts',
 	'scripts/lib/read-file.ts',

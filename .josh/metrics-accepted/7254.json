@@ -1,0 +1,7 @@
+{
+	"reason": "Lane count split into its own module and read through a child process, so the vitest config stops importing the lane reading (#7254)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 22
+	}
+}

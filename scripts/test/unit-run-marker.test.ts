@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
@@ -182,44 +182,6 @@ describe('unit_run_marker.live_run_count — what it leaves alone', () => {
 	// Being wrong in this direction costs wall time; being wrong in the other throttles a solo run.
 	it('answers no other run when the directory cannot be read', () => {
 		expect(count_under_absent_child()).toBe(0)
-	})
-})
-
-// joshuafolkken/kit#6682: the run count sees a lane only once its suite is in flight, so the first of
-// several lanes took the whole machine. The live lanes divide it from the start.
-describe('unit_run_marker.live_lane_count', () => {
-	const LANES = ['6682', '6905', '7001']
-	const REPOSITORY = 'repo'
-	const LANES_ROOT = '.repo-lanes'
-
-	// A repository checkout beside its lanes root holding three lanes and two entries that are not lanes.
-	function lanes_fixture(): string {
-		const parent = probe_directory()
-
-		for (const name of [...LANES, '.seat-locks', 'notes']) {
-			mkdirSync(path.join(parent, LANES_ROOT, name), { recursive: true })
-		}
-
-		return parent
-	}
-
-	it('counts the issue-number directories under the lanes root, read from a main checkout', () => {
-		const checkout = path.join(lanes_fixture(), REPOSITORY)
-
-		expect(unit_run_marker.live_lane_count(checkout, {})).toBe(LANES.length)
-	})
-
-	it('counts the same lanes from inside one of them', () => {
-		const lane = path.join(lanes_fixture(), LANES_ROOT, '6682')
-
-		expect(unit_run_marker.live_lane_count(lane, {})).toBe(LANES.length)
-	})
-
-	// No lanes root — CI, a repository that never opened a lane — leaves the division to the run count.
-	it('answers no lane when the lanes root cannot be read', () => {
-		const checkout = path.join(probe_directory(), REPOSITORY)
-
-		expect(unit_run_marker.live_lane_count(checkout, {})).toBe(0)
 	})
 })
 

@@ -1,5 +1,6 @@
 import { availableParallelism } from 'node:os'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { unit_lane_count } from './unit-lane-count'
 import { unit_run_marker } from './unit-run-marker'
 
 // How wide one vitest run may fan out when it is not the only one on the machine.
@@ -177,6 +178,7 @@ async function with_run_marker<T>(run: () => Promise<T>): Promise<T> {
 
 const unit_worker_share = {
 	...unit_run_marker,
+	...unit_lane_count,
 	MAIN_PROCESS_CORES,
 	cap_to_capacity,
 	cap_to_claim,
