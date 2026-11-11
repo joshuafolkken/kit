@@ -87,6 +87,7 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/actions/setup-node/action.yml',
 	'.github/actions/change-scope/action.yml',
 	'scripts/gate/change-scope-action.ts',
+	'scripts/gate/path-glob.ts',
 	'scripts/gate/toolchain-inputs.ts',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
