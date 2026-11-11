@@ -1,3 +1,4 @@
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 const REPO = '--repo <owner/repo>'
@@ -303,8 +304,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: ['--reason "<理由>"'],
-					description:
-						"the follow-up's `- 分割しない理由:` line, the only excuse from the size bar; the issue's own is not carried over.",
+					description: `the follow-up's \`${issue_body_keys.prefix('no_split_reason')}\` line, the only excuse from the size bar; the issue's own is not carried over.`,
 				},
 				{
 					names: [DISTINCT],

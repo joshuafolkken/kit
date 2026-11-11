@@ -5,6 +5,7 @@ import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { temporary_directory } from '#tools/test/temporary-directory'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_environment } from './lane-environment'
+import { lane_open_git } from './lane-open-git-fixture'
 import { lane_registry } from './lane-open-registry-fixture'
 import { lane_paths } from './lane-paths'
 import type { LaneInfo } from './lane-registry'
@@ -15,33 +16,20 @@ import { lane_seat_ownership } from './lane-seat-ownership'
 const make_directory = temporary_directory('suite')
 
 // joshuafolkken/kit#1490, joshuafolkken/kit#1494: opening a lane produces a work tree that keeps the
-// project's own `PORT_SEED` and adds its seat in `JOSH_LANE_SEAT`. `git_command` is mocked because
-// the assertions are about what this module asks git for and what it writes beside it, not about git
-// itself — `git-worktree.test.ts` pins the flags of the worktree calls, and `lane-registry.test.ts`
-// the reading of the seats.
+// project's own `PORT_SEED` and adds its seat in `JOSH_LANE_SEAT`. git is mocked by
+// `lane-open-git-fixture.ts`, and `lane-registry.test.ts` pins the reading of the seats.
 
-vi.mock('#scripts/git/git-command', () => ({
-	git_command: {
-		branch_exists: vi.fn(),
-		branch_names_remote: vi.fn(),
-		default_branch_reference: vi.fn(),
-		fetch_branch: vi.fn(),
-		get_default_branch: vi.fn(),
-	},
-}))
-vi.mock('#scripts/git/git-worktree', () => ({
-	git_worktree: { ls_remote_branch: vi.fn(), set_upstream: vi.fn(), worktree_add: vi.fn() },
-}))
 vi.mock('./lane-install', () => ({
 	lane_install: { install_dependencies: vi.fn() },
 }))
+vi.mock('./lane-setup', () => ({ lane_setup: { run_setup: vi.fn() } }))
 vi.mock('#scripts/lint/eslint-warm', () => ({ eslint_warm: { start: vi.fn() } }))
 vi.mock('./lane-leftover', () => ({
 	lane_leftover: { reclaim: vi.fn() },
 }))
-const { git_command } = await import('#scripts/git/git-command')
-const { git_worktree } = await import('#scripts/git/git-worktree')
+const { git_command, git_worktree, START_POINT } = lane_open_git
 const { lane_install } = await import('./lane-install')
+const { lane_setup } = await import('./lane-setup')
 const { eslint_warm } = await import('#scripts/lint/eslint-warm')
 const { lane_leftover } = await import('./lane-leftover')
 const { lane_open } = await import('./lane-open')
@@ -61,7 +49,6 @@ const ROOT_ENV = [BOT_TOKEN, CHAT_ID, ROOT_SEED_LINE, ''].join('\n')
 const PERMISSION_RANGE = 0o1000
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
-const START_POINT = 'refs/remotes/origin/main'
 const DEV_BASE = 5173
 const PREVIEW_BASE = 4173
 // What `prepare` prints in a linked work tree, whose hooks belong to the primary repository
@@ -116,25 +103,6 @@ function lanes_are(lanes: ReadonlyArray<LaneInfo>): void {
 	vi.mocked(lane_registry.list_lanes).mockResolvedValue([...lanes])
 }
 
-function git_answers(): void {
-	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')
-	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
-	// No branch of the lane's name anywhere, which is what opening a lane for a fresh child finds
-	// (joshuafolkken/kit#1627). The suite that drives the other two answers is
-	// `lane-open-start-point.test.ts`, against real git.
-	vi.mocked(git_command.branch_exists).mockResolvedValue(false)
-	vi.mocked(git_command.branch_names_remote).mockResolvedValue([])
-	vi.mocked(git_worktree.ls_remote_branch).mockResolvedValue('')
-	vi.mocked(git_command.default_branch_reference).mockResolvedValue(START_POINT)
-	// Stands in for what `git worktree add` does to the filesystem, so the `.env` write that follows
-	// it has somewhere to land.
-	vi.mocked(git_worktree.worktree_add).mockImplementation(async (directory: string) => {
-		mkdirSync(directory, { recursive: true })
-
-		return ''
-	})
-}
-
 beforeEach(lane_seat_fixture.mock_ownership)
 
 beforeEach(() => {
@@ -148,7 +116,7 @@ beforeEach(() => {
 	vi.mocked(lane_leftover.reclaim).mockReset()
 	// The stage an open writes goes to the checkout's own stream, which is a live run's: never from a test.
 	vi.spyOn(run_event_setup, 'emit').mockReset().mockResolvedValue()
-	git_answers()
+	lane_open_git.git_answers()
 })
 
 it('writes the seat acquired by the shared allocator rather than choosing one independently', async () => {
@@ -431,4 +399,17 @@ it('asks git for no start point, so the work tree lands on that branch', async (
 		'1490-lane',
 		undefined,
 	)
+})
+
+// joshuafolkken/kit#7203: the project's setup runs in the lane after the install, told the main checkout.
+it('runs the project setup after the install, with the main checkout', async () => {
+	await lane_open.open_lane(ISSUE)
+
+	const setup = vi.mocked(lane_setup.run_setup)
+
+	expect(setup).toHaveBeenCalledWith(
+		expect.objectContaining({ directory: path.join(LANE_ROOT, ISSUE) }),
+		REPOSITORY_ROOT,
+	)
+	expect(vi.mocked(lane_install.install_dependencies)).toHaveBeenCalledBefore(setup)
 })

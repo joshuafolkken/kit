@@ -1,0 +1,7 @@
+{
+	"reason": "#7200: write minimumReleaseAge before josh init's first kit install, and name the too-new-lockfile remedy on install failure",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 30
+	}
+}

@@ -1,3 +1,4 @@
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_priority } from '#scripts/issue/issue-priority'
 import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
@@ -69,7 +70,7 @@ function selection_lines(scope: string): ReadonlyArray<string> {
 		`Take at most the ${limit} with the most reducible minutes, largest first, each cutting`,
 		`${String(MIN_MINUTES)} minute or more, and drop the rest: file or fold only those.`,
 		'File a defect — a tool did something unneeded or wrong (a rerun on an unchanged tree, a lost scope)',
-		'— as `- 種別: 不具合`, any other cause as `- 目的: 時間短縮`.',
+		`— as \`${issue_body_keys.line('kind', 'bug')}\`, any other cause as \`${issue_body_keys.line('purpose', 'time_saving')}\`.`,
 	]
 }
 
@@ -119,7 +120,7 @@ function cause_handling(rules: CauseHandling): string {
 function loss_lines_of(issue: number, minutes: string): string {
 	const cite = issue_cite.plain_for('program', issue)
 
-	return `\`- 原因のレーン: ${minutes} 分（${cite}）\` and \`${issue_priority.CAUSE_PREFIX} <分> 分\``
+	return `\`${issue_priority.LANE_PREFIX} ${minutes} 分（${cite}）\` and \`${issue_priority.CAUSE_PREFIX} <分> 分\``
 }
 
 // The breakdown the overrun's prompt leads with orders the search (joshuafolkken/kit#4995); a stage no

@@ -1,6 +1,7 @@
 import { bash_triggers } from './bash-triggers'
 import { direct_pr_create } from './direct-pr-create'
 import { git_argv, type ProgramCall } from './git-argv'
+import { keychain_read } from './keychain-read'
 import { launched_call } from './launched-call'
 import { nested_commands } from './nested-commands'
 import { shell_permissions } from './shell-permissions'
@@ -263,6 +264,7 @@ const PROGRAM_CHECKS: ReadonlyArray<ProgramCheck> = [
 	shell_permissions.is_restricted,
 	is_gh_credential,
 	is_environment_dump,
+	keychain_read.is_keychain_read,
 ]
 
 // A segment that runs no program but names `env` prints the environment (`env`, `env -0`).
@@ -295,7 +297,7 @@ const ROW = {
 		title: 'Network egress or credential print',
 		topic: '`SECURITY.md` → "Secrets"',
 		fires:
-			'network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential or environment prints — in each shell segment and nested command. Every occurrence',
+			'network sends, inline interpreter execution, direct `gh` writes, `git push` without explicit `origin`, credential, keychain or environment prints — in each shell segment and nested command. Every occurrence',
 		quiet:
 			'ordinary reads, `gh` reads against github.com, `git fetch`, `git push origin`, named scripts and `pnpm josh` routes. A plain `curl` / `wget` is still refused by the deny list; the hook allows local or GitHub destinations with known flags',
 	},

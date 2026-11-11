@@ -82,6 +82,15 @@ the project's own resolution, under its `minimumReleaseAge`, picks the version. 
 before the hand-off existed still sets the project up on its own until the cache expires. The bare
 `package.json` stops pnpm walking up to an ancestor's manifest and rewriting that project's files.
 
+A new project has no `minimumReleaseAge` until the handed-off `josh init` writes it, so the bootstrap
+writes the template's line first (or the `.npmrc` value `josh init` would carry), keeping a value the
+project already set. Without it, the first `pnpm add` resolved kit's tree with no wait, and later
+installs refused that lockfile (#7200).
+
+A kit published inside the wait leaves the previous version installed. A lockfile that already pins
+a too-new version is not rescued; the failure message names deleting `pnpm-lock.yaml` and installing
+again.
+
 ## The AI files
 
 `CLAUDE.md` is distributed by import rather than byte-copied: the package ships a path-transformed

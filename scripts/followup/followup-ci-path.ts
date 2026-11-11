@@ -10,37 +10,53 @@ import { CHECK_STATUS_PENDING, type PrStateSnapshot } from '#scripts/gh/git-pr-c
 // held nothing up and is not recorded. CodeRabbit is left out — its wait is `coderabbit-wait`'s
 // (`followup-coderabbit-wait.ts`), so it is never counted twice. The clock is `performance.now()`'s
 // for the reason `git-followup-stages.ts` states.
+//
+// **A check seen pending again after it was seen settled — at the first poll too — was rerun** (joshuafolkken/kit#7202): its time then
+// spans the failed attempt and the rerun's queue, not the check's own run, so the row is marked
+// `has_rerun` and `lane:stats` keeps it out of the critical path's median and maximum. A name the
+// rollup lists more than once in a poll is pending while any of its entries is, so its order in the
+// rollup never reads as a rerun.
 
 // Mutable for the reason `StageLog` is: the observer adds to it as the wait polls.
 interface CiPath {
 	start_ms?: number
 	pending: Set<string>
+	settled: Set<string>
 	check_ms: Record<string, number>
+	has_rerun?: true
 }
 
-// The `ci-wait` row's critical-path fields, both absent where no check was seen to settle.
+// The `ci-wait` row's critical-path fields, all absent where no check was seen to settle.
 interface CiPathRecord {
 	last_check?: string
 	check_ms?: Record<string, number>
+	has_rerun?: true
 }
 
 function new_path(): CiPath {
-	return { pending: new Set(), check_ms: {} }
+	return { pending: new Set(), settled: new Set(), check_ms: {} }
 }
 
 function settle(path: CiPath, name: string, elapsed_ms: number): void {
 	if (path.pending.delete(name)) path.check_ms[name] = elapsed_ms
+	path.settled.add(name)
+}
+
+function hold(path: CiPath, name: string): void {
+	if (path.settled.has(name)) path.has_rerun = true
+	path.pending.add(name)
 }
 
 function observe(path: CiPath, snapshot: PrStateSnapshot, now_ms: number): void {
 	path.start_ms ??= now_ms
 	const elapsed_ms = now_ms - path.start_ms
 	const checks = snapshot.rollup.filter((check) => !is_coderabbit_check(check.name))
+	const pending = new Set(
+		checks.filter((check) => check.status === CHECK_STATUS_PENDING).map((check) => check.name),
+	)
 
-	for (const check of checks) {
-		if (check.status === CHECK_STATUS_PENDING) path.pending.add(check.name)
-		else settle(path, check.name, elapsed_ms)
-	}
+	for (const name of pending) hold(path, name)
+	for (const check of checks) if (!pending.has(check.name)) settle(path, check.name, elapsed_ms)
 }
 
 // **Only the first check wait is timed**: the `ci-wait` row is that wait's lap, and the wait the merge
@@ -58,7 +74,11 @@ function record_of(path: CiPath): CiPathRecord {
 
 	if (last === undefined) return {}
 
-	return { last_check: last[0], check_ms: { ...path.check_ms } }
+	return {
+		last_check: last[0],
+		check_ms: { ...path.check_ms },
+		...(path.has_rerun && { has_rerun: path.has_rerun }),
+	}
 }
 
 const followup_ci_path = { new_path, observe, observer_of, record_of }

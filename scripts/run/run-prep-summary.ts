@@ -1,3 +1,4 @@
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { issue_read } from '#scripts/issue/issue-read'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { acceptance_map } from '#scripts/review/acceptance-map'
@@ -7,8 +8,8 @@ import { acceptance_map } from '#scripts/review/acceptance-map'
 // acceptance criterion a Check line with an empty `- test:` under it for the model to fill
 // (`report-format.md`). A section the body lacks prints its heading alone — nothing is guessed.
 
-const NOW_HEADING = '## 現象'
-const CHANGE_HEADING = '## 期待結果'
+const NOW_HEADING = issue_body_keys.heading('symptom')
+const CHANGE_HEADING = issue_body_keys.heading('expected')
 const TEST_LINE = '  - test:'
 
 function is_blank(line: string): boolean {

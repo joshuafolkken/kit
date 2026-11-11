@@ -6,12 +6,13 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { temporary_directory } from '#tools/test/temporary-directory'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli } from './issue-scout-cli'
+import { issue_wip } from './issue-wip'
 
 // joshuafolkken/kit#5191: `josh issue:file` prints every local refusal in one call — the body lint and
 // the run label an `auto-ok` filing owes — so one reissue fixes them all, and it files nothing while any
@@ -86,6 +87,10 @@ beforeEach(() => {
 	})
 })
 
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
+
 afterAll(() => {
 	vi.restoreAllMocks()
 })
@@ -114,6 +119,16 @@ describe('issue_file_cli.run — every refusal in one pass', () => {
 
 		expect(issue_scout_cli.scout).toHaveBeenCalledOnce()
 		expect(printed).toContain(`--distinct ${String(DUPLICATE)}`)
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#7201: a malformed cap is refused by name, never counted against the default.
+	it('refuses a malformed JOSH_WIP_CAP by name, and files nothing', async () => {
+		scout_finds_none()
+		vi.stubEnv(issue_wip.WIP_CAP_KEY, 'thirty')
+
+		expect(await issue_file_cli.run(CLEAR_ARGV)).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(issue_wip.WIP_CAP_KEY)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })

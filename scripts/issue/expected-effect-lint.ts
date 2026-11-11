@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
 // joshuafolkken/kit#3909: a run-time-shortening proposal was filed and implemented on a criterion that
@@ -6,9 +7,9 @@ import { markdown_section } from './markdown-section'
 // per miss and where each number came from — before `issue:lint` and `issue:file` accept it. The
 // declaration, the heading and the item labels are the template's, pinned by the document test.
 
-const DECLARATION_LINE = '- 目的: 時間短縮'
-const BACKGROUND_HEADING = '## 背景'
-const HEADING = '## 期待効果'
+const DECLARATION_LINE = issue_body_keys.line('purpose', 'time_saving')
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const HEADING = issue_body_keys.heading('expected_effect')
 const RATE_LABEL = '効く率'
 const GAIN_LABEL = '1 回あたりの得'
 const ITEM_LABELS: ReadonlyArray<string> = [RATE_LABEL, GAIN_LABEL, '外れたときの損', '出典']

@@ -1,4 +1,5 @@
 import { behavior_change_lint } from './behavior-change-lint'
+import { issue_body_keys } from './issue-body-keys'
 import { measure_declaration } from './measure-declaration'
 
 // A behavior-change Issue adds a rule the model is asked to keep, and a prose-only rule is kept only by
@@ -7,9 +8,10 @@ import { measure_declaration } from './measure-declaration'
 // template placeholder is refused — measurement-only enforcement with no measurement is prose alone,
 // and the measurement check refuses it. A line inside a fenced example is not a declaration.
 
-const ENFORCEMENT_PREFIX = '- 強制:'
-const MEASUREMENT_PREFIX = '- 計測:'
-const NONE_VALUE = 'なし'
+const ENFORCEMENT_PREFIX = issue_body_keys.prefix('enforcement')
+const MEASUREMENT_PREFIX = issue_body_keys.prefix('measurement')
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const NONE_VALUE = issue_body_keys.value('none')
 const PLACEHOLDER_PREFIX = '<'
 
 function is_unnamed(value: string): boolean {
@@ -19,7 +21,9 @@ function is_unnamed(value: string): boolean {
 function declaration_problem(body: string, prefix: string, guide: string): string | undefined {
 	const value = measure_declaration.background_value(body, prefix)
 
-	if (value === undefined) return `missing declaration under ## 背景:\`${prefix} ${guide}\``
+	if (value === undefined) {
+		return `missing declaration under ${BACKGROUND_HEADING}:\`${prefix} ${guide}\``
+	}
 
 	return is_unnamed(value) ? `\`${prefix}\` must name ${guide}, not \`${value}\`` : undefined
 }

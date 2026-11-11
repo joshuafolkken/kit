@@ -1,4 +1,5 @@
 import { lane_net_read } from '#scripts/lane/lane-net-read'
+import { issue_body_keys } from './issue-body-keys'
 import { issue_cite } from './issue-cite'
 import { issue_priority } from './issue-priority'
 
@@ -18,7 +19,7 @@ async function lines_of(
 	const line = `${issue_priority.LANE_PREFIX} ${String(minutes)} 分（${issue_cite.plain_for('github', found_during)}）`
 
 	return [
-		`↳ the causing lane from \`josh lane:net ${found_during}\`, to paste under \`## 背景\` when it caused this Issue:`,
+		`↳ the causing lane from \`josh lane:net ${found_during}\`, to paste under \`${issue_body_keys.heading('background')}\` when it caused this Issue:`,
 		line,
 	]
 }

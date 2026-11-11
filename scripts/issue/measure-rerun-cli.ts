@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { baseline_measure, type Baseline } from './baseline-measure'
+import { issue_body_keys } from './issue-body-keys'
 import { trusted_measure, type TrustedBody } from './trusted-measure'
 
 // `josh measure:rerun <N>` — read a behavior-change Issue body after merge, re-run each baseline
@@ -16,7 +17,7 @@ import { trusted_measure, type TrustedBody } from './trusted-measure'
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh measure:rerun <issue-number>'
-const NO_BASELINE = 'no `command → value` baseline found in ## ベースライン — nothing to re-run'
+const NO_BASELINE = `no \`command → value\` baseline found in ${issue_body_keys.heading('baseline')} — nothing to re-run`
 const DATE_END = 10
 
 interface Outcome {

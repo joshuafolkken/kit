@@ -77,6 +77,53 @@ describe('followup_ci_path.record_of — what it leaves out', () => {
 	})
 })
 
+// joshuafolkken/kit#7202: a wait with a rerun is marked so lane:stats keeps it out of the critical path.
+describe('followup_ci_path.record_of — reruns', () => {
+	it('marks the record has_rerun where a settled check is seen pending again', () => {
+		const path = polled([
+			[0, [check('test', PENDING)]],
+			[60, [check('test', FAIL)]],
+			[90, [check('test', PENDING)]],
+			[300, [check('test', PASS)]],
+		])
+
+		expect(followup_ci_path.record_of(path)).toStrictEqual({
+			last_check: 'test',
+			check_ms: { test: 300 * SECONDS },
+			has_rerun: true,
+		})
+	})
+
+	it('marks the record has_rerun where a check already failed at the first poll is rerun', () => {
+		const path = polled([
+			[0, [check('lint', PENDING), check('test', FAIL)]],
+			[20, [check('lint', PASS), check('test', PENDING)]],
+			[200, [check('lint', PASS), check('test', PASS)]],
+		])
+
+		expect(followup_ci_path.record_of(path)).toStrictEqual({
+			last_check: 'test',
+			check_ms: { lint: 20 * SECONDS, test: 200 * SECONDS },
+			has_rerun: true,
+		})
+	})
+})
+
+describe('followup_ci_path.record_of — a name listed twice', () => {
+	it('reads a name listed both settled and pending in one poll as pending, not as a rerun', () => {
+		const path = polled([
+			[0, [check('test', PASS), check('test', PENDING)]],
+			[30, [check('test', PASS), check('test', PENDING)]],
+			[80, [check('test', PASS), check('test', PASS)]],
+		])
+
+		expect(followup_ci_path.record_of(path)).toStrictEqual({
+			last_check: 'test',
+			check_ms: { test: 80 * SECONDS },
+		})
+	})
+})
+
 describe('followup_ci_path.observer_of — the first wait only', () => {
 	it('ignores the polls of a later wait', async () => {
 		const clock = vi.spyOn(performance, 'now').mockReturnValue(0)

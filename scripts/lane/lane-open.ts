@@ -13,6 +13,7 @@ import { lane_leftover } from './lane-leftover'
 import { lane_paths } from './lane-paths'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seat, type SeatReservation } from './lane-seat'
+import { lane_setup } from './lane-setup'
 import { lane_start_point } from './lane-start-point'
 import { lane_state } from './lane-state'
 
@@ -88,10 +89,12 @@ function guard_install(lane: LaneInfo, result: InstallResult): void {
 // `run:board` draws it apart from the work tree being made. Best-effort, as every stage is.
 // **The eslint daemon is warmed once the install lands, unawaited**, so the child's first edit hook
 // lints warm rather than paying the daemon's start (joshuafolkken/kit#4720).
-async function fill(lane: LaneInfo): Promise<void> {
+// The project's own setup runs last, once the install and the caches are in (`lane-setup.ts`).
+async function fill(lane: LaneInfo, source_root: string): Promise<void> {
 	await run_event_setup.emit(run_event_setup.installing(lane.issue))
 	guard_install(lane, await lane_install.install_dependencies(lane.directory))
 	eslint_warm.start(lane.directory)
+	await lane_setup.run_setup(lane, source_root)
 }
 
 async function build_plan(
@@ -151,7 +154,7 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 		lane_registry.write_environment(plan.lane.directory, plan.environment_content)
 		lane_cache.seed_caches(source_root, plan.lane.directory)
 		lane_cache.seed_hook_bundles(source_root, plan.lane.directory)
-		await fill(plan.lane)
+		await fill(plan.lane, source_root)
 	} finally {
 		lane_seat.release(plan.reservation)
 	}

@@ -1,3 +1,4 @@
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { markdown_section } from '#scripts/issue/markdown-section'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
@@ -41,7 +42,7 @@ const NO_KNOWN_REPOS: ReadonlySet<string> = new Set()
 // Where a child states what it must deliver. Both spellings, because the bodies are written in
 // whichever language the session was in.
 const ACCEPTANCE_HEADINGS: ReadonlySet<string> = new Set([
-	'## 受け入れ条件',
+	issue_body_keys.heading('criteria'),
 	'## Acceptance criteria',
 ])
 
