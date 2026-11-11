@@ -36,7 +36,7 @@ What `pnpm exec` adds over a direct launch, and what that loses:
 
 The shim itself exports `NODE_PATH`; `node <bin entry>` (`resolve_package_bin`, `scripts/build/local-bin.ts`) does not, and pnpm's symlinked layout resolves the tools' own dependencies without it. cspell's `exports` map hides `cspell/package.json`, so `resolve_package_bin` returns nothing for it and the shim is its direct route.
 
-`scripts/hooks/format-edited-file.ts` and `scripts/hooks/edited-cspell.ts` use `pnpm exec` only as the last fallback, when the `node_modules/.bin` shim is missing.
+`scripts/test/test-unit-guard.ts`, `scripts/hooks/format-edited-file.ts` and `scripts/hooks/edited-cspell.ts` launch through `direct_launch`, which falls back to `pnpm exec` only when neither the bin entry nor a shim at or above the root is installed ([#7259](https://github.com/joshuafolkken/kit/issues/7259)).
 
 ## `josh gate`'s core budget
 

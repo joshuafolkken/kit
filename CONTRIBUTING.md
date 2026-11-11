@@ -32,11 +32,12 @@ take it over where it does not.
 
 ## Decisions not to act, and when they are revisited
 
-When a report is declined, the reason is written on the Issue or epic that handles it, together with
-what you can do in your own project meanwhile and the condition under which it would be revisited —
-for example, the declined items listed on
-[#7212](https://github.com/joshuafolkken/kit/issues/7212). If that condition is met later, comment on
-the same Issue rather than opening a new one.
+When a report is declined or kept under consideration, the reason is written on the Issue or epic
+that handles it, together with what you can do in your own project meanwhile and what would move it
+forward — the condition under which it would be revisited, or a question back to you. For an example,
+see the items under consideration listed on
+[#7212](https://github.com/joshuafolkken/kit/issues/7212). If that condition is met later, or you can
+answer the question, comment on the same Issue rather than opening a new one.
 
 ## Language
 

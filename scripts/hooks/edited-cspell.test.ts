@@ -150,15 +150,20 @@ async function both_routes(name: string): Promise<ReadonlyArray<string>> {
 	])
 }
 
+// joshuafolkken/kit#7259: cspell's `exports` map hides its manifest, so the shim is its direct route.
 describe('cspell_command', () => {
 	it('spawns the project shim directly when it is installed', () => {
-		expect(edited_cspell.cspell_command(PROJECT)).toStrictEqual([
-			resolve_local_bin(PROJECT, 'cspell'),
-		])
+		expect(edited_cspell.cspell_command(PROJECT)).toStrictEqual({
+			file: resolve_local_bin(PROJECT, 'cspell'),
+			args: [],
+		})
 	})
 
-	it('falls back to pnpm exec where the root carries no shim', () => {
-		expect(edited_cspell.cspell_command(DIRECTORY)).toStrictEqual(['pnpm', 'exec', 'cspell'])
+	it('falls back to pnpm exec where no shim is installed at or above the root', () => {
+		expect(edited_cspell.cspell_command(DIRECTORY)).toStrictEqual({
+			file: 'pnpm',
+			args: ['exec', 'cspell'],
+		})
 	})
 })
 
