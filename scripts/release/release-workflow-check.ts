@@ -17,7 +17,7 @@ function quoted(name: string): string {
 }
 
 function missing_workflow_message(tip: string): string {
-	return `No workflow on \`${tip}\` creates the GitHub Release (looked for ${RELEASE_WORKFLOWS.map(quoted).join(' and ')}), so the release would push its tag and then wait for a release that never comes. Upgrade kit to ${DISTRIBUTED_SINCE} or later and run \`pnpm josh sync\` to add \`github-release.yml\`, merge it, then run \`pnpm josh release\` again.`
+	return `No workflow on \`${tip}\` creates the GitHub Release (looked for ${RELEASE_WORKFLOWS.map((name) => quoted(name)).join(' and ')}), so the release would push its tag and then wait for a release that never comes. Upgrade kit to ${DISTRIBUTED_SINCE} or later and run \`pnpm josh sync\` to add \`github-release.yml\`, merge it, then run \`pnpm josh release\` again.`
 }
 
 function found_workflow_message(held: ReadonlyArray<string>): string {
