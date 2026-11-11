@@ -128,10 +128,13 @@ describe('vitest_config_workers.lane_count_probe.spawned_lane_count', () => {
 		)
 	})
 
-	it('counts no lane when the child prints no number', () => {
-		const broken = { NODE_OPTIONS: '--no-such-node-flag' }
+	it.each([
+		['fails to start', '--no-such-node-flag'],
+		['prints more than a number', '--import=data:text/javascript,process.stdout.write("x")'],
+	])('counts no lane when the child %s', (_case, node_options) => {
+		const environment = { NODE_OPTIONS: node_options }
 
-		expect(lane_count_probe.spawned_lane_count(checkout_beside_lanes(), broken)).toBe(0)
+		expect(lane_count_probe.spawned_lane_count(checkout_beside_lanes(), environment)).toBe(0)
 	})
 
 	it('spawns no lane count for a josh-driven run', () => {
