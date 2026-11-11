@@ -23,6 +23,9 @@ describe('keychain_read.is_keychain_read — refuses a secret subcommand', () =>
 		[['-v', GENERIC]],
 		[['-p', 'prompt', DUMP]],
 		[['-i']],
+		[['-qi']],
+		[['-qp', 'prompt', DUMP]],
+		[['-p', '-i', LIST]],
 	])('refuses security %j', (args) => {
 		expect(reads(SECURITY, args)).toBe(true)
 	})

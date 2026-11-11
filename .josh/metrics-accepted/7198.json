@@ -2,6 +2,6 @@
 	"reason": "New keychain-read egress check for the security CLI (#7198)",
 	"date": "2026-11-11",
 	"growth": {
-		"scripts.code_lines": 27
+		"scripts.code_lines": 32
 	}
 }

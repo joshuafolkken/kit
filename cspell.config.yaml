@@ -19,6 +19,10 @@ words:
   - pushurl
   # One of the network programs `egress-guard.ts` refuses (#5999).
   - ncat
+  # The Xcode launcher `launched-call.ts` looks past, so `xcrun security` reaches the keychain check (#7198).
+  - xcrun
+  # The option-parsing convention the #7198 review cites for `security -qi` flag clusters.
+  - getopt
   # `josh review:selfcheck`, the self-check's questions 2, 4 and 10 run as one command (#5540).
   - selfcheck
   - uncomputable
