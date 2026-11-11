@@ -228,7 +228,7 @@ async function run_gate_steps(
 	)
 }
 
-const gate_run_steps = { default_budget, run_gate_step, run_gate_steps }
+const gate_run_steps = { default_budget, reused_result, run_gate_step, run_gate_steps }
 
 export type { BudgetContext, ReusedChecks }
 export { gate_run_steps }
