@@ -16,8 +16,8 @@ import { release_tag } from './release-tag'
 // publishing jobs pass. Stopping at the tag would call the release published ahead of both, so the
 // command waits for each, prints one line per stage reached, and prints the completion line only
 // when every stage has — a stage that times out, or whose Publish run fails first, is named with ❌
-// and the run exits non-zero. In a consumer, which has no `publish.yml`, the distributed `GitHub
-// Release` workflow opens the release instead.
+// and the run exits non-zero. In a consumer the distributed `GitHub Release` workflow opens the
+// release instead.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -98,15 +98,16 @@ function has_workflow(cwd: string, workflow_path: string): boolean {
 	return file_reader.read_if_readable(path.join(cwd, workflow_path)) !== undefined
 }
 
-// kit opens its GitHub Release from `publish.yml`; a consumer has none, and its release comes from the
-// `GitHub Release` workflow `josh sync` distributes — so the hint names the run that repository has.
+// A consumer's release comes from the `GitHub Release` workflow `josh sync` distributes — even beside
+// its own `publish.yml`, which that workflow waits for. kit carries no such workflow and opens its
+// release from `publish.yml`'s create-release job. The hint names the run the repository has.
 function missed_release_hint(cwd: string, tag: string): string {
-	if (has_workflow(cwd, PUBLISH_WORKFLOW_PATH)) {
-		return `  Check the Publish run for ${tag}: its create-release job did not finish.`
-	}
-
 	if (has_workflow(cwd, RELEASE_WORKFLOW_PATH)) {
 		return `  Check the GitHub Release ${tag} run: it did not create the release.`
+	}
+
+	if (has_workflow(cwd, PUBLISH_WORKFLOW_PATH)) {
+		return `  Check the Publish run for ${tag}: its create-release job did not finish.`
 	}
 
 	return `  ${RELEASE_WORKFLOW_PATH} is missing: run pnpm josh sync to install the GitHub Release workflow.`

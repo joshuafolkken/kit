@@ -162,8 +162,9 @@ describe('release_progress.wait_for_distribution hint when the GitHub Release ti
 		given_release(undefined)
 	})
 
+	// kit's own layout: publish.yml's create-release job opens the release.
 	it('points at the Publish run when the repository has publish.yml', async () => {
-		given_workflows(PUBLISH_WORKFLOW, RELEASE_WORKFLOW)
+		given_workflows(PUBLISH_WORKFLOW)
 
 		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
 		expect(printed()).toContain(
@@ -171,8 +172,12 @@ describe('release_progress.wait_for_distribution hint when the GitHub Release ti
 		)
 	})
 
-	it('points at the GitHub Release run when the repository has no publish.yml', async () => {
-		given_workflows(RELEASE_WORKFLOW)
+	// The distributed workflow opens a consumer's release, even when it waits for the consumer's Publish.
+	it.each([
+		['no publish.yml', [RELEASE_WORKFLOW]],
+		['its own publish.yml', [PUBLISH_WORKFLOW, RELEASE_WORKFLOW]],
+	])('points at the GitHub Release run in a consumer with %s', async (_layout, workflows) => {
+		given_workflows(...workflows)
 
 		expect(await release_progress.wait_for_distribution(VERSION)).toBe(FAILURE)
 		expect(printed()).toContain(`Check the GitHub Release ${TAG} run`)
