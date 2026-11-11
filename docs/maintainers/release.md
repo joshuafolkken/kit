@@ -1,6 +1,6 @@
 # Release
 
-For kit maintainers publishing a new version of `@joshuafolkken/kit`; projects that use kit can skip this page.
+For kit maintainers publishing a new version of `@joshuafolkken/kit`; projects that use kit can skip this page. To release a project that uses kit, see [`josh release`](../josh-commands-automation.md#josh-release), whose consumer-repository list names the workflows it needs.
 
 ## When to use it
 
