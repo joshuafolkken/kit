@@ -34,6 +34,7 @@ const LAUNCHERS: ReadonlyMap<string, Launcher> = new Map([
 	['nohup', launcher([])],
 	['stdbuf', launcher(['-i', '-o', '-e', '--input', '--output', '--error'])],
 	['timeout', launcher(['-s', '--signal', '-k', '--kill-after'], 1)],
+	['xcrun', launcher(['--sdk', '-sdk', '--toolchain', '-toolchain'])],
 	[
 		'xargs',
 		launcher(['-a', '--arg-file', '-d', '--delimiter', '-E', '-I', '-L', '-n', '-P', '-s']),
