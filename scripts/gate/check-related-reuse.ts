@@ -11,6 +11,14 @@ import { scoped_green } from './scoped-green'
 // scoped records (`scoped-green.ts`); the type check and cspell read and write the gate's per-check
 // records under the gate's labels (`check-reuse.ts`), so a green from either end serves the other. A
 // failed check writes no record, so it runs again.
+//
+// **The gate's `lint` record is not one of them** (joshuafolkken/kit#7250): `lint:related` already had a
+// scoped record when this file read the existing ones, and neither direction carries over as is. The
+// gate's `lint --changed` is prettier plus eslint alone, while `lint:related` also runs the structural,
+// document and unused-member checks (`lint-related.ts`), so a gate green does not vouch for it. A
+// `lint:related` green does not vouch for the gate's either: the gate lints the whole tree in CI and on
+// a changed lint configuration (`lint-gate-scope.ts`), where `lint:related` stays on the changed files,
+// and the gate records only a pass with nothing to say (`check-reuse.ts`).
 
 const GATE_LABELS: ReadonlyMap<string, string> = new Map([
 	[gate_labels.TYPE_CHECK_TARGET, gate_labels.TYPE_CHECK_LABEL],

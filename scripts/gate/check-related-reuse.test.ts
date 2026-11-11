@@ -62,6 +62,15 @@ describe('check_related_reuse.reusable', () => {
 			new Set([LINT, CSPELL]),
 		)
 	})
+
+	// joshuafolkken/kit#7250: the gate's lint is prettier plus eslint, `lint:related` more than that.
+	it('does not reuse lint:related on a holding gate lint record', async () => {
+		answer([], [gate_labels.LINT_LABEL, TYPE_CHECK_LABEL])
+
+		await expect(check_related_reuse.reusable(CHECKS, TREE, RECORDS)).resolves.toStrictEqual(
+			new Set([TYPE_CHECK]),
+		)
+	})
 })
 
 describe('check_related_reuse.read_tree', () => {
