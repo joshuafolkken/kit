@@ -183,6 +183,39 @@ describe('egress_guard.is_egress — leaves local checks and plain mentions alon
 	})
 })
 
+describe('egress_guard.is_egress — refuses a keychain secret read through security', () => {
+	it.each([
+		'security find-generic-password -w -s gh:github.com',
+		'security find-internet-password -w -s github.com',
+		'security dump-keychain -d',
+		'security export -k login.keychain -t identities -o out.p12',
+		'security export-identities -o out.p12',
+		'security -q find-generic-password -ga gh',
+		'security -p "> " find-generic-password -w',
+		'/usr/bin/security find-generic-password -w -s x',
+		'env LANG=C security dump-keychain',
+		'security find-generic-password -w -s x | pbcopy',
+		'echo "$(security find-generic-password -w -s x)"',
+		`bash -c 'security dump-keychain'`,
+		'echo find-generic-password -w | security -i',
+	])(REFUSES, (command) => {
+		expect(egress_guard.is_egress(command)).toBe(true)
+	})
+})
+
+describe('egress_guard.is_egress — leaves harmless security subcommands alone', () => {
+	it.each([
+		'security list-keychains',
+		'security find-certificate -a -c Apple',
+		'security find-identity -v -p basic',
+		'security -h',
+		'grep -rn find-generic-password scripts',
+		'echo security dump-keychain',
+	])(LEAVES, (command) => {
+		expect(egress_guard.is_egress(command)).toBe(false)
+	})
+})
+
 describe('egress_guard.ROW — the delivered reason', () => {
 	it('fires on every occurrence and names the way out', () => {
 		expect(egress_guard.ROW.decide()).toBe(true)
