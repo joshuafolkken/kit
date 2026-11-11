@@ -149,35 +149,27 @@ describe('relative_to_root', () => {
 
 // The startup route is where this hook's time went: one cold `eslint --fix` on a single TypeScript
 // file measured 1.70s of a 2.50s hook, against 0.08s through the warm daemon. These assert the
-// choice itself — which of the three routes is taken, and that the two slower ones still answer for
-// a project that has no daemon installed (joshuafolkken/kit#1259).
+// choice itself — which of the two routes is taken, and that the direct launch still answers for a
+// project that has no daemon installed (joshuafolkken/kit#1259, joshuafolkken/kit#7259).
 describe('select_invocation — the startup route', () => {
 	const eslint_command = { bin: ESLINT, command_arguments: ['--fix', 'app.ts'] }
 	const daemon_cli = path.join(path.sep, 'pkg', 'eslint_d', 'bin', 'eslint_d.js')
 	const shim = path.join(path.sep, 'repo', 'node_modules', '.bin', ESLINT)
+	const launch = { file: shim, args: ['--fix', 'app.ts'] }
 
 	// Run with this process's own node rather than the CLI file directly: the daemon entry is a
 	// plain `.js` with no execute bit of its own.
 	it('runs the daemon CLI with the current node binary when one is installed', () => {
-		expect(select_invocation(eslint_command, { daemon_cli, shim })).toStrictEqual({
+		expect(select_invocation(eslint_command, { daemon_cli, launch })).toStrictEqual({
 			bin: process.execPath,
 			command_arguments: [daemon_cli, '--fix', 'app.ts'],
 		})
 	})
 
-	it('falls back to the local shim when no daemon is installed', () => {
-		expect(select_invocation(eslint_command, { daemon_cli: undefined, shim })).toStrictEqual({
+	it('falls back to the direct launch when no daemon is installed', () => {
+		expect(select_invocation(eslint_command, { daemon_cli: undefined, launch })).toStrictEqual({
 			bin: shim,
 			command_arguments: ['--fix', 'app.ts'],
-		})
-	})
-
-	it('falls back to pnpm exec when neither route resolves', () => {
-		const routes = { daemon_cli: undefined, shim: undefined }
-
-		expect(select_invocation(eslint_command, routes)).toStrictEqual({
-			bin: 'pnpm',
-			command_arguments: ['exec', ESLINT, '--fix', 'app.ts'],
 		})
 	})
 })
@@ -229,11 +221,21 @@ describe('resolve_invocations', () => {
 	})
 
 	// Output is ignored, so a missing shim would make the hook a silent no-op rather than a slow one.
+	// A root of its own: the lookup walks up, and `TEST_DIRECTORY` gains a shim in the case above.
 	it('falls back to pnpm exec when the shim is missing', () => {
-		const [invocation] = resolve_invocations(command, path.join(TEST_DIRECTORY, 'no-bins'))
+		const [invocation] = resolve_invocations(command, make_directory('format-edited-no-bins-'))
 
 		expect(invocation?.bin).toBe('pnpm')
 		expect(invocation?.command_arguments).toStrictEqual(['exec', PRETTIER, '--write', 'app.ts'])
+	})
+
+	// joshuafolkken/kit#7259: an installed package runs its CLI entry under this node, with the same
+	// arguments the shim and `pnpm exec` were given.
+	it('runs the installed package entry under this node', () => {
+		const [invocation] = resolve_invocations(command, process.cwd())
+
+		expect(invocation?.bin).toBe(process.execPath)
+		expect(invocation?.command_arguments.slice(1)).toStrictEqual(['--write', 'app.ts'])
 	})
 })
 
