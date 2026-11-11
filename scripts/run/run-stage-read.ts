@@ -26,9 +26,21 @@ interface StageRead {
 	returned?: string
 }
 
+// The text naming what returned the pull request. A read that fails (a gh or API error) answers
+// `undefined` with a warning — the entry goes on to the gate, where `followup` still refuses a red merge.
+async function read_returned(issue: string): Promise<string | undefined> {
+	try {
+		return run_pr_return.format(await run_pr_return.read(issue))
+	} catch (error) {
+		console.warn(`pr-returned check skipped, resuming at the gate: ${String(error)}`)
+
+		return undefined
+	}
+}
+
 // An open pull request returned for a fix resumes at implementation, any other at the gate.
 async function read_open_pr(issue: string): Promise<Omit<StageRead, 'prrun_token'>> {
-	const returned = run_pr_return.format(await run_pr_return.read(issue))
+	const returned = await read_returned(issue)
 
 	return returned === undefined
 		? { state: run_stage.PR_OPEN }

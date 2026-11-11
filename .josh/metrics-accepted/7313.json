@@ -1,8 +1,8 @@
 {
-	"reason": "The returned-for-fix read (run-pr-return.ts) and its tests add the lines; the extra +8 anchors the person-comment cut on the last commit, since a josh-posted person comment carries the run marker",
+	"reason": "Round-2 fixes: a failed returned-for-fix read falls back to the gate with a warning (+8 lines with its test)",
 	"date": "2026-11-11",
 	"growth": {
-		"scripts.code_lines": 96,
+		"scripts.code_lines": 104,
 		"ai_cost.on_demand_bytes": 95
 	}
 }

@@ -102,6 +102,24 @@ describe('run_stage_read.read_stage — an existing fullrun pull request', () =>
 	})
 })
 
+describe('run_stage_read.read_stage — a returned-for-fix read that fails', () => {
+	const FAILURE = 'gh unavailable'
+
+	it('resumes at the gate with a warning rather than stopping the entry', async () => {
+		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		read_issue_mock.mockResolvedValue(open_with([]))
+		open_pr_mock.mockResolvedValue(true)
+		pr_return_mock.mockRejectedValue(new Error(FAILURE))
+
+		const read = await run_stage_read.read_stage(ISSUE)
+
+		expect(read.state).toBe(run_stage.PR_OPEN)
+		expect(read.returned).toBeUndefined()
+		expect(warn_spy).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(FAILURE))
+	})
+})
+
 describe('run_stage_read.read_stage — the planned mark (joshuafolkken/kit#3042)', () => {
 	it('reads the kickoff label as planned', async () => {
 		read_issue_mock.mockResolvedValue(open_with([PLANNED_LABEL]))
