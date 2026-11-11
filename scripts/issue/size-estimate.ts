@@ -4,6 +4,7 @@ import { lane_stage_budget } from '#scripts/lane/lane-stage-budget'
 import { declared_growth } from '#scripts/split/declared-growth'
 import { split_assess, type SizeMeasurement } from '#scripts/split/split-assess'
 import { z } from 'zod'
+import { issue_body_keys } from './issue-body-keys'
 import { SPLIT_ROUTE_LABEL } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
@@ -19,9 +20,9 @@ import { markdown_section } from './markdown-section'
 // Each axis grows by the recent merged lanes' median, independently of the implement rate.
 // `parse` keeps the declared counts: `lane:plan` reads them as declared.
 
-const BACKGROUND_HEADING = '## 背景'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const EPIC_HEADING = '## Split rationale'
-const PREFIX = '- 規模見積もり:'
+const PREFIX = issue_body_keys.prefix('size')
 const HEADING_PREFIX = '## '
 const { REASON_PREFIX } = split_assess
 const DECLARATION = `${PREFIX} 約 <N> ファイル / <M> 行（テスト除く）`

@@ -115,6 +115,9 @@ pnpm --allow-build=esbuild dlx @joshuafolkken/kit init
 **Only the kit the project itself installed sets the project up.** A `josh init` run from anywhere else — `pnpm dlx`, a global install — compares its own directory with the project's `node_modules/@joshuafolkken/kit`. When they differ:
 
 1. **It installs the project's kit.** A directory with no `package.json` first gets `{ "private": true }`, so pnpm does not install into an ancestor project. A project that does not list `@joshuafolkken/kit` gets `pnpm add -D` with the esbuild and unrs-resolver build approvals; one that lists it gets `pnpm install`, keeping its version.
+
+   Before installing, `pnpm-workspace.yaml` gets the template's `minimumReleaseAge` (or the `.npmrc` value) unless it sets one, so a kit published inside the wait leaves the previous one installed.
+
 2. **It hands the run to that kit** — `pnpm exec josh init` with the same arguments, in the project root.
 
 `--no-install` installs nothing, so the kit that is running does the setup itself. Why: `docs/maintainers/init-rationale.md` → "Running from outside the project".

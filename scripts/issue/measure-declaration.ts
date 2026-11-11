@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
 // joshuafolkken/kit#4621: a follow-up measurement ("measure K merges after #N") took a lane for 20–40
@@ -9,14 +10,14 @@ import { markdown_section } from './markdown-section'
 // **The value is the command's last non-empty output line, read as one number.** Anything else — a
 // unit, a sentence, a failure — is unreadable, so a person never relies on how a free-text line parses.
 
-const BACKGROUND_HEADING = '## 背景'
-const PREFIX = '- 計測宣言:'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const PREFIX = issue_body_keys.prefix('measure_declaration')
 // joshuafolkken/kit#7021: a number a decision rests on, declared in the same shape so the command that
 // measures it is named before the work starts. Every premise line is checked, not only the first.
-const PREMISE_PREFIX = '- 前提:'
+const PREMISE_PREFIX = issue_body_keys.prefix('premise')
 // joshuafolkken/kit#5144: a follow-up whose value no one command prints (an Actions record, an external
 // service) says why under the same heading instead, so it files without a declaration.
-const ABSENT_PREFIX = '- 計測宣言なし:'
+const ABSENT_PREFIX = issue_body_keys.prefix('measure_absent')
 const ABSENT = `${ABSENT_PREFIX} <理由>`
 const SHAPE = '`<command>` <=|<|>=|> <number>'
 const DECLARATION = `${PREFIX} ${SHAPE}`

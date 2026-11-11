@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { has_label_name, PRIORITY_CRITICAL_LABEL, PRIORITY_HIGH_LABEL } from './issue-labels'
 import { markdown_section } from './markdown-section'
 
@@ -26,28 +27,37 @@ interface FloorLine {
 	problem: string
 }
 
-const BACKGROUND_HEADING = '## 背景'
-const DECLARATION_PREFIX = '- 優先度:'
-const NORMAL_LINE = '- 優先度: 通常'
-const CRITICAL_PATTERN = /^- 優先度: 緊急（(?<basis>.*)）$/u
-const HIGH_PATTERN = /^- 優先度: 高（(?<basis>.*)）$/u
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const DECLARATION_PREFIX = issue_body_keys.prefix('priority')
+const NORMAL_LINE = issue_body_keys.line('priority', 'normal')
+const CRITICAL_PATTERN = new RegExp(
+	`^${issue_body_keys.line('priority', 'critical')}（(?<basis>.*)）$`,
+	'u',
+)
+const HIGH_PATTERN = new RegExp(
+	`^${issue_body_keys.line('priority', 'high')}（(?<basis>.*)）$`,
+	'u',
+)
 // An interrupt-filing condition number (`wip-cap.md`); a reduction is no basis (joshuafolkken/kit#4928).
 const CRITICAL_BASIS = /条件 ?[1-3]/u
 const PLACEHOLDER = /^<.*>$/u
-const LANE_PREFIX = '- 原因のレーン:'
+const LANE_PREFIX = issue_body_keys.prefix('cause_lane')
 // The minutes are the lane's net time (`josh lane:net`), the number its Issue.
-const LANE_LINE = /^- 原因のレーン: (?<minutes>\d+(?:\.\d+)?) 分（#[1-9]\d*）$/u
+const LANE_LINE = new RegExp(
+	String.raw`^${LANE_PREFIX} (?<minutes>\d+(?:\.\d+)?) 分（#[1-9]\d*）$`,
+	'u',
+)
 // The minutes one cause of an overrun lost, ranked ahead of its causing lane's (joshuafolkken/kit#4861).
-const CAUSE_PREFIX = '- 原因の損失:'
-const CAUSE_LINE = /^- 原因の損失: (?<minutes>\d+(?:\.\d+)?) 分$/u
+const CAUSE_PREFIX = issue_body_keys.prefix('cause_loss')
+const CAUSE_LINE = new RegExp(String.raw`^${CAUSE_PREFIX} (?<minutes>\d+(?:\.\d+)?) 分$`, 'u')
 // The summed cause-loss minutes that set the high floor; provisional, tuned from use.
 const LOSS_HIGH_MINUTES = 30
-const SECURITY_PREFIX = '- セキュリティ:'
-const PARK_PREFIX = '- 原因の park:'
-const PARK_LINE = /^- 原因の park: #(?<issue>[1-9]\d*)$/u
+const SECURITY_PREFIX = issue_body_keys.prefix('security')
+const PARK_PREFIX = issue_body_keys.prefix('cause_park')
+const PARK_LINE = new RegExp(String.raw`^${PARK_PREFIX} #(?<issue>[1-9]\d*)$`, 'u')
 // Queues the Issue behind every undeclared one of its pool (joshuafolkken/kit#5310).
-const ORDER_PREFIX = '- 実施順:'
-const LAST_LINE = '- 実施順: 最後'
+const ORDER_PREFIX = issue_body_keys.prefix('order')
+const LAST_LINE = issue_body_keys.line('order', 'last')
 const LEVELS: ReadonlyArray<PriorityLevel> = ['normal', 'high', 'critical']
 const RAISED_LEVELS: ReadonlySet<PriorityLevel> = new Set(['high', 'critical'])
 const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
@@ -55,7 +65,7 @@ const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 	high: PRIORITY_HIGH_LABEL,
 	normal: undefined,
 }
-const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent one names its condition, a high one its basis (\`issue-template.md\`)`
+const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`${issue_body_keys.line('priority', 'critical')}（条件 <1-3>）\`, \`${issue_body_keys.line('priority', 'high')}（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent one names its condition, a high one its basis (\`issue-template.md\`)`
 
 const LANE_PROBLEM = `state a causing lane under \`${BACKGROUND_HEADING}\` as \`${LANE_PREFIX} <分> 分（#<N>）\` — the lane's net minutes from \`josh lane:net <N>\` (\`issue-template.md\`)`
 
@@ -254,7 +264,7 @@ function floor_problem(body: string, level: PriorityLevel): string | undefined {
 
 	if (LEVELS.indexOf(level) >= LEVELS.indexOf(floor)) return undefined
 
-	return `${floor_reason(body)} ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`- 優先度: ${HIGH_DECLARATION}\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
+	return `${floor_reason(body)} ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`${DECLARATION_PREFIX} ${HIGH_DECLARATION}\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
 }
 
 // Whether the body declares `LAST_LINE`; any other value is no declaration.

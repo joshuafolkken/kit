@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { JOSH_TMP_DIRECTORY } from '#scripts/lib/josh-temporary-directory'
@@ -37,19 +38,19 @@ function title_of(finding: BatchFinding, issue: number): string {
 // high floor `issue-template.md` → H gives it; any other finding runs at the normal priority.
 function priority_line(finding: BatchFinding): string {
 	return finding.spec.startsWith(SECURITY_CATEGORY)
-		? `- セキュリティ: ${finding.description}`
-		: '- 優先度: 通常'
+		? `${issue_body_keys.prefix('security')} ${finding.description}`
+		: issue_body_keys.line('priority', 'normal')
 }
 
 function background_lines(finding: BatchFinding, issue: number): ReadonlyArray<string> {
 	return [
-		'## 背景',
+		issue_body_keys.heading('background'),
 		'',
-		'- 種別: 非不具合',
-		'- 目的: 機能改善',
-		'- 人の判断: 不要',
+		issue_body_keys.line('kind', 'non_bug'),
+		issue_body_keys.line('purpose', 'improvement'),
+		issue_body_keys.line('judgement', 'not_needed'),
 		priority_line(finding),
-		'- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）',
+		`${issue_body_keys.prefix('size')} 約 1 ファイル / 20 行（テスト除く）`,
 		'',
 		`${cite(issue)} のレビューで確かめた所見 \`${finding.spec}\`。ラウンド上限のため、その場では直さずに持ち越した。`,
 	]
@@ -61,15 +62,15 @@ function body_of(finding: BatchFinding, issue: number): string {
 		'',
 		...background_lines(finding, issue),
 		'',
-		'## 現象',
+		issue_body_keys.heading('symptom'),
 		'',
 		`- ${finding.description}`,
 		'',
-		'## 期待結果',
+		issue_body_keys.heading('expected'),
 		'',
 		`- \`${finding.spec}\` の失敗シナリオが起きない`,
 		'',
-		'## 受け入れ条件',
+		issue_body_keys.heading('criteria'),
 		'',
 		'- [ ] 所見の失敗シナリオを入力と状態で再現するテストが通る',
 		'',

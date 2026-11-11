@@ -1,6 +1,7 @@
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { split_assess } from '#scripts/split/split-assess'
 import { expected_effect_lint } from './expected-effect-lint'
+import { issue_body_keys } from './issue-body-keys'
 import { issue_cite } from './issue-cite'
 import { markdown_section } from './markdown-section'
 
@@ -12,9 +13,10 @@ import { markdown_section } from './markdown-section'
 // the files and lines they need, so the follow-up's size-estimate line is built from `--estimate`,
 // and its reason for staying one Issue only from `--reason` — #N's own reason was about #N.
 
-const BACKGROUND_HEADING = '## 背景'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const EXPECTED_HEADING = issue_body_keys.heading('expected')
 const HEADING_PREFIX = '## '
-const ESTIMATE_PREFIX = '- 規模見積もり:'
+const ESTIMATE_PREFIX = issue_body_keys.prefix('size')
 const SIZING_PREFIXES: ReadonlyArray<string> = [ESTIMATE_PREFIX, split_assess.REASON_PREFIX]
 const UNCHECKED_PATTERN = /^\s*[-*+]\s+\[ \]\s+\S/u
 const CHECKED_PATTERN = /^\s*[-*+]\s+\[[xX]\]\s+\S/u
@@ -148,16 +150,16 @@ function follow_up_body(subject: SpillSubject, sizing: ReadonlyArray<string>): s
 		...declarations(subject.body),
 		...sizing,
 		'',
-		'## 現象',
+		issue_body_keys.heading('symptom'),
 		'',
 		`${origin} の受け入れ条件のうち、下の行が未完了のまま残った。`,
 		'',
-		'## 期待結果',
+		EXPECTED_HEADING,
 		'',
-		`${origin} の \`## 期待結果\` のうち、下の受け入れ条件が求める部分を満たす。`,
+		`${origin} の \`${EXPECTED_HEADING}\` のうち、下の受け入れ条件が求める部分を満たす。`,
 		'',
 		...effect_section(subject.body),
-		'## 受け入れ条件',
+		issue_body_keys.heading('criteria'),
 		'',
 		...unchecked_lines(subject.body),
 		'',

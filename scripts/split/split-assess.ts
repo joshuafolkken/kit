@@ -1,4 +1,5 @@
 import { git_path_quoting } from '#scripts/git/git-path-quoting'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { run_record_path } from '#scripts/josh/run-record-path'
 import { lane_implement_rate, type ImplementRate } from '#scripts/lane/lane-implement-rate'
 import type { SizeRatios } from '#scripts/lane/lane-size-stats'
@@ -283,7 +284,7 @@ function notice_bar(declared: DeclaredSize | undefined, guide: SplitGuide): Noti
 const NOTICE_SECTION = 'Over the guide before the gate'
 const QUESTION_SECTION = 'The question'
 // The filing's reason line (`size_estimate`); it does not answer a later split notice.
-const REASON_PREFIX = '- 分割しない理由:'
+const REASON_PREFIX = issue_body_keys.prefix('no_split_reason')
 const NOTICE_ACTION = `go on to the end; a started Issue is never split, and the merge records the overrun as a pre-split miss — split-assessment.md → "${NOTICE_SECTION}"`
 
 // The notice for a diff past `notice_bar` on either axis — strictly greater than, as the guide is — and

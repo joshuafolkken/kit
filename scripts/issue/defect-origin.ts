@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { issue_cite } from './issue-cite'
 
 // Candidate origins for a defect: the merged pull requests that last changed what its issue names.
@@ -15,7 +16,7 @@ const MERGE_RECORD = new RegExp(
 const LOG_LIMIT = '--max-count=5'
 const MAX_CANDIDATES = 5
 const DATE_LENGTH = 'YYYY-MM-DD'.length
-const ORIGIN_HINT = '`- 原因: #<PR>`'
+const ORIGIN_HINT = `\`${issue_body_keys.prefix('origin')} #<PR>\``
 const NO_CANDIDATES = '(no merged pull request changed what the issue names)'
 
 interface Merge {

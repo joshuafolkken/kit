@@ -17,6 +17,9 @@ const KIT_ADD = 'pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver @
 const HANDOFF = 'pnpm exec josh init --profile static'
 const PROFILE_ARGS = ['--profile', 'basic']
 const PACKAGE_JSON = 'package.json'
+const WORKSPACE = 'pnpm-workspace.yaml'
+const TEMPLATE_RELEASE_AGE = 'minimumReleaseAge: 4320'
+const OWN_RELEASE_AGE = 'minimumReleaseAge: 10080'
 const fixture = { root: '' }
 const make_directory = temporary_directory()
 
@@ -50,6 +53,10 @@ function link_project_kit(target: string): void {
 
 function read_manifest(directory: string): string {
 	return readFileSync(path.join(directory, PACKAGE_JSON), 'utf8')
+}
+
+function read_workspace(): string {
+	return readFileSync(path.join(fixture.root, WORKSPACE), 'utf8')
 }
 
 // Records, at each command the hand-off runs, whether the project already had its own package.json.
@@ -134,7 +141,9 @@ describe('hand_off', () => {
 	it('stops before handing off when the install fails', () => {
 		mocked_execa.mockReturnValueOnce(result(1))
 
-		expect(init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)).toBe(`${KIT_ADD} failed`)
+		expect(init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)).toMatch(
+			new RegExp(`^${KIT_ADD} failed`, 'u'),
+		)
 		expect(commands()).toStrictEqual([KIT_ADD])
 	})
 
@@ -180,6 +189,66 @@ describe('hand_off — a directory without package.json', () => {
 		init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
 
 		expect(read_manifest(fixture.root)).toBe(manifest)
+	})
+})
+
+// Records, at each command the hand-off runs, the project's pnpm-workspace.yaml as it stood then.
+function record_workspace(project: string): Array<string> {
+	const contents: Array<string> = []
+	const file = path.join(project, WORKSPACE)
+
+	mocked_execa.mockImplementation(() => {
+		contents.push(existsSync(file) ? readFileSync(file, 'utf8') : '')
+
+		return result(0)
+	})
+
+	return contents
+}
+
+describe('hand_off — the release-age wait before the first install', () => {
+	it('writes the template’s minimumReleaseAge into a new project before adding kit', () => {
+		const workspace = record_workspace(fixture.root)
+
+		init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
+
+		expect(commands()[0]).toBe(KIT_ADD)
+		expect(workspace[0]).toContain(TEMPLATE_RELEASE_AGE)
+	})
+
+	it('appends the wait to an existing pnpm-workspace.yaml, keeping its own lines', () => {
+		const own_lines = 'packages:\n  - app\n'
+
+		writeFileSync(path.join(fixture.root, WORKSPACE), own_lines)
+		const workspace = record_workspace(fixture.root)
+
+		init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
+
+		expect(workspace[0]).toContain(own_lines)
+		expect(workspace[0]).toContain(TEMPLATE_RELEASE_AGE)
+	})
+
+	it('keeps the wait a project already set in pnpm-workspace.yaml', () => {
+		writeFileSync(path.join(fixture.root, WORKSPACE), `${OWN_RELEASE_AGE}\n`)
+		init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
+
+		expect(read_workspace()).toBe(`${OWN_RELEASE_AGE}\n`)
+	})
+
+	it('carries the wait a project set in .npmrc', () => {
+		writeFileSync(path.join(fixture.root, '.npmrc'), 'minimum-release-age=10080\n')
+		init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
+
+		expect(read_workspace()).toContain(OWN_RELEASE_AGE)
+	})
+
+	it('names the too-new dependency and the lockfile regeneration when the install fails', () => {
+		mocked_execa.mockReturnValueOnce(result(1))
+
+		const failure = init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
+
+		expect(failure).toContain('minimumReleaseAge')
+		expect(failure).toContain('pnpm-lock.yaml')
 	})
 })
 

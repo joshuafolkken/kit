@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import {
 	BREAKING_CHANGE_LABEL as BREAKING,
 	BUG_LABEL,
@@ -18,10 +19,10 @@ const CLASSIFICATION_SET: ReadonlySet<string> = new Set(CLASSIFICATION_LABELS)
 // The line an Issue body declares its release classification with. A body written by a script
 // (`josh propagate`'s upgrade issue) builds it with `declaration`, so the writer and this parser share
 // one format.
-const DECLARATION_PREFIX = '- リリース分類: '
+const DECLARATION_PREFIX = `${issue_body_keys.prefix('release')} `
 const DECLARATION = new RegExp(`^${DECLARATION_PREFIX}(.+)$`, 'gmu')
 const DECLARATION_LINE = new RegExp(String.raw`^${DECLARATION_PREFIX}.*(?:\n|$)`, 'gmu')
-const BACKGROUND_HEADING = '## 背景'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const BULLET = '- '
 const NEWLINE = '\n'
 // The command a lane runs to write the declaration, since it cannot edit the Issue body by hand.

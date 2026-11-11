@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
 // A behavior-change Issue's baseline section is written as `command + value`, never prose, so that
@@ -5,7 +6,7 @@ import { markdown_section } from './markdown-section'
 // When the value has not moved, the premise the rule rested on is recorded
 // as refuted in the observation ledger — reusing that append-only mechanism rather than a second one.
 
-const BASELINE_HEADING = '## ベースライン'
+const BASELINE_HEADING = issue_body_keys.heading('baseline')
 // `- `<command>` → <value>` (an ASCII `->` is accepted for the arrow). Prose with no backticked
 // command does not match, which is exactly how a natural-language measurement is rejected.
 const BASELINE_LINE = /^-\s*`([^`]+)`\s*(?:→|->)\s*(\S.*)$/u

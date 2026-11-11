@@ -55,6 +55,15 @@ describe('run_post_init_steps', () => {
 		expect(failure).toContain('pnpm install && pnpm josh format')
 	})
 
+	it('names a too-new dependency as a cause, and regenerating the lockfile as the remedy', () => {
+		mocked_execa.mockReturnValueOnce(result(1))
+
+		const failure = init_install.run_post_init_steps(ROOT)
+
+		expect(failure).toContain(init_install.TOO_NEW_DEPENDENCY_HINT)
+		expect(init_install.TOO_NEW_DEPENDENCY_HINT).toMatch(/minimumReleaseAge.*pnpm-lock\.yaml/u)
+	})
+
 	// `josh format` runs `eslint --fix` in a full project, which fails on the project's own code.
 	it('warns instead of failing when the format fails', () => {
 		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)

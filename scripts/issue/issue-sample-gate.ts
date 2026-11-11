@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { issue_cite } from './issue-cite'
 import { markdown_section } from './markdown-section'
 
@@ -21,8 +22,8 @@ import { markdown_section } from './markdown-section'
 // and `prime` resolves the merged pull request that closes it; until one exists the body waits as
 // unmerged.
 
-const BACKGROUND_HEADING = '## 背景'
-const PREFIX = '- 実施可能条件:'
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const PREFIX = issue_body_keys.prefix('sample_gate')
 const CONDITION_PATTERN =
 	/^#(?<cited>[1-9]\d*) (?<closing>を閉じる PR )?のマージ後 (?<count>[1-9]\d*) マージ$/u
 const VALUE_FORMAT = '#<PR> のマージ後 <K> マージ'
