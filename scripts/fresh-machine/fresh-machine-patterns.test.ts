@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fresh_machine_patterns } from './fresh-machine-patterns'
+import { fresh_machine_registry } from './fresh-machine-registry'
 import type { Scenario } from './fresh-machine-spec'
 
 const LUA_START = 'kit-test-lua-start'
@@ -8,6 +9,8 @@ const SVELTE_START = 'kit-test-svelte-start'
 const SVELTE_INIT = 'kit-test-svelte-init'
 const INIT_NAMES = ['kit-test-lua-init', 'kit-test-html-init', SVELTE_INIT]
 const START_NAMES = [LUA_START, HTML_START, SVELTE_START]
+const DLX = 'kit-test-lua-dlx'
+const DLX_INIT = 'pnpm --allow-build=esbuild dlx @joshuafolkken/kit init'
 const GIT_INIT = 'git init --initial-branch main'
 const CREATE_REPOSITORY = 'gh repo create "$RUN_NAME" --private --source . --push'
 const START = 'pnpm exec josh start --yes --github'
@@ -37,17 +40,39 @@ function pattern(name: string): Scenario {
 }
 
 describe('fresh_machine_patterns', () => {
-	it('lists three projects by two commands', () => {
+	it('lists three projects by two commands, and the dlx pattern', () => {
 		const names = new Set(fresh_machine_patterns.names())
 
-		expect(names).toStrictEqual(new Set([...INIT_NAMES, ...START_NAMES]))
+		expect(names).toStrictEqual(new Set([...INIT_NAMES, ...START_NAMES, DLX]))
 		expect(fresh_machine_patterns.names()).toHaveLength(names.size)
 	})
 
 	it('answers undefined for a name that is not a pattern', () => {
 		expect(fresh_machine_patterns.find('kit-test-python-init')).toBeUndefined()
 	})
+})
 
+describe('fresh_machine_patterns — kit-test-lua-dlx', () => {
+	it('runs the dlx pattern against the local registry, then installs from its lockfile', () => {
+		const scenario = pattern(DLX)
+		const { commands } = scenario
+		const dlx = commands.indexOf(DLX_INIT)
+
+		expect(scenario).toMatchObject({ package_source: 'tarball', requires_github: true })
+		expect(commands.slice(0, fresh_machine_registry.COMMANDS.length)).toStrictEqual(
+			fresh_machine_registry.COMMANDS,
+		)
+		expect(commands.indexOf(GIT_INIT)).toBeLessThan(dlx)
+		expect(commands.slice(dlx)).toStrictEqual([DLX_INIT, 'pnpm install --frozen-lockfile'])
+		expect(commands.join('\n')).not.toMatch(/minimumReleaseAge|gh /u)
+	})
+
+	it('records the locked version of the dependency inside the wait', () => {
+		expect(pattern(DLX).probes[0]).toBe("grep -n -A2 'run-parallel@' pnpm-lock.yaml")
+	})
+})
+
+describe('fresh_machine_patterns — the init and start patterns', () => {
 	it.each(INIT_NAMES)('%s installs the packed checkout and needs no GitHub', (name) => {
 		const scenario = pattern(name)
 		const commands = scenario.commands.join('\n')
