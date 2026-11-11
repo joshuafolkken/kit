@@ -11,7 +11,20 @@ import { file_reader } from './read-file'
 const PACKAGE_JSON = 'package.json'
 const REVIEW_GATE_SCHEMA = z.enum(['ci', 'local'])
 const LANE_SCHEMA = z.object({ setup: z.string().min(1) })
+// A project gate step: its name is the label the gate reports it under, so names are unique.
+const GATE_STEP_SCHEMA = z.strictObject({
+	name: z.string().min(1),
+	command: z.string().min(1),
+	paths: z.array(z.string().min(1)).min(1).optional(),
+})
+const GATE_STEPS_SCHEMA = z
+	.array(GATE_STEP_SCHEMA)
+	.refine((steps) => new Set(steps.map((step) => step.name)).size === steps.length, {
+		message: 'step names must be unique',
+	})
+const GATE_SCHEMA = z.object({ steps: GATE_STEPS_SCHEMA.optional() })
 const josh_schemas = {
+	gate_steps: z.object({ josh: z.object({ gate: GATE_SCHEMA.optional() }).optional() }),
 	lane_setup: z.object({ josh: z.object({ lane: LANE_SCHEMA.optional() }).optional() }),
 	progress_interval_minutes: z.object({
 		josh: z.object({ progress_interval_minutes: z.number().positive() }).optional(),
@@ -63,4 +76,7 @@ const package_manifest = {
 	read_nearest_value,
 }
 
+type GateStepDefinition = z.infer<typeof GATE_STEP_SCHEMA>
+
+export type { GateStepDefinition }
 export { PACKAGE_JSON, REVIEW_GATE_SCHEMA, package_manifest }

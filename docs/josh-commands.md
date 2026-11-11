@@ -46,6 +46,11 @@ Also runs [behavior](#josh-behavior) and the [lockfile policy](josh-commands-aut
 - **The last line is the verdict, counting ran apart from skipped**: `✔ verification gate passed (6 checks) in 41.2s.`, or `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` — which exits `0` but writes no green record.
 - Exit `1` if any check failed. Refuses any argument other than the four flags and `--static-group=<group>`.
 - [`josh test:related`](#josh-testrelated) narrows the unit leg; CI runs the whole sharded suite regardless.
+- Project steps (`josh.gate.steps` in `package.json`: `{ name, command, paths? }`) run after the fixed checks, in order, as `pnpm exec --shell-mode <command>`; `paths` is validated, not used yet.
+  - A failed step makes the gate red under its `name`; later steps still run.
+  - An invalid definition runs none and fails as one `josh.gate.steps` check naming the error.
+  - With `--static-group`, only `rest` runs them.
+
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh gate` in detail".

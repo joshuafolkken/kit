@@ -107,6 +107,8 @@ Which steps run at a lowered effort:
 - `josh.lane.setup`: one shell command, unset by default; `josh lane:open` runs it in the new lane
   after the install and cache seeding, with `JOSH_MAIN_CHECKOUT` set
   ([`josh lane:open`](./josh-commands-lane.md#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune)).
+- `josh.gate.steps`: a list of `{ name, command, paths? }`, unset by default; `josh gate` runs each
+  command after its fixed checks and reports it under its name ([`josh gate`](./josh-commands.md#josh-gate)).
 
 | Variable                         | Required | Default                                                          | Used when                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
