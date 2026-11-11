@@ -129,9 +129,7 @@ describe('josh gate --whole-tree', () => {
 
 // joshuafolkken/kit#5215: a CI matrix leg names one static group, and the group implies `--no-unit`, so
 // a leg run without that flag still makes none of the claims below.
-const LINT_GROUP: ReadonlyArray<string> = [
-	`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${gate_labels.LINT_LABEL}`,
-]
+const LINT_GROUP: ReadonlyArray<string> = [`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}lint-1`]
 
 describe('josh gate --static-group', () => {
 	it('starts only the named group', async () => {
