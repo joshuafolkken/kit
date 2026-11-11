@@ -1,0 +1,1 @@
+- rf:tests | low | tools/metrics/run-board-profile-main.test.ts:16 | 2026-11-11 | #7257

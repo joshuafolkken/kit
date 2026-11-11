@@ -1,0 +1,1 @@
+- rf:performance | low | scripts/lint/import-graph-store.ts:158 | 2026-11-11 | #7252
