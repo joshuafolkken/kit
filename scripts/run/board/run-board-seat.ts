@@ -1,3 +1,4 @@
+import { backlog_hold_text } from '#scripts/backlog/backlog-hold-text'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_labels } from './run-board-labels'
@@ -13,7 +14,8 @@ import { run_board_setup } from './run-board-setup'
 const KIND = run_event_stream.EVENT_KIND
 const { STAGE } = run_event_setup
 const { WAIT_ICONS } = run_board_labels
-const NO_CANDIDATE = 'no runnable candidate'
+const NO_CANDIDATE = 'no issue ready to start'
+const HELD = 'held'
 // The row waits that a free seat itself, or the driver's hold, answers — the row could run in the seat.
 const ROOM_ICONS: ReadonlySet<string> = new Set([
 	WAIT_ICONS.lane,
@@ -71,14 +73,18 @@ function has_candidate(layout: BoardLayout | undefined): boolean {
 	)
 }
 
-// What a seat no refusal explains says: no runnable row, or the hold that keeps a runnable one out.
+function with_hold(lead: string, hold: string | undefined): string {
+	return hold === undefined ? lead : `${lead} — ${backlog_hold_text.text_of(hold)}`
+}
+
+// What a seat no refusal explains says: no runnable row, or the hold that keeps a runnable one out —
+// the hold as a sentence, never its ledger code (`backlog-hold-text.ts`).
 function idle_reason(room: SeatRoom): string | undefined {
 	const hold = room.seats?.hold
-	const held = hold === undefined ? '' : ` (${hold})`
 
-	if (!has_candidate(room.layout)) return `${NO_CANDIDATE}${held}`
+	if (!has_candidate(room.layout)) return with_hold(NO_CANDIDATE, hold)
 
-	return hold === undefined ? undefined : `held: ${hold}`
+	return hold === undefined ? undefined : with_hold(HELD, hold)
 }
 
 // No seat line where the seats are unread — before the plan is read, or once the run stopped.

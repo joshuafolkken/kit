@@ -104,7 +104,7 @@ describe('run_board_tick.tick empty lane seats', () => {
 
 		expect(frames[0]).toContain('💺 blocked: #6242: lane:open refused')
 		expect(frames.at(-1)).not.toContain('blocked: #6242')
-		expect(frames.at(-1)).toContain(`💺 no runnable candidate (${HOLD})`)
+		expect(frames.at(-1)).toContain('💺 no issue ready to start — every queued issue is blocked')
 	})
 
 	it.each([

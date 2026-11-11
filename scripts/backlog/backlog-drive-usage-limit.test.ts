@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_fixture } from './backlog-drive-fixture'
+import { backlog_hold_codes } from './backlog-hold-codes'
 
 // joshuafolkken/kit#4745: no lane opens while a Claude usage limit that stopped a child has yet to
 // reset, and the held offer launches once it has.
 
 const { CONFIG, OFFERED, POLL_MS, harness, offer, state } = backlog_drive_fixture
-const { USAGE_LIMIT_REASON } = backlog_drive
+const { USAGE_LIMIT_REASON } = backlog_hold_codes
 const THREE_PASSES = { ...CONFIG, window_ms: POLL_MS * 3 }
 
 describe('backlog_drive.run_loop — a usage-limit hold', () => {
