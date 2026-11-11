@@ -1,11 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { package_path } from '#scripts/init/init-paths'
+import { issue_body_keys, type Column } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
 // One section of the Issue body template, cut from the fenced template in `issue-template.md` — its
 // single source — so a refusal for a missing heading can print the section to paste back in rather than
-// sending the filer to reopen the document (joshuafolkken/kit#5206).
-const TEMPLATE_PATH = 'prompts/collaboration-workflow/issue-template.md'
+// sending the filer to reopen the document (joshuafolkken/kit#5206). The body's column picks the
+// template: its headings are the ones the refusal names (joshuafolkken/kit#7211).
+const TEMPLATE_PATHS: Readonly<Record<Column, string>> = {
+	ja: 'prompts/collaboration-workflow/issue-template.md',
+	en: 'prompts/collaboration-workflow/issue-template.en.md',
+}
 const TEMPLATE_FENCE = '````'
 
 // The lines inside the document's four-backtick template fence; an empty array when it has none.
@@ -31,7 +36,7 @@ function section_of(document: string, heading: string): string | undefined {
 
 // A package without the template prints the bare problem rather than failing the lint.
 function section(heading: string): string | undefined {
-	const template_path = package_path(TEMPLATE_PATH)
+	const template_path = package_path(TEMPLATE_PATHS[issue_body_keys.column()])
 
 	if (!existsSync(template_path)) return undefined
 
