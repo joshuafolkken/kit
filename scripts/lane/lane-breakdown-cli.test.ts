@@ -44,6 +44,7 @@ const START = Date.parse('2026-10-26T05:43:00.000Z')
 const MINUTE_MS = 60_000
 const JOSH_GATE = 'josh gate'
 const SHIP_STAGE = 'ship-stage'
+const TIMELINE = [String(ISSUE), '--timeline']
 
 function at(minute: number): string {
 	return new Date(START + minute * MINUTE_MS).toISOString()
@@ -112,6 +113,30 @@ describe('lane_breakdown_cli.run', () => {
 	it('prints the usage for anything but one issue number', async () => {
 		await expect(lane_breakdown_cli.run([])).resolves.toBe(FAILURE)
 		await expect(lane_breakdown_cli.run(['x'])).resolves.toBe(FAILURE)
+		expect(console.error).toHaveBeenCalledWith(lane_breakdown_cli.USAGE)
+	})
+})
+
+// joshuafolkken/kit#7186: `--timeline` prints the lane in time order instead of by stage.
+describe('lane_breakdown_cli.run — --timeline', () => {
+	it('prints the lane in time order under its header', async () => {
+		await expect(lane_breakdown_cli.run(TIMELINE)).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringMatching(
+				/^\[#4970\]\(.*\) timeline .*\n2026-10-26 05:43Z +\+0\.0 +10\.0 min {2}start to plan\n/u,
+			),
+		)
+	})
+
+	it('refuses a lane the ledger holds no merge of', async () => {
+		mocks.read_entries.mockReturnValue([{ kind: 'dispatch', at: at(0), issue: ISSUE }])
+
+		await expect(lane_breakdown_cli.run(TIMELINE)).resolves.toBe(FAILURE)
+		expect(console.info).not.toHaveBeenCalled()
+	})
+
+	it('refuses an unknown flag with the usage', async () => {
+		await expect(lane_breakdown_cli.run([String(ISSUE), '--other'])).resolves.toBe(FAILURE)
 		expect(console.error).toHaveBeenCalledWith(lane_breakdown_cli.USAGE)
 	})
 })
