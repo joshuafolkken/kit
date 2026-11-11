@@ -1,0 +1,7 @@
+{
+	"reason": "Drift checker for .env.example against docs plus its tests (review fixes added code-span value parsing and exact default matching)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 137
+	}
+}

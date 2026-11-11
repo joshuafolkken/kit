@@ -14,7 +14,15 @@ Only these load `.env` themselves, and only when it exists:
 
 `scripts/document/environment-file-reference.test.ts` checks this list against the command registry, both ways.
 
-Every other command — `josh gate`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read (`JOSH_SCOPED_GREEN`, `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`, the two `*_FORCE` switches) in the shell that runs them.
+Every other command — `josh gate`, `josh review:brief`, `josh clone:scan`, `josh release`, `josh eval`, `josh run:progress` and the git hooks among them — reads only the real environment. Set the variables they read in the shell that runs them — the two `*_FORCE` switches and these:
+
+- Gate and git hooks — `JOSH_SCOPED_GREEN`, `JOSH_PRE_PUSH_RELATED`, `JOSH_PRE_COMMIT_LINT`, `JOSH_SECRETLINT_REQUIRE`.
+- Release and metrics — `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`, `JOSH_RELEASE_NPM_TIMEOUT_SECONDS`, `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS`, `JOSH_METRICS_BASE`.
+- Unit suite — `JOSH_UNIT_DURATIONS`, `JOSH_VITEST_CACHE_DIR`.
+- Evaluation and progress — `JOSH_EVAL_MODEL`, `JOSH_EVAL_CONCURRENCY`, `JOSH_PROGRESS`.
+- Read by every command — `JOSH_TEMP_ROOT`: from `.env` it would reach only the commands that load the file, splitting the run state and core budget between two roots.
+
+`.env.example` lists every other variable below, and `scripts/document/environment-example-reference.test.ts` holds it to this page.
 
 Set `JOSH_PROGRESS_INTERVAL_MINUTES` in the shell, or commit `josh.progress_interval_minutes` in `package.json`: in `.env` it reaches only the `josh pretool:guard` heartbeat, not `josh run:progress`.
 
@@ -73,14 +81,14 @@ Detached launchers also hand this variable to processes without an agent session
 | ----------------------------------- | -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `JOSH_AGENT_PROVIDER`               | No       | `anthropic`                                        | The default provider for a new `josh backlogrun`: `anthropic` or `openai`.                                                            |
 | `JOSH_SCHEDULER_MODEL`              | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.                                                                                        |
-| `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch.                                                                                       |
+| `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch: `low`, `medium`, `high`, `xhigh` or `max`.                                            |
 | `JOSH_WORKER_MODEL`                 | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue, outside the ship phase.                                                              |
-| `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue.                                                                                     |
+| `JOSH_WORKER_EFFORT`                | No       | `medium`, and `low` once the lane reaches the gate | The effort of each lane that implements an Issue: `low`, `medium`, `high`, `xhigh` or `max`.                                          |
 | `JOSH_WORKER_SHIP_MODEL`            | No       | `claude-sonnet-5-5`                                | The model a lane relaunches on once it reaches the gate (the ship phase).                                                             |
 | `JOSH_REVIEWER_MODEL`               | No       | `claude-opus-5-5`                                  | The model of the review a lane's change gets.                                                                                         |
-| `JOSH_REVIEWER_EFFORT`              | No       | `medium`                                           | The effort of the review a lane's change gets.                                                                                        |
+| `JOSH_REVIEWER_EFFORT`              | No       | `medium`                                           | The effort of the review a lane's change gets: `low`, `medium`, `high`, `xhigh` or `max`.                                             |
 | `JOSH_REVIEWER_VERIFICATION_MODEL`  | No       | `claude-sonnet-5-5`                                | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_MODEL`.                                                             |
-| `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_EFFORT`.                                                            |
+| `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass: `low`, `medium`, `high`, `xhigh` or `max`; falls back to `JOSH_REVIEWER_EFFORT`.                 |
 | `JOSH_REVIEWER_PAIRED`              | No       | off                                                | `1` pairs a round 1 — `josh run:review`'s or the one `josh ship` opens — with a Sonnet reviewer, recorded by `josh review:pair` only. |
 | `JOSH_INVESTIGATION_MODEL`          | No       | `claude-sonnet-5-5`                                | The model the consultation main line hands broad investigation to.                                                                    |
 | `JOSH_LANE_MODEL`                   | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.                                                                            |
