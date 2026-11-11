@@ -24,9 +24,15 @@ function has_new(seen: ReadonlySet<number> | undefined, numbers: ReadonlySet<num
 // Whether the `auto-ok` listing's first page holds an issue the previous read lacked
 // (joshuafolkken/kit#7227). The ETag keeps the read cheap, but a running lane's own comments and
 // label edits change it too, so only a new issue number counts. The first read is the baseline,
-// and a read that fails reads as unchanged: the ask's interval still comes.
+// and a read that fails reads as unchanged: the ask's interval still comes. A first read that fails
+// leaves an empty baseline rather than none, so an issue listed before the next read that answers
+// still counts as new (joshuafolkken/kit#7229).
 function watcher(): ListingCheck {
 	const memory: { seen?: ReadonlySet<number> } = {}
+
+	function keep(numbers: ReadonlySet<number>): void {
+		memory.seen = numbers
+	}
 
 	return async function is_changed(): Promise<boolean> {
 		try {
@@ -34,10 +40,12 @@ function watcher(): ListingCheck {
 			const numbers = numbers_of(detail.body)
 			const is_new = has_new(memory.seen, numbers)
 
-			memory.seen = numbers
+			keep(numbers)
 
 			return is_new
 		} catch {
+			keep(memory.seen ?? new Set())
+
 			return false
 		}
 	}
@@ -47,4 +55,5 @@ const backlog_drive_listing = {
 	watcher,
 }
 
+export type { ListingCheck }
 export { backlog_drive_listing }
