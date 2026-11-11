@@ -1,6 +1,7 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
+import { issue_body_keys } from './issue-body-keys'
 import { issue_closing_pr } from './issue-closing-pr'
 import { issue_sample_gate } from './issue-sample-gate'
 import { session_cite } from './session-cite'
@@ -68,7 +69,7 @@ async function problem(
 	const cited = session_cite.issue(number, undefined, repo)
 	const hint = await hint_of(number, repo, ports)
 
-	return `\`- 実施可能条件:\` cites ${cited}, an issue, not a pull request — ${hint}`
+	return `\`${issue_body_keys.prefix('sample_gate')}\` cites ${cited}, an issue, not a pull request — ${hint}`
 }
 
 const issue_sample_source = { problem }

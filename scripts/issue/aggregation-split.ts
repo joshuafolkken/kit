@@ -1,3 +1,4 @@
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 import { size_estimate } from './size-estimate'
 
@@ -7,7 +8,8 @@ import { size_estimate } from './size-estimate'
 // asking for both is refused and the aggregation routed to a prior `--route split` Issue — the
 // implementation Issue then starts from the comment it cites.
 
-const CRITERIA_HEADING = '## 受け入れ条件'
+const CRITERIA_HEADING = issue_body_keys.heading('criteria')
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
 const CRITERION_PREFIX = '- ['
 // Recording on an Issue, not a feature that posts a PR comment: every one of these words names the
 // lane's own act.
@@ -19,7 +21,7 @@ const SUBJECT_WORDS: ReadonlyArray<string> = ['集計', '計測', 'before', '変
 const ISSUE_REFERENCE = /#\d+/u
 // The implementation the estimate declares: a prior aggregation Issue may add a script or two of its own.
 const IMPLEMENTATION_FILES = 3
-const REFUSAL = `an acceptance criterion records an aggregation or a measurement as an Issue comment beside an implementation of ${String(IMPLEMENTATION_FILES)}+ files — file it as a prior Issue (\`--route split\`) and cite its comment under ## 背景 in this one; issue-template.md → "\`## 背景\` 直下の宣言と分類ラベル"`
+const REFUSAL = `an acceptance criterion records an aggregation or a measurement as an Issue comment beside an implementation of ${String(IMPLEMENTATION_FILES)}+ files — file it as a prior Issue (\`--route split\`) and cite its comment under ${BACKGROUND_HEADING} in this one; issue-template.md → "\`${BACKGROUND_HEADING}\` 直下の宣言と分類ラベル"`
 
 function is_aggregation_criterion(line: string): boolean {
 	const text = line.trim()

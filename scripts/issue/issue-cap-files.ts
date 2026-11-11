@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { line_budget, type FileBudget, type LineBudget } from '#scripts/lines/line-budget'
 import { run_prep_locate } from '#scripts/run/run-prep-locate'
+import { issue_body_keys } from './issue-body-keys'
 import { size_estimate } from './size-estimate'
 
 // The files an Issue body names that sit at or past 90% of their code-line limit
@@ -15,8 +16,8 @@ import { size_estimate } from './size-estimate'
 const PERCENT = 100
 const CAP_PERCENT = 90
 const CAP_FRACTION = CAP_PERCENT / PERCENT
-const NO_LINES_PREFIX = '- 行を増やさない:'
-const REFACTOR_PREFIX = '- 先行リファクタ:'
+const NO_LINES_PREFIX = issue_body_keys.prefix('no_lines')
+const REFACTOR_PREFIX = issue_body_keys.prefix('refactor_first')
 const ISSUE_REFERENCE = /^#\d+$/u
 const REFACTOR_GUIDE = 'prompts/refactoring.md'
 // The files `max-lines` limits: every script and component ESLint lints (`eslint/base.js`).

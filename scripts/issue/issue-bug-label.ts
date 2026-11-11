@@ -1,9 +1,12 @@
+import { issue_body_keys } from './issue-body-keys'
 import { markdown_section } from './markdown-section'
 
-const BUG_DECLARATION_LINE = '- 種別: 不具合'
+const BUG_DECLARATION_LINE = issue_body_keys.line('kind', 'bug')
 
 function is_bug_fix(body: string): boolean {
-	const background = markdown_section.section_lines(body, '## 背景').join('\n')
+	const background = markdown_section
+		.section_lines(body, issue_body_keys.heading('background'))
+		.join('\n')
 
 	return markdown_section.has_unfenced_line(background, BUG_DECLARATION_LINE)
 }

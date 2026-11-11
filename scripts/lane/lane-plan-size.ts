@@ -1,5 +1,6 @@
 import { codex_hooks } from '#scripts/agent/codex-hooks'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
@@ -338,10 +339,12 @@ function bar_tail(): string {
 	return `A \`${split_assess.REASON_PREFIX}\` comment does not pass this bar — split-assessment.md → "${split_assess.QUESTION_SECTION}".`
 }
 
+const SIZE_PREFIX = issue_body_keys.prefix('size')
+
 function files_text(issue: number, over: FilesOver): string {
 	const planned = [...over.kept, ...over.split_off]
 	const counted = planned.filter((file) => is_counted(file, planned)).length
-	const bar = `${String(counted)} files (tests and generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`- 規模見積もり:\` declares`
+	const bar = `${String(counted)} files (tests and generated artifacts excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} its \`${SIZE_PREFIX}\` declares`
 	const replan = ['pnpm josh lane:plan', String(issue), ...over.kept, ...over.tests].join(' ')
 
 	return `split (files): ${session_cite.issue(issue)}'s plan holds ${bar}, so it is not recorded. Keep in this Issue: ${over.kept.join(', ')}. Split off: ${over.split_off.join(', ')} — file them as a follow-up Issue with \`pnpm josh issue:file "<title>" --body-file <body.md> --route split\`, revert any edit to them here, run \`${replan}\`, and ship this Issue on the kept files. One deliverable with no separately-mergeable part instead → run this \`lane:plan\` again with \`--single\`. ${bar_tail()}`
@@ -353,10 +356,10 @@ function waiver_text(issue: number, over: Oversize): string {
 
 function measure_bar(over: MeasureOver): string {
 	if (over.reason === 'hunks') {
-		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
+		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(over.limit / over.declared)} times the ${String(over.declared)} files its \`${SIZE_PREFIX}\` declares`
 	}
 
-	return `\`- 規模見積もり:\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)} declared lines the size bar allows`
+	return `\`${SIZE_PREFIX}\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)} declared lines the size bar allows`
 }
 
 function measure_text(issue: number, over: MeasureOver): string {

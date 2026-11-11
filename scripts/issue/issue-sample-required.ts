@@ -1,4 +1,5 @@
 import { acceptance_map } from '#scripts/review/acceptance-map'
+import { issue_body_keys } from './issue-body-keys'
 import { issue_sample_gate } from './issue-sample-gate'
 import { measure_declaration } from './measure-declaration'
 import { size_estimate } from './size-estimate'
@@ -28,10 +29,11 @@ const LEDGER_READ = /lane:breakdown(?:[^`\n]*`)?\s*(?:の(?:出力|結果|表))?
 const CLOSING_NOTE = /（[^（）]*）\s*$/u
 const TEST_VERIFIED = 'テスト'
 const CITATION_PATTERN = /#[1-9]\d*/u
-const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\`, or \`${issue_sample_gate.CLOSING_FORMAT}\` before that pull request exists, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
+const BACKGROUND_HEADING = issue_body_keys.heading('background')
+const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\`, or \`${issue_sample_gate.CLOSING_FORMAT}\` before that pull request exists, under ${BACKGROUND_HEADING} — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
 // joshuafolkken/kit#5144: one waiting K merges reads one value against a bound, which `backlog:drive`
 // does without a lane once it is declared; the declaration is the default, a stated reason the exception.
-const UNDECLARED = `measurement follow-up without a measure declaration: declare \`${measure_declaration.DECLARATION}\` (any \`lane:stats\` cell: \`pnpm josh lane:value cell\`), or \`${measure_declaration.ABSENT}\` when no one command prints the value, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"\n${measure_declaration.EXAMPLE}`
+const UNDECLARED = `measurement follow-up without a measure declaration: declare \`${measure_declaration.DECLARATION}\` (any \`lane:stats\` cell: \`pnpm josh lane:value cell\`), or \`${measure_declaration.ABSENT}\` when no one command prints the value, under ${BACKGROUND_HEADING} — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"\n${measure_declaration.EXAMPLE}`
 
 function measures_a_change(criterion: string): boolean {
 	if (AFTER_CITED_CHANGE.some((pattern) => pattern.test(criterion))) return true

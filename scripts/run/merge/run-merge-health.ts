@@ -1,6 +1,7 @@
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { issue_body_keys } from '#scripts/issue/issue-body-keys'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { PRIORITY_CRITICAL_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
@@ -42,21 +43,25 @@ function is_filed(events: ReadonlyArray<RunEvent>): boolean {
 
 // The lines `issue:file` requires of a defect whose origin is unknown (`issue:file --check`).
 const DECLARATIONS = [
-	'## 背景',
+	issue_body_keys.heading('background'),
 	'',
-	'- 種別: 不具合',
-	'- 目的: 不具合修正',
-	'- 人の判断: 不要',
-	'- 原因: 不明（found by the backlogrun health check, not traced yet）',
-	'- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）',
+	issue_body_keys.line('kind', 'bug'),
+	issue_body_keys.line('purpose', 'bug_fix'),
+	issue_body_keys.line('judgement', 'not_needed'),
+	`${issue_body_keys.line('origin', 'unknown')}（found by the backlogrun health check, not traced yet）`,
+	`${issue_body_keys.prefix('size')} 約 1 ファイル / 20 行（テスト除く）`,
 ]
-const SYMPTOM = ['## 現象', '', `${COMMANDS} fail on \`main\`, twice in a row.`]
+const SYMPTOM = [
+	issue_body_keys.heading('symptom'),
+	'',
+	`${COMMANDS} fail on \`main\`, twice in a row.`,
+]
 const EXPECTED = [
-	'## 期待結果',
+	issue_body_keys.heading('expected'),
 	'',
 	`${COMMANDS} pass on \`main\`.`,
 	'',
-	'## 受け入れ条件',
+	issue_body_keys.heading('criteria'),
 	'',
 	`- [ ] ${COMMANDS} pass on \`main\`.`,
 ]
@@ -64,7 +69,15 @@ const EXPECTED = [
 function body_of(child: string, output: string): string {
 	const tail = output.split('\n').slice(-OUTPUT_TAIL_LINES).join('\n')
 	const origin = `Filed by \`pnpm josh run:merge\` after ${issue_cite.plain_for('github', child)}: a streak of children failed, and the whole-tree verification on \`main\` failed too, so it is broken for every lane.`
-	const reproduction = ['## 再現', '', `${COMMANDS} on \`main\`:`, '', '```text', tail, '```']
+	const reproduction = [
+		issue_body_keys.heading('reproduction'),
+		'',
+		`${COMMANDS} on \`main\`:`,
+		'',
+		'```text',
+		tail,
+		'```',
+	]
 
 	return [...DECLARATIONS, '', origin, '', ...SYMPTOM, '', ...reproduction, '', ...EXPECTED].join(
 		'\n',
