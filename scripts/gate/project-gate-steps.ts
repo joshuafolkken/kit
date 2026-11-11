@@ -4,6 +4,7 @@ import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { package_manifest, type GateStepDefinition } from '#scripts/lib/package-manifest'
 import { z } from 'zod'
+import { gate_checks } from './gate-checks'
 import type { GateStep, GateStepResult } from './gate-report'
 import { gate_run_steps } from './gate-run-steps'
 
@@ -24,8 +25,21 @@ type GateStepsManifest = z.infer<typeof package_manifest.josh_schemas.gate_steps
 
 type ProjectSteps = { steps: ReadonlyArray<GateStepDefinition> } | { error: string }
 
+// A step's name is its label, and the gate keeps a check's green record by label (`check-reuse.ts`):
+// a project step named `lint` would write, or reuse, the lint check's record.
+const RESERVED_LABELS = new Set([
+	...gate_checks.GATE_CHECKS.map((check) => check.label),
+	DEFINITION_LABEL,
+])
+
 function steps_of(manifest: GateStepsManifest): ReadonlyArray<GateStepDefinition> {
-	return manifest.josh?.gate?.steps ?? []
+	const steps = manifest.josh?.gate?.steps ?? []
+	const reserved = steps.filter((step) => RESERVED_LABELS.has(step.name))
+	if (reserved.length === 0) return steps
+
+	throw new Error(
+		`step names ${reserved.map((step) => step.name).join(', ')} are the gate's own check labels; the reserved names are ${[...RESERVED_LABELS].join(', ')}`,
+	)
 }
 
 function describe_error(error: unknown): string {

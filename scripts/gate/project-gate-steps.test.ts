@@ -101,6 +101,8 @@ describe('run_project_steps — invalid definitions', () => {
 		['an unknown key', [{ ...GODOT, when: 'always' }], 'when'],
 		['a duplicated name', [GODOT, GODOT], 'step names must be unique'],
 		['empty paths', [{ ...GODOT, paths: [] }], 'paths'],
+		['a fixed check label', [{ ...GODOT, name: 'lint' }], "lint are the gate's own check labels"],
+		['the definition label', [{ ...GODOT, name: DEFINITION_LABEL }], DEFINITION_LABEL],
 	])('rejects %s as one failed definition result, running nothing', async (_case, steps, named) => {
 		const ran = stub_runs()
 
