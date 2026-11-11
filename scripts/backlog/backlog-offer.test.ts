@@ -131,6 +131,13 @@ describe('backlog_offer.answer_of — the chain and gate causes', () => {
 		})
 	})
 
+	// joshuafolkken/kit#7307: an overlap-withheld candidate beside a dated one is held on both.
+	it('marks a wait on a running lane beside a start condition with both and their issues', () => {
+		const read = wait_with(`${GATE_LINE}\nWaiting on a running lane: #7303`, SOME_RUNNING)
+
+		expect(read).toMatchObject({ cause: 'gate+lane', waiting: [4487, 7303] })
+	})
+
 	it('lets the run:solo notice win over a cause line', () => {
 		expect(wait_with(`${SOLO_NOTICE}\n${CHAIN_LINE}`, SOME_RUNNING).cause).toBe('solo')
 	})

@@ -66,6 +66,12 @@ describe('test_related_pins.pinned_tests', () => {
 		expect(test_related_pins.pinned_tests(changed)).toEqual(REGISTRY_TESTS)
 	})
 
+	it('pins the in-process main-guard test to a change adding a command to a table', () => {
+		expect(test_related_pins.pinned_tests([COMMAND_TABLE])).toContain(
+			'scripts/josh/josh-in-process.test.ts',
+		)
+	})
+
 	it('pins nothing to a change outside the registry', () => {
 		expect(test_related_pins.pinned_tests(['scripts/test/test-related.ts'])).toEqual([])
 	})

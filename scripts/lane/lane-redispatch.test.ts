@@ -62,6 +62,7 @@ beforeEach(() => {
 	find_open_lane.mockResolvedValue(lane())
 	record_output.mockResolvedValue({ kind: 'recorded', lane: lane(), output: DERIVED_LOG })
 	apply_label.mockResolvedValue({ is_applied: true })
+	vi.spyOn(git_gh_command, 'issue_clear_label').mockResolvedValue(true)
 })
 
 describe('re-dispatching a released child to a lane (joshuafolkken/kit#1934)', () => {

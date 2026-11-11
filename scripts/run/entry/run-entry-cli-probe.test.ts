@@ -12,6 +12,7 @@ const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
 const print_once_mock = vi.hoisted(() => vi.fn(() => 0))
 const SECTION = vi.hoisted(() => ({ ENTRY: 'entry', PROGRESS: 'run:progress' }))
 const open_pr_mock = vi.hoisted(() => vi.fn())
+const returned_mock = vi.hoisted(() => vi.fn((): string | undefined => undefined))
 const labels_mock = vi.hoisted(() => vi.fn((): Array<string> => []))
 const emit_plan_mock = vi.hoisted(() => vi.fn())
 const fit_mock = vi.hoisted(() => vi.fn((_prep: { is_planned?: boolean }) => 'report'))
@@ -27,6 +28,9 @@ vi.mock('#scripts/lane/lane-ledger-write', () => ({
 	lane_ledger_write: { record_ship_lap: record_lap_mock, target: async () => undefined },
 }))
 vi.mock('#scripts/run/run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
+vi.mock('#scripts/run/run-pr-return', () => ({
+	run_pr_return: { read: async () => ({ red_checks: [], comments: [] }), format: returned_mock },
+}))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: vi.fn() } }))
@@ -85,6 +89,7 @@ const ISSUE = '5171'
 const FRESH = { code: OK, out: 'fresh' }
 const HELD = { code: OK, out: 'hold' }
 const UNDER = { code: OK, out: 'under' }
+const RED_BUILD = 'red required check: build'
 const GIVEN_BACK = 'lane given back at the entry'
 const PLANNED_LABELS = ['run:lane', 'run:planned']
 
@@ -110,6 +115,17 @@ describe('run_entry_cli.run — an existing fullrun pull request', () => {
 		expect(info_lines.join('\n')).toContain('at: pr-open · to: fullrun · start: gate')
 		expect(info_lines.join('\n')).toContain('verdict: gate')
 		expect(record_baseline_mock).toHaveBeenCalledWith(ISSUE)
+	})
+
+	it('starts a returned pull request at implementation and prints what returned it', async () => {
+		is_child_mock.mockReturnValue(false)
+		open_pr_mock.mockResolvedValue(true)
+		yield_mock.mockResolvedValue(false)
+		returned_mock.mockReturnValueOnce(RED_BUILD)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(info_lines.join('\n')).toContain('start: implement')
+		expect(info_lines).toContain(RED_BUILD)
 	})
 })
 

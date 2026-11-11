@@ -1,6 +1,5 @@
 import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
-import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { LabelWrite } from '#scripts/gh/git-gh-issue-write'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
@@ -323,7 +322,7 @@ function prepared(lane: LaneInfo, is_fresh: boolean): Prepared {
 // its unapplied answer is a real refusal to launch rather than a note — confirmed by a read-back, so
 // a write that landed but answered with an error still launches.
 async function mark_in_progress(issue: string): Promise<LabelWrite> {
-	return await git_gh_command.issue_apply_label(issue, IN_PROGRESS_LABEL)
+	return await run_label.claim(issue)
 }
 
 // A started child is recorded on the run's stream, which is where the stall detector ages the last

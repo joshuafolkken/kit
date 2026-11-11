@@ -122,16 +122,18 @@ function is_selected(rest: RestIssue, request: IssueListRequest): boolean {
 // One page, already filtered, sent with the ETag of the previous process's read of the same page
 // (joshuafolkken/kit#6560). `is_full` rides along because the page's *unfiltered* size is what
 // says whether there is another page — a page emptied by the filter is still a full page.
+// `is_unchanged` is whether GitHub answered the page 304 (joshuafolkken/kit#7306).
 async function fetch_page(
 	request: IssueListRequest,
 	page: number,
-): Promise<{ selected: Array<RestIssue>; is_full: boolean }> {
-	const path = listing_path(request, page)
-	const rows = git_gh_issue_rest.parse_rest_issues(await git_gh_etag_read.read(path))
+): Promise<{ selected: Array<RestIssue>; is_full: boolean; is_unchanged: boolean }> {
+	const detail = await git_gh_etag_read.read_detail(listing_path(request, page))
+	const rows = git_gh_issue_rest.parse_rest_issues(detail.body)
 
 	return {
 		selected: rows.filter((row) => is_selected(row, request)),
 		is_full: rows.length >= PER_PAGE,
+		is_unchanged: detail.is_unchanged,
 	}
 }
 
@@ -169,9 +171,11 @@ function wants_more(has_more: boolean, selected_count: number, limit: number): b
 // and the empty page that would have proved the listing ended is the one the ceiling refuses to
 // fetch. Left as it is: erring toward "I may not have seen everything" is the safe direction here,
 // and the alternative spends a request on every capped run to rule out one boundary.
+// `is_unchanged` is whether every page read answered 304.
 interface SelectedRows {
 	rows: Array<RestIssue>
 	is_capped: boolean
+	is_unchanged: boolean
 }
 
 // Paged with `page` rather than `gh api --paginate`, which reads the whole backlog whatever the
@@ -183,21 +187,23 @@ interface SelectedRows {
 // than `limit` matches; the page ceiling is what terminates any listing that has not reached either.
 async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> {
 	const selected: Array<RestIssue> = []
-	let page = FIRST_PAGE
+	// One entry per page read, in order — its length is the pages read so far.
+	const unchanged: Array<boolean> = []
 	let has_more = true
 
-	while (page <= MAX_PAGES && wants_more(has_more, selected.length, request.limit)) {
+	while (unchanged.length < MAX_PAGES && wants_more(has_more, selected.length, request.limit)) {
 		// eslint-disable-next-line no-await-in-loop -- paging stops as soon as enough rows are selected
-		const result = await fetch_page(request, page)
+		const result = await fetch_page(request, FIRST_PAGE + unchanged.length)
 
 		selected.push(...result.selected)
 		has_more = result.is_full
-		page += 1
+		unchanged.push(result.is_unchanged)
 	}
 
 	return {
 		rows: selected.slice(0, request.limit),
 		is_capped: wants_more(has_more, selected.length, request.limit),
+		is_unchanged: unchanged.length > 0 && unchanged.every(Boolean),
 	}
 }
 
@@ -233,14 +239,20 @@ async function read_relations(
 // `is_capped` is `false` on that failure path, and says nothing there: an unreadable listing is
 // already fully described by `json`, and a caller reading a truncation flag off it would be reading
 // a field about pages that were never fetched.
+//
+// `is_unchanged` is `true` only where every REST page answered 304 (joshuafolkken/kit#7306), so
+// `backlog:next` can record whether its listing was the previous scan's. A GraphQL read carries no
+// ETag and answers `false`; it is absent on the failure path.
 interface IssueListOutcome {
 	json: string | undefined
 	is_capped: boolean
+	is_unchanged?: boolean
 }
 
 interface MappedListing {
 	rows: Array<Record<string, unknown>>
 	is_capped: boolean
+	is_unchanged: boolean
 }
 
 // The fields a GraphQL listing row carries (`git_gh_issue_graphql.to_rest_issue`). A request naming
@@ -290,14 +302,14 @@ async function read_graphql(
 		.slice(0, request.limit)
 		.map((issue) => git_gh_issue_rest.to_gh_issue(issue.rest, fields, issue.blocked_by))
 
-	return { rows, is_capped: false }
+	return { rows, is_capped: false, is_unchanged: false }
 }
 
 async function read_rest(
 	request: IssueListRequest,
 	fields: ReadonlyArray<string>,
 ): Promise<MappedListing> {
-	const { rows, is_capped } = await fetch_selected(request)
+	const { rows, is_capped, is_unchanged } = await fetch_selected(request)
 	const relations = fields.includes(BLOCKED_BY_FIELD)
 		? await read_relations(rows, request.repo)
 		: undefined
@@ -305,17 +317,17 @@ async function read_rest(
 		git_gh_issue_rest.to_gh_issue(row, fields, relations?.[index]),
 	)
 
-	return { rows: mapped, is_capped }
+	return { rows: mapped, is_capped, is_unchanged }
 }
 
 // One invocation shape for every issue listing.
 async function issue_list(request: IssueListRequest): Promise<IssueListOutcome> {
 	try {
 		const fields = git_gh_issue_rest.split_fields(request.json_fields)
-		const { rows, is_capped } =
+		const { rows, is_capped, is_unchanged } =
 			(await read_graphql(request, fields)) ?? (await read_rest(request, fields))
 
-		return { json: JSON.stringify(rows), is_capped }
+		return { json: JSON.stringify(rows), is_capped, is_unchanged }
 	} catch {
 		return { json: undefined, is_capped: false }
 	}

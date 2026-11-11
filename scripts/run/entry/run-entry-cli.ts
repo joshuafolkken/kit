@@ -413,6 +413,12 @@ async function resume_cut(request: EntryRequest): Promise<number | undefined> {
 		: resume_report(request.issue_number, resume)
 }
 
+// The stage line, and under it what returned an open pull request for a fix.
+function print_stage(issue_number: string, decision: StageDecision, stage: StageRead): void {
+	console.info(session_cite.text(run_stage.format_decision(issue_number, decision)))
+	if (stage.returned !== undefined) console.info(stage.returned)
+}
+
 // `kickoff` stops at the stage line whatever it says — it plans, and claims nothing.
 async function open_run(request: EntryRequest): Promise<number> {
 	const { issue_number, command } = request
@@ -423,7 +429,7 @@ async function open_run(request: EntryRequest): Promise<number> {
 	const stage = await timed(STEP.STAGE, async () => await run_stage_read.read_stage(issue_number))
 	const decision = run_stage.decide(stage.state, command)
 
-	console.info(session_cite.text(run_stage.format_decision(issue_number, decision)))
+	print_stage(issue_number, decision, stage)
 
 	if (command === run_stage.KICKOFF || is_settled(decision)) return SUCCESS_EXIT_CODE
 

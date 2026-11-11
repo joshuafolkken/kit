@@ -34,6 +34,7 @@ function prepare(): void {
 		output: 'log',
 	})
 	vi.spyOn(git_gh_command, 'issue_apply_label').mockResolvedValue({ is_applied: true })
+	vi.spyOn(git_gh_command, 'issue_clear_label').mockResolvedValue(true)
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
 	vi.spyOn(detached_launch, 'launch').mockReturnValue({ kind: 'launched', pid: 1 })
 	vi.spyOn(lane_seat_start, 'start').mockImplementation(

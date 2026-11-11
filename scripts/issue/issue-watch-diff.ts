@@ -224,6 +224,7 @@ function withheld_notice(baseline: WatchBaseline, snapshot: WatchSnapshot): stri
 }
 
 const issue_watch_diff = {
+	BOT_SUFFIX,
 	RUN_MARKER,
 	WITHHELD_BODY_EDIT,
 	baseline_of,
