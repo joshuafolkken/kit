@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { untyped_environment } from '#eslint/untyped-environment.js'
 import { resolve_local_bin } from '#scripts/build/local-bin'
 import { ESLINT_EDIT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { json_value } from '#scripts/lib/json-value'
@@ -279,7 +278,8 @@ function is_start_failure(outcome: CommandOutcome): boolean {
 // `ESLINT_D_MISS=fail` refuses the bundled eslint the daemon would otherwise fall back to when the
 // project's own is not resolvable — the hook must format with the project's eslint or not at all,
 // and a refusal here is a start failure, which the caller retries on the slower route.
-// Every route lints without a type program (`eslint/untyped.js`), the daemon this may start included.
+// Every route lints without a type program (`eslint/untyped.js`) and under the daemon's own heap,
+// the daemon this may start included (`eslint_daemon.launch_environment`).
 async function spawn_invocation(
 	invocation: FormatCommand,
 	project_root: string,
@@ -287,7 +287,7 @@ async function spawn_invocation(
 	const result = await execa(invocation.bin, [...invocation.command_arguments], {
 		reject: false,
 		cwd: project_root,
-		env: { ESLINT_D_MISS: 'fail', ...untyped_environment.environment() },
+		env: eslint_daemon.launch_environment(),
 		stdout: 'pipe',
 		stderr: 'ignore',
 		timeout: HOOK_PROCESS_TIMEOUT_MS,
