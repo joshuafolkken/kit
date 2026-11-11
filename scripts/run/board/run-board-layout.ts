@@ -62,6 +62,9 @@ interface RowReason {
 	// `+<rest>` where the rest follow its title.
 	issues?: ReadonlyArray<string> | undefined
 	tail?: string | undefined
+	// The pull request the value and tail end on, which the board links where it draws the number
+	// whole (joshuafolkken/kit#7181).
+	pr?: number | undefined
 	// When the row entered a stage, where the reason is one — the condition column counts how long it
 	// has stood there from it.
 	since_ms?: number | undefined

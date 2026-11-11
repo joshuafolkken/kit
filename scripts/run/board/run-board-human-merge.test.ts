@@ -8,10 +8,14 @@ import {
 	NEEDS_HUMAN_MERGE_LABEL,
 } from '#scripts/issue/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_human_merge } from './run-board-human-merge'
-import { run_board_layout, type BoardPlan } from './run-board-layout'
+import { run_board_layout, type BoardPlan, type BoardRow } from './run-board-layout'
+import { run_board_link } from './run-board-link'
 import { run_board_reason } from './run-board-reason'
+import { run_board_render_condition } from './run-board-render-condition'
+import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_tick } from './run-board-tick'
 
 const ISSUE = 6221
@@ -176,6 +180,63 @@ describe('run board human merge rows', () => {
 			expect(relevant.join('\n')).toContain(FIND_TAIL)
 		},
 	)
+})
+
+const PULL_URL = 'https://github.com/joshuafolkken/kit/pull/6225'
+const NARROW_CUT = 3
+
+function osc_link(text: string, url: string): string {
+	return `\u{1B}]8;;${url}\u{7}${text}\u{1B}]8;;\u{7}`
+}
+
+const LINKED = run_board_render_fixture.header({
+	pull_link: run_board_link.pull_linker(REPO, osc_link),
+})
+const PLAIN = run_board_render_fixture.header()
+
+function waiting_row(): BoardRow {
+	const [row] = layout_of(plan_of()).unreached
+
+	if (row === undefined) throw new Error('no waiting row')
+
+	return row
+}
+
+describe('run board human merge pull request links', () => {
+	it('links the PR number in the condition column and the tail', () => {
+		const row = waiting_row()
+		const linked = osc_link(String(PR), PULL_URL)
+
+		expect(run_board_render_condition.condition_of(row, LINKED)).toContain(`PR ${linked}`)
+		expect(run_board_render_condition.tail_of(row, 0, LINKED)).toBe(`→ merge PR #${linked}`)
+	})
+
+	it('keeps the plain text where the header knows no repository', () => {
+		const row = waiting_row()
+
+		expect(run_board_render_condition.condition_of(row, PLAIN).trimEnd()).toBe('PR 6225')
+		expect(run_board_render_condition.tail_of(row, 0, PLAIN)).toBe(MERGE_TAIL)
+	})
+
+	it('draws the linked PR number in the rendered waiting row', async () => {
+		const { LOCAL, harness } = run_board_fixture
+		const { ports, frames } = harness(LOCAL, [plan_of()])
+
+		await run_board_tick.tick(run_board_tick.FRESH_STATE, { ...ports, link: osc_link })
+		const linked = osc_link(String(PR), PULL_URL)
+
+		expect(frames.at(-1)).toContain(`PR ${linked}`)
+		expect(frames.at(-1)).toContain(`→ merge PR #${linked}`)
+	})
+
+	it('leaves a cut tail plain, so no escape is cut and its width stays the same', () => {
+		const row = waiting_row()
+		const cut = run_board_render_condition.tail_of(row, NARROW_CUT, LINKED)
+
+		expect(cut).toBe(run_board_render_condition.tail_of(row, NARROW_CUT, PLAIN))
+		expect(stripVTControlCharacters(cut)).toBe(cut)
+		expect(run_board_fit.width_of(cut)).toBe(run_board_fit.width_of(MERGE_TAIL) - NARROW_CUT)
+	})
 })
 
 describe('run board human merge earlier lanes', () => {
