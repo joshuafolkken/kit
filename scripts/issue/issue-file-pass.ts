@@ -11,7 +11,7 @@ import { issue_priority } from './issue-priority'
 import { issue_sample_required } from './issue-sample-required'
 import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli, type ScoutOutcome } from './issue-scout-cli'
-import { issue_wip } from './issue-wip'
+import { issue_wip, type WipCap } from './issue-wip'
 import { measure_twin } from './measure-twin'
 import { size_estimate } from './size-estimate'
 
@@ -76,7 +76,7 @@ async function open_count(target: string): Promise<number | undefined> {
 // The count is printed whatever it answers, and the filing is held only past the cap with no
 // exemption declared. An unreadable count warns and goes on: the cap makes growth visible, and a
 // listing outage is not a reason to stop the run a blocked filing exists for.
-async function is_wip_clear(filing: Filing): Promise<boolean> {
+async function is_count_clear(filing: Filing, cap: WipCap): Promise<boolean> {
 	const count = await open_count(filing.target)
 
 	if (count === undefined) {
@@ -85,12 +85,25 @@ async function is_wip_clear(filing: Filing): Promise<boolean> {
 		return true
 	}
 
-	const verdict = issue_wip.verdict_of(count, filing.args)
+	const verdict = issue_wip.verdict_of(count, filing.args, cap)
 
-	console.info(issue_wip.count_line(count, filing.target, verdict))
+	console.info(issue_wip.count_line(count, filing.target, verdict, cap))
 	if (verdict === issue_wip.HELD) console.error(issue_wip.HELD_MESSAGE)
 
 	return verdict !== issue_wip.HELD
+}
+
+// A `JOSH_WIP_CAP` that is neither a positive integer nor `off` refuses the filing by name.
+async function is_wip_clear(filing: Filing): Promise<boolean> {
+	const setting = issue_wip.read_cap()
+
+	if (setting.kind === 'problem') {
+		console.error(`✖ ${setting.problem}`)
+
+		return false
+	}
+
+	return await is_count_clear(filing, setting.cap)
 }
 
 // Set before the scout and left set for `epic:bundle`, so both read the target's backlog.

@@ -10,7 +10,9 @@ import { file_reader } from './read-file'
 // that cannot be read answers.
 const PACKAGE_JSON = 'package.json'
 const REVIEW_GATE_SCHEMA = z.enum(['ci', 'local'])
+const LANE_SCHEMA = z.object({ setup: z.string().min(1) })
 const josh_schemas = {
+	lane_setup: z.object({ josh: z.object({ lane: LANE_SCHEMA.optional() }).optional() }),
 	progress_interval_minutes: z.object({
 		josh: z.object({ progress_interval_minutes: z.number().positive() }).optional(),
 	}),

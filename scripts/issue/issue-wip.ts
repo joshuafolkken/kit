@@ -1,3 +1,4 @@
+import { cli_flags } from '#scripts/lib/cli-flags'
 import { json_value } from '#scripts/lib/json-value'
 import { INTERRUPT_ROUTE_LABEL, SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './issue-labels'
 
@@ -5,8 +6,11 @@ import { INTERRUPT_ROUTE_LABEL, SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './
 // question before anything is sent, the same hold `--distinct` places on a duplicate.
 // What stays judgement — whether a filing is exempt — is declared by the route or by `--over-cap`.
 
-// `WIP_CAP` is the number's single source; `wip-cap.md` states it once and a test pins the two equal.
-const WIP_CAP = 30
+// `DEFAULT_WIP_CAP` is the default's single source; `wip-cap.md` states it once and a test pins the
+// two equal. `JOSH_WIP_CAP` changes it for one repository, or turns it `off`.
+const DEFAULT_WIP_CAP = 30
+const WIP_CAP_KEY = 'JOSH_WIP_CAP'
+const CAP_OFF = 'off' as const
 const WITHIN = 'within'
 const EXEMPT = 'exempt'
 const HELD = 'held' as const
@@ -38,19 +42,39 @@ interface WipFiling {
 	is_over_cap: boolean
 }
 
+// The cap in force: a number, or `off` when the repository turned it off.
+type WipCap = number | typeof CAP_OFF
+
+type WipCapSetting = { kind: 'cap'; cap: WipCap } | { kind: 'problem'; problem: string }
+
+// Blank or unset is the default; `off` (any case) turns the cap off; anything else must be a
+// positive integer, and a value that is neither is refused rather than quietly read as the default.
+function read_cap(environment: NodeJS.ProcessEnv = process.env): WipCapSetting {
+	const raw = environment[WIP_CAP_KEY]
+	if (raw?.trim().toLowerCase() === CAP_OFF) return { kind: 'cap', cap: CAP_OFF }
+
+	const setting = cli_flags.read_positive_setting(raw, WIP_CAP_KEY, DEFAULT_WIP_CAP)
+
+	if (setting.kind === 'problem') {
+		return { kind: 'problem', problem: `${setting.problem} (or "${CAP_OFF}" to turn the cap off)` }
+	}
+
+	return { kind: 'cap', cap: setting.limit }
+}
+
 function is_exempt(filing: WipFiling): boolean {
 	return filing.is_over_cap || (filing.route !== undefined && EXEMPT_ROUTES.has(filing.route))
 }
 
-// The cap is "more than `WIP_CAP` open", so exactly the cap is still within it.
-function verdict_of(count: number, filing: WipFiling): WipVerdict {
-	if (count <= WIP_CAP) return WITHIN
+// The cap is "more than `cap` open", so exactly the cap is still within it.
+function verdict_of(count: number, filing: WipFiling, cap: WipCap): WipVerdict {
+	if (cap === CAP_OFF || count <= cap) return WITHIN
 
 	return is_exempt(filing) ? EXEMPT : HELD
 }
 
-function count_line(count: number, repo: string, verdict: WipVerdict): string {
-	return `wip: ${String(count)} open in ${repo} · cap ${String(WIP_CAP)} · ${verdict}`
+function count_line(count: number, repo: string, verdict: WipVerdict, cap: WipCap): string {
+	return `wip: ${String(count)} open in ${repo} · cap ${String(cap)} · ${verdict}`
 }
 
 // The listing's JSON is an array of rows; anything else is unreadable rather than zero, because zero
@@ -59,7 +83,18 @@ function count_of(json: string): number | undefined {
 	return json_value.parse_array(json)?.length
 }
 
-const issue_wip = { WIP_CAP, HELD, HELD_MESSAGE, UNREAD_MESSAGE, verdict_of, count_line, count_of }
+const issue_wip = {
+	DEFAULT_WIP_CAP,
+	WIP_CAP_KEY,
+	CAP_OFF,
+	HELD,
+	HELD_MESSAGE,
+	UNREAD_MESSAGE,
+	read_cap,
+	verdict_of,
+	count_line,
+	count_of,
+}
 
-export type { WipVerdict }
+export type { WipCap, WipVerdict }
 export { issue_wip }

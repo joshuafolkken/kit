@@ -189,6 +189,7 @@ function merge_workspace_yaml(existing: string, template: string): string {
 const init_logic_workspace = {
 	carry_npmrc_settings,
 	drop_kit_only_regions,
+	extract_yaml_block,
 	merge_workspace_yaml,
 	template_build_values,
 }

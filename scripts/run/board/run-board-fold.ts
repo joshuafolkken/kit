@@ -10,7 +10,8 @@ import {
 import { run_board_render_section } from './run-board-render-section'
 
 // A live `run:board`'s sections folded and unfolded by one key each (joshuafolkken/kit#4172): every
-// section starts unfolded, and what a person folds holds until the board closes — it is never saved.
+// section starts as the last board left it, and what a person folds is saved to `~/.claude/josh/board.json`
+// (`$CLAUDE_CONFIG_DIR` in its place) on every fold (`run-board-fold-store.ts`, joshuafolkken/kit#7213).
 // A folded section is its heading alone, led by ▸ and saying what it holds, and the rows it gave up go
 // to the other sections before `run-board-fit.ts` cuts anything; an unfolded one's heading is led by ▾.
 
@@ -148,7 +149,7 @@ function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }
 
-const run_board_fold = { KEYS_LINE, bounded, fold_parts, toggled }
+const run_board_fold = { KEYS_LINE, SECTIONS, bounded, fold_parts, toggled }
 
 export { run_board_fold }
 export type { FrameBounds }

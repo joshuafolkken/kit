@@ -19,9 +19,16 @@ const FORMAT_STEP: InstallStep = {
 	command: 'pnpm',
 	args: ['exec', 'josh', 'format'],
 }
+// A lockfile written before the project had `minimumReleaseAge` can pin a version published inside
+// the wait, which every later install refuses; only resolving again drops it (#7200).
+const TOO_NEW_DEPENDENCY_HINT = [
+	'If pnpm refused a dependency published inside minimumReleaseAge, the lockfile pins a version',
+	'newer than the wait allows: delete pnpm-lock.yaml and run pnpm install to resolve again.',
+].join(' ')
 const INSTALL_FAILURE = [
 	`${INSTALL_STEP.label} failed — fix the cause above,`,
-	`then run it manually: ${INSTALL_STEP.label} && ${FORMAT_STEP.label}`,
+	`then run it manually: ${INSTALL_STEP.label} && ${FORMAT_STEP.label}.`,
+	TOO_NEW_DEPENDENCY_HINT,
 ].join(' ')
 const FORMAT_WARNING = [
 	`  ⚠ ${FORMAT_STEP.label} left problems it could not fix in the project's own files —`,
@@ -65,6 +72,7 @@ function run_post_init_steps(project_root: string): string | undefined {
 const init_install = {
 	NO_INSTALL_FLAG,
 	INSTALL_STEP,
+	TOO_NEW_DEPENDENCY_HINT,
 	FORMAT_STEP,
 	split_install_flag,
 	did_step_succeed,

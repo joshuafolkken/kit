@@ -40,6 +40,7 @@ const BASIC_PRETTIER = 'prettier.config.mjs'
 const NO_INSTALL = '--no-install'
 const INSTALL_HINT = 'run `pnpm install`'
 const PNPM_INSTALL = 'pnpm install'
+const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 
 function write_index_html(): void {
 	writeFileSync(path.join(paths_mock.root, INDEX_HTML), '<h1>Hello</h1>')
@@ -134,7 +135,7 @@ describe('Git-free basic initialization', () => {
 	it('approves the esbuild and unrs-resolver builds so the first pnpm install succeeds', async () => {
 		write_index_html()
 		await run_init()
-		const workspace = readFileSync(path.join(paths_mock.root, 'pnpm-workspace.yaml'), 'utf8')
+		const workspace = readFileSync(path.join(paths_mock.root, WORKSPACE_YAML), 'utf8')
 
 		expect(workspace).toContain('allowBuilds:\n  esbuild: true\n  unrs-resolver: true\n')
 		expect(workspace).not.toContain('overrides')
@@ -280,8 +281,9 @@ describe('the install and format init finishes with', () => {
 // setup is that version's (joshuafolkken/kit#2794).
 describe('a kit run from outside the project', () => {
 	// The bare package.json anchors pnpm to this directory rather than an ancestor project
-	// (joshuafolkken/kit#2866); it carries no kit version or template, so #2794's guarantee holds.
-	it('installs the project kit and hands the run to it, writing only a bare package.json itself', async () => {
+	// (joshuafolkken/kit#2866); it carries no kit version or template, so #2794's guarantee holds. The
+	// release-age wait is the one template line written first, so pnpm resolves kit under it (#7200).
+	it('installs the project kit and hands the run to it, writing only a bare package.json and the wait itself', async () => {
 		write_index_html()
 		mocked_execa.mockReturnValue(fake_git_result(0, ''))
 		await run_init(['--profile', 'basic'])
@@ -291,9 +293,13 @@ describe('a kit run from outside the project', () => {
 			'pnpm exec josh init --profile static',
 		])
 		const manifest = readFileSync(path.join(paths_mock.root, PACKAGE_JSON), 'utf8')
+		const workspace = readFileSync(path.join(paths_mock.root, WORKSPACE_YAML), 'utf8')
 
-		expect(new Set(readdirSync(paths_mock.root))).toStrictEqual(new Set([INDEX_HTML, PACKAGE_JSON]))
+		expect(new Set(readdirSync(paths_mock.root))).toStrictEqual(
+			new Set([INDEX_HTML, PACKAGE_JSON, WORKSPACE_YAML]),
+		)
 		expect(JSON.parse(manifest)).toStrictEqual({ private: true })
+		expect(workspace).toBe('minimumReleaseAge: 4320\n')
 	})
 
 	it('fails without handing off when the kit install fails', async () => {
