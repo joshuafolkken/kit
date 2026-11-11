@@ -202,6 +202,26 @@ describe('backlog_drive_listing.watcher', () => {
 	})
 })
 
+describe('backlog_drive_listing.watcher — a failed first read', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('counts the listing as new at the first read that answers after a failed first read', async () => {
+		const read = vi.spyOn(git_gh_issue, 'issue_list_label_first_page')
+
+		read.mockRejectedValueOnce(new Error('offline'))
+		read.mockResolvedValueOnce({
+			body: body_of({ numbers: [LISTED], updated_at: EARLIER }),
+			is_unchanged: false,
+		})
+		const is_changed = backlog_drive_listing.watcher()
+
+		await expect(is_changed()).resolves.toBe(false)
+		await expect(is_changed()).resolves.toBe(true)
+	})
+})
+
 describe('backlog_drive_cli.ports_of — the listing check', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()

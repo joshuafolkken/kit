@@ -5,7 +5,7 @@ import { backlog_arrival, type ArrivalPorts } from './backlog-arrival'
 // rather than wait for the stall detector to discover it.
 
 const START_MS = 1_000_000
-const MINUTE_MS = backlog_arrival.PROBE_INTERVAL_MS
+const PROBE_MS = backlog_arrival.PROBE_INTERVAL_MS
 const FREE = 3
 const NO_FREE = 0
 
@@ -14,12 +14,19 @@ interface Pool {
 	free: number
 }
 
+// A listing that holds a new issue at every check, so these suites judge the reading alone; the
+// listing gate has its own suite (`backlog-arrival-listing.test.ts`).
+async function always_changed(): Promise<boolean> {
+	return true
+}
+
 function ports_of(pool: Pool, added_at: Array<number> = []): ArrivalPorts {
 	return {
 		free_lane_count: vi.fn(async () => pool.free),
 		ready_issues: vi.fn(async () => [...pool.issues]),
 		is_added_since: vi.fn(async (since_ms: number) => added_at.some((at) => at >= since_ms)),
 		observe_offerable: vi.fn<ArrivalPorts['observe_offerable']>(),
+		listing_watcher: () => always_changed,
 	}
 }
 
@@ -32,21 +39,21 @@ async function not_parent(): Promise<boolean> {
 }
 
 describe('backlog_arrival.start — a newly runnable issue wakes the parent', () => {
-	it('reports an arrival at the first probe, one minute after the start', async () => {
+	it('reports an arrival at the first probe, one interval after the start', async () => {
 		const pool = { issues: ['2445'], free: FREE }
 		const probe = await backlog_arrival.start(START_MS, ports_of(pool), parent)
 
 		pool.issues.push('2493')
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(true)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(true)
 	})
 
-	it('does not read the backlog again before a minute has passed', async () => {
+	it('does not read the backlog again before an interval has passed', async () => {
 		const pool = { issues: [], free: FREE }
 		const ports = ports_of(pool)
 		const probe = await backlog_arrival.start(START_MS, ports, parent)
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS - 1)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS - 1)).resolves.toBe(false)
 		expect(ports.ready_issues).toHaveBeenCalledTimes(1)
 	})
 
@@ -57,7 +64,7 @@ describe('backlog_arrival.start — a newly runnable issue wakes the parent', ()
 			parent,
 		)
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 	})
 
 	it('does not wake, nor read the backlog, when no lane is free', async () => {
@@ -67,7 +74,7 @@ describe('backlog_arrival.start — a newly runnable issue wakes the parent', ()
 
 		pool.issues.push('2493')
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 		expect(ports.ready_issues).toHaveBeenCalledTimes(1)
 	})
 })
@@ -79,14 +86,14 @@ describe('backlog_arrival.start — what never wakes the parent', () => {
 
 		pool.free = FREE
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 	})
 
 	it('is inert outside a backlogrun parent, reading nothing', async () => {
 		const ports = ports_of({ issues: ['2493'], free: FREE })
 		const probe = await backlog_arrival.start(START_MS, ports, not_parent)
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 		expect(ports.free_lane_count).not.toHaveBeenCalled()
 		expect(ports.ready_issues).not.toHaveBeenCalled()
 	})
@@ -98,12 +105,12 @@ describe('backlog_arrival.start — what never wakes the parent', () => {
 
 		const probe = await backlog_arrival.start(START_MS, ports, parent)
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 	})
 })
 
 // joshuafolkken/kit#3433: an issue `run:add` handed the run wakes the parent at the next tick, without
-// the minute — and a `--only` run, whose pool is always empty, wakes at all.
+// the probe interval — and a `--only` run, whose pool is always empty, wakes at all.
 describe('backlog_arrival.start — an issue run:add handed the run', () => {
 	it('wakes the parent before the first pool probe is due', async () => {
 		const probe = await backlog_arrival.start(
@@ -137,9 +144,9 @@ describe('backlog_arrival.start — a baseline that did not answer', () => {
 
 		const probe = await backlog_arrival.start(START_MS, ports, parent)
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 		pool.issues.push('2493')
-		await expect(probe.has_arrived(START_MS + MINUTE_MS + MINUTE_MS)).resolves.toBe(true)
+		await expect(probe.has_arrived(START_MS + PROBE_MS + PROBE_MS)).resolves.toBe(true)
 	})
 })
 
@@ -150,12 +157,12 @@ describe('backlog_arrival.start — a failed probe', () => {
 
 		vi.mocked(ports.free_lane_count).mockRejectedValueOnce(new Error('git worktree list failed'))
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 	})
 })
 
 // Round 2 of the review: `backlog:next` exits 0 on `retry` and `error`, and a baseline read as empty
-// from either would wake the parent for the whole pool a minute later.
+// from either would wake the parent for the whole pool at the next probe.
 describe('backlog_arrival.answered_issues', () => {
 	it('names the runnable issues of an answered read', () => {
 		expect(backlog_arrival.answered_issues({ code: 0, out: '2445\n2446' })).toEqual([
@@ -209,11 +216,11 @@ describe('backlog_arrival.start — a raised lane limit wakes the parent', () =>
 		const raised = { is_raised: false }
 		const probe = await backlog_arrival.start(START_MS, ports_of(pool), parent, watch_of(raised))
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 
 		raised.is_raised = true
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS + MINUTE_MS)).resolves.toBe(true)
+		await expect(probe.has_arrived(START_MS + PROBE_MS + PROBE_MS)).resolves.toBe(true)
 	})
 
 	it('does not wake on a raise that freed no lane', async () => {
@@ -225,18 +232,18 @@ describe('backlog_arrival.start — a raised lane limit wakes the parent', () =>
 			watch_of({ is_raised: true }),
 		)
 
-		await expect(probe.has_arrived(START_MS + MINUTE_MS)).resolves.toBe(false)
+		await expect(probe.has_arrived(START_MS + PROBE_MS)).resolves.toBe(false)
 	})
 })
 
-// joshuafolkken/kit#4349: the stall episode opens at the minute's reading, not at the first stop past
+// joshuafolkken/kit#4349: the stall episode opens at the probe's reading, not at the first stop past
 // the dispatch-age gate.
 describe('backlog_arrival.start — the probe records whether work meets a free lane', () => {
 	it('records offerable work at the first probe when a lane is free', async () => {
 		const ports = ports_of({ issues: ['2445'], free: FREE })
 		const probe = await backlog_arrival.start(START_MS, ports, parent)
 
-		await probe.has_arrived(START_MS + MINUTE_MS)
+		await probe.has_arrived(START_MS + PROBE_MS)
 
 		expect(ports.observe_offerable).toHaveBeenCalledWith(true)
 	})
@@ -245,7 +252,7 @@ describe('backlog_arrival.start — the probe records whether work meets a free 
 		const ports = ports_of({ issues: ['2445'], free: NO_FREE })
 		const probe = await backlog_arrival.start(START_MS, ports, parent)
 
-		await probe.has_arrived(START_MS + MINUTE_MS)
+		await probe.has_arrived(START_MS + PROBE_MS)
 
 		expect(ports.observe_offerable).toHaveBeenCalledWith(false)
 	})
