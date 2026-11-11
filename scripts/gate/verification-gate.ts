@@ -359,7 +359,7 @@ async function run_checked_gate(
 	async function run_and_settle(): Promise<number> {
 		const fixed = await gate_run_steps.run_gate_steps(plan, budget, reused)
 		const records = check_records_of(plan, options)
-		const project = await project_gate_steps.run_for(options, { tree, records })
+		const project = await project_gate_steps.run_for(options, { tree, records }, budget)
 		const results = [...fixed, ...project]
 
 		return await settle_gate(plan, results, tree, { ...options, started_at, ledger })
