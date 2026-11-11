@@ -35,7 +35,9 @@ async function runs_release_step(tip: string, workflow: string): Promise<boolean
 
 async function read_release_workflows(tip: string): Promise<Array<string>> {
 	const held = await changed_paths.read_held_at(tip, RELEASE_WORKFLOWS)
-	const answers = await Promise.all(held.map((workflow) => runs_release_step(tip, workflow)))
+	const answers = await Promise.all(
+		held.map(async (workflow) => await runs_release_step(tip, workflow)),
+	)
 
 	return held.filter((_workflow, index) => answers[index])
 }
