@@ -72,7 +72,7 @@ function matches_npm_publish_file(path: string): boolean {
 	return path === npm_publish_files.PUBLISH_WORKFLOW
 }
 
-// A table rather than a chain of `if`s: a fifth distribution surface is then one row, and the search
+// A table rather than a chain of `if`s: another distribution surface is then one row, and the search
 // order stays visible in one place. The sources are searched top to bottom and the first to claim the
 // path wins — a path on two is reported once, because naming the second changes nothing the reader
 // does and a second row per path would make the count of hits disagree with the count of files.
