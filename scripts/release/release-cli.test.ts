@@ -6,12 +6,14 @@ import { release_cli } from './release-cli'
 import { release_history } from './release-history'
 import type { ReleasePlan } from './release-plan'
 import { release_publish } from './release-publish'
+import { release_workflow_check } from './release-workflow-check'
 
 const REPOSITORY_ROOT = path.resolve(import.meta.dirname, '..', '..')
 const SCRIPT_NAME = 'release-cli.ts'
 const NODE = 'node'
 const RELEASE_BRANCH = 'release/v1.342.0'
 const THREE = 3
+const GITHUB_RELEASE_WORKFLOW = '.github/workflows/github-release.yml'
 const PLAN: ReleasePlan = {
 	base: 'abcdef1234567890',
 	pending: THREE,
@@ -87,6 +89,7 @@ function arrange_run(pending: number): void {
 	vi.spyOn(release_history, 'read_current_version').mockResolvedValue(PLAN.current_version)
 	vi.spyOn(release_history, 'read_release_plan').mockResolvedValue({ ...PLAN, pending })
 	vi.spyOn(release_publish, 'publish').mockResolvedValue(release_publish.SUCCESS_EXIT_CODE)
+	vi.spyOn(git_command, 'tree_names_at').mockResolvedValue(GITHUB_RELEASE_WORKFLOW)
 }
 
 afterEach(() => {
@@ -116,6 +119,26 @@ describe('release_cli.run', () => {
 		expect(code).toBe(release_publish.SUCCESS_EXIT_CODE)
 		expect(git_command.fetch_branch).not.toHaveBeenCalled()
 		expect(release_publish.publish).not.toHaveBeenCalled()
+	})
+
+	// Without a workflow that creates the GitHub Release, the tag and `production` would move and the
+	// release would then time out waiting — so nothing is created (joshuafolkken/kit#7296).
+	it('refuses before publishing when no release workflow is on origin', async () => {
+		arrange_run(THREE)
+		vi.spyOn(git_command, 'tree_names_at').mockResolvedValue('')
+
+		await expect(release_cli.run(false)).rejects.toThrow('pnpm josh sync')
+		expect(release_publish.publish).not.toHaveBeenCalled()
+	})
+
+	it('reports the release workflow it found under --dry-run', async () => {
+		arrange_run(THREE)
+
+		await release_cli.run(true)
+
+		expect(console.info).toHaveBeenCalledWith(
+			release_workflow_check.found_workflow_message([GITHUB_RELEASE_WORKFLOW]),
+		)
 	})
 })
 

@@ -1,0 +1,7 @@
+{
+	"reason": "#7296 adds the pre-release check for a GitHub Release workflow (new module release-workflow-check.ts)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}
