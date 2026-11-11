@@ -2,6 +2,6 @@
 	"reason": "New ETag gate module for the CI completion wait (#7238) and its tests",
 	"date": "2026-11-11",
 	"growth": {
-		"scripts.code_lines": 73
+		"scripts.code_lines": 78
 	}
 }

@@ -8,7 +8,10 @@
 // the branch; the old commit's listings would answer 304 for ever and keep a verdict on what is no
 // longer the head. The combined status names its `sha`, so a moved head changes its ETag.
 //
-// **Three answers the probe cannot vouch for, so the poll reads anyway:**
+// **Answers the probe cannot vouch for, so the poll reads anyway:**
+// - Anything once no check is pending. The probe only says CI has not moved; after CI settles the
+//   merge state still moves on its own (a lagging `BLOCKED` turning `CLEAN`, a base move to
+//   `DIRTY`), so only a snapshot that still waits on a running check is reused.
 // - `mergeable_state` is computed late and moves without the pull request's ETag moving
 //   (joshuafolkken/kit#4589, joshuafolkken/kit#6721), so a snapshot whose merge state is not yet
 //   known is never reused.
@@ -19,7 +22,7 @@
 // never leaves a 304 vouching for a snapshot that was not taken.
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { git_gh_conditional, type ConditionalRead } from './git-gh-conditional'
-import type { PrStateSnapshot } from './git-pr-checks-parse'
+import { CHECK_STATUS_PENDING, type PrStateSnapshot } from './git-pr-checks-parse'
 
 // Whether this poll has to read the review listing, asked of the snapshot *without* one. It is a
 // question about the current poll rather than a cache key: answering `false` skips one request now
@@ -82,14 +85,20 @@ function is_merge_state_known(snapshot: PrStateSnapshot): boolean {
 	return status !== undefined && status.toUpperCase() !== MERGE_STATE_UNKNOWN
 }
 
+function is_ci_running(snapshot: PrStateSnapshot): boolean {
+	return snapshot.rollup.some((check) => check.status === CHECK_STATUS_PENDING)
+}
+
+function can_reuse(snapshot: PrStateSnapshot, should_read: ReviewDecisionPredicate): boolean {
+	return is_ci_running(snapshot) && is_merge_state_known(snapshot) && !should_read(snapshot)
+}
+
 // The last snapshot where it can answer an unchanged poll, otherwise `undefined`.
 function reusable(
 	last: PrStateSnapshot | undefined,
 	should_read: ReviewDecisionPredicate,
 ): PrStateSnapshot | undefined {
-	if (last === undefined || !is_merge_state_known(last) || should_read(last)) return undefined
-
-	return last
+	return last !== undefined && can_reuse(last, should_read) ? last : undefined
 }
 
 // One gate per wait: the last snapshot and the ETags are that wait's, never shared between two.
