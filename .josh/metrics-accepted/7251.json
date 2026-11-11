@@ -2,6 +2,6 @@
 	"reason": "check:related writes the gate lint record from a vouching lint:related green (#7251)",
 	"date": "2026-11-11",
 	"growth": {
-		"scripts.code_lines": 17
+		"scripts.code_lines": 23
 	}
 }

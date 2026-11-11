@@ -5,6 +5,7 @@ import type { GateStepResult } from './gate-report'
 import { gate_tree, type GateTree } from './gate-tree'
 import { scoped_green } from './scoped-green'
 import { since_green } from './since-green'
+import { tree_verdict } from './tree-verdict'
 import { verification_inputs } from './verification-inputs'
 
 // **`check:related` runs only the checks whose green record no longer holds** (joshuafolkken/kit#5156):
@@ -14,19 +15,17 @@ import { verification_inputs } from './verification-inputs'
 // records under the gate's labels (`check-reuse.ts`), so a green from either end serves the other. A
 // failed check writes no record, so it runs again.
 //
-// **The gate's `lint` record is not one of them** (joshuafolkken/kit#7250): `lint:related` already had a
-// scoped record when this file read the existing ones, and neither direction carries over as is. The
-// gate's `lint --changed` is prettier plus eslint alone, while `lint:related` also runs the structural,
-// document and unused-member checks (`lint-related.ts`), so a gate green does not vouch for it. A
-// `lint:related` green does not vouch for the gate's either: the gate lints the whole tree in CI and on
-// a changed lint configuration (`lint-gate-scope.ts`), where `lint:related` stays on the changed files,
-// and the gate records only a pass with nothing to say (`check-reuse.ts`).
+// **The gate's `lint` record is read for none of them** (joshuafolkken/kit#7250): the gate's
+// `lint --changed` is prettier plus eslint alone, while `lint:related` also runs the structural, document
+// and unused-member checks (`lint-related.ts`), so a gate green does not vouch for it.
 //
-// **A `lint:related` green that does vouch for the gate's lint writes its record** (joshuafolkken/kit#7251),
-// so ship's gate after its sync does not lint the same tree again. It vouches when it read the whole
-// branch change itself — a since-green run leans on an earlier run whose warnings this output does not
-// repeat — on a tree with no lint configuration changed, and said nothing (`check-reuse.ts`). The
-// direction stays one way: a gate green is still no `lint:related` green.
+// **A `lint:related` green writes the gate's `lint` record only where it vouches for it**
+// (joshuafolkken/kit#7251), so ship's gate after its sync does not lint the same tree again. The gate
+// lints the whole tree on a changed lint configuration (`lint-gate-scope.ts`), where `lint:related`
+// stays on the changed files, and records only a pass with nothing to say (`check-reuse.ts`). So the
+// green vouches when no lint configuration changed and the run read the whole branch change itself: a
+// since-green run or a replayed verdict (`tree-verdict.ts`) leans on an earlier run whose warnings this
+// output does not repeat.
 
 const GATE_LABELS: ReadonlyMap<string, string> = new Map([
 	[gate_labels.TYPE_CHECK_TARGET, gate_labels.TYPE_CHECK_LABEL],
@@ -51,10 +50,12 @@ async function reusable(
 	return new Set(commands.filter((command) => scoped.has(command) || gate.has(gate_label(command))))
 }
 
+function reads_whole_change(output: string): boolean {
+	return !since_green.is_narrowed(output) && !tree_verdict.is_replay(output)
+}
+
 function vouches_for_gate_lint(result: CheckResult, tree: GateTree): boolean {
-	if (result.command !== gate_labels.LINT_TARGET || since_green.is_narrowed(result.output)) {
-		return false
-	}
+	if (result.command !== gate_labels.LINT_TARGET || !reads_whole_change(result.output)) return false
 
 	return !verification_inputs.configures(gate_labels.LINT_LABEL, Object.keys(tree.files))
 }

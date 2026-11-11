@@ -6,6 +6,7 @@ import { gate_labels } from './gate-labels'
 import { gate_tree, type GateTree } from './gate-tree'
 import { scoped_green } from './scoped-green'
 import { since_green } from './since-green'
+import { tree_verdict } from './tree-verdict'
 
 // joshuafolkken/kit#5156: `check:related` read neither green record, so a re-run after fixing one
 // check ran the three that had passed over again.
@@ -128,8 +129,15 @@ describe('check_related_reuse.record', () => {
 			RECORDS,
 		)
 	})
+})
 
-	// joshuafolkken/kit#7251: a since-green run leans on an earlier run whose warnings it does not repeat.
+// joshuafolkken/kit#7251: a since-green run or a replay leans on an earlier run whose warnings it does
+// not repeat, and a changed lint configuration makes the gate lint the whole tree.
+describe('check_related_reuse.record — the gate lint it withholds', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	it('does not record the gate lint from a lint:related run narrowed since its last green run', async () => {
 		const narrowed = since_green.describe('josh lint:related', [SOURCE])
 		const unmoved = `josh lint:related: ${since_green.UNMOVED_REASON}`
@@ -137,6 +145,13 @@ describe('check_related_reuse.record', () => {
 		await expect(recorded_labels([result(LINT, 0, narrowed)])).resolves.toStrictEqual([])
 		vi.restoreAllMocks()
 		await expect(recorded_labels([result(LINT, 0, unmoved)])).resolves.toStrictEqual([])
+	})
+
+	it('does not record the gate lint from a replayed lint:related verdict', async () => {
+		const verdict = { tree: 'tree-hash', at: AT, exit_code: 0, tail: '' }
+		const replayed = tree_verdict.reused_line(verdict, '/records/lint-related.json')
+
+		await expect(recorded_labels([result(LINT, 0, replayed)])).resolves.toStrictEqual([])
 	})
 
 	it('does not record the gate lint when the change configures lint, as the gate lints the whole tree', async () => {
