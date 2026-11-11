@@ -53,4 +53,10 @@ describe('run_board_cli.run keys', () => {
 		expect(calls).toStrictEqual([])
 		expect([...once.frames, ...live.frames].join('')).not.toContain(KEYS_LINE)
 	})
+
+	// joshuafolkken/kit#7213: the live keyboard keeps its folds across launches.
+	it('gives the live keyboard a store for its folds', () => {
+		expect(run_board_cli.LIVE_PORTS.keys?.store?.load).toBeTypeOf('function')
+		expect(run_board_cli.LIVE_PORTS.keys?.store?.save).toBeTypeOf('function')
+	})
 })

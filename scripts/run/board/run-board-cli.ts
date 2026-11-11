@@ -11,6 +11,7 @@ import terminalLink from 'terminal-link'
 import { run_board_closed } from './run-board-closed'
 import { run_board_every } from './run-board-every'
 import { run_board_fold } from './run-board-fold'
+import { run_board_fold_store } from './run-board-fold-store'
 import { run_board_gather } from './run-board-gather'
 import { run_board_gather_live } from './run-board-gather-live'
 import { run_board_gather_thread } from './run-board-gather-thread'
@@ -91,6 +92,7 @@ const LIVE_PORTS: Omit<BoardPorts, 'gather'> = {
 			process.stdin.pause()
 		},
 		interrupt: () => process.exit(SIGINT_EXIT_CODE),
+		store: run_board_fold_store.file_store(),
 	},
 	mark: async () => {
 		run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
