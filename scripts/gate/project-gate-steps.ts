@@ -4,9 +4,10 @@ import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { package_manifest, type GateStepDefinition } from '#scripts/lib/package-manifest'
 import { z } from 'zod'
+import { core_budget, type ReserveOptions } from './core-budget'
 import { gate_checks } from './gate-checks'
 import type { GateStep, GateStepResult } from './gate-report'
-import { gate_run_steps } from './gate-run-steps'
+import { gate_run_steps, type BudgetContext } from './gate-run-steps'
 import { project_step_reuse, type StepRecords } from './project-step-reuse'
 
 // The project's own gate steps, declared in its `package.json` (`josh.gate.steps`), run after the
@@ -25,6 +26,11 @@ const PROJECT_STEPS_GROUP = 'rest'
 type GateStepsManifest = z.infer<typeof package_manifest.josh_schemas.gate_steps>
 
 type ProjectSteps = { steps: ReadonlyArray<GateStepDefinition> } | { error: string }
+
+// The gate's budget, plus the ledger options a test points at a ledger of its own.
+interface StepBudget extends BudgetContext {
+	options?: ReserveOptions | undefined
+}
 
 // A step's name is its label, and the gate keeps a check's green record by label (`check-reuse.ts`):
 // a project step named `lint` would write, or reuse, the lint check's record.
@@ -99,19 +105,53 @@ function to_gate_step(name: string, command: string, directory: string): GateSte
 	return { label: name, command_args: [...SHELL_ARGUMENTS, command], cwd: directory }
 }
 
+// A step without `cores` is taken to fill the machine, as a `cargo build` uses every core it finds, and
+// one asking for more than the budget asks for all of it, so it is admitted once the ledger empties.
+function step_weight(step: GateStepDefinition, budget: StepBudget): number {
+	return Math.min(step.cores ?? budget.available_cores, budget.available_cores)
+}
+
+// Each step claims its cores in the machine-wide budget the fixed checks claim from, so lanes' heavy
+// steps wait for each other rather than fill the machine together. A nested gate claims nothing, for
+// the reason `gate-run-steps.ts`'s `run_claimed_step` gives.
+async function run_claimed(
+	step: GateStepDefinition,
+	gate_step: GateStep,
+	budget: StepBudget,
+): Promise<GateStepResult> {
+	if (!budget.is_reserved) return await gate_run_steps.run_gate_step(gate_step)
+
+	const weight = step_weight(step, budget)
+
+	return await core_budget.with_core_reservation(
+		weight,
+		async (admission) => ({
+			...(await gate_run_steps.run_gate_step(gate_step)),
+			...gate_run_steps.claimed_fields(weight, admission),
+		}),
+		{ budget: budget.available_cores, command: `gate ${gate_step.label}`, ...budget.options },
+	)
+}
+
+// Under the held mark, as the fixed checks run, so a step that is itself a weighted `pnpm josh`
+// command does not claim a second place for the cores claimed for it here.
 async function run_steps(
 	steps: ReadonlyArray<GateStepDefinition>,
 	reused: ReadonlyMap<string, string>,
 	directory: string,
+	budget: StepBudget,
 ): Promise<ReadonlyArray<GateStepResult>> {
-	return await bounded_pool.bounded_map(steps, SEQUENTIAL, async (step) => {
-		const gate_step = to_gate_step(step.name, step.command, directory)
-		const reused_at = reused.get(step.name)
+	return await core_budget.with_held_mark(
+		async () =>
+			await bounded_pool.bounded_map(steps, SEQUENTIAL, async (step) => {
+				const gate_step = to_gate_step(step.name, step.command, directory)
+				const reused_at = reused.get(step.name)
 
-		if (reused_at !== undefined) return gate_run_steps.reused_result(gate_step, reused_at)
+				if (reused_at !== undefined) return gate_run_steps.reused_result(gate_step, reused_at)
 
-		return await gate_run_steps.run_gate_step(gate_step)
-	})
+				return await run_claimed(step, gate_step, budget)
+			}),
+	)
 }
 
 /**
@@ -119,18 +159,20 @@ async function run_steps(
  *
  * Unset, nothing runs and the gate is what it always was. An invalid definition answers one failed
  * `josh.gate.steps` result naming what the schema rejected. With `reuse`, a step whose `paths` no path
- * moved under since it last passed is reused rather than run (`project-step-reuse.ts`).
+ * moved under since it last passed is reused rather than run (`project-step-reuse.ts`). A step that
+ * runs first claims its cores in the machine-wide budget and waits while it is full.
  */
 async function run_project_steps(
 	directory: string = process.cwd(),
 	reuse?: StepRecords,
+	budget: StepBudget = gate_run_steps.default_budget(),
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const read = read_project_steps(directory)
 	if ('error' in read) return [definition_failure(directory, read.error)]
-	if (reuse === undefined) return await run_steps(read.steps, new Map(), directory)
+	if (reuse === undefined) return await run_steps(read.steps, new Map(), directory, budget)
 
 	const reused = await project_step_reuse.reusable_steps(read.steps, reuse)
-	const results = await run_steps(read.steps, reused, directory)
+	const results = await run_steps(read.steps, reused, directory, budget)
 
 	await project_step_reuse.record_green_steps(read.steps, results, reuse)
 
@@ -147,14 +189,18 @@ interface StepRun {
 async function run_for(
 	run: StepRun,
 	reuse: Omit<StepRecords, 'is_forced'>,
+	budget: BudgetContext,
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const { static_group } = run
 
 	if (static_group !== undefined && static_group !== PROJECT_STEPS_GROUP) return []
 
-	return await run_project_steps(process.cwd(), { ...reuse, is_forced: run.is_forced === true })
+	const records = { ...reuse, is_forced: run.is_forced === true }
+
+	return await run_project_steps(process.cwd(), records, budget)
 }
 
 const project_gate_steps = { run_for, run_project_steps }
 
+export type { StepBudget }
 export { DEFINITION_LABEL, project_gate_steps }

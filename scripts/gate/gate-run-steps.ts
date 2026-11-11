@@ -114,6 +114,17 @@ function claim_of(requested: number, admission: Admission): CheckClaim {
 	}
 }
 
+// The fields a step run under a claim adds to its result: an overflow note and its ledger row.
+function claimed_fields(
+	requested: number,
+	admission: Admission,
+): Pick<GateStepResult, 'budget_note' | 'claim'> {
+	return {
+		budget_note: core_budget.describe_overflow(admission),
+		claim: claim_of(requested, admission),
+	}
+}
+
 // **The unit step's width is bounded by the free memory too** (joshuafolkken/kit#4528). The plan's cap
 // and the granted width are sized from the cores alone, and the `--maxWorkers` they become skips the
 // guard's own reading (`test-unit-guard.ts`), so the memory is read here, once the claim is admitted
@@ -152,8 +163,7 @@ async function run_claimed_step(
 				await admitted_step(reserved, admission, budget.available_cores),
 				cpu,
 			)),
-			budget_note: core_budget.describe_overflow(admission),
-			claim: claim_of(reserved.weight, admission),
+			...claimed_fields(reserved.weight, admission),
 		}),
 		{
 			budget: budget.available_cores,
@@ -228,7 +238,13 @@ async function run_gate_steps(
 	)
 }
 
-const gate_run_steps = { default_budget, reused_result, run_gate_step, run_gate_steps }
+const gate_run_steps = {
+	claimed_fields,
+	default_budget,
+	reused_result,
+	run_gate_step,
+	run_gate_steps,
+}
 
 export type { BudgetContext, ReusedChecks }
 export { gate_run_steps }

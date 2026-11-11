@@ -144,10 +144,11 @@ describe('run_for', () => {
 		vi.spyOn(process, 'cwd').mockReturnValue(project_root(steps_manifest([GODOT])))
 		const ran = stub_runs()
 		const reuse = { tree: TREE, records: undefined }
+		const budget = { available_cores: 1, is_reserved: false }
 
-		await project_gate_steps.run_for({ static_group: 'types' }, reuse)
-		await project_gate_steps.run_for({ static_group: 'rest' }, reuse)
-		await project_gate_steps.run_for({}, reuse)
+		await project_gate_steps.run_for({ static_group: 'types' }, reuse, budget)
+		await project_gate_steps.run_for({ static_group: 'rest' }, reuse, budget)
+		await project_gate_steps.run_for({}, reuse, budget)
 
 		expect(ran.map((step) => step.label)).toStrictEqual([GODOT.name, GODOT.name])
 	})

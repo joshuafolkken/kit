@@ -17,6 +17,7 @@ const GATE_STEP_SCHEMA = z.strictObject({
 	name: z.string().min(1),
 	command: z.string().min(1),
 	paths: z.array(z.string().min(1)).min(1).optional(),
+	cores: z.int().positive().optional(),
 })
 const GATE_STEPS_SCHEMA = z
 	.array(GATE_STEP_SCHEMA)
