@@ -1,8 +1,0 @@
-{
-	"reason": "Park auto-resolve after-merge module; merging main made run_park_body's export span lines",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 69,
-		"ai_cost.on_demand_bytes": 186
-	}
-}

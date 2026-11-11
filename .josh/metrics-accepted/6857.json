@@ -1,7 +1,0 @@
-{
-	"reason": "#6857 adds the batched GraphQL read of needs-decision comments (read_comments) and the shared comments fragment/schema export",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}

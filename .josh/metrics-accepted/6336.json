@@ -1,7 +1,0 @@
-{
-	"reason": "Final-message causes and recognized cut recovery add 17 code lines; existing board truncation and shared stall judgment are reused.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

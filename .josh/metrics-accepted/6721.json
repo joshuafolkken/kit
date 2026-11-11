@@ -1,7 +1,0 @@
-{
-	"reason": "#6721 adds the ETag detail read with its GraphQL state fallback and the merged field on the merge-gate snapshot",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 38
-	}
-}

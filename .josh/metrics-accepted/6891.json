@@ -1,7 +1,0 @@
-{
-	"reason": "run_board_status exports WAITING_STATES as the single source run-board-github reads (#6891); prettier wraps the namespace object onto one member per line",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

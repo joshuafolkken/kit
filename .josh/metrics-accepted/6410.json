@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6410: keep stable defect-first ranking independent of measurement and isolate conditional mechanism deferral plus its unreadable-rate diagnostic; 12 added runtime lines preserve explicit types and complexity limits.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

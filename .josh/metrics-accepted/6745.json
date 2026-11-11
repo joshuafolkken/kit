@@ -1,7 +1,0 @@
-{
-	"reason": "backlog:drive runs the retrospective unit itself (#6745): a new launcher module, its owner-scoped close and record-mark check, the board stage, and their tests",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 103
-	}
-}

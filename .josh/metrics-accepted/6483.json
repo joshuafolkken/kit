@@ -1,7 +1,0 @@
-{
-	"reason": "Add the clearMocks and restoreMocks project settings and their explicit types (+4 production lines); remove redundant per-test mock cleanup without changing spy restoration.",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

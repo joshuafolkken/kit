@@ -1,7 +1,0 @@
-{
-	"reason": "Normalize path spellings (./, //, x/../, backslash) in the secret-path matcher so non-normalized spellings cannot bypass the credential-read guard (round-2 security finding)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 52
-	}
-}

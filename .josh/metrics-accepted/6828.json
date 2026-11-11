@@ -1,7 +1,0 @@
-{
-	"reason": "#6828 adds run-board-render-quota-cell.ts (one cell renderer shared by the claude/codex/github usage rows) and its colocated test plus the three-row column alignment test",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 36
-	}
-}

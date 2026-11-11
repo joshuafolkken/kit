@@ -1,8 +1,0 @@
-{
-	"reason": "#7227 adds the auto-ok listing ETag check (new port, constant, module and its tests) and the doc row the acceptance criteria require to state the 10-second check",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 91,
-		"ai_cost.on_demand_bytes": 83
-	}
-}

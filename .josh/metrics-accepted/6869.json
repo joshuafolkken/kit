@@ -1,7 +1,0 @@
-{
-	"reason": "#6869 shares the batch-first read across epic-close, epic-audit and epic-bundle-referenced: a new batch-read module plus its tests and a shared test stub",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 101
-	}
-}

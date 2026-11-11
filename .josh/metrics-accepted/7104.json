@@ -1,9 +1,0 @@
-{
-	"reason": "#7104: per-role DROPPED_TOOLS table drops Skill from lane workers, plus the one lane-instructions line telling a lane session to Read SKILL.md instead",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 4,
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 187
-	}
-}

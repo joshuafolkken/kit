@@ -1,7 +1,0 @@
-{
-	"reason": "#6962 serves installed packages through the hook daemon: installed-package currency and a symlink-resolving main guard",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Skip the network offer when the fresh lane capacity is zero; preserve collection and stop handling.",
-	"date": "2026-11-06",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

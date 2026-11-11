@@ -1,7 +1,0 @@
-{
-	"reason": "plain_for and its PlainReason union add the call-site reason declaration that replaces central PLAIN_CALLS rows (#6807)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 5
-	}
-}

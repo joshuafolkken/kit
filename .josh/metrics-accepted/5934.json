@@ -1,7 +1,0 @@
-{
-	"reason": "the --imports hint line under run:step implement and lane:plan's auto run (#5934)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Named backlog:drive launch reads the core rate-limit hold before classify (#6729)",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Share tool payload parsing independently of transcript history while retaining history validation and runtime path classification (#6585)",
-	"date": "2026-11-06",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

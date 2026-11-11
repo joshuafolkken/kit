@@ -1,7 +1,0 @@
-{
-	"reason": "Batched resume reads (backlog-resume-reads.ts) plus the open-PR reference matching that keeps is_resumable equal to the per-child timeline read; issue_closing_pr.has_open_pr removal follows in #6615",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 106
-	}
-}

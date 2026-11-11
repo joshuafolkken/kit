@@ -1,7 +1,0 @@
-{
-	"reason": "#6758 adds the --critical route to issue:priority: a new module and CLI flag parsing",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 62
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Registry files skip the command-name scan in split-direction (#6639): one import line",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

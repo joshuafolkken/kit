@@ -1,7 +1,0 @@
-{
-	"reason": "New hook refusal ledger (#6587): hook-ledger.ts and the record calls from pretool-guard, stop-guard and the Codex adapter",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 139
-	}
-}

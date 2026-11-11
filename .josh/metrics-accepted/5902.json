@@ -1,7 +1,0 @@
-{
-	"reason": "#5902 adds the retrospective digest's ranked improvement picks (new retrospective-picks module) and shares the cost-audit filing frame",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 126
-	}
-}

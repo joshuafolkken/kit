@@ -1,7 +1,0 @@
-{
-	"reason": "is_missing_need predicate, its settle_unnamed wiring, and reusable-workflow need names (#6923)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

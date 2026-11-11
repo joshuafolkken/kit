@@ -1,8 +1,0 @@
-{
-	"reason": "#5878: the tree pre-check names pnpm josh tree:status, which bundles git status and stash list into one read",
-	"date": "2026-11-02",
-	"growth": {
-		"ai_cost.resident_bytes": 11,
-		"ai_cost.on_demand_bytes": 56
-	}
-}

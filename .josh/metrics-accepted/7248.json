@@ -1,7 +1,0 @@
-{
-	"reason": "Test-selection time recorded in the test:related ledger and shown in lane:stats (#7248)",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "New batched GraphQL blocker read for listings (#6634): one module plus its wiring",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 79
-	}
-}

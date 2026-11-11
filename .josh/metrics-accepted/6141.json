@@ -1,7 +1,0 @@
-{
-	"reason": "Re-ship after a review failure skips the detached pre-detach region but keeps a --review ship's test:pinned; a new module decides it from the last ledger ship mark and its recorded base (#6141)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 91
-	}
-}

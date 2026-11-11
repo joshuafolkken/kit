@@ -1,7 +1,0 @@
-{
-	"reason": "#5844 adds the Japanese table for backlog:plan's words and the child kind of report:template",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 84
-	}
-}

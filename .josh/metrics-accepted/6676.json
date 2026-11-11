@@ -1,8 +1,0 @@
-{
-	"reason": "#6676 splits docs/josh-commands-run.md into four pages: the registries list three more pages (code lines), and the moved-section pointers name the longer board/session page paths (on-demand bytes)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 10,
-		"ai_cost.on_demand_bytes": 16
-	}
-}

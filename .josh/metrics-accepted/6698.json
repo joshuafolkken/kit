@@ -1,7 +1,0 @@
-{
-	"reason": "Build the timeline rows in TypeScript so the merged-close read goes through the ETag layer #6698",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

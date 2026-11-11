@@ -1,7 +1,0 @@
-{
-	"reason": "#6145: run:review's wait stop quotes lane:plan's wait bound (shared lane_plan_wait_until) and the issue:spill way out",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 23
-	}
-}

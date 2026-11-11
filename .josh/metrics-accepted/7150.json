@@ -1,7 +1,0 @@
-{
-	"reason": "Short-lived in-process memo for the counted rate_limit reads (#7150)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

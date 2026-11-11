@@ -1,9 +1,0 @@
-{
-	"reason": "Issue #6245 adds the guarded same-tree join fast path and its chain contract; existing gate and pinned predicates remain shared.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 71,
-		"ai_cost.on_demand_bytes": 293,
-		"prose.long_paragraphs": 1
-	}
-}

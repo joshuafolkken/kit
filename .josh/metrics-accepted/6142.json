@@ -1,7 +1,0 @@
-{
-	"reason": "run:review's open now widens a lane plan and checks its overlap and declared size before the review (#6142); the oversize check moved into lane-plan-probe with its tests",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 83
-	}
-}

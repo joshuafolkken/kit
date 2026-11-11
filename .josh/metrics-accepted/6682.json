@@ -1,7 +1,0 @@
-{
-	"reason": "live lane count threaded through the gate plan's ledger claim (review fix: claim must divide by lanes like the share)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 56
-	}
-}

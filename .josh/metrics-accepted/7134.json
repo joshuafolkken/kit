@@ -1,7 +1,0 @@
-{
-	"reason": "rule:value keeps per-run counts between refreshes (stamped store, per-run summaries) and versions them by the counting code's import closure, which moves the closure walker from a test fixture into scripts/lib with its own test",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 195
-	}
-}

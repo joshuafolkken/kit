@@ -1,8 +1,0 @@
-{
-	"reason": "Retrospective unit: close names the backlogrun parent as --owner, run:handoff refuses an already-marked carry, and run:handoff children carry JOSH_HANDOFF_CHILD (not JOSH_RUN_HEADLESS) so they never drive or cut the parent's carry",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 90,
-		"ai_cost.on_demand_bytes": 121
-	}
-}

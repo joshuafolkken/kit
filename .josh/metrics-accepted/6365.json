@@ -1,7 +1,0 @@
-{
-	"reason": "Pass the measured implement rate through backlog candidate selection and warning display, with typed shared context and runnable options.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 27
-	}
-}

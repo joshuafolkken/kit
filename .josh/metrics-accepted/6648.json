@@ -1,7 +1,0 @@
-{
-	"reason": "needs-human-merge board rows gain the merge / find-PR action tail (#6648)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

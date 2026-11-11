@@ -1,8 +1,0 @@
-{
-	"reason": "Issue #6389: shared size measurement adds 84 implementation lines, including matching staged Unicode paths to the existing name reader; review threshold documentation adds 109 bytes.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 84,
-		"ai_cost.on_demand_bytes": 109
-	}
-}

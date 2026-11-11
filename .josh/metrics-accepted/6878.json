@@ -1,8 +1,0 @@
-{
-	"reason": "#6878: the driver parks a refused launch run:stalled through a new shared run_stalled_park.apply (label + comment + park event) the ship cap also uses; the launch row and section table point at the stalled retry",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 41,
-		"ai_cost.on_demand_bytes": 77
-	}
-}

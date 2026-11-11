@@ -1,7 +1,0 @@
-{
-	"reason": "#7202 marks ci-wait rows with a rerun, including a check already settled at the first poll, so lane:stats keeps reruns out of the critical path",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

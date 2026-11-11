@@ -1,7 +1,0 @@
-{
-	"reason": "#7030 adds the --whole-tree gate flag and whole-tree-reuse so a lane gate leaves exports/metrics to the ship and CI",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 62
-	}
-}

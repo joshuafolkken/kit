@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats --over gains an over-budget stage column, read as lane:breakdown reads it (#7008)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

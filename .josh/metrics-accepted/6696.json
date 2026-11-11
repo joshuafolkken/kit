@@ -1,7 +1,0 @@
-{
-	"reason": "#6696 threads the ETag read path through issue_view_json and passes it from the run board's closed read (+8 code lines, the call now spans its four arguments)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

@@ -1,9 +1,0 @@
-{
-	"reason": "#5820 names the backlog:triage --unblock path in the destructive-command reason and operating-rules.md",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 1,
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 305
-	}
-}

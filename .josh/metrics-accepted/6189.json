@@ -1,7 +1,0 @@
-{
-	"reason": "lane:stats --pairs adds the pairs table and the stats request parser (#6189)",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 120
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "#7077: the drive now auto-decides a no-recommendation park (default_pick, decision record, decision notice) and backlogrun-park.md documents it, including its no-size-approval rule",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 42,
-		"ai_cost.on_demand_bytes": 654
-	}
-}

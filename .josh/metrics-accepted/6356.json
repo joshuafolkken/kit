@@ -1,7 +1,0 @@
-{
-	"reason": "Add the shared budget-derived split guide and inverse rate API required by #6356 while preserving legacy defaults.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 32
-	}
-}

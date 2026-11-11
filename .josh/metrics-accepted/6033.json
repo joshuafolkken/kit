@@ -1,8 +1,0 @@
-{
-	"reason": "#6033: launcher tests now cover the Codex root, a launch with no CLAUDE_PROJECT_DIR and the pre-#6033 consumer shape; the rewrite keeps the old shapes as history markers so unsynced consumers still migrate",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 37,
-		"prose.long_paragraphs": 1
-	}
-}

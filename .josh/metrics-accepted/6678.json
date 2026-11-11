@@ -1,7 +1,0 @@
-{
-	"reason": "#6678: lane net time takes out a split run and its wait for the redispatch (new split_spans and a shared cut helper)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 32
-	}
-}

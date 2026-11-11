@@ -1,7 +1,0 @@
-{
-	"reason": "#6537 adds the decision tail for a withheld row and waiting-on text for every blocked stalled row; the standing-blocker helpers move to run-board-standing-waits.ts so touched rows read them too (+41 code lines)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 41
-	}
-}

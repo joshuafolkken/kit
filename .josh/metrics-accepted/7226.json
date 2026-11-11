@@ -1,7 +1,0 @@
-{
-	"reason": "#7226 adds the disk ETag read that says whether a body changed (read_detail) and the label listing's first-page read backlog:drive needs",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

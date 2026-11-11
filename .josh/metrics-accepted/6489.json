@@ -1,8 +1,0 @@
-{
-	"reason": "#6489 adds the two test-helper lint bans and the testing-guide sections the Issue's acceptance criteria require",
-	"date": "2026-11-09",
-	"growth": {
-		"rules.lines": 13,
-		"ai_cost.on_demand_bytes": 758
-	}
-}

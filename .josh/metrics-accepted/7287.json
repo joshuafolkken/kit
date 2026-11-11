@@ -1,7 +1,0 @@
-{
-	"reason": "#7287 adds the hold-code-to-sentence table (backlog-hold-text.ts) and the leaf hold-code module its readers and writers share",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 83
-	}
-}

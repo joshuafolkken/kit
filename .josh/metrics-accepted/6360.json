@@ -1,7 +1,0 @@
-{
-	"reason": "Round-2 fix #6360: decode C-quoted numstat paths at the shared test-file filter; three runtime lines prevent tracked and untracked tests from inflating split measurements.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 125
-	}
-}

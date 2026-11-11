@@ -1,7 +1,0 @@
-{
-	"reason": "A followup check stop takes the re-ship skip, and the in-ship merge-again path prints one ship-log line (#6675)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

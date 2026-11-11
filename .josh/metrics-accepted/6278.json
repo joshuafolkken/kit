@@ -1,7 +1,0 @@
-{
-	"reason": "Keep touched review-fix greens separate from full-reach verification and admit later review rounds through the existing scoped stamp reader.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 35
-	}
-}

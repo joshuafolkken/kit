@@ -1,9 +1,0 @@
-{
-	"reason": "Issue #6237 adds a shared-classifier triage pass, explicit solo evidence decision, branch tests and command guidance; the growth is required for the requested command surface.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 100,
-		"ai_cost.on_demand_bytes": 498,
-		"prose.long_paragraphs": 1
-	}
-}

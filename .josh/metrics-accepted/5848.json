@@ -1,7 +1,0 @@
-{
-	"reason": "#5848 adds issue:fold-existing --apply (new write/verify module and CLI mode) replacing a manual six-step chain",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 108
-	}
-}

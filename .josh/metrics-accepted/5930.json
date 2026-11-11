@@ -1,9 +1,0 @@
-{
-	"reason": "#5930 adds the lane-branch WIP-commit set-aside (new module + its tests), keeps a children split stashed, and documents the commit-vs-stash resume in run:pause / prerequisite docs",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 52,
-		"ai_cost.on_demand_bytes": 190,
-		"prose.long_paragraphs": 1
-	}
-}

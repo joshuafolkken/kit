@@ -1,8 +1,0 @@
-{
-	"reason": "run:park / run:pause print their governing section (#5842): two table rows, a lane-child row, the print calls, and the docs naming the print",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 16,
-		"ai_cost.on_demand_bytes": 68
-	}
-}

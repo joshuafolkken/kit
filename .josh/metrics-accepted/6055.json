@@ -1,8 +1,0 @@
-{
-	"reason": "cli_body refuses unignored in-tree body files (#6055): one git check-ignore helper, a shared .josh/tmp constant module and its test, plus a one-line shell-body.md note",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 29,
-		"ai_cost.on_demand_bytes": 181
-	}
-}

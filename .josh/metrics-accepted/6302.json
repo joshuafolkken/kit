@@ -1,7 +1,0 @@
-{
-	"reason": "Add historical timeline reconstruction while reusing the existing evidence collector and breakdown calculations for #6302",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 139
-	}
-}

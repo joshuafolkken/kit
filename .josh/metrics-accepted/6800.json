@@ -1,7 +1,0 @@
-{
-	"reason": "Named-run hold reads in-progress lanes outside the run as holders (#6800)",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

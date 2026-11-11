@@ -1,7 +1,0 @@
-{
-	"reason": "#6077: the prose:stale scan reads the change's working-tree declarations so a name still declared on an unchanged line is kept",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

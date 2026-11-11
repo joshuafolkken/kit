@@ -1,7 +1,0 @@
-{
-	"reason": "#6822 adds the GraphQL rate-limit gauge beside REST core on the run:board github row (new render module + resources read)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 81
-	}
-}

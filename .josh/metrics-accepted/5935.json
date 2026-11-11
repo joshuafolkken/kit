@@ -1,7 +1,0 @@
-{
-	"reason": "#5935: split children over the guide now warned on in backlog:next (split_over_guide + note remedy)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

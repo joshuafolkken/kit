@@ -1,7 +1,0 @@
-{
-	"reason": "Generated pure-files list grows by 103 entries moved from isolated to pure (#6956)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 103
-	}
-}

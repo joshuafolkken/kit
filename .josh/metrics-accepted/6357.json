@@ -1,7 +1,0 @@
-{
-	"reason": "Wire the shared measured guide into filing decisions and add boundary regression coverage for #6357",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 24
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Unreadable-seat quarantine diagnostics require four net runtime code lines; allocation still uses the existing port checks.",
-	"date": "2026-11-06",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

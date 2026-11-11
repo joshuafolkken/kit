@@ -1,7 +1,0 @@
-{
-	"reason": "#7075: shared stdin reader that retries EAGAIN on a non-blocking pipe, replacing two readFileSync(0) copies",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 39
-	}
-}

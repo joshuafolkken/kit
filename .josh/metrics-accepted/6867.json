@@ -1,7 +1,0 @@
-{
-	"reason": "gh:usage per-endpoint breakdown: call-kind normalizer, endpoint table, and the direct hook recording endpoints (#6867 review fix)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 168
-	}
-}

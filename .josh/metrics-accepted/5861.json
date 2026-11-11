@@ -1,7 +1,0 @@
-{
-	"reason": "issue:file --batch refuses --check instead of reporting every clean filing as refused (#5861)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

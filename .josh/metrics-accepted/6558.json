@@ -1,7 +1,0 @@
-{
-	"reason": "New feature: backlog:drive records GitHub core rate-limit usage per offer cycle (new backlog-drive-rate module) #6558",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 57
-	}
-}

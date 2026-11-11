@@ -1,8 +1,0 @@
-{
-	"reason": "epic:bundle recommends and places an ask answer into an epic, with a decision record and the scout's Recommended line",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 89,
-		"prose.long_paragraphs": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6719 adds the poll backoff cadence to the shared poll helper and wires it into the PR-checks waits",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 58
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "run:carry --begin records the lane limit it starts under (#6147)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

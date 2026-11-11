@@ -1,8 +1,0 @@
-{
-	"reason": "New issue:body command (#7002): CLI code, its epic-body branch, and the shell-body.md rule pointing body rewrites at it instead of the refused gh api PATCH",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 53,
-		"ai_cost.on_demand_bytes": 130
-	}
-}

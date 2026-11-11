@@ -1,7 +1,0 @@
-{
-	"reason": "New per-guard rephrase counter (guard-rephrase.ts, rule-rephrase.ts) and the rule:value column it feeds (#6032)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 107
-	}
-}

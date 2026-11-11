@@ -1,8 +1,0 @@
-{
-	"reason": "#6742 adds the protected-label re-park in backlog:drive's retry, the board note it shows on the decision row, and the one prerequisite.md line the Issue asks for",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 27,
-		"ai_cost.on_demand_bytes": 225
-	}
-}

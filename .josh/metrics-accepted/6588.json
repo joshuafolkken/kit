@@ -1,7 +1,0 @@
-{
-	"reason": "Opt-in hook payload capture module (with missing-directory handling from round-1 review), its two call sites, and the adapter run exposed for its capture pin (#6588)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

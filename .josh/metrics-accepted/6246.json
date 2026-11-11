@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6246 adds one provenance snapshot reader and the declaration and audit boundary required to reject untrusted editors before shell execution; the 72 code lines reuse the existing declaration parsers and write-permission lookup.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

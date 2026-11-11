@@ -1,7 +1,0 @@
-{
-	"reason": "The investigation record moves to durable state keyed by repository and Issue so a yielded lane's re-dispatch reads it; a closed Issue's withdrawal removes it and the retention prunes a stale one (#6153)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}

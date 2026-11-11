@@ -1,7 +1,0 @@
-{
-	"reason": "New josh gh:usage command (tally module + CLI) adds code lines #6753",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 135
-	}
-}

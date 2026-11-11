@@ -1,7 +1,0 @@
-{
-	"reason": "Require the shared solo-run verdict before filing and record its three answers after creation (#6444)",
-	"date": "2026-11-05",
-	"growth": {
-		"scripts.code_lines": 31
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#7159 adds lane-hand-back-hold.ts: the hand-back mark a full-pool driver leaves for the ship-side writer (#7121)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 61
-	}
-}

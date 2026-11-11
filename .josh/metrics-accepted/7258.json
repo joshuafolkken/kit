@@ -1,7 +1,0 @@
-{
-	"reason": "#7258 adds the incremental event-stream reader run:board reads each tick (run-event-tail.ts)",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 81
-	}
-}

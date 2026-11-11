@@ -1,7 +1,0 @@
-{
-	"reason": "#6799 adds the yield cap module (backlog-yield-cap.ts) that parks an issue yielding its lane 3 times in 15 minutes, and its fixture ports",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 124
-	}
-}

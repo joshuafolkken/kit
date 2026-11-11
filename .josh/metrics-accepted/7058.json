@@ -1,7 +1,0 @@
-{
-	"reason": "catch_up reads origin/main's conflicts before merging so a clean main move is left to the merge ref's CI (#7058); read_conflicts exposes the probe's unanswered case",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

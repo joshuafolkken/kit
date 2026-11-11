@@ -1,7 +1,0 @@
-{
-	"reason": "#6836: run-board-scope imports run_carry_added to reuse the driver's ordering instead of cloning it",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

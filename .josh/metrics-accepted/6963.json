@@ -1,7 +1,0 @@
-{
-	"reason": "212 classifier-pure scripts/run test paths listed in the generated tools/test/pure-files.ts (data entries, no logic), plus 23 lines in run-cut-cli-fixture.ts that attach its stable mocks per suite so it survives isolate:false (#6963)",
-	"date": "2026-11-10",
-	"growth": {
-		"scripts.code_lines": 235
-	}
-}

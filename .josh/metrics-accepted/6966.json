@@ -1,7 +1,0 @@
-{
-	"reason": "#6966 registers 122 more classifier-pure test files in the generated pure list, one line each",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 122
-	}
-}

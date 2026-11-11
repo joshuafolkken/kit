@@ -1,7 +1,0 @@
-{
-	"reason": "tree:status passes --no-optional-locks to git status and pins the argv order with a regression test (#6608)",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

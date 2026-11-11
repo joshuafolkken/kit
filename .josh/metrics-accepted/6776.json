@@ -1,7 +1,0 @@
-{
-	"reason": "Size-approval park lines, the adopt-written approval json and their tests (#6776), plus round 1 review fixes: zero-bound / empty-path refusal and prefix-reuse tests",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 166
-	}
-}

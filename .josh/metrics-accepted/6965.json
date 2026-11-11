@@ -1,7 +1,0 @@
-{
-	"reason": "Spawned josh commands hand their gh request tally back to the dispatcher so gh:usage records them (#6965): new handoff module plus tests",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 101
-	}
-}

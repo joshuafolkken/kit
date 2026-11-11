@@ -1,7 +1,0 @@
-{
-	"reason": "#6902 adds paired Sonnet review recording: review:pair CLI, paired brief offer and review-pairs.jsonl ledger",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 242
-	}
-}

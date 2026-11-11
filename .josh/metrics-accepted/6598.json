@@ -1,7 +1,0 @@
-{
-	"reason": "New lane step progress events (run-event-step, run-step-progress) with tests for #6598",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 105
-	}
-}

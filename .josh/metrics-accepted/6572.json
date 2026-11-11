@@ -1,8 +1,0 @@
-{
-	"reason": "Verified single-deliverable answer to the split notice adds one module and a pointer line in split-assessment.md #6572",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 41,
-		"ai_cost.on_demand_bytes": 250
-	}
-}

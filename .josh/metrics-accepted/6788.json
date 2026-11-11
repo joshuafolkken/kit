@@ -1,8 +1,0 @@
-{
-	"reason": "#6788 adds the run:add re-offer and the short idle interval: the due check, its ports and tests, and the progress row naming both",
-	"date": "2026-11-08",
-	"growth": {
-		"scripts.code_lines": 77,
-		"ai_cost.on_demand_bytes": 90
-	}
-}

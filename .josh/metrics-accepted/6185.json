@@ -1,7 +1,0 @@
-{
-	"reason": "#6185: the import-graph split names why it failed, and a failed split names nothing over the synced scope (failure reasons, the unsplit log line, a bare-pair fallback helper)",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 44
-	}
-}

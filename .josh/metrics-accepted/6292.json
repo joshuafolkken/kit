@@ -1,7 +1,0 @@
-{
-	"reason": "Persist checkout-specific capped hunk identifiers and tree hashes, prioritize pending probes, and reuse held verdicts for #6292.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 68
-	}
-}

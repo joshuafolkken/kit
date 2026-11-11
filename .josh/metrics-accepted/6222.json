@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #6222 adds the human-merge board overlay, open PR lookup, and cache codec; these share the existing board rendering and REST parsers.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 90
-	}
-}

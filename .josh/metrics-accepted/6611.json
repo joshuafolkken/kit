@@ -1,7 +1,0 @@
-{
-	"reason": "#6611 adds epic-child-source (listed-row reuse and closed-child cache) and threads it through the epic reads",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 130
-	}
-}

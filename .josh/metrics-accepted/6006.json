@@ -1,7 +1,0 @@
-{
-	"reason": "lane:breakdown splits the yield wait into holder remaining time, redispatch gap and an unsplit remainder (#6006)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

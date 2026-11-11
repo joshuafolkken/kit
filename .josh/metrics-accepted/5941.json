@@ -1,8 +1,0 @@
-{
-	"reason": "followup --merge runs main:sync as a guarded tail step, skipped when the primary checkout is off the default branch (#5941)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 44,
-		"ai_cost.on_demand_bytes": 10
-	}
-}

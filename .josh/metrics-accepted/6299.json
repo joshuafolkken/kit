@@ -1,7 +1,0 @@
-{
-	"reason": "Add the shared review gate reader and reusable nearest manifest value lookup for #6299",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 39
-	}
-}

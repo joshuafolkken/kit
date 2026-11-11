@@ -1,8 +1,0 @@
-{
-	"reason": "Add shared run:tail summary templates and usage instructions for issue #6234; reuse the existing report formatter.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 24,
-		"ai_cost.on_demand_bytes": 307
-	}
-}

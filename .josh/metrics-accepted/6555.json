@@ -1,7 +1,0 @@
-{
-	"reason": "testing-guide.md names the canonical pnpm josh test:e2e entry instead of the nonexistent pnpm test:e2e script (#6555)",
-	"date": "2026-11-09",
-	"growth": {
-		"ai_cost.on_demand_bytes": 5
-	}
-}

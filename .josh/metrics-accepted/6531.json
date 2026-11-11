@@ -1,8 +1,0 @@
-{
-	"reason": "answered-question judgment for run:park (#6531): contract, tool-less judge, park connector, system-stop park write",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 301,
-		"prose.excess_bold": 3
-	}
-}

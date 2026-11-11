@@ -1,7 +1,0 @@
-{
-	"reason": "New GraphQL single-issue reader (#6722): one query for body, labels, blockers and comments, mapped into the existing REST shapes, with its REST fallback and tests",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 167
-	}
-}

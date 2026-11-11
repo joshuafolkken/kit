@@ -1,7 +1,0 @@
-{
-	"reason": "durable_state asks git for the common directory only when no JOSH_TEMP_ROOT override stands, so the unit suite stops paying a git probe per record lookup (#6177)",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

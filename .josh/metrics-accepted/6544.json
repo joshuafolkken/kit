@@ -1,8 +1,0 @@
-{
-	"reason": "The time-bar split notice (#6544) adds a budget-over module, a budget reason and an unmeasurable-diff fallback for the time bar",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 44,
-		"ai_cost.on_demand_bytes": 229
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#6898: cost:audit classifies run:handoff children as their own kind; the handoff origin marker is exported for it (export object reflowed by the formatter)",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 11
-	}
-}

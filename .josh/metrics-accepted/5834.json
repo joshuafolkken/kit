@@ -1,7 +1,0 @@
-{
-	"reason": "lane:breakdown attributes subagent, read, edit and overlapping ship:wait time between ship stages, backgrounded subagents left out (#5834)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}

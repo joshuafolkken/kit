@@ -1,7 +1,0 @@
-{
-	"reason": "#6139 adds the lane-limit history module and its ledger kind",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 58
-	}
-}

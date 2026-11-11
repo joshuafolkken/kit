@@ -1,7 +1,0 @@
-{
-	"reason": "Migrating 157 plain() calls to plain_for('<reason>', ...) lengthens them; prettier wraps some across lines while the PLAIN_CALLS list it replaces was test code",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

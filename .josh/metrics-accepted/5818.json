@@ -1,7 +1,0 @@
-{
-	"reason": "backlog:triage --unblock adds the relation-removal path, dropping the declaration from every epic listing the issue (#5818)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 83
-	}
-}

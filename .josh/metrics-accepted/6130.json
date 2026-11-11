@@ -1,7 +1,0 @@
-{
-	"reason": "q2 reads a deleted file's reachable names only (#6130): reachable_names helper and the deleted-file tree answer",
-	"date": "2026-11-03",
-	"growth": {
-		"scripts.code_lines": 34
-	}
-}

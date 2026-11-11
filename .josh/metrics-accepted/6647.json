@@ -1,7 +1,0 @@
-{
-	"reason": "lane:plan --single records one deliverable past its declared files (#6647), and run:review's widening now applies the same files-axis waiver as lane:plan --probe",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#7181 links the PR number on the human-merge waiting row: a pr field on RowReason and the render-side link helper",
-	"date": "2026-11-11",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

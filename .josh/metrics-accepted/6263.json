@@ -1,7 +1,0 @@
-{
-	"reason": "OpenAI supervisor claim wait now tolerates concurrent cold starts and distinguishes cancelled, timed out, and rejected startup; adds 34 runtime lines with regression coverage.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 34
-	}
-}

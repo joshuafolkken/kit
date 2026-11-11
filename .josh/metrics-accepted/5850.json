@@ -1,7 +1,0 @@
-{
-	"reason": "New observation:depth command derives the depth test's depth from a subject path, read from any directory (#5850)",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 108
-	}
-}

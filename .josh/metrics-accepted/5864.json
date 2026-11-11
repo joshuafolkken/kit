@@ -1,8 +1,0 @@
-{
-	"reason": "run:pickup gains the launch half (#5864): epic:next offers launched in one call, with its tests",
-	"date": "2026-11-02",
-	"growth": {
-		"scripts.code_lines": 67,
-		"prose.long_paragraphs": 1
-	}
-}

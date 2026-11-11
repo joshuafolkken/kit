@@ -1,8 +1,0 @@
-{
-	"reason": "#6538 adds the run:board empty lane seat lines (run-board-seat.ts, render/tick wiring, seat-aware row counts) and documents them under the 🧵 bullet",
-	"date": "2026-11-09",
-	"growth": {
-		"scripts.code_lines": 109,
-		"prose.long_paragraphs": 1
-	}
-}

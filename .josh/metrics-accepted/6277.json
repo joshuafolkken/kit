@@ -1,7 +1,0 @@
-{
-	"reason": "#6277: Add durable review-step checkpoints and attestation recovery using existing stamps; test all three review paths and invalidation.",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 112
-	}
-}

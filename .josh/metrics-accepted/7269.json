@@ -1,7 +1,0 @@
-{
-	"reason": "#7269: the --over-cap description and wip-cap.md name the typed new entry, which now files with --over-cap from the start",
-	"date": "2026-11-11",
-	"growth": {
-		"ai_cost.on_demand_bytes": 160
-	}
-}

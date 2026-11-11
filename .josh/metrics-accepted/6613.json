@@ -1,7 +1,0 @@
-{
-	"reason": "#6613 adds gh-permission-cache.ts, the cross-process write-role record that lets a backlog scan skip re-asking collaborator permission",
-	"date": "2026-11-07",
-	"growth": {
-		"scripts.code_lines": 43
-	}
-}

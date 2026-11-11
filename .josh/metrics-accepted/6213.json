@@ -1,8 +1,0 @@
-{
-	"reason": "Add ledger stop-count medians to the existing stage turns table and document its distinct lane cohort",
-	"date": "2026-11-04",
-	"growth": {
-		"scripts.code_lines": 20,
-		"prose.long_paragraphs": 1
-	}
-}
