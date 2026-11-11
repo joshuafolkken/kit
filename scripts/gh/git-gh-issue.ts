@@ -150,10 +150,12 @@ async function issue_list_by_label_summary(
 	})
 }
 
-// The first page `issue_list_by_label_summary` reads over REST, through the same disk ETag, saying
-// whether it changed since the previous process read it (joshuafolkken/kit#7226): `backlog:drive`
-// asks it of the `auto-ok` listing before an offer, and the `--wait` arrival probe asks the same. A
-// failure throws, as `git_gh_etag_read.read_detail` does.
+// The first page `issue_list_by_label_summary` reads over REST, saying whether it changed since the
+// previous process read it (joshuafolkken/kit#7226): `backlog:drive` asks it of the `auto-ok` listing
+// before an offer, and the `--wait` arrival probe asks the same. It answers for that one page only —
+// a change past its hundred rows reads as unchanged. The ETag is shared with the listing only where
+// the listing reads REST; on GraphQL it keeps its own. A failure throws, as
+// `git_gh_etag_read.read_detail` does.
 async function issue_list_label_first_page(label: string): Promise<ReadDetail> {
 	const path = git_gh_issue_list.listing_path({ label }, FIRST_PAGE)
 

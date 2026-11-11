@@ -7,7 +7,7 @@ import { git_gh_issue } from './git-gh-issue'
 import { TRANSPORT_ENV_VAR } from './git-gh-transport'
 
 // joshuafolkken/kit#7226: `backlog:drive` asks whether the `auto-ok` listing changed by reading the
-// page `backlog:next` reads, so both share one disk ETag.
+// page `backlog:next` reads over REST, so on that transport both share one disk ETag.
 
 const ETAG = 'W/"listing"'
 const EMPTY_PAGE = '[]'
