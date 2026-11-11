@@ -20,7 +20,10 @@ const CACHE_PATH = '.eslintcache'
 // joshuafolkken/kit#5215: `static-checks` is a matrix, and only its lint leg restores and writes the cache.
 const PULL_REQUEST_ONLY = "github.event_name == 'pull_request' && matrix.group == 'lint'"
 const PREFIX_FILE = 'eslint-cache-prefix'
-const UPLOAD_ARTIFACT = 'eslint-cache-${{ github.event.pull_request.number }}'
+// joshuafolkken/kit#7126: the artifact, the key and the seed and warm legs all carry the matrix group, so
+// two lint legs can hand over a cache each without colliding.
+const UPLOAD_ARTIFACT = 'eslint-cache-${{ github.event.pull_request.number }}-${{ matrix.group }}'
+const LINT_GROUPS = ['lint']
 const ON_REUSE = "needs.reuse-pr-checks.outputs.reuse == 'true'"
 const CACHE_ACTION = 'actions/cache@'
 
@@ -89,13 +92,13 @@ describe('a reused main push saves that cache', () => {
 		expect(outputs?.['run-id']).toBe('${{ steps.prove.outputs.run-id }}')
 		expect(outputs?.['pull-number']).toBe('${{ steps.prove.outputs.pull-number }}')
 		expect(seed_script()).toContain('gh run download "${RUN_ID}"')
-		expect(seed_script()).toContain('--name "eslint-cache-${PULL_NUMBER}"')
+		expect(seed_script()).toContain('--name "eslint-cache-${PULL_NUMBER}-${GROUP}"')
 	})
 
 	it('checks the prefix before it becomes a key, and stays green without one', () => {
 		const script = seed_script()
 
-		expect(script).toContain('-eslint-cache-v[0-9.]+-')
+		expect(script).toContain('-eslint-cache-${GROUP}-v[0-9.]+-')
 		expect(script.indexOf('grep -Eq')).toBeLessThan(script.indexOf('prefix=${prefix}'))
 		expect(script).not.toContain('exit 1')
 	})
@@ -151,13 +154,32 @@ describe("a reused main push warms the runner's Node.js lineage", () => {
 	})
 })
 
+function matrix_groups(job_name: string): ReadonlyArray<string | number> | undefined {
+	return job(job_name)?.strategy?.matrix?.['group']
+}
+
+function download_environment(name: string): string | undefined {
+	return ci_yml_fixture.find_step_by_id(job(SEED_JOB), 'download')?.env?.[name]
+}
+
+describe('each lint group hands over its own cache', () => {
+	it.each([SEED_JOB, WARM_JOB])('runs %s once per lint group', (job_name) => {
+		expect(matrix_groups(job_name)).toEqual(LINT_GROUPS)
+	})
+
+	it('downloads the artifact of the leg’s own group', () => {
+		expect(download_environment('GROUP')).toBe('${{ matrix.group }}')
+	})
+})
+
 // joshuafolkken/kit#5050: an outside author's run can write any `.eslintcache`, so only a pull request
 // whose author holds a trusted association is promoted to main's scope. The download step runs
 // under `bash -e`, as a runner does, with a stub `gh` that hands back a valid prefix file, so a row
 // reads what the script actually does rather than what its text contains.
 const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR']
 const UNTRUSTED = ['CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'NONE', '']
-const STUB_PREFIX = 'Linux-eslint-cache-v24.1.0-0a1b-2c3d-'
+const STUB_GROUP = 'lint'
+const STUB_PREFIX = `Linux-eslint-cache-${STUB_GROUP}-v24.1.0-0a1b-2c3d-`
 const make_directory = temporary_directory()
 
 function write_stub_gh(directory: string): void {
@@ -181,6 +203,7 @@ function run_download(association: string): { did_download: boolean; output: str
 			PATH: `${path.join(directory, 'bin')}${path.delimiter}${process.env['PATH'] ?? ''}`,
 			GITHUB_OUTPUT: output_path,
 			AUTHOR_ASSOCIATION: association,
+			GROUP: STUB_GROUP,
 		},
 		encoding: 'utf8',
 	})
