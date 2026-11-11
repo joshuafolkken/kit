@@ -25,7 +25,7 @@ Measured on 2026-11-11 (pnpm 12.17.0, Node 26.12.1, macOS arm64; median of 15 `<
 | eslint   | 139 ms      | 82 ms                    | 76 ms              |
 | cspell   | 265 ms      | 208 ms                   | —                  |
 
-The wrapper costs about 55–65 ms per launch, not the 0.3–0.5 s once estimated, and leaves one pnpm process alive per running tool.
+The wrapper costs about 50–65 ms per launch, not the 0.3–0.5 s once estimated, and leaves one pnpm process alive per running tool.
 
 What `pnpm exec` adds over a direct launch, and what that loses:
 
