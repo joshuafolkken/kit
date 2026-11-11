@@ -4,6 +4,8 @@
 // checks from these; a reader that needs only a name imports this leaf.
 
 const LINT_LABEL = 'lint'
+// The `josh` command `check:related` lints with, whose green also writes the gate's `lint` record.
+const LINT_TARGET = 'lint:related'
 const TYPE_CHECK_LABEL = 'check'
 // The `josh` command the gate's type check runs, shared with `check:related` so the scoped check runs the same one.
 const TYPE_CHECK_TARGET = 'check'
@@ -33,6 +35,7 @@ const gate_labels = {
 	EXPORTS_LABEL,
 	KEEP_WHOLE_SUITE_FLAG,
 	LINT_LABEL,
+	LINT_TARGET,
 	LOCKFILE_LABEL,
 	METRICS_LABEL,
 	SPELL_CHECK_LABEL,
