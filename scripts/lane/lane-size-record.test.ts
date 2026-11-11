@@ -29,13 +29,14 @@ beforeEach(() => {
 })
 
 describe('lane_size_record.record', () => {
-	it('records declared and measured non-test size before merging', async () => {
+	it('records declared and measured non-test size before merging, past the bar as missed', async () => {
 		await lane_size_record.record(true, '5384')
 
 		expect(lane_ledger_write.record_size).toHaveBeenCalledWith({
 			issue: 5384,
 			declared: { files: 7, lines: 160 },
 			actual: { files: 12, lines: 300 },
+			missed: true,
 		})
 	})
 
@@ -65,5 +66,22 @@ describe('lane_size_record.record', () => {
 
 		await expect(lane_size_record.record(true, '5384')).resolves.toBeUndefined()
 		expect(lane_ledger_write.record_size).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#7183: only a diff past the split notice bar is a pre-split miss.
+describe('lane_size_record.record within the bar', () => {
+	it('records a diff within the bar as not missed', async () => {
+		vi.mocked(split_measure.read_branch).mockResolvedValue({
+			files: 7,
+			lines: 160,
+			verdict: 'single',
+		})
+
+		await lane_size_record.record(true, '5384')
+
+		expect(lane_ledger_write.record_size).toHaveBeenCalledWith(
+			expect.objectContaining({ missed: false }),
+		)
 	})
 })

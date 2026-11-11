@@ -26,14 +26,14 @@ describe('split-assessment.md points to the split:assess command', () => {
 // joshuafolkken/kit#4302: the steps a run takes on the pre-gate notice live in one section, and the
 // notice points at exactly that heading.
 describe('split-assessment.md carries the pre-gate notice steps', () => {
-	// joshuafolkken/kit#6602: size alone warns; only an independent requirement re-splits.
-	it('treats the notice as a warning and keeps the independent-requirement split', () => {
+	// joshuafolkken/kit#7183: a dispatched lane is finished; a found requirement is an observation.
+	it('finishes a dispatched lane and records an overrun as a pre-split miss', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
 		expect(document).toContain(`## ${split_assess.NOTICE_SECTION}`)
-		expect(document).toContain('The notice is a warning, not a stop')
-		expect(document).toContain('Split again only for an independent added requirement')
-		expect(document).toContain('pnpm josh issue:file --route split --found-during <N>')
+		expect(document).toContain('A dispatched lane is never split')
+		expect(document).toContain('file it as an observation, without `--route split`')
+		expect(document).toContain('recorded as a pre-split miss')
 		expect(document).toContain(
 			'The quality gates, the clash and unread checks, and the review stay stops',
 		)
@@ -49,19 +49,20 @@ describe('split-assessment.md carries the pre-gate notice steps', () => {
 		expect(document).toContain('never splits, spills or stops for size')
 	})
 
+	it('tells a backlogrun child to finish rather than split itself', () => {
+		const document = read_repo_file(`${WORKFLOW_COMMANDS}/backlogrun-park.md`)
+		const section = document.split('## Splitting a child mid-run', 2)[1]?.split('\n## ', 1)[0] ?? ''
+
+		expect(section).toContain('A dispatched child is never split')
+		expect(section).toContain('without\n`--route split`')
+	})
+
 	it('leaves no mid-implementation split or spill guidance in the other workflow documents', () => {
 		const guided = readdirSync(package_file(WORKFLOW_COMMANDS)).filter((name) =>
 			/split notice|issue:spill/u.test(read_repo_file(`${WORKFLOW_COMMANDS}/${name}`)),
 		)
 
 		expect(guided).toEqual([])
-	})
-
-	it('lets one verified deliverable answer the notice without a child (ac-75da8719)', () => {
-		const document = read_repo_file(SPLIT_ASSESSMENT)
-
-		expect(document).toContain('One verified deliverable (every ship-draft acceptance row')
-		expect(document).toContain('scripts/split/split-verified-single.ts')
 	})
 })
 
@@ -87,7 +88,9 @@ describe('split-assessment.md states the lane:plan growth bar', () => {
 	it('points one deliverable past any axis at --single and a re-plan at a warning', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
-		expect(document).toContain('`--single` or a re-plan → `size warning` (`lane-plan-size.ts`)')
+		expect(document).toContain(
+			'`--single`, a re-plan or a dispatched lane → `size warning` (`lane-plan-size.ts`)',
+		)
 	})
 })
 

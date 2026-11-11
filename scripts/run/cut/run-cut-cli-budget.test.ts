@@ -2,12 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { run_cut_cli } from './run-cut-cli'
 import { run_cut_cli_fixture } from './run-cut-cli-fixture'
 
-const { CONTEXT_UNDER, ISSUE, printed_errors, session_verdict, split_warning, verdict } =
-	run_cut_cli_fixture
+const { CONTEXT_UNDER, ISSUE, printed_errors, session_verdict, verdict } = run_cut_cli_fixture
 
 run_cut_cli_fixture.install()
-
-const NOTE = 'size warning: got the split notice — not a stop'
 
 // joshuafolkken/kit#7010: a started Issue is implemented to the end — an implementation past its stage
 // budget is neither spilled nor shipped part-way; the overrun stays in `lane:stats` / `lane:breakdown`,
@@ -26,14 +23,5 @@ describe('the pre-gate cut of an implementation over its budget', () => {
 
 		expect(await run_cut_cli.run([ISSUE])).toBe(0)
 		expect(verdict()).toBe(run_cut_cli.UNDER_THRESHOLD_VERDICT)
-	})
-
-	it('cuts past an unanswered split notice, which only warns', async () => {
-		split_warning.mockResolvedValue(NOTE)
-
-		await run_cut_cli.run([ISSUE])
-
-		expect(printed_errors()).toContain(NOTE)
-		expect(verdict()).toBe(run_cut_cli.CUT_VERDICT)
 	})
 })

@@ -14,7 +14,6 @@ import { review_record } from '#scripts/review/review-record'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_step_section } from '#scripts/run/run-step-section'
-import { split_resolution } from '#scripts/split/split-resolution'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
 import { run_cut_digest } from './run-cut-digest'
@@ -76,9 +75,6 @@ const is_reviewer = vi.fn<typeof agent_session_role.is_reviewer>().mockReturnVal
 // The stream append a cut makes is spied so the suite writes no event to the real repository; what it
 // pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
 const emit = vi.fn<typeof run_event_stream_emit.emit>()
-// The split notice's warning is read off the repository's own lane ledger; a case that got the notice
-// says so (joshuafolkken/kit#4695, joshuafolkken/kit#6602).
-const split_warning = vi.fn<typeof split_resolution.ledger_warning>()
 // The review round a cut must not drop is read off the repository's own attestation and ledger; no
 // round is attested unless a case says so (joshuafolkken/kit#4868).
 const is_attested_on = vi.fn<typeof review_attest.is_attested_on>()
@@ -105,7 +101,6 @@ function attach_run_spies(): void {
 }
 
 function attach_review_spies(): void {
-	vi.spyOn(split_resolution, 'ledger_warning').mockImplementation(split_warning)
 	vi.spyOn(review_attest, 'is_attested_on').mockImplementation(is_attested_on)
 	vi.spyOn(review_record, 'check').mockImplementation(record_check)
 	vi.spyOn(run_cut_digest, 'own_digest').mockImplementation(own_digest)
@@ -160,7 +155,6 @@ function write_handoffs(): void {
 }
 
 function reset_review(): void {
-	split_warning.mockResolvedValue(undefined)
 	is_attested_on.mockReturnValue(false)
 	record_check.mockResolvedValue({ status: 'not-required' })
 }
@@ -217,7 +211,6 @@ const run_cut_cli_fixture = {
 	is_reviewer,
 	launch,
 	session_verdict,
-	split_warning,
 	is_attested_on,
 	record_check,
 	own_digest,

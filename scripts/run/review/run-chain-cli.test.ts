@@ -1,6 +1,6 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
-import { split_resolution } from '#scripts/split/split-resolution'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
 
@@ -9,8 +9,6 @@ const josh_run_mock = vi.hoisted(() =>
 )
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
-
-const SPLIT_WARNING = 'size warning: split notice unanswered'
 
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
@@ -43,7 +41,6 @@ beforeEach(() => {
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
-	vi.spyOn(split_resolution, 'ledger_warning').mockResolvedValue(undefined)
 	info_lines.length = 0
 	error_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
@@ -112,22 +109,15 @@ describe('run_chain_cli.run — main:merge', () => {
 		)
 	})
 
-	it('goes on past main:merge to the review stages on an unanswered split notice', async () => {
-		vi.mocked(split_resolution.ledger_warning).mockResolvedValue(SPLIT_WARNING)
+	// joshuafolkken/kit#7183: `lane:plan` warned once, so the chain reads no split notice and repeats none.
+	it('goes on past main:merge to the review stages without repeating a size notice', async () => {
+		const target = vi.spyOn(lane_ledger, 'target')
 
 		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(0)
 
 		expect(ran()).toStrictEqual(MAIN_LINE)
-		expect(error_lines.join('\n')).not.toContain('stopped at main:merge')
-	})
-
-	it('still stops on a red quality stage when a split notice stands', async () => {
-		vi.mocked(split_resolution.ledger_warning).mockResolvedValue(SPLIT_WARNING)
-		stop_at(CHECK_RELATED)
-
-		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(1)
-
-		expect(ran()).toStrictEqual([[MAIN_MERGE], [SELFCHECK], [CHECK_RELATED]])
+		expect(target).not.toHaveBeenCalled()
+		expect(error_lines.join('\n')).not.toMatch(/size warning|split notice/u)
 	})
 })
 

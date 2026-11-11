@@ -1,7 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { issue_declared_size } from '#scripts/issue/issue-declared-size'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import {
 	lane_ledger,
 	type LedgerEntry,
@@ -10,16 +10,33 @@ import {
 } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { error_text } from '#scripts/lib/error-message'
-import { split_assess, type DeclaredSize } from './split-assess'
-import { split_measure } from './split-measure'
-import { split_verified_single } from './split-verified-single'
+import { split_assess } from './split-assess'
 
-// A split child answers a notice, or a fresh measurement falls under its bar. The child is recorded
-// as the filing lands (joshuafolkken/kit#6212); one verified deliverable with nothing left to split
-// answers it too (`split-verified-single.ts`). An unanswered notice is a warning the later steps print,
-// never a stop: size alone does not re-split a started Issue (joshuafolkken/kit#6602).
+// A split child answers a notice; the child is recorded as the filing lands (joshuafolkken/kit#6212).
+// A started lane is never split (joshuafolkken/kit#7183): its own `--route split --found-during` is
+// refused, and an overrun is recorded at its merge as a pre-split miss (`lane-size-record.ts`).
 
 const NOTICE_SECTION = `split-assessment.md → "${split_assess.NOTICE_SECTION}"`
+
+interface SplitArguments {
+	route: string | undefined
+	found_during: string | undefined
+}
+
+// Whether the filing is not a split of the dispatched lane it is filed from; a refusal is printed. An
+// independent new requirement found in the lane is filed as an observation instead. An omitted
+// `--found-during` is the lane's own, as `issue_file_fold.finder` reads it.
+function is_split_clear({ route, found_during }: SplitArguments): boolean {
+	const marked = lane_child_marker.marked_issue()
+	const finder = found_during ?? marked
+
+	if (route !== SPLIT_ROUTE_LABEL || finder === undefined || finder !== marked) return true
+	console.error(
+		`refused: ${session_cite.issue(finder)} is a dispatched lane, which is never split — finish it; file an independent new requirement without \`--route split\` (${NOTICE_SECTION}).`,
+	)
+
+	return false
+}
 
 function is_notice(entry: LedgerEntry): entry is SplitNoticeEntry {
 	return entry.kind === lane_ledger.KIND.SPLIT_NOTICE
@@ -37,57 +54,6 @@ function notices(entries: ReadonlyArray<LedgerEntry>): ReadonlyArray<SplitNotice
 // The Issues whose lane filed a split child.
 function split_issues(entries: ReadonlyArray<LedgerEntry>): ReadonlySet<number> {
 	return new Set(entries.filter((entry) => is_split_child(entry)).map((entry) => entry.issue))
-}
-
-function warning_text(notice: SplitNoticeEntry): string {
-	const counted = `${String(notice.files)} file(s), ${String(notice.lines)} line(s), tests excluded`
-	const action = `go on; file a split child with \`pnpm josh issue:file --route split --found-during ${String(notice.issue)}\` only for an independent added requirement or scope growth this Issue cannot verify`
-
-	return `size warning: ${session_cite.issue(notice.issue)} got the split notice (${counted}) — not a stop. ${action} — ${NOTICE_SECTION}`
-}
-
-// The warning for a noticed Issue without a split child, else `undefined`; no GitHub read is needed.
-async function warning(
-	issue: number,
-	entries: ReadonlyArray<LedgerEntry>,
-): Promise<string | undefined> {
-	const notice = notices(entries).findLast((entry) => entry.issue === issue)
-
-	if (notice === undefined || split_issues(entries).has(issue)) return undefined
-
-	return warning_text(notice)
-}
-
-// The Issue's declared size, or none when its body cannot be read — the bar is then the guide.
-async function declared_of(issue: number): Promise<DeclaredSize | undefined> {
-	try {
-		return await issue_declared_size.read(String(issue))
-	} catch {
-		return undefined
-	}
-}
-
-// Whether the branch still passes the notice bar; a failed measurement keeps the notice.
-async function is_still_over(issue: number): Promise<boolean> {
-	try {
-		const measurement = await split_measure.read_branch()
-
-		return split_assess.notice(measurement, await declared_of(issue)) !== undefined
-	} catch {
-		return true
-	}
-}
-
-// The warning against this repository's lane ledger; outside a repository there is none to read. A
-// notice still over its bar stands unless the work is one verified deliverable (joshuafolkken/kit#6572).
-async function ledger_warning(issue: number): Promise<string | undefined> {
-	const ledger = await lane_ledger.target()
-	const note =
-		ledger === undefined ? undefined : await warning(issue, lane_ledger.read_entries(ledger))
-
-	if (note === undefined || !(await is_still_over(issue))) return undefined
-
-	return (await split_verified_single.verified(issue)) ? undefined : note
 }
 
 interface Filing {
@@ -133,12 +99,11 @@ async function record_fold({ origin, target }: Fold): Promise<void> {
 }
 
 const split_resolution = {
-	ledger_warning,
+	is_split_clear,
 	notices,
 	record_child,
 	record_fold,
 	split_issues,
-	warning,
 }
 
 export { split_resolution }
