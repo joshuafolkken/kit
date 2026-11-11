@@ -6,6 +6,18 @@ const FENCE = '```'
 const AFTER_FENCE = 'after the fence'
 const FENCED_HEADING_BODY = [HEADING, '', '```md', '## Example', FENCE, '', AFTER_FENCE].join('\n')
 
+describe('markdown_section in either body language', () => {
+	const ENGLISH_BODY = '## Background\n- Type: non-defect'
+
+	it('reads a section written in the other language', () => {
+		expect(markdown_section.section_lines(ENGLISH_BODY, '## 背景')).toEqual(['- 種別: 非不具合'])
+	})
+
+	it('keeps the filer text in the lines a writer rebuilds', () => {
+		expect(markdown_section.lines_of(ENGLISH_BODY)).toEqual(ENGLISH_BODY.split('\n'))
+	})
+})
+
 describe('markdown_section.section_lines', () => {
 	it('returns the lines under the heading up to the next heading', () => {
 		const body = ['## Before', 'x', HEADING, 'inside', '## After', 'outside'].join('\n')
