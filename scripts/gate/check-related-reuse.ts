@@ -4,6 +4,8 @@ import { gate_labels } from './gate-labels'
 import type { GateStepResult } from './gate-report'
 import { gate_tree, type GateTree } from './gate-tree'
 import { scoped_green } from './scoped-green'
+import { since_green } from './since-green'
+import { verification_inputs } from './verification-inputs'
 
 // **`check:related` runs only the checks whose green record no longer holds** (joshuafolkken/kit#5156):
 // a re-run after fixing one failure ran the three that had passed over again, minutes of a hub-file
@@ -19,6 +21,12 @@ import { scoped_green } from './scoped-green'
 // `lint:related` green does not vouch for the gate's either: the gate lints the whole tree in CI and on
 // a changed lint configuration (`lint-gate-scope.ts`), where `lint:related` stays on the changed files,
 // and the gate records only a pass with nothing to say (`check-reuse.ts`).
+//
+// **A `lint:related` green that does vouch for the gate's lint writes its record** (joshuafolkken/kit#7251),
+// so ship's gate after its sync does not lint the same tree again. It vouches when it read the whole
+// branch change itself — a since-green run leans on an earlier run whose warnings this output does not
+// repeat — on a tree with no lint configuration changed, and said nothing (`check-reuse.ts`). The
+// direction stays one way: a gate green is still no `lint:related` green.
 
 const GATE_LABELS: ReadonlyMap<string, string> = new Map([
 	[gate_labels.TYPE_CHECK_TARGET, gate_labels.TYPE_CHECK_LABEL],
@@ -43,19 +51,30 @@ async function reusable(
 	return new Set(commands.filter((command) => scoped.has(command) || gate.has(gate_label(command))))
 }
 
-function gate_results(results: ReadonlyArray<CheckResult>): Array<GateStepResult> {
-	return results
-		.filter((result) => GATE_LABELS.has(result.command))
-		.map((result) => ({ ...result, label: gate_label(result.command), elapsed_ms: 0 }))
+function vouches_for_gate_lint(result: CheckResult, tree: GateTree): boolean {
+	if (result.command !== gate_labels.LINT_TARGET || since_green.is_narrowed(result.output)) {
+		return false
+	}
+
+	return !verification_inputs.configures(gate_labels.LINT_LABEL, Object.keys(tree.files))
 }
 
-// Records the green type check and cspell against `tree`, the tree read before they started.
+function gate_results(results: ReadonlyArray<CheckResult>, tree: GateTree): Array<GateStepResult> {
+	const shared = results.filter((result) => GATE_LABELS.has(result.command))
+	const steps = shared.map((result) => ({ ...result, label: gate_label(result.command) }))
+	const lint = results.filter((result) => vouches_for_gate_lint(result, tree))
+	const lint_steps = lint.map((result) => ({ ...result, label: gate_labels.LINT_LABEL }))
+
+	return [...steps, ...lint_steps].map((step) => ({ ...step, elapsed_ms: 0 }))
+}
+
+// Records the green type check, cspell and a vouching lint against `tree`, the tree read before they started.
 async function record(
 	results: ReadonlyArray<CheckResult>,
 	tree: GateTree,
 	records: CheckRecords = check_reuse.DEFAULT_RECORDS,
 ): Promise<void> {
-	await check_reuse.record_green_checks(gate_results(results), tree, records)
+	await check_reuse.record_green_checks(gate_results(results, tree), tree, records)
 }
 
 // A tree git could not read is one with no answer, so nothing is reused and every check runs.

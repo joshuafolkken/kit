@@ -5,6 +5,7 @@ import { check_reuse, type CheckRecords } from './check-reuse'
 import { gate_labels } from './gate-labels'
 import { gate_tree, type GateTree } from './gate-tree'
 import { scoped_green } from './scoped-green'
+import { since_green } from './since-green'
 
 // joshuafolkken/kit#5156: `check:related` read neither green record, so a re-run after fixing one
 // check ran the three that had passed over again.
@@ -88,8 +89,19 @@ describe('check_related_reuse.read_tree', () => {
 	})
 })
 
-function result(command: string, exit_code = 0): CheckResult {
-	return { command, exit_code, output: '' }
+function result(command: string, exit_code = 0, output = ''): CheckResult {
+	return { command, exit_code, output }
+}
+
+async function recorded_labels(
+	results: ReadonlyArray<CheckResult>,
+	tree: GateTree = TREE,
+): Promise<Array<string>> {
+	const record = vi.spyOn(check_reuse, 'record_green_checks').mockResolvedValue()
+
+	await check_related_reuse.record(results, tree, RECORDS)
+
+	return (record.mock.calls[0]?.[0] ?? []).map((step) => step.label)
 }
 
 describe('check_related_reuse.record', () => {
@@ -97,7 +109,7 @@ describe('check_related_reuse.record', () => {
 		vi.restoreAllMocks()
 	})
 
-	it('hands the type check and cspell to the gate records under the gate labels', async () => {
+	it('hands the type check, cspell and lint to the gate records under the gate labels', async () => {
 		const record = vi.spyOn(check_reuse, 'record_green_checks').mockResolvedValue()
 
 		await check_related_reuse.record(
@@ -110,9 +122,26 @@ describe('check_related_reuse.record', () => {
 			[
 				{ ...result(TYPE_CHECK), label: TYPE_CHECK_LABEL, elapsed_ms: 0 },
 				{ ...result(CSPELL, 1), label: SPELL_CHECK_LABEL, elapsed_ms: 0 },
+				{ ...result(LINT), label: gate_labels.LINT_LABEL, elapsed_ms: 0 },
 			],
 			TREE,
 			RECORDS,
 		)
+	})
+
+	// joshuafolkken/kit#7251: a since-green run leans on an earlier run whose warnings it does not repeat.
+	it('does not record the gate lint from a lint:related run narrowed since its last green run', async () => {
+		const narrowed = since_green.describe('josh lint:related', [SOURCE])
+		const unmoved = `josh lint:related: ${since_green.UNMOVED_REASON}`
+
+		await expect(recorded_labels([result(LINT, 0, narrowed)])).resolves.toStrictEqual([])
+		vi.restoreAllMocks()
+		await expect(recorded_labels([result(LINT, 0, unmoved)])).resolves.toStrictEqual([])
+	})
+
+	it('does not record the gate lint when the change configures lint, as the gate lints the whole tree', async () => {
+		const configured: GateTree = { files: { 'eslint.config.js': 'digest-c' }, base: 'base-a' }
+
+		await expect(recorded_labels([result(LINT)], configured)).resolves.toStrictEqual([])
 	})
 })
