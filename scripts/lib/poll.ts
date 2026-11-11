@@ -45,8 +45,9 @@ const PR_POLL_SCHEDULES = {
 		factor: 1,
 		max_ms: 20_000,
 	},
-	// A merge lands soon after the checks pass, so its wait starts fine and keeps a low cap.
-	merge: { initial_ms: 10_000, factor: 1.5, max_ms: 30_000 },
+	// A merge lands soon after the checks pass, so its wait starts fine and keeps a low cap that
+	// bounds the delay between the merge landing and its detection (joshuafolkken/kit#7237).
+	merge: { initial_ms: 10_000, factor: 1.5, max_ms: 15_000 },
 } satisfies Record<string, BackoffSchedule>
 
 interface PollBackoff {
