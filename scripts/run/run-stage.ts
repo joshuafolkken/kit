@@ -30,10 +30,13 @@ const HALFRUN_STOPPED = 'halfrun-stopped'
 const PRRUN_STOPPED = 'prrun-stopped'
 const MERGED = 'merged'
 const PR_OPEN = 'pr-open'
+const PR_RETURNED = 'pr-returned'
 
-// Ranked states have completed that many rungs. An unverified open PR resumes at the gate.
+// Ranked states have completed that many rungs. An unverified open PR resumes at the gate; one
+// returned for a fix — a red required check, or a person's comment since the run's last one — resumes
+// at implementation (`run-pr-return.ts`).
 const RANKED_STATES = [FRESH, PLANNED, HALFRUN_STOPPED, PRRUN_STOPPED, MERGED] as const
-const STATES = [...RANKED_STATES, PR_OPEN] as const
+const STATES = [...RANKED_STATES, PR_OPEN, PR_RETURNED] as const
 
 type StageState = (typeof STATES)[number]
 
@@ -48,6 +51,7 @@ const STARTS: Readonly<Record<StageState, string>> = {
 	[PRRUN_STOPPED]: 'followup',
 	[MERGED]: REACHED,
 	[PR_OPEN]: 'gate',
+	[PR_RETURNED]: 'implement',
 }
 
 // Every start a decision can print, in ladder order — the `run:entry` oracle's vocabulary.
@@ -97,7 +101,7 @@ function state_of(facts: StageFacts): StageState {
 }
 
 function decide(state: StageState, command: StageCommand): StageDecision {
-	const ranked_state = state === PR_OPEN ? PLANNED : state
+	const ranked_state = state === PR_OPEN || state === PR_RETURNED ? PLANNED : state
 	const is_reached = RANKED_STATES.indexOf(ranked_state) > COMMANDS.indexOf(command)
 	const start = is_reached ? REACHED : STARTS[state]
 
@@ -151,6 +155,7 @@ const run_stage = {
 	MERGED,
 	PLANNED,
 	PR_OPEN,
+	PR_RETURNED,
 	PRRUN,
 	PRRUN_STOPPED,
 	REACHED,

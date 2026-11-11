@@ -3,6 +3,7 @@ import { issue_state } from '#scripts/issue/issue-state'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_open_pr } from './run-open-pr'
+import { run_pr_return } from './run-pr-return'
 import { run_prrun_resume, type PrrunToken } from './run-prrun-resume'
 import { run_stage, type StageState } from './run-stage'
 
@@ -21,6 +22,29 @@ interface StageRead {
 	// The `prrun` stop's resume token, kept so the entry acts on it without reading the pull request
 	// again; `undefined` when no `prrun` stop is recorded for the issue.
 	prrun_token: PrrunToken | undefined
+	// What returned an open pull request for a fix, printed under the stage line; absent otherwise.
+	returned?: string
+}
+
+// The text naming what returned the pull request. A read that fails (a gh or API error) answers
+// `undefined` with a warning — the entry goes on to the gate, where `followup` still refuses a red merge.
+async function read_returned(issue: string): Promise<string | undefined> {
+	try {
+		return run_pr_return.format(await run_pr_return.read(issue))
+	} catch (error) {
+		console.warn(`pr-returned check skipped, resuming at the gate: ${String(error)}`)
+
+		return undefined
+	}
+}
+
+// An open pull request returned for a fix resumes at implementation, any other at the gate.
+async function read_open_pr(issue: string): Promise<Omit<StageRead, 'prrun_token'>> {
+	const returned = await read_returned(issue)
+
+	return returned === undefined
+		? { state: run_stage.PR_OPEN }
+		: { state: run_stage.PR_RETURNED, returned }
 }
 
 function is_closed(read: StateRead): boolean {
@@ -55,9 +79,11 @@ async function read_stage(issue: string): Promise<StageRead> {
 	})
 
 	const has_pr = state === run_stage.FRESH || state === run_stage.PLANNED
-	const selected = has_pr && (await run_open_pr.is_pending(issue)) ? run_stage.PR_OPEN : state
+	const is_open_pr = has_pr && (await run_open_pr.is_pending(issue))
 
-	return { state: selected, prrun_token: stop.prrun_token }
+	if (!is_open_pr) return { state, prrun_token: stop.prrun_token }
+
+	return { ...(await read_open_pr(issue)), prrun_token: stop.prrun_token }
 }
 
 const run_stage_read = { read_stage }

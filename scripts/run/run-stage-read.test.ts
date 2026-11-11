@@ -5,6 +5,7 @@ const is_pending_mock = vi.hoisted(() => vi.fn())
 const prrun_token_mock = vi.hoisted(() => vi.fn())
 const open_pr_mock = vi.hoisted(() => vi.fn())
 const read_plan_mock = vi.hoisted(() => vi.fn())
+const pr_return_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -12,6 +13,11 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 vi.mock('./run-halfrun-resume', () => ({ run_halfrun_resume: { is_pending: is_pending_mock } }))
 vi.mock('./run-prrun-resume', () => ({ run_prrun_resume: { resume_token: prrun_token_mock } }))
 vi.mock('./run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
+vi.mock(import('./run-pr-return'), async (import_original) => {
+	const actual = await import_original()
+
+	return { run_pr_return: { ...actual.run_pr_return, read: pr_return_mock } }
+})
 vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { read_plan: read_plan_mock },
 }))
@@ -32,6 +38,7 @@ beforeEach(() => {
 	prrun_token_mock.mockReset().mockResolvedValue(undefined)
 	open_pr_mock.mockReset().mockResolvedValue(false)
 	read_plan_mock.mockReset().mockResolvedValue(undefined)
+	pr_return_mock.mockReset().mockResolvedValue({ red_checks: [], comments: [] })
 })
 
 // joshuafolkken/kit#5700: a fullrun lane's `issue:plan` posts the plan comment without `run:planned`, so
@@ -68,6 +75,20 @@ describe('run_stage_read.read_stage — an existing fullrun pull request', () =>
 		expect(read.state).toBe(run_stage.PR_OPEN)
 		expect(run_stage.decide(read.state, 'fullrun').start).toBe('gate')
 		expect(read.prrun_token).toBeUndefined()
+		expect(read.returned).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#7313: a red pull request dispatched back resumed at the gate and shipped unfixed.
+	it('resumes an open pull request with a red required check at implementation, naming it', async () => {
+		read_issue_mock.mockResolvedValue(open_with([]))
+		open_pr_mock.mockResolvedValue(true)
+		pr_return_mock.mockResolvedValue({ red_checks: ['CI / test'], comments: [] })
+
+		const read = await run_stage_read.read_stage(ISSUE)
+
+		expect(read.state).toBe(run_stage.PR_RETURNED)
+		expect(run_stage.decide(read.state, 'fullrun').start).toBe('implement')
+		expect(read.returned).toContain('red required check: CI / test')
 	})
 
 	it('keeps an explicit halfrun stop without reading another pull request', async () => {
@@ -78,6 +99,24 @@ describe('run_stage_read.read_stage — an existing fullrun pull request', () =>
 
 		expect(read.state).toBe(run_stage.HALFRUN_STOPPED)
 		expect(open_pr_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_stage_read.read_stage — a returned-for-fix read that fails', () => {
+	const FAILURE = 'gh unavailable'
+
+	it('resumes at the gate with a warning rather than stopping the entry', async () => {
+		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		read_issue_mock.mockResolvedValue(open_with([]))
+		open_pr_mock.mockResolvedValue(true)
+		pr_return_mock.mockRejectedValue(new Error(FAILURE))
+
+		const read = await run_stage_read.read_stage(ISSUE)
+
+		expect(read.state).toBe(run_stage.PR_OPEN)
+		expect(read.returned).toBeUndefined()
+		expect(warn_spy).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(FAILURE))
 	})
 })
 

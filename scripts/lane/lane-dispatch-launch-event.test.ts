@@ -56,6 +56,7 @@ beforeEach(() => {
 		output: LOG_PATH,
 	})
 	vi.spyOn(git_gh_command, 'issue_apply_label').mockResolvedValue({ is_applied: true })
+	vi.spyOn(git_gh_command, 'issue_clear_label').mockResolvedValue(true)
 	vi.spyOn(run_label, 'unmark').mockResolvedValue(true)
 	emit.mockResolvedValue(undefined)
 })

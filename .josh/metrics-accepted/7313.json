@@ -1,0 +1,8 @@
+{
+	"reason": "Round-2 fixes: a failed returned-for-fix read falls back to the gate with a warning (+8 lines with its test)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 104,
+		"ai_cost.on_demand_bytes": 95
+	}
+}
