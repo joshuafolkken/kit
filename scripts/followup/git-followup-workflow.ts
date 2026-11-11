@@ -183,7 +183,8 @@ async function assert_merge_gates(
 // checked out, then a line appended since the run's commit rides the pull request
 // itself, so it merges with it — a lane's included. **A pull request that has
 // already merged skips both**: the gates guard a merge this run no longer
-// makes, and a ledger commit would land on a branch that has already gone in.
+// makes, and a ledger commit would land on a branch that has already gone in. The human-merge stop
+// is not here: it waits for green CI in `before_merge`, so a red workflow PR fails as red.
 async function prepare_merge(
 	plan: MergePlan,
 	issue_number: string | undefined,
@@ -191,7 +192,6 @@ async function prepare_merge(
 ): Promise<void> {
 	if (plan.is_merged) return
 
-	if (plan.should_merge) await followup_human_merge.assert_allowed(branch_name, issue_number)
 	await assert_merge_gates(plan.should_merge, issue_number, branch_name)
 	if (is_valid_issue(issue_number)) await lane_size_record.record(plan.should_merge, issue_number)
 	await git_followup_flush.commit_ledger_step(plan.should_merge, issue_number)

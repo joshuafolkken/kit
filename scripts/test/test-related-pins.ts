@@ -1,12 +1,15 @@
 // **A change to the josh command registry always runs the registry's own tests** (joshuafolkken/kit#5642):
 // a command-table file reaches hundreds of tests, so the cap (`test-related-cap.ts`) and the touched scope
 // (`test-related-touched.ts`) both drop `josh-logic.test.ts`'s ALIASES and the command-map checks, and a
-// command added without an alias first failed in CI. The pin adds them back, and followup's unrelated-failure
-// verdict (`followup-failed-tests.ts`) counts a pinned test's failure as the change's own.
+// command added without an alias first failed in CI. `josh-in-process.test.ts` reads every table's scripts
+// off `COMMAND_MAP` rather than importing them, so a command added without the canonical main guard failed in
+// CI the same way (joshuafolkken/kit#7314). The pin adds them back, and followup's unrelated-failure verdict
+// (`followup-failed-tests.ts`) counts a pinned test's failure as the change's own.
 
 const REGISTRY_TESTS: ReadonlyArray<string> = [
 	'scripts/josh/josh-logic.test.ts',
 	'scripts/josh/josh-command-map.test.ts',
+	'scripts/josh/josh-in-process.test.ts',
 ]
 const REGISTRY_SOURCE =
 	/^scripts\/josh\/(?:josh-commands-[\w-]+|josh-aliases|josh-command-map)\.ts$/u

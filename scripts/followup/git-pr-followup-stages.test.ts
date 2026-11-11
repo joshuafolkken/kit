@@ -111,6 +111,7 @@ const BASE_INPUT: FollowupInput = {
 	ai_review_ignore_reason: undefined,
 	is_skip_watch: true,
 	should_merge: false,
+	before_merge: vi.fn(async () => undefined),
 }
 
 function answer_github_reads(): void {
@@ -195,13 +196,14 @@ describe('git_pr_followup.run — the CI wait in the lane ledger', () => {
 		])
 	})
 
-	it('records nothing for a run that failed before its wait finished', async () => {
+	it('records nothing and stops no merge for a run that failed before its wait finished', async () => {
 		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 
 		vi.mocked(git_pr_checks.wait_for_pr_success).mockRejectedValue(new Error('checks failed'))
 
 		await expect(git_pr_followup.run({ ...BASE_INPUT, should_merge: true })).rejects.toThrow()
-		expect(record).not.toHaveBeenCalled()
+		// joshuafolkken/kit#7312: nor the human-merge guard, so a red workflow PR fails as red.
+		for (const spy of [record, BASE_INPUT.before_merge]) expect(spy).not.toHaveBeenCalled()
 	})
 })
 
