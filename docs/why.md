@@ -185,7 +185,7 @@ You let the agent file what it notices along the way, and three Issues say the s
 
 **Every filing checks the existing Issues for a duplicate first.** A duplicate is folded into the existing Issue instead of filed, and a related epic takes it in. A filing that skips the check is stopped on the spot.
 
-When more than 30 Issues are open, nothing new is filed until one is closed. If nothing can honestly be closed, the filing is dropped. The only exceptions are a filing the work itself needs, and an interrupt such as a verification giving a wrong answer or data being lost.
+When more than 30 Issues are open (the default, which a repository can change or turn off), nothing new is filed until one is closed. If nothing can honestly be closed, the filing is dropped. The only exceptions are a filing the work itself needs, and an interrupt such as a verification giving a wrong answer or data being lost.
 
 ## Writing TypeScript
 
