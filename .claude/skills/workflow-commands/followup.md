@@ -21,10 +21,10 @@ request already merged by hand** (a `prrun` stop) runs only the post-merge tail;
 Issue is not posted twice, so re-running is safe. Keep the default Issue target. Ignore a finding only
 after verifying it is inapplicable; rate-limit text is not a finding.
 
-**A PR changing `.github/workflows/**` waits for a human merge**, including additions, deletions and
-either side of a rename. `followup` leaves it open, labels its Issue `needs-human-merge`, prints the
-PR URL and exits successfully without a completion report. Read the diff on GitHub and merge there;
-`--merge` cannot bypass this stop. Re-run `followup` after the manual merge to finish the tail.
+**A PR changing `.github/workflows/**` (adds, deletes, either side of a rename) waits for a human
+merge.** Once CI is green, `followup` leaves it open, labels its Issue `needs-human-merge`, prints the
+PR URL and exits 0 with no completion report; red CI fails as usual. Read the diff on GitHub and merge
+there; `--merge` cannot bypass this stop. Re-run `followup` after merging to finish the tail.
 
 **A rate-limited CodeRabbit check is cleared by a retrigger, never a bypass** (Tier C). `followup`
 waits out each window (≤30 min), posts `@coderabbitai review` ≤3 times per PR, then asks for
