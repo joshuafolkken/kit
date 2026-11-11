@@ -21,8 +21,8 @@ interface GateCheck {
 	memory_mb?: number
 	// A check whose `josh` command is kit-only, so a consumer's gate leaves it out rather than running
 	// a command that is not in the published package. It restates the command
-	// entry's own `is_kit_only`, because the command map imports this module; `gate-plan.test.ts` pins
-	// that the two agree.
+	// entry's own `is_kit_only`, because the command map imports this module;
+	// `gate-plan-selection.test.ts` pins that the two agree.
 	is_kit_only?: boolean
 	// A check that reads the whole repository however small the change (joshuafolkken/kit#7030): a lane's
 	// own gate leaves it out, and the ship's gate on the final tree and CI run it.
@@ -59,8 +59,8 @@ const {
 //
 // **The behavior check belongs here, and it reserves no core**. It reads one
 // recorded transcript rather than the tree, so it is I/O-bound and a zero reservation leaves
-// `RESERVED_CORES` and the unit worker cap exactly where the other three were measured. Being a static
-// check rather than one appended after the unit suite is what keeps the plan's shape intact: the
+// `gate-plan.ts`'s `RESERVED_CORES` and the unit worker cap exactly where the other three were
+// measured. Being a static check rather than one appended after the unit suite is what keeps the plan's shape intact: the
 // `--no-unit` set stays "the whole gate minus the unit suite", and a CI runner — which has no recorded
 // transcripts — runs it as a trivial green rather than skipping it.
 //
