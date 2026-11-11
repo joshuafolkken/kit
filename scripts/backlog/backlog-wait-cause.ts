@@ -107,7 +107,7 @@ function numbers_of(causes: WaitCauses): ReadonlyArray<number> {
 	return [...causes.chain, ...causes.gate]
 }
 
-const backlog_wait_cause = { classify, lines_of, numbers_of, parse, tag_of }
+const backlog_wait_cause = { cause_of, classify, lines_of, numbers_of, parse, tag_of }
 
 export type { WaitCauses }
 export { backlog_wait_cause }
