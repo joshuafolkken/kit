@@ -2,11 +2,16 @@ import { agent_headless } from '#scripts/agent/agent-headless'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { HookContext } from '#scripts/hooks/hook-context'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { json_value } from '#scripts/lib/json-value'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_headless } from '#scripts/run/run-headless'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_reported_failure } from '#scripts/time-runtime/time-reported-failure'
+import { z } from 'zod'
 import { bash_triggers } from './bash-triggers'
 import { last_prompt } from './last-prompt'
+import { shell_segments } from './shell-segments'
+import { turn_filings } from './turn-filings'
 
 // The `unasked-filing` row of `delivered-rules.ts` (joshuafolkken/kit#7293). An interactive session
 // files only on the person's instruction; an unattended run files without asking
@@ -25,11 +30,24 @@ const FILING_WORDS: ReadonlyArray<RegExp> = [
 	/起票/u,
 	/issue\s*[に化]/iu,
 	/\bfile (?:an? |the |this |these )?(?:issues?|it|them)\b/iu,
-	// A typed command whose procedure files: a split, a prerequisite, an upstream interrupt, `kickoff new`.
-	/^\/?(?:kickoff|fullrun|backlogrun)\b/iu,
+	// A typed command whose procedure files: a split, a prerequisite, an upstream interrupt, a `new` form.
+	/^\/?(?:kickoff|fullrun|halfrun|prrun|backlogrun)\b/iu,
 ]
 
+// A short yes to the model's own proposal is the confirmation the refusal asks for.
+const AFFIRMATIVE = /^(?:はい|うん|お願い|どうぞ|進めて|yes|ok|okay|sure|please do|go ahead)/iu
+const SHORT_REPLY = 40
+const PROPOSAL = /起票|\bissues?\b/iu
+
+const ASSISTANT_LINE_SCHEMA = z.object({
+	type: z.literal('assistant'),
+	message: z.object({ content: z.unknown() }),
+})
+
 const CHECK_FLAG = /\s--check\b/u
+// A quoted argument (a title) never carries the flag, whatever it spells.
+const QUOTED = /"[^"]*"|'[^']*'/gu
+const FILING_NAMES: ReadonlySet<string> = new Set(['issue:file'])
 
 const UNASKED_FILING_REASON =
 	'⛔ unasked filing: this interactive session files an Issue only on the person’s explicit ' +
@@ -43,9 +61,34 @@ function is_instructed(prompt: string): boolean {
 	return FILING_WORDS.some((pattern) => pattern.test(trimmed))
 }
 
-// The person's last prompt asks for filing — the stand-down that lets an instructed filing through.
+function reply_text(line: string): string {
+	const parsed = ASSISTANT_LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
+
+	return parsed.success ? time_reported_failure.result_text(parsed.data.message.content) : ''
+}
+
+// The model's last words before the person's last prompt — where the proposal a yes confirms sits.
+function reply_before_prompt(tail: string): string {
+	const lines = tail.split('\n')
+	const prompt_at = lines.findLastIndex((line) => turn_filings.is_prompt_line(line))
+	const replies = lines.slice(0, Math.max(prompt_at, 0)).map((line) => reply_text(line))
+
+	return replies.findLast((text) => text !== '') ?? ''
+}
+
+function is_confirmed(prompt: string, tail: string): boolean {
+	const trimmed = prompt.trim()
+	if (trimmed.length > SHORT_REPLY || !AFFIRMATIVE.test(trimmed)) return false
+
+	return PROPOSAL.test(reply_before_prompt(tail))
+}
+
+// The person's last prompt asks for filing, or says yes to a proposed Issue — the stand-down that lets
+// an instructed filing through.
 function is_asked(tail: string): boolean {
-	return is_instructed(last_prompt.person_prompt(tail) ?? '')
+	const prompt = last_prompt.person_prompt(tail) ?? ''
+
+	return is_instructed(prompt) || is_confirmed(prompt, tail)
 }
 
 function is_run_parent(context: HookContext): boolean {
@@ -63,9 +106,16 @@ function is_unattended(context: HookContext): boolean {
 	return lane_child_marker.marked_issue(env) !== undefined || is_run_parent(context)
 }
 
-// `--check` creates nothing, so only a filing that writes is gated.
+function is_writing_segment(segment: string): boolean {
+	if (!shell_segments.is_josh_command(segment, FILING_NAMES)) return false
+
+	return !CHECK_FLAG.test(segment.replaceAll(QUOTED, ''))
+}
+
+// `--check` creates nothing, so only a filing that writes is gated — read per segment, so a checked
+// filing chained before a real one does not let the real one through.
 function is_writing_filing(command: string): boolean {
-	return bash_triggers.is_issue_filing(command) && !CHECK_FLAG.test(command)
+	return shell_segments.segments_of(command).some((segment) => is_writing_segment(segment))
 }
 
 // The command is read first, so a call that files nothing never reads the carry record.

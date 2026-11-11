@@ -25,14 +25,26 @@ const INTERACTIVE = hook_context_fixture.of(WORK_DIRECTORY, {})
 
 const OWNER_PID = 4242
 
-function is_satisfied(content: string): boolean {
-	const tail = JSON.stringify({
+const PROPOSAL_REPLY = 'この不具合を Issue として起票しますか？'
+const OTHER_REPLY = 'テストを追加しました。続けますか？'
+
+function bash_call(command: string): { name: string; input: { command: string } } {
+	return { name: 'Bash', input: { command } }
+}
+
+// A tail of the model's reply (when given) followed by the person's prompt.
+function is_satisfied(content: string, reply = ''): boolean {
+	const answer = JSON.stringify({
+		type: 'assistant',
+		message: { role: 'assistant', content: [{ type: 'text', text: reply }] },
+	})
+	const prompt = JSON.stringify({
 		type: 'user',
 		timestamp: '2026-11-11T00:00:00.000Z',
 		message: { role: 'user', content },
 	})
 
-	return unasked_filing.ROW.already_satisfied(tail)
+	return unasked_filing.ROW.already_satisfied([answer, prompt].join('\n'))
 }
 
 afterEach(() => {
@@ -46,6 +58,16 @@ describe('unasked_filing.is_unasked_filing', () => {
 
 	it('stays silent on --check, which files nothing', () => {
 		expect(unasked_filing.is_unasked_filing(CHECK_CALL, INTERACTIVE)).toBe(false)
+	})
+
+	it.each([
+		['a title spelling --check', 'pnpm josh issue:file "Drop --check flag" --body-file b.md'],
+		[
+			'a checked filing chained before a real one',
+			'pnpm josh issue:file "T" --check && pnpm josh issue:file "T" --body-file b.md',
+		],
+	])('fires on %s', (_name, command) => {
+		expect(unasked_filing.is_unasked_filing(bash_call(command), INTERACTIVE)).toBe(true)
 	})
 
 	it.each([
@@ -76,6 +98,8 @@ describe('unasked_filing.ROW.already_satisfied', () => {
 		'please file an issue for it',
 		'kickoff new',
 		'/fullrun #12',
+		'halfrun new',
+		'prrun new',
 	])('stands down when the person asked: %s', (content) => {
 		expect(is_satisfied(content)).toBe(true)
 	})
@@ -86,6 +110,23 @@ describe('unasked_filing.ROW.already_satisfied', () => {
 			expect(is_satisfied(content)).toBe(false)
 		},
 	)
+
+	it.each(['はい', 'お願いします', 'yes', 'OK'])(
+		'stands down on a yes to a proposed Issue: %s',
+		(content) => {
+			expect(is_satisfied(content, PROPOSAL_REPLY)).toBe(true)
+		},
+	)
+
+	it('holds on a yes to something other than an Issue', () => {
+		expect(is_satisfied('はい', OTHER_REPLY)).toBe(false)
+	})
+})
+
+describe('unasked_filing.ROW.decide', () => {
+	it('refuses every occurrence', () => {
+		expect(unasked_filing.ROW.decide()).toBe(true)
+	})
 })
 
 describe('delivered_rules', () => {
