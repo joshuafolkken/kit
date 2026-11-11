@@ -1,0 +1,7 @@
+{
+	"reason": "version_changed adds the release-bump publish rule to the change-scope classifier (#7292)",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 4
+	}
+}
