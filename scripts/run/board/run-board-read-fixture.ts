@@ -6,7 +6,8 @@ import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended, type EndedRun } from '#scripts/run/carry/run-carry-ended'
-import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { transcript_tail } from '#scripts/time-runtime/transcript-tail'
@@ -63,7 +64,7 @@ function arrange_records(read: CarryRead, ended: EndedRun | undefined): void {
 function arrange(read: CarryRead, ended: EndedRun | undefined): void {
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
 	arrange_records(read, ended)
-	vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, AFTER])
+	vi.spyOn(run_event_tail, 'read_events').mockReturnValue([INSIDE, AFTER])
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([lane('3432')])
 	vi.spyOn(lane_registry, 'main_repository_root').mockResolvedValue(MAIN_ROOT)
 	// The limit is read off the environment and a live run's override: never a real one from a test.

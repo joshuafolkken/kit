@@ -12,6 +12,7 @@ import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_event_tail } from '#scripts/run/event/run-event-tail'
 import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
@@ -345,7 +346,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 
 	if (repository === undefined || span === undefined) return undefined
 
-	const events = run_event_stream.read_events(run_event_stream.target_of(repository))
+	const events = run_event_tail.read_events(run_event_stream.target_of(repository))
 	const lanes = await lane_registry.list_lanes(await main_root())
 	const lane_read = await lanes_here(lanes, repository, events, span.started_ms)
 
