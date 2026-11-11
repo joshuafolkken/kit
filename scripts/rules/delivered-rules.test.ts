@@ -108,11 +108,10 @@ const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PR
 // the disabled list recognizes, so the guard reads as on exactly as it does on a fresh machine.
 beforeEach(() => {
 	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
-	// The lane-child block sets `JOSH_LANE_CHILD`; clearing it here, beside the cwd reset, keeps it from
-	// leaking into any case that runs after — the same reset-before-every-case discipline as the cwd.
+	// The lane-child block and the filing cases set `JOSH_LANE_CHILD` and the headless mark; clearing them
+	// here, beside the cwd reset, keeps them from leaking into any case that runs after. The launcher's
+	// own marks are blanked by the unit environment (joshuafolkken/kit#7309).
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
-	// A kit-launched session carries the headless mark; clearing it runs every case as an interactive
-	// session wherever vitest was launched, so `unasked-filing` reads the same locally and in CI.
 	Reflect.deleteProperty(process.env, agent_headless.KEY)
 	process.chdir(WORK_DIRECTORY)
 })

@@ -1,6 +1,6 @@
 import { agent_headless } from '#scripts/agent/agent-headless'
 import { delivered_rules_harness } from '#tools/rules/delivered-rules-harness'
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import {
 	BODY_READ_COMMAND,
@@ -67,10 +67,6 @@ describe('delivered_rules.delivery — an issue:file call reaches the command', 
 	// these cases run as the kit-launched headless session that files without asking.
 	beforeEach(() => {
 		Object.assign(process.env, agent_headless.environment())
-	})
-
-	afterEach(() => {
-		Reflect.deleteProperty(process.env, agent_headless.KEY)
 	})
 
 	// joshuafolkken/kit#4750: the filing cap counts per originating work item on the event stream, as
