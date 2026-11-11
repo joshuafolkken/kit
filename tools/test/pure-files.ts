@@ -745,7 +745,6 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'scripts/run/cut/run-cut-cli-digest.test.ts',
 	'scripts/run/cut/run-cut-cli-impl.test.ts',
 	'scripts/run/cut/run-cut-cli-section.test.ts',
-	'scripts/run/cut/run-cut-cli-split.test.ts',
 	'scripts/run/cut/run-cut-digest.test.ts',
 	'scripts/run/cut/run-cut-resume.test.ts',
 	'scripts/run/detached-launch-attached-log.test.ts',

@@ -124,10 +124,11 @@ single source of the distinction, the filing, the pause and the ceiling. Then:
 
 ## Splitting a child mid-run
 
-Never after implementation starts (`split-assessment.md` → "Over the guide before the gate").
+**A dispatched child is never split** (`split-assessment.md` → "Over the guide before the gate"):
+finish it, and file an independent new requirement found in it as an observation, without
+`--route split`.
 
-Not a reason to stop. File the new children (Tier A, first-party; `split-assessment.md` → "Two or
-more always means an epic"), then
+A split is decided before dispatch: file the new children (Tier A, first-party; `split-assessment.md`
+→ "Two or more always means an epic"), then
 `pnpm josh epic --add <E> <N...> [--before <M> | --after <M>]` — never a hand edit. Same criteria as
-`kickoff`. If what remains needs a person, park **that** child and move on. Splitting alone never adds
-`needs-decision` to the promoted epic.
+`kickoff`. Splitting alone never adds `needs-decision` to the promoted epic.

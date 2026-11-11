@@ -1,13 +1,18 @@
+import { issue_cite } from '#scripts/issue/issue-cite'
 import type { LedgerEntry, SizeEntry } from './lane-ledger-schema'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // Compare actual non-test changes with the declaration for merged lanes only. A followup retry
-// may record size twice; use the latest measurement before each merge (joshuafolkken/kit#5384).
+// may record size twice; use the latest measurement before each merge (joshuafolkken/kit#5384). A merge
+// recorded past the split notice bar counts as a pre-split miss, listed with its declared and actual size
+// so the pre-dispatch assessment can be tuned (joshuafolkken/kit#7183).
 const COLUMNS = [
 	'measured lanes',
 	'files actual / declared median',
 	'lines actual / declared median',
+	'pre-split misses',
 ]
+const MISS_COLUMNS = ['pre-split miss', 'files declared → actual', 'lines declared → actual']
 const DECIMALS = 1
 
 interface SizeRatios {
@@ -62,17 +67,41 @@ function ratios(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): SizeR
 	return { ...(files !== undefined && { files }), ...(lines !== undefined && { lines }) }
 }
 
+function header(columns: ReadonlyArray<string>): Array<string> {
+	return [lane_stats.to_row(columns), lane_stats.to_row(columns.map(() => '---'))]
+}
+
+function change_cell(size: SizeEntry, axis: 'files' | 'lines'): string {
+	return `${String(size.declared[axis])} → ${String(size.actual[axis])}`
+}
+
+// One row per merged lane recorded past the split notice bar; none prints no table.
+function miss_rows(misses: ReadonlyArray<SizeEntry>): Array<string> {
+	if (misses.length === 0) return []
+	const rows = misses.map((size) =>
+		lane_stats.to_row([
+			issue_cite.plain_for('terminal', size.issue),
+			change_cell(size, 'files'),
+			change_cell(size, 'lines'),
+		]),
+	)
+
+	return ['', ...header(MISS_COLUMNS), ...rows]
+}
+
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
 	const sizes = merged_sizes(entries, window)
+	const misses = sizes.filter((size) => size.missed === true)
 
 	return [
-		lane_stats.to_row(COLUMNS),
-		lane_stats.to_row(COLUMNS.map(() => '---')),
+		...header(COLUMNS),
 		lane_stats.to_row([
 			String(sizes.length),
 			ratio_cell(sizes, 'files'),
 			ratio_cell(sizes, 'lines'),
+			String(misses.length),
 		]),
+		...miss_rows(misses),
 	].join('\n')
 }
 

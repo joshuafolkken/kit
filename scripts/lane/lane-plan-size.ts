@@ -348,7 +348,7 @@ function files_text(issue: number, over: FilesOver): string {
 }
 
 function waiver_text(issue: number, over: Oversize): string {
-	return `size warning (${over.reason}): ${session_cite.issue(issue)}'s plan is past its ${String(over.limit)} bar, recorded and noted on the ledger — a warning, not a stop; re-split only on an independent added requirement or scope growth this Issue cannot verify (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
+	return `size warning (${over.reason}): ${session_cite.issue(issue)}'s plan is past its ${String(over.limit)} bar, recorded and noted on the ledger — a warning, not a stop; finish this Issue, never split it — an overrun at the merge is recorded as a pre-split miss (split-assessment.md → "${split_assess.NOTICE_SECTION}").`
 }
 
 function measure_bar(over: MeasureOver): string {

@@ -12,7 +12,6 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_step_section } from '#scripts/run/run-step-section'
-import { split_resolution } from '#scripts/split/split-resolution'
 import { run_cut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_decline } from './run-cut-decline'
@@ -93,15 +92,12 @@ function verdict_answer(verdict: CostVerdict): number | undefined {
 // Only the pre-gate phase is checked here; the implementation-phase caller gates its own
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
 //
-// **An unanswered split notice is printed as a warning and the cut goes on** (joshuafolkken/kit#6602):
-// size alone never stops a started Issue. **Nor does an implementation past its budget**
+// **Size never reaches the cut** (joshuafolkken/kit#7183): `lane:plan` warned once, and an overrun is
+// recorded at the merge as a pre-split miss. **Nor does an implementation past its budget**
 // (joshuafolkken/kit#7010): the overrun stays in `lane:stats` / `lane:breakdown` only, and a started
 // Issue is implemented to the end. Returns the answer given without cutting, or `undefined`.
-async function pre_gate_answer(issue: string, phase: string): Promise<number | undefined> {
+function pre_gate_answer(phase: string): number | undefined {
 	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
-	const split_note = await split_resolution.ledger_warning(Number(issue))
-
-	if (split_note !== undefined) console.error(split_note)
 
 	return verdict_answer(cost_cli.session_verdict())
 }
@@ -271,7 +267,7 @@ async function cut(
 		return await declined({ issue, phase }, state, refuse_unready(state))
 	}
 
-	const answered = await pre_gate_answer(issue, phase)
+	const answered = pre_gate_answer(phase)
 
 	if (answered !== undefined) return answered
 
