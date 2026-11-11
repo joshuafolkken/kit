@@ -1,0 +1,7 @@
+{
+	"reason": "New import-graph store module and its tests persist resolved imports across runs (#7252); import-graph.ts itself shrank",
+	"date": "2026-11-11",
+	"growth": {
+		"scripts.code_lines": 156
+	}
+}

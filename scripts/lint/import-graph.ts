@@ -2,6 +2,12 @@ import path from 'node:path'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { file_reader } from '#scripts/lib/read-file'
 import type ts from 'typescript'
+import {
+	import_graph_store,
+	type Dependency,
+	type EdgeName,
+	type EdgeStore,
+} from './import-graph-store'
 import { import_test_inputs } from './import-test-inputs'
 import { type_only_imports } from './type-only-imports'
 
@@ -21,11 +27,6 @@ const GLOBAL_DECLARATION = /^declare (?:global|module|namespace)\b/mu
 
 type TypeScript = typeof ts
 
-interface Dependency {
-	file: string
-	external: boolean
-}
-
 interface Resolver {
 	typescript: TypeScript
 	options: ts.CompilerOptions
@@ -35,9 +36,8 @@ interface GraphContext extends Resolver {
 	root: string
 	resolution_cache: ts.ModuleResolutionCache
 	ambient: ReadonlyArray<Dependency>
-	dependencies: Map<string, ReadonlyArray<Dependency>>
-	runtime_dependencies: Map<string, ReadonlyArray<Dependency>>
-	content_hashes: Map<string, string>
+	// The memo of each kind of edge, kept across runs, and the content digests it is keyed by.
+	store: EdgeStore
 }
 
 interface ProjectConfig {
@@ -60,8 +60,11 @@ interface ImportGraph {
 	strings: (file: string) => ReadonlyArray<string>
 }
 
-// A file's direct dependencies along one kind of edge.
-type Edges = (context: GraphContext, file: string) => ReadonlyArray<Dependency>
+// A file's direct dependencies along one kind of edge, and the name its memo is stored under.
+interface Edges {
+	name: EdgeName
+	of: (context: GraphContext, file: string) => ReadonlyArray<Dependency>
+}
 
 // `typescript` is an optional peer: a project without it has no type-aware rule to go stale.
 async function load_typescript(): Promise<TypeScript | undefined> {
@@ -173,13 +176,13 @@ function references_of(
 }
 
 function direct_dependencies(context: GraphContext, file: string): ReadonlyArray<Dependency> {
-	const known = context.dependencies.get(file)
+	const known = context.store.memo.all.get(file)
 	if (known !== undefined) return known
 	const found = references_of(context, file, file_reader.read_if_readable(file) ?? '').filter(
 		(dependency) => dependency !== undefined,
 	)
 
-	context.dependencies.set(file, found)
+	context.store.memo.all.set(file, found)
 
 	return found
 }
@@ -187,7 +190,7 @@ function direct_dependencies(context: GraphContext, file: string): ReadonlyArray
 // The direct dependencies the test runner follows: the imports left once the transpiler drops the
 // type-only declarations, and no `/// <reference>` (joshuafolkken/kit#5368).
 function runtime_dependencies(context: GraphContext, file: string): ReadonlyArray<Dependency> {
-	const known = context.runtime_dependencies.get(file)
+	const known = context.store.memo.runtime.get(file)
 	if (known !== undefined) return known
 	const content = file_reader.read_if_readable(file) ?? ''
 	const found = type_only_imports
@@ -195,7 +198,7 @@ function runtime_dependencies(context: GraphContext, file: string): ReadonlyArra
 		.map((specifier) => resolve_module(context, specifier, file))
 		.filter((dependency) => dependency !== undefined)
 
-	context.runtime_dependencies.set(file, found)
+	context.store.memo.runtime.set(file, found)
 
 	return found
 }
@@ -224,16 +227,6 @@ function ambient_of(resolver: Resolver, root: string, config: ProjectConfig): Ar
 		.filter((dependency) => dependency !== undefined)
 
 	return [...declarations, ...types]
-}
-
-function content_hash(context: GraphContext, file: string): string {
-	const known = context.content_hashes.get(file)
-	if (known !== undefined) return known
-	const computed = input_fingerprint.of_file(file)
-
-	context.content_hashes.set(file, computed)
-
-	return computed
 }
 
 // Every file the imports reach, the starting file excluded: its own content is the cache's key
@@ -276,7 +269,7 @@ function token_of(context: GraphContext, dependency: Dependency): string {
 	const name = path.relative(context.root, dependency.file)
 	if (dependency.external) return name
 
-	return `${name}:${content_hash(context, dependency.file)}`
+	return `${name}:${import_graph_store.content_hash(context.store, dependency.file)}`
 }
 
 function closure_hash(context: GraphContext, file: string): string {
@@ -320,12 +313,15 @@ function reverse_edges(
 	edges: Edges,
 ): Map<string, Array<string>> {
 	const reverse = new Map<string, Array<string>>()
+	const missing = import_graph_store.seed(context.store, edges.name, universe)
 
 	for (const file of universe) {
-		for (const dependency of edges(context, file)) {
+		for (const dependency of edges.of(context, file)) {
 			append(reverse, dependency.file, file)
 		}
 	}
+
+	import_graph_store.keep(context.store, edges.name, missing)
 
 	return reverse
 }
@@ -378,9 +374,10 @@ function graph_of(context: GraphContext): ImportGraph {
 		closure: (file) => closure(context, file),
 		closure_hash: (file) => closure_hash(context, file),
 		imports: (file, content) => imports(context, file, content),
-		importers: (files, universe) => importers(context, files, universe, direct_dependencies),
+		importers: (files, universe) =>
+			importers(context, files, universe, { name: 'all', of: direct_dependencies }),
 		runtime_importers: (files, universe) =>
-			importers(context, files, universe, runtime_dependencies),
+			importers(context, files, universe, { name: 'runtime', of: runtime_dependencies }),
 		strings: (file) => type_only_imports.strings(context.typescript, file),
 	}
 }
@@ -398,9 +395,7 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 		options: parsed.options,
 		resolution_cache: typescript.createModuleResolutionCache(root, (name) => name, parsed.options),
 		ambient: ambient_of({ typescript, options: parsed.options }, root, parsed),
-		dependencies: new Map(),
-		runtime_dependencies: new Map(),
-		content_hashes: new Map(),
+		store: import_graph_store.open(root, parsed.config_files),
 	})
 }
 
