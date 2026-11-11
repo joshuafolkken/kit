@@ -87,9 +87,9 @@ row names:
   lockfile that left. A first install that resolves before the wait is written locks the new version
   and the later install refuses it (#7200). Every other package comes from npm through the registry.
   The pattern runs on the GitHub machine for its git, and creates no repository.
-- **Every `init` and `start` pattern ends with two probes**, recorded whatever they exit with: `pnpm josh gate` from
-  `bash --noprofile --norc` with an environment of `HOME` and the system `PATH` only, and `josh gate`
-  from a `PATH` that has `node` on it and no `pnpm`.
+- **Every `init` and `start` pattern ends with two probes**, recorded whatever they exit with:
+  `pnpm josh gate` from `bash --noprofile --norc` with an environment of `HOME` and the system `PATH`
+  only, and `josh gate` from a `PATH` that has `node` on it and no `pnpm`.
 
 ## What the first runs found
 
