@@ -15,6 +15,7 @@ const KIND = {
 	ROUND_ONE: 'round-one',
 	ROUND_TWO: 'round-two',
 	OFFERABLE: 'offerable',
+	OFFER: 'offer',
 	CORE_WAIT: 'core-wait',
 	UNIT_FILES: 'unit-files',
 	TEST_RELATED: 'test-related',
