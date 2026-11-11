@@ -77,7 +77,7 @@ function record(
 	write_line(file, line_of(call, (previous ?? 0) + call.files, pid, now), previous === undefined)
 }
 
-const eslint_daemon_calls = { record, CALLS_RECORD, DAEMON_CALLER }
+const eslint_daemon_calls = { pid_of, record, CALLS_RECORD, DAEMON_CALLER }
 
 export type { DaemonCall }
 export { eslint_daemon_calls }

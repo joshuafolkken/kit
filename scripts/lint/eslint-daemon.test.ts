@@ -242,6 +242,27 @@ describe('eslint_daemon.run', () => {
 	})
 })
 
+describe('eslint_daemon.stop', () => {
+	// A stop that failed or timed out is not reported as stopped.
+	it.each([
+		[0, true],
+		[1, false],
+	])('stops through its own cli, bounded: exit %i → %s', async (code, stopped) => {
+		mocked_execa.mockResolvedValue(answer(code, ''))
+
+		expect(await eslint_daemon.stop(project_root)).toBe(stopped)
+		expect(mocked_execa.mock.lastCall?.[1]).toEqual([CLI, 'stop'])
+		expect(mocked_execa.mock.lastCall?.at(-1)).toMatchObject({ timeout: expect.any(Number) })
+	})
+
+	it('stops nothing where no daemon cli resolves', async () => {
+		mocked_resolve.mockReturnValue(undefined)
+
+		expect(await eslint_daemon.stop(project_root)).toBe(false)
+		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+})
+
 describe('eslint_daemon.run — a stale daemon', () => {
 	it('stops a daemon whose config moved since it started before linting', async () => {
 		current_checkout()
