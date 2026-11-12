@@ -1,0 +1,7 @@
+{
+	"reason": "#7335 splits implementation-shell-deny.ts into three modules; the +17 lines are the new modules' imports and namespace exports",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 17
+	}
+}
