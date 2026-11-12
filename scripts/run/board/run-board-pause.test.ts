@@ -2,6 +2,7 @@ import { issue_outcome } from '#scripts/issue/issue-outcome'
 import type { IssueComment } from '#scripts/issue/issue-read'
 import { describe, expect, it } from 'vitest'
 import { run_board_pause } from './run-board-pause'
+import run_board_pause_fixture from './run-board-pause-fixture.json' with { type: 'json' }
 
 const AT = '2026-11-12T09:00:00Z'
 const BODY = '### 選択肢\n1. Wait\n   - 層: C\n   - 必要な権限: 人\n\n### 推奨\n1 safer\n'
@@ -47,10 +48,11 @@ describe('run_board_pause.from_comments', () => {
 	it.each([
 		{ comments: [] },
 		{ comments: [note()] },
-		{ comments: [note('Earlier reason'), note()] },
+		{ comments: [{ ...note('Earlier reason'), html_url: `${note().html_url}2` }, note()] },
 	])('falls back without inheriting older evidence: $comments', ({ comments }) => {
 		expect(run_board_pause.from_comments(comments)).toEqual({
 			summary: run_board_pause.FALLBACK,
+			url: comments.at(-1)?.html_url,
 			at_ms: comments.length === 0 ? 0 : Date.parse(AT),
 		})
 	})
@@ -91,6 +93,7 @@ describe('run_board_pause.reason_of', () => {
 
 		expect(run_board_pause.reason_of(ISSUE, read, status)).toEqual({
 			tail: run_board_pause.FALLBACK,
+			evidence_url: record.url?.split('#', 1)[0],
 		})
 		const fresh = { pause_reasons: new Map([[ISSUE, { ...record, at_ms: NEW_ATTEMPT }]]) }
 
@@ -99,5 +102,73 @@ describe('run_board_pause.reason_of', () => {
 
 	it('leaves an unread plan without invented metadata', () => {
 		expect(run_board_pause.reason_of(ISSUE, {})).toBeUndefined()
+	})
+})
+
+const PARKED_STOP = {
+	...run_board_pause_fixture.parked,
+	summary: 'Approve landing-test scope or keep paused',
+}
+const REAL_STOPS = [
+	PARKED_STOP,
+	{ ...run_board_pause_fixture.decision, summary: 'Inspect stale cut and lane before resuming' },
+]
+
+function real_stop(fixture: (typeof REAL_STOPS)[number]): IssueComment {
+	return { ...note(), body: fixture.body, html_url: fixture.url, created_at: fixture.createdAt }
+}
+
+function backfill(fixture: (typeof REAL_STOPS)[number]): IssueComment {
+	return {
+		...note(undefined, '停止説明を補完。承認・解除・再開は行わない。'),
+		html_url: `${fixture.url}9`,
+		body: issue_outcome.body_of({
+			body: '停止説明の補完',
+			summary: fixture.summary,
+			url: fixture.url,
+		}),
+	}
+}
+
+describe('run_board_pause real stops without markers', () => {
+	it.each(REAL_STOPS)('keeps raw evidence before and after backfill: $summary', (fixture) => {
+		const stop = real_stop(fixture)
+
+		expect(stop.body).not.toContain('josh:outcome')
+		expect(run_board_pause.from_comments([stop])).toMatchObject({
+			summary: run_board_pause.FALLBACK,
+			url: fixture.url,
+		})
+		expect(
+			run_board_pause.from_comments([stop, backfill(fixture), note('Administrative', 'Released')]),
+		).toMatchObject({ summary: fixture.summary, url: fixture.url })
+	})
+
+	it('expires a backfill when the lane stops again', () => {
+		const fixture = PARKED_STOP
+		const next = { ...note(), html_url: `${fixture.url}1` }
+		const comments = [real_stop(fixture), backfill(fixture), next, backfill(fixture)]
+
+		expect(run_board_pause.from_comments(comments)).toMatchObject({
+			summary: run_board_pause.FALLBACK,
+			url: next.html_url,
+		})
+	})
+
+	it.each([
+		undefined,
+		'https://evil.example/1',
+		'https://github.com/o/r/issues/1#issuecomment-1\n',
+	])('uses the issue when the stop URL is invalid: %s', (html_url) => {
+		const url = 'https://github.com/o/r/issues/1'
+		const record = run_board_pause.from_comments([{ ...note(), html_url }], url)
+
+		expect(run_board_pause.record_schema.parse(record).url).toBe(url)
+	})
+
+	it('ignores an untrusted backfill', () => {
+		const comments = [real_stop(PARKED_STOP), { ...backfill(PARKED_STOP), is_trusted: false }]
+
+		expect(run_board_pause.from_comments(comments).summary).toBe(run_board_pause.FALLBACK)
 	})
 })

@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_decision } from './run-board-decision'
 import { run_board_decision_read } from './run-board-decision-read'
 import { run_board_layout, type BoardPlan } from './run-board-layout'
+import { run_board_pause } from './run-board-pause'
 import { run_board_reason } from './run-board-reason'
 
 const REPO = 'joshuafolkken/kit'
@@ -140,7 +141,8 @@ describe('run_board_decision_read pause evidence', () => {
 		const plan = await run_board_decision_read.with_decisions(plan_of([asking]))
 
 		expect(plan?.pause_reasons?.get(PERSON)).toEqual({
-			summary: 'Pause reason unavailable',
+			summary: run_board_pause.FALLBACK,
+			url: `https://github.com/${REPO}/issues/${String(PERSON)}`,
 			at_ms: 0,
 		})
 	})
@@ -225,7 +227,10 @@ describe('run_board_decision_read question comments', () => {
 		const layout = run_board_layout.layout_of(plan, new Map())
 
 		expect(plan.decision_questions?.get(PERSON)).toBe(QUESTION)
-		expect(layout.people[0]?.reason?.tail).toBe(`→ decide: ${QUESTION}`)
+		expect(layout.people[0]?.reason).toMatchObject({
+			tail: run_board_pause.FALLBACK,
+			evidence_url: `https://github.com/${REPO}/issues/${String(PERSON)}`,
+		})
 	})
 })
 
