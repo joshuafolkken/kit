@@ -11,7 +11,7 @@ Two example files show these settings:
 
 ## `josh.review_gate`
 
-Where the review gate runs. kit only reads the value for now: review execution does not change with it.
+Where the review gate runs. Only `local` lets a lane within its size guide skip round one of the review (`round1: skipped-in-size`); `ci` keeps round one for every lane.
 
 | Setting            | Value               | Default   |
 | ------------------ | ------------------- | --------- |

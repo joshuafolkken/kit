@@ -5,7 +5,7 @@
 	"josh": {
 		// Where the review gate runs: "local" | "ci". Default: "local".
 		// The JOSH_REVIEW_GATE environment variable overrides it.
-		// kit only reads the value for now: review execution does not change with it.
+		// Only "local" lets a lane within its size guide skip round one of the review.
 		"review_gate": "local",
 
 		// Minutes a run stays quiet before josh run:progress prints a line. A positive number. Default: 20.
