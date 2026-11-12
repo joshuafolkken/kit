@@ -24,7 +24,9 @@ const early_push_schema = z.object({
 // finding that decided a review or round-2 stop — the blocking ones, else the fixed ones
 // (joshuafolkken/kit#4426), absent where none decided the stop. `base` is the change base a review
 // failure or a followup `check` stopped on, so its re-ship can tell a fix-only tree from a moved base
-// (joshuafolkken/kit#6141, joshuafolkken/kit#6675), absent on every other stop. How long it stayed stopped is derived
+// (joshuafolkken/kit#6141, joshuafolkken/kit#6675), absent on every other stop. `checks` names the CI
+// checks a followup `check` stop's wait reported failed (joshuafolkken/kit#7333), absent on every other
+// stop and on one recorded before it had them. How long it stayed stopped is derived
 // from the next ship stage, not recorded, so a resumed ship never has to know the stop it ends.
 const stop_schema = z.object({
 	kind: z.literal(KIND.STOP),
@@ -35,6 +37,7 @@ const stop_schema = z.object({
 	preconditions: z.array(z.string()).optional(),
 	findings: z.array(z.string()).optional(),
 	base: z.string().optional(),
+	checks: z.array(z.string()).optional(),
 })
 // One `josh run:chain` on `issue`, done or stopped: `at` is its end and `elapsed_ms` its length, so the
 // next run's start ends the wait after a stop. `stage` names where it stopped and `reason` why — the

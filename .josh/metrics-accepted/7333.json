@@ -1,0 +1,7 @@
+{
+	"reason": "#7333 adds a lane:stats measurement: the failed-check and longest-stop tables, the followup stop's recorded checks and the shared failed-checks parser, with their tests",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 128
+	}
+}

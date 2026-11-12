@@ -190,6 +190,24 @@ describe('run_ship_stop_cause.record_of — the ledger record of a stop', () => 
 		).toStrictEqual({ issue: 7, reason: 'conflict', cause: CAUSE.CONFLICT })
 	})
 
+	// joshuafolkken/kit#7333: a followup red on a check names the checks its wait reported failed.
+	it('carries the failed checks of a followup check stop', () => {
+		const body = '❌ Error: PR checks failed (failed checks: CodeQL, Unit Tests (3/6)).'
+
+		expect(run_ship_stop_cause.record_of(7, 'followup', { body })).toStrictEqual({
+			issue: 7,
+			reason: 'followup',
+			cause: CAUSE.CHECK,
+			checks: ['CodeQL', 'Unit Tests (3/6)'],
+		})
+	})
+
+	it('names no failed checks on a stop at another stage', () => {
+		const body = 'PR checks failed (failed checks: CodeQL).'
+
+		expect(run_ship_stop_cause.record_of(7, 'gate', { body })).not.toHaveProperty('checks')
+	})
+
 	it('records a stop that handed back no section as a check', () => {
 		expect(run_ship_stop_cause.record_of(7, 'gate')).toStrictEqual({
 			issue: 7,
