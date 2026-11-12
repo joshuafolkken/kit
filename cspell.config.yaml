@@ -371,6 +371,8 @@ words:
   # `shutil.copy`/`shutil.move` into an existing path. They appear only in that module's patterns and tests.
   - writelines
   - shutil
+  # npm package name weighed in `docs/maintainers/shell-tokenizer.md` (joshuafolkken/kit#7334).
+  - shlex
   # English word in `scripts/rules/worktree-guard.ts` — a message-tagged stash is "findable and poppable"
   # by `pnpm josh stash:pop` (joshuafolkken/kit#2120). Appears only in that module's comment.
   - poppable
