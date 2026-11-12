@@ -21,6 +21,11 @@ const JOBS_SCHEMA = z.object({ jobs: z.array(JOB_SCHEMA) })
 type Run = z.infer<typeof RUN_SCHEMA>
 type PollState = 'ready' | 'failed' | 'pending'
 
+interface JobOutcomes {
+	failed: ReadonlyArray<string>
+	succeeded: ReadonlyArray<string>
+}
+
 // `read` answers a GET on a repository API path. `workflow` is the publish workflow and `jobs` the
 // jobs in it whose failure counts (empty: every job). `release_run_workflow` is the workflow that
 // creates a tag's release — the publish workflow itself when its run creates the release.
@@ -59,18 +64,22 @@ async function find_run(
 	return runs.find((item) => item.display_title === title)
 }
 
-async function failed_job_names(source: RunSource, run_id: number): Promise<ReadonlyArray<string>> {
+// A job skipped because the one it needs failed is in neither list.
+async function job_outcomes(source: RunSource, run_id: number): Promise<JobOutcomes> {
 	const { jobs } = JOBS_SCHEMA.parse(
 		await source.read(`/actions/runs/${String(run_id)}/jobs?per_page=100`),
 	)
 
-	return jobs.filter((job) => is_failed_job(job, source.jobs)).map((job) => job.name)
+	return {
+		failed: jobs.filter((job) => is_failed_job(job, source.jobs)).map((job) => job.name),
+		succeeded: jobs.filter((job) => job.conclusion === 'success').map((job) => job.name),
+	}
 }
 
 async function has_failed_job(source: RunSource, run_id: number): Promise<boolean> {
-	const names = await failed_job_names(source, run_id)
+	const { failed } = await job_outcomes(source, run_id)
 
-	return names.length > 0
+	return failed.length > 0
 }
 
 // A run started before its title named the tag may be at work on any tag.
@@ -131,13 +140,13 @@ async function publication_state(
 }
 
 const github_release_runs = {
-	failed_job_names,
 	is_named_job,
+	job_outcomes,
 	is_release_lost,
 	publication_state,
 	publish_run,
 	run_state,
 }
 
-export type { PollState, Run, RunSource }
+export type { JobOutcomes, PollState, Run, RunSource }
 export { github_release_runs }

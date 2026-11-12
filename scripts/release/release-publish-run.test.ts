@@ -59,6 +59,16 @@ describe('release_publish_run.failed_run — a failed run', () => {
 		})
 	})
 
+	it('counts npm as failed when publish-npm was skipped behind a failed pack', async () => {
+		given_runs([FAILED_RUN], [job('pack', FAILURE), job(NPM_JOB, 'skipped')])
+
+		expect(await release_publish_run.failed_run(VERSION)).toEqual({
+			run_id: RUN_ID,
+			failed_jobs: ['pack'],
+			has_npm_job_failed: true,
+		})
+	})
+
 	it('counts npm as failed when the jobs cannot be read', async () => {
 		given_runs([FAILED_RUN])
 

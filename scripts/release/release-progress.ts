@@ -66,7 +66,7 @@ function failed_run_headline(tag: string, run: FailedRun): string {
 
 	if (run.has_npm_job_failed) return `❌ ${run_label} before npm listed ${tag}.`
 
-	return `❌ ${run_label} in ${run.failed_jobs.join(', ')}; its publish-npm job did not fail.`
+	return `❌ ${run_label} in ${run.failed_jobs.join(', ')}; its publish-npm job succeeded.`
 }
 
 // The run's own failure is known, so the line names the run rather than a stage that never came. It
