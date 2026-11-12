@@ -1,7 +1,0 @@
-{
-	"reason": "Keep the approved outcome propagation and reuse the existing close-before-launch check to isolate relaunched attempts; the review fix adds two code lines.",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 148
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Issue #7392 isolates observation flush preparation and preserves durable recovery, with finite lock retry and real Git regression coverage; the approved transaction replaces unsafe rollback.",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 244
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "New josh.worker schema and its per-Issue resolver module with tests (#7351)",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 129
-	}
-}

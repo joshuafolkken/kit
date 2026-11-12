@@ -1,7 +1,0 @@
-{
-	"reason": "Archive step of the observation ledger retention policy (#7339): new observation-ledger-archive.ts and its flush wiring",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 148
-	}
-}

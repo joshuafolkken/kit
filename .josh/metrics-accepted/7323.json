@@ -1,7 +1,0 @@
-{
-	"reason": "release:github reads the Releases API error body and caps oversized release notes at GitHub's 125000-character limit (#7323)",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

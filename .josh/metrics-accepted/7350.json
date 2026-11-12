@@ -1,7 +1,0 @@
-{
-	"reason": "Moving the phase tables and their resolution out of agent-role-profile.ts into agent-phase-profile.ts adds the new module's imports and namespace object (#7350)",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

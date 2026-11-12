@@ -1,7 +1,0 @@
-{
-	"reason": "#7331 adds the prose flag scanner (document_scan.command_flag_references) and registers four flags the CLIs already accept (lint --shard, test:unit --shard, git --body-file, sync --force)",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}

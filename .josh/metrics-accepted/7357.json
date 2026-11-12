@@ -1,7 +1,0 @@
-{
-	"reason": "New feature: resume an escalated lane one josh.worker profile up (backlog-drive-escalate.ts) #7357",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 112
-	}
-}

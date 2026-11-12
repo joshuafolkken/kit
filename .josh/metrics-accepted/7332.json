@@ -1,7 +1,0 @@
-{
-	"reason": "New --weekly mode for rule:value (#7332): rule-value-trend.ts module, CLI wiring and usage entry",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 104
-	}
-}

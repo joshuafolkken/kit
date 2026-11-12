@@ -1,7 +1,0 @@
-{
-	"reason": "#7356 adds the worker escalation declaration (run:park --escalate) and its worker-only instruction guide — new feature code",
-	"date": "2026-11-12",
-	"growth": {
-		"scripts.code_lines": 109
-	}
-}
