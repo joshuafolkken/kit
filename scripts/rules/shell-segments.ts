@@ -27,33 +27,52 @@ const COMMAND_OPERATORS: ReadonlySet<string> = new Set([...SEGMENT_OPERATORS, '|
 // **A compound command's opening word is a cut too** (joshuafolkken/kit#7334): the command after it
 // starts a segment of its own, so `f() { rm -rf x; }` yields `rm -rf x` for a rule anchored at `^rm`,
 // and `case $x in a) rm -rf x;; esac` does the same past the arm's pattern. A `{` opens a group or a
-// function body only at a command's start or after `name()`; a pattern closes with `)` right after
-// `case … in` or after the previous arm's `;;`.
+// function body only at a command's start, after `name()` or after `function name`; a pattern closes
+// with `)` right after `case … in` or after the previous arm's `;;`.
 const CASE_ARM_ENDS: ReadonlySet<string> = new Set([';;', ';;&', ';&'])
 const GROUP_OPENER = '{'
 const FUNCTION_HEAD_END = '()'
+const FUNCTION_KEYWORD = 'function'
+const FUNCTION_NAME_OFFSET = 2
 const PATTERN_END = ')'
 const NEWLINE = '\n'
+// joshuafolkken/kit#7340: what may stand between an arm's start and its `)` — the pattern's words, the
+// `|` between its alternatives (`a|b)`) and newlines — so `a|b)` and a `)` standing apart (`a )`) end
+// the pattern too.
+const PATTERN_LINKS: ReadonlySet<string> = new Set(['|', NEWLINE])
+const ARM_START = 'in'
 
 type Cut = Pick<ShellToken, 'begin' | 'end'>
 
-function is_group_opener(token: ShellToken, previous: ShellToken | undefined): boolean {
-	if (token.text !== GROUP_OPENER) return false
+function is_function_head(tokens: ReadonlyArray<ShellToken>, index: number): boolean {
+	const previous = tokens[index - 1]
 
-	return (
-		previous === undefined ||
-		previous.kind === 'operator' ||
-		previous.text.endsWith(FUNCTION_HEAD_END)
-	)
+	if (previous?.text.endsWith(FUNCTION_HEAD_END) === true) return true
+
+	return tokens[index - FUNCTION_NAME_OFFSET]?.text === FUNCTION_KEYWORD
+}
+
+function is_group_opener(tokens: ReadonlyArray<ShellToken>, index: number): boolean {
+	if (tokens[index]?.text !== GROUP_OPENER) return false
+
+	const previous = tokens[index - 1]
+
+	return previous?.kind !== 'word' || is_function_head(tokens, index)
 }
 
 function follows_case_head(tokens: ReadonlyArray<ShellToken>, index: number): boolean {
 	return tokens.slice(0, index).some((token) => token.text === 'case')
 }
 
-// A pattern may start the line after `in` or `;;`, so the newlines between are passed over.
+function is_pattern_part(token: ShellToken): boolean {
+	if (token.kind === 'operator') return PATTERN_LINKS.has(token.text)
+
+	return token.text !== ARM_START && !token.text.endsWith(PATTERN_END)
+}
+
+// The token the arm's pattern follows, past the pattern's own words.
 function lead_index(tokens: ReadonlyArray<ShellToken>, index: number): number {
-	return tokens.slice(0, index).findLastIndex((token) => token.text !== NEWLINE)
+	return tokens.slice(0, index).findLastIndex((token) => !is_pattern_part(token))
 }
 
 function is_case_pattern(
@@ -67,7 +86,7 @@ function is_case_pattern(
 	if (previous === undefined || !token.text.endsWith(PATTERN_END)) return false
 	if (CASE_ARM_ENDS.has(previous.text)) return true
 
-	return previous.text === 'in' && follows_case_head(tokens, lead_at)
+	return previous.text === ARM_START && follows_case_head(tokens, lead_at)
 }
 
 function is_cut(
@@ -80,7 +99,7 @@ function is_cut(
 	if (token === undefined) return false
 	if (token.kind === 'operator') return operators.has(token.text)
 
-	return is_group_opener(token, tokens[index - 1]) || is_case_pattern(tokens, index, token)
+	return is_group_opener(tokens, index) || is_case_pattern(tokens, index, token)
 }
 
 function cuts_of(reading: string, operators: ReadonlySet<string>): Array<Cut> {

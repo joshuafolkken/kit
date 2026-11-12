@@ -1,0 +1,7 @@
+{
+	"reason": "#7340: the shared cut reads case-arm alternatives and function-keyword bodies, replacing the guard's blanket case/function refusal",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}

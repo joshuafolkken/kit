@@ -39,6 +39,9 @@ const RUNS = [
 	'for f in a.md b.md\ndo\n\tgrep -n pattern $f\ndone',
 	'npx done',
 	'if git diff --quiet; then echo same; fi',
+	'case "$x" in a|b) echo same ;; *) git status ;; esac',
+	'function f { git log -1; }; f',
+	'select x in a b; do echo $x; done',
 	'(cd /tmp/other-repo && git log -1)',
 	"sed -n '1,5p' scripts/a.ts",
 	'cp scripts/a.ts /tmp/notes.md',
@@ -102,10 +105,22 @@ const OTHER_REFUSED: ReadonlyArray<readonly [string, string]> = [
 	["perl -pi -e 's/a/b/' /tmp/6688/scripts/a.ts", '`perl` to a runtime path outside'],
 	["cd ../6688 && sed -i '' 's/a/b/' notes.md", CD_WRITE],
 	// joshuafolkken/kit#6586 review round 2: an unread compound body and the other outside writers.
-	['case x in a) git push ;; esac', UNREAD_BODY],
-	// joshuafolkken/kit#7334: the segment cut reads a `name() {` body, so the write in it is named.
+	// joshuafolkken/kit#7334 / #7340: the segment cut reads a `case` arm and a `{` function body, so the
+	// write in it is named; a body the cut leaves unread is still refused.
+	['case x in a) git push ;; esac', GIT_PUSH],
+	['case x in a|b) git push ;; esac', GIT_PUSH],
+	['case x in a ) git push ;; esac', GIT_PUSH],
+	['case x in a) ls;; b) cp /tmp/a ../6688/scripts/a.ts;; esac', '`cp` to a runtime path outside'],
+	// An arm whose command touches its `)` is not cut, so it is refused as unread.
+	['case x in a) ls;; b)git push;; esac', UNREAD_BODY],
+	['case x in\na) ls;;\nb)git push;;\nesac', UNREAD_BODY],
+	['case x in a) ls;; b|c)git push;; esac', UNREAD_BODY],
+	['case x in a) ls;; (b)git push;; esac', UNREAD_BODY],
 	['f() { git push; }; f', '`git push`, a git write'],
-	['function f { git push; }; f', UNREAD_BODY],
+	['function f { git push; }; f', GIT_PUSH],
+	['function f() { npm --prefix web install; }; f', INSTALL],
+	['f() ( git push ); f', UNREAD_BODY],
+	['function f ( git push ); f', UNREAD_BODY],
 	['rsync -a /tmp/x/ ../6688/scripts/', '`rsync` to a runtime path outside'],
 	['install /tmp/a ../6688/scripts/a.ts', '`install` to a runtime path outside'],
 	['dd if=/tmp/a of=../6688/scripts/a.ts', '`dd` to a runtime path outside'],

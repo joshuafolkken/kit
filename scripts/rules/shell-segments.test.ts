@@ -55,7 +55,15 @@ describe('compound commands', () => {
 			[case_head, '', 'rm -rf y', '', '', 'ls', '', 'esac'],
 		],
 		['f() { rm -rf y; }', ['f()', 'rm -rf y', '}']],
+		['function f { rm -rf y; }', ['function f', 'rm -rf y', '}']],
 		['{ rm -rf y; ls; }', ['', 'rm -rf y', 'ls', '}']],
+		// joshuafolkken/kit#7340: a pattern's alternatives and a `)` standing apart end the pattern too;
+		// the pattern's words before the `)` stay on the segment ahead of the cut.
+		[`${case_head} a|b) rm -rf y;; esac`, [`${case_head} a|`, 'rm -rf y', 'esac']],
+		[
+			`${case_head} a ) rm -rf y;; (b|c) ls;; esac`,
+			[`${case_head} a`, 'rm -rf y', '(b|', 'ls', 'esac'],
+		],
 	])('cuts %j', (command, expected) => {
 		expect(shell_segments.segments_of(command)).toStrictEqual(expected)
 	})
