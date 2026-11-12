@@ -11,7 +11,7 @@ const directory = temporary_directory('suite')('codex-filing-')
 const transcript = path.join(directory, 'rollout.jsonl')
 const FILING = 'pnpm josh issue:file "Title" --body-file .josh/tmp/body.md'
 const INSTRUCTION = '追跡Issueを起票してください'
-const { line } = codex_transcript_fixture
+const { image_line, line } = codex_transcript_fixture
 
 function reason_for(tail: ReadonlyArray<string>, command = FILING): string | undefined {
 	writeFileSync(transcript, tail.join('\n'))
@@ -48,6 +48,12 @@ describe('Codex native filing authorization through the hook adapter', () => {
 		{ name: 'quoted instruction', tail: [line('> 起票してください')] },
 		{ name: 'newer non-filing prompt', tail: [line(INSTRUCTION), line('調査だけ続けて')] },
 		{ name: 'newer empty prompt', tail: [line(INSTRUCTION), line('')] },
+		{ name: 'newer image prompt', tail: [line(INSTRUCTION), image_line('調査だけ続けて')] },
+		{ name: 'newer image-only prompt', tail: [line(INSTRUCTION), image_line('')] },
+		{
+			name: 'nested unlike fences',
+			tail: [line('Example:\n~~~~\n```\n起票してください\n```\n~~~~')],
+		},
 		{
 			name: 'tool output',
 			tail: [
@@ -61,11 +67,17 @@ describe('Codex native filing authorization through the hook adapter', () => {
 		expect(reason_for(tail)).toContain('unasked filing')
 	})
 
+	it('keeps the read-only check available without approval', () => {
+		expect(reason_for([line('調査して')], `${FILING} --check`)).toBeUndefined()
+	})
+})
+
+describe('Codex multimodal authorization', () => {
 	it('allows a yes to the native assistant proposal', () => {
 		expect(reason_for([line('起票しますか？', 'assistant'), line('はい')])).toBeUndefined()
 	})
 
-	it('keeps the read-only check available without approval', () => {
-		expect(reason_for([line('調査して')], `${FILING} --check`)).toBeUndefined()
+	it('allows an explicit instruction accompanying an image', () => {
+		expect(reason_for([image_line(INSTRUCTION)])).toBeUndefined()
 	})
 })

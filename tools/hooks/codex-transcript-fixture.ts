@@ -16,6 +16,17 @@ function line(text: string, role = 'user', provenance = 'user'): string {
 	})
 }
 
-const codex_transcript_fixture = { line }
+function image_line(text: string): string {
+	const raw = JSON.parse(line(text))
+
+	raw.payload.content.push({ type: 'input_image', image_url: 'data:image/png;base64,fixture' })
+	raw.payload.internal_chat_message_metadata_passthrough.content_item_metadata.push({
+		provenance: { type: 'user' },
+	})
+
+	return JSON.stringify(raw)
+}
+
+const codex_transcript_fixture = { image_line, line }
 
 export { codex_transcript_fixture }

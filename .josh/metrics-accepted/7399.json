@@ -1,7 +1,7 @@
 {
-	"reason": "Codex transcript provenance parsing and filing authorization regression coverage for #7399 require 71 additional runtime code lines.",
+	"reason": "Codex provenance-aware text and image turn parsing and shared matching-fence exclusion require 98 additional runtime code lines for #7399.",
 	"date": "2026-11-12",
 	"growth": {
-		"scripts.code_lines": 76
+		"scripts.code_lines": 98
 	}
 }

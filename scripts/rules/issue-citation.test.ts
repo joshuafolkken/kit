@@ -10,6 +10,22 @@ const LINKED_CITATION = '[#12](https://github.com/o/r/issues/12) — 要約'
 const INLINE_CODE_MENTION = 'the example `closes #34` is fine'
 const PR_MENTION = 'landed in PR #78'
 
+describe('issue_citation — matching fence boundaries', () => {
+	it.each([
+		'~~~~\n```\n#12\n```\n~~~~',
+		'````\n```\n#12\n```\n````',
+		'~~~\n~~~ not a closing fence\n#12\n~~~',
+	])('excludes nested or incomplete closing delimiters: %s', (fenced) => {
+		const message = `${fenced}\n#34`
+
+		expect(issue_citation.prose_lines(message)).toEqual(['#34'])
+		expect(issue_citation.bare_references(message)).toEqual(['#34'])
+		expect(issue_citation.linkify(message, 'o/r')).toBe(
+			`${fenced}\n[#34](https://github.com/o/r/issues/34)`,
+		)
+	})
+})
+
 describe('issue_citation.has_bare_reference', () => {
 	it('flags a bare #N in session-facing prose', () => {
 		expect(issue_citation.has_bare_reference('closed by #123 earlier')).toBe(true)

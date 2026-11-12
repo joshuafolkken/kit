@@ -5,8 +5,8 @@ import { z } from 'zod'
 // carries AGENTS/environment context, so only user-authored items become prompts (#7399).
 const content_schema = z.array(
 	z.object({
-		type: z.enum(['input_text', 'output_text']),
-		text: z.string(),
+		type: z.string(),
+		text: z.string().optional(),
 	}),
 )
 const provenance_schema = z.object({ provenance: z.object({ type: z.string() }) })
@@ -23,13 +23,19 @@ const record_schema = z.object({
 	payload: payload_schema,
 })
 
+function content_text(block: z.infer<typeof content_schema>[number]): string {
+	if (block.type !== 'input_text' && block.type !== 'output_text') return ''
+
+	return block.text ?? ''
+}
+
 function person_content(payload: z.infer<typeof record_schema>['payload']): string | undefined {
 	const metadata = payload.internal_chat_message_metadata_passthrough?.content_item_metadata
 	if (metadata?.length !== payload.content.length) return undefined
 
 	const authored = payload.content
 		.filter((_block, index) => metadata[index]?.provenance.type === 'user')
-		.map((block) => block.text)
+		.map((block) => content_text(block))
 
 	return authored.length === 0 ? undefined : authored.join('\n')
 }
@@ -42,7 +48,7 @@ function normalize(line: string): string {
 	const content =
 		payload.role === 'user'
 			? person_content(payload)
-			: payload.content.map((block) => block.text).join('\n')
+			: payload.content.map((block) => content_text(block)).join('\n')
 
 	return JSON.stringify({
 		type: payload.role,

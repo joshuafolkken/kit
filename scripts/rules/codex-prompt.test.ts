@@ -47,6 +47,12 @@ describe('codex_prompt.normalize', () => {
 })
 
 describe('codex_prompt.normalize — harness boundaries', () => {
+	it('reads text beside an image while retaining provenance alignment', () => {
+		const raw = codex_transcript_fixture.image_line('調査だけ続けて')
+
+		expect(JSON.parse(codex_prompt.normalize(raw)).message.content).toBe('調査だけ続けて\n')
+	})
+
 	it.each(['agents_md', 'harness'])(
 		'marks injected %s context as harness-authored',
 		(provenance) => {
