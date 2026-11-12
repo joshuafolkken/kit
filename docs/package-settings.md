@@ -5,7 +5,7 @@ Every setting kit reads from the `josh` key of the project's `package.json`, in 
 Two example files show these settings:
 
 - [`package.json.full-example.jsonc`](../package.json.full-example.jsonc) lists every setting, with a comment on its values, its default and what happens when you leave it out. Read it to learn what you can write. `package.json` cannot hold comments, so remove them when you copy a part of it.
-- `package.json.example` (joshuafolkken/kit#7373) is plain JSON with only the settings one project uses, meant to be pasted as it is.
+- [`package.json.example`](../package.json.example) is plain JSON with the settings for hacco, ready to copy into your `package.json`. Replace the placeholder crate name `core` and path `crates/core`; the lane setup command has not been verified against hacco's layout. This example is not distributed by `josh sync`.
 
 `scripts/document/package-settings-reference.test.ts` checks that the rows below and the keys of the full example match the settings the schemas in `scripts/lib/package-manifest.ts` read, both ways, so a new setting cannot ship without a row here and a key there.
 

@@ -2,6 +2,9 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The project and Rust linter named in its package settings example (#7373).
+  - hacco
+  - clippy
   # The POSIX named-pipe command the resident hook daemon and its launcher create FIFOs with (#6683).
   - mkfifo
   # The POSIX checksum command and shell-depth variable that key the hook daemon by its environment (#6683).
