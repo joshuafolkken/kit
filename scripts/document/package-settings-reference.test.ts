@@ -13,6 +13,7 @@ import { read_document } from './ai-document-fixture'
 // Both are held to the same list, walked from the schemas, so the page and the example cannot disagree.
 const REFERENCE = 'docs/package-settings.md'
 const EXAMPLE = 'package.json.full-example.jsonc'
+const HACCO_EXAMPLE = 'package.json.example'
 // An array's elements share one path: `josh.gate.steps[].name`.
 const ELEMENT = '[]'
 // A reference row opens with the setting's full path in a code span.
@@ -136,6 +137,28 @@ describe('the full package.json example', () => {
 		const named = value_paths(read_example().value, '')
 
 		expect(sorted_unique(named)).toStrictEqual(setting_paths())
+	})
+})
+
+describe('the hacco package.json example', () => {
+	it('is plain JSON read by its josh schemas (ac-da54804a)', () => {
+		const value: unknown = JSON.parse(readFileSync(package_file(HACCO_EXAMPLE), 'utf8'))
+		const named = sorted_unique(value_paths(value, ''))
+		const { lane_setup, gate_steps, worker } = package_manifest.josh_schemas
+
+		for (const schema of [lane_setup, gate_steps, worker]) {
+			expect(schema.safeParse(value).success).toBe(true)
+		}
+
+		expect(named.filter((key) => !setting_paths().includes(key))).toStrictEqual([])
+		expect(named).toEqual(
+			expect.arrayContaining(['josh.lane.setup', 'josh.gate.steps', 'josh.worker.default']),
+		)
+	})
+
+	it('is linked from the settings page (ac-28bd549a)', () => {
+		expect(read_document(REFERENCE)).toContain(`[\`${HACCO_EXAMPLE}\`](../${HACCO_EXAMPLE})`)
+		expect(readFileSync(package_file(HACCO_EXAMPLE), 'utf8')).toContain('"josh"')
 	})
 })
 
