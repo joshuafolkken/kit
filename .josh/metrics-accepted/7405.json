@@ -1,0 +1,7 @@
+{
+	"reason": "Persist the attempted cut identity before launch and carry it across supervisor recovery so an unchanged failed resume cannot restart or repeat notifications; keep the existing resume classification as the single source.",
+	"date": "2026-11-12",
+	"growth": {
+		"scripts.code_lines": 35
+	}
+}
