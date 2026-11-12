@@ -369,7 +369,7 @@ async function run_touched(given: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const explicit = explicit_files(root, command_arguments)
 	const changed = explicit.length > 0 ? explicit : await branch_change()
-	const scope = test_related_touched.touched_scope(root, changed)
+	const scope = await test_related_touched.read_scope(root, changed)
 	const input = { scope, root, changed, synced: [], since_map: [], kind: TOUCHED_KIND }
 
 	return await test_related_run.run_and_record(input, command_arguments)

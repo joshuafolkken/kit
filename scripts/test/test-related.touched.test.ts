@@ -44,6 +44,8 @@ const SAME_NAMED_TEST = path.join(
 	'test-related-touched.test.ts',
 )
 const TOUCHED = '--touched'
+const SHARED_FIXTURE = 'scripts/run/cut/run-cut-cli-fixture.ts'
+const FIXTURE_CONSUMER = path.join(REPOSITORY_ROOT, 'scripts/run/cut/run-cut-cli.test.ts')
 
 const mocked_record = vi.spyOn(test_related_record, 'record_run')
 
@@ -60,6 +62,38 @@ beforeEach(() => {
 })
 
 // joshuafolkken/kit#5237: the implementation loop's narrow re-check.
+describe('test_related.run_related_tests — a shared fixture touched run', () => {
+	it('fails early when a changed shared fixture breaks its consumer (ac-5467a9e8)', async () => {
+		vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([SHARED_FIXTURE])
+		vi.mocked(test_unit_guard.run_guarded_vitest).mockResolvedValue(1)
+
+		const code = await test_related.run_related_tests([TOUCHED])
+		const [, args] = vi.mocked(test_unit_guard.run_guarded_vitest).mock.calls[0] ?? []
+
+		expect(args).toContain(FIXTURE_CONSUMER)
+		expect(code).toBe(1)
+	})
+
+	it('keeps fixture runs separate from the full-reach record (ac-9b0d3652)', async () => {
+		vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([SHARED_FIXTURE])
+
+		await test_related.run_related_tests([TOUCHED])
+
+		expect(mocked_record).toHaveBeenCalledWith(
+			expect.objectContaining({
+				kind: 'touched',
+				scope: expect.objectContaining({ mode: 'related' }),
+			}),
+			expect.anything(),
+		)
+		expect(scoped_green.record_if_green).toHaveBeenCalledWith(review_stamps.test_related_stamp, {
+			before: undefined,
+			exit_code: 0,
+			target: test_related_verdict.touched_target(),
+		})
+	})
+})
+
 describe('test_related.run_related_tests — a --touched run', () => {
 	it('runs the same-named tests of the changed module, never handing --touched to vitest', async () => {
 		await test_related.run_related_tests([TOUCHED])

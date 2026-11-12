@@ -315,7 +315,7 @@ Run only the unit tests related to the changed files (full suite on fallback).
 ```bash
 pnpm josh test:related
 pnpm josh test:related scripts/thing.ts   # narrow by the given files instead
-pnpm josh test:related --touched          # only the diff's tests and its modules' same-named ones
+pnpm josh test:related --touched          # diff tests, same-named tests and direct test importers
 pnpm josh test:related --silent           # flags are forwarded to vitest
 ```
 
@@ -323,7 +323,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 `josh gate` runs it as its unit leg.
 
-- `--touched` rechecks the diff's test files (or the given files') and each changed module's colocated `foo.test.ts` / `foo.*.test.ts`, without the test-read map or import graph (`scripts/test/test-related-touched.ts`). The lane ledger records it as `touched`.
+- `--touched` rechecks changed tests, each changed module's `foo.test.ts` / `foo.*.test.ts`, and its direct test importers, including fixture consumers (`scripts/test/test-related-touched.ts`). It scans import text without a read map or transitive graph. The `touched` record never replaces full-reach verification.
   With no other arguments, its separate green record admits review round 2; round 1 and the gate's reuse require a full-reach run.
 
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
