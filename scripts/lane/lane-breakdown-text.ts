@@ -1,3 +1,4 @@
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
 import {
@@ -9,6 +10,7 @@ import { lane_breakdown_laps, type Laps } from './lane-breakdown-laps'
 import { lane_breakdown_pinned } from './lane-breakdown-pinned'
 import { lane_breakdown_related } from './lane-breakdown-related'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
+import { lane_elapsed_time } from './lane-elapsed-time'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 
@@ -27,6 +29,7 @@ const OUTSIDE = 'outside calls'
 const DRIVER = '(outside lane net)'
 
 interface Report {
+	elapsed?: string | undefined
 	breakdown: Breakdown
 	detail: ImplementDetail
 	// The ship pre-detach line's `test:pinned` detail, `''` when none (joshuafolkken/kit#5078).
@@ -217,11 +220,14 @@ function report_of(
 	issue: number,
 	breakdown: Breakdown,
 	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent> = [],
 ): Report {
 	const calls = lane_breakdown_implement.read(issue, breakdown)
 	const rows = lane_breakdown_pinned.rows_of(entries, issue, breakdown)
+	const timing = lane_elapsed_time.of(entries, events, issue, calls)
 
 	return {
+		elapsed: timing === undefined ? undefined : lane_elapsed_time.text(timing),
 		breakdown,
 		detail: lane_breakdown_implement.of(calls, breakdown),
 		laps: lane_breakdown_laps.of(entries, issue, breakdown, calls),
@@ -243,6 +249,7 @@ function comment(issue: number, minutes: number, report: Report): string {
 		`${lead} ${source}`,
 		'',
 		...entries_of(report).flatMap((entry) => bullets_of(entry)),
+		...(report.elapsed === undefined ? [] : [report.elapsed]),
 	].join('\n')
 }
 

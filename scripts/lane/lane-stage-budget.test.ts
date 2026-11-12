@@ -15,6 +15,12 @@ describe('lane_stage_budget.BUDGET_MINUTES', () => {
 			followup: 5,
 		})
 	})
+
+	it('distinguishes the inclusive end-to-end target from the unchanged internal budgets', () => {
+		expect(lane_stage_budget.TARGET_MINUTES).toBe(30)
+		expect(lane_stage_budget.DESCRIPTION).toContain('human wait reported separately, included')
+		expect(lane_stage_budget.DESCRIPTION).toContain('internal stage budgets 25 min')
+	})
 })
 
 describe('lane_stage_budget.over_minutes', () => {

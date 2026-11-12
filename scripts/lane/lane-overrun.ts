@@ -215,7 +215,7 @@ type OverranNet = Extract<LaneNet, { kind: 'minutes' }>
 async function overran_text(issue: number, net: OverranNet): Promise<string> {
 	const breakdown =
 		lane_breakdown_implement.breakdown_of(net.entries, net.events, issue) ?? net.breakdown
-	const report = lane_breakdown_text.report_of(issue, breakdown, net.entries)
+	const report = lane_breakdown_text.report_of(issue, breakdown, net.entries, net.events)
 	const comment = lane_breakdown_text.comment(issue, net.minutes, report)
 
 	if (!net.is_commented) await git_gh_issue_write.issue_try_comment(String(issue), comment)

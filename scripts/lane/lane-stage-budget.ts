@@ -12,6 +12,11 @@ const BUDGET_MINUTES = {
 	followup: 5,
 } as const
 
+// An end-to-end target, independent of the internal stage budgets and legacy lane net exclusions.
+const TARGET_MINUTES = 30
+const INTERNAL_MINUTES = Object.values(BUDGET_MINUTES).reduce((sum, minutes) => sum + minutes, 0)
+const DESCRIPTION = `target ${String(TARGET_MINUTES)} min dispatch to merge (human wait reported separately, included); internal stage budgets ${String(INTERNAL_MINUTES)} min (plan 3 + implement 9 + ship 8 + followup 5)`
+
 type BudgetStage = keyof typeof BUDGET_MINUTES
 
 // The whole minutes `elapsed_ms` runs past `stage`'s budget, `undefined` within it.
@@ -21,7 +26,7 @@ function over_minutes(stage: BudgetStage, elapsed_ms: number): number | undefine
 	return over_ms > 0 ? Math.ceil(over_ms / MS_PER_MINUTE) : undefined
 }
 
-const lane_stage_budget = { BUDGET_MINUTES, over_minutes }
+const lane_stage_budget = { BUDGET_MINUTES, DESCRIPTION, TARGET_MINUTES, over_minutes }
 
 export { lane_stage_budget }
 export type { BudgetStage }
