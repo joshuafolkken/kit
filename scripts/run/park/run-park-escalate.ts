@@ -9,7 +9,7 @@ import { run_stalled_park } from './run-stalled-park'
 // `josh run:park <N> --escalate "<reason>"` (joshuafolkken/kit#7356): a worker declares that its Issue
 // needs a stronger `josh.worker` profile and stops. Only a repository with `josh.worker.escalate: true`
 // accepts it. The park is a `run:stalled` one whose cause has no retry check, so the drive never
-// re-offers it on the same profile.
+// re-offers it on the same profile: it resumes the lane one profile up (joshuafolkken/kit#7357).
 
 const ESCALATE_FLAG = '--escalate'
 const OPTIONS = { escalate: { type: 'string' } } as const
@@ -76,7 +76,7 @@ function comment_of(escalation: Escalation): string {
 	return [
 		`Parked with \`${RUN_STALLED_LABEL}\`: ${run_stalled.ESCALATION_REQUESTED.why}`,
 		`- Reason: ${reason}`,
-		`- Next: not auto-retried — give it a stronger \`worker:<name>\` profile, ${run_stalled.next_step(issue)}.`,
+		`- Next: the backlogrun drive resumes it one \`worker:<name>\` profile up, or hands it to a person at the top profile; without a drive, give it a stronger profile, ${run_stalled.next_step(issue)}.`,
 	].join('\n')
 }
 

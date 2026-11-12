@@ -19,6 +19,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { backlog_budget } from './backlog-budget'
+import { backlog_drive_escalate } from './backlog-drive-escalate'
 import { backlog_drive_retry } from './backlog-drive-retry'
 import { backlog_yield_cap } from './backlog-yield-cap'
 
@@ -26,11 +27,13 @@ import { backlog_yield_cap } from './backlog-yield-cap'
 // park whose check shows its cause gone — through `run:add --retry`, at most `RETRY_CAP` times per
 // issue, counted off the whole stream so a restarted drive counts the retries before it. A recorded
 // ship stop is checked by its stage; a park with no stop by its cause: `run:merge`'s three wait for the
-// next sweep, a yield-cap park for its window. Any other park, or a protected label, stays for a person;
+// next sweep, a yield-cap park for its window. A worker's escalation park is resumed one `josh.worker`
+// profile up (`backlog-drive-escalate.ts`). Any other park, or a protected label, stays for a person;
 // one at the cap is restated once with `CAP_NOTE` and its cause, which its board row shows.
 
 const RETRY_CAP = 2
 const CAP_NOTE = `auto-retry cap ${String(RETRY_CAP)} reached`
+const RESUME_REFUSED = 'escalated one profile up, but run:add refused the resume'
 const { PARK } = run_event_stream.EVENT_KIND
 const last_sweep = { at: -Infinity }
 
@@ -95,19 +98,23 @@ function latest_parks(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, RunE
 	return parks
 }
 
-// Still open, still `run:stalled` and free of a protected label `run:add` would refuse. An issue that
-// cannot be read is not re-offered.
-async function is_still_stalled(issue: number): Promise<boolean> {
+// The labels of an issue still open, still `run:stalled` and free of a protected label `run:add` would
+// refuse, else `undefined`. An issue that cannot be read is not re-offered.
+async function stalled_labels(issue: number): Promise<ReadonlyArray<string> | undefined> {
 	const read = await run_add_issue.read(issue)
 
-	if (read === undefined) return false
+	if (read === undefined) return undefined
 	const labels = epic_issue.label_names(read)
-
-	return (
+	const is_stalled =
 		epic_issue.is_open(read.state) &&
 		has_label_name(labels, RUN_STALLED_LABEL) &&
 		run_add.protected_label(labels) === undefined
-	)
+
+	return is_stalled ? labels : undefined
+}
+
+async function is_still_stalled(issue: number): Promise<boolean> {
+	return (await stalled_labels(issue)) !== undefined
 }
 
 // The check a park's recorded stop has, or with no stop its cause; none for a stage or cause with no
@@ -137,14 +144,18 @@ async function note_cap(issue: number, park: RunEvent): Promise<void> {
 
 // A refused `run:add` (a settled or withdrawn issue, an unreadable lane, a failed label write) leaves the
 // park for a person instead of ending the drive.
-async function retry_cleared(issue: number): Promise<void> {
+async function retry_cleared(issue: number): Promise<boolean> {
 	try {
 		await backlog_drive_retry.add_retry(
 			issue,
 			`${issue_cite.plain_for('program', issue)} automatically`,
 		)
+
+		return true
 	} catch (error) {
 		console.error(`${String(error)} Left for a person.`)
+
+		return false
 	}
 }
 
@@ -170,6 +181,33 @@ async function retry_park(issue: number, park: RunEvent, context: SweepContext):
 	await (is_capped ? note_cap(issue, park) : retry_cleared(issue))
 }
 
+function is_escalation(park: RunEvent): boolean {
+	const cause = run_stalled.cause_in(park.text) ?? ''
+
+	return run_stalled.class_of(cause) === run_stalled.ESCALATION_REQUESTED.short
+}
+
+// A refused resume restates the park with a cause of its own, so the next sweep does not read the
+// escalation again and step the already moved label up a second time.
+async function resume_escalated(issue: number): Promise<void> {
+	if (await retry_cleared(issue)) return
+
+	await run_event_stream_emit.emit(PARK, run_stalled.park_event(issue, RESUME_REFUSED))
+}
+
+// A worker's escalation is not retried on its profile but resumed one up (joshuafolkken/kit#7357);
+// the retry cap does not count it, since the profile order bounds it.
+async function escalate_park(issue: number, park: RunEvent): Promise<void> {
+	await backlog_drive_escalate.escalate(issue, run_stalled.cause_in(park.text) ?? '', {
+		labels: async () => await stalled_labels(issue),
+		retry: resume_escalated,
+	})
+}
+
+async function settle_park(issue: number, park: RunEvent, context: SweepContext): Promise<void> {
+	await (is_escalation(park) ? escalate_park(issue, park) : retry_park(issue, park, context))
+}
+
 async function retry_all(
 	parks: ReadonlyArray<[number, RunEvent]>,
 	context: SweepContext,
@@ -177,7 +215,7 @@ async function retry_all(
 	const [first, ...rest] = parks
 
 	if (first === undefined) return
-	await retry_park(first[0], first[1], context)
+	await settle_park(first[0], first[1], context)
 	await retry_all(rest, context)
 }
 
