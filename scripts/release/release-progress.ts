@@ -64,7 +64,7 @@ function missed_npm_line(package_name: string, version: string): string {
 function failed_run_headline(tag: string, run: FailedRun): string {
 	const run_label = `Publish ${tag} failed (run ${String(run.run_id)})`
 
-	if (run.npm_job_failed) return `❌ ${run_label} before npm listed ${tag}.`
+	if (run.has_npm_job_failed) return `❌ ${run_label} before npm listed ${tag}.`
 
 	return `❌ ${run_label} in ${run.failed_jobs.join(', ')}; its publish-npm job did not fail.`
 }
@@ -74,7 +74,7 @@ function failed_run_headline(tag: string, run: FailedRun): string {
 // may still take the version, so the npm side is reported as unconfirmed rather than failed.
 function failed_publish_line(package_name: string, version: string, run: FailedRun): string {
 	const tag = release_tag.tag_name(version)
-	const npm_lines = run.npm_job_failed
+	const npm_lines = run.has_npm_job_failed
 		? []
 		: [`  npm has not listed ${tag} yet: check ${npm_package_url(package_name, version)}`]
 

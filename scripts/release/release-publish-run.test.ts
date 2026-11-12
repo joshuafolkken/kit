@@ -44,7 +44,7 @@ describe('release_publish_run.failed_run — a failed run', () => {
 		expect(await release_publish_run.failed_run(VERSION)).toEqual({
 			run_id: RUN_ID,
 			failed_jobs: [NPM_JOB],
-			npm_job_failed: true,
+			has_npm_job_failed: true,
 		})
 		expect(git_gh_exec.exec_gh_api).toHaveBeenCalledWith({ path: RUNS_PATH })
 	})
@@ -55,7 +55,7 @@ describe('release_publish_run.failed_run — a failed run', () => {
 		expect(await release_publish_run.failed_run(VERSION)).toEqual({
 			run_id: RUN_ID,
 			failed_jobs: [RELEASE_JOB],
-			npm_job_failed: false,
+			has_npm_job_failed: false,
 		})
 	})
 
@@ -65,7 +65,7 @@ describe('release_publish_run.failed_run — a failed run', () => {
 		expect(await release_publish_run.failed_run(VERSION)).toEqual({
 			run_id: RUN_ID,
 			failed_jobs: [],
-			npm_job_failed: true,
+			has_npm_job_failed: true,
 		})
 	})
 })

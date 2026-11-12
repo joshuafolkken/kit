@@ -10,12 +10,12 @@ import { release_tag } from './release-tag'
 const PUBLISH_WORKFLOW = 'publish.yml'
 const NPM_JOBS = ['publish-npm']
 
-// `failed_jobs` is empty when the jobs could not be read; `npm_job_failed` then holds, since
+// `failed_jobs` is empty when the jobs could not be read; `has_npm_job_failed` then holds, since
 // nothing shows that npm took the version.
 interface FailedRun {
 	run_id: number
 	failed_jobs: ReadonlyArray<string>
-	npm_job_failed: boolean
+	has_npm_job_failed: boolean
 }
 
 function gh_run_source(): RunSource {
@@ -40,11 +40,11 @@ async function read_failed_jobs(source: RunSource, run_id: number): Promise<Read
 
 async function describe_failure(source: RunSource, run_id: number): Promise<FailedRun> {
 	const failed_jobs = await read_failed_jobs(source, run_id)
-	const npm_job_failed =
+	const has_npm_job_failed =
 		failed_jobs.length === 0 ||
 		failed_jobs.some((name) => github_release_runs.is_named_job(name, NPM_JOBS))
 
-	return { run_id, failed_jobs, npm_job_failed }
+	return { run_id, failed_jobs, has_npm_job_failed }
 }
 
 // A repository without the workflow, or a read that fails, tells nothing about the run, so the npm
