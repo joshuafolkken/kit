@@ -152,7 +152,9 @@ async function question_of(
 	const comments = await comments_of(number, repo, answered)
 	const question = run_board_decision.comment_question(issue_read.trusted_bodies(comments))
 
-	return [number, { question, pause: run_board_pause.from_comments(comments) }]
+	const issue_url = `https://github.com/${repo}/issues/${String(number)}`
+
+	return [number, { question, pause: run_board_pause.from_comments(comments, issue_url) }]
 }
 
 function question_pair([number, value]: readonly [number, CommentReasons]): Array<
