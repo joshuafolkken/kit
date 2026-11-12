@@ -124,7 +124,10 @@ function printed_errors(): string {
 // case here takes.
 function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv' }> {
 	const phase = run_cut.PRE_GATE_PHASE
-	const built = agent_argv.resume_argv(invocation, undefined, phase, LANE_DIRECTORY)
+	const built = agent_argv.resume_argv(invocation, undefined, phase, {
+		cwd: LANE_DIRECTORY,
+		labels: () => [],
+	})
 	if (built.kind === 'rejected') throw new Error(built.note)
 
 	return built

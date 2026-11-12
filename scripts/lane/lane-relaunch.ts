@@ -1,4 +1,5 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
+import { gh_issue_label_names } from '#scripts/gh/gh-issue-label-names'
 import { error_text } from '#scripts/lib/error-message'
 import { detached_launch, type LaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
@@ -53,10 +54,14 @@ async function relaunch(
 	phase: string,
 	on_note: (note: string) => void,
 ): Promise<RelaunchResult> {
-	const built = agent_argv.resume_argv(invocation, lane.profile, phase, lane.directory)
-	if (built.kind === 'rejected') return built
-
 	try {
+		const built = agent_argv.resume_argv(invocation, lane.profile, phase, {
+			cwd: lane.directory,
+			// Read only when `josh.worker` caps the phase's model; a failed read is reported as `failed`.
+			labels: () => gh_issue_label_names.read_sync(lane.issue),
+		})
+		if (built.kind === 'rejected') return built
+
 		return await lane_seat_start.start(lane, async (seated) => launch(seated, built, on_note))
 	} catch (error) {
 		return { kind: 'failed', note: error_text.message_of(error) }

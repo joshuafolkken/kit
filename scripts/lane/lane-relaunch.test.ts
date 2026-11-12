@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_seat_fixture } from './lane-seat-fixture'
 
+interface ResumeSite {
+	cwd: string
+	labels: () => ReadonlyArray<string>
+}
+
 const launch_mock = vi.hoisted(() => vi.fn())
+const read_labels_mock = vi.hoisted(() => vi.fn(() => ['haiku']))
 const resume_argv_mock = vi.hoisted(() =>
-	vi.fn<(invocation: string) => unknown>(() => ({
+	vi.fn<(invocation: string, profile: unknown, phase: string, site: ResumeSite) => unknown>(() => ({
 		kind: 'argv',
 		argv: { command: 'claude', args: [] },
 		profile: undefined,
@@ -11,6 +17,9 @@ const resume_argv_mock = vi.hoisted(() =>
 )
 
 vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resume_argv: resume_argv_mock } }))
+vi.mock('#scripts/gh/gh-issue-label-names', () => ({
+	gh_issue_label_names: { read_sync: read_labels_mock },
+}))
 vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch: launch_mock } }))
 vi.mock('./lane-dispatch-log', () => ({
 	lane_dispatch_log: { default_log_path: () => '/lanes/2428/lane.log' },
@@ -52,6 +61,20 @@ describe('lane_relaunch.resume and is_openai_lane', () => {
 			kind: 'launched',
 		})
 		expect(resume_argv_mock.mock.calls.at(-1)?.[0]).toMatch(/fullrun #2428$/u)
+	})
+
+	// joshuafolkken/kit#7354: the ship-phase cap reads the lane Issue's labels, and only when asked.
+	it('hands resume_argv the lane directory and a reader of the lane Issue labels', async () => {
+		launch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
+		read_labels_mock.mockClear()
+
+		await lane_relaunch.resume(LANE as never, 'pre-gate', vi.fn())
+		const site = resume_argv_mock.mock.calls.at(-1)?.[3]
+
+		expect(site?.cwd).toBe(LANE.directory)
+		expect(read_labels_mock).not.toHaveBeenCalled()
+		expect(site?.labels()).toEqual(['haiku'])
+		expect(read_labels_mock).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('reads an OpenAI profile as an OpenAI lane and any other as not', () => {
