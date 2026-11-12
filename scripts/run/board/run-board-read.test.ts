@@ -55,6 +55,7 @@ const UNRECORDED = {
 	stuck: new Map(),
 	closing: new Set(),
 	carry: undefined,
+	is_session_active: false,
 }
 const STUCK_PID = 20_611
 const STUCK_REASON = 'owned by root'

@@ -14,6 +14,7 @@ import { run_board_reason, type ReasonRead } from './run-board-reason'
 import { run_board_released } from './run-board-released'
 import { run_board_render } from './run-board-render'
 import { run_board_seat, type SeatRead } from './run-board-seat'
+import { run_board_setup } from './run-board-setup'
 import type { Known } from './run-board-snapshot'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
@@ -82,10 +83,15 @@ function titles_of(state: BoardState): Titles {
 
 // A run `run:carry --end` closed and one nobody drives any more are both drawn as stopped.
 function activity_here(local: LocalRead): RunActivity {
-	return run_board_status.activity_of(
+	const activity = run_board_status.activity_of(
 		local.events,
 		local.ended_ms !== undefined || local.is_stranded,
 	)
+
+	return {
+		...activity,
+		is_setup_working: run_board_setup.is_working(activity.setup, local.is_session_active),
+	}
 }
 
 // The already-read supervisor or parent drives retries until the run stops or becomes stranded.

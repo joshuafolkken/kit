@@ -78,3 +78,50 @@ describe('run_board_roots.roots_of', () => {
 		expect(is_same).not.toHaveBeenCalled()
 	})
 })
+
+describe('run_board_roots.session_is_active', () => {
+	it.each([
+		{ name: 'live session', carry: CARRY, live: true, expected: true },
+		{ name: 'exited session', carry: CARRY, live: false, expected: false },
+		{ name: 'unreadable identity', carry: CARRY, live: undefined, expected: true },
+		{
+			name: 'handed back session',
+			carry: { ...CARRY, is_handed_off: true },
+			live: true,
+			expected: false,
+		},
+		{ name: 'driver', carry: { ...CARRY, owner_pid: SUPERVISOR }, live: true, expected: false },
+	])('reads $name from ownership and process evidence', ({ carry, live, expected }) => {
+		vi.spyOn(run_wake, 'read_wake').mockReturnValue(WAKE)
+
+		expect(
+			run_board_roots.session_is_active(REPOSITORY, { kind: 'carried', carry }, same(live)),
+		).toBe(expected)
+	})
+})
+
+describe('run_board_roots.session_is_active pid-less owners', () => {
+	it.each([true, false])('reads a pid-less Codex session from the wake launch: %s', (live) => {
+		vi.spyOn(run_wake, 'read_wake').mockReturnValue({ ...WAKE, woke_pid: PARENT })
+		const carry = {
+			...CARRY,
+			owner_pid: undefined,
+			owner_start: undefined,
+			is_owner_headless: true,
+		}
+
+		expect(
+			run_board_roots.session_is_active(REPOSITORY, { kind: 'carried', carry }, same(live)),
+		).toBe(live)
+	})
+
+	it('has no session without a carried run or a recorded launch', () => {
+		vi.spyOn(run_wake, 'read_wake').mockReturnValue(undefined)
+		const carry = { ...CARRY, owner_pid: undefined, owner_start: undefined }
+
+		expect(run_board_roots.session_is_active(REPOSITORY, { kind: 'none' }, same(true))).toBe(false)
+		expect(
+			run_board_roots.session_is_active(REPOSITORY, { kind: 'carried', carry }, same(true)),
+		).toBe(false)
+	})
+})
