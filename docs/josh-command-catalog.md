@@ -237,7 +237,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:liveness` | `<issue> --output <path> [options]` | automation | processes | Say whether a delegated unit is still working, or stopped without reporting |
 | `josh run:merge` | `<issue> [options]` | automation | git, network | Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child |
 | `josh run:next` | `<issue>` | automation | network | Print the next step a fullrun takes, computed from the run’s state |
-| `josh run:park` | `<issue> --body-file <path> \| <issue> --clear` | automation | files, network | Park a lane child for a decision, or clear the park |
+| `josh run:park` | `<issue> --body-file <path> \| <issue> --clear \| <issue> --escalate <reason>` | automation | files, network | Park a lane child for a decision or an escalation, or clear the park |
 | `josh run:pause` | `<issue> --for <prerequisite>` | automation | git, network, files | Set a run aside while its prerequisite lands first |
 | `josh run:pickup` | `[<epic>...]` | automation | processes | Pick the lanes up after a manual cut: launch what the epics offer, then each liveness and the watcher line |
 | `josh run:prep` | `<issue> [--summary]` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |
