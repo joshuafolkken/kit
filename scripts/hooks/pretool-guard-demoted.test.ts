@@ -51,12 +51,13 @@ function refusal(reason: string): GuardOutcome {
 	return { reason, notice: undefined, fault: undefined }
 }
 
-// The envelope the hook writes and the reasons it hands the ledger for `gh issue view 7`.
+// The envelope the hook writes and the reasons it hands the ledger for `gh issue view 7 --comments`,
+// a read `direct-issue-read` refuses rather than rewrites.
 async function responded(demoted: ReadonlyArray<string>): Promise<[string, Array<unknown>]> {
 	vi.spyOn(hook_demoted, 'rules').mockReturnValue(new Set(demoted))
 	const record = vi.spyOn(hook_ledger, 'record_reason').mockResolvedValue(undefined)
 	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
-	const payload = { tool_name: 'Bash', tool_input: { command: 'gh issue view 7' } }
+	const payload = { tool_name: 'Bash', tool_input: { command: 'gh issue view 7 --comments' } }
 
 	await pretool_guard.respond(JSON.stringify({ ...payload, transcript_path: TRANSCRIPT }))
 

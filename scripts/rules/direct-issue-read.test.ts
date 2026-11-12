@@ -9,8 +9,10 @@ import {
 } from './delivered-rules-fixture'
 import { direct_issue_read } from './direct-issue-read'
 
+const { OWN } = vi.hoisted(() => ({ OWN: 'joshuafolkken/kit' }))
+
 vi.mock('#scripts/issue/session-cite', () => ({
-	session_cite: { session_repo: (): string => 'joshuafolkken/kit' },
+	session_cite: { session_repo: (): string => OWN },
 }))
 
 // joshuafolkken/kit#4663, #4703: a `gh api` or `gh issue view` read of one issue or its comments
@@ -93,6 +95,75 @@ describe('direct_issue_read.is_direct_issue_read — the issue-comments fixtures
 		STATE_CHECK_COMMAND,
 	])('leaves %j to the issue-comments row', (command) => {
 		expect(direct_issue_read.is_direct_issue_read(command)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#7330: a line that is only `gh issue view <N>` carries every argument `issue:read`
+// takes, so it is rewritten to that command instead of refused.
+const ISSUE = '4663'
+const VIEW = `gh issue view ${ISSUE}`
+const READ = `pnpm josh issue:read ${ISSUE}`
+const READ_OWN = `${READ} --repo ${OWN}`
+const DESCRIPTION = 'Read the issue'
+
+describe('direct_issue_read.issue_read_command — rewrites a standalone view', () => {
+	it.each([
+		[VIEW, READ],
+		[`  ${VIEW}  `, READ],
+		[`${VIEW} --repo ${OWN}`, READ_OWN],
+		[`${VIEW} -R ${OWN}`, READ_OWN],
+		[`${VIEW} --repo=${OWN}`, READ_OWN],
+		[`gh issue view --repo ${OWN} ${ISSUE}`, READ_OWN],
+	])('rewrites %j to %j', (command, expected) => {
+		expect(direct_issue_read.issue_read_command(command)).toBe(expected)
+	})
+
+	it.each([
+		`${VIEW} | head`,
+		`${VIEW} > /tmp/issue.md`,
+		`${VIEW} && pnpm josh ms`,
+		`${VIEW}\npnpm josh ms`,
+		`${VIEW} --comments`,
+		`${VIEW} --json body,comments`,
+		`${VIEW} -R github.com/${OWN}`,
+		`${VIEW} --repo ${OWN} --comments`,
+		`${VIEW} 4664`,
+		`gh issue view https://github.com/${OWN}/issues/${ISSUE}`,
+		`gh --repo ${OWN} issue view ${ISSUE}`,
+		`${VIEW} --web`,
+		`${VIEW} --repo joshuafolkken/other`,
+		`gh api repos/${OWN}/issues/${ISSUE}`,
+		READ,
+	])('leaves %j as it is', (command) => {
+		expect(direct_issue_read.issue_read_command(command)).toBeUndefined()
+	})
+})
+
+describe('direct_issue_read.ROW.rewrite — the call made right', () => {
+	it('swaps the Bash command for issue:read and keeps the other input fields', () => {
+		const input = { command: VIEW, description: DESCRIPTION }
+
+		expect(direct_issue_read.ROW.rewrite({ name: 'Bash', input })).toEqual({
+			command: READ,
+			description: DESCRIPTION,
+		})
+	})
+
+	it('leaves a non-Bash call alone', () => {
+		expect(
+			direct_issue_read.ROW.rewrite({ name: 'Read', input: { command: VIEW } }),
+		).toBeUndefined()
+	})
+
+	// The rewrite is `issue:read` itself, whose untrusted-comment withholding is pinned in
+	// `issue-read-trust.test.ts`: the rewritten line is the josh read the row keeps, and fires no more.
+	it('lands on the read that withholds untrusted comments, which the row keeps', () => {
+		const rewritten = direct_issue_read.ROW.rewrite({ name: 'Bash', input: { command: VIEW } })
+		const call = { name: 'Bash', input: rewritten ?? {} }
+
+		expect(direct_issue_read.ROW.keeps(call)).toBe(true)
+		expect(direct_issue_read.ROW.is_trigger(call)).toBe(false)
+		expect(direct_issue_read.ISSUE_READ_NOTE).toContain('withholds')
 	})
 })
 
