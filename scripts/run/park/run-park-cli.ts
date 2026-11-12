@@ -10,12 +10,15 @@ import { run_step_section } from '#scripts/run/run-step-section'
 import { run_park } from './run-park'
 import { run_park_answered } from './run-park-answered'
 import { run_park_body } from './run-park-body'
+import { run_park_escalate } from './run-park-escalate'
 import { run_park_release } from './run-park-release'
 import { run_park_write } from './run-park-write'
 
 // `josh run:park <N> --body-file <path>` — park a lane child for a person's decision in one call: the
 // question as a comment, `needs-decision`, and the local record the `lane-park` guard reads.
 // `josh run:park <N> --clear` takes the park back off once the decision is recorded.
+// `josh run:park <N> --escalate "<reason>"` parks a worker that needs a stronger profile
+// (`run-park-escalate.ts`).
 //
 // **The park was two hand-typed commands, and a child could stop after either one**
 // (joshuafolkken/kit#4132). One call writes both, and only a park that has both is recorded, so the
@@ -35,7 +38,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const CLEAR_FLAG = '--clear'
-const USAGE = `Usage: josh run:park <issue-number> --body-file <path> | <issue-number> ${CLEAR_FLAG}\n\n${run_park_body.FORMAT}`
+const USAGE = `Usage: josh run:park <issue-number> --body-file <path> | <issue-number> ${CLEAR_FLAG} | <issue-number> ${run_park_escalate.ESCALATE_FLAG} "<reason>"\n\n${run_park_body.FORMAT}`
 const CLEAR_OPTIONS = { clear: { type: 'boolean' } } as const
 
 function clear_issue(argv: ReadonlyArray<string>): string | undefined {
@@ -94,11 +97,20 @@ async function run_clear(argv: ReadonlyArray<string>, directory: string): Promis
 	return FAILURE_EXIT_CODE
 }
 
+// **A worker's escalation is a mechanical stop, not a question** (joshuafolkken/kit#7356): no
+// decision schema, the same release.
+async function run_escalate(argv: ReadonlyArray<string>, directory: string): Promise<number> {
+	const issue_number = await run_park_escalate.park(argv, directory, USAGE)
+
+	return issue_number === undefined ? FAILURE_EXIT_CODE : await release(issue_number, directory)
+}
+
 async function run(
 	argv: ReadonlyArray<string>,
 	directory: string = process.cwd(),
 ): Promise<number> {
 	if (argv.includes(CLEAR_FLAG)) return await run_clear(argv, directory)
+	if (run_park_escalate.is_requested(argv)) return await run_escalate(argv, directory)
 
 	const request = issue_comment_cli.resolve_request(argv, USAGE)
 

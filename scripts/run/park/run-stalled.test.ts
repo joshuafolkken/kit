@@ -48,6 +48,14 @@ describe('run_stalled.class_of', () => {
 		expect(run_stalled.class_of(short)).toBe(run_stalled.SESSION_UNFINISHED.short)
 	})
 
+	it('reads an escalation cause carrying the worker reason as its class', () => {
+		const { short, why } = run_stalled.escalation_requested('Needs deeper design work.\nMore.')
+
+		expect(short).toBe('escalation requested: Needs deeper design work.')
+		expect(why).toBe('Needs deeper design work.')
+		expect(run_stalled.class_of(short)).toBe(run_stalled.ESCALATION_REQUESTED.short)
+	})
+
 	it('keeps any other cause as it is', () => {
 		expect(run_stalled.class_of(CAUSE)).toBe(CAUSE)
 		expect(run_stalled.class_of(run_stalled.SESSION_UNFINISHED.short)).toBe('session unfinished')

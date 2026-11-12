@@ -175,3 +175,54 @@ describe('lane instruction prompt file', () => {
 		expect(readFileSync(prompt_file, 'utf8')).toContain(QUALITY_LIMITS)
 	})
 })
+
+// joshuafolkken/kit#7356: the escalation how-to rides only on a repository with `josh.worker.escalate`.
+const ESCALATE_COMMAND = 'run:park <N> --escalate'
+const SONNET = { name: 'sonnet', model: 'claude-sonnet-5-5', effort: 'medium', when: 'A brief' }
+const LANE_MARKDOWN = readFileSync(
+	path.join(REPO_ROOT, 'prompts/collaboration-workflow/lane-instructions.md'),
+	'utf8',
+)
+
+function checkout_with_worker(worker?: object): string {
+	const directory = checkout_with(KIT_RULES)
+	const josh = worker === undefined ? {} : { josh: { worker } }
+
+	writeFileSync(path.join(directory, 'package.json'), JSON.stringify({ name: 'app', ...josh }))
+
+	return directory
+}
+
+function worker_with(escalate: boolean): object {
+	return { default: SONNET.name, escalate, profiles: [SONNET] }
+}
+
+function prompt_text_of(cwd: string, is_worker: boolean): string {
+	const prompt_file = value_after(
+		lane_instructions.flags(cwd, is_worker),
+		lane_instructions.PROMPT_FILE_FLAG,
+	)
+
+	return readFileSync(prompt_file, 'utf8')
+}
+
+describe('lane instruction escalation guide', () => {
+	it.each([
+		['no josh.worker', undefined, true],
+		['josh.worker without escalate', worker_with(false), true],
+		['a review session under escalate', worker_with(true), false],
+	])('keeps the text byte-identical with %s', (_case, worker, is_worker) => {
+		const text = prompt_text_of(checkout_with_worker(worker), is_worker)
+
+		expect(text).toBe(lane_instructions.compose(LANE_MARKDOWN, KIT_RULES))
+		expect(text).not.toContain(ESCALATE_COMMAND)
+	})
+
+	it('appends how to declare an escalation for a worker when josh.worker.escalate is true', () => {
+		const today = lane_instructions.compose(LANE_MARKDOWN, KIT_RULES) ?? ''
+		const text = prompt_text_of(checkout_with_worker(worker_with(true)), true)
+
+		expect(text.startsWith(today)).toBe(true)
+		expect(text.slice(today.length)).toContain(ESCALATE_COMMAND)
+	})
+})

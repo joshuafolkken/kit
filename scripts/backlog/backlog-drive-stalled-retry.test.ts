@@ -172,6 +172,11 @@ describe('backlog_drive_stalled_retry.sweep — parks left for a person (ac-22d3
 		],
 		['no stop and a cause with no check', () => mock_stream([park({})])],
 		[
+			'a worker escalation (joshuafolkken/kit#7356)',
+			() =>
+				mock_stream([park({}, run_stalled.escalation_requested('needs a stronger model').short)]),
+		],
+		[
 			'a stage with no check',
 			() => mock_stream([park({ stop: { stage: 'review', cause: 'finding' } })]),
 		],
