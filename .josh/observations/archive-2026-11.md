@@ -4934,3 +4934,55 @@
 - rf:none | none | - | 2026-11-12 | #7386
 - rb:2026-11-12 | #7386
 - rf:none | none | - | 2026-11-12 | #7386
+- rf:none | none | - | 2026-11-12 | #7387
+- ri:none | none | - | 2026-11-12 | #7387
+- ri:none | none | - | 2026-11-12 | #7387
+- rb:2026-11-12 | #7387
+- rf:none | none | - | 2026-11-12 | #7387
+- rb:2026-11-12 | #7387
+- rf:none | none | - | 2026-11-12 | #7387
+- rf:none | none | - | 2026-11-12 | #7392
+- rb:2026-11-12 | #7392
+- rf:bug-risks | medium | scripts/observations/observations-flush.ts:258 | 2026-11-12 | #7392 | fixed
+- rx:{"round":"05755dd1-d96f-489c-8c1a-e8def5aa1e91","category":"bug-risks","severity":"medium","file":"scripts/observations/observations-flush.ts:258","disposition":"fixed","description":"Push/PR creation failure still claims the primary checkout is stranded on the flush branch although the isolated transaction preserves its default branch and source ledger; update the recovery message for the isolated worktree.","status":"resolved"}
+- rf:none | none | - | 2026-11-12 | #7396
+- ri:none | none | - | 2026-11-12 | #7396
+- rb:2026-11-12 | #7396
+- rf:bug-risks | medium | scripts/run/board/run-board-status.ts:403 | 2026-11-12 | #7396 | fixed
+- rx:{"round":"a171ec1c-c467-489a-9fc1-3a897bb375bb","category":"bug-risks","severity":"medium","file":"scripts/run/board/run-board-status.ts:403","disposition":"fixed","description":"再launch後に終了したattemptへ、launch前のcloseに付いた旧outcomeを付与して表示するため、outcomeにもclose-before-launch判定を適用する。","status":"resolved"}
+- rf:none | none | - | 2026-11-12 | #7397
+- ri:none | none | - | 2026-11-12 | #7397
+- ri:none | none | - | 2026-11-12 | #7397
+- rb:2026-11-12 | #7397
+- rf:none | none | - | 2026-11-12 | #7397
+- rf:none | none | - | 2026-11-12 | #7398
+- ri:none | none | - | 2026-11-12 | #7398
+- ri:none | none | - | 2026-11-12 | #7398
+- rb:2026-11-12 | #7398
+- rf:none | none | - | 2026-11-12 | #7398
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:68 | 2026-11-12 | #7399 | fixed
+- rf:bug-risks | medium | scripts/rules/codex-prompt.ts:46 | 2026-11-12 | #7399 | fixed
+- rf:none | none | - | 2026-11-12 | #7399
+- rf:none | none | - | 2026-11-12 | #7399
+- ri:none | none | - | 2026-11-12 | #7399
+- rb:2026-11-12 | #7399
+- rf:bug-risks | medium | scripts/rules/codex-prompt.ts:8 | 2026-11-12 | #7399
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:66 | 2026-11-12 | #7399
+- rx:{"round":"5537c18e-303e-40b1-868f-31aa6fce8d08","previous":"27fb6071-e099-4c03-a4aa-9e31b0bee27f","category":"bug-risks","severity":"medium","file":"scripts/rules/codex-prompt.ts:8","description":"input_image を含む利用者メッセージは行全体が正規化されず、以前の起票指示の後に画像付きで「調査だけ続けて」と送っても古い承認が残るため、非テキスト項目を許容して provenance の対応を保ったままテキストとターン境界を読む必要がある; other sites: scripts/rules/last-prompt.ts:38, scripts/rules/last-prompt.ts:59, scripts/rules/unasked-filing.ts:77, scripts/hooks/stop-guard.ts:138","status":"new"}
+- rx:{"round":"5537c18e-303e-40b1-868f-31aa6fce8d08","previous":"27fb6071-e099-4c03-a4aa-9e31b0bee27f","category":"bug-risks","severity":"medium","file":"scripts/rules/unasked-filing.ts:66","description":"prose_lines はフェンスの種類と長さを区別せず反転するため、外側のチルダ4個のコードブロック内に backtick3個で囲んだ「起票してください」を貼ると引用文だけで承認が成立し、開始フェンスに対応する終端まで除外する必要がある; other sites: scripts/rules/issue-citation.ts:163","status":"new"}
+- rx:{"round":"5537c18e-303e-40b1-868f-31aa6fce8d08","previous":"27fb6071-e099-4c03-a4aa-9e31b0bee27f","category":"bug-risks","severity":"medium","file":"scripts/rules/unasked-filing.ts:68","description":"二重 backtick の引用文を起票承認として扱うため、対応する delimiter 全体を除外する。","disposition":"fixed","status":"resolved"}
+- rx:{"round":"5537c18e-303e-40b1-868f-31aa6fce8d08","previous":"27fb6071-e099-4c03-a4aa-9e31b0bee27f","category":"bug-risks","severity":"medium","file":"scripts/rules/codex-prompt.ts:46","description":"native harness 通知を turn 境界として保持しないため、以前の質問によって必要な confirmation 通知が抑制される。","disposition":"fixed","status":"resolved"}
+- rb:2026-11-12 | #7399
+- rf:bug-risks | medium | scripts/rules/codex-prompt.ts:8 | 2026-11-12 | #7399 | fixed
+- rf:bug-risks | medium | scripts/rules/unasked-filing.ts:66 | 2026-11-12 | #7399 | fixed
+- rx:{"round":"162dff47-457f-4f6a-adb1-0025d15ef8e6","previous":"5537c18e-303e-40b1-868f-31aa6fce8d08","category":"bug-risks","severity":"medium","file":"scripts/rules/codex-prompt.ts:8","disposition":"fixed","description":"input_image を含む利用者メッセージは行全体が正規化されず、以前の起票指示の後に画像付きで「調査だけ続けて」と送っても古い承認が残るため、非テキスト項目を許容して provenance の対応を保ったままテキストとターン境界を読む必要がある; other sites: scripts/rules/last-prompt.ts:38, scripts/rules/last-prompt.ts:59, scripts/rules/unasked-filing.ts:77, scripts/hooks/stop-guard.ts:138","status":"resolved"}
+- rx:{"round":"162dff47-457f-4f6a-adb1-0025d15ef8e6","previous":"5537c18e-303e-40b1-868f-31aa6fce8d08","category":"bug-risks","severity":"medium","file":"scripts/rules/unasked-filing.ts:66","disposition":"fixed","description":"prose_lines はフェンスの種類と長さを区別せず反転するため、外側のチルダ4個のコードブロック内に backtick3個で囲んだ「起票してください」を貼ると引用文だけで承認が成立し、開始フェンスに対応する終端まで除外する必要がある; other sites: scripts/rules/issue-citation.ts:163","status":"resolved"}
+- rf:none | none | - | 2026-11-12 | #7405
+- rf:none | none | - | 2026-11-12 | #7405
+- ri:none | none | - | 2026-11-12 | #7405
+- ri:none | none | - | 2026-11-12 | #7405
+- rf:none | none | - | 2026-11-12 | #7406
+- rf:none | none | - | 2026-11-12 | #7406
+- rf:none | none | - | 2026-11-12 | #7406
+- rf:none | none | - | 2026-11-12 | #7406
+- ri:none | none | - | 2026-11-12 | #7406
