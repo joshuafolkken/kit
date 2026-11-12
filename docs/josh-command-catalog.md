@@ -222,7 +222,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh review:selfcheck` | `[--interaction-answered]` | automation | files, processes | Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command |
 | `josh review:submit` | `[--interaction] [--review <absolute-path> [--round <1\|2>]] < findings \| … --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
-| `josh rule:value` · `josh ruv` | `[--fresh \| --refresh \| --period <days> \| --prose]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
+| `josh rule:value` · `josh ruv` | `[--fresh \| --refresh \| --period <days> \| --weekly <rule-id>... \| --prose]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority; epics become roots |
 | `josh run:board` | `[--once \| --chat \| --every <minutes>]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
 | `josh run:carry` | `<operation> [arguments...]` | automation | files | Carry one invocation’s budget across its own session cuts |

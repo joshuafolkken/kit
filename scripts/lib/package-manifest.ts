@@ -25,6 +25,29 @@ const GATE_STEPS_SCHEMA = z
 		message: 'step names must be unique',
 	})
 const GATE_SCHEMA = z.object({ steps: GATE_STEPS_SCHEMA.optional() })
+// A worker profile a lane may run on: `profiles` runs weakest first, which is the escalation order.
+// The model and effort are checked against the agent rules by `agent-worker-profile.ts`.
+const WORKER_PROFILE_SCHEMA = z.strictObject({
+	name: z.string().min(1),
+	model: z.string().min(1),
+	effort: z.string().min(1),
+	when: z.string().min(1),
+})
+const WORKER_PROFILES_SCHEMA = z
+	.array(WORKER_PROFILE_SCHEMA)
+	.min(1)
+	.refine((profiles) => new Set(profiles.map((profile) => profile.name)).size === profiles.length, {
+		message: 'profile names must be unique',
+	})
+const WORKER_SCHEMA = z
+	.strictObject({
+		default: z.string().min(1),
+		escalate: z.boolean().default(false),
+		profiles: WORKER_PROFILES_SCHEMA,
+	})
+	.refine((worker) => worker.profiles.some((profile) => profile.name === worker.default), {
+		message: 'default must name one of the profiles',
+	})
 const josh_schemas = {
 	format: z.object({ josh: z.object({ format: FORMAT_SCHEMA.optional() }).optional() }),
 	gate_steps: z.object({ josh: z.object({ gate: GATE_SCHEMA.optional() }).optional() }),
@@ -33,6 +56,7 @@ const josh_schemas = {
 		josh: z.object({ progress_interval_minutes: z.number().positive() }).optional(),
 	}),
 	review_gate: z.object({ josh: z.object({ review_gate: REVIEW_GATE_SCHEMA }).optional() }),
+	worker: z.object({ josh: z.object({ worker: WORKER_SCHEMA.optional() }).optional() }),
 }
 
 function manifest_path(directory: string): string {
@@ -81,6 +105,8 @@ const package_manifest = {
 
 type GateStepDefinition = z.infer<typeof GATE_STEP_SCHEMA>
 type FormatScope = z.infer<typeof FORMAT_SCHEMA>
+type WorkerConfig = z.infer<typeof WORKER_SCHEMA>
+type WorkerProfileDefinition = z.infer<typeof WORKER_PROFILE_SCHEMA>
 
-export type { FormatScope, GateStepDefinition }
+export type { FormatScope, GateStepDefinition, WorkerConfig, WorkerProfileDefinition }
 export { PACKAGE_JSON, REVIEW_GATE_SCHEMA, package_manifest }
