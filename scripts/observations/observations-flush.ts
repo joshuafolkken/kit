@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
 import { main_sync } from '#scripts/git/main-sync'
 import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
@@ -9,6 +10,7 @@ import { observation_ledger_archive } from './observation-ledger-archive'
 import type { BrokenLine } from './observation-ledger-line'
 import { observation_ledger_prepare } from './observation-ledger-prepare'
 import { observations_flush_landing } from './observations-flush-landing'
+import { observations_flush_transaction } from './observations-flush-transaction'
 
 // The commit path for the ledger lines no run's own commit carried. Every run —
 // a lane's included — commits its appended lines with its own pull request (`scripts/git/
@@ -30,8 +32,6 @@ const BRANCH_PREFIX = 'observations/'
 const SUCCESS_EXIT_CODE = 0
 const RETURN_FAILURE_MESSAGE =
 	'Could not return this checkout to the default branch; `pnpm josh ms` printed the reason above.'
-const FAST_FORWARD_FAILURE_MESSAGE =
-	'The flush pull request merged, but the local default branch could not be fast-forwarded to it, so this checkout is still on the flush branch:'
 const DATE_END = 10
 const TIME_START = 11
 const TIME_END = 19
@@ -225,7 +225,7 @@ async function catch_up_default(default_branch: string): Promise<void> {
 	}
 }
 
-// Returns the default branch, which is what the rollback below checks out again.
+// Refuse another person's work before creating the isolated flush checkout.
 async function refuse_unsafe_flush(status_output: string): Promise<string> {
 	const current = await git_command.branch()
 	const default_branch = await git_command.get_default_branch()
@@ -239,157 +239,26 @@ async function refuse_unsafe_flush(status_output: string): Promise<string> {
 	return default_branch
 }
 
-// **`main_sync.run` rather than a third copy of its three lines.** `pnpm josh ms` and
-// `pnpm josh release`'s own `finally` already spell out "read the default branch, check it out, pull
-// it", and writing it again here would be the clone `CLAUDE.md` prohibits. Reusing the command also
-// brings its refusal inside a linked work tree, which is a precondition this flush wants anyway.
-//
-// **Its exit code is read rather than discarded**: `run` catches its own errors and returns `1`, so a
-// checkout left on the flush branch would otherwise be reported as a completed flush.
-//
-// **The local default branch is fast-forwarded before it is checked out**.
-// Lines appended while the pull request waited leave the ledger dirty, and git refuses to check out a
-// default branch whose ledger differs from the flush branch's. Once the merge is in, the fast-forwarded
-// default branch holds the same ledger the flush branch does, so the checkout carries those lines over.
-//
-// **A failed fast-forward says the merge is already in**, so the person reading it knows the ledger
-// lines are safe and only this checkout is left on the flush branch.
+// The source stayed on the default branch; main:sync owns its fast-forward and exit status.
 async function return_to_default_branch(default_branch: string): Promise<void> {
-	try {
-		await git_command.fast_forward_local(default_branch)
-	} catch (error) {
-		throw new Error(`${FAST_FORWARD_FAILURE_MESSAGE} ${error_text.message_of(error)}`, {
-			cause: error,
-		})
-	}
-
+	if ((await git_command.branch()) !== default_branch) throw new Error(RETURN_FAILURE_MESSAGE)
 	const exit_code = await main_sync.run([])
 
 	if (exit_code !== SUCCESS_EXIT_CODE) throw new Error(RETURN_FAILURE_MESSAGE)
 }
 
-// Everything after the commit, so a failure here can say what is on the branch and what it costs to
-// walk away from it.
+// Publication failures retain the isolated commit and the source records for retry.
 async function push_and_open(branch_name: string, body: string): Promise<string> {
 	try {
 		await git_command.push()
 
 		return await git_gh_command.pr_create(COMMIT_MESSAGE, body, IGNORE_FOR_RELEASE_LABEL)
 	} catch (error) {
-		throw new Error(stranded_branch_message(branch_name, error_text.message_of(error)), {
-			cause: error,
-		})
-	}
-}
-
-// **The side that created the branch is the side that rolls it back**, so a commit rejected by the
-// pre-commit hook does not leave the branch behind with nothing on it. Nothing is stranded at this
-// point — the appended lines are still in the working tree, staged and uncommitted — so returning to
-// the default branch and removing the branch loses none of them.
-//
-// **Its own failure is returned rather than thrown or printed**, so the single error the command
-// exits with can carry both facts — why the commit was rejected, and whether the branch is still
-// there. Printed above the throw it scrolled past the message that mattered; thrown over it, the
-// reason for the rejection was lost outright. `undefined` means the rollback finished.
-async function roll_back(branch_name: string, default_branch: string): Promise<string | undefined> {
-	try {
-		await git_command.checkout(default_branch)
-		await git_command.delete_branch(branch_name)
-
-		return undefined
-	} catch (error) {
-		return error_text.message_of(error)
-	}
-}
-
-// **The message is chosen from what the rollback did, never assumed.** A rollback that could not
-// check the default branch out leaves the branch exactly where it was, and a message asserting its
-// removal would send somebody looking for something that is still in the checkout.
-function rejection_message(
-	branch_name: string,
-	reason: string,
-	roll_back_reason: string | undefined,
-): string {
-	if (roll_back_reason === undefined) return rejected_commit_message(branch_name, reason)
-
-	return roll_back_failure_message(branch_name, reason, roll_back_reason)
-}
-
-// **Every ledger path the status names is staged, not the one constant**.
-// After a migration the change is the new file together with the old one's deletion, and a commit
-// holding only the first would leave the deletion behind as a change no later flush could tell apart
-// from a fresh append.
-async function stage_ledger(): Promise<void> {
-	const ledger_paths = observation_ledger.ledger_paths(await git_command.status())
-
-	for (const file_path of ledger_paths) {
-		// eslint-disable-next-line no-await-in-loop -- git add holds the index lock, so two at once fail
-		await git_command.add_path(file_path)
-	}
-}
-
-async function commit_ledger(branch_name: string, default_branch: string): Promise<void> {
-	try {
-		await stage_ledger()
-		await git_command.commit(COMMIT_MESSAGE)
-	} catch (error) {
-		const roll_back_reason = await roll_back(branch_name, default_branch)
-
 		throw new Error(
-			rejection_message(branch_name, error_text.message_of(error), roll_back_reason),
-			{
-				cause: error,
-			},
+			`The ledger is committed on \`${branch_name}\` in the recovery worktree; publication failed: ${error_text.message_of(error)}. The source checkout and original records are preserved. Rerun \`pnpm josh observations:flush\` from the source checkout to resume.`,
+			{ cause: error },
 		)
 	}
-}
-
-async function open_pull_request(
-	branch_name: string,
-	default_branch: string,
-	body: string,
-): Promise<string> {
-	await git_command.checkout_b(branch_name)
-	await commit_ledger(branch_name, default_branch)
-
-	return await push_and_open(branch_name, body)
-}
-
-// **The checkout goes back to the default branch only on the way that merged.** A `finally` here
-// would check the default branch out after a red check too — and the ledger would then
-// revert to main's content, leaving the appended lines on a branch nothing in this checkout points
-// at any more. The next flush would read `has_ledger_change` as false and report `clean`, which is
-// the silent loss the refusals above exist to prevent. Left on the branch, the refusal fires.
-//
-// With auto-merge on, a failed wait does not strand the lines for good — GitHub still merges once
-// the checks pass — but the checkout stays on the branch all the same,
-// because only a merge this command has seen makes returning to the default branch safe.
-async function land(
-	branch_name: string,
-	default_branch: string,
-	is_auto_merge: boolean,
-): Promise<void> {
-	try {
-		await observations_flush_landing.wait_for_landing(branch_name, is_auto_merge)
-	} catch (error) {
-		throw new Error(stranded_branch_message(branch_name, error_text.message_of(error)), {
-			cause: error,
-		})
-	}
-
-	await return_to_default_branch(default_branch)
-}
-
-async function open_and_land(
-	branch_name: string,
-	default_branch: string,
-	body: string,
-): Promise<void> {
-	console.info(await open_pull_request(branch_name, default_branch, body))
-
-	const is_auto_merge = await observations_flush_landing.request_auto_merge(branch_name)
-
-	await land(branch_name, default_branch, is_auto_merge)
 }
 
 function merged_message(branch_name: string): string {
@@ -402,69 +271,78 @@ function broken_lines_message(broken: ReadonlyArray<BrokenLine>): string {
 	return `\`${OBSERVATION_LEDGER_DIRECTORY}\` has ${String(broken.length)} line(s) that break the ledger grammar, so the ledger commit stops rather than carrying them:\n${rows}`
 }
 
-// **A malformed line is refused before a branch is cut, not after.** The ledger path was collected
-// without a line ever being parsed, so a broken append could ride a flush
-// through; validating here keeps the committed ledger to its grammar. The migration and the parse are
-// `observation-ledger-prepare.ts`'s, shared with the run's own commit.
+// Validate the isolated payload before staging it.
 async function prepare_ledger(): Promise<void> {
 	const broken = await observation_ledger_prepare.prepare(process.cwd())
 
 	if (broken.length > 0) throw new Error(broken_lines_message(broken))
 }
 
-// The checkout made safe and caught up: a carried file an earlier flush left uncommitted is discarded
-// first, since it would make git refuse the fast-forward (`review-comment-carry.ts`).
+// Recovery must precede a freshness check: an already landed archive can conflict with the snapshot.
 async function ready_default_branch(status_output: string): Promise<string> {
 	const default_branch = await refuse_unsafe_flush(status_output)
 
-	review_comment_carry.discard_uncommitted(status_output, process.cwd())
-	await catch_up_default(default_branch)
+	if (status_output.split('\n').some((line) => /^[^ ?]/u.test(line))) {
+		throw new Error(
+			'Staged changes must be committed or unstaged before observations:flush; index left untouched',
+		)
+	}
+
+	if (!(await observations_flush_transaction.pending(process.cwd()))) {
+		await catch_up_default(default_branch)
+	}
 
 	return default_branch
 }
 
-// **The closed issues' comment rounds are carried only once a flush will go ahead**
-// (joshuafolkken/kit#5326): a lane child leaves them to this flush, so the carried files ride its pull
-// request, and the status is read again so a carry alone is a change to flush. A carry left behind by
-// a later stop is discarded by the next flush's `ready_default_branch`.
-//
-// **The closed issues' files are archived after the carry** (joshuafolkken/kit#7336), so a rounds file
-// carried here is archived with the rest, and only here: a lane never writes the shared archive.
+// Partial archival must throw: the transaction rebuilds it from its durable snapshot on retry.
 async function carried_status(): Promise<{ status_output: string; archived_files: number }> {
 	await review_comment_carry.carry_reported(process.cwd())
 
-	const archived_files = await observation_ledger_archive.archive_reported(process.cwd())
+	const archived_files = await observation_ledger_archive.archive(process.cwd())
 
 	return { status_output: await git_command.status(), archived_files }
 }
 
-// **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by
-// definition at this point, so `git pull --ff-only` aborts on it in exactly the case a pull would
-// have been for — an upstream flush that already advanced the ledger — and reports a failure about
-// the wrong thing. So the freshness of the start
-// point is read from the remote first, and `catch_up_default` fast-forwards
-// only where git can do it without touching the ledger: a default branch
-// that predates another merged flush still stops here — before a branch is cut — rather than opening
-// a pull request that cannot merge. An earlier flush pull request still open is checked for the same
-// reason: a branch cut beside it conflicts with it at the ledger's tail. So the order is: ready the
-// default branch, defer to an open flush, carry, then check, prepare and land.
-async function flush(now: Date): Promise<string> {
-	const default_branch = await ready_default_branch(await git_command.status())
-
-	const deferred = await observations_flush_landing.refuse_open_flush(BRANCH_PREFIX)
-	if (deferred !== undefined) return deferred
-
-	const { status_output, archived_files } = await carried_status()
-
-	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
+// Carry, migration and archival run only in the isolated checkout.
+async function prepare_isolated(): Promise<number> {
+	const { archived_files } = await carried_status()
 
 	await prepare_ledger()
 
+	return archived_files
+}
+
+async function publish_isolated(branch_name: string, archived_files: number): Promise<void> {
+	if ((await git_pr_checks.read_merge_progress(branch_name)) === 'merged') return
+	const open = await git_gh_command.pr_list_open_with_head_prefix(branch_name)
+
+	if (open.length === 0) {
+		console.info(await push_and_open(branch_name, pull_request_body(archived_files)))
+	}
+
+	const is_auto_merge = await observations_flush_landing.request_auto_merge(branch_name)
+
+	await observations_flush_landing.wait_for_landing(branch_name, is_auto_merge)
+}
+
+async function flush(now: Date): Promise<string> {
+	const default_branch = await ready_default_branch(await git_command.status())
+	const is_pending = await observations_flush_transaction.pending(process.cwd())
+	const deferred = is_pending
+		? undefined
+		: await observations_flush_landing.refuse_open_flush(BRANCH_PREFIX)
+	if (deferred !== undefined) return deferred
 	const branch_name = branch_name_for(timestamp_for(now))
 
-	await open_and_land(branch_name, default_branch, pull_request_body(archived_files))
+	const committed_branch = await observations_flush_transaction.run(process.cwd(), branch_name, {
+		prepare: prepare_isolated,
+		publish: publish_isolated,
+	})
+	if (committed_branch === '') return CLEAN_MESSAGE
+	await return_to_default_branch(default_branch)
 
-	return merged_message(branch_name)
+	return merged_message(committed_branch)
 }
 
 const observations_flush = {
