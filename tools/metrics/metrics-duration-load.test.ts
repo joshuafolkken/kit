@@ -98,18 +98,63 @@ describe('metrics_duration_load.split', () => {
 	const gate_change = { name: 'gate', baseline: GATE_MS, current: GATE_MS * 2 }
 	const startup_change = { name: 'josh_startup', baseline: GATE_MS, current: GATE_MS * 2 }
 
-	it('warns on the gate and unit regressions of a busy interval and still fails a startup', () => {
-		expect(metrics_duration_load.split([gate_change, startup_change], true)).toStrictEqual({
+	const regressions = [gate_change, startup_change]
+
+	it('warns on the gate regression of a busy interval and fails a startup timed on a quiet machine', () => {
+		const reading = { is_busy: true, is_startup_busy: false }
+
+		expect(metrics_duration_load.split(regressions, reading)).toStrictEqual({
 			warned: [gate_change],
 			failed: [startup_change],
 		})
 	})
 
-	it('fails every regression of a quiet interval', () => {
-		expect(metrics_duration_load.split([gate_change, startup_change], false)).toStrictEqual({
-			warned: [],
-			failed: [gate_change, startup_change],
+	it('warns on a startup timed on a busy machine and fails the gate of a quiet interval', () => {
+		const reading = { is_busy: false, is_startup_busy: true }
+
+		expect(metrics_duration_load.split(regressions, reading)).toStrictEqual({
+			warned: [startup_change],
+			failed: [gate_change],
 		})
+	})
+
+	it('fails every regression measured on a quiet machine', () => {
+		const reading = { is_busy: false, is_startup_busy: false }
+
+		expect(metrics_duration_load.split(regressions, reading)).toStrictEqual({
+			warned: [],
+			failed: regressions,
+		})
+	})
+})
+
+// The machine's load at the check, read from one live sample taken inside a lane or outside one.
+function is_startup_loaded(sample: { load: number; lanes?: number }, is_in_lane = true): boolean {
+	const entry = { kind: 'load' as const, at: '', ...sample }
+
+	return metrics_duration_load.is_startup_loaded(entry, CORES, is_in_lane)
+}
+
+// joshuafolkken/kit#7337: a startup is read against the machine's load at the check.
+describe('metrics_duration_load.is_startup_loaded', () => {
+	it('is busy where another lane is working', () => {
+		expect(is_startup_loaded({ load: 1, lanes: 2 })).toBe(true)
+	})
+
+	it('is busy where the load average passed the cores', () => {
+		expect(is_startup_loaded({ load: CORES + 1, lanes: 1 })).toBe(true)
+	})
+
+	it('is quiet where only its own lane works under the cores', () => {
+		expect(is_startup_loaded({ load: CORES, lanes: 1 })).toBe(false)
+	})
+
+	it('is busy where one lane works beside a run outside any lane', () => {
+		expect(is_startup_loaded({ load: 1, lanes: 1 }, false)).toBe(true)
+	})
+
+	it('is quiet where no lane works beside a run outside any lane', () => {
+		expect(is_startup_loaded({ load: 1, lanes: 0 }, false)).toBe(false)
 	})
 })
 

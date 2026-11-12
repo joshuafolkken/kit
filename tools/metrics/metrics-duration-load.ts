@@ -10,8 +10,11 @@ import { metrics_durations, type DurationChange, type MeasuredWindow } from './m
 // may fall between two samples. A median moves past the tolerance through busy gates only when they
 // are the majority, so only a majority of busy spans excuses it; a span with no sample of a busy
 // machine, or no sample at all, is quiet, and a slowdown the quiet majority measured still fails. A
-// sample in the idle gap between two gates timed nothing the verdict reads, nor does a startup, timed
-// at the check, so neither is excused.
+// sample in the idle gap between two gates timed nothing the verdict reads, so it is not counted.
+//
+// A startup is timed at the check, not inside a gate, so it is read against one live sample taken
+// right after its runs: a manual `josh metrics` beside other lanes warns on a startup slowdown
+// rather than failing (joshuafolkken/kit#7337).
 
 // The lane the gate itself may run in — a lane beyond it is another lane's work.
 const OWN_LANES = 1
@@ -23,8 +26,20 @@ interface RegressionSplit {
 	failed: ReadonlyArray<DurationChange>
 }
 
-function is_loaded(entry: LoadEntry, cores: number): boolean {
-	return (entry.lanes ?? 0) > OWN_LANES || entry.load > cores
+// Whether the machine was busy while each kind of duration was measured: the gate and unit inside
+// their gates, the startups at the check.
+interface LoadReading {
+	is_busy: boolean
+	is_startup_busy: boolean
+}
+
+function is_loaded(entry: LoadEntry, cores: number, own_lanes = OWN_LANES): boolean {
+	return (entry.lanes ?? 0) > own_lanes || entry.load > cores
+}
+
+// The startups' live sample: run outside a lane, no working lane is the caller's own.
+function is_startup_loaded(entry: LoadEntry, cores: number, is_in_lane: boolean): boolean {
+	return is_loaded(entry, cores, is_in_lane ? OWN_LANES : 0)
 }
 
 function is_inside(entry: LoadEntry, window: MeasuredWindow): boolean {
@@ -51,11 +66,13 @@ function is_busy(entries: ReadonlyArray<LedgerEntry>, cores: number): boolean {
 	return busy.length > windows.length / HALF
 }
 
-// On a busy interval the gate and unit regressions warn; a startup's still fails.
-function split(regressions: ReadonlyArray<DurationChange>, is_excused: boolean): RegressionSplit {
-	const warned = is_excused
-		? regressions.filter((change) => metrics_durations.is_recorded(change))
-		: []
+function is_excused(change: DurationChange, reading: LoadReading): boolean {
+	return metrics_durations.is_recorded(change) ? reading.is_busy : reading.is_startup_busy
+}
+
+// A regression measured while the machine was busy warns; any other fails.
+function split(regressions: ReadonlyArray<DurationChange>, reading: LoadReading): RegressionSplit {
+	const warned = regressions.filter((change) => is_excused(change, reading))
 
 	return { warned, failed: regressions.filter((change) => !warned.includes(change)) }
 }
@@ -69,8 +86,10 @@ function render_warning(regressions: ReadonlyArray<DurationChange>, baseline_pat
 
 const metrics_duration_load = {
 	is_busy,
+	is_startup_loaded,
 	render_warning,
 	split,
 }
 
+export type { LoadReading }
 export { metrics_duration_load }
