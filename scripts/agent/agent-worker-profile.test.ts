@@ -42,14 +42,14 @@ function settings(): WorkerSettings {
 	return result.settings
 }
 
-function resolved(labels: ReadonlyArray<string>): WorkerResult {
+async function resolved(labels: ReadonlyArray<string> | undefined): Promise<WorkerResult> {
 	write_worker(WORKER)
 
-	return agent_worker_profile.resolve(fixture.directory, () => labels)
+	return await agent_worker_profile.resolve(fixture.directory, async () => await labels)
 }
 
-function resolved_name(labels: ReadonlyArray<string>): string | undefined {
-	const result = resolved(labels)
+async function resolved_name(labels: ReadonlyArray<string>): Promise<string | undefined> {
+	const result = await resolved(labels)
 
 	return result.kind === 'worker' ? result.worker.name : undefined
 }
@@ -115,12 +115,12 @@ describe('agent_worker_profile.read — no josh.worker setting', () => {
 })
 
 describe('agent_worker_profile.resolve — the profile an Issue runs on', () => {
-	it('picks the profile its worker:<name> label names', () => {
-		expect(resolved_name(['enhancement', `worker:${OPUS_NAME}`])).toBe(OPUS_NAME)
+	it('picks the profile its worker:<name> label names', async () => {
+		expect(await resolved_name(['enhancement', `worker:${OPUS_NAME}`])).toBe(OPUS_NAME)
 	})
 
-	it('falls back to the default without a worker label', () => {
-		expect(resolved_name(['enhancement'])).toBe(SONNET_NAME)
+	it('falls back to the default without a worker label', async () => {
+		expect(await resolved_name(['enhancement'])).toBe(SONNET_NAME)
 	})
 
 	it.each([
@@ -130,17 +130,18 @@ describe('agent_worker_profile.resolve — the profile an Issue runs on', () => 
 			'has no profile for the label worker:opus-max',
 		],
 		['two worker labels', [`worker:${HAIKU_NAME}`, `worker:${OPUS_NAME}`], 'allows one'],
-	])('rejects %s, naming the label', (_label, labels, reason) => {
-		const result = resolved(labels)
+		['a label read that failed', undefined, 'could not read the Issue labels'],
+	])('rejects %s, naming the reason', async (_label, labels, reason) => {
+		const result = await resolved(labels)
 
 		expect(result.kind === 'rejected' ? result.note : '').toContain(reason)
 	})
 
-	it('answers unset without fetching the labels where no setting exists', () => {
+	it('answers unset without fetching the labels where no setting exists', async () => {
 		write_manifest({ name: 'app' })
-		const fetch_labels = vi.fn((): ReadonlyArray<string> => [])
+		const fetch_labels = vi.fn(async (): Promise<ReadonlyArray<string>> => [])
 
-		expect(agent_worker_profile.resolve(fixture.directory, fetch_labels)).toEqual(UNSET)
+		expect(await agent_worker_profile.resolve(fixture.directory, fetch_labels)).toEqual(UNSET)
 		expect(fetch_labels).not.toHaveBeenCalled()
 	})
 })

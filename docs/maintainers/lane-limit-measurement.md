@@ -184,6 +184,14 @@ stop late in the period whose end falls after it reads as `not resumed` as well.
 keeps about a week of a run's events, so a park older than that is gone and its stop reads as
 `not resumed`.
 
+Two tables under it say what the waits were spent on (`lane-stop-check-stats.ts`,
+[#7333](https://github.com/joshuafolkken/kit/issues/7333)). The failed-check table counts followup
+`check` stops per CI check their recorded `checks` name, longest total first; a stop naming two
+checks counts under each, and an older one reads as `none named`.
+
+The longest-stop table lists the period's ten longest ended stops of every reason with issue,
+`stopped at`, causes and wait, so a wait spent overnight or on a person reads by its time and issue.
+
 The `causes` column counts each reason's stops by cause, most frequent first (`infra 2, check 1`):
 `finding`, `conflict`, `infra` (a rate limit, missing checks, a network failure), `check`, `auth` (a
 reviewer that could not authenticate) or `attest` (a refused review attestation).

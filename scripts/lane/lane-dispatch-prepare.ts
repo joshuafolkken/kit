@@ -1,5 +1,11 @@
 import { agent_argv, type AgentArgv, type AgentArgvResult } from '#scripts/agent/agent-argv'
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import {
+	agent_role_profile,
+	type AgentProfile,
+	type ProfileResult,
+} from '#scripts/agent/agent-role-profile'
+import { agent_worker_profile } from '#scripts/agent/agent-worker-profile'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { run_ending } from '#scripts/run/run-ending'
 import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
@@ -26,14 +32,30 @@ function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): Age
 	return agent_argv.with_profile_in(plan.invocation, profile, lane.directory)
 }
 
+// **The worker profile the lane's Issue selects, where the repository opts into `josh.worker`**.
+// The Issue's `worker:<name>` label (else the configured default) wins over `JOSH_WORKER_MODEL` /
+// `JOSH_WORKER_EFFORT`; a repository without the setting resolves the worker from the environment as
+// before and never reads the labels. `record_output` keeps the chosen profile in the lane's `.env`,
+// which a cut relaunch resumes on.
+async function worker_profile(lane: LaneInfo): Promise<ProfileResult> {
+	const worker = await agent_worker_profile.resolve(
+		lane.directory,
+		async () => await git_gh_issue_write.read_label_names(lane.issue),
+	)
+
+	if (worker.kind === 'unset') return agent_role_profile.resolve(agent_role_profile.WORKER)
+
+	return worker.kind === 'rejected' ? worker : { kind: 'profile', profile: worker.worker.agent }
+}
+
 // **The re-dispatch decides resume-or-fresh from the lane's own exit record**.
 // The record is read from the log the previous dispatch of this lane wrote — a first dispatch finds
 // none and starts fresh, an `outage` ending with a session id resumes it. The provider is resolved
 // first because the resume mechanism is Claude Code's, and an OpenAI lane falls back to fresh. **A
 // fresh dispatch never reads the record**: a person restarting a child (`lane:restart`) wants a new
 // session that reads the Issue from the start, whatever the previous one ended on.
-function prepared(lane: LaneInfo, is_fresh: boolean): Prepared {
-	const resolved = agent_role_profile.resolve(agent_role_profile.WORKER)
+async function prepared(lane: LaneInfo, is_fresh: boolean): Promise<Prepared> {
+	const resolved = await worker_profile(lane)
 
 	if (resolved.kind === 'rejected') return resolved
 

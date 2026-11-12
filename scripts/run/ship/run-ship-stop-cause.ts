@@ -3,6 +3,7 @@ import { RERUNS_SPENT_MESSAGE } from '#scripts/followup/followup-job-rerun'
 import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
 import { gh_retry } from '#scripts/gh/git-gh-retry'
 import { PR_CHECKS_TIMEOUT_MESSAGE } from '#scripts/gh/git-pr-checks'
+import { git_pr_checks_failed } from '#scripts/gh/git-pr-checks-failed'
 import { is_blocked_cause } from '#scripts/gh/git-pr-checks-missing'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { git_error } from '#scripts/git/git-error'
@@ -176,6 +177,13 @@ function findings_of(stage: Stage, cause: Cause, body: string): ReadonlyArray<st
 	return is_finding_stop(stage, cause) ? run_ship_review.blocking_kinds(body) : []
 }
 
+// The CI checks a followup `check` stop's wait reported failed (joshuafolkken/kit#7333).
+function checks_of(stage: Stage, cause: Cause, body: string): ReadonlyArray<string> {
+	return stage === STAGE.FOLLOWUP && cause === CAUSE.CHECK
+		? git_pr_checks_failed.names_of(body)
+		: []
+}
+
 // Each finding that decided a review stop, whole, for the durable stop log (joshuafolkken/kit#4519).
 function details_of(stage: Stage, failed: StoppedOutput = NO_OUTPUT): ReadonlyArray<StopFinding> {
 	if (!is_finding_stop(stage, cause_of(stage, failed))) return []
@@ -185,11 +193,13 @@ function details_of(stage: Stage, failed: StoppedOutput = NO_OUTPUT): ReadonlyAr
 
 // The lane ledger's record of one stop — the stage, its cause and, for a preflight, which
 // preconditions were unmet, so `lane:stats` counts the one worth meeting before a ship
-// (joshuafolkken/kit#4166); for a review, which kinds of finding stopped it (joshuafolkken/kit#4426).
+// (joshuafolkken/kit#4166); for a review, which kinds of finding stopped it (joshuafolkken/kit#4426);
+// for a followup red on a check, which checks failed (joshuafolkken/kit#7333).
 function record_of(issue: number, stage: Stage, failed: StoppedOutput = NO_OUTPUT): StopRecord {
 	const { body, conflicts, preconditions } = failed
 	const cause = cause_of(stage, failed)
 	const findings = findings_of(stage, cause, body)
+	const checks = checks_of(stage, cause, body)
 
 	return {
 		issue,
@@ -197,6 +207,7 @@ function record_of(issue: number, stage: Stage, failed: StoppedOutput = NO_OUTPU
 		cause,
 		...(preconditions !== undefined && { preconditions: [...preconditions] }),
 		...(findings.length > 0 && { findings: [...findings] }),
+		...(checks.length > 0 && { checks: [...checks] }),
 	}
 }
 

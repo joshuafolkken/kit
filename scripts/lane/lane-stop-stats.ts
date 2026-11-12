@@ -48,8 +48,10 @@ const NO_CAUSES = '-'
 const NOTICED = ' (noticed)'
 
 // `causes` is a preflight stop's unmet preconditions or a review stop's blocking finding kinds, every
-// one of them, else the stop's one cause.
+// one of them, else the stop's one cause. `stop` is the ledger entry, read for its issue, its instant
+// and a followup stop's failed checks (`lane-stop-check-stats.ts`).
 interface StopWait {
+	stop: StopEntry
 	reason: string
 	causes: ReadonlyArray<string>
 	wait_ms: number | undefined
@@ -143,6 +145,7 @@ function waits_of(
 	notices: ReadonlyArray<IssueAt>,
 ): Array<StopWait> {
 	return entries.filter(is_stop).map((stop) => ({
+		stop,
 		reason: stop.reason,
 		causes: causes_of(stop, notices),
 		wait_ms: wait_ms(instant_of(stop), ends),
@@ -183,15 +186,25 @@ function reason_row(reason: string, waits: ReadonlyArray<StopWait>): string {
 	])
 }
 
-// The period's table: `entries` is the whole ledger, filtered here to `window` — only the stops are; a
-// wait may end after the period's last stop. `events` is the run's event stream, read for its parks.
+// The period's stops with their waits: `entries` is the whole ledger, filtered here to `window` — only
+// the stops are; a wait may end after the period's last stop. `events` is the run's event stream, read
+// for its parks.
+function waits_in(
+	entries: ReadonlyArray<LedgerEntry>,
+	window: StatsWindow,
+	events: ReadonlyArray<RunEvent> = [],
+): Array<StopWait> {
+	const ends = ends_of(entries, parks_of(events))
+
+	return waits_of(lane_stats.in_window(entries, window), ends, notices_of(entries))
+}
+
 function table(
 	entries: ReadonlyArray<LedgerEntry>,
 	window: StatsWindow,
 	events: ReadonlyArray<RunEvent> = [],
 ): string {
-	const ends = ends_of(entries, parks_of(events))
-	const waits = waits_of(lane_stats.in_window(entries, window), ends, notices_of(entries))
+	const waits = waits_in(entries, window, events)
 
 	return [
 		lane_stats.to_row(COLUMNS),
@@ -200,6 +213,17 @@ function table(
 	].join('\n')
 }
 
-const lane_stop_stats = { REASONS, dispatches_of, ends_of, events_of, issue_of, table, wait_ms }
+const lane_stop_stats = {
+	REASONS,
+	dispatches_of,
+	ends_of,
+	events_of,
+	issue_of,
+	table,
+	total,
+	wait_ms,
+	waits_in,
+}
 
+export type { StopWait }
 export { lane_stop_stats }

@@ -208,7 +208,7 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print period lane throughput, stage, stop, check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
+Print period lane throughput, stage, stop (by failed CI check, longest first), check and machine-load statistics; --sinks shows stage totals, --over lane chains, --why cause groups above a net-minute threshold, and --pairs scoped pair runs.
 
 ```bash
 pnpm josh lane:stats --period 7                           # a 7-day period's stage medians and maxima
@@ -268,6 +268,9 @@ including zero-stop and transcript-missing lanes; no dispatched lanes means `not
 Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts, per check that settled last in `followup`'s CI wait,
 its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
 left to the `coderabbit-wait` row (`followup-ci-path.ts`).
+
+Under the stop table, the failed-check table (`lane-stop-check-stats.ts`) counts followup `check` stops per failed CI check
+(stops, wait total and maximum, not resumed), and the longest-stop table lists the ten longest stops with issue, `stopped at` and causes.
 
 Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
 claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and
