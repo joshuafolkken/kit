@@ -6,7 +6,10 @@
 //
 // **Quoting is the caller's reading, not this file's.** A caller that must not cut inside quotes hands
 // in the quote-blanked line (`time_shell.blanked`), whose offsets are the typed line's; a caller that
-// reads quoted text as commands too hands in the line as typed.
+// reads quoted text as commands too hands in the line as typed. `words_of` is the one reading of a
+// command's words for the guards that read arguments rather than cut commands.
+
+import { time_shell } from '#scripts/time-runtime/time-shell'
 
 type ShellTokenKind = 'operator' | 'word'
 
@@ -22,6 +25,10 @@ interface ShellToken {
 const OPERATOR = String.raw`;;&?|;&|&&|\|\||(?<!>)\|&?|;|\n|(?<![<>])&(?!>)`
 const WORD = String.raw`(?:[^\s;&|]|(?<=[<>])&|&(?=>)|(?<=>)\|)+`
 const TOKEN_PATTERN = new RegExp(`(?<operator>${OPERATOR})|${WORD}`, 'gu')
+// A separator character the quote-held reading turns into a word character where a quote holds it.
+const SEPARATOR = /[;&|]/gu
+const HELD = '_'
+const BLANK = ' '
 
 /** The line's tokens in order, each with its offsets; whitespace other than a newline separates them. */
 function tokens_of(reading: string): Array<ShellToken> {
@@ -33,6 +40,27 @@ function tokens_of(reading: string): Array<ShellToken> {
 	}))
 }
 
-const shell_tokens = { tokens_of }
+// The line with each `;`, `&` or `|` a quote or a backslash holds made a word character; the quote-blanked
+// line has the typed line's offsets. A heredoc line, which `blanked` does not read, stays as typed.
+function quote_held(line: string): string {
+	const plain = time_shell.blanked(line)
+	if (plain === undefined) return line
+
+	return line.replaceAll(SEPARATOR, (character, offset: number) =>
+		plain[offset] === BLANK ? HELD : character,
+	)
+}
+
+/**
+ * The line's words, each with its typed text: whitespace cuts a word as it does unquoted, but a
+ * separator inside quotes stays in its word (`rg "a|b" f` is three words).
+ */
+function words_of(line: string): Array<ShellToken> {
+	return tokens_of(quote_held(line))
+		.filter((token) => token.kind === 'word')
+		.map((token) => ({ ...token, text: line.slice(token.begin, token.end) }))
+}
+
+const shell_tokens = { tokens_of, words_of }
 
 export { shell_tokens, type ShellToken }

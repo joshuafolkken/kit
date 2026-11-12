@@ -33,3 +33,15 @@ describe('shell_redirects.targets_of combined redirects', () => {
 		expect(shell_redirects.targets_of('make &> log.txt', 'make')).toEqual(['log.txt'])
 	})
 })
+
+// joshuafolkken/kit#7338: the words come from the shared tokenizer, and the reading stays the same.
+describe('shell_redirects.targets_of on the shared words', () => {
+	it.each([
+		['make 2>&1', ['&1']],
+		['cat<in.txt>out.txt', ['in.txt', 'out.txt']],
+		['echo x > "a|b.txt"', ['"a|b.txt"']],
+		['echo "a;b" > out.txt', ['out.txt']],
+	])('reads %j', (segment, expected) => {
+		expect(shell_redirects.targets_of(segment, 'echo')).toEqual(expected)
+	})
+})
